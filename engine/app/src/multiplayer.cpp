@@ -108,6 +108,7 @@ void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat
 void MapViewer::apply_session_events() {
     const auto who = [](const net::SessionEvent& e) { return e.name.empty() ? std::to_string(e.seat) : e.name; };
     std::optional<std::string> ended;
+    bool host_left = false;
     for (const net::SessionEvent& e : m_session->take_events()) {
         switch (e.kind) {
             case net::SessionEvent::Kind::Welcomed:
@@ -119,6 +120,7 @@ void MapViewer::apply_session_events() {
                 }
                 break;
             case net::SessionEvent::Kind::Loaded:
+                m_host_game_loaded = true;
                 std::fprintf(stderr, "multiplayer: game from the host loaded at frame %llu\n",
                              static_cast<unsigned long long>(e.frame));
                 if (m_hud && m_hud->multiplayer_open()) {
@@ -146,6 +148,7 @@ void MapViewer::apply_session_events() {
                 std::fprintf(stderr, "multiplayer: %s\n",
                              e.reason == net::EndReason::Refused ? net::describe(e.refused) : net::describe(e.reason));
                 ended = e.reason == net::EndReason::Refused ? mp_text(e.refused) : mp_text(e.reason);
+                host_left = e.reason == net::EndReason::HostLeft;
                 break;
             case net::SessionEvent::Kind::LobbyChanged:
                 break;  // the menu shows the lobby as it is
@@ -158,7 +161,19 @@ void MapViewer::apply_session_events() {
     // in the game keeps the game standing as it is (the title says so).
     if (ended && m_hud && m_hud->multiplayer_open()) {
         leave_session(*ended);
+    } else if (host_left && m_host_game_loaded) {
+        save_after_host_left();
     }
+}
+
+void MapViewer::save_after_host_left() {
+    const std::filesystem::path path = save_folder() / ("hostleft" + std::string(sim::kSaveExtension));
+    const auto status = save_game(path);
+    const std::string text = status
+                                 ? mp_text(MpText::HostLeftSaved, utf8_to_cp1252(core::path_to_utf8(path.filename())))
+                                 : ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")});
+    chat_line({}, text);
+    notify(text);
 }
 
 // --- The menu ---
@@ -327,6 +342,7 @@ void MapViewer::update_lan_beacon() {
 
 void MapViewer::end_session() {
     m_session.reset();
+    m_host_game_loaded = false;
     m_command_sink.set_session(nullptr);
     m_lan_beacon.reset();
     m_hosted.reset();

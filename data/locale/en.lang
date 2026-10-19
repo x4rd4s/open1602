@@ -206,6 +206,7 @@ net.end.refused = The host refused.
 net.end.protocol_error = A message from the network made no sense.
 net.end.load_failed = The host's game could not be loaded.
 net.end.desync = This computer keeps diverging from the host.
+net.host_left_saved = The host left. The game was saved as {1}, to play on alone or to host again as a savegame.
 net.refused.version = The host has another version of Open1602.
 net.refused.content = The host has other game data.
 net.refused.full = No free slot.

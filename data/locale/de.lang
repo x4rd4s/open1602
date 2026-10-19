@@ -187,6 +187,7 @@ net.end.refused = Der Gastgeber hat abgelehnt.
 net.end.protocol_error = Unverständliche Nachricht im Netz.
 net.end.load_failed = Das Spiel des Gastgebers ließ sich nicht laden.
 net.end.desync = Dieser Rechner weicht immer wieder vom Gastgeber ab.
+net.host_left_saved = Der Gastgeber ist gegangen. Das Spiel wurde als {1} gesichert, zum Weiterspielen allein oder als Spielstand für ein neues Spiel im Netz.
 net.refused.version = Der Gastgeber hat eine andere Version von Open1602.
 net.refused.content = Der Gastgeber hat andere Spieldaten.
 net.refused.full = Kein Platz mehr frei.

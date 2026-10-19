@@ -116,6 +116,7 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 
 - Choosing banners in the lobby, the endless game's own world settings over the network.
 - The computer taking over slots of players who began as humans, waiting for a disconnected player.
-- Changing the host when it leaves (today the game ends for everyone), a relay for hosts behind strict
+- Changing the host when it leaves (today the game ends for everyone; each client saves it as
+  `hostleft`, so one of them can host it again as a savegame), a relay for hosts behind strict
   NAT, IPv6 (ENet 1.3 knows IPv4 only), searches beyond the local network.
 - Replays: the savegame plus the session's frames are already all one needs.

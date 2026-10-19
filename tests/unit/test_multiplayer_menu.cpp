@@ -83,12 +83,13 @@ TEST_CASE("multiplayer menu: addresses with and without a port") {
 TEST_CASE("multiplayer menu: every text in both languages, with its value") {
     const ui::Catalogue english = ui::builtin_catalogue("en");
     const ui::Catalogue german = ui::builtin_catalogue("de");
-    for (std::size_t i = 0; i <= static_cast<std::size_t>(MpText::StartFailed); ++i) {
+    for (std::size_t i = 0; i <= static_cast<std::size_t>(MpText::HostLeftSaved); ++i) {
         const std::string_view key = app::mp_key(static_cast<MpText>(i));
         CHECK(english.find(key) != nullptr);
         CHECK(german.find(key) != nullptr);
     }
     CHECK(app::mp_text(MpText::PlayerJoined, "Anna") == "Anna joined.");
+    CHECK(app::mp_text(MpText::HostLeftSaved, "hostleft.o1602").find("hostleft.o1602") != std::string::npos);
     CHECK(!app::mp_text(net::RefuseReason::Kicked).empty());
     CHECK(!app::mp_text(net::EndReason::HostLeft).empty());
     const LanguageGuard german_game("de");

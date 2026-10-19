@@ -321,6 +321,9 @@ private:
     void end_session();
     /// Out of the session, back to the search (with `notice`, why).
     void leave_session(std::string notice = {});
+    /// The host of the running game left: there is no host migration, so the client saves the game
+    /// it holds as a whole and says where; loaded, it plays on alone or is hosted anew.
+    void save_after_host_left();
     /// A line for the chat: a player's (`name` given) or a notice of the session.
     void chat_line(std::string name, std::string text, sim::PlayerId seat = sim::kNoPlayer);
     [[nodiscard]] net::HostSession* host_session() const noexcept;
@@ -414,6 +417,7 @@ private:
     std::unique_ptr<GameState> m_state;  ///< the running game (after m_buildings, m_figures, m_options)
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
+    bool m_host_game_loaded = false;  ///< this client runs the game its host sent
     /// The local player's commands: to m_state's simulation, or to m_session while there is one.
     CommandSink m_command_sink;
     std::unique_ptr<net::LanBrowser> m_lan_browser;  ///< while the multiplayer menu looks for games
