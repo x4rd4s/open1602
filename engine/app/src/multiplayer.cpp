@@ -63,7 +63,7 @@ core::Status MapViewer::start_multiplayer() {
         if (name.empty()) {
             name = ui::tr("menu.default_name");
         }
-        m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_simulation, m_buildings,
+        m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_state->simulation, m_buildings,
                                                        m_local_player, name, content_fingerprint());
         m_session->submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
@@ -84,9 +84,12 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     for (const auto& w : warnings) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
-    replace_world(std::move(world).value());
+    if (const auto replaced = replace_world(std::move(world).value()); !replaced) {
+        std::fprintf(stderr, "multiplayer: %s\n", replaced.error().message.c_str());
+        return nullptr;
+    }
     report_load_problems(warnings.size());
-    return &m_simulation;
+    return &m_state->simulation;
 }
 
 void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat) {
@@ -518,8 +521,10 @@ core::Status MapViewer::start_hosted_game() {
                 break;  // made closed above
         }
     }
-    replace_world(std::move(*world));
-    host->start(m_simulation, m_buildings);
+    if (auto replaced = replace_world(std::move(*world)); !replaced) {
+        return replaced;
+    }
+    host->start(m_state->simulation, m_buildings);
     if (own != sim::kNoPlayer && own < lobby.seats.size()) {
         m_session->submit(sim::PlayerRename{own, lobby.seats[own].name});
     }

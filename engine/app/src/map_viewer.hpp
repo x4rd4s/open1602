@@ -124,6 +124,20 @@ struct ViewerOptions {
 /// game's language; players named otherwise keep their names.
 void name_more_players(sim::World& world);
 
+/// One game: the world and the simulation that runs on it. A game that is loaded or started is
+/// built whole first and then takes the place of the old one, which stays as it was if building
+/// fails. Not movable: the simulation keeps a reference to the world next to it.
+struct GameState {
+    GameState(sim::World w, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
+              const sim::Rules& rules)
+        : world(std::move(w)), simulation(world, buildings, figures, rules) {}
+    GameState(const GameState&) = delete;
+    GameState& operator=(const GameState&) = delete;
+
+    sim::World world;
+    sim::Simulation simulation;
+};
+
 class MapViewer {
 public:
     static core::Result<std::unique_ptr<MapViewer>> create(const assets::GameDirectory& game,
@@ -208,10 +222,12 @@ private:
     /// `warnings`: how many the loader gave (they are written to the log).
     [[nodiscard]] core::Result<sim::World> read_world(const std::filesystem::path& path,
                                                       std::size_t* warnings = nullptr) const;
-    /// The game goes on in another world (a savegame, a scenario, a new game): everything of the old
-    /// one goes, the simulation starts anew on it. noexcept: m_simulation is rebuilt in place, and
-    /// a failure halfway (out of memory) must end the program, not leave a destroyed simulation.
-    void replace_world(sim::World world) noexcept;
+    /// The game goes on in another world (a savegame, a scenario, a new game): the new game is
+    /// built whole, then everything of the old one goes. `source`: the file it came from, for the
+    /// window title (empty: the game's own name). Out of memory leaves the old game running.
+    core::Status replace_world(sim::World world, const std::filesystem::path& source = {});
+    /// The name of the game for the window title (UTF-8).
+    [[nodiscard]] std::string game_title() const;
     /// Tells (on stderr) that a savegame's simulation state was damaged (Simulation::state_damaged).
     void warn_if_state_damaged() const;
     /// A game that loaded with `warnings` (parts skipped, other game data) or without its running
@@ -370,7 +386,6 @@ private:
 
     assets::GameDirectory m_game;
     assets::BuildingTable m_buildings;
-    sim::World m_world;
     assets::Palette m_palette;
     assets::FigureTable m_figures;
     render::BannerTable m_banners;  ///< colours and flags of the players (ADR 0007)
@@ -387,8 +402,8 @@ private:
     std::uint64_t m_title_game_ms = 0;
     bool m_debug_title = core::environment_variable("O1602_DEBUG_TITLE").has_value();
     ViewerOptions m_options;
-    sim::Simulation m_simulation;  ///< runs the economy on m_world (after m_world, m_buildings, m_figures)
-    /// A multiplayer game: drives m_simulation in place of Simulation::advance().
+    std::unique_ptr<GameState> m_state;  ///< the running game (after m_buildings, m_figures, m_options)
+    /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
     std::unique_ptr<net::LanBrowser> m_lan_browser;  ///< while the multiplayer menu looks for games
     std::unique_ptr<net::LanBeacon> m_lan_beacon;    ///< while this computer hosts a game shown on the network

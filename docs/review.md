@@ -164,7 +164,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-1 | Medium | Build status line, window title and default names are English and bypass localization | `app/src/map_viewer.cpp` | Fixed #20 (title and build status; default names see MP-12, AU15) |
 | UI-2 | Medium | Sim state depends on the local Text.cod city and ship names | `app/src/map_viewer.cpp`, `sim/src/trader.cpp` | Fixed #20 |
 | UI-3 | Medium | Control groups survive loading another game and select unrelated units | `ui/src/unit_selection.cpp` | Fixed #19 |
-| UI-4 | Low | `replace_world` rebuilds the simulation in place and misses per-game state | `app/src/map_viewer.cpp` | Open |
+| UI-4 | Low | `replace_world` rebuilds the simulation in place and misses per-game state | `app/src/map_viewer.cpp` | Fixed #24 (`GameState` built whole, then swapped; out of memory keeps the old game) |
 | UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Open |
 | UI-6 | Low | The window title receives Windows-1252 bytes, but SDL expects UTF-8 | `app/src/map_viewer.cpp` | Fixed #20 |
 | UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Open |
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 1 | 2 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 0 | 3 | 10 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 4 | 2 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 10 | 25 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 2 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 0 | 3 | 9 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 0 | 2 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 1 | 10 | 24 |
 
 ## Open work, in order
 
@@ -268,8 +268,8 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. AU15 stays
 `Pool::for_each` guard and money saturation are fixed in #20.)
 
 **2. Architecture and tests**
-1. UI-4 then UI-5 (M, then L): a `GameSession` that is built completely and then swapped in. After
-   that, a `CommandSink` as the only path to `Simulation::submit`, then `MapInput`,
+1. UI-5 (L): the running game is a `GameState` built whole and then swapped in since #24 (UI-4).
+   Next a `CommandSink` as the only path to `Simulation::submit`, then `MapInput`,
    `EventPresenter`, `VideoController` and a screen stack.
 2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool is
    there since #21, with tests). Next tests for `question_for`, smoke tests for o1602-tool, and an

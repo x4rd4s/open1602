@@ -289,7 +289,7 @@ ui::KeyContext MapViewer::key_context() const {
     if (m_tool.active() || (m_hud && m_hud->mode() == Hud::kModeBuild)) {
         return ui::KeyContext::Building;
     }
-    if (!m_units.empty() && m_units.owner(m_world) == m_local_player) {
+    if (!m_units.empty() && m_units.owner(m_state->world) == m_local_player) {
         return ui::KeyContext::Units;
     }
     return ui::KeyContext::General;
@@ -410,7 +410,7 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             }
             break;
         case KeyAction::CentreOnSelection:
-            if (const auto c = m_units.centre(m_world)) {
+            if (const auto c = m_units.centre(m_state->world)) {
                 m_camera.center_on(render::TilePos{static_cast<std::uint32_t>(std::max(0.0, c->first)),
                                                    static_cast<std::uint32_t>(std::max(0.0, c->second))});
             } else {
@@ -420,16 +420,17 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
         case KeyAction::Pause:
             submit(sim::GameSpeedOrder{
                 m_local_player,
-                m_simulation.paused() ? sim::GameSpeedOrder::Op::Resume : sim::GameSpeedOrder::Op::Pause,
-                m_simulation.speed()});
+                m_state->simulation.paused() ? sim::GameSpeedOrder::Op::Resume : sim::GameSpeedOrder::Op::Pause,
+                m_state->simulation.speed()});
             break;
         case KeyAction::SpeedUp:
-            submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
-                                       std::min(m_simulation.rules().max_game_speed, m_simulation.speed() * 2)});
+            submit(sim::GameSpeedOrder{
+                m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
+                std::min(m_state->simulation.rules().max_game_speed, m_state->simulation.speed() * 2)});
             break;
         case KeyAction::SpeedDown:
             submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
-                                       std::max(1U, m_simulation.speed() / 2)});
+                                       std::max(1U, m_state->simulation.speed() / 2)});
             break;
         case KeyAction::QuickSave: {
             const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
@@ -499,7 +500,7 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
         case KeyAction::PickBuilding:
             // The pipette: the building under the mouse becomes the order.
             if (const auto spot = spot_at_mouse()) {
-                if (const auto at = sim::building_at(m_world, m_buildings, spot->island, {spot->x, spot->y})) {
+                if (const auto at = sim::building_at(m_state->world, m_buildings, spot->island, {spot->x, spot->y})) {
                     set_mode(Hud::kModeBuild);
                     if (m_tool.select(at->type->id)) {
                         m_tool.set_mode(BuildTool::Mode::Build);
@@ -525,11 +526,11 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             m_units.store_group(b.param);
             break;
         case KeyAction::GroupAdd:
-            m_units.add_to_group(m_world, b.param);
+            m_units.add_to_group(m_state->world, b.param);
             break;
         case KeyAction::GroupRecall: {
             const std::uint64_t now = platform::ticks_ms();
-            if (m_units.recall_group(m_world, b.param)) {
+            if (m_units.recall_group(m_state->world, b.param)) {
                 selection_changed(false);
                 if (m_last_group == b.param && now - m_last_group_ms < kDoubleGroupMs) {
                     run_action(ui::KeyBinding{ui::KeyContext::General, {}, KeyAction::CentreOnSelection, 0});
@@ -545,13 +546,13 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             const bool ships = b.action == KeyAction::NextIdleShip;
             std::vector<ui::UnitRef> idle;
             if (ships) {
-                for (const sim::Ship& s : m_world.ships()) {
+                for (const sim::Ship& s : m_state->world.ships()) {
                     if (s.owner == m_local_player && !s.sinking && s.target.empty() && !s.route.active) {
                         idle.push_back({ui::UnitRef::Kind::Ship, s.id});
                     }
                 }
             } else {
-                for (const sim::Soldier& s : m_world.soldiers()) {
+                for (const sim::Soldier& s : m_state->world.soldiers()) {
                     if (s.owner == m_local_player && !s.away() && s.target.empty() && !s.patrol.active) {
                         idle.push_back({ui::UnitRef::Kind::Soldier, s.id});
                     }
@@ -565,13 +566,13 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
                 const auto it = std::find(idle.begin(), idle.end(), m_units.units().front());
                 next = it == idle.end() ? 0 : static_cast<std::size_t>(it - idle.begin() + 1) % idle.size();
             }
-            m_units.select(m_world, idle[next]);
+            m_units.select(m_state->world, idle[next]);
             selection_changed(false);
             run_action(ui::KeyBinding{ui::KeyContext::General, {}, KeyAction::CentreOnSelection, 0});
             break;
         }
         case KeyAction::NextKindInSelection:
-            if (m_units.cycle_types(m_world)) {
+            if (m_units.cycle_types(m_state->world)) {
                 selection_changed(false);
             }
             break;
@@ -579,10 +580,10 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             m_pick = Pick::Attack;
             break;
         case KeyAction::Stop:
-            submit_orders(m_units.stop_orders(m_world, m_local_player), false);
+            submit_orders(m_units.stop_orders(m_state->world, m_local_player), false);
             break;
         case KeyAction::HoldPosition:
-            submit_orders(m_units.hold_orders(m_world, m_local_player), false);
+            submit_orders(m_units.hold_orders(m_state->world, m_local_player), false);
             break;
         case KeyAction::Patrol:
             m_pick = Pick::Patrol;
@@ -590,20 +591,20 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
         case KeyAction::Formation:
         case KeyAction::Scatter: {
             if (b.action == KeyAction::Formation) {
-                m_units.formation(m_world, m_figures, m_formation);
+                m_units.formation(m_state->world, m_figures, m_formation);
                 m_formation = (m_formation + 1) % 3;
             } else {
-                m_units.scatter(m_world);
+                m_units.scatter(m_state->world);
             }
             // The group takes its places around where it stands (0x0044C6D0).
-            if (const auto c = m_units.centre(m_world)) {
-                submit_orders(m_units.move_orders(m_world, m_local_player, c->first, c->second, false));
+            if (const auto c = m_units.centre(m_state->world)) {
+                submit_orders(m_units.move_orders(m_state->world, m_local_player, c->first, c->second, false));
             }
             break;
         }
         case KeyAction::WhiteFlag: {
             std::vector<sim::Command> orders;
-            const bool on = !m_units.any_white_flag(m_world);
+            const bool on = !m_units.any_white_flag(m_state->world);
             for (const ui::UnitRef& r : m_units.units()) {
                 if (r.kind == ui::UnitRef::Kind::Ship) {
                     sim::ShipCommand o;
@@ -691,10 +692,10 @@ std::optional<render::FigureSprites> MapViewer::unit_sprites(const ui::UnitRef& 
     const render::WorldLayers layers = world_layers(*graphics);
     render::FigureSprites out;
     if (ref.kind == ui::UnitRef::Kind::Ship) {
-        const sim::Ship* ship = m_world.ship(ref.id);
+        const sim::Ship* ship = m_state->world.ship(ref.id);
         render::ShipSprites s;
         if (ship == nullptr ||
-            !render::ship_sprites(*ship, m_world, m_camera.view(), layers, m_clock.elapsed_ms(), s)) {
+            !render::ship_sprites(*ship, m_state->world, m_camera.view(), layers, m_clock.elapsed_ms(), s)) {
             return std::nullopt;
         }
         out.row = s.row;
@@ -706,7 +707,7 @@ std::optional<render::FigureSprites> MapViewer::unit_sprites(const ui::UnitRef& 
         return out;
     }
     const render::FigureInstance* figure = m_soldiers.find(ref.id);
-    if (figure == nullptr || !render::land_figure_sprites(*figure, m_world, m_camera.view(), layers, out)) {
+    if (figure == nullptr || !render::land_figure_sprites(*figure, m_state->world, m_camera.view(), layers, out)) {
         return std::nullopt;
     }
     // The shadow is not part of the unit.
@@ -749,7 +750,7 @@ std::optional<std::array<double, 4>> MapViewer::unit_box(const ui::UnitRef& ref)
         }
     }
     // No graphics yet: an estimate around the unit's position.
-    const auto pos = ui::unit_position(m_world, ref);
+    const auto pos = ui::unit_position(m_state->world, ref);
     if (!pos) {
         return std::nullopt;
     }
@@ -782,12 +783,12 @@ std::vector<ui::UnitCandidate> MapViewer::units_in(double x0, double y0, double 
             out.push_back({ref, static_cast<std::int64_t>(w * h)});
         }
     };
-    for (const sim::Ship& s : m_world.ships()) {
+    for (const sim::Ship& s : m_state->world.ships()) {
         if (!s.sinking) {
             test({ui::UnitRef::Kind::Ship, s.id});
         }
     }
-    for (const sim::Soldier& s : m_world.soldiers()) {
+    for (const sim::Soldier& s : m_state->world.soldiers()) {
         if (!s.away()) {
             test({ui::UnitRef::Kind::Soldier, s.id});
         }
@@ -843,7 +844,7 @@ std::optional<ui::UnitRef> MapViewer::unit_at(double sx, double sy) const {
         const double dx = (*b)[0] + (*b)[2] / 2 - sx;
         const double dy = (*b)[1] + (*b)[3] / 2 - sy;
         const double d = dx * dx + dy * dy;
-        const bool own = ui::unit_owner(m_world, c.ref) == m_local_player;
+        const bool own = ui::unit_owner(m_state->world, c.ref) == m_local_player;
         const double rank = d - (c.ref.kind == ui::UnitRef::Kind::Soldier ? 1e6 : 0.0);
         if (!best || (own && !best_own) || (own == best_own && rank < best_d)) {
             best = c.ref;
@@ -862,7 +863,7 @@ void MapViewer::map_left_up(double x, double y, std::uint16_t mod, int clicks) {
         return;
     }
     if (m_rubber_band && m_press) {
-        m_units.box(m_world, units_in(m_press->first, m_press->second, x, y), m_local_player, shift);
+        m_units.box(m_state->world, units_in(m_press->first, m_press->second, x, y), m_local_player, shift);
         selection_changed(true);
         return;
     }
@@ -870,16 +871,16 @@ void MapViewer::map_left_up(double x, double y, std::uint16_t mod, int clicks) {
         if (ctrl || clicks >= 2) {
             // All of this kind on screen.
             const ui::Rect v = m_hud ? m_hud->game_view() : ui::Rect{0, 0, 1 << 15, 1 << 15};
-            m_units.select_alike(m_world, units_in(v.x, v.y, v.x + v.w, v.y + v.h), *unit);
+            m_units.select_alike(m_state->world, units_in(v.x, v.y, v.x + v.w, v.y + v.h), *unit);
         } else if (shift) {
-            m_units.toggle(m_world, *unit);
+            m_units.toggle(m_state->world, *unit);
         } else {
-            m_units.select(m_world, *unit);
+            m_units.select(m_state->world, *unit);
         }
         selection_changed(false);
         return;
     }
-    if (m_options.original_mouse && !m_units.empty() && m_units.owner(m_world) == m_local_player) {
+    if (m_options.original_mouse && !m_units.empty() && m_units.owner(m_state->world) == m_local_player) {
         map_order(x, y, shift);
         return;
     }
@@ -890,7 +891,7 @@ void MapViewer::map_left_up(double x, double y, std::uint16_t mod, int clicks) {
 
 void MapViewer::map_order(double x, double y, bool queue) {
     const Pick pick = std::exchange(m_pick, Pick::None);
-    if (m_units.empty() || m_units.owner(m_world) != m_local_player) {
+    if (m_units.empty() || m_units.owner(m_state->world) != m_local_player) {
         return;
     }
     const auto tile = m_camera.tile_at_screen(x, y);
@@ -909,7 +910,7 @@ void MapViewer::map_order(double x, double y, bool queue) {
                 o.x = static_cast<std::uint16_t>(tile->x);
                 o.y = static_cast<std::uint16_t>(tile->y);
                 orders.emplace_back(o);
-            } else if (const sim::Soldier* s = m_world.soldier(r.id)) {
+            } else if (const sim::Soldier* s = m_state->world.soldier(r.id)) {
                 sim::SoldierCommand o;
                 o.player = m_local_player;
                 o.soldier = r.id;
@@ -934,36 +935,36 @@ void MapViewer::map_order(double x, double y, bool queue) {
     if (const auto unit = unit_at(x, y); unit && !m_units.contains(*unit)) {
         const sim::Target t =
             unit->kind == ui::UnitRef::Kind::Ship ? sim::Target::other_ship(unit->id) : sim::Target::soldier(unit->id);
-        const bool foreign = ui::unit_owner(m_world, *unit) != m_local_player;
-        submit_orders(m_units.target_orders(m_world, m_local_player, t, queue, foreign || attack_pick));
+        const bool foreign = ui::unit_owner(m_state->world, *unit) != m_local_player;
+        submit_orders(m_units.target_orders(m_state->world, m_local_player, t, queue, foreign || attack_pick));
         return;
     }
     if (!tile) {
         return;
     }
-    const sim::World::Cell& cell = m_world.cell(tile->x, tile->y);
+    const sim::World::Cell& cell = m_state->world.cell(tile->x, tile->y);
     if (cell.island != sim::World::kSea) {
         if (m_units.kind() == ui::UnitRef::Kind::Ship) {
             // A ship to a Kontor: its city.
-            for (const sim::City& c : m_world.cities()) {
+            for (const sim::City& c : m_state->world.cities()) {
                 if (c.island != cell.island || !c.warehouse_x || !c.warehouse_y) {
                     continue;
                 }
                 const auto b = sim::building_at(
-                    m_world, m_buildings, c.island,
+                    m_state->world, m_buildings, c.island,
                     {static_cast<std::int32_t>(*c.warehouse_x), static_cast<std::int32_t>(*c.warehouse_y)});
                 const auto here = sim::building_at(
-                    m_world, m_buildings, cell.island,
+                    m_state->world, m_buildings, cell.island,
                     {static_cast<std::int32_t>(cell.local_x), static_cast<std::int32_t>(cell.local_y)});
                 if (b && here && b->origin.x == here->origin.x && b->origin.y == here->origin.y) {
                     const sim::Target t = sim::Target::city_of(c.island, c.index);
-                    submit_orders(m_units.target_orders(m_world, m_local_player, t, queue,
+                    submit_orders(m_units.target_orders(m_state->world, m_local_player, t, queue,
                                                         attack_pick && c.owner != m_local_player));
                     return;
                 }
             }
         } else if (const auto b = sim::building_at(
-                       m_world, m_buildings, cell.island,
+                       m_state->world, m_buildings, cell.island,
                        {static_cast<std::int32_t>(cell.local_x), static_cast<std::int32_t>(cell.local_y)});
                    b && b->type->kind != sim::building_kind::kGround && b->type->kind != sim::building_kind::kRoad &&
                    !sim::soldiers_walk_on(*b->type)) {
@@ -971,20 +972,21 @@ void MapViewer::map_order(double x, double y, bool queue) {
             const sim::Target t = sim::Target::building(cell.island, static_cast<std::uint32_t>(b->origin.x),
                                                         static_cast<std::uint32_t>(b->origin.y));
             const bool foreign =
-                target_owner(m_world, t) != m_local_player && target_owner(m_world, t) != sim::kNoPlayer;
-            submit_orders(m_units.target_orders(m_world, m_local_player, t, queue, foreign || attack_pick));
+                target_owner(m_state->world, t) != m_local_player && target_owner(m_state->world, t) != sim::kNoPlayer;
+            submit_orders(m_units.target_orders(m_state->world, m_local_player, t, queue, foreign || attack_pick));
             return;
         }
     }
     // With F first: an attack move (fights on the way, ADR 0010).
-    submit_orders(m_units.move_orders(m_world, m_local_player, tile->x + 0.5, tile->y + 0.5, queue, attack_pick));
+    submit_orders(
+        m_units.move_orders(m_state->world, m_local_player, tile->x + 0.5, tile->y + 0.5, queue, attack_pick));
 }
 
 void MapViewer::order_to_tile(double tx, double ty, bool queue) {
-    if (m_units.empty() || m_units.owner(m_world) != m_local_player) {
+    if (m_units.empty() || m_units.owner(m_state->world) != m_local_player) {
         return;
     }
-    submit_orders(m_units.move_orders(m_world, m_local_player, tx, ty, queue));
+    submit_orders(m_units.move_orders(m_state->world, m_local_player, tx, ty, queue));
 }
 
 void MapViewer::cancel_action() {
@@ -1043,13 +1045,13 @@ void MapViewer::selection_changed(bool box) {
 std::optional<std::string> MapViewer::question_for(const sim::Command& command) const {
     if (const auto* c = std::get_if<sim::ShipCommand>(&command);
         c != nullptr && c->op == sim::ShipCommand::Op::Scuttle) {
-        const sim::Ship* s = m_world.ship(c->ship);
+        const sim::Ship* s = m_state->world.ship(c->ship);
         // Windows-1252, as the fonts of the game have it.
         return ui::tr("dialog.scuttle_ship", {s != nullptr ? std::string_view(s->name) : std::string_view()});
     }
     if (const auto* c = std::get_if<sim::SoldierCommand>(&command);
         c != nullptr && c->op == sim::SoldierCommand::Op::Disband) {
-        const sim::Soldier* s = m_world.soldier(c->soldier);
+        const sim::Soldier* s = m_state->world.soldier(c->soldier);
         const assets::FigureType* t = s != nullptr ? m_figures.get(s->figure) : nullptr;
         const std::uint32_t cost = t != nullptr ? m_figures.unit_cost(t->kind) : 0;
         return ui::tr("dialog.disband_unit", {std::to_string(cost)});
@@ -1057,8 +1059,8 @@ std::optional<std::string> MapViewer::question_for(const sim::Command& command) 
     if (const auto* o = std::get_if<sim::DiplomacyOrder>(&command);
         o != nullptr && o->kind == sim::DiplomacyOrder::Kind::Peace && o->value == sim::Treaty::None) {
         // Breaking a peace treaty is a declaration of war (the original does not ask, U-033).
-        const sim::Diplomacy& d = m_world.diplomacy();
-        const sim::Player* p = m_world.player(o->partner);
+        const sim::Diplomacy& d = m_state->world.diplomacy();
+        const sim::Player* p = m_state->world.player(o->partner);
         if (p != nullptr && o->player < d.size() && o->partner < d.size() &&
             d.relation(o->player, o->partner).peace == sim::Treaty::Signed) {
             return ui::tr("dialog.break_peace", {p->name});
@@ -1077,9 +1079,9 @@ std::optional<std::string> MapViewer::question_for(const sim::Command& command) 
         return std::nullopt;
     }
     // An attack that means war (0x0044D540): not on the free trader, not at war already.
-    const sim::PlayerId other = target_owner(m_world, target);
-    const sim::Player* p = m_world.player(other);
-    const sim::Diplomacy& d = m_world.diplomacy();
+    const sim::PlayerId other = target_owner(m_state->world, target);
+    const sim::Player* p = m_state->world.player(other);
+    const sim::Diplomacy& d = m_state->world.diplomacy();
     if (p == nullptr || other == m_local_player || p->role == sim::PlayerRole::Trader || m_local_player >= d.size() ||
         other >= d.size() || d.relation(m_local_player, other).peace == sim::Treaty::None) {
         return std::nullopt;
@@ -1113,7 +1115,7 @@ void MapViewer::submit_orders(std::vector<sim::Command> orders, bool sound) {
     }
     // One acknowledgement of the first unit (0x0044D540).
     if (sound && !m_units.empty()) {
-        if (const auto pos = ui::unit_position(m_world, m_units.units().front())) {
+        if (const auto pos = ui::unit_position(m_state->world, m_units.units().front())) {
             m_sound->order(m_units.kind() == ui::UnitRef::Kind::Ship, attack, pos->first, pos->second);
         }
     }
@@ -1132,7 +1134,7 @@ void MapViewer::draw_selection_overlay() {
     std::vector<render::DrawCommand> digits;
     for (const ui::UnitRef& ref : m_units.units()) {
         const auto b = unit_box(ref);
-        const auto health = ui::unit_health(m_world, m_figures, ref);
+        const auto health = ui::unit_health(m_state->world, m_figures, ref);
         if (!b || !health) {
             continue;
         }
