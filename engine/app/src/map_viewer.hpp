@@ -272,8 +272,12 @@ private:
     void end_session();
     /// Out of the session, back to the search (with `notice`, why).
     void leave_session(std::string notice = {});
-    /// The host of the running game left: there is no host migration, so the client saves the game
-    /// it holds as a whole and says where; loaded, it plays on alone or is hosted anew.
+    /// The host of the running game left: the game moves on to the successor the host named (host
+    /// migration): this computer hosts it on its port, or follows the successor there. False if it
+    /// cannot (no successor, the port is taken).
+    bool migrate();
+    /// The host of the running game left and the game cannot move on: the client saves the game it
+    /// holds as a whole and says where; loaded, it plays on alone or is hosted anew.
     void save_after_host_left();
     /// A line for the chat: a player's (`name` given) or a notice of the session (add_chat_line).
     void chat_line(std::string name, std::string text, sim::PlayerId seat = sim::kNoPlayer, bool echo = true);
@@ -355,7 +359,11 @@ private:
     EventPresenter m_events;
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
-    bool m_host_game_loaded = false;  ///< this client runs the game its host sent
+    bool m_host_game_loaded = false;                ///< this client runs the game its host sent
+    std::string m_host_address;                     ///< of the host joined
+    std::uint16_t m_host_port = net::kDefaultPort;  ///< of the host joined: the successor hosts on it too
+    bool m_migrating = false;                       ///< following a successor, its game not here yet
+    std::string m_successor_name;                   ///< the one followed
     /// The local player's commands: to m_state's simulation, or to m_session while there is one.
     CommandSink m_command_sink;
     std::unique_ptr<net::LanBrowser> m_lan_browser;  ///< while the multiplayer menu looks for games

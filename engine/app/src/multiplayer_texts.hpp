@@ -96,6 +96,9 @@ enum class MpText : std::uint16_t {
     CannotConnect,
     StartFailed,
     HostLeftSaved,
+    HostMoving,
+    HostMoved,
+    HostMovedYou,
 };
 
 /// The catalogue key of a text ("net.player_joined").

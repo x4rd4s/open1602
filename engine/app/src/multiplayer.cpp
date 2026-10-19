@@ -83,9 +83,14 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     for (const auto& w : warnings) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
+    // After the host changed it is the same game: the view stays where it was.
+    const render::Camera view = m_camera;
     if (const auto replaced = replace_world(std::move(world).value()); !replaced) {
         std::fprintf(stderr, "multiplayer: %s\n", replaced.error().message.c_str());
         return nullptr;
+    }
+    if (m_migrating) {
+        m_camera = view;
     }
     report_load_problems(warnings.size());
     return &m_state->simulation;
@@ -112,6 +117,12 @@ void MapViewer::apply_session_events() {
                 break;
             case net::SessionEvent::Kind::Loaded:
                 m_host_game_loaded = true;
+                if (m_migrating) {
+                    m_migrating = false;
+                    const std::string text = mp_text(MpText::HostMoved, m_successor_name);
+                    chat_line({}, text, sim::kNoPlayer, false);
+                    m_events.notify(text, platform::ticks_ms());
+                }
                 std::fprintf(stderr, "multiplayer: game from the host loaded at frame %llu\n",
                              static_cast<unsigned long long>(e.frame));
                 if (m_hud && m_hud->multiplayer_open()) {
@@ -150,11 +161,56 @@ void MapViewer::apply_session_events() {
     }
     // A session that ends before its game ran: back to the search with the reason. One that ends
     // in the game keeps the game standing as it is (the title says so).
+    // When the host leaves the running game, it moves on to the successor; following one that
+    // did not take this computer in, the game is saved as it stood.
     if (ended && m_hud && m_hud->multiplayer_open()) {
         leave_session(*ended);
-    } else if (host_left && m_host_game_loaded) {
+    } else if (ended && m_migrating) {
+        m_migrating = false;
+        save_after_host_left();
+    } else if (host_left && m_host_game_loaded && !migrate()) {
         save_after_host_left();
     }
+}
+
+bool MapViewer::migrate() {
+    net::ClientSession* client = client_session();
+    if (client == nullptr || !client->can_migrate()) {
+        return false;
+    }
+    std::string text;
+    if (client->hosts_next()) {
+        auto transport = net::enet_listen(m_host_port);
+        if (!transport) {
+            std::fprintf(stderr, "multiplayer: cannot host the game on: %s\n", transport.error().message.c_str());
+            return false;
+        }
+        std::fprintf(stderr, "multiplayer: the host left; hosting the game on UDP port %u\n",
+                     static_cast<unsigned>(m_host_port));
+        m_session = std::make_unique<net::HostSession>(std::move(transport).value(), *client, m_buildings);
+        text = mp_text(MpText::HostMovedYou);
+    } else {
+        // A successor the host saw on its own computer is on the computer this one joined.
+        std::string address = client->successor_address();
+        if (address.starts_with("127.")) {
+            address = m_host_address;
+        }
+        m_host_address = address;
+        const std::uint16_t port = m_host_port;
+        std::fprintf(stderr, "multiplayer: the host left; following %s:%u\n", address.c_str(),
+                     static_cast<unsigned>(port));
+        m_successor_name = client->successor_name();
+        m_session = std::make_unique<net::ClientSession>(*client, [address, port]() -> std::unique_ptr<net::Transport> {
+            auto transport = net::enet_connect(address, port);
+            return transport ? std::move(transport).value() : nullptr;
+        });
+        m_migrating = true;
+        text = mp_text(MpText::HostMoving, m_successor_name);
+    }
+    m_command_sink.set_session(m_session.get());
+    chat_line({}, text, sim::kNoPlayer, false);
+    m_events.notify(text, platform::ticks_ms());
+    return true;
 }
 
 void MapViewer::save_after_host_left() {
@@ -348,6 +404,7 @@ void MapViewer::update_lan_beacon() {
 void MapViewer::end_session() {
     m_session.reset();
     m_host_game_loaded = false;
+    m_migrating = false;
     m_command_sink.set_session(nullptr);
     m_lan_beacon.reset();
     m_hosted.reset();
@@ -580,6 +637,8 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     if (!transport) {
         return transport.error();
     }
+    m_host_address = address;
+    m_host_port = port;
     // The host joined by address comes first in the search next time.
     const std::string remembered = port == net::kDefaultPort ? address : address + ":" + std::to_string(port);
     std::vector<std::string>& hosts = m_app_settings.remembered_hosts;
