@@ -129,7 +129,7 @@ and localized names are part of the sim state (see UI-2).
 | IO-12 | Low | Building and production kind numbers are duplicated in assets and sim | `assets/src/building_table.cpp` | Fixed #22 |
 | IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Open |
 | IO-14 | Low | Load and save error messages are English text inside localized notices | `app/src/map_input.cpp`, `map_viewer.cpp` | Fixed #20 |
-| IO-15 | Low | Stale format docs: limits, section table, string encoding | `docs/formats/o1602-save.md`, `o1602-chunk.md` | Open |
+| IO-15 | Low | Stale format docs: limits, section table, string encoding | `docs/formats/o1602-save.md`, `o1602-chunk.md` | Fixed #26 |
 
 ### Computer players, ships and military (AU)
 
@@ -172,12 +172,12 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Open |
 | UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Open |
 | UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Open |
-| UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Open |
+| UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Fixed #26 |
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
-| UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Open |
+| UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Fixed #26 |
 | UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21: see BD-7) |
-| UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Open |
+| UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Fixed #26 |
 | UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Fixed #20 |
 
 ### Multiplayer and scores (MP)
@@ -214,7 +214,7 @@ bought-ship item.
 |---|---|---|---|---|
 | BD-1 | Medium | CI reports one green test; data tests skip invisibly | `tests/CMakeLists.txt` | Fixed #19 |
 | BD-2 | Low | A test that fails a `CHECK` and then skips counts as skipped; an empty filter passes | `tests/test_main.cpp` | Fixed #19 |
-| BD-3 | Medium | Data tests use the maintainer's own savegame slots as fixtures | `tests/data/` | Open |
+| BD-3 | Medium | Data tests use the maintainer's own savegame slots as fixtures | `tests/data/` | Fixed #26 |
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
 | BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours) |
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 2 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 0 | 2 | 9 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 2 | 6 | 24 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 1 | 0 | 1 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 2 | 6 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 4 | 1 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 2 | 6 | 19 |
 
 ## Open work, in order
 
@@ -276,9 +276,9 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #
    o1602-tool and an ASan game run with the dummy video driver.
 3. BD-6 rest (M): round-trip a synthetic world through `savegame_writer` and track coverage in
    CI. (Since #23 a data test runs the computers of a new endless game for three game hours and
-   checks that they keep their cities and that the game saves and goes on the same.)
-4. BD-3 (S to M): identify data-test fixtures by size and checksum, and skip on mismatch.
-5. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
+   checks that they keep their cities and that the game saves and goes on the same. Since #26 the
+   data tests check their savegame fixtures by size and CRC-32 and skip on another file: BD-3.)
+4. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
    symmetric `io()` descriptions in files per section.
 
 **3. Moddability: game numbers in one place**
@@ -300,15 +300,16 @@ limit and tile spots named. MP-11 was fixed in #20.)
    units like ships.
 
 **5. Remaining low items and documentation**
-1. Platform: UI-7 (render device loss, M), UI-8 (display-scale changes), UI-17 (fatal errors on
-   macOS and Linux), UI-15 (dangling `GameDirectory` pointer), UI-12 (scroll clamping), UI-13
-   encoding (declare the files UTF-8).
+1. Platform: UI-7 (render device loss, M), UI-8 (display-scale changes), UI-13 encoding (declare
+   the files UTF-8). (Fixed in #26: UI-17 fatal errors on macOS and Linux, UI-15 the
+   `GameDirectory` pointer, UI-12 scroll clamping.)
 2. Sim cleanups: AU9 (dead state), AU11 and AU12 (check against the original first), MP-20 (offer
    "save this game" when the host leaves).
 3. Build: BD-8 rest (pin actions by SHA, pin clang-format), BD-10 rest (dependency diagram,
    layering check), BD-17.
-4. Docs: BD-11 and BD-12 first, since they mislead newcomers. Then IO-15, BD-13, BD-14, BD-15 and
-   BD-16. [status.md](status.md) should become the single place for counts and open items.
+(Docs: BD-11 to BD-16 were fixed in #20; #26 fixed what was still stale after it and IO-15.
+[status.md](status.md) is the single place for counts and open items. ADR 0005's dependency
+diagram belongs to BD-10.)
 
 ## Known gaps not covered by this review
 
