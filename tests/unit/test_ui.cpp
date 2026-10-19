@@ -500,6 +500,52 @@ TEST_CASE("ui: a form of Open1602's own: clicks, focus, cut texts and the scale"
     CHECK(texts[1] == "******");
 }
 
+TEST_CASE("ui: cutting text to a width finds the same cut as trying one byte after the other") {
+    // The cut by removing one byte at a time, as the form did before.
+    const auto linear = [](const ui::Font* font, std::string s, double width, bool keep_end) {
+        const auto measure = [font](const std::string& t) {
+            return font != nullptr ? font->width(t) / font->design_scale() : 9.0 * static_cast<double>(t.size());
+        };
+        if (measure(s) <= width) {
+            return s;
+        }
+        if (keep_end) {
+            while (!s.empty() && measure(s) > width) {
+                s.erase(s.begin());
+            }
+            return s;
+        }
+        while (!s.empty() && measure(s + "...") > width) {
+            s.pop_back();
+        }
+        return s + "...";
+    };
+    ui::Font font = test_font();
+    ui::Font scaled = test_font();
+    scaled.set_design_scale(0.625);
+    const std::array<const ui::Font*, 3> fonts = {&font, &scaled, nullptr};
+    // Narrow and wide glyphs, bytes without a glyph and control characters, which end the measure.
+    const std::string alphabet = std::string("aW .\x01\x80") + '\0';
+    std::uint32_t seed = 12345;
+    const auto next = [&seed] {
+        seed = seed * 1103515245U + 12345U;
+        return seed >> 16U;
+    };
+    for (int i = 0; i < 2000; ++i) {
+        std::string text;
+        const std::uint32_t length = next() % 40;
+        for (std::uint32_t k = 0; k < length; ++k) {
+            text += alphabet[next() % alphabet.size()];
+        }
+        const double width = static_cast<double>(next() % 200) - 5.0;
+        for (const ui::Font* f : fonts) {
+            for (const bool keep_end : {false, true}) {
+                CHECK(ui::fit_text(f, text, width, keep_end) == linear(f, text, width, keep_end));
+            }
+        }
+    }
+}
+
 TEST_CASE("ui: key bindings: a key by its place works on every layout, by meaning where it is printed") {
     // SDL numbers: scancode 26 is the key at W on a US keyboard; on AZERTY it prints Z.
     constexpr std::int32_t kScanW = 26;

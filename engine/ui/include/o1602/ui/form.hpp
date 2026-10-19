@@ -32,6 +32,11 @@ struct FormStyle {
     std::int32_t warning = 9;
 };
 
+/// The text cut to `width` design units: its end replaced by "..." (or, with `keep_end`, for a
+/// field being typed in, its start left out, so that the caret stays in sight). Without a font
+/// every byte is 9 units wide.
+[[nodiscard]] std::string fit_text(const Font* font, std::string text, double width, bool keep_end);
+
 class Form {
 public:
     using Id = std::int32_t;

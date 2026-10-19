@@ -2,6 +2,7 @@
 #include "o1602/ui/form.hpp"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 namespace o1602::ui {
@@ -14,30 +15,12 @@ constexpr std::int32_t kBox = 18;     ///< the box of a check box
 constexpr double kFallbackText = 18;  ///< text height without a font
 
 /// Width and height of text in design units.
-double text_width(const Font* font, const std::string& s) {
+double text_width(const Font* font, std::string_view s) {
     return font != nullptr ? font->width(s) / font->design_scale() : 9.0 * static_cast<double>(s.size());
 }
 
 double text_height(const Font* font) {
     return font != nullptr ? font->height() / font->design_scale() : kFallbackText;
-}
-
-/// The text cut to `width`: its end replaced by "..." (or, for a field being typed in, its start
-/// left out, so that the caret stays in sight).
-std::string fit(const Font* font, std::string s, double width, bool keep_end) {
-    if (text_width(font, s) <= width) {
-        return s;
-    }
-    if (keep_end) {
-        while (!s.empty() && text_width(font, s) > width) {
-            s.erase(s.begin());
-        }
-        return s;
-    }
-    while (!s.empty() && text_width(font, s + "...") > width) {
-        s.pop_back();
-    }
-    return s + "...";
 }
 
 Form::Widget make(Form::Widget::Kind kind, Form::Id id, Rect r, std::string text = {}) {
@@ -50,6 +33,50 @@ Form::Widget make(Form::Widget::Kind kind, Form::Id id, Rect r, std::string text
 }
 
 }  // namespace
+
+std::string fit_text(const Font* font, std::string s, double width, bool keep_end) {
+    if (text_width(font, s) <= width) {
+        return s;
+    }
+    // Binary search for the cut: shorter text is never wider. The font measures up to the first
+    // control character, so the start may move up to it at most (the rest is then 0 wide).
+    if (keep_end) {
+        const auto control =
+            std::find_if(s.begin(), s.end(), [](char c) { return static_cast<unsigned char>(c) < 0x20; });
+        std::size_t lo = 0;
+        std::size_t hi = font != nullptr ? static_cast<std::size_t>(control - s.begin()) : s.size();
+        if (text_width(font, std::string_view(s).substr(hi)) > width) {
+            return {};
+        }
+        while (lo < hi) {  // the first start whose rest fits
+            const std::size_t mid = lo + (hi - lo) / 2;
+            if (text_width(font, std::string_view(s).substr(mid)) <= width) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        return s.substr(lo);
+    }
+    std::string probe;
+    const auto fits = [&](std::size_t n) {
+        probe.assign(s, 0, n);
+        probe += "...";
+        return text_width(font, probe) <= width;
+    };
+    std::size_t lo = 0;
+    std::size_t hi = s.size();
+    while (lo < hi) {  // the longest start that fits with the dots, 0 if none does
+        const std::size_t mid = lo + (hi - lo + 1) / 2;
+        if (fits(mid)) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    s.resize(lo);
+    return s + "...";
+}
 
 void Form::panel(Rect r) {
     m_widgets.push_back(make(Widget::Kind::Panel, -1, r));
@@ -170,7 +197,7 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, 3>& fonts) const 
         d.block = m_style.font;
         d.colour = colour;
         d.align = align;
-        d.text = fit(font, std::move(t), std::max(room, 0.0), keep_end);
+        d.text = fit_text(font, std::move(t), std::max(room, 0.0), keep_end);
         const std::int32_t x = align == Align::Left    ? r.x + kPadding
                                : align == Align::Right ? r.x + r.w - kPadding
                                                        : r.x + r.w / 2;
