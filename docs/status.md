@@ -10,7 +10,7 @@ Links into `re/` (for example [bugs.md](re/bugs.md)) point to the private compan
 [CONTRIBUTING.md](../CONTRIBUTING.md#reverse-engineering)).
 
 **Review October 2026:** The code review of October 2026 with all findings and their status is in
-[review.md](review.md). Of its 99 findings, 85 are fixed (PRs #19 to #30), 5 are left on purpose and
+[review.md](review.md). Of its 99 findings, 85 are fixed (PRs #19 to #29 and #32), 5 are left on purpose and
 9 are partly fixed; what remains of them is listed under
 [Remaining work](review.md#remaining-work).
 

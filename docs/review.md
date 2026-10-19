@@ -12,8 +12,9 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #30. The status column says which one fixes each finding.
-After #30 no finding is fully open: 85 are fixed, 5 are left on purpose and 9 are partly fixed, with
+The fixes since then are in PRs #19 to #29 and #32. The status column says which one fixes each
+finding.
+After #32 no finding is fully open: 85 are fixed, 5 are left on purpose and 9 are partly fixed, with
 what remains listed under "Remaining work".
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
@@ -144,10 +145,10 @@ and localized names are part of the sim state (see UI-2).
 | AU6 | Medium | Ships from original files keep 8 holds; about ten code paths ignore the type's hold count | `sim/src/world.cpp`, `ships.cpp`, `castles.cpp` | Fixed #21 |
 | AU7 | Low | O(n) scans per soldier run and per combat candidate | `sim/src/soldiers.cpp`, `combat.cpp` | Fixed #29 (soldiers in 16 x 16 squares for the crowd and blocked checks: -25% instructions in a 2,000-unit battle; a tower index measured no gain and was left out) |
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Won't fix (measured in #29: about 0.1% of a large battle's instructions; the path search itself dominates) |
-| AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Fixed #30 (`failed_launches` and `run_pirate_task` removed, the save keeps a reserved byte; the scenario switch behind `no_colonies` is not located in `PLAYER4` yet, so colonies stay allowed; one shared `ship_moving()`) |
+| AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Fixed #32 (`failed_launches` and `run_pirate_task` removed, the save keeps a reserved byte; the scenario switch behind `no_colonies` is not located in `PLAYER4` yet, so colonies stay allowed; one shared `ship_moving()`) |
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
-| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Partly #30 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320 and documented; native warriors and pirates use the same formula, unconfirmed in the binary) |
-| AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Won't fix (#30: by design, the original writes the war time only into the victim's own entry; documented) |
+| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Partly #32 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320 and documented; native warriors and pirates use the same formula, unconfirmed in the binary) |
+| AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Won't fix (#32: by design, the original writes the war time only into the victim's own entry; documented) |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
 | AU15 | Low | Fallback ship name `"Ship N"` is not localized | `sim/src/trader.cpp` | Won't fix (#21: the simulation's names must not depend on the player's language; every installation has Text.cod's ship names, so the fallback does not show) |
@@ -171,8 +172,8 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Partly #29 (a render device reset rebuilds all textures; a lost device is only logged) |
 | UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Fixed #29 (the pixel scale follows display-scale changes, a Ctrl +/- offset is kept) |
 | UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Fixed #29 (LRU text cache, sorted soldier index, reused draw-list containers; the mission text is still wrapped each frame) |
-| UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Fixed #30 (soldiers, walkers, townsfolk and sea creatures are drawn between two ticks like ships, through a shared `TickTrail`) |
-| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Fixed #29, #30 (#29: audio prefilled before loads and videos; #30: the zoom levels are prepared on a background thread from the start, only the upload stays on the main thread) |
+| UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Fixed #32 (soldiers, walkers, townsfolk and sea creatures are drawn between two ticks like ships, through a shared `TickTrail`) |
+| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Fixed #29, #32 (#29: audio prefilled before loads and videos; #32: the zoom levels are prepared on a background thread from the start, only the upload stays on the main thread) |
 | UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Fixed #26 |
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Fixed #20, #29 (#20: atomic writes and logged errors; #29: the files are UTF-8, older Windows-1252 files still read) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
@@ -204,7 +205,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Fixed #27 (score curves, money steps and the monument rule named in `assets/game_data.hpp`) |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
 | MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Fixed #29 (binary search, the same cuts as before) |
-| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Partly #30 (a client saves the game to `saves/hostleft.o1602` when the host leaves; no host migration) |
+| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Partly #32 (a client saves the game to `saves/hostleft.o1602` when the host leaves; no host migration) |
 
 MP-3 is the earlier review's `SoldierOrder` item. In the new numbering it is not AU14, which is the
 bought-ship item.
@@ -243,7 +244,7 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #30 | Won't fix | Partly | Open |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Won't fix | Partly | Open |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 0 | 0 |
 | IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 |
@@ -272,9 +273,9 @@ the order the project's goals suggest (architecture and tests first, then the re
    sections of the wrong size are refused and there is one CRC-32 (#29).
 5. UI-7 (M): recover from a lost render device by recreating the renderer. Done: a device reset
    rebuilds all textures (#29).
-6. MP-20: host migration. Done: a client saves the game when the host leaves (#30).
+6. MP-20: host migration. Done: a client saves the game when the host leaves (#32).
 7. AU11: confirm in the original binary that the native warriors and the pirates use the same
-   random-offset helper as the soldiers (#30 documents the soldiers' one).
+   random-offset helper as the soldiers (#32 documents the soldiers' one).
 8. BD-15: the German test player names and two anchors into the private repository stay on
    purpose (#20).
 
