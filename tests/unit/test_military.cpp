@@ -13,6 +13,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/military.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -71,6 +72,8 @@ assets::FigureTable make_figures() {
         "  Worktime: 2.0\n  Shottime: 0.7\n  Maxenergy: 15\n  Hitpoint: 2.4\n"
         "  Nummer: 38\n  Gfx: 0\n  Blocknr: 1\n  Shotradius: 7.5\n  Worktime: 3.0\n  Shottime: 0.6\n"
         "  Maxenergy: 24\n  Hitpoint: 4.0\n"
+        // A small ship with two holds.
+        "  Nummer: 21\n  Gfx: 0\n  Blocknr: 1\n  Maxware: 2\n"
         "EndObj\n",
         types);
     auto table = assets::FigureTable::from_cod(doc);
@@ -430,6 +433,31 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
     CHECK(f.world.soldiers()[0].health == 640);
     CHECK(f.world.soldiers()[0].figure == kSword);
     CHECK(boat->cargo[0].ware == 0);
+}
+
+TEST_CASE("military: a ship from the original's files takes as many soldiers as its type has holds") {
+    Field f;
+    f.start();
+    // Eight cargo slots as the original keeps them for every ship; the type has two holds.
+    sim::Ship ship = sim::make_ship("Boat", 8, 15, 21, 0);
+    ship.cargo.resize(8);
+    f.world.add_ship(ship);
+    const std::uint32_t ship_id = f.world.ships().back().id;
+    std::vector<std::uint32_t> ids;
+    for (std::int32_t i = 0; i < 3; ++i) {
+        ids.push_back(f.add(kSword, 0, 2 * 14, 2 * (14 + i)).id);
+    }
+    REQUIRE(f.military->order(sim::SoldierOrder{0, ids, sim::Target::other_ship(ship_id)}));
+    f.run(10'000);
+    const sim::Ship* boat = f.world.ship(ship_id);
+    REQUIRE(boat != nullptr);
+    CHECK(sim::usable_holds(*boat, f.figures) == 2);
+    CHECK(boat->cargo[0].ware == 25);
+    CHECK(boat->cargo[1].ware == 25);
+    for (std::size_t h = 2; h < boat->cargo.size(); ++h) {
+        CHECK(boat->cargo[h].ware == 0);
+    }
+    CHECK(f.world.soldiers().size() == 1);  // the third stays ashore
 }
 
 TEST_CASE("military: a Kontor over the destroyed Kontor of a defenceless city takes the city over") {

@@ -68,11 +68,10 @@ public:
         m_panel.set_slider(kHealth, 0, static_cast<std::int32_t>(health * 1000.0), 1000);
         m_panel.set_selected(kPatrol, ship->route.patrol() || m_picking);
         m_panel.set_selected(kWhiteFlag, ship->held);
-        const assets::FigureType* f = c.figures.get(ship->figure);
-        const std::size_t n = f != nullptr && f->ship.cargo_slots != 0 ? f->ship.cargo_slots : ship->cargo.size();
+        const std::size_t n = sim::usable_holds(*ship, c.figures);
         for (std::size_t h = 0; h < 8; ++h) {
             const auto k = static_cast<std::int32_t>(h);
-            const bool hold = own && h < n && h < ship->cargo.size();
+            const bool hold = own && h < n;
             m_panel.set_visible(kHoldIcon + k, hold);
             m_panel.set_visible(kHoldButton + k, hold);
             const bool filled = hold && ship->cargo[h].ware != 0 && ship->cargo[h].amount != 0;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Castles: recruiting, training, sending units out; soldiers on board ships (docs/re/military.md).
 #include <algorithm>
+#include <span>
 
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/logistics.hpp"
@@ -353,7 +354,7 @@ bool Military::board(Soldier& s, Ship& ship) {
     if (type == nullptr || ship.owner != s.owner || ship.sinking) {
         return false;
     }
-    for (CargoSlot& c : ship.cargo) {
+    for (CargoSlot& c : std::span<CargoSlot>(ship.cargo.data(), usable_holds(ship, *m_figures))) {
         if (c.ware != 0) {
             continue;
         }

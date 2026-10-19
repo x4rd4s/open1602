@@ -137,10 +137,14 @@ const assets::FigureType* Fleet::type_of(const Ship& ship) const {
     return m_figures->get(ship.figure);
 }
 
-std::size_t Fleet::holds(const Ship& ship) const {
-    const assets::FigureType* t = type_of(ship);
+std::size_t usable_holds(const Ship& ship, const assets::FigureTable& figures) {
+    const assets::FigureType* t = figures.get(ship.figure);
     const std::size_t n = t != nullptr && t->ship.cargo_slots != 0 ? t->ship.cargo_slots : ship.cargo.size();
     return std::min(n, ship.cargo.size());
+}
+
+std::size_t Fleet::holds(const Ship& ship) const {
+    return usable_holds(ship, *m_figures);
 }
 
 std::uint32_t Fleet::space_for(const Ship& ship, std::uint8_t ware, std::uint8_t hold) const {

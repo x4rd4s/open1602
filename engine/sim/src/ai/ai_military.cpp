@@ -5,6 +5,7 @@
 // foreign city after every step, the soldiers on one island per tick, the treaties every 30 s.
 #include <algorithm>
 #include <array>
+#include <span>
 
 #include "ai_engine.hpp"
 
@@ -168,7 +169,7 @@ std::uint32_t Engine::soldiers_aboard(const Ship& s) const {
 
 std::uint32_t Engine::free_holds(const Ship& s) const {
     std::uint32_t n = 0;
-    for (const CargoSlot& c : s.cargo) {
+    for (const CargoSlot& c : std::span<const CargoSlot>(s.cargo.data(), usable_holds(s, *m_sim.m_figures))) {
         n += c.ware == 0 ? 1U : 0U;
     }
     return n;

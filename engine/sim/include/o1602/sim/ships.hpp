@@ -211,6 +211,11 @@ struct ShipEvent {
 
 class Combat;
 
+/// The holds a ship uses: as many as its type has (Maxware), the first of `ship.cargo`. Ships from
+/// the original's files keep its eight slots; the ones beyond the type's stay empty. Everything
+/// that puts goods or soldiers into a hold looks only at these.
+[[nodiscard]] std::size_t usable_holds(const Ship& ship, const assets::FigureTable& figures);
+
 class Fleet {
 public:
     Fleet(World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures, const Rules& rules);

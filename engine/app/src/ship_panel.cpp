@@ -530,11 +530,10 @@ private:
 
     void holds(ui::Panel& p, const sim::Ship& ship, const PanelContext& c, std::int32_t icon, std::int32_t bar,
                std::int32_t button, bool shown) {
-        const assets::FigureType* f = c.figures.get(ship.figure);
-        const std::size_t n = f != nullptr && f->ship.cargo_slots != 0 ? f->ship.cargo_slots : ship.cargo.size();
+        const std::size_t n = sim::usable_holds(ship, c.figures);
         for (std::size_t h = 0; h < 8; ++h) {
             const auto k = static_cast<std::int32_t>(h);
-            const bool hold = shown && h < n && h < ship.cargo.size();
+            const bool hold = shown && h < n;
             p.set_visible(icon + k, hold);
             p.set_visible(button + k, hold);
             const bool filled = hold && ship.cargo[h].ware != 0 && ship.cargo[h].amount != 0;

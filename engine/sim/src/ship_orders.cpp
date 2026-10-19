@@ -3,6 +3,7 @@
 // Orders of the ship panel beyond sailing and trade (docs/re/ships.md#ship-window): mounting
 // and taking off cannons, goods overboard, the name, and selling ships between players.
 #include <algorithm>
+#include <span>
 
 #include "o1602/sim/ships.hpp"
 
@@ -36,7 +37,7 @@ bool Fleet::command(const ShipCommand& c) {
             if (!own || type == nullptr || ship->cannons >= type->ship.max_cannons) {
                 return false;
             }
-            for (std::size_t h = 0; h < ship->cargo.size(); ++h) {
+            for (std::size_t h = 0; h < holds(*ship); ++h) {
                 CargoSlot& slot = ship->cargo[h];
                 if ((c.hold != 0xFF && h != c.hold) || slot.ware != cannons || slot.amount < kTon) {
                     continue;
@@ -56,14 +57,15 @@ bool Fleet::command(const ShipCommand& c) {
                 return false;
             }
             CargoSlot* target = nullptr;
-            for (CargoSlot& slot : ship->cargo) {
+            const std::span<CargoSlot> usable(ship->cargo.data(), holds(*ship));
+            for (CargoSlot& slot : usable) {
                 if (slot.ware == cannons && slot.amount + kTon <= kHoldCapacity) {
                     target = &slot;
                     break;
                 }
             }
             if (target == nullptr) {
-                for (CargoSlot& slot : ship->cargo) {
+                for (CargoSlot& slot : usable) {
                     if (slot.ware == 0) {
                         target = &slot;
                         break;
