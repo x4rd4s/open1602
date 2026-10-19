@@ -901,6 +901,24 @@ private:
                 const std::size_t n = std::min<std::size_t>(player->name.size(), 0x3F);
                 std::copy_n(player->name.begin(), n, r.begin() + 0x3C0);
             }
+            if (player != nullptr && p < raw.size() && player->status == PlayerStatus::Playing &&
+                (player->role == PlayerRole::Human || player->role == PlayerRole::Computer)) {
+                // A seat that changed hands since the source file (a multiplayer game saved after
+                // the host left): the controller and the name as they are now.
+                const auto kind = static_cast<assets::PlayerKind>(r[4]);
+                if ((kind == assets::PlayerKind::Human || kind == assets::PlayerKind::Computer) &&
+                    kind != original_kind(*player)) {
+                    r[4] = static_cast<std::uint8_t>(original_kind(*player));
+                }
+                const auto name = r.begin() + 0x3C0;
+                const auto stored = static_cast<std::size_t>(std::find(name, name + 0x40, 0) - name);
+                const std::string_view now = std::string_view(player->name).substr(0, 0x3F);
+                if (!std::equal(name, name + static_cast<std::ptrdiff_t>(stored), now.begin(), now.end(),
+                                [](std::uint8_t a, char b) { return a == static_cast<std::uint8_t>(b); })) {
+                    std::fill_n(name, 0x40, std::uint8_t{0});
+                    std::copy(now.begin(), now.end(), name);
+                }
+            }
             if (player != nullptr) {
                 put32(r, 0, static_cast<std::uint32_t>(player->money));
                 put32(r, 0x34, player->infra_mask);

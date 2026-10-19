@@ -513,6 +513,22 @@ TEST_CASE("save game: the original's chunks of a .GAM alone hold the synthetic w
     CHECK(original_chunks_only(loaded, buildings) == bytes);
 }
 
+TEST_CASE("save game: seats that changed hands since the source file are written as they are now") {
+    const auto buildings = make_buildings();
+    // Loaded from a .GAM: the players' records come from the file.
+    sim::World loaded = load(original_chunks_only(make_world(buildings), buildings), buildings);
+    // As a game saved after the host left: the person's seat is the computer's now, and the
+    // computer's seat is a person's under another name.
+    loaded.player(kHuman)->role = sim::PlayerRole::Computer;
+    loaded.player(kComputer)->role = sim::PlayerRole::Human;
+    loaded.player(kComputer)->name = "Bert";
+    const sim::World again = load(original_chunks_only(loaded, buildings), buildings);
+    CHECK(again.player(kHuman)->role == sim::PlayerRole::Computer);
+    CHECK(again.player(kHuman)->name == "Anna");
+    CHECK(again.player(kComputer)->role == sim::PlayerRole::Human);
+    CHECK(again.player(kComputer)->name == "Bert");
+}
+
 TEST_CASE("save game: a world beyond the original's limits is not written as .GAM") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings);
