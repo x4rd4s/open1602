@@ -70,4 +70,9 @@ elseif(MSVC)
     target_compile_options(o1602_tests PRIVATE /wd4242 /wd4244)
 endif()
 
-add_test(NAME unit COMMAND o1602_tests)
+# Two ctest entries: the unit tests, and the tests against the original game data, which skip
+# without ANNO1602_DIR. Exit code 77 means every selected test skipped; ctest shows "Skipped".
+add_test(NAME unit COMMAND o1602_tests --no-data)
+add_test(NAME data COMMAND o1602_tests --only-data)
+set_tests_properties(unit data PROPERTIES SKIP_RETURN_CODE 77)
+set_tests_properties(data PROPERTIES TIMEOUT 3600)  # it plays whole games of the original

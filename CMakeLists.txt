@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.25)
 project(Open1602
     VERSION 0.1.0
     DESCRIPTION "Open-source engine reimplementation for Anno 1602"
-    HOMEPAGE_URL "https://github.com/"
+    HOMEPAGE_URL "https://github.com/x4rd4s/open1602"
     LANGUAGES CXX)
 
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
@@ -41,8 +41,16 @@ option(O1602_BUILD_TOOLS  "Build command line tools (o1602-tool)"    ON)
 option(O1602_BUILD_GAME   "Build the game executable (needs SDL3)"   OFF)
 option(O1602_WARNINGS_AS_ERRORS "Treat compiler warnings as errors"  OFF)
 
-# Optional zlib: used for compressed PNG output in tools. Fallback is uncompressed PNG.
-find_package(ZLIB QUIET)
+# zlib packs savegames (.o1602) and PNG screenshots. The game needs it: without it, it could not
+# load the compressed savegames other builds write. Libraries, tests and tools build without it.
+if(O1602_BUILD_GAME)
+    find_package(ZLIB REQUIRED)
+else()
+    find_package(ZLIB QUIET)
+    if(NOT ZLIB_FOUND)
+        message(WARNING "zlib not found: compressed savegames can neither be written nor read")
+    endif()
+endif()
 
 add_subdirectory(third_party/enet)
 add_subdirectory(engine)

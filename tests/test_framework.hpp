@@ -5,7 +5,9 @@
 #pragma once
 
 #include <cstdio>
+#include <filesystem>
 #include <functional>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -33,6 +35,13 @@ struct Skip {
 inline int& failures() {
     static int count = 0;
     return count;
+}
+
+/// A path in the temporary folder that belongs to this test run: two runs at the same time (two
+/// presets, parallel CI jobs) do not delete each other's files.
+inline std::filesystem::path temp_path(const std::string& name) {
+    static const std::string run = std::to_string(std::random_device{}());
+    return std::filesystem::temp_directory_path() / (name + "-" + run);
 }
 
 inline void report(const char* file, int line, const char* expr) {

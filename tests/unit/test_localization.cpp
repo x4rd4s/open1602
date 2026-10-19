@@ -21,7 +21,7 @@ namespace {
 /// A folder of its own under the system's temporary folder, removed again at the end.
 struct TempFolder {
     std::filesystem::path path;
-    explicit TempFolder(std::string_view name) : path(std::filesystem::temp_directory_path() / name) {
+    explicit TempFolder(std::string_view name) : path(test::temp_path(std::string(name))) {
         std::filesystem::remove_all(path);
         std::filesystem::create_directories(path);
     }

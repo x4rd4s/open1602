@@ -201,7 +201,7 @@ TEST_CASE("file: a full disk is an error, and an atomic write keeps the old file
         const std::vector<std::uint8_t> data(100, 7);
         CHECK(!core::write_file("/dev/full", data).ok());
     }
-    const fs::path dir = fs::temp_directory_path() / "o1602_test_atomic";
+    const fs::path dir = test::temp_path("o1602_test_atomic");
     std::error_code ec;
     fs::remove_all(dir, ec);
     REQUIRE(fs::create_directories(dir));
@@ -223,7 +223,7 @@ TEST_CASE("file: paths go to and from UTF-8 unchanged (a user named Juergen)") {
     namespace fs = std::filesystem;
     const std::string name = "J\xC3\xBCrgen";  // "Jürgen" in UTF-8
     CHECK(core::path_to_utf8(core::path_from_utf8(name)) == name);
-    const fs::path dir = fs::temp_directory_path() / "o1602_test_utf8";
+    const fs::path dir = test::temp_path("o1602_test_utf8");
     std::error_code ec;
     fs::remove_all(dir, ec);
     const fs::path folder = dir / core::path_from_utf8(name);

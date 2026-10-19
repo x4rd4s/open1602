@@ -47,8 +47,29 @@ jobs:
         with:
           arch: x64
 
+      - name: Cache zlib (Windows)
+        if: runner.os == 'Windows'
+        id: zlib-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/zlib
+          key: zlib-1.3.1-${{ matrix.os }}
+
+      - name: Build zlib (Windows)
+        if: runner.os == 'Windows' && steps.zlib-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.3.1 https://github.com/madler/zlib zlib-src
+          cmake -S zlib-src -B zlib-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="${{ runner.temp }}/zlib"
+          cmake --build zlib-build
+          cmake --install zlib-build
+
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+        shell: bash
+        run: >
+          cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/zlib" -DZLIB_USE_STATIC_LIBS=ON
 
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }} -- -k 0  # report every failing file at once
@@ -105,9 +126,29 @@ jobs:
           cmake --build sdl-build
           cmake --install sdl-build
 
+      - name: Cache zlib (Windows)
+        if: runner.os == 'Windows'
+        id: zlib-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/zlib
+          key: zlib-1.3.1-${{ matrix.os }}
+
+      - name: Build zlib (Windows)
+        if: runner.os == 'Windows' && steps.zlib-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.3.1 https://github.com/madler/zlib zlib-src
+          cmake -S zlib-src -B zlib-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="${{ runner.temp }}/zlib"
+          cmake --build zlib-build
+          cmake --install zlib-build
+
       - name: Configure
+        shell: bash
         run: >
-          cmake --preset ci -DO1602_BUILD_GAME=ON -DCMAKE_PREFIX_PATH="${{ runner.temp }}/sdl3"
+          cmake --preset ci -DO1602_BUILD_GAME=ON -DCMAKE_PREFIX_PATH="${{ runner.temp }}/sdl3;${{ runner.temp }}/zlib"
+          -DZLIB_USE_STATIC_LIBS=ON
 
       - name: Build
         run: cmake --build --preset ci -- -k 0

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 #include <vector>
 
@@ -283,6 +284,23 @@ TEST_CASE("ai: two runs of the same game stay the same, tick by tick") {
         CHECK(saved(sa.computers()) == saved(sb.computers()));
     }
     CHECK(a.cities_of(kComputer) == 1);
+}
+
+// Lockstep needs the same game on every machine (ADR 0004). This hash is checked on every build of
+// CI (GCC, Clang, MSVC, Apple Clang), so a difference between compilers or standard libraries shows
+// here. A change that alters the game on purpose updates the number, and says why in its PR.
+TEST_CASE("ai: a computer's first minutes give the same state on every platform") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    run(s, 90'000);
+    const auto hash = s.state_hash();
+    REQUIRE(hash.has_value());
+    constexpr std::uint64_t kExpected = 0xf924c6df75ffcf8fULL;
+    if (*hash != kExpected) {
+        std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(*hash));
+    }
+    CHECK(*hash == kExpected);
+    CHECK(g.cities_of(kComputer) == 1);
 }
 
 TEST_CASE("ai: a game saved while the computer is under way goes on as if never saved") {

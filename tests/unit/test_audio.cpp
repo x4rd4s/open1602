@@ -142,7 +142,7 @@ namespace {
 struct FakeGame {
     std::filesystem::path root;
     FakeGame() {
-        root = std::filesystem::temp_directory_path() / "o1602_audio_test";
+        root = test::temp_path("o1602_audio_test");
         std::filesystem::remove_all(root);
         for (const char* d : {"toolgfx", "gfx", "SAMPLES", "Speech8", "MUSIC8"}) {
             std::filesystem::create_directories(root / d);
