@@ -87,8 +87,47 @@ std::optional<std::uint64_t> Simulation::state_hash() const {
     return savegame_fingerprint(bytes.value());
 }
 
+namespace {
+
+/// Name lists of a game: at most this many names of at most this many bytes each.
+constexpr std::uint32_t kMaxNames = 4096;
+constexpr std::uint32_t kMaxNameBytes = 255;
+
+void write_names(core::ByteWriter& out, const std::vector<std::string>& names) {
+    const auto n = static_cast<std::uint32_t>(std::min<std::size_t>(names.size(), kMaxNames));
+    out.u32(n);
+    for (std::uint32_t i = 0; i < n; ++i) {
+        out.string(std::string_view(names[i]).substr(0, kMaxNameBytes));
+    }
+}
+
+bool read_names(StateIn& in, std::vector<std::string>& names) {
+    const std::uint32_t n = in.count(4);
+    if (n > kMaxNames) {
+        return false;
+    }
+    names.clear();
+    for (std::uint32_t i = 0; i < n && in.ok(); ++i) {
+        std::string name = in.string();
+        if (name.size() > kMaxNameBytes) {
+            return false;
+        }
+        names.push_back(std::move(name));
+    }
+    return in.ok();
+}
+
+}  // namespace
+
+void Simulation::offer_names(std::vector<std::string> cities, std::vector<std::string> ships) {
+    if (m_city_names.empty() && m_fleet.ship_names().empty()) {
+        m_city_names = std::move(cities);
+        m_fleet.set_ship_names(std::move(ships));
+    }
+}
+
 void Simulation::save_state(core::ByteWriter& out) const {
-    constexpr std::uint16_t kVersion = 4;
+    constexpr std::uint16_t kVersion = 5;
     out.u16(kVersion);
     out.u32(m_production_ms);
     out.u32(m_city_ms);
@@ -99,6 +138,8 @@ void Simulation::save_state(core::ByteWriter& out) const {
     m_fleet.save(out);
     m_military.save(out);
     m_ai.save(out);
+    write_names(out, m_city_names);
+    write_names(out, m_fleet.ship_names());
 }
 
 bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
@@ -108,7 +149,7 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     core::ByteReader reader(state);
     StateIn in(reader);
     const std::uint16_t version = in.u16();
-    if (version < 1 || version > 4) {
+    if (version < 1 || version > 5) {
         return false;
     }
     const std::uint32_t production = in.u32();
@@ -137,11 +178,20 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     } else {
         m_ai.reset();  // games of earlier versions had no computer players' state
     }
+    std::vector<std::string> cities;
+    std::vector<std::string> ships;
+    if (version >= 5 && (!read_names(in, cities) || !read_names(in, ships))) {
+        return false;
+    }
     m_production_ms = production;
     m_city_ms = city;
     m_disaster_ms = disaster;
     m_upkeep_ms = upkeep;
     m_island_ms = island;
+    if (version >= 5) {
+        m_city_names = std::move(cities);
+        m_fleet.set_ship_names(std::move(ships));
+    }
     return true;
 }
 

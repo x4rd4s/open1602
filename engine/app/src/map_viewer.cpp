@@ -229,8 +229,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         viewer->m_city_names = texts->section("STAEDTE");
         viewer->m_ship_names = texts->section("SHIPS");
         viewer->m_campaign_labels = texts->section("KAMPAGNE");
-        viewer->m_simulation.set_city_names(viewer->m_city_names);
-        viewer->m_simulation.set_ship_names(viewer->m_ship_names);
+        viewer->m_simulation.offer_names(viewer->m_city_names, viewer->m_ship_names);
     }
     viewer->m_soldiers.reset(viewer->m_world, viewer->m_buildings, viewer->m_figures);
     viewer->m_show_owners = options.show_owners;
@@ -2313,8 +2312,7 @@ void MapViewer::replace_world(sim::World world) noexcept {
     m_world = std::move(world);
     std::construct_at(&m_simulation, m_world, m_buildings, m_figures, m_options.rules);
     warn_if_state_damaged();
-    m_simulation.set_city_names(m_city_names);
-    m_simulation.set_ship_names(m_ship_names);
+    m_simulation.offer_names(m_city_names, m_ship_names);  // a saved game keeps its own
     m_simulation.set_tick_observer([this](const sim::World& now) { m_ambient.tick(now, m_buildings, m_figures); });
     // In a multiplayer game the slot the host gave this computer (kNoPlayer: watching).
     m_local_player = m_session ? m_session->local_seat() : sim::first_human_player(m_world);

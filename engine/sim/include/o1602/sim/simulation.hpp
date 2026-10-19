@@ -183,6 +183,11 @@ public:
     [[nodiscard]] std::vector<ConstructionEvent> take_construction_events() { return m_construction_events.take(); }
     /// Names for new cities (Text.cod [STAEDTE]).
     void set_city_names(std::vector<std::string> names) { m_city_names = std::move(names); }
+    /// The names for new cities and ships of a game that has none yet. A game keeps the names it
+    /// began with: they are saved with it, so that every computer of a multiplayer game names new
+    /// cities and ships alike, whatever the language of its installation.
+    void offer_names(std::vector<std::string> cities, std::vector<std::string> ships);
+    [[nodiscard]] const std::vector<std::string>& city_names() const noexcept { return m_city_names; }
     /// One tick of game time: the commands that are due, then the steps of tick_step_names().
     void tick();
     /// The steps of a tick in the order they run (documentation and tests).

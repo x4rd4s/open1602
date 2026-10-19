@@ -295,7 +295,7 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     run(s, 90'000);
     const auto hash = s.state_hash();
     REQUIRE(hash.has_value());
-    constexpr std::uint64_t kExpected = 0xf924c6df75ffcf8fULL;
+    constexpr std::uint64_t kExpected = 0x7e7fc0d6d363168aULL;
     if (*hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(*hash));
     }
@@ -330,6 +330,29 @@ TEST_CASE("ai: a game saved while the computer is under way goes on as if never 
         CHECK(a.cities_of(kComputer) == 1);
     }
     CHECK(under_way);
+}
+
+TEST_CASE("ai: the names for new cities and ships travel with the saved game") {
+    Game a;
+    sim::Simulation sa(a.world, a.buildings, a.figures);
+    sa.offer_names({"Neustadt", "Altdorf"}, {"Seeadler"});
+    sa.offer_names({"Newtown"}, {"Sea eagle"});  // the game has names already
+    const std::vector<std::string> german{"Neustadt", "Altdorf"};
+    CHECK(sa.city_names() == german);
+    run(sa, 40'000);
+    const auto bytes = sim::write_game(a.world, a.buildings, &sa, sim::SaveOptions{false});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, a.buildings, nullptr, &a.figures);
+    REQUIRE(loaded.ok());
+    sim::World world = std::move(loaded).value();
+    sim::Simulation sb(world, a.buildings, a.figures);
+    CHECK(!sb.state_damaged());
+    // An installation in another language keeps the game's names, and the computers stay alike.
+    sb.offer_names({"Newtown"}, {"Sea eagle"});
+    CHECK(sb.city_names() == sa.city_names());
+    CHECK(sa.state_hash() == sb.state_hash());
+    CHECK(a.cities_of(kComputer) == 1);
+    CHECK(a.world.cities().front().name == "Neustadt");
 }
 
 TEST_CASE("ai: the state of the computers goes to bytes and back whole") {

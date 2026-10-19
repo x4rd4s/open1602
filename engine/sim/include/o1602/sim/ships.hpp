@@ -259,6 +259,7 @@ public:
 
     /// Names for new ships (Text.cod [SHIPS]), handed out in turn.
     void set_ship_names(std::vector<std::string> names) { m_ship_names = std::move(names); }
+    [[nodiscard]] const std::vector<std::string>& ship_names() const noexcept { return m_ship_names; }
     /// A pack donkey brought material to a shipyard (the logistics call this).
     void yard_delivery(std::uint16_t island, std::uint16_t x, std::uint16_t y, std::uint8_t ware, std::uint32_t amount);
     /// Asks the logistics for a pack donkey: shipyard (island, x, y) needs `ware`.

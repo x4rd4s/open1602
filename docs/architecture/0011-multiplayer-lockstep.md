@@ -50,8 +50,10 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    that was left stays in the game and gives no commands until someone comes back. The player's name
    is set as a `PlayerRename` of that player.
 9. **Same data.** When a computer joins, the host checks the protocol version and a fingerprint of the
-   game data the simulation depends on (`haeuser.cod`, `figuren.cod`, city and ship names from
-   `Text.cod`), and the game's password if it has one.
+   game data the simulation depends on (`haeuser.cod`, `figuren.cod`), and the game's password if it
+   has one. The names for new cities and ships (`Text.cod` of the installation that began the game)
+   are part of the simulation's saved state, so they reach every computer with the game and
+   installations in different languages can play together.
 10. **Transport.** Messages travel reliably and in order over ENet 1.3.18 (`third_party/enet`, MIT,
     shipped unchanged so that the build needs no network). The sessions only know the interface
     `net::Transport`; the tests have an in-memory network with latency, jitter and cuts, and a relay

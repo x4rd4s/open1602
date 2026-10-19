@@ -27,20 +27,14 @@ constexpr std::size_t kChatKept = 100;
 }  // namespace
 
 std::uint64_t MapViewer::content_fingerprint() const {
-    // The tables the simulation computes with, and the names it gives new cities and ships.
+    // The tables the simulation computes with. The names for new cities and ships travel with the
+    // game (Simulation::offer_names), so installations in other languages play together.
     std::uint64_t h = net::fingerprint({});
     for (const char* file : {"haeuser.cod", "figuren.cod"}) {
         if (const auto path = m_game.resolve(file)) {
             if (const auto bytes = core::read_file(*path)) {
                 h = net::fingerprint(*bytes, h);
             }
-        }
-    }
-    for (const auto* names : {&m_city_names, &m_ship_names}) {
-        for (const std::string& name : *names) {
-            const std::uint8_t end = 0;
-            h = net::fingerprint({reinterpret_cast<const std::uint8_t*>(name.data()), name.size()}, h);
-            h = net::fingerprint({&end, 1}, h);
         }
     }
     return h;

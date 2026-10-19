@@ -345,7 +345,7 @@ int main(int argc, char** argv) {
             }
             seed_given = seed;
         } else if (arg == "--name" && has_value) {
-            new_game_options.name = argv[++i];
+            new_game_options.name = core::utf8_to_cp1252(argv[++i]);  // the game keeps names in Windows-1252
             name_given = true;
         } else if (arg == "--host") {
             multiplayer.role = app::ViewerOptions::Multiplayer::Role::Host;
