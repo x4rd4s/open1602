@@ -63,21 +63,33 @@ bool VideoPlayer::start(std::uint16_t number, bool loop, std::uint64_t now_ms) {
     const auto w = static_cast<std::int32_t>(m_video->info().width);
     const auto h = static_cast<std::int32_t>(m_video->info().display_height());
     if (m_texture == nullptr || m_texture_w != w || m_texture_h != h) {
-        if (m_texture != nullptr) {
-            SDL_DestroyTexture(m_texture);
-        }
-        m_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
-        if (m_texture != nullptr) {
-            // DirectDraw doubled the frames without smoothing.
-            SDL_SetTextureScaleMode(m_texture, SDL_SCALEMODE_NEAREST);
-        }
-        m_texture_w = w;
-        m_texture_h = h;
+        make_texture(w, h);
     }
     if (m_video->next()) {
         m_dirty = true;
     }
     return true;
+}
+
+void VideoPlayer::make_texture(std::int32_t w, std::int32_t h) {
+    if (m_texture != nullptr) {
+        SDL_DestroyTexture(m_texture);
+    }
+    m_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
+    if (m_texture != nullptr) {
+        // DirectDraw doubled the frames without smoothing.
+        SDL_SetTextureScaleMode(m_texture, SDL_SCALEMODE_NEAREST);
+    }
+    m_texture_w = w;
+    m_texture_h = h;
+}
+
+void VideoPlayer::recreate_texture() {
+    if (m_texture == nullptr) {
+        return;
+    }
+    make_texture(m_texture_w, m_texture_h);
+    m_dirty = m_video.has_value();
 }
 
 void VideoPlayer::hold_until(std::uint64_t ms) noexcept {

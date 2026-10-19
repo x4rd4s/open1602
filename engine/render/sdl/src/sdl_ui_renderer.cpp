@@ -17,6 +17,17 @@ constexpr std::size_t kMaxTexts = 512;  // cached text textures before the least
 constexpr std::int32_t kCheckerSize = 64;
 constexpr std::uint8_t kMaskAlpha = 110;  // opacity of a GraphicFill shadow
 
+/// A checkerboard (black, every second pixel) for disabled gadgets and 50 % fills.
+std::vector<std::uint8_t> checker_pixels() {
+    std::vector<std::uint8_t> rgba(static_cast<std::size_t>(kCheckerSize * kCheckerSize * 4), 0);
+    for (std::int32_t y = 0; y < kCheckerSize; ++y) {
+        for (std::int32_t x = 0; x < kCheckerSize; ++x) {
+            rgba[static_cast<std::size_t>((y * kCheckerSize + x) * 4 + 3)] = ((x + y) & 1) == 0 ? 255 : 0;
+        }
+    }
+    return rgba;
+}
+
 }  // namespace
 
 SdlUiRenderer::SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets::Palette& palette,
@@ -38,14 +49,7 @@ SdlUiRenderer::SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory
     for (std::size_t c = 0; c < m_colours.size(); ++c) {
         m_colours[c] = ui::text_recolour(palette, c);
     }
-    // A checkerboard (black, every second pixel) for disabled gadgets and 50 % fills.
-    std::vector<std::uint8_t> rgba(static_cast<std::size_t>(kCheckerSize * kCheckerSize * 4), 0);
-    for (std::int32_t y = 0; y < kCheckerSize; ++y) {
-        for (std::int32_t x = 0; x < kCheckerSize; ++x) {
-            rgba[static_cast<std::size_t>((y * kCheckerSize + x) * 4 + 3)] = ((x + y) & 1) == 0 ? 255 : 0;
-        }
-    }
-    m_checker = make(rgba, kCheckerSize, kCheckerSize);
+    m_checker = make(checker_pixels(), kCheckerSize, kCheckerSize);
 }
 
 SdlUiRenderer::~SdlUiRenderer() {
@@ -58,6 +62,21 @@ SdlUiRenderer::~SdlUiRenderer() {
     m_texts.for_each([](const Texture& t) { SDL_DestroyTexture(t.texture); });
     destroy(m_images);
     SDL_DestroyTexture(m_checker.texture);
+}
+
+void SdlUiRenderer::release_textures() {
+    const auto destroy = [](auto& map) {
+        for (auto& [k, t] : map) {
+            SDL_DestroyTexture(t.texture);
+        }
+        map.clear();
+    };
+    destroy(m_sprites);
+    m_texts.for_each([](const Texture& t) { SDL_DestroyTexture(t.texture); });
+    m_texts = TextCache<Texture>(kMaxTexts);
+    destroy(m_images);
+    SDL_DestroyTexture(m_checker.texture);
+    m_checker = make(checker_pixels(), kCheckerSize, kCheckerSize);
 }
 
 std::array<const ui::Font*, 3> SdlUiRenderer::fonts() const noexcept {

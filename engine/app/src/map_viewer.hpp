@@ -336,6 +336,9 @@ private:
     /// The window went to a screen with another scale (or the desktop's scale changed): the map's
     /// pixel scale follows; a change the player made with the keys stays on top of it.
     void follow_display_scale();
+    /// The render device was reset (a driver update, a GPU timeout, sleep on some laptops): every
+    /// texture lost its contents, all are made again.
+    void recreate_textures();
     /// What a click on the frame asked for.
     void apply_hud(const Hud::Action& action);
     /// The resource bar: money, and goods and inhabitants of the city under the mouse.

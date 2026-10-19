@@ -50,8 +50,12 @@ public:
     /// Draws the current frame as large as it fits into a rectangle of the screen, on black (the
     /// minimap's window, ADR 0010).
     void draw_in(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height);
+    /// The render device was reset: the texture is made again, the current frame uploaded anew.
+    void recreate_texture();
 
 private:
+    /// A texture of the video's size; the one before goes.
+    void make_texture(std::int32_t w, std::int32_t h);
     SDL_Renderer* m_renderer;
     const assets::GameDirectory* m_game;
     mutable std::map<std::uint16_t, bool> m_available;

@@ -59,6 +59,9 @@ public:
                const ui::Rect& at, bool update);
     /// After a frame is shown: its texts' textures may be given up again when the cache is full.
     void next_frame() noexcept { m_texts.next_frame(); }
+    /// The render device was reset and the textures lost their contents: all go and are made
+    /// again when next drawn (an image from the pixels given then).
+    void release_textures();
 
 private:
     struct Texture {

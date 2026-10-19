@@ -630,6 +630,13 @@ void MapViewer::handle_event(const SDL_Event& original) {
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             follow_display_scale();
             break;
+        // SDL_EVENT_RENDER_TARGETS_RESET needs nothing: no texture is drawn into.
+        case SDL_EVENT_RENDER_DEVICE_RESET:
+            recreate_textures();
+            break;
+        case SDL_EVENT_RENDER_DEVICE_LOST:
+            std::fprintf(stderr, "error: the render device was lost and cannot be recovered\n");
+            break;
         case SDL_EVENT_KEY_DOWN:
             if (m_hud && m_hud->typing()) {
                 // A savegame's name is typed: the keys go there, not to the key table.
@@ -1535,6 +1542,8 @@ void MapViewer::handle_video_event(const SDL_Event& event) {
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+        case SDL_EVENT_RENDER_DEVICE_RESET:
+        case SDL_EVENT_RENDER_DEVICE_LOST:
             handle_event(event);
             break;
         case SDL_EVENT_KEY_DOWN:
@@ -1601,6 +1610,23 @@ void MapViewer::follow_display_scale() {
     m_camera.set_pixel_scale(std::clamp(scale + own, 1, kMaxPixelScale), w / 2.0, h / 2.0);
     std::fprintf(stderr, "display scale %.2f: pixel scale %d\n", static_cast<double>(m_window->display_scale()),
                  m_camera.pixel_scale());
+}
+
+void MapViewer::recreate_textures() {
+    std::fprintf(stderr, "the render device was reset: textures are made again\n");
+    // The world's sprites keep no pixels after the upload (drop_pixels): they are loaded again.
+    for (auto& g : m_graphics) {
+        g.reset();
+    }
+    if (auto status = ensure_graphics(m_camera.view().zoom); !status) {
+        std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
+    }
+    if (m_hud) {
+        m_hud->release_textures();
+    }
+    if (m_video) {
+        m_video->recreate_texture();
+    }
 }
 
 void MapViewer::select_building_at_mouse() {

@@ -184,6 +184,8 @@ public:
     }
     /// Another game was loaded: messages, selection, questions and the minimap of the old one go.
     void reset_game();
+    /// The render device was reset: the frame's textures are made again when next drawn.
+    void release_textures() { m_renderer->release_textures(); }
     /// The settings (mode 30014): what they show, and what they asked for since the last call.
     [[nodiscard]] OptionsModel& options_model() noexcept { return m_options_model; }
     [[nodiscard]] std::vector<OptionsEvent> take_option_events() { return std::exchange(m_option_events, {}); }
