@@ -198,6 +198,26 @@ bool same(const std::vector<sim::ComputerPlayers::View>& a, const std::vector<si
     return true;
 }
 
+/// A pirate slot behind the natives (slot 4).
+void add_pirates(Game& g) {
+    std::vector<sim::Player> players = g.world.players();
+    players.push_back(sim::Player{});
+    players.back().role = sim::PlayerRole::Pirates;
+    g.world.set_players(players);
+}
+
+/// Runs until the computer has founded its city, then `ms` more.
+void found_city(Game& g, sim::Simulation& s, std::uint32_t ms = 1'000) {
+    REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+    run(s, ms);
+}
+
+bool remembers(const sim::World& world, sim::PlayerId who, sim::DiplomacyEventType type, sim::PlayerId partner) {
+    const auto& events = world.diplomacy().events(who);
+    return std::any_of(events.begin(), events.end(),
+                       [&](const sim::DiplomacyEvent& e) { return e.type == type && e.partner == partner; });
+}
+
 std::vector<std::uint8_t> saved(const sim::ComputerPlayers& ai) {
     core::ByteWriter out;
     ai.save(out);
@@ -591,5 +611,105 @@ TEST_CASE("ai: a founding the computers do not know of is ignored") {
     CHECK(saved(ai) == before);
     for (const auto& e : g.world.diplomacy().events(kComputer)) {
         CHECK(e.type == sim::DiplomacyEventType::None);
+    }
+}
+
+TEST_CASE("ai: computers sign trade treaties with each other and leave their peace alone") {
+    Game g;
+    // Slot 0 is a computer with a city on the islet.
+    g.world.player(kHuman)->role = sim::PlayerRole::Computer;
+    sim::City c;
+    c.island = 0;
+    c.owner = kHuman;
+    g.world.add_city(c);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    const auto& d = g.world.diplomacy();
+    REQUIRE(d.relation(kComputer, kHuman).trade == sim::Treaty::None);
+    const sim::Treaty with_trader = d.relation(kComputer, kTrader).trade;
+    const bool signed_both = run_until(s, 600'000, [&] {
+        return d.relation(kComputer, kHuman).trade == sim::Treaty::Signed &&
+               d.relation(kHuman, kComputer).trade == sim::Treaty::Signed;
+    });
+    CHECK(signed_both);
+    CHECK(g.cities_of(kComputer) == 1);
+    CHECK(d.relation(kComputer, kHuman).peace == sim::Treaty::Signed);
+    CHECK(d.relation(kHuman, kComputer).peace == sim::Treaty::Signed);
+    CHECK(d.relation(kComputer, kTrader).trade == with_trader);
+}
+
+TEST_CASE("ai: a computer at war takes a human's peace offer, unless it is still angry") {
+    for (const bool angry : {false, true}) {
+        Game g;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s);
+        auto& d = g.world.diplomacy();
+        d.relation(kComputer, kHuman).peace = sim::Treaty::None;
+        d.relation(kHuman, kComputer).peace = sim::Treaty::None;
+        if (angry) {
+            d.relation(kComputer, kHuman).damage = 400;  // a mood of -100
+        }
+        REQUIRE(d.set_peace(g.world, kHuman, kComputer, sim::Treaty::Offered, g.world.time_ms()));
+        REQUIRE(d.relation(kComputer, kHuman).peace == sim::Treaty::Received);
+        // A changed treaty is answered at once.
+        run(s, 1'000);
+        CHECK(d.relation(kComputer, kHuman).peace == (angry ? sim::Treaty::Received : sim::Treaty::Signed));
+        CHECK(d.relation(kHuman, kComputer).peace == (angry ? sim::Treaty::Offered : sim::Treaty::Signed));
+    }
+}
+
+TEST_CASE("ai: a computer a human has hurt declares war if it is as strong, else pays the pirates against him") {
+    for (const bool human_fleet : {false, true}) {
+        Game g;
+        add_pirates(g);
+        constexpr sim::PlayerId kPirates = 4;
+        // The cannoneer's damage weighs the cannons of a fleet.
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
+            "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n  Rohmenge: 25\n"
+            "  Nummer: 13\n  Gfx: 0\n  Hitpoint: 50.0\n  Worktime: 1.0\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        g.figures = std::move(figures).value();
+        if (human_fleet) {
+            g.add_ship(kHuman, 5, 80).cannons = 20;
+        }
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s);
+        auto& d = g.world.diplomacy();
+        REQUIRE(d.relation(kComputer, kHuman).peace == sim::Treaty::Signed);
+        d.relation(kComputer, kHuman).damage = 400;
+        // Rich enough to bribe the pirates, with 9000 to spare.
+        g.world.player(kComputer)->money = 30'000;
+        const std::int32_t before = g.world.players()[kComputer].money;
+        // The computer looks at its relations every 30 s.
+        run(s, 31'000);
+        if (!human_fleet) {
+            CHECK(d.relation(kComputer, kHuman).peace == sim::Treaty::None);
+            CHECK(d.relation(kHuman, kComputer).peace == sim::Treaty::None);
+            CHECK(!remembers(g.world, kPirates, sim::DiplomacyEventType::BribedBy, kComputer));
+        } else {
+            CHECK(d.relation(kComputer, kHuman).peace == sim::Treaty::Signed);
+            CHECK(remembers(g.world, kPirates, sim::DiplomacyEventType::BribedBy, kComputer));
+            CHECK(remembers(g.world, kPirates, sim::DiplomacyEventType::BribedAgainst, kHuman));
+            CHECK(g.world.players()[kComputer].money < before);
+        }
+    }
+}
+
+TEST_CASE("ai: a rich computer buys peace from the pirates, a poor one does not") {
+    for (const std::int32_t money : {9'000, 100'000}) {
+        Game g;
+        add_pirates(g);
+        constexpr sim::PlayerId kPirates = 4;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s);
+        g.world.player(kComputer)->money = money;
+        run(s, 7'000);  // the 6-second recruiting phase
+        const bool bought = remembers(g.world, kPirates, sim::DiplomacyEventType::PeaceBought, kComputer);
+        CHECK(bought == (money > 10'000));
+        CHECK((g.world.players()[kComputer].money < money) == bought);
     }
 }

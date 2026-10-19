@@ -54,6 +54,19 @@ need no original data.
 ctest --preset debug -R tool:
 ```
 
+## Coverage
+
+The `coverage` preset is a Debug build with `O1602_COVERAGE=ON` (gcov instrumentation, GCC or
+Clang). CI's coverage job builds it with GCC, runs `o1602_tests --no-data` and reports the lines and
+branches of `engine/` with [gcovr](https://gcovr.com); the summary is on the job's page, the HTML
+report in its `coverage` artifact. Locally:
+
+```sh
+cmake --preset coverage && cmake --build --preset coverage
+./build/coverage/tests/o1602_tests --no-data
+mkdir -p coverage && gcovr --root . --object-directory build/coverage --filter 'engine/' --html-details coverage/index.html --print-summary
+```
+
 ## Tests against the original data
 
 Set `ANNO1602_DIR` to the folder of an installation of *Anno 1602* (see the

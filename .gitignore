@@ -1,6 +1,7 @@
 # Build
 /build/
 /out/
+/coverage/
 /cmake-build-*/
 CMakeUserPresets.json
 compile_commands.json

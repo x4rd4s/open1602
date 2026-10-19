@@ -48,6 +48,7 @@ add_executable(o1602_tests
     unit/test_sea_paths.cpp
     unit/test_land_paths.cpp
     unit/test_world_generator.cpp
+    unit/test_new_game.cpp
     unit/test_ai.cpp
     unit/test_save_fuzz.cpp
     unit/test_savegame_writer.cpp

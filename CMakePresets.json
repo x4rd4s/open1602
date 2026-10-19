@@ -41,6 +41,12 @@
       }
     },
     {
+      "name": "coverage",
+      "displayName": "Debug with test coverage (GCC, gcov)",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "O1602_COVERAGE": "ON" }
+    },
+    {
       "name": "vcpkg",
       "displayName": "Release game with vcpkg (Windows/macOS)",
       "inherits": "release",
@@ -53,6 +59,7 @@
     { "name": "release", "configurePreset": "release" },
     { "name": "asan",    "configurePreset": "asan" },
     { "name": "ci",      "configurePreset": "ci" },
+    { "name": "coverage", "configurePreset": "coverage" },
     { "name": "vcpkg",   "configurePreset": "vcpkg" }
   ],
   "testPresets": [
@@ -60,6 +67,7 @@
     { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
     { "name": "asan",    "configurePreset": "asan",    "output": { "outputOnFailure": true } },
     { "name": "ci",      "configurePreset": "ci",      "output": { "outputOnFailure": true } },
+    { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } },
     { "name": "vcpkg",   "configurePreset": "vcpkg",   "output": { "outputOnFailure": true } }
   ]
 }

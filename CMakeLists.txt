@@ -33,6 +33,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Sanitizers)
+include(Coverage)
 include(EmbedFiles)
 include(WindowsUtf8)
 

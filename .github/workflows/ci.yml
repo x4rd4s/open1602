@@ -204,6 +204,51 @@ jobs:
         timeout-minutes: 5
         run: .github/workflows/start-game.sh build/vcpkg/engine/app/open1602
 
+  coverage:
+    name: Coverage (Linux GCC)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install dependencies
+        # gcovr from PyPI at a fixed version: the report looks the same on every runner image.
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev
+          pipx install gcovr==8.3
+
+      - name: Configure
+        run: cmake --preset coverage -DCMAKE_CXX_COMPILER=g++
+
+      - name: Build
+        run: cmake --build --preset coverage -- -k 0
+
+      - name: Run the tests that need no original data
+        run: build/coverage/tests/o1602_tests --no-data
+
+      - name: Report
+        # Lines and branches of the engine's sources (not tests, tools or third_party); the summary
+        # goes to the job's page, the HTML report into the artifact.
+        run: |
+          set -o pipefail
+          mkdir -p coverage
+          gcovr --root . --object-directory build/coverage --filter 'engine/' \
+                --exclude-throw-branches --exclude-unreachable-branches \
+                --txt coverage/summary.txt --json-summary-pretty --json-summary coverage/summary.json \
+                --html-details coverage/index.html --print-summary | tee coverage/totals.txt
+          {
+            echo '### Coverage of `o1602_tests --no-data` (engine/)'
+            echo '```'
+            cat coverage/totals.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: error
+
   checks:
     name: Formatting
     runs-on: ubuntu-24.04
