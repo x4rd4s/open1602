@@ -1,11 +1,14 @@
 # Tests
 
-All tests are in one executable, `o1602_tests`, built with every preset (no SDL needed). It uses a
+Most tests are in one executable, `o1602_tests`, built with every preset (no SDL needed). The SDL
+layer has a second one, `o1602_sdl_tests`, built only with the game (`O1602_BUILD_GAME`). Both use a
 small framework of its own ([test_framework.hpp](test_framework.hpp)).
 
 - `unit/`: unit tests. They need no original game data and run everywhere, including CI.
 - `data/`: tests against the original game data and real savegames. Their names start with `data:`.
   They skip themselves when the data is missing.
+- `sdl/`: tests of `engine/platform` and `engine/render/sdl` (`o1602_sdl_tests`), see
+  [below](#tests-of-the-sdl-layer).
 
 ## Running the tests
 
@@ -22,6 +25,7 @@ ctest knows these tests:
 | `unit` | every test whose name does not start with `data:` | `o1602_tests --no-data` |
 | `data` | only the `data:` tests (time limit one hour: some play whole games) | `o1602_tests --only-data` |
 | `tool:*` | smoke tests of `o1602-tool` (built with the tools): its commands on small synthetic files | see below |
+| `sdl` | the tests of the SDL layer (built with the game), on SDL's dummy drivers | `o1602_sdl_tests` |
 
 The executable returns 0 when everything selected passed, 1 when a test failed or nothing matched the
 filter, and 77 when every selected test skipped. ctest reports exit code 77 as "Skipped", so without
@@ -66,6 +70,25 @@ cmake --preset coverage && cmake --build --preset coverage
 ./build/coverage/tests/o1602_tests --no-data
 mkdir -p coverage && gcovr --root . --object-directory build/coverage --filter 'engine/' --html-details coverage/index.html --print-summary
 ```
+
+## Tests of the SDL layer
+
+`o1602_sdl_tests` ([sdl/](sdl)) tests the window and its renderer, the sound device, and the SDL
+backends of the world's sprites and of the interface. It needs no screen, sound card or GPU: the
+ctest entry `sdl` sets `SDL_VIDEO_DRIVER=dummy` and `SDL_AUDIO_DRIVER=dummy`, and the executable asks
+for the dummy drivers itself when those variables are not set. The renderers draw with SDL's
+software renderer into a surface, and the tests read the pixels back (`SDL_RenderReadPixels`) to
+check where sprites, text and rectangles land and in which colour. The interface's sheet and font
+are small synthetic files written into a temporary game folder. CI runs them in every game job
+(Linux, Linux ASan, Windows, macOS, and the Windows vcpkg build).
+
+```sh
+ctest --preset ci -R '^sdl$'
+./build/ci/tests/sdl/o1602_sdl_tests "sprite renderer"   # a filter as with o1602_tests
+```
+
+Not covered headless: a real HiDPI screen (the dummy driver has a pixel density and display scale of
+1) and the GPU render backends.
 
 ## Tests against the original data
 

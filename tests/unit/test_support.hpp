@@ -27,9 +27,9 @@ inline void put_chunk(std::vector<std::uint8_t>& file, const char* name, const s
     file.insert(file.end(), payload.begin(), payload.end());
 }
 
-/// BSH with solid sprites of the given sizes, all pixels palette index `index`.
-inline assets::SpriteSheet make_sheet(const std::vector<std::pair<std::uint32_t, std::uint32_t>>& sizes,
-                                      std::uint8_t index = 1) {
+/// The bytes of a BSH file with solid sprites of the given sizes, all pixels palette index `index`.
+inline std::vector<std::uint8_t> sheet_bytes(const std::vector<std::pair<std::uint32_t, std::uint32_t>>& sizes,
+                                             std::uint8_t index = 1) {
     std::vector<std::vector<std::uint8_t>> records;
     for (const auto& [w, h] : sizes) {
         std::vector<std::uint8_t> rle;
@@ -59,7 +59,13 @@ inline assets::SpriteSheet make_sheet(const std::vector<std::pair<std::uint32_t,
     }
     std::vector<std::uint8_t> file;
     put_chunk(file, "BSH", payload);
-    auto chunks = assets::ChunkFile::from_bytes(file);
+    return file;
+}
+
+/// BSH with solid sprites of the given sizes, all pixels palette index `index`.
+inline assets::SpriteSheet make_sheet(const std::vector<std::pair<std::uint32_t, std::uint32_t>>& sizes,
+                                      std::uint8_t index = 1) {
+    auto chunks = assets::ChunkFile::from_bytes(sheet_bytes(sizes, index));
     auto sheet = assets::SpriteSheet::from_chunk_file(std::move(chunks).value());
     return std::move(sheet).value();
 }

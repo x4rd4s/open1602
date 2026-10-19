@@ -157,6 +157,10 @@ jobs:
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }} -- -k 0
 
+      # The other tests run in the build job; here the SDL layer's, on SDL's dummy drivers.
+      - name: Test the SDL layer
+        run: ctest --preset ${{ matrix.preset }} -R "^sdl$"
+
       - name: Start the game without data
         shell: bash
         timeout-minutes: 5

@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// The window and its renderer (engine/platform/window.cpp) on SDL's dummy video driver.
+
+#include <SDL3/SDL.h>
+#include <cstring>
+#include <string>
+
+#include "../test_framework.hpp"
+#include "sdl_support.hpp"
+
+#include "o1602/platform/window.hpp"
+#include "o1602/render/camera.hpp"
+
+using namespace o1602;
+
+TEST_CASE("window: a window has a renderer whose output is the window's size in pixels") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.title = "test", .width = 320, .height = 200});
+    REQUIRE(window.ok());
+    const platform::Window& w = **window;
+    REQUIRE(w.sdl_window() != nullptr);
+    REQUIRE(w.sdl_renderer() != nullptr);
+    CHECK(SDL_GetRenderWindow(w.sdl_renderer()) == w.sdl_window());
+
+    // The dummy driver has no HiDPI: one pixel per window coordinate.
+    CHECK(w.pixel_density() == 1.0F);
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    w.output_size(width, height);
+    CHECK(width == 320);
+    CHECK(height == 200);
+    CHECK(!w.renderer_name().empty());
+    CHECK(w.renderer_name() != "unknown");
+    CHECK(w.max_texture_size() >= 0);
+}
+
+TEST_CASE("window: the output size follows a resize") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 320, .height = 200, .vsync = false});
+    REQUIRE(window.ok());
+    REQUIRE(SDL_SetWindowSize((*window)->sdl_window(), 400, 300));
+    SDL_SyncWindow((*window)->sdl_window());
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    (*window)->output_size(width, height);
+    CHECK(width == 400);
+    CHECK(height == 300);
+}
+
+TEST_CASE("window: the display scale is positive and gives the game a pixel scale of 1 on a plain screen") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 320, .height = 200});
+    REQUIRE(window.ok());
+    const float scale = (*window)->display_scale();
+    CHECK(scale > 0.0F);
+    // SDL reports the display's content scale; without one, the pixel density stands in.
+    const float content = SDL_GetWindowDisplayScale((*window)->sdl_window());
+    CHECK(scale == (content > 0.0F ? content : (*window)->pixel_density()));
+    CHECK(render::pixel_scale_for(scale, 4) == 1);
+}
+
+TEST_CASE("window: set_title changes the window's title") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.title = "first"});
+    REQUIRE(window.ok());
+    CHECK(std::strcmp(SDL_GetWindowTitle((*window)->sdl_window()), "first") == 0);
+    (*window)->set_title("Open1602 - second");
+    CHECK(std::strcmp(SDL_GetWindowTitle((*window)->sdl_window()), "Open1602 - second") == 0);
+}
+
+TEST_CASE("window: what the renderer draws reaches the window's pixels") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    REQUIRE(window.ok());
+    SDL_Renderer* renderer = (*window)->sdl_renderer();
+    SDL_SetRenderDrawColor(renderer, 10, 20, 30, 255);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 200, 100, 50, 255);
+    const SDL_FRect rect{8.0F, 4.0F, 16.0F, 8.0F};
+    SDL_RenderFillRect(renderer, &rect);
+
+    SDL_Surface* shot = SDL_RenderReadPixels(renderer, nullptr);
+    REQUIRE(shot != nullptr);
+    CHECK(shot->w == 64);
+    CHECK(shot->h == 48);
+    const auto pixel = [&](int x, int y) {
+        std::uint8_t r = 0;
+        std::uint8_t g = 0;
+        std::uint8_t b = 0;
+        SDL_ReadSurfacePixel(shot, x, y, &r, &g, &b, nullptr);
+        return assets::Rgba{r, g, b, 255};
+    };
+    CHECK(pixel(8, 4) == (assets::Rgba{200, 100, 50, 255}));
+    CHECK(pixel(23, 11) == (assets::Rgba{200, 100, 50, 255}));
+    CHECK(pixel(24, 11) == (assets::Rgba{10, 20, 30, 255}));
+    CHECK(pixel(8, 12) == (assets::Rgba{10, 20, 30, 255}));
+    SDL_DestroySurface(shot);
+    CHECK(SDL_RenderPresent(renderer));
+}
+
+TEST_CASE("window: ticks_ms counts up from SDL_Init") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    const std::uint64_t before = platform::ticks_ms();
+    SDL_Delay(5);
+    const std::uint64_t after = platform::ticks_ms();
+    CHECK(after >= before + 5);
+}

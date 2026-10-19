@@ -84,6 +84,11 @@ add_test(NAME data COMMAND o1602_tests --only-data)
 set_tests_properties(unit data PROPERTIES SKIP_RETURN_CODE 77)
 set_tests_properties(data PROPERTIES TIMEOUT 3600)  # it plays whole games of the original
 
+# The SDL layer has its own executable, built with the game (tests/sdl).
+if(O1602_BUILD_GAME)
+    add_subdirectory(sdl)
+endif()
+
 # The module layering of ADR 0005 on the sources (cmake/CheckLayering.cmake): no module includes
 # headers of one it does not link, and no module below the game includes SDL.
 add_test(NAME layering COMMAND ${CMAKE_COMMAND} -DENGINE_DIR=${PROJECT_SOURCE_DIR}/engine
