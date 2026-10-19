@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: >
           cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
-          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/zlib" -DZLIB_USE_STATIC_LIBS=ON
+          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/zlib" ${{ runner.os == 'Windows' && '-DZLIB_USE_STATIC_LIBS=ON' || '' }}
 
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }} -- -k 0  # report every failing file at once
@@ -148,7 +148,7 @@ jobs:
         shell: bash
         run: >
           cmake --preset ci -DO1602_BUILD_GAME=ON -DCMAKE_PREFIX_PATH="${{ runner.temp }}/sdl3;${{ runner.temp }}/zlib"
-          -DZLIB_USE_STATIC_LIBS=ON
+          ${{ runner.os == 'Windows' && '-DZLIB_USE_STATIC_LIBS=ON' || '' }}
 
       - name: Build
         run: cmake --build --preset ci -- -k 0

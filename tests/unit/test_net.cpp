@@ -792,7 +792,13 @@ TEST_CASE("net: a host is found by its address over real UDP") {
     CHECK(!found.address.empty());  // 127.0.0.1, or this computer's address if the broadcast came first
     CHECK(found.info.title == "Probe");
     CHECK(found.info.port == 46032);
-    // Not answering any more: forgotten.
+    // Not answering any more: forgotten. Answers still on their way (to the broadcasts of the
+    // search, which may come back late) arrive first, so that the forgetting starts after them.
+    beacon.value().reset();
+    for (int i = 0; i < 20; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        browser.value()->update(5);
+    }
     browser.value()->update(7000);
     CHECK(browser.value()->games().empty());
 }
