@@ -10,7 +10,9 @@ Links into `re/` (for example [bugs.md](re/bugs.md)) point to the private compan
 [CONTRIBUTING.md](../CONTRIBUTING.md#reverse-engineering)).
 
 **Review October 2026:** The code review of October 2026 with all findings and their status is in
-[review.md](review.md).
+[review.md](review.md). Of its 99 findings, 85 are fixed (PRs #19 to #30), 5 are left on purpose and
+9 are partly fixed; what remains of them is listed under
+[Remaining work](review.md#remaining-work).
 
 Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original not confirmed (needs clarification).
 
@@ -152,7 +154,7 @@ are recorded in the ADRs and in [bugs.md](re/bugs.md).
 
 | Point | Status |
 |---|---|
-| Tests | 494 cases on 2026-10-19: 425 that need no original data (the 48 files in `tests/unit/` and one test in `tests/data/`), and 69 tests against the original data in the 11 files of `tests/data/` (they skip without `ANNO1602_DIR`). Sea and land routes, world generator, AI, multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: the game executable (`engine/app` outside the menus), `engine/platform`, `render_sdl`; `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). How to run them: [tests/README.md](../tests/README.md) |
+| Tests | 505 cases on 2026-10-19: 436 that need no original data (the 49 files in `tests/unit/` and one test in `tests/data/`), and 69 tests against the original data in the 11 files of `tests/data/` (they skip without `ANNO1602_DIR`). Sea and land routes, world generator, AI, multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: the game executable (`engine/app` outside the menus), `engine/platform`, `render_sdl`; `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). How to run them: [tests/README.md](../tests/README.md) |
 | Builds | presets `debug`, `release`, `asan`, `ci` and `vcpkg` (the game with `-DO1602_BUILD_GAME=ON`), locally under Linux without warnings; CI for Linux (GCC, Clang, ASan), Windows (MSVC 2022), macOS 14 and the game with SDL3 on all three. Windows and macOS have never run locally |
 | Player commands | complete for the simulation (since 2026-10-18 also the town window and ship window); the selection windows trigger them; white flag, scuttling, patrol, command chains and group commands with offset have been added |
 | Symbol table `re/symbols/` | 596 functions (private, in `open1602-re`; evidence refers to the document) |
