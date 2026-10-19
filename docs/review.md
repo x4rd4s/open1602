@@ -218,7 +218,7 @@ bought-ship item.
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
 | BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours) |
-| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #25: the questions before orders, with four tests; platform, render_sdl and o1602-tool remain) |
+| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; platform, render_sdl and o1602-tool remain) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
 | BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20 |
@@ -272,7 +272,7 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. AU15 stays
    Next a `CommandSink` as the only path to `Simulation::submit`, then `MapInput`,
    `EventPresenter`, `VideoController` and a screen stack.
 2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool since
-   #21 and the questions before orders since #25 are there, with tests). Next smoke tests for
+   #21 and the questions before orders since #24 are there, with tests). Next smoke tests for
    o1602-tool and an ASan game run with the dummy video driver.
 3. BD-6 rest (M): round-trip a synthetic world through `savegame_writer` and track coverage in
    CI. (Since #23 a data test runs the computers of a new endless game for three game hours and
