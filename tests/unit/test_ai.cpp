@@ -468,6 +468,20 @@ TEST_CASE("ai: humans, the trader and the natives are left alone") {
     }
 }
 
+TEST_CASE("ai: a seat the computer did not hold before is taken on when it becomes the computer's") {
+    // A game saved after the host left gives the other people's seats to the computer.
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    run(s, 5'000);
+    REQUIRE(s.computers().view().size() == 1);
+    g.world.player(kHuman)->role = sim::PlayerRole::Computer;
+    run(s, 1'000);
+    const auto view = s.computers().view();
+    REQUIRE(view.size() == 2);
+    CHECK(view[0].player == kComputer);
+    CHECK(view[1].player == kHuman);
+}
+
 TEST_CASE("ai: a computer without a ship founds nothing and harms nobody") {
     Game g(false);
     sim::Simulation s(g.world, g.buildings, g.figures);

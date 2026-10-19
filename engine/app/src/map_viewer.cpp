@@ -364,8 +364,12 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
                                                    static_cast<std::uint32_t>(std::max(0.0, s.y()))});
     }
     viewer->start_preloading();
-    if (auto status = viewer->ensure_graphics(viewer->m_camera.view().zoom); !status) {
-        return status.error();
+    // The menu draws no world: its sprites are made while the player chooses, and a quit from the
+    // menu does not wait for them. A game that starts without the menu needs them now.
+    if (!viewer->in_menu()) {
+        if (auto status = viewer->ensure_graphics(viewer->m_camera.view().zoom); !status) {
+            return status.error();
+        }
     }
     if (options.multiplayer) {
         if (auto status = viewer->start_multiplayer(); !status) {
@@ -407,7 +411,7 @@ void MapViewer::warn_if_state_damaged() const {
 MapViewer::~MapViewer() {
     // GPU resources must go before the renderer/window, which go before SDL_Quit: the textures of
     // the video and the HUD as well as the world's sprites.
-    m_preloader.reset();  // waits for the zoom level being loaded
+    m_preloader.reset();  // cancels the zoom level being loaded
     m_video.reset();
     m_hud.reset();
     for (auto& g : m_graphics) {
@@ -424,8 +428,11 @@ void MapViewer::start_preloading() {
     options.derive_missing_sheets = m_options.derive_small_figures;
     // The thread works on its own copies: nothing it reads changes under it.
     m_preloader = std::make_unique<render::GraphicsPreloader>(
-        [game = m_game, palette = m_palette, banners = m_banners, figures = m_figures, options](render::Zoom zoom) {
-            return render::prepare_world_graphics(game, palette, zoom, render::kWorldFigureSheets, options, &banners,
+        [game = m_game, palette = m_palette, banners = m_banners, figures = m_figures, options](
+            render::Zoom zoom, const std::atomic<bool>& cancel) {
+            render::GraphicsOptions own = options;
+            own.cancel = &cancel;
+            return render::prepare_world_graphics(game, palette, zoom, render::kWorldFigureSheets, own, &banners,
                                                   &figures);
         },
         true);
@@ -591,6 +598,12 @@ int MapViewer::run() {
                 }
                 render();
             } else {
+                // Leaving the menu: the game waits for the sprites of the zoom level if the
+                // background has not made them yet.
+                if (auto status = ensure_graphics(m_camera.view().zoom); !status) {
+                    std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
+                    return 1;
+                }
                 if (m_hud) {
                     // What the windows of the panel ordered (scuttling and disbanding ask first).
                     submit_orders(m_hud->take_commands(), false);
@@ -1660,7 +1673,7 @@ void MapViewer::recreate_textures() {
         g.reset();
     }
     m_preloader->request(render::preload_order(m_camera.view().zoom));
-    if (auto status = ensure_graphics(m_camera.view().zoom); !status) {
+    if (auto status = in_menu() ? core::Status(core::Ok{}) : ensure_graphics(m_camera.view().zoom); !status) {
         std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
     }
     if (m_hud) {

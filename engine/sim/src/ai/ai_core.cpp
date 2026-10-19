@@ -102,10 +102,30 @@ void Engine::reset() {
     m_state.initialised = true;
 }
 
+void Engine::adopt_new_computers() {
+    // A slot the computer did not play before (a person's seat in a game saved after the host
+    // left): it takes the slot on from what it finds there, as after loading a game of the original.
+    for (std::size_t i = 0; i < m_world.players().size(); ++i) {
+        if (m_world.players()[i].role != PlayerRole::Computer) {
+            continue;
+        }
+        const auto id = static_cast<PlayerId>(i);
+        if (std::any_of(m_state.players.begin(), m_state.players.end(),
+                        [id](const AiPlayer& p) { return p.player == id && !p.pirates; })) {
+            continue;
+        }
+        AiPlayer p;
+        p.player = id;
+        init_player(p);
+        m_state.players.push_back(std::move(p));
+    }
+}
+
 void Engine::tick(std::uint32_t dt_ms) {
     if (!m_state.initialised) {
         reset();
     }
+    adopt_new_computers();
     if (m_state.islands.size() != m_world.islands().size()) {
         m_state.islands.resize(m_world.islands().size());
     }

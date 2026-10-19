@@ -166,6 +166,8 @@ private:
     void start_preloading();
     /// The graphics of `zoom` on the GPU; waits for the background if it is not done yet.
     core::Status ensure_graphics(render::Zoom zoom);
+    /// The menu is shown: no world is drawn.
+    [[nodiscard]] bool in_menu() const noexcept { return m_hud && m_hud->menu_active(); }
     /// Every frame: uploads the zoom levels the background finished.
     void adopt_preloaded_graphics();
     core::Status install_graphics(render::Zoom zoom, render::PreparedGraphics prepared);
@@ -333,7 +335,8 @@ private:
     /// it holds as a whole and says where; loaded, it plays on alone or is hosted anew.
     void save_after_host_left();
     /// A line for the chat: a player's (`name` given) or a notice of the session.
-    void chat_line(std::string name, std::string text, sim::PlayerId seat = sim::kNoPlayer);
+    /// A line in the chat (Windows-1252, as drawn), also on stderr unless `echo` is off.
+    void chat_line(std::string name, std::string text, sim::PlayerId seat = sim::kNoPlayer, bool echo = true);
     [[nodiscard]] net::HostSession* host_session() const noexcept;
     [[nodiscard]] net::ClientSession* client_session() const noexcept;
 

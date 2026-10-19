@@ -12,7 +12,7 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #29 and #32. The status column says which one fixes each
+The fixes since then are in PRs #19 to #29, #32 and #33. The status column says which one fixes each
 finding.
 After #32 no finding is fully open: 85 are fixed, 5 are left on purpose and 9 are partly fixed, with
 what remains listed under "Remaining work".
@@ -173,7 +173,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Fixed #29 (the pixel scale follows display-scale changes, a Ctrl +/- offset is kept) |
 | UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Fixed #29 (LRU text cache, sorted soldier index, reused draw-list containers; the mission text is still wrapped each frame) |
 | UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Fixed #32 (soldiers, walkers, townsfolk and sea creatures are drawn between two ticks like ships, through a shared `TickTrail`) |
-| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Fixed #29, #32 (#29: audio prefilled before loads and videos; #32: the zoom levels are prepared on a background thread from the start, only the upload stays on the main thread) |
+| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Fixed #29, #32, #33 (#29: audio prefilled before loads and videos; #32: the zoom levels are prepared on a background thread from the start, only the upload stays on the main thread; #33: the menu shows at once instead of waiting for the sprites, and quitting cancels the level being made) |
 | UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Fixed #26 |
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Fixed #20, #29 (#20: atomic writes and logged errors; #29: the files are UTF-8, older Windows-1252 files still read) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
@@ -205,7 +205,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Fixed #27 (score curves, money steps and the monument rule named in `assets/game_data.hpp`) |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
 | MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Fixed #29 (binary search, the same cuts as before) |
-| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Partly #32 (a client saves the game to `saves/hostleft.o1602` when the host leaves; no host migration) |
+| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Partly #32, #33 (a client saves the game to `saves/hostleft.o1602` when the host leaves; #33: it loads with that player's seat and the computer plays the other people's seats; no host migration) |
 
 MP-3 is the earlier review's `SoldierOrder` item. In the new numbering it is not AU14, which is the
 bought-ship item.
@@ -273,7 +273,8 @@ the order the project's goals suggest (architecture and tests first, then the re
    sections of the wrong size are refused and there is one CRC-32 (#29).
 5. UI-7 (M): recover from a lost render device by recreating the renderer. Done: a device reset
    rebuilds all textures (#29).
-6. MP-20: host migration. Done: a client saves the game when the host leaves (#32).
+6. MP-20: host migration. Done: a client saves the game when the host leaves (#32), and that
+   game loads with its own seat while the computer plays the others (#33).
 7. AU11: confirm in the original binary that the native warriors and the pirates use the same
    random-offset helper as the soldiers (#32 documents the soldiers' one).
 8. BD-15: the German test player names and two anchors into the private repository stay on

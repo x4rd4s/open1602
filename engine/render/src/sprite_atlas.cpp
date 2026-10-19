@@ -28,7 +28,8 @@ core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const assets::SpriteSheet
     return build(std::span<const SpriteSource* const>(pointers), page_size);
 }
 
-core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const> sources, std::uint32_t page_size) {
+core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const> sources, std::uint32_t page_size,
+                                             const std::atomic<bool>* cancel) {
     constexpr std::uint32_t kPad = 1;
     if (page_size == 0 || page_size > 0xFFFF) {
         return make_error(ErrorCode::OutOfRange, "invalid atlas page size");
@@ -76,6 +77,9 @@ core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const
 
     std::vector<std::uint8_t> rgba;
     for (const Entry& e : entries) {
+        if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) {
+            return make_error(ErrorCode::Unsupported, "cancelled");
+        }
         if (e.width == 0 || e.height == 0) {
             continue;
         }

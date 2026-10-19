@@ -5,6 +5,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -31,6 +32,9 @@ struct GraphicsOptions {
     /// visible when zoomed out.
     bool derive_missing_sheets = true;
     std::uint32_t page_size = 2048;
+    /// Checked while the sprites are decoded: once set, loading stops with an error (the game is
+    /// quitting and waits for the thread that loads).
+    const std::atomic<bool>* cancel = nullptr;
 };
 
 struct WorldGraphics {

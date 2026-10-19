@@ -137,6 +137,8 @@ public:
     void tick(std::uint32_t dt_ms);
     void reset();
     void init_player(AiPlayer& p);
+    /// Gives every computer slot without a state one (reset() makes them for the slots of the start).
+    void adopt_new_computers();
 
 private:
     // ---- ai_core.cpp ----

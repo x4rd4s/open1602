@@ -93,8 +93,11 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     return &m_state->simulation;
 }
 
-void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat) {
-    std::fprintf(stderr, "multiplayer: %s%s%s\n", name.c_str(), name.empty() ? "" : ": ", text.c_str());
+void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat, bool echo) {
+    if (echo) {
+        std::fprintf(stderr, "multiplayer: %s%s%s\n", core::cp1252_to_utf8(name).c_str(), name.empty() ? "" : ": ",
+                     core::cp1252_to_utf8(text).c_str());
+    }
     if (!m_hud) {
         return;
     }
@@ -168,11 +171,25 @@ void MapViewer::apply_session_events() {
 
 void MapViewer::save_after_host_left() {
     const std::filesystem::path path = save_folder() / ("hostleft" + std::string(sim::kSaveExtension));
+    // The game goes on at this computer alone: it loads with this player's seat (the only person
+    // left) and the computer plays the seats of the others. The running game stays as it is.
+    std::vector<sim::Player*> others;
+    for (std::size_t i = 0; i < m_state->world.players().size() && i < sim::kNoPlayer; ++i) {
+        const auto id = static_cast<sim::PlayerId>(i);
+        sim::Player* p = m_state->world.player(id);
+        if (p != nullptr && p->role == sim::PlayerRole::Human && id != m_local_player) {
+            p->role = sim::PlayerRole::Computer;
+            others.push_back(p);
+        }
+    }
     const auto status = save_game(path);
+    for (sim::Player* p : others) {
+        p->role = sim::PlayerRole::Human;
+    }
     const std::string text = status
                                  ? mp_text(MpText::HostLeftSaved, utf8_to_cp1252(core::path_to_utf8(path.filename())))
                                  : ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")});
-    chat_line({}, text);
+    chat_line({}, text, sim::kNoPlayer, false);  // notify() puts it on stderr
     notify(text);
 }
 

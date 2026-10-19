@@ -5,6 +5,7 @@
 // still for seconds. Only the upload to the GPU is left for the thread that owns the renderer.
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -28,14 +29,15 @@ namespace o1602::render {
 class GraphicsPreloader {
 public:
     /// Makes one zoom level. Called on the background thread: it must own everything it reads
-    /// (copies, not references to state the caller changes).
-    using Prepare = std::function<core::Result<PreparedGraphics>(Zoom)>;
+    /// (copies, not references to state the caller changes). It may give up with an error once
+    /// `cancel` is set (GraphicsOptions::cancel): nobody waits for the level any more.
+    using Prepare = std::function<core::Result<PreparedGraphics>(Zoom, const std::atomic<bool>& cancel)>;
     using Ready = std::pair<Zoom, core::Result<PreparedGraphics>>;
 
     /// Without `background` (or if no thread can be started) nothing is made ahead: take() makes
     /// the level on the calling thread.
     GraphicsPreloader(Prepare prepare, bool background);
-    /// Waits for the level being made (the levels still queued are dropped).
+    /// Cancels the level being made and waits for the thread (the levels still queued are dropped).
     ~GraphicsPreloader();
     GraphicsPreloader(const GraphicsPreloader&) = delete;
     GraphicsPreloader& operator=(const GraphicsPreloader&) = delete;
@@ -65,7 +67,8 @@ private:
     std::optional<Zoom> m_making;
     std::vector<Ready> m_ready;
     bool m_stop = false;
-    std::thread m_thread;  ///< touched only by the owning thread
+    std::atomic<bool> m_cancel{false};  ///< read by Prepare while it runs
+    std::thread m_thread;               ///< touched only by the owning thread
 };
 
 }  // namespace o1602::render

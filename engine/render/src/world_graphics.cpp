@@ -144,7 +144,7 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
             pointers.push_back(sources.back().get());
         }
     }
-    auto atlas = SpriteAtlas::build(std::span<const SpriteSource* const>(pointers), options.page_size);
+    auto atlas = SpriteAtlas::build(std::span<const SpriteSource* const>(pointers), options.page_size, options.cancel);
     if (!atlas) {
         return atlas.error();
     }
@@ -192,6 +192,9 @@ core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirector
         if (k != static_cast<std::size_t>(assets::FigureSheet::Stadtfld) && p.graphics.base[k]) {
             first_figure = std::min(first_figure, *p.graphics.base[k]);
         }
+    }
+    if (options.cancel != nullptr && options.cancel->load(std::memory_order_relaxed)) {
+        return core::make_error(core::ErrorCode::Unsupported, "cancelled");
     }
     p.hit_mask = SpriteHitMask::build(p.graphics.atlas, first_figure);
     p.ms = static_cast<std::uint32_t>(

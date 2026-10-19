@@ -97,7 +97,7 @@ TEST_CASE("graphics preloader: the shown level first, then its neighbours, small
 TEST_CASE("graphics preloader: without background a level is made when it is taken") {
     Log log;
     render::GraphicsPreloader preloader(
-        [&log](Zoom zoom) -> core::Result<render::PreparedGraphics> {
+        [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
             log.add(zoom);
             return stand_in(zoom);
         },
@@ -119,7 +119,7 @@ TEST_CASE("graphics preloader: levels are made once each on another thread, in t
     Log log;
     {
         render::GraphicsPreloader preloader(
-            [&log](Zoom zoom) -> core::Result<render::PreparedGraphics> {
+            [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
                 log.add(zoom);
                 return stand_in(zoom);
             },
@@ -151,7 +151,7 @@ TEST_CASE("graphics preloader: a level wanted now goes first, the wait keeps cal
     std::promise<void> entered;
     Gate gate;
     render::GraphicsPreloader preloader(
-        [&](Zoom zoom) -> core::Result<render::PreparedGraphics> {
+        [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
             if (zoom == Zoom::Large) {
                 entered.set_value();
                 gate.wait();
@@ -185,7 +185,7 @@ TEST_CASE("graphics preloader: a level wanted now goes first, the wait keeps cal
 }
 
 TEST_CASE("graphics preloader: failures and lack of memory come back as errors") {
-    const auto prepare = [](Zoom zoom) -> core::Result<render::PreparedGraphics> {
+    const auto prepare = [](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
         if (zoom == Zoom::Medium) {
             throw std::bad_alloc();
         }
@@ -215,7 +215,7 @@ TEST_CASE("graphics preloader: the end waits for the level being made and drops 
     std::promise<void> entered;
     {
         render::GraphicsPreloader preloader(
-            [&](Zoom zoom) -> core::Result<render::PreparedGraphics> {
+            [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
                 if (made.fetch_add(1) == 0) {
                     entered.set_value();
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -227,6 +227,28 @@ TEST_CASE("graphics preloader: the end waits for the level being made and drops 
         entered.get_future().wait();
     }
     CHECK(made.load() == 1);
+}
+
+TEST_CASE("graphics preloader: the end cancels the level being made") {
+    std::atomic<bool> cancelled{false};
+    std::promise<void> entered;
+    {
+        render::GraphicsPreloader preloader(
+            [&](Zoom /*zoom*/, const std::atomic<bool>& cancel) -> core::Result<render::PreparedGraphics> {
+                entered.set_value();
+                // A long level: it ends only when the preloader gives it up (or after 10 s).
+                const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+                while (!cancel.load() && std::chrono::steady_clock::now() < give_up) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                cancelled = cancel.load();
+                return core::make_error(core::ErrorCode::Unsupported, "cancelled");
+            },
+            true);
+        preloader.request(render::preload_order(Zoom::Large));
+        entered.get_future().wait();
+    }
+    CHECK(cancelled.load());
 }
 
 namespace {
@@ -275,7 +297,7 @@ TEST_CASE("graphics preloader: a level is made from the sheets of a folder, with
     const assets::Palette palette;
     const std::vector<assets::FigureSheet> sheets{assets::FigureSheet::Ship};
     render::GraphicsPreloader preloader(
-        [game = *game, palette, sheets](Zoom zoom) {
+        [game = *game, palette, sheets](Zoom zoom, const std::atomic<bool>& /*cancel*/) {
             return render::prepare_world_graphics(
                 game, palette, zoom, sheets, render::GraphicsOptions{.derive_missing_sheets = true, .page_size = 64});
         },
@@ -297,5 +319,10 @@ TEST_CASE("graphics preloader: a level is made from the sheets of a folder, with
     auto small = preloader.take(Zoom::Small);
     REQUIRE(small.ok());
     CHECK(small->graphics.derived[static_cast<std::size_t>(assets::FigureSheet::Ship)]);
+    // A cancelled load stops with an error.
+    const std::atomic<bool> cancel{true};
+    CHECK(!render::prepare_world_graphics(*game, palette, Zoom::Large, sheets,
+                                          render::GraphicsOptions{.page_size = 64, .cancel = &cancel})
+               .ok());
     std::filesystem::remove_all(root);
 }

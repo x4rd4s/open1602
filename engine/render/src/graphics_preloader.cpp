@@ -31,6 +31,7 @@ GraphicsPreloader::~GraphicsPreloader() {
         m_stop = true;
         m_queue.clear();
     }
+    m_cancel.store(true, std::memory_order_relaxed);
     m_wake.notify_all();
     if (m_thread.joinable()) {
         m_thread.join();
@@ -126,7 +127,7 @@ void GraphicsPreloader::work() {
 
 core::Result<PreparedGraphics> GraphicsPreloader::prepare(Zoom zoom) const {
     try {
-        return m_prepare(zoom);
+        return m_prepare(zoom, m_cancel);
     } catch (const std::bad_alloc&) {
         return core::make_error(core::ErrorCode::PlatformError, "not enough memory for the graphics");
     } catch (const std::exception& e) {

@@ -5,6 +5,7 @@
 // CPU without any platform dependency, so it is covered by the tests.
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -39,9 +40,10 @@ public:
     static core::Result<SpriteAtlas> build(std::span<const assets::SpriteSheet* const> sheets,
                                            const assets::Palette& palette, std::uint32_t page_size = 2048);
 
-    /// General form: sprites from any sources (original sheets, reduced sheets, mod images).
-    static core::Result<SpriteAtlas> build(std::span<const SpriteSource* const> sources,
-                                           std::uint32_t page_size = 2048);
+    /// General form: sprites from any sources (original sheets, reduced sheets, mod images). Stops
+    /// with an error once `cancel` is set.
+    static core::Result<SpriteAtlas> build(std::span<const SpriteSource* const> sources, std::uint32_t page_size = 2048,
+                                           const std::atomic<bool>* cancel = nullptr);
 
     /// First sprite index of a sheet given to build().
     [[nodiscard]] std::uint32_t sheet_base(std::size_t sheet) const noexcept {

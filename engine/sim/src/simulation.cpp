@@ -450,8 +450,8 @@ bool Simulation::rename_player(const PlayerRename& order) {
 
 bool Simulation::control_player(const PlayerControl& order) {
     Player* p = m_world->player(order.player);
-    // Only the two kinds of players change hands; the computer goes on from where the person was
-    // only for a slot it played before (its AI keeps a state for the slots that began as computers).
+    // Only the two kinds of players change hands. The computer goes on with the state it kept for a
+    // slot it played before; a slot new to it it takes on from what it finds (ai::Engine).
     if (p == nullptr || !p->active() || (p->role != PlayerRole::Human && p->role != PlayerRole::Computer)) {
         return false;
     }
