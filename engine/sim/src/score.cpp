@@ -10,6 +10,7 @@
 
 #include "o1602/assets/scenario.hpp"
 #include "o1602/core/byte_reader.hpp"
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/mission.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -21,18 +22,12 @@ constexpr std::size_t kTimersMission = 0xA7;  // TIMERS: mission number (endless
 constexpr std::size_t kTimersGameId = 0xAC;   // TIMERS: game id
 constexpr std::size_t kTimersRanking = 0xBC;  // TIMERS: SZENE_RANKING of the scenario
 
-constexpr std::size_t kCityCurve = 1000;  // last index of the city curve: 20,000 Einwohner
-constexpr std::size_t kFightCurve = 200;  // last index of the fight curve
+constexpr std::size_t kCityCurve = scoring::kCityCurveLast;
+constexpr std::size_t kFightCurve = scoring::kFightCurveLast;
 
-/// A table of straight segments as 0x00474F90 builds them: from a to b in steps of 1/256,
+/// Fills a table with a straight segment as 0x00474F90 builds them: from a to b in steps of 1/256,
 /// truncated, the end value exactly.
-struct Segment {
-    std::int32_t a;
-    std::int32_t b;
-    std::int32_t from;
-    std::int32_t to;
-};
-void fill(std::span<std::int32_t> table, const Segment& s) {
+void fill(std::span<std::int32_t> table, const scoring::Segment& s) {
     const std::int32_t step = (s.to * 256 - s.from * 256) / (s.b - s.a);
     std::int32_t acc = s.from * 256;
     for (std::int32_t i = s.a; i < s.b; ++i) {
@@ -45,9 +40,7 @@ void fill(std::span<std::int32_t> table, const Segment& s) {
 const std::array<std::int32_t, kCityCurve + 1>& city_table() {
     static const auto table = [] {
         std::array<std::int32_t, kCityCurve + 1> t{};
-        for (const Segment& s : {Segment{0, 10, 12, 12}, Segment{10, 25, 12, 19}, Segment{25, 50, 19, 32},
-                                 Segment{50, 100, 32, 51}, Segment{100, 200, 51, 76}, Segment{200, 400, 76, 102},
-                                 Segment{400, 500, 102, 160}, Segment{500, 1000, 160, 254}}) {
+        for (const scoring::Segment& s : scoring::kCityCurve) {
             fill(t, s);
         }
         for (std::int32_t& v : t) {
@@ -61,9 +54,7 @@ const std::array<std::int32_t, kCityCurve + 1>& city_table() {
 const std::array<std::int32_t, kFightCurve + 1>& fight_table() {
     static const auto table = [] {
         std::array<std::int32_t, kFightCurve + 1> t{};
-        for (const Segment& s : {Segment{0, 1, 0, 0}, Segment{1, 4, 100, 400}, Segment{4, 10, 400, 1000},
-                                 Segment{10, 20, 1000, 2000}, Segment{20, 40, 2000, 3000}, Segment{40, 80, 3000, 5000},
-                                 Segment{80, 140, 5000, 7000}, Segment{140, 200, 7000, 10000}}) {
+        for (const scoring::Segment& s : scoring::kFightCurve) {
             fill(t, s);
         }
         t[0] = 0;
@@ -73,16 +64,9 @@ const std::array<std::int32_t, kFightCurve + 1>& fight_table() {
 }
 
 std::int64_t money_points(std::int64_t money) {
-    constexpr std::array<std::pair<std::int64_t, std::int64_t>, 7> kSteps{{{10'000'000, 5000},
-                                                                           {5'000'000, 4000},
-                                                                           {1'000'000, 3000},
-                                                                           {500'000, 2500},
-                                                                           {250'000, 2000},
-                                                                           {100'000, 1500},
-                                                                           {50'000, 1000}}};
-    for (const auto& [limit, points] : kSteps) {
-        if (money >= limit) {
-            return points;
+    for (const scoring::MoneyStep& step : scoring::kMoneySteps) {
+        if (money >= step.limit) {
+            return step.points;
         }
     }
     return 0;
@@ -160,11 +144,11 @@ ScoreSheet score_sheet(const World& world, const assets::BuildingTable& building
 
     // Monuments the people wanted, per hour of game time from the tenth minute on.
     s.monuments = p->monuments_allowed;
-    s.monument_points = t <= 6000 ? 0 : s.monuments * 90'000'000 / t;
+    s.monument_points = t <= scoring::kMonumentStart ? 0 : s.monuments * scoring::kMonumentFactor / t;
 
     // Opponents defeated: the original counts the triumphal arch allowances (player + 0x8E).
     s.opponents_defeated = p->arches_allowed;
-    s.defeat_points = s.opponents_defeated * 1500;
+    s.defeat_points = s.opponents_defeated * scoring::kDefeatPoints;
 
     s.soldiers_killed = p->soldiers_killed;
     s.soldiers_lost = p->soldiers_lost;

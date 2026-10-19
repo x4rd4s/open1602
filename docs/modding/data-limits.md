@@ -24,3 +24,9 @@ The game numbers the engine relies on (ware, building kind, production kind and 
 are named in one place, `engine/assets/include/o1602/assets/game_data.hpp`. A data set that
 renumbers them needs that header changed too; a data loader for that is planned
 ([ADR 0007](../architecture/0007-extensibility-and-modding.md)).
+
+The score of the end screen and the monument allowance are named there too, in
+`assets::scoring`: the city and fight curves as tables of straight segments, the money steps, the
+monument and defeat points, and the rule that lets a growing city build a monument (every 30
+minutes of game time with 200 inhabitants of class Bürger and higher). A mod changes them in that
+header.

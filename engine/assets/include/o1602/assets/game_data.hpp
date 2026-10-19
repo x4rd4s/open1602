@@ -11,6 +11,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 
 namespace o1602::assets {
@@ -85,6 +86,67 @@ inline constexpr std::array<std::uint16_t, ware::kLastTrade + 1> kBasePrices = {
 [[nodiscard]] constexpr std::uint16_t base_price(std::uint8_t w) noexcept {
     return w < kBasePrices.size() ? kBasePrices[w] : 0;
 }
+
+/// The score of the end screen and the monument allowance (docs/re/missions.md).
+namespace scoring {
+/// A straight segment of a score curve: entries a to b run from `from` to `to` (0x00474F90).
+struct Segment {
+    std::int32_t a;
+    std::int32_t b;
+    std::int32_t from;
+    std::int32_t to;
+};
+
+/// Last index of the city curve (20,000 Einwohner; the index is a city's Einwohner / 20).
+inline constexpr std::size_t kCityCurveLast = 1000;
+/// The city curve: points per 64 Einwohner by the size of the city (a byte table).
+inline constexpr std::array<Segment, 8> kCityCurve{{{0, 10, 12, 12},
+                                                    {10, 25, 12, 19},
+                                                    {25, 50, 19, 32},
+                                                    {50, 100, 32, 51},
+                                                    {100, 200, 51, 76},
+                                                    {200, 400, 76, 102},
+                                                    {400, 500, 102, 160},
+                                                    {500, 1000, 160, 254}}};
+/// Last index of the fight curve.
+inline constexpr std::size_t kFightCurveLast = 200;
+/// The fight curve: points of fights by the number of wins (entry 0 is always 0).
+inline constexpr std::array<Segment, 8> kFightCurve{{{0, 1, 0, 0},
+                                                     {1, 4, 100, 400},
+                                                     {4, 10, 400, 1000},
+                                                     {10, 20, 1000, 2000},
+                                                     {20, 40, 2000, 3000},
+                                                     {40, 80, 3000, 5000},
+                                                     {80, 140, 5000, 7000},
+                                                     {140, 200, 7000, 10000}}};
+
+/// Points of money: the first step whose limit the balance reaches, highest first.
+struct MoneyStep {
+    std::int64_t limit;
+    std::int64_t points;
+};
+inline constexpr std::array<MoneyStep, 7> kMoneySteps{{{10'000'000, 5000},
+                                                       {5'000'000, 4000},
+                                                       {1'000'000, 3000},
+                                                       {500'000, 2500},
+                                                       {250'000, 2000},
+                                                       {100'000, 1500},
+                                                       {50'000, 1000}}};
+
+/// Points of monuments: allowances times this, divided by the game time in 1/10 s ...
+inline constexpr std::int64_t kMonumentFactor = 90'000'000;
+/// ... counted only after this game time in 1/10 s (the tenth minute).
+inline constexpr std::int64_t kMonumentStart = 6000;
+/// Points per opponent defeated (triumphal arch allowance).
+inline constexpr std::int64_t kDefeatPoints = 1500;
+
+/// A growing city earns its owner a monument allowance every this many milliseconds ...
+inline constexpr std::uint64_t kMonumentIntervalMs = 30ULL * 60 * 1000;
+/// ... when it has this many inhabitants ...
+inline constexpr std::uint32_t kMonumentMinInhabitants = 200;
+/// ... of this resident class and higher (2: Bürger).
+inline constexpr std::size_t kMonumentFirstClass = 2;
+}  // namespace scoring
 
 /// HAUS Kind values (record +0x04).
 namespace kind {

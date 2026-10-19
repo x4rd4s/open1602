@@ -305,18 +305,16 @@ void unlock_levels(World& world, const assets::BuildingTable& buildings, const C
 }
 
 void allow_monument(World& world, City& city, std::vector<CityEvent>* events) {
-    constexpr std::uint64_t kInterval = 30ULL * 60 * 1000;
-    constexpr std::size_t kFirstClass = 2;  // Bürger and higher
-    constexpr std::uint32_t kMinInhabitants = 200;
     Player* owner = world.player(city.owner);
     if (owner == nullptr || city.house_growth <= 0) {
         return;
     }
     std::uint32_t inhabitants = 0;
-    for (std::size_t c = kFirstClass; c < city.inhabitants.size(); ++c) {
+    for (std::size_t c = scoring::kMonumentFirstClass; c < city.inhabitants.size(); ++c) {
         inhabitants += city.inhabitants[c];
     }
-    if (inhabitants < kMinInhabitants || world.time_ms() < city.growing_since_ms + kInterval) {
+    if (inhabitants < scoring::kMonumentMinInhabitants ||
+        world.time_ms() < city.growing_since_ms + scoring::kMonumentIntervalMs) {
         return;
     }
     city.growing_since_ms = world.time_ms();
