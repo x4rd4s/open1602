@@ -25,6 +25,8 @@ std::uint64_t random_token() {
     return t;
 }
 
+/// Frames' worth of commands a player may have waiting for room in a frame.
+constexpr std::uint32_t kWaitingFrames = 4;
 /// Pauses, resumes and renames a computer may send per second.
 constexpr std::uint32_t kMaxGameOrdersPerSecond = 4;
 /// Time a new connection has to send its Hello.
@@ -155,12 +157,29 @@ void HostSession::queue(Seat from, sim::Command command) {
         }
         count = &(*it)->this_frame;
     }
-    // Per player, and for the frame as a whole: one frame must fit into one message.
-    if (*count >= m_config.max_commands_per_frame || m_open.size() >= kMaxCommandsPerMessage) {
+    // Per player, and for the frame as a whole: one frame must fit into one message. Each player
+    // has his share of it, so that a few cannot crowd out the others; what does not fit waits for
+    // the next frames, up to a few frames' worth.
+    const std::uint32_t share = frame_share();
+    if (*count >= share || m_open.size() >= kMaxCommandsPerMessage) {
+        const auto waiting = static_cast<std::size_t>(
+            std::count_if(m_overflow.begin(), m_overflow.end(), [from](const auto& w) { return w.first == from; }));
+        if (waiting < std::size_t{kWaitingFrames} * share) {
+            m_overflow.emplace_back(from, std::move(command));
+        }
         return;
     }
     ++*count;
     m_open.push_back(std::move(command));
+}
+
+std::uint32_t HostSession::frame_share() const {
+    std::uint32_t players = m_seat != sim::kNoPlayer ? 1U : 0U;
+    for (const auto& p : m_peers) {
+        players += !p->gone && p->welcomed && p->seat != sim::kNoPlayer ? 1U : 0U;
+    }
+    const auto fair = static_cast<std::uint32_t>(kMaxCommandsPerMessage / std::max(players, 1U));
+    return std::max(1U, std::min(m_config.max_commands_per_frame, fair));
 }
 
 void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick) {
@@ -430,6 +449,12 @@ void HostSession::close_frame() {
     m_open_own = 0;
     for (const auto& p : m_peers) {
         p->this_frame = 0;
+    }
+    // The commands that waited go first into the new frame, in the order they came.
+    std::deque<std::pair<Seat, sim::Command>> waiting;
+    waiting.swap(m_overflow);
+    for (auto& [from, command] : waiting) {
+        queue(from, std::move(command));
     }
 }
 

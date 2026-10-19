@@ -505,6 +505,25 @@ TEST_CASE("net: a slot's token is good only for the one it was given to") {
     CHECK(c->session->local_seat() != seat);
 }
 
+TEST_CASE("net: a flooding player leaves room for the others' commands") {
+    net::LoopbackNetwork network(5, 0);
+    net::SessionConfig config;
+    config.max_commands_per_frame = 1024;  // one player alone could fill a whole frame
+    Host host(network, config);
+    Computer a(network, "Anna", 0, kContent, config);
+    Computer b(network, "Bernd", 0, kContent, config);
+    run_for(network, host, {&a, &b}, 1000);
+    REQUIRE(a.session->playing());
+    REQUIRE(b.session->playing());
+    for (int i = 0; i < 3000; ++i) {
+        a.session->submit(sim::ProductionSwitch{a.session->local_seat(), 0, 1, 1});
+    }
+    b.session->submit(sim::PlayerRename{b.session->local_seat(), "Bea"});
+    run_for(network, host, {&a, &b}, 1000);
+    CHECK(host.game.world->players()[b.session->local_seat()].name == "Bea");
+    CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
+}
+
 TEST_CASE("net: a connection that never says hello is let go") {
     net::LoopbackNetwork network(5, 0);
     Host host(network);

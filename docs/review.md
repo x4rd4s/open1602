@@ -186,18 +186,18 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-2 | Medium | ENet's 1 MiB limit also applies to sending; bigger snapshots are dropped silently | `net/src/enet_transport.cpp` | Fixed #20 |
 | MP-3 | Medium | Large `SoldierOrder`s with duplicate ids stall every computer | `sim/src/military.cpp` | Fixed #20 |
 | MP-4 | Medium | No authority over pause, speed and host-only commands | `net/src/host_session.cpp`, `sim/src/simulation.cpp` | Fixed #20 |
-| MP-5 | Medium | Flooding players crowd out other players' commands, which are dropped silently | `net/src/host_session.cpp` | Open |
+| MP-5 | Medium | Flooding players crowd out other players' commands, which are dropped silently | `net/src/host_session.cpp` | Fixed #20 |
 | MP-6 | Medium | Connections that never send `Hello` keep their slot forever | `net/src/host_session.cpp` | Fixed #20 |
 | MP-7 | Low | Rejoining in a loop makes the host serialize and send the whole game repeatedly | `net/src/host_session.cpp` | Open |
 | MP-8 | Low | LAN discovery can be abused and spoofed | `net/src/lan.cpp` | Open |
 | MP-9 | Low | German and English installations cannot play together | `app/src/multiplayer.cpp` | Fixed #20 |
 | MP-10 | Low | "Main menu" or "New game" on the end screen does not leave the session | `app/src/hud.cpp`, `map_viewer.cpp` | Fixed #20 |
-| MP-11 | Low | The end screen handles only 4 colours; players 5 to 12 cannot be selected | `app/src/end_screen.cpp` | Open |
-| MP-12 | Low | English default names and engine error texts reach players and the sim state | `net/src/host_session.cpp`, `app/src/main.cpp`, `app/src/multiplayer.cpp` | Open |
+| MP-11 | Low | The end screen handles only 4 colours; players 5 to 12 cannot be selected | `app/src/end_screen.cpp` | Fixed #20 |
+| MP-12 | Low | English default names and engine error texts reach players and the sim state | `net/src/host_session.cpp`, `app/src/main.cpp`, `app/src/multiplayer.cpp` | Partly (#20: generated names, `--name` encoding; the net default name stays) |
 | MP-13 | Low | The fingerprint serializes the game every 100 frames, so its cost grows with speed | `net/src/session.cpp` | Open |
 | MP-14 | Low | Names and chat accept control characters; a newline breaks the high-score file | `net/src/protocol.cpp`, `assets/src/high_scores.cpp` | Fixed #20 |
 | MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Open |
-| MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Open |
+| MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Fixed #20 |
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Open |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
 | MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Open |
@@ -246,9 +246,9 @@ had no slot to join, because every other start player is a computer. Those slots
 | IO | 15 | 9 | 1 | 1 | 4 |
 | AU | 15 | 6 | 0 | 0 | 9 |
 | UI | 18 | 1 | 3 | 2 | 12 |
-| MP | 20 | 0 | 9 | 0 | 11 |
+| MP | 20 | 0 | 12 | 1 | 7 |
 | BD | 17 | 6 | 5 | 2 | 4 |
-| All | 99 | 28 | 20 | 6 | 45 |
+| All | 99 | 28 | 23 | 7 | 41 |
 
 ## Open work, in order
 
@@ -264,16 +264,13 @@ taken from the area reports (S, M, L).
 3. SC-3 (M): save the pause flag (and the speed if wanted) with a section version bump. Network
    sessions already order commands while paused. Single-player and replay paths should follow the
    same turn rule.
-4. MP-5 (M): carry overflowing commands into the next frame per player, and tell the client when
-   commands are dropped.
-5. IO-6 (M): show load warnings in a localized notice, extend the fingerprint to everything that
+4. IO-6 (M): show load warnings in a localized notice, extend the fingerprint to everything that
    drives the simulation, and make a mismatch a hard error in multiplayer.
-6. MP-7, MP-15, MP-13, MP-8 (S each): resync and snapshot limits per token, kicking spectators and a
+5. MP-7, MP-15, MP-13, MP-8 (S each): resync and snapshot limits per token, kicking spectators and a
    lag grace period, a hash interval in game time, and a bounded LAN browser that checks nonces.
-7. AU6 (M): one hold-count rule for ships from original files and new ones.
-8. Robustness leftovers (S each): SC-12 saturating subtraction, AU13 no shared static scratch, the
-   `Pool::for_each` guard, the `int32` money saturation (earlier SC and AU items), MP-16 no score
-   files in the installation, UI-18 deriving the pause video from `paused()`.
+6. AU6 (M): one hold-count rule for ships from original files and new ones.
+7. Robustness leftovers (S each): SC-12 saturating subtraction, AU13 no shared static scratch, the
+   `Pool::for_each` guard, the `int32` money saturation (earlier SC and AU items), UI-18 deriving the pause video from `paused()`.
 
 **2. Architecture and tests**
 1. UI-4 then UI-5 (M, then L): a `GameSession` that is built completely and then swapped in. After

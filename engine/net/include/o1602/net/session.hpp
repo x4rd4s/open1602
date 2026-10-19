@@ -246,6 +246,9 @@ private:
     void init_lobby();
     /// The token of a slot (made when it is first needed).
     [[nodiscard]] std::uint64_t token_of(Seat seat);
+    /// Commands each player may put into one frame: the configured limit or an equal share of a
+    /// message, whichever is less.
+    [[nodiscard]] std::uint32_t frame_share() const;
     /// The slot's token is no longer good: the slot changed hands.
     void forget_token(Seat seat);
     [[nodiscard]] Peer* peer_of(LinkId link);
@@ -262,10 +265,11 @@ private:
     std::vector<std::unique_ptr<Peer>> m_peers;
     std::deque<Frame> m_log;  ///< frames m_log_start to m_closed - 1
     std::uint64_t m_log_start = 0;
-    std::uint64_t m_closed = 0;        ///< frames below are complete
-    std::uint64_t m_broadcast = 0;     ///< frames below went out to every computer
-    std::vector<sim::Command> m_open;  ///< for frame m_closed
-    std::uint32_t m_open_own = 0;      ///< commands of the host's player in m_open
+    std::uint64_t m_closed = 0;                            ///< frames below are complete
+    std::uint64_t m_broadcast = 0;                         ///< frames below went out to every computer
+    std::vector<sim::Command> m_open;                      ///< for frame m_closed
+    std::uint32_t m_open_own = 0;                          ///< commands of the host's player in m_open
+    std::deque<std::pair<Seat, sim::Command>> m_overflow;  ///< no room in m_open: for the next frames
     std::uint16_t m_lead = 0;
     std::uint32_t m_lead_ms = 0;                           ///< time since the lead last shrank
     std::deque<FrameHash> m_hashes;                        ///< the host's latest fingerprints
