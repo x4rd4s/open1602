@@ -310,6 +310,10 @@ void MapViewer::handle_key(int key, int scancode, std::uint16_t mod) {
         }
         return;
     }
+    if (m_hud && m_hud->end_screen_active() && (key == SDLK_LEFT || key == SDLK_RIGHT)) {
+        m_hud->end_screen_step(key == SDLK_LEFT ? -1 : 1);
+        return;
+    }
     if (m_hud && m_hud->helping()) {
         m_hud->close_help();  // any key closes the key overview
         return;

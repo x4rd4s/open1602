@@ -258,6 +258,7 @@ public:
     /// through take_end_choice().
     void open_end_screen(sim::EndScreenSummary summary, bool view_only);
     [[nodiscard]] bool end_screen_active() const noexcept { return m_end_active; }
+    void end_screen_step(int direction) { m_end.step(direction); }
     [[nodiscard]] std::optional<EndScreen::Choice> take_end_choice() { return std::exchange(m_end_choice, {}); }
     /// Leaves the end screen: the main menu (Resume, or no menu: the game).
     void close_end_screen(EndScreen::Choice choice);

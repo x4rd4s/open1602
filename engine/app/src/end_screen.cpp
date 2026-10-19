@@ -68,6 +68,7 @@ void EndScreen::show(std::size_t row) {
         return;
     }
     ui::Panel& p = *m_panel;
+    m_row = row;
     const sim::EndScreenRow& r = m_summary.rows[row];
     const sim::ScoreSheet& s = r.sheet;
     const std::array<std::int64_t, 10> figures{s.cities,     s.inhabitants,       s.monuments,     s.money,
@@ -86,11 +87,20 @@ void EndScreen::show(std::size_t row) {
     }
     p.set_text(kTotal, std::to_string(s.total));
     p.set_text(kName, r.name.empty() ? ui::tr("end.player", {std::to_string(r.player + 1)}) : r.name);
-    const std::int32_t colour = r.banner > 3 ? 0 : static_cast<std::int32_t>(r.banner);
-    p.set_graphic(kArms, m_arms + colour, 0);
+    // The four colours of the original have coats of arms; the further players show none.
+    p.set_visible(kArms, r.banner <= 3);
+    p.set_graphic(kArms, m_arms + std::min<std::int32_t>(r.banner, 3), 0);
     for (std::size_t c = 0; c < m_by_colour.size(); ++c) {
         p.set_selected(kColours + static_cast<std::int32_t>(c), m_by_colour[c] == row);
     }
+}
+
+void EndScreen::step(int direction) {
+    const std::size_t n = m_summary.rows.size();
+    if (n < 2 || m_view_only) {
+        return;
+    }
+    show(direction < 0 ? (m_row + n - 1) % n : (m_row + 1) % n);
 }
 
 void EndScreen::set_scale(double scale) {

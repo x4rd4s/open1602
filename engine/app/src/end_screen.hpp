@@ -47,6 +47,9 @@ public:
     /// Escape: back to a running game, or into a won one (Open1602: the original has no keys on
     /// its final screen and ends the game).
     [[nodiscard]] std::optional<Choice> back() const noexcept;
+    /// Left and right: the sheet of the previous or next player (Open1602: ENDE.GAD has coats of
+    /// arms for four colours, a game may have twelve players).
+    void step(int direction);
 
     [[nodiscard]] const sim::EndScreenSummary& summary() const noexcept { return m_summary; }
     [[nodiscard]] bool view_only() const noexcept { return m_view_only; }
@@ -58,6 +61,7 @@ private:
     double m_scale = 1.0;
     std::int32_t m_arms = 0;  ///< sprite of the coat of arms of colour 0 (gadget 36005)
     sim::EndScreenSummary m_summary;
+    std::size_t m_row = 0;  ///< the row shown
     bool m_view_only = false;
     /// The row of each colour's button, nothing for a colour nobody plays.
     std::array<std::optional<std::size_t>, 4> m_by_colour{};

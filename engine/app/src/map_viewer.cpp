@@ -12,6 +12,7 @@
 #include <random>
 #include <span>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 #include "o1602/assets/chunk_file.hpp"
@@ -145,13 +146,18 @@ std::string player_label(const sim::Player& p, sim::PlayerId slot, const render:
 }  // namespace
 
 void name_more_players(sim::World& world) {
+    // Only a game that has not run yet: later a person may have taken a slot and its name.
+    if (world.time_ms() != 0) {
+        return;
+    }
     // In the order of render::BannerTable::add_more_players.
     static constexpr std::array<const char*, sim::kMaxPlayers - sim::kOriginalPlayers> kKeys = {
         "player.colour.orange",     "player.colour.green", "player.colour.teal",   "player.colour.pink",
         "player.colour.light_blue", "player.colour.lime",  "player.colour.purple", "player.colour.brown"};
     for (std::size_t n = sim::kOriginalPlayers; n < sim::kMaxPlayers; ++n) {
         sim::Player* p = world.player(sim::player_slot(n));
-        if (p != nullptr && p->banner == sim::kFirstExtraBanner + (n - sim::kOriginalPlayers) &&
+        if (p != nullptr && p->role == sim::PlayerRole::Computer &&
+            p->banner == sim::kFirstExtraBanner + (n - sim::kOriginalPlayers) &&
             p->name == "Player " + std::to_string(n + 1)) {
             p->name = ui::tr(kKeys[n - sim::kOriginalPlayers]);
         }
@@ -1981,7 +1987,14 @@ std::filesystem::path MapViewer::data_folder() {
         folder = core::path_from_utf8(pref);
         SDL_free(pref);
     } else {
-        folder = std::filesystem::current_path();
+        // Never the working folder: started from the installation, the game would write into it.
+        std::error_code ec;
+        folder = std::filesystem::temp_directory_path(ec) / "Open1602";
+        static bool warned = false;
+        if (!std::exchange(warned, true)) {
+            std::fprintf(stderr, "warning: no user data folder (%s), using %s\n", SDL_GetError(),
+                         core::path_to_utf8(folder).c_str());
+        }
     }
     return folder;
 }
