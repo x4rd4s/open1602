@@ -54,10 +54,13 @@ struct DiplomacyEvent {
 struct Relation {
     Treaty peace = Treaty::Signed;
     Treaty trade = Treaty::None;
-    std::uint64_t war_time_ms = 0;  ///< the original's +0xF4: when war was last declared on a
-    std::uint32_t tribute = 0;      ///< tribute received from b, scaled; decays
-    std::uint32_t trade_mood = 0;   ///< trade (and plunder) with b; decays
-    std::uint32_t damage = 0;       ///< damage received from b (1/32 HP); decays
+    /// The original's +0xF4: when war was last declared on a. As in the original, only a's own
+    /// entry relation(a, a) is written; the pair entries keep what a savegame brought. Nothing
+    /// reads it (docs/re/diplomacy.md); it is kept for the savegame round trip.
+    std::uint64_t war_time_ms = 0;
+    std::uint32_t tribute = 0;     ///< tribute received from b, scaled; decays
+    std::uint32_t trade_mood = 0;  ///< trade (and plunder) with b; decays
+    std::uint32_t damage = 0;      ///< damage received from b (1/32 HP); decays
 };
 
 /// Messages for the players.

@@ -198,7 +198,7 @@ bool Diplomacy::set_peace(const World& world, PlayerId a, PlayerId b, Treaty v, 
             // sends the same value as a declaration of war and b remembers one.
             if (ab.peace != Treaty::Offered) {
                 add_event(b, a, DiplomacyEventType::WarDeclared, now_ms);
-                relation(b, b).war_time_ms = now_ms;
+                relation(b, b).war_time_ms = now_ms;  // the victim's own entry, as the original
             }
             ab.peace = Treaty::None;
             ba.peace = Treaty::None;
