@@ -12,8 +12,8 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PR #19 (merged) and PR #20 (open). The status column says which one
-fixes each finding.
+The fixes since then are in PR #19 and PR #20 (both merged) and PR #21. The status column says
+which one fixes each finding.
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
 `third_party/`, `tools/` or `.github/`.
@@ -118,7 +118,7 @@ and localized names are part of the sim state (see UI-2).
 | IO-3 | Medium | `core::read_file` throws on a directory and has no size limit | `core/src/file.cpp` | Fixed #19 |
 | IO-4 | Medium | Ship and unit ids are not validated; `next_*_id` can stick at `0xFFFFFFFF` | `sim/src/validate.cpp` | Fixed #19 |
 | IO-5 | Medium | The documented island limits are not enforced on load; the `.GAM` export truncates silently | `sim/src/savegame_extension.cpp` | Fixed #19 |
-| IO-6 | Medium | Load warnings go to stderr only; the building-data fingerprint is weak and only warns | `sim/src/savegame_extension.cpp`, `app/src/map_viewer.cpp` | Open |
+| IO-6 | Medium | Load warnings go to stderr only; the building-data fingerprint is weak and only warns | `sim/src/savegame_extension.cpp`, `app/src/map_viewer.cpp` | Partly (#21: a status-line notice; multiplayer already compares the whole `.cod` files; the savegame fingerprint stays weak) |
 | IO-7 | Low | Mixer interpolation overflows signed `int` | `audio/src/mixer.cpp` | Fixed #19 |
 | IO-8 | Low | The sub-tile of a saved tile is not checked against its building | `sim/src/savegame_extension.cpp` | Fixed #19 |
 | IO-9 | Low | A ship's tile position is truncated from `pos_x`/`pos_y` | `sim/src/savegame_extension.cpp` | Fixed #19 |
@@ -138,7 +138,7 @@ and localized names are part of the sim state (see UI-2).
 | AU3 | Medium | A ship can be repaired at any player's shipyard | `sim/src/shipyards.cpp` | Fixed #19 |
 | AU4 | Medium | Shipyards never set `fetching`, so they send a new pack donkey every cycle | `sim/src/shipyards.cpp` | Fixed #19 |
 | AU5 | Medium | `Fleet::load` takes `m_yard_ms` and `m_trader_ms` unbounded, so a crafted save can stall the game | `sim/src/ships.cpp` | Fixed #19 |
-| AU6 | Medium | Ships from original files keep 8 holds; about ten code paths ignore the type's hold count | `sim/src/world.cpp`, `ships.cpp`, `castles.cpp` | Open |
+| AU6 | Medium | Ships from original files keep 8 holds; about ten code paths ignore the type's hold count | `sim/src/world.cpp`, `ships.cpp`, `castles.cpp` | Fixed #21 |
 | AU7 | Low | O(n) scans per soldier run and per combat candidate | `sim/src/soldiers.cpp`, `combat.cpp` | Open |
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Open |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Open |
@@ -147,7 +147,7 @@ and localized names are part of the sim state (see UI-2).
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Open |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
-| AU15 | Low | Fallback ship name `"Ship N"` is not localized | `sim/src/trader.cpp` | Open |
+| AU15 | Low | Fallback ship name `"Ship N"` is not localized | `sim/src/trader.cpp` | Won't fix (#21: the simulation's names must not depend on the player's language; every installation has Text.cod's ship names, so the fallback does not show) |
 
 Earlier items still present: `ShipNote& note()` appends while callers iterate
 (`sim/src/ai/ai_logistics.cpp`). `City::trader_inbound` stays set when a trader gives up
@@ -174,7 +174,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Open |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Open |
-| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Open |
+| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21: see BD-7) |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Open |
 | UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Fixed #20 |
 
@@ -188,15 +188,15 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-4 | Medium | No authority over pause, speed and host-only commands | `net/src/host_session.cpp`, `sim/src/simulation.cpp` | Fixed #20 |
 | MP-5 | Medium | Flooding players crowd out other players' commands, which are dropped silently | `net/src/host_session.cpp` | Fixed #20 |
 | MP-6 | Medium | Connections that never send `Hello` keep their slot forever | `net/src/host_session.cpp` | Fixed #20 |
-| MP-7 | Low | Rejoining in a loop makes the host serialize and send the whole game repeatedly | `net/src/host_session.cpp` | Open |
-| MP-8 | Low | LAN discovery can be abused and spoofed | `net/src/lan.cpp` | Open |
+| MP-7 | Low | Rejoining in a loop makes the host serialize and send the whole game repeatedly | `net/src/host_session.cpp` | Fixed #21 |
+| MP-8 | Low | LAN discovery can be abused and spoofed | `net/src/lan.cpp` | Partly (#21: bounded reads, nonce check, at most 64 games; a host name is still looked up on the main thread) |
 | MP-9 | Low | German and English installations cannot play together | `app/src/multiplayer.cpp` | Fixed #20 |
 | MP-10 | Low | "Main menu" or "New game" on the end screen does not leave the session | `app/src/hud.cpp`, `map_viewer.cpp` | Fixed #20 |
 | MP-11 | Low | The end screen handles only 4 colours; players 5 to 12 cannot be selected | `app/src/end_screen.cpp` | Fixed #20 |
-| MP-12 | Low | English default names and engine error texts reach players and the sim state | `net/src/host_session.cpp`, `app/src/main.cpp`, `app/src/multiplayer.cpp` | Partly (#20: generated names, `--name` encoding; the net default name stays) |
-| MP-13 | Low | The fingerprint serializes the game every 100 frames, so its cost grows with speed | `net/src/session.cpp` | Open |
+| MP-12 | Low | English default names and engine error texts reach players and the sim state | `net/src/host_session.cpp`, `app/src/main.cpp`, `app/src/multiplayer.cpp` | Fixed #21 |
+| MP-13 | Low | The fingerprint serializes the game every 100 frames, so its cost grows with speed | `net/src/session.cpp` | Fixed #21 |
 | MP-14 | Low | Names and chat accept control characters; a newline breaks the high-score file | `net/src/protocol.cpp`, `assets/src/high_scores.cpp` | Fixed #20 |
-| MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Open |
+| MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Partly (#21: a repeated staller waits a quarter of the time; spectators cannot be kicked yet) |
 | MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Fixed #20 |
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Open |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
@@ -216,7 +216,7 @@ bought-ship item.
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
 | BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Open |
-| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Open |
+| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; platform, render_sdl and o1602-tool remain) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
 | BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20 |
@@ -240,15 +240,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Partly | Open |
-|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 1 | 4 |
-| IO | 15 | 9 | 1 | 1 | 4 |
-| AU | 15 | 6 | 1 | 0 | 8 |
-| UI | 18 | 1 | 4 | 1 | 12 |
-| MP | 20 | 0 | 12 | 1 | 7 |
-| BD | 17 | 6 | 5 | 2 | 4 |
-| All | 99 | 28 | 26 | 6 | 39 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 0 | 1 | 4 |
+| IO | 15 | 9 | 1 | 0 | 0 | 2 | 3 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 6 |
+| UI | 18 | 1 | 4 | 0 | 0 | 2 | 11 |
+| MP | 20 | 0 | 12 | 3 | 0 | 2 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 3 | 3 |
+| All | 99 | 28 | 26 | 4 | 1 | 10 | 30 |
 
 ## Open work, in order
 
@@ -257,28 +257,24 @@ tests, then moddability, then performance, and finally cosmetic and documentatio
 taken from the area reports (S, M, L).
 
 **1. Determinism and multiplayer leftovers**
-1. AU15 (S): the `"Ship N"` fallback without a name list. (UI-2 and MP-9 are fixed in #20: the
-   name lists are saved with the game and travel with it, so they left the content fingerprint.)
-2. MP-12 (S): no `"Player"` literal in hashed state. Mark generated players with a flag instead of
-   matching the string, and map the remaining English error texts to `tr()` keys.
-3. SC-3 (M): save the pause flag (and the speed if wanted) with a section version bump. Network
+1. SC-3 (M): save the pause flag (and the speed if wanted) with a section version bump. Network
    sessions already order commands while paused. Single-player and replay paths should follow the
    same turn rule.
-4. IO-6 (M): show load warnings in a localized notice, extend the fingerprint to everything that
-   drives the simulation, and make a mismatch a hard error in multiplayer.
-5. MP-7, MP-15, MP-13, MP-8 (S each): resync and snapshot limits per token, kicking spectators and a
-   lag grace period, a hash interval in game time, and a bounded LAN browser that checks nonces.
-6. AU6 (M): one hold-count rule for ships from original files and new ones.
-(The robustness leftovers SC-12, AU13, UI-18, the `Pool::for_each` guard and money saturation are
-fixed in #20.)
+2. IO-6 rest (M): a savegame fingerprint over everything that drives the simulation (multiplayer
+   already compares the whole `.cod` files in its Hello).
+3. MP-15 rest (S): a way to kick spectators (the host's roster has no seat for them).
+4. MP-8 rest (S): look host names up off the main thread.
+(Fixed in #21: AU6 one hold rule, MP-7 games rationed, MP-12 no English default names, MP-13
+fingerprints per real time. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
+`Pool::for_each` guard and money saturation are fixed in #20.)
 
 **2. Architecture and tests**
 1. UI-4 then UI-5 (M, then L): a `GameSession` that is built completely and then swapped in. After
    that, a `CommandSink` as the only path to `Simulation::submit`, then `MapInput`,
    `EventPresenter`, `VideoController` and a screen stack.
-2. BD-7 and UI-16 (M): an `o1602_app` static library with a thin `main.cpp`. First tests for
-   settings and slot parsing, `BuildTool::build_order` and `question_for`. Smoke tests for
-   o1602-tool, and an ASan game run with the dummy video driver.
+2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool is
+   there since #21, with tests). Next tests for `question_for`, smoke tests for o1602-tool, and an
+   ASan game run with the dummy video driver.
 3. BD-6 (M): run the synthetic AI world for several game hours so the AI reaches site search,
    building, military and logistics. Round-trip a synthetic world through `savegame_writer`. Track
    coverage in CI.
