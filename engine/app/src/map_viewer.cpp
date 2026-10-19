@@ -1989,7 +1989,9 @@ void MapViewer::update_title(double fps) {
     // reached since the last title.
     const std::uint64_t now = platform::ticks_ms();
     const std::uint64_t game_ms = m_state->simulation.game_time_ms();
-    if (!m_state->simulation.paused() && now > m_title_real_ms && game_ms >= m_title_game_ms && m_title_real_ms != 0) {
+    // A multiplayer game that ended stands still on purpose.
+    const bool stands = m_state->simulation.paused() || (m_session && m_session->ended());
+    if (!stands && now > m_title_real_ms && game_ms >= m_title_game_ms && m_title_real_ms != 0) {
         const double reached =
             static_cast<double>(game_ms - m_title_game_ms) / static_cast<double>(now - m_title_real_ms);
         if (reached < 0.9 * m_state->simulation.speed()) {
