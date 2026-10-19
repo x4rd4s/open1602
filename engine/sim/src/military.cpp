@@ -206,7 +206,7 @@ bool Military::command(const SoldierCommand& c) {
             // The original charges the third value of the Soldat: line (0x0043D559).
             const assets::FigureType* type = type_of(*s);
             if (Player* p = m_world->player(s->owner); p != nullptr && type != nullptr) {
-                p->money -= static_cast<std::int32_t>(m_figures->unit_cost(type->kind));
+                p->money = money_plus(p->money, -static_cast<std::int64_t>(m_figures->unit_cost(type->kind)));
             }
             kill(*s, kNoPlayer, true);
             return true;

@@ -139,12 +139,11 @@ const Relation& Diplomacy::relation(PlayerId a, PlayerId b) const noexcept {
 }
 
 Relation& Diplomacy::relation(PlayerId a, PlayerId b) noexcept {
-    static Relation scratch{};
     if (a < m_count && b < m_count) {
         return m_pairs[std::size_t{a} * m_count + b];
     }
-    scratch = Relation{};
-    return scratch;
+    m_scratch = Relation{};  // a pair that does not exist: written to and forgotten
+    return m_scratch;
 }
 
 bool Diplomacy::hostile(PlayerId a, PlayerId b) const noexcept {
@@ -483,7 +482,7 @@ bool apply_diplomacy(World& world, const DiplomacyOrder& order) {
             if (price == 0 || payer->money < static_cast<std::int64_t>(price)) {
                 return false;
             }
-            payer->money -= static_cast<std::int32_t>(price);  // the money is gone (original)
+            payer->money = money_plus(payer->money, -std::int64_t{price});  // the money is gone (original)
             d.add_event(pirates, order.player, DiplomacyEventType::PeaceBought, world.time_ms());
             pirates_reconsider(world);
             return true;
@@ -496,7 +495,7 @@ bool apply_diplomacy(World& world, const DiplomacyOrder& order) {
         if (payer->money < static_cast<std::int64_t>(price)) {
             return false;
         }
-        payer->money -= static_cast<std::int32_t>(price);
+        payer->money = money_plus(payer->money, -std::int64_t{price});
         d.add_event(pirates, order.player, DiplomacyEventType::BribedBy, world.time_ms());
         d.add_event(pirates, order.target, DiplomacyEventType::BribedAgainst, world.time_ms());
         pirates_reconsider(world);
@@ -546,10 +545,10 @@ bool apply_diplomacy(World& world, const DiplomacyOrder& order) {
             Relation& r = d.relation(order.partner, order.player);
             r.tribute = std::min(kCounterMax, r.tribute + order.gold * 32 / 17);
             if (Player* payer = world.player(order.player)) {
-                payer->money -= static_cast<std::int32_t>(order.gold);
+                payer->money = money_plus(payer->money, -std::int64_t{order.gold});
             }
             if (Player* receiver = world.player(order.partner)) {
-                receiver->money += static_cast<std::int32_t>(order.gold);
+                receiver->money = money_plus(receiver->money, std::int64_t{order.gold});
             }
             return true;
         }

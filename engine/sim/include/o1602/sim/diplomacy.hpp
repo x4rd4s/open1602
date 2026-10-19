@@ -133,6 +133,7 @@ public:
 private:
     std::size_t m_count = 0;
     std::vector<Relation> m_pairs;  ///< a * count + b
+    Relation m_scratch;             ///< what relation() gives for a pair that does not exist
     std::vector<std::array<DiplomacyEvent, kEvents>> m_events;
     std::vector<PlayerId> m_blamed;  ///< the original's +0x81: last player who destroyed a's Kontor/market
     EventBuffer<DiplomacyNotice> m_notices;

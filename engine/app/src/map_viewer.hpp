@@ -472,6 +472,7 @@ private:
     std::deque<VideoRequest> m_videos;     ///< waiting
     VideoRequest m_video_now;              ///< playing
     bool m_pause_video = false;            ///< the original's pause is on
+    bool m_pause_seen = false;             ///< and the game has stood still since (the command arrived)
     struct EndPending {
         sim::GameOutcome outcome = sim::GameOutcome::Lost;
         /// Real time left while the game runs: the original waits game speed * 5 s of game time.

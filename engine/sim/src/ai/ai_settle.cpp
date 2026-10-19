@@ -558,7 +558,7 @@ void Engine::task_settle_land(AiPlayer& p) {
     }
     Player& pl = player(p);
     if (pl.money < 500) {
-        pl.money += 799;  // the original's founding money (cheat)
+        pl.money = money_plus(pl.money, std::int64_t{799});  // the original's founding money (cheat)
     }
     BuildOrder order;
     order.player = p.player;

@@ -732,7 +732,7 @@ void Simulation::pay_upkeep() {
         // Computer players pay nothing, as in the original (0x00475B00).
         Player* player = m_world->player(static_cast<PlayerId>(p));
         if (player != nullptr && player->role == PlayerRole::Human) {
-            player->money -= static_cast<std::int32_t>(upkeep[p] / 12);
+            player->money = money_plus(player->money, -static_cast<std::int64_t>(upkeep[p] / 12));
         }
     }
 }

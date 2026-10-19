@@ -57,7 +57,8 @@ void Engine::refresh_city(AiPlayer& p) {
     p.refresh_ms = now_ms();
     Player& pl = player(p);
     if (pl.money < kCheatBelow) {
-        pl.money += kCheatMoney;  // the original's steady money (cheat), on every difficulty
+        pl.money = money_plus(pl.money,
+                              std::int64_t{kCheatMoney});  // the original's steady money (cheat), on every difficulty
     }
     if (!threatened(p) && behind(p)) {
         subsidy(p, 1);
@@ -73,9 +74,9 @@ void Engine::subsidy(AiPlayer& p, std::int32_t m) {
     }
     Player& pl = player(p);
     if (pl.money < 4733) {
-        pl.money += 797 * m;
+        pl.money = money_plus(pl.money, static_cast<std::int64_t>(797 * m));
     } else if (pl.money < 9376 && civ_level(p) >= 1) {
-        pl.money += 1793 * m;
+        pl.money = money_plus(pl.money, static_cast<std::int64_t>(1793 * m));
     }
     const auto& mat = m_buildings.materials();
     const auto u = static_cast<std::uint32_t>(m);
@@ -1169,7 +1170,7 @@ void Engine::reserve(AiPlayer& p, const assets::BuildingType& b, std::int64_t ex
     r.island = c->island;
     r.city = c->index;
     r.money = std::int64_t{b.build_cost.money} + extra_money;
-    player(p).money -= static_cast<std::int32_t>(r.money);
+    player(p).money = money_plus(player(p).money, -std::int64_t{r.money});
     r.wood = remove_goods(*c, m.wood, b.build_cost.wood);
     r.bricks = remove_goods(*c, m.bricks, b.build_cost.bricks);
     r.tools = remove_goods(*c, m.tools, b.build_cost.tools);
@@ -1183,7 +1184,7 @@ void Engine::refund(AiPlayer& p) {
         return;
     }
     if (Player* pl = m_world.player(p.player)) {
-        pl->money += static_cast<std::int32_t>(r.money);
+        pl->money = money_plus(pl->money, std::int64_t{r.money});
     }
     if (City* c = city(r.island, r.city); c != nullptr && c->owner == p.player) {
         const auto& m = m_buildings.materials();

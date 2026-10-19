@@ -786,6 +786,17 @@ void MapViewer::zoom_by(int steps, double sx, double sy) {
 
 void MapViewer::update(std::uint32_t delta_ms) {
     scroll_with_keys(delta_ms);
+    // The pause of the video ended another way (F3, another player): the video goes too.
+    if (m_pause_video) {
+        if (m_simulation.paused()) {
+            m_pause_seen = true;
+        } else if (m_pause_seen) {
+            m_pause_video = false;
+            if (m_video && m_video->playing() && m_video->number() == 6 && m_video_now.loop) {
+                stop_video();
+            }
+        }
+    }
     // A window changed the selection (filters, formations): the windows follow.
     if (m_units.take_changed()) {
         selection_changed(false);
@@ -1528,7 +1539,9 @@ void MapViewer::handle_video_event(const SDL_Event& event) {
 }
 
 void MapViewer::toggle_pause_video() {
-    m_pause_video = !m_pause_video;
+    // Follows the game: paused another way (F3, another player), the Pause key goes on.
+    m_pause_video = !m_simulation.paused() && !m_pause_video;
+    m_pause_seen = false;
     if (m_pause_video) {
         submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Pause, m_simulation.speed()});
         if (m_video && m_video->available(6)) {

@@ -345,7 +345,8 @@ void advance_cities(World& world, const assets::BuildingTable& buildings, std::v
                 consume(*city, buildings, events);
                 // Money (0x0047F8A0): a sixth of the balance per minute, truncated towards zero
                 // every 10 s (kept: small balances cost nothing, as in the original).
-                owner->money += (tax_income(*city, buildings) - costs[i]) / 6;
+                owner->money =
+                    money_plus(owner->money, static_cast<std::int64_t>((tax_income(*city, buildings) - costs[i]) / 6));
                 unlock_levels(world, buildings, *city, events);
                 allow_monument(world, *city, events);
                 break;

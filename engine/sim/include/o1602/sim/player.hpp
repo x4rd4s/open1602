@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 
 #include "o1602/assets/scenario.hpp"
@@ -133,12 +134,18 @@ constexpr void add_count(std::uint16_t& counter, std::uint32_t n) noexcept {
 
 /// Money a player gets from or pays for a trade with a Kontor (0x00475AB0, 0x00475A20): it
 /// counts in the trade statistics, unlike taxes, costs or tributes.
+/// Money after adding `value`, held within the range of the original's 32-bit field.
+[[nodiscard]] inline std::int32_t money_plus(std::int32_t money, std::int64_t value) noexcept {
+    return static_cast<std::int32_t>(std::clamp<std::int64_t>(std::int64_t{money} + value,
+                                                              std::numeric_limits<std::int32_t>::min(),
+                                                              std::numeric_limits<std::int32_t>::max()));
+}
 inline void earn_from_trade(Player& p, std::int64_t value) noexcept {
-    p.money = static_cast<std::int32_t>(p.money + value);
+    p.money = money_plus(p.money, value);
     p.sales += 32 * value;
 }
 inline void pay_for_trade(Player& p, std::int64_t value) noexcept {
-    p.money = static_cast<std::int32_t>(p.money - value);
+    p.money = money_plus(p.money, -value);
     p.purchases += 32 * value;
 }
 

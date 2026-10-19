@@ -480,7 +480,7 @@ void Engine::buy_pirate_peace(AiPlayer& p) {
     Player& pl = player(p);
     if (price > 1000 && static_cast<std::int64_t>(price) < std::int64_t{pl.money} - 9000) {
         m_world.diplomacy().add_event(pirates, p.player, DiplomacyEventType::PeaceBought, now_ms());
-        pl.money -= static_cast<std::int32_t>(price);
+        pl.money = money_plus(pl.money, -std::int64_t{price});
     }
 }
 
@@ -1153,7 +1153,7 @@ void Engine::diplomacy(AiPlayer& p) {
                             if (static_cast<std::int64_t>(price) < std::int64_t{pl.money} - 9000) {
                                 d.add_event(pirates, p.player, DiplomacyEventType::BribedBy, now_ms());
                                 d.add_event(pirates, b, DiplomacyEventType::BribedAgainst, now_ms());
-                                pl.money -= static_cast<std::int32_t>(price);
+                                pl.money = money_plus(pl.money, -std::int64_t{price});
                             }
                         }
                     }

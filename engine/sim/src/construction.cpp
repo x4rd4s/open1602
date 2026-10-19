@@ -1831,7 +1831,7 @@ BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, co
         for (auto it = deposits.begin(); it != deposits.end(); ++it) {
             if (it->ware == ware::kTreasure && f.contains(it->x, it->y)) {
                 if (Player* p = world.player(order.player)) {
-                    p->money += it->amount;
+                    p->money = money_plus(p->money, std::int64_t{it->amount});
                 }
                 deposits.erase(it);
                 break;
@@ -1900,7 +1900,7 @@ BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, co
         take(m.cannons, plan.bill.cannons);
     }
     if (Player* p = world.player(order.player)) {
-        p->money -= static_cast<std::int32_t>(plan.bill.money);
+        p->money = money_plus(p->money, -std::int64_t{plan.bill.money});
         // Counted limits; castle and cathedral raise the satisfaction of their city.
         const auto pride = [&] {
             if (City* c = world.city(order.island, city)) {
@@ -2052,7 +2052,7 @@ DemolishResult execute_demolish(World& world, const assets::BuildingTable& build
             }
             if (Player* p = world.player(order.player); p != nullptr && cost.money > 0) {
                 const auto gold = static_cast<std::int32_t>(std::int64_t{cost.money} * refund_percent / 100);
-                p->money += gold;
+                p->money = money_plus(p->money, std::int64_t{gold});
                 result.refund.money += gold;
             }
         }

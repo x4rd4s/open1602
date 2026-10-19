@@ -61,8 +61,10 @@ void finish_cycle(Production& p, const assets::BuildingType& b, std::uint32_t in
     // End of the running cycle: take the raw material, store the product.
     if (p.rate != 0) {
         const std::uint16_t before = p.stock;
-        p.raw = static_cast<std::uint16_t>(p.raw - scale(b.raw_amount, p.rate));
-        p.raw2 = static_cast<std::uint16_t>(p.raw2 - scale(b.raw2_amount, p.rate));
+        // At most what is in store: a building upgraded during the cycle, or a damaged save, may
+        // have taken less for the cycle than the building now needs.
+        p.raw = static_cast<std::uint16_t>(p.raw - std::min<std::uint32_t>(p.raw, scale(b.raw_amount, p.rate)));
+        p.raw2 = static_cast<std::uint16_t>(p.raw2 - std::min<std::uint32_t>(p.raw2, scale(b.raw2_amount, p.rate)));
         p.stock = static_cast<std::uint16_t>(p.stock + scale(b.produce_amount, p.rate));
         if (p.stock / assets::kStockUnitsPerTon > before / assets::kStockUnitsPerTon) {
             emit(events, ProductionEvent::Kind::Produced, index,

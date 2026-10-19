@@ -5,6 +5,7 @@
 // a reused slot (ADR 0004, S-002: a carrier belongs to its building by handle, not by position).
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -24,6 +25,8 @@ class Pool {
 public:
     /// Adds an entity; reuses the lowest free slot so the order stays deterministic.
     Handle add(T value) {
+        // Not inside for_each: a new slot could move the entity it is working on.
+        assert(!m_iterating);
         std::uint32_t index = 0;
         if (!m_free.empty()) {
             // Lowest free slot (m_free is kept sorted descending, so the back is the lowest).
@@ -65,11 +68,13 @@ public:
     /// Calls fn(handle, value) for every entity in slot order. fn may remove the current entity.
     template <class Fn>
     void for_each(Fn&& fn) {
+        m_iterating = true;
         for (std::uint32_t i = 0; i < m_slots.size(); ++i) {
             if (m_slots[i].value) {
                 fn(Handle{i, m_slots[i].generation}, *m_slots[i].value);
             }
         }
+        m_iterating = false;
     }
     template <class Fn>
     void for_each(Fn&& fn) const {
@@ -110,6 +115,7 @@ private:
     std::vector<Slot> m_slots;
     std::vector<std::uint32_t> m_free;  ///< free slots, descending
     std::size_t m_size = 0;
+    bool m_iterating = false;  ///< inside for_each (add() is not allowed then)
 };
 
 }  // namespace o1602::sim

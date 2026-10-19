@@ -361,7 +361,7 @@ private:
         take(m.wood, cost.wood);
         take(m.cannons, cost.cannons);
         if (Player* owner = m_world.player(city.owner); owner != nullptr) {
-            owner->money -= cost.money;
+            owner->money = money_plus(owner->money, -std::int64_t{cost.money});
         }
         return true;
     }

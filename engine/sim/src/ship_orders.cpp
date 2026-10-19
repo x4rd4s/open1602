@@ -138,8 +138,8 @@ bool Fleet::command(const ShipCommand& c) {
                 return false;
             }
             const PlayerId old_owner = ship->owner;
-            buyer->money -= price;
-            seller->money += price;
+            buyer->money = money_plus(buyer->money, -std::int64_t{price});
+            seller->money = money_plus(seller->money, std::int64_t{price});
             ship->owner = c.player;
             ship->for_sale = false;
             ship->sale_factor = 128;
