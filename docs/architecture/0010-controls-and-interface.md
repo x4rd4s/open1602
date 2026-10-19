@@ -136,7 +136,7 @@ with a confirmation before „Ende“ ("Quit")).
 
 ## Consequences
 - Input runs through an action → key table (settings file), not through fixed keys in the
-  code. The current fixed keys of the viewer will be switched over to it.
+  code. The game's default keys are entries of that table (done, `keys.cfg`).
 - The simulation needs a command queue per ship and unit as well as group commands with
   an offset per unit.
 - Deviations from the original in the controls are not bugs in the sense of ADR 0006, but

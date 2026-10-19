@@ -142,8 +142,8 @@ a clear message.
 | Overlay colour `DrawCommand::tint` | index into the 7 colours | ✅ RGBA directly in the command |
 | `sim::World::kWidth/kHeight`, `Cell` with 8-bit island number and coordinates | 500 × 350, 255 islands, islands up to 255 × 255 | ✅ size per world, 16 bits |
 | Buildings, figures | `.cod` numbers as index | ⬜ content registry with ids (with the first custom content) |
-| Goods | fixed list of the original | ⬜ with the economy simulation |
+| Goods | fixed list of the original | ⬜ the economy simulation is done with the original's list; a free goods list comes with content packs (M8) |
 | Factions, scaling of neutral players | – | ⬜ `sim::PlayerRole` is still a fixed enum; the computer opponents (2026-10-18) build on it, factions as data are still pending |
-| Player count at game start, saving | 4 players at start, 7 players, 150 ships, 400 soldiers, 350 towers in the savegame | ⬜ the world plan supports 16 players; saving beyond the original limits goes into our own chunk ([status.md](../status.md)) |
+| Player count at game start, saving | 4 players at start, 7 players, 150 ships, 400 soldiers, 350 towers in the savegame | ⬜ the world plan supports 16 players; saving beyond the original limits is done with the own format `.o1602` ([ADR 0009](0009-own-save-format.md)) |
 | Island generator | – | 🟡 stage 1: custom worlds from the original templates (200–2000 tiles, [worldgen.md](../re/worldgen.md)); stage 2 with custom island shapes postponed |
 | Lua, campaigns, content packages | – | ⬜ own milestones (M8) |

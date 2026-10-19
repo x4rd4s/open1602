@@ -13,7 +13,7 @@ CMake finds both variants. Check: `pacman -Qo /usr/include/zlib.h`.
 Build and test:
 
 ```sh
-cd "$HOME/Projekt Anno"
+cd open1602            # the clone of https://github.com/x4rd4s/open1602
 cmake --preset debug
 cmake --build --preset debug
 ctest --preset debug
@@ -26,7 +26,7 @@ ctest --preset debug
 
 More presets: `release`, `asan` (AddressSanitizer + UBSan), `ci` (warnings as errors).
 
-### Map viewer `open1602` (SDL3)
+### The game `open1602` (SDL3)
 
 The program is only built with `-DO1602_BUILD_GAME=ON` and needs the `sdl3` package (see above):
 
@@ -34,21 +34,23 @@ The program is only built with `-DO1602_BUILD_GAME=ON` and needs the `sdl3` pack
 cmake --preset release -DO1602_BUILD_GAME=ON
 cmake --build --preset release
 export ANNO1602_DIR="$HOME/Games/Heroic/Anno 1602"
-./build/release/engine/app/open1602                                  # „Das Atoll“ ("The Atoll")
+./build/release/engine/app/open1602                                  # the main menu
 ./build/release/engine/app/open1602 --scenario "Szenes/Endlosspiel00.szs" --zoom 1
 ./build/release/engine/app/open1602 --savegame Merlin01           # name from the game (Game.dat)
 ./build/release/engine/app/open1602 --load ~/.local/share/Open1602/saves/quicksave.o1602  # own savegame
 ./build/release/tools/o1602-tool/o1602-tool savegames               # all savegames with names
 ```
 
-Controls: arrow keys/WASD (faster with Shift) or drag with the right/middle mouse button to
-scroll · mouse wheel zooms at the mouse position · 1/2/3 zoom level · R / Shift+R rotate ·
-+/− pixel magnification · O ownership view (territories in player colour) · Space pauses animations · Home jumps to the first island ·
-F5 quicksave (`quicksave.o1602` in the user folder, [o1602-save.md](formats/o1602-save.md)) ·
-F12 screenshot · Esc/Q quit. `--save file.o1602` saves on exit, `--save file.gam`
-exports for the original. The title bar shows the tile under the mouse, frame rate and
-sprite count. With `--frames N --screenshot image.png` the program runs for N frames, saves the
-last one and reports the frame rate (for tests without user input).
+Every option and the default keys: `open1602 --help`. In the game, F1 shows the keys over the map;
+they can be changed in `keys.cfg` in the user's data folder. The decisions behind the controls are in
+[ADR 0010](architecture/0010-controls-and-interface.md). Note that Q and E rotate the view; Ctrl+Q quits.
+
+The window title shows the game, the game clock, the speed or pause and, in a multiplayer game, the
+number of players and the state of the session, in the player's language. With the environment
+variable `O1602_DEBUG_TITLE` set, it also shows a developer readout: zoom and rotation, the tile under
+the mouse with its island, city and owner, the selection, the frame rate and the number of sprites
+drawn. With `--frames N --screenshot image.png` the program runs for N frames, saves the last one and
+reports the frame rate (for tests without user input).
 
 ## 2. Reverse engineering tools
 
@@ -111,8 +113,11 @@ export ANNO1602_DIR="$HOME/Games/Heroic/Anno 1602"
 re/scripts/rea-smoke-test.sh
 ```
 
-The log ends up in `re/notes/rea-smoke-test-*.log`. Please check it in or show it to me – it decides
-whether we use rea directly or Ghidra headless with the scripts from `re/scripts/ghidra/`.
+The log ends up in `re/notes/rea-smoke-test-*.log`. It is not committed (`.gitignore`), because analysis
+logs may contain decompiled code of the original ([ADR 0003](architecture/0003-reimplementation.md));
+summarise the result by hand, as in
+[re/notes/rea-smoke-test-result.md](../re/notes/rea-smoke-test-result.md). It decides whether rea is used directly or Ghidra
+headless with the scripts from `re/scripts/ghidra/`.
 
 ### More tools
 

@@ -73,9 +73,9 @@ __pycache__/
 re/notes/*.log
 *.mp4
 
-# Inputs for the analysis (savegames, videos, screenshots): local only, see docs/requests.md
-/eingaben/
-/ausgaben/
+# Inputs and outputs of the analysis (savegames, videos, screenshots): local only, see docs/requests.md
+/inputs/
+/outputs/
 
 # Private analysis of the original, in the separate repository open1602-re (see CONTRIBUTING.md)
 /docs/re

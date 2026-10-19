@@ -7,8 +7,9 @@ stable multiplayer and room for new features, quality-of-life improvements and m
 > **Status (October 2026):** The simulation of the original is largely complete (construction, economy,
 > population, disasters, ships and trade, military, diplomacy, pirates, computer opponents, new endless
 > game, savegames in the original format). The game starts in the original's main menu and is played with
-> its side panel; multiplayer and parts of the interface are still missing. What is done, open and
-> unclear: [docs/status.md](docs/status.md).
+> its side panel; multiplayer runs in lockstep over the network with a lobby. The editor, parts of the
+> interface and the modding foundations are still missing. What is done, open and unclear:
+> [docs/status.md](docs/status.md).
 
 ## Original game data
 
@@ -31,8 +32,18 @@ on Windows. On Linux and macOS the GOG installer can be unpacked without Windows
 
 ## Building
 
-Requirements on every platform: CMake ≥ 3.25, Ninja, a 64-bit C++20 compiler (GCC 11+, Clang 14+,
-MSVC 2022) and, for the game itself, **SDL 3**. zlib is optional. 32-bit platforms are not supported.
+Get the source:
+
+```sh
+git clone https://github.com/x4rd4s/open1602
+cd open1602
+```
+
+Requirements on every platform: CMake ≥ 3.25, Ninja, a 64-bit C++20 compiler and, for the game
+itself, **SDL 3** and **zlib** (savegames and screenshots are compressed with it). The libraries,
+tests and tools also build without zlib, but then cannot read or write compressed savegames. CI
+builds with GCC 13, Clang 18, AppleClang 15 and MSVC 2022; older compilers may work but are not
+tested. 32-bit platforms are not supported.
 
 Without `-DO1602_BUILD_GAME=ON` only the libraries, the tests and `o1602-tool` are built, not the game.
 The presets are in [CMakePresets.json](CMakePresets.json): `release` for playing, `debug` and `asan`
@@ -43,7 +54,7 @@ The presets are in [CMakePresets.json](CMakePresets.json): `release` for playing
 Install the tools and SDL 3, for example:
 
 ```sh
-sudo pacman -S --needed base-devel cmake ninja sdl3                 # Arch, CachyOS, Manjaro
+sudo pacman -S --needed base-devel cmake ninja sdl3                 # Arch, CachyOS, Manjaro (zlib is already there)
 sudo dnf install gcc-c++ cmake ninja-build SDL3-devel zlib-devel     # Fedora 41+
 sudo apt install build-essential cmake ninja-build libsdl3-dev zlib1g-dev  # Debian 13, Ubuntu 25.04+
 ```
@@ -63,7 +74,7 @@ With [Homebrew](https://brew.sh) (Apple Silicon and Intel):
 
 ```sh
 xcode-select --install
-brew install cmake ninja sdl3
+brew install cmake ninja sdl3      # zlib comes with macOS
 cmake --preset release -DO1602_BUILD_GAME=ON
 cmake --build --preset release
 ctest --preset release
@@ -105,7 +116,7 @@ open1602 --scenario "Szenes/Das Atoll.szs"         # a scenario of the installat
 open1602 --new-game 1 --name Merlin                # a new endless game, difficulty 0 (easy) .. 3 (hard)
 open1602 --savegame NAME                           # a savegame of the original by its name
 open1602 --load path/to/game.o1602                 # a savegame of Open1602
-open1602 --help                                    # every option
+open1602 --help                                    # lists every option and the default keys
 ```
 
 In the game **F1** shows the keys (they can be changed in `keys.cfg`). W A S D, Q, E and the group
@@ -121,6 +132,7 @@ folder, never in the installation:
 | Windows | `%APPDATA%\Open1602\` |
 
 Tests that need the original data run when `ANNO1602_DIR` is set and skip themselves otherwise.
+How to run the tests, filter them and use their environment variables: [tests/README.md](tests/README.md).
 
 ## Tools
 
@@ -135,17 +147,29 @@ o1602-tool cod-dump   haeuser.cod --type HAUS        # interpret a .cod script
 o1602-tool render-island NORD/lar01.SCP island.png   # draw an island isometrically
 o1602-tool render-world "Szenes/Das Atoll.szs" w.png # draw a whole world map
 o1602-tool savegames                                 # the savegames of the installation with their names
+o1602-tool bsh-info   GFX/SHIP.BSH                   # list the sprites of a sheet
+o1602-tool smk        VideoSmk/58.smk --png out/     # decode a Smacker video, frames as PNG
+o1602-tool state      SAVEGAME/game00.gam            # players, cities, warehouses, ships of a game
+o1602-tool new-world  world.gam --world 900x600      # an own world as a savegame for the original
+o1602-tool export     game.o1602 game.gam            # export a game for the original
 ```
+
+Without arguments `o1602-tool` lists every command with its options.
 
 ## Project layout
 
 | Folder | Contents |
 |---|---|
-| `engine/` | Engine modules: `core`, `assets`, `sim`, `render`, `platform`, `audio`, `video`, `ui`, `app` |
+| `engine/` | Engine modules: `core`, `assets`, `sim`, `net`, `render`, `platform`, `audio`, `video`, `ui`, `app`; each has a README |
 | `tools/` | `o1602-tool` (C++) and Python prototypes |
-| `tests/` | Unit tests and tests against the original data |
+| `tests/` | Unit tests and tests against the original data ([how to run them](tests/README.md)) |
 | `docs/` | [Plan](docs/00-plan.md), [status](docs/status.md), [file formats](docs/formats/README.md), [architecture decisions](docs/architecture/README.md), [languages and modding](docs/modding/languages.md) |
 | `re/` | Analysis scripts and notes |
+
+The analysis of the original game (`docs/re/`) and the symbol tables (`re/symbols/`) are kept in the
+private companion repository **open1602-re**, which holds the reverse-engineering notes. They are not
+part of a public clone, so links into `docs/re/` only work for maintainers who have it set up
+([CONTRIBUTING.md](CONTRIBUTING.md#reverse-engineering)).
 
 ## Contributing
 

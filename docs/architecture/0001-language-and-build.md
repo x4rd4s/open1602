@@ -8,7 +8,7 @@ sessions. The original is an MSVC 6 C++ program.
 
 ## Decision
 - **C++20** for the engine and tools; **Python 3** for research/RE scripts.
-- **CMake ≥ 3.25** with presets; dependencies from the system on Linux, via **vcpkg** on Windows/macOS.
+- **CMake ≥ 3.25** with presets; dependencies from the system on Linux, from Homebrew on macOS and via **vcpkg** on Windows.
 - **SDL3** as the only platform layer (window, input, audio, timers, GPU API).
 - `assets` and `core` stay free of mandatory external dependencies (zlib optional).
 

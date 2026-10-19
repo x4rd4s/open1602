@@ -11,7 +11,9 @@
 
 ## Code
 
-- C++20, formatting via `.clang-format` (`clang-format -i <files>`), 120 characters.
+- C++20, formatting via `.clang-format` (`clang-format -i <files>`), 120 characters. CI checks it with
+  clang-format 18 and fails on any difference, so format your changes with that version before a pull
+  request ([tests/README.md](tests/README.md#before-a-pull-request)).
 - Everything in the repository is in **English**: documents, identifiers and code comments, log and
   error messages, commit messages, PR titles and descriptions. Terms from the original game data
   (`Insel`, `Haus`, `Figur`) stay recognisable. In-game texts follow the language of the installed game;
@@ -29,7 +31,9 @@
 - Collect bugs of the original you find in `docs/re/bugs.md`.
 
 The symbol tables (`re/symbols/`) and the analysis of the original (`docs/re/`) are not in
-this repository but in the private repository `open1602-re`. Set it up next to this folder:
+this repository (https://github.com/x4rd4s/open1602) but in the private companion repository
+`open1602-re`. Links into `docs/re/` from the public documents only work with it in place. Maintainers
+set it up next to this folder:
 
 ```sh
 git clone <url-of-open1602-re> ../open1602-re
@@ -43,4 +47,6 @@ Both paths are in `.gitignore`; changes to them are committed in `open1602-re`.
 
 - Small, self-contained commits; prefix by area, e.g. `assets: decode ZEI glyph overhang`,
   `re: name Cod_LoadHaeuser`, `docs: describe INSELHAUS bits`.
-- Before committing: `cmake --build --preset debug && ctest --preset debug`.
+- Before committing: `cmake --build --preset debug && ctest --preset debug`, and clang-format 18 over
+  the changed files. How to run single tests and the tests against the original data:
+  [tests/README.md](tests/README.md).

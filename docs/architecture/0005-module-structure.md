@@ -3,16 +3,20 @@
 Status: accepted · 2026-10-16
 
 ```
-            core            Logging, files, errors (Result), text, fixed point, RNG
+            core            Files, errors (Result), bytes, text, compression
               ▲
             assets          Loaders for original formats (no platform/graphics dependency)
               ▲
-             sim            Deterministic simulation (world, islands, buildings, economy, AI …)
-           ▲     ▲
-         net   script       Lockstep multiplayer / modding
-           ▲
-platform ◄─ render, audio, ui ◄─ app
+             sim            Deterministic simulation (world, islands, economy, AI, random numbers …)
+              ▲
+   net, render, audio, ui   Lockstep multiplayer, draw lists, sound, interface (each on sim)
+              ▲
+   video (on audio), render_sdl (on render, ui, platform), platform (on core and SDL3)
+              ▲
+             app            The game executable, links all of them
 ```
+
+The exact links of every target are listed at the top of `engine/CMakeLists.txt`.
 
 Rules:
 - Arrows point to dependencies; cycles are forbidden.
@@ -21,5 +25,4 @@ Rules:
   public interface; internals live in `src/`.
 - Namespace `o1602::<module>`.
 
-Already done: `core`, `assets`, `sim` (island grid), `render` (software renderer). The remaining modules are described in `engine/<module>/README.md`
-and will be created with their milestones.
+All modules exist except `script` (Lua, M8). Each is described in `engine/<module>/README.md`.

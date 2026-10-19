@@ -1,8 +1,16 @@
 # Implementation status
 
-Status: 2026-10-18 (controls per ADR 0010 with attack-move, pixel-exact selection, key file, quick load, ship and town list, diplomacy window). This page is the overview. The
-details are in the linked documents, each in its "Open" section. It is updated with every
-completed step.
+Status: 2026-10-19 (multiplayer in lockstep with lobby and LAN search, score sheets with end screen and
+high score lists, UTF-8 paths, save fuzz test, game numbers in one place). This page is the overview
+and the single place for the status of the project. The details are in the linked documents, each in
+its "Open" section. It is updated with every completed step.
+
+Links into `re/` (for example [bugs.md](re/bugs.md)) point to the private companion repository
+`open1602-re` and only work for maintainers who have it set up (see
+[CONTRIBUTING.md](../CONTRIBUTING.md#reverse-engineering)).
+
+**Review October 2026:** The code review of October 2026 with all findings and their status is in
+[review.md](review.md).
 
 Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original not confirmed (needs clarification).
 
@@ -12,14 +20,16 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
   disasters, volcanoes, ships and trade, military, diplomacy, pirates, natives, computer opponents,
   new endless game, missions of the scenarios with victory and defeat, reading original savegames
   and exporting them, own save format. It runs in fixed ticks, deterministic and command-based,
-  with 320 tests (many of them against the original data
-  and real savegames).
+  with more than 450 tests (many of them against the original data and real savegames; the
+  current numbers are in section 3).
 - **Playable** via the main menu of the original (endless game, scenarios, savegames) or the
   command line, with the side panel of the original (building, combat, status, settings), controls per
   ADR 0010; feedback also in the terminal.
-- **The large open blocks** are the interface (menus, the selection windows, options),
-  campaign progress and high score list, multiplayer and the
-  modding foundations (content packs, factions as data, Lua).
+- **Multiplayer** works in lockstep through the host over the network, with Open1602's own menu,
+  a lobby and a search for games on the local network ([ADR 0011](architecture/0011-multiplayer-lockstep.md)).
+- **The large open blocks** are the editor, the rest of the interface (own game menu, mouse cursor),
+  the rest of multiplayer (banner choice in the lobby, changing the host) and the modding foundations
+  (content packs, factions as data, Lua).
 - **Savegames**: since 2026-10-18 Open1602 saves in its own format `.o1602`
   ([o1602-save.md](formats/o1602-save.md), [ADR 0009](architecture/0009-own-save-format.md)): without
   the limits of the original (7 players, 150 ships, 400 soldiers, 350 towers), with a checksum, compressed,
@@ -54,15 +64,15 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
 | Islands, buildings, world map | ✅ three zoom levels, four rotations, flags, smoke, status symbols, ownership view (image comparison 0.967) | brightness and colour-cast tables; shipyard symbols „Material fehlt“ ("material missing") and „Brand“ ("fire") | [rendering.md](re/rendering.md) |
 | Figures | ✅ all figures of the economy, soldiers in every banner colour, ships with damage, bow wave, white flag, sinking, decorative figures (walkers, jugglers, whales, dolphins, krakens) | muzzle and shot smoke, hits, wreck (SHIPSUNK), health bars; decorative figures also on undiscovered islands | [figures.md](re/figures.md), [flavor.md](re/flavor.md) |
 | Interface | 🟡 foundations: all 45 layouts (`.GAD`) read, fonts (`.ZEI`) with colours and line wrapping, screen areas, gadgets in operation (states, click, toggles, groups, sliders, glyph list); in the viewer the frame of the original: head of the side panel with world map, compass, rotation and zoom, status bar with help texts and message symbols; build and info modes: **build menu** (groups as data, drop-down, availability, costs, preview, production chain, demolish, rotate) and player status; money and goods at the top of the map; **selection windows**: production buildings, public buildings, house, warehouse/marketplace with lists and stock, foreign warehouse, shipyard with type selection, castle, ship with transfer of cargo, trading, warehouse founding, trade route and pirates; **controls per ADR 0010**: freely assignable keys (`keys.cfg`, overview with F1), pixel-exact selection with a frame, groups by number key, formations, filters and Tab, right-click and minimap commands, command chains, attack-move, hold position, confirmation prompts, quick save/load; **military mode** with the four windows; **ship and town list**, **diplomacy** with tribute; **settings** with savegames, music & effects, voice messages & films, mission window; **main menu** (single player: scenario list, mission with level choice and high score list, name and flag, savegames, continue, credits, intro); **score sheets** (end screen and "Bewertung" of the info panel, points in the info panel) | own game menu, mouse cursor | [ui.md](re/ui.md) |
-| Sound, music, speech | ✅ sounds (building, shots, hits, commands, birds, surf, work and animals, clicks) spatial as in the original, voice messages with a queue, music with randomness, battle music and fading out, 4-bit music unpacked; volumes from `Game.dat` (read only) | tutorial speech, inhabitant and goods messages, options window | [audio.md](re/audio.md) |
-| Videos | ✅ own Smacker decoder, message, victory, defeat and pause videos, start sequence (`--intro`), sound via the mixer | main menu (intro button, credits in the picture frame), video 2990 (campaign progress), options window; do not pause in multiplayer (M-018) | [videos.md](re/videos.md), [smk.md](formats/smk.md) |
+| Sound, music, speech | ✅ sounds (building, shots, hits, commands, birds, surf, work and animals, clicks) spatial as in the original, voice messages with a queue, music with randomness, battle music and fading out, 4-bit music unpacked; volumes from `Game.dat` (read only) | tutorial speech, inhabitant and goods messages | [audio.md](re/audio.md) |
+| Videos | ✅ own Smacker decoder, message, victory, defeat and pause videos, start sequence (`--intro`), intro and credits from the main menu, sound via the mixer; in a multiplayer game the game runs on during a video (M-018) | video 2990 (campaign progress) | [videos.md](re/videos.md), [smk.md](formats/smk.md) |
 | Multiplayer | 🟡 Lockstep through the host over ENet: commands in complete frames, lead by round trip, sender checks, fingerprint every 5 s, resync by savegame after a desync, joining a running game and reconnecting into the same slot (M-003), spectators, slow and frozen computers. Open1602's own multiplayer menu: games on the local network found by themselves, joining by address (remembered), creating an endless game (4 to 12 players, more than four in a world of their own with banners of their own) or a scenario or savegame with password and options, lobby with slots (open, computer), ready, chat and start; a slot nobody took is played by the computer until someone joins, and again when that player leaves; leaving the game leaves its session; `--host`, `--join` | Banner choice in the lobby, the computer taking over slots of players who began as humans, changing the host | [ADR 0011](architecture/0011-multiplayer-lockstep.md) |
 | Editor | ⬜ | rebuild `1602Edit.exe` (later) | – |
 
 ### 1.3 Needs clarification (behaviour of the original not confirmed)
 
-An observation in the original would help where it says "observation"; what I need for that is in
-[requests.md](requests.md).
+An observation in the original would help where it says "observation"; how to record and send one is
+in [requests.md](requests.md).
 
 | Point | Where | Way to clarify |
 |---|---|---|
@@ -92,7 +102,7 @@ An observation in the original would help where it says "observation"; what I ne
 
 | What | Where |
 |---|---|
-| **Bugs of the original**: 173 entries in the catalogue, of which 96 fixed, 43 avoided, 6 switchable as a rule, 18 kept | [bugs.md](re/bugs.md) |
+| **Bugs of the original**: 196 entries in the catalogue (2026-10-18), of which 107 fixed, 52 avoided, 6 switchable as a rule, 19 kept | [bugs.md](re/bugs.md) |
 | **Settings** (`sim::Rules`, in the savegame): refund on demolition, ships per player (100, original 33), units per player (250, original 100), raw material guarantee, highest game speed (8, original 4), droughts, volcanoes, trader prices | [ADR 0008](architecture/0008-game-settings.md) |
 | **Custom worlds** (world generator stage 1): 200–2000 fields per side, number of islands, mix of sizes, villages, volcanic islands, starting areas; chunk `O1602MAP` | [worldgen.md](re/worldgen.md) |
 | **Own save format `.o1602`**: full state (map, clocks, randomness, figures, fires, lava, diplomacy, exploration, ships, soldiers, AI) without limits, canonical, CRC-32, zlib; a saved game continues exactly. Exported `.GAM` files carry the same state in the chunk `O1602` | [o1602-save.md](formats/o1602-save.md), [o1602-chunk.md](formats/o1602-chunk.md) |
@@ -117,24 +127,23 @@ An observation in the original would help where it says "observation"; what I ne
 | Lua scripts, custom scenarios and campaigns | M8, scenarios | ADR 0007 |
 | World generator stage 2 (custom island shapes, including ones larger than the templates) | deferred until everything runs | [00-plan.md](00-plan.md) |
 | Data patches for `.cod` bugs (D-001, D-002 as candidates), switchable | mechanism missing | [bugs.md](re/bugs.md), ADR 0006 |
-| Arbitrary resolution, free zoom, UI scaling, freely assignable keys | M7, interface | [00-plan.md](00-plan.md) |
+| Arbitrary resolution, free zoom, UI scaling (freely assignable keys are done) | M7, interface | [00-plan.md](00-plan.md) |
 | Replays from the session's frames | M6 | [ADR 0011](architecture/0011-multiplayer-lockstep.md) |
-| Ideas: full refund shortly after building; own road pathfinding alongside that of the original; pirate distance of the difficulty level as a setting (S-068) | open, decision needed | [00-plan.md](00-plan.md) |
+| Ideas: full refund shortly after building; own road pathfinding alongside that of the original; pirate distance of the difficulty level as a setting (S-068) | open, decision needed | – |
 
 ### 2.3 Decisions still pending
 
-- ~~Saving beyond the original limits~~: decided (2026-10-18), own format `.o1602` (ADR 0009).
-- ~~U-013~~ (exploring at a shipyard and a pirate warehouse): decided (2026-10-18), the interface offers it (ADR 0010).
-- ~~Key bindings~~ (ADR 0010): confirmed (2026-10-18).
 - **S-035** (demolishing a marketplace destroys houses): kept, warning with the interface.
-- ~~Urgent goods and tower cost class~~: done (2026-10-18).
+
+The decisions taken so far (own save format, U-013, key bindings, urgent goods and tower cost class)
+are recorded in the ADRs and in [bugs.md](re/bugs.md).
 
 ## 3. Technology and quality
 
 | Point | Status |
 |---|---|
-| Tests | 406 cases (35 unit files, 10 with original data), all unit tests without original data: sea and land routes, world generator, AI and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: viewer |
-| Builds | locally under Linux: debug, game, game-rel, asan, game-asan without warnings; CI for Linux (GCC, Clang, ASan), Windows (MSVC 2022), macOS 14 and the game with SDL3 on all three. Windows and macOS have never run locally |
+| Tests | 453 cases on 2026-10-19: 384 unit tests in 43 files that need no original data, and 69 tests against the original data in 11 files (they skip without `ANNO1602_DIR`). Sea and land routes, world generator, AI, multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: the game executable (`engine/app` outside the menus), `engine/platform`, `render_sdl`, `o1602-tool`. How to run them: [tests/README.md](../tests/README.md) |
+| Builds | presets `debug`, `release`, `asan`, `ci` and `vcpkg` (the game with `-DO1602_BUILD_GAME=ON`), locally under Linux without warnings; CI for Linux (GCC, Clang, ASan), Windows (MSVC 2022), macOS 14 and the game with SDL3 on all three. Windows and macOS have never run locally |
 | Player commands | complete for the simulation (since 2026-10-18 also the town window and ship window); the selection windows trigger them; white flag, scuttling, patrol, command chains and group commands with offset have been added |
-| Symbol table `re/symbols/` | 532 functions (on 2026-10-18 extended with the addresses from military, pirates, diplomacy, AI, missions, disasters and new game; evidence refers to the document) |
-| Local player | the first human, until there is a lobby |
+| Symbol table `re/symbols/` | 596 functions (private, in `open1602-re`; evidence refers to the document) |
+| Local player | the first human in a single player game; in multiplayer the slot taken in the lobby |
