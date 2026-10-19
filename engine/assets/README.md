@@ -12,6 +12,7 @@ Depends only on `core`; every loader returns `core::Result`.
 | `building_table.hpp` | Typed building and terrain types from `haeuser.cod`, lookup by id and sprite |
 | `figure_table.hpp` | Figure definitions from `figuren.cod` (ships, soldiers, carriers, flags) |
 | `text_table.hpp` | Texts of `Text.cod` by section |
+| `game_data.hpp` | Numbers of the original's data the engine relies on (wares, building kinds, figures, prices), in one place |
 | `palette.hpp` | `.COL` palette |
 | `sprite_sheet.hpp` | `.BSH`/`.ZEI` sprites (RLE) |
 | `gad.hpp` | Interface layouts `GADDATA/*.GAD` |

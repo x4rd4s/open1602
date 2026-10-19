@@ -23,7 +23,7 @@ for `BSH`). Compare only up to the first NUL.
 | `BSH` | `.BSH` | sprite collection → [bsh.md](bsh.md) |
 | `ZEI` | `.ZEI` | font glyphs (same format as BSH) |
 | `COL` | `.COL` | palette → [col.md](col.md) |
-| `INSEL3` / `INSEL5` | `.SCP .SZS .SZM .GAM` | island header (40 or 116 bytes) → [scp.md](scp.md) |
+| `INSEL3` / `INSEL4` / `INSEL5` | `.SCP .SZS .SZM .GAM` | island header (40 or 116 bytes) → [scp.md](scp.md) |
 | `INSELHAUS` | ditto | tiles/buildings of an island, 8 bytes per entry |
 | `HIRSCH2`, `PRODLIST2`, `WERFT`, `MILITAR`, `SIEDLER`, `ROHWACHS2`, `STADT4`, `KONTOR2`, `MARKT2` | scenarios, savegames | island-related game state (one set per island) |
 | `SZENE_PLAYERMIN`, `SZENE_PLAYERMAX`, `SZENE_GAMEID`, `SZENE_MISSNR`, `SZENE_RANKING` | scenarios | 4 bytes each |

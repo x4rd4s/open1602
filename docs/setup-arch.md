@@ -41,7 +41,7 @@ export ANNO1602_DIR="$HOME/Games/Heroic/Anno 1602"
 ./build/release/tools/o1602-tool/o1602-tool savegames               # all savegames with names
 ```
 
-Every option and the default keys: `open1602 --help`. In the game, F1 shows the keys over the map;
+Every option and the default keys: `open1602 --help` (any unknown option prints them). In the game, F1 shows the keys over the map;
 they can be changed in `keys.cfg` in the user's data folder. The decisions behind the controls are in
 [ADR 0010](architecture/0010-controls-and-interface.md). Note that Q and E rotate the view; Ctrl+Q quits.
 

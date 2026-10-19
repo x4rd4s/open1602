@@ -116,8 +116,10 @@ open1602 --scenario "Szenes/Das Atoll.szs"         # a scenario of the installat
 open1602 --new-game 1 --name Merlin                # a new endless game, difficulty 0 (easy) .. 3 (hard)
 open1602 --savegame NAME                           # a savegame of the original by its name
 open1602 --load path/to/game.o1602                 # a savegame of Open1602
-open1602 --help                                    # lists every option and the default keys
 ```
+
+An option the game does not know, for example `--help`, prints every option and the default keys
+(and exits with code 2).
 
 In the game **F1** shows the keys (they can be changed in `keys.cfg`). W A S D, Q, E and the group
 digits work by their place on the keyboard, so they lie the same on QWERTY, QWERTZ and AZERTY; the

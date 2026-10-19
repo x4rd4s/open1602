@@ -9,7 +9,7 @@ Main entry points:
 
 | Header | Contents |
 |---|---|
-| `simulation.hpp` | `Simulation`: the running game, `tick()`, commands (`submit`, `schedule`), state hash |
+| `simulation.hpp` | `Simulation`: the running game, `tick()` (its steps in the original's order: `tick_steps()`), commands (`submit`, `schedule`), state hash |
 | `world.hpp`, `player.hpp`, `island_map.hpp` | The world: islands and their tile grids, players, cities |
 | `command_io.hpp` | Commands as bytes (multiplayer, replays) |
 | `rules.hpp` | Game settings (`sim::Rules`, [ADR 0008](../../docs/architecture/0008-game-settings.md)) |
@@ -19,8 +19,9 @@ Game systems: `construction`, `drag_path`, `production`, `production_cycle`, `lo
 `pathfinding`, `growth`, `houses`, `consumption`, `disasters`, `volcanoes`, `island_events`,
 `ship`/`ships`, `sea_paths`, `soldier`/`military`, `land_paths`, `combat`, `target`, `diplomacy`,
 `mission`, `score`, `ai` (with `src/ai/`), `event_buffer` (events for the interface), `game_data`
-(numbers of the original's data).
+(the numbers of the original's data from `assets/game_data.hpp` in this namespace).
 
-New games and saving: `new_game`, `world_plan`, `world_generator`; `save_game` (the own format
-`.o1602`), `savegame_extension` and `state_io` (the `O1602` chunk), `savegame_writer` (export as
-`.GAM` for the original), `validate` (the last check of every load).
+New games and saving: `new_game`, `world_plan`, `world_generator`; `save_game` (the file of the own
+format `.o1602`: header, zlib, CRC-32), `savegame_extension` (its sections, which the `O1602` chunk of
+an exported `.GAM` shares) with `state_io` (bounds-checked reading and writing of the state),
+`savegame_writer` (export as `.GAM` for the original), `validate` (the last check of every load).

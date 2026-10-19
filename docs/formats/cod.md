@@ -72,6 +72,9 @@ Peculiarities that the reimplementation reproduces exactly:
 
 - Numbers above 32 bits stop at 2147483647 (`strtol()` of the original with a 32-bit `long`),
   the same on every platform.
+- Numbers with a decimal point are read without the C library, so the locale does not matter: up
+  to 15 significant digits they round like `strtod()`, further digits are dropped. The integer value
+  is the number truncated toward zero and clamped to 32 bits (`ftol()`).
 - **No operator precedence**: values are combined strictly from left to right.
   `A = 2+3*4` gives 20.
 - An operator stays active until another one comes (`A: 1 + 2 3` = 6).

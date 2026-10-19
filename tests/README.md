@@ -72,6 +72,7 @@ into `kFixtures` and load it with `test::fixture()` or `test::fixture_or_skip()`
 | `ANNO1602_DIR` | Folder of the original installation; enables the data tests |
 | `O1602_REPLAY` | `earlier.gam,later.gam` (paths in the installation, for example `SAVEGAME/game08.gam,SAVEGAME/game09.gam`): the data test "a savegame played on in the original replays tile for tile" plays the first savegame for the game time between the two and compares the result with the second. Without it that test skips. |
 | `O1602_FUZZ_ITERATIONS` | Number of mutated savegames the save fuzz test tries (default 400); raise it for longer runs |
+| `O1602_FUZZ_SEED` | First seed of the save fuzz test (default 1); a failure prints the seed that caused it |
 | `O1602_AI_LOG` | When set, the computer players log their decisions to stderr (also in the game) |
 
 ## Before a pull request

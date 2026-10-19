@@ -106,7 +106,8 @@ also fits with changed graphics; an unknown Id makes the chunk invalid.
 - **Check before applying:** first everything is read and checked against the world (islands, tiles
   within their island, free slots of the production list, number of random generators); only if everything
   is correct is it applied. A damaged or truncated chunk changes nothing.
-- Every count is checked against the remaining length before memory is reserved.
+- Every count is checked before memory is reserved: lists against the remaining length, the player
+  count of `DIPL` (one entry per pair of players) against the player limit.
 
 ## Limits of this version
 

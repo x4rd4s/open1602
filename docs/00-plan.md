@@ -144,7 +144,7 @@ from `ANNO1602_DIR` or `--game-dir`.
 | # | Milestone | Result |
 |---|---|---|
 | M0 | Setup | Repo, toolchain, rea+Ghidra feasibility test, CI skeleton |
-| M1 | Assets | All formats documented, `tools/` + `libanno`, asset viewer |
+| M1 | Assets | All formats documented, `tools/` + the asset library, asset viewer |
 | M2 | Map renderer | Load a scenario/savegame and display it statically in isometric view (3 zoom levels) |
 | M3 | Core simulation | Building, production, population, storage, taxes – parity tests against the original |
 | M4 | Playable endless game | Ships, trade, figures, UI, saving/loading (compatible with `.GAM`) |
@@ -153,16 +153,7 @@ from `ANNO1602_DIR` or `--game-dir`.
 | M7 | Improvements | Bug fixes, arbitrary resolutions, free zoom, hotkeys, UI scaling, editor |
 | M8 | Content and modding | Content packs with manifest, content registry with identifiers, PNG/OGG import, Lua scripts, campaigns, custom island shapes (world generator stage 2, ADR 0007) |
 
-**Status of the milestones (2026-10-19)**, details in [status.md](status.md): M0 ✅ · M1 🟡 (open:
-parts of the island header and scenario chunks; fonts, layouts, sound and videos done) · M2 ✅ ·
-M3 ✅ · M4 ✅ (simulation, ships, trade, savegames, sound, the side panel with the selection windows,
-menus and settings) · M5 🟡 (military, pirates, world generator stage 1, AI, missions with victory and
-defeat, points, end screen, high score lists and campaign progress done; open: AI switch and diplomacy
-stance of the scenarios, volcano events of the scenarios) · M6 🟡 (lockstep, desync detection with
-resync, reconnecting, lobby, LAN search, Open1602's own multiplayer menu, 4 to 12 players; open: banner
-choice in the lobby, changing the host) · M7 🟡 (freely assignable keys, mouse-wheel zoom, pixel
-scaling, screenshot and bug fixes done; open: arbitrary resolutions, free zoom, UI scaling, editor) ·
-M8 ⬜ (banners with tinted flags already in place).
+The status of each milestone is in [status.md](status.md#summary).
 
 ## 7. Order of work
 

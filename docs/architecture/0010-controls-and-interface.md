@@ -130,7 +130,8 @@ explore button next to repair and pirates in the ship window (U-013), ship and c
 Shift+L), diplomacy window with tribute (V; confirmation before breaking a peace treaty), the
 settings of the side panel and the main menu for single player (scenarios, endless game, savegames),
 the end screen after victory or defeat as in the original (ENDE.GAD; after a victory Escape goes
-on with the game, which the original ends, with a hint over the buttons). Not yet: our own game menu (Escape) with save, load, settings and quit. The original
+on with the game, which the original ends, with a hint over the buttons). Not yet: our own game menu (Escape) with save, load, settings and quit; the original's key
+bindings as a second preset; F1 as help for the window under the mouse (today F1 shows the keys). The original
 has no game menu: save, load and quit are in the settings of the side panel (done
 with a confirmation before „Ende“ ("Quit")).
 

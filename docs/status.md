@@ -20,8 +20,8 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
   disasters, volcanoes, ships and trade, military, diplomacy, pirates, natives, computer opponents,
   new endless game, missions of the scenarios with victory and defeat, reading original savegames
   and exporting them, own save format. It runs in fixed ticks, deterministic and command-based,
-  with more than 450 tests (many of them against the original data and real savegames; the
-  current numbers are in section 3).
+  with unit tests and tests against the original data and real savegames (the numbers are in
+  section 3).
 - **Playable** via the main menu of the original (endless game, scenarios, savegames) or the
   command line, with the side panel of the original (building, combat, status, settings), controls per
   ADR 0010; feedback also in the terminal.
@@ -30,6 +30,16 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
 - **The large open blocks** are the editor, the rest of the interface (own game menu, mouse cursor),
   the rest of multiplayer (banner choice in the lobby, changing the host) and the modding foundations
   (content packs, factions as data, Lua).
+- **Milestones** (defined in [00-plan.md](00-plan.md#6-milestones)): M0 ✅ · M1 🟡 (open: parts of the
+  island header and scenario chunks; fonts, layouts, sound and videos done) · M2 ✅ · M3 ✅ · M4 ✅
+  (simulation, ships, trade, savegames, sound, the side panel with the selection windows, menus and
+  settings) · M5 🟡 (military, pirates, world generator stage 1, AI, missions with victory and defeat,
+  points, end screen, high score lists and campaign progress done; open: AI switch and diplomacy stance
+  of the scenarios, volcano events of the scenarios) · M6 🟡 (lockstep, desync detection with resync,
+  reconnecting, lobby, LAN search, Open1602's own multiplayer menu, 4 to 12 players; open: see
+  Multiplayer in 1.2) · M7 🟡 (freely assignable keys, mouse-wheel zoom, pixel scaling, screenshot and
+  bug fixes done; open: arbitrary resolutions, free zoom, UI scaling, editor) · M8 ⬜ (banners with
+  tinted flags already in place).
 - **Savegames**: since 2026-10-18 Open1602 saves in its own format `.o1602`
   ([o1602-save.md](formats/o1602-save.md), [ADR 0009](architecture/0009-own-save-format.md)): without
   the limits of the original (7 players, 150 ships, 400 soldiers, 350 towers), with a checksum, compressed,
@@ -102,7 +112,7 @@ in [requests.md](requests.md).
 
 | What | Where |
 |---|---|
-| **Bugs of the original**: 196 entries in the catalogue (2026-10-18), of which 107 fixed, 52 avoided, 6 switchable as a rule, 19 kept | [bugs.md](re/bugs.md) |
+| **Bugs of the original**: 199 entries in the catalogue by its own count (2026-10-19), of which 109 fixed, 53 avoided, 6 switchable as a rule, 20 kept | [bugs.md](re/bugs.md) |
 | **Settings** (`sim::Rules`, in the savegame): refund on demolition, ships per player (100, original 33), units per player (250, original 100), raw material guarantee, highest game speed (8, original 4), droughts, volcanoes, trader prices | [ADR 0008](architecture/0008-game-settings.md) |
 | **Custom worlds** (world generator stage 1): 200–2000 fields per side, number of islands, mix of sizes, villages, volcanic islands, starting areas; chunk `O1602MAP` | [worldgen.md](re/worldgen.md) |
 | **Own save format `.o1602`**: full state (map, clocks, randomness, figures, fires, lava, diplomacy, exploration, ships, soldiers, AI) without limits, canonical, CRC-32, zlib; a saved game continues exactly. Exported `.GAM` files carry the same state in the chunk `O1602` | [o1602-save.md](formats/o1602-save.md), [o1602-chunk.md](formats/o1602-chunk.md) |
@@ -113,7 +123,7 @@ in [requests.md](requests.md).
 | **Computer opponents**: speed independent of the frame rate, wider quarry search, replanting fields instead of demolishing them, log with `O1602_AI_LOG` | [ai.md](re/ai.md) |
 | **Fixes after feedback (2026-10-18)**: name entry in the menu (text input only worked in the game), name prefilled with „Namenlos“ ("Nameless") or the last one, the first key replaces it, Enter speaks „Wählt Euer Banner“ ("Choose your banner") (Speech8 107–115), Escape back to the mission choice; confirmation prompts and key overview respond only to clicks (press and release), not to hovering; sea creatures less frequent (`sea_creatures_every`, default 60 s); view frame of the minimap keeps its shape at the map edge; shadow of the build preview shows the selected building (previously the wooden wall); body text wraps in font pixels (mission window, briefing in the menu); status bar and mission window at full width without seams; event symbol in the colour of the competitor (new town, new ship); right-click first closes the drop-down of the build menu, then the building in hand | [flavor.md](re/flavor.md), [bugs.md](re/bugs.md#bugs-of-open1602-itself) |
 | **Fixes after feedback, second list (2026-10-18)**: fertility of an explored island in the status bar over grass and trees ([GAME] 22); build mode darkens what cannot be built on, and when placing or clicking a building, everything outside its catchment area; forest in random variants; empty goods slots without a yellow frame; camera stays over the map; softer shadows in the build menu; right-click back to the player status (one click from any menu, build menu together with the building in hand); a farm being looked at selects its field in the build menu; when dragging fields and forest the area is hatched yellow as in the History Edition; savegames unlimited with arrows, Enter saves a new one immediately, a voice confirms the save | [ui.md](re/ui.md), [bugs.md](re/bugs.md#bugs-of-open1602-itself) |
-| **Display and controls**: figures also at the smallest zoom level, zoom with the mouse wheel, pixel scaling, screenshot as PNG, own save folder (never into the installation) | [setup-arch.md](setup-arch.md) |
+| **Display and controls**: figures also at the smallest zoom level, zoom with the mouse wheel, pixel scaling, screenshot as PNG, own save folder (never into the installation) | [README](../README.md#running), [ADR 0010](architecture/0010-controls-and-interface.md) |
 
 ### 2.2 Open or planned
 
@@ -142,7 +152,7 @@ are recorded in the ADRs and in [bugs.md](re/bugs.md).
 
 | Point | Status |
 |---|---|
-| Tests | 453 cases on 2026-10-19: 384 unit tests in 43 files that need no original data, and 69 tests against the original data in 11 files (they skip without `ANNO1602_DIR`). Sea and land routes, world generator, AI, multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: the game executable (`engine/app` outside the menus), `engine/platform`, `render_sdl`, `o1602-tool`. How to run them: [tests/README.md](../tests/README.md) |
+| Tests | 473 cases on 2026-10-19: 404 that need no original data (the 45 files in `tests/unit/` and one test in `tests/data/`), and 69 tests against the original data in the 11 files of `tests/data/` (they skip without `ANNO1602_DIR`). Sea and land routes, world generator, AI, multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) have their own. Without their own unit tests: the game executable (`engine/app` outside the menus), `engine/platform`, `render_sdl`, `o1602-tool`. How to run them: [tests/README.md](../tests/README.md) |
 | Builds | presets `debug`, `release`, `asan`, `ci` and `vcpkg` (the game with `-DO1602_BUILD_GAME=ON`), locally under Linux without warnings; CI for Linux (GCC, Clang, ASan), Windows (MSVC 2022), macOS 14 and the game with SDL3 on all three. Windows and macOS have never run locally |
 | Player commands | complete for the simulation (since 2026-10-18 also the town window and ship window); the selection windows trigger them; white flag, scuttling, patrol, command chains and group commands with offset have been added |
 | Symbol table `re/symbols/` | 596 functions (private, in `open1602-re`; evidence refers to the document) |

@@ -85,8 +85,10 @@ makes the savegame unreadable (instead of wrong buildings).
   craters on known islands and within their tiles, owners that exist. If the loader is given the
   figure table (the game does that), it also reads `SIMU` as a trial run
   (`Simulation::state_readable`). Only if everything is correct is the world created; a damaged, truncated
-  or newer savegame loads nothing. Every count is checked against the remaining length before
-  memory is reserved. Writing goes first to a side file, which is then renamed. A fuzz test
+  or newer savegame loads nothing. Every count is checked before memory is reserved: lists against
+  the remaining length (they grow with the records actually read), the world size against 4096 tiles
+  per side, the player count of `DIPL` (one entry per pair of players) against the player limit.
+  Writing goes first to a side file, which is then renamed. A fuzz test
   (`tests/unit/test_save_fuzz.cpp`) changes the sections of a saved game at random (bits, bytes, counts,
   sizes, sections cut, left out, doubled or moved) with a correct checksum: every such file loads
   nothing or a world that validates, saves again and runs.
@@ -102,8 +104,10 @@ makes the savegame unreadable (instead of wrong buildings).
 
 ## Limits of this version
 
-- Islands are addressed by their number (8 bit) in some sections; a world has at most
-  255 islands, an island at most 255 × 255 tiles (the world generator and templates reach that far too).
+- A world has at most 4096 tiles per side (a larger one is refused when reading). The unpacked
+  sections have at most 256 MiB; a larger game is neither written nor read.
+- Islands are addressed by their number (8 bit) in some sections: every island needs a number of its
+  own, and an island has at most 255 × 255 tiles. `validate` refuses anything else.
 - Commands not yet executed between two ticks are not saved (saving
   happens between the ticks).
 - The `.GAM` export of a game loaded from an `.o1602` equals that of a directly loaded one
