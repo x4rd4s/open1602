@@ -79,3 +79,66 @@ add_test(NAME unit COMMAND o1602_tests --no-data)
 add_test(NAME data COMMAND o1602_tests --only-data)
 set_tests_properties(unit data PROPERTIES SKIP_RETURN_CODE 77)
 set_tests_properties(data PROPERTIES TIMEOUT 3600)  # it plays whole games of the original
+
+# Smoke tests of o1602-tool on small synthetic files (tests/tool/write_tool_files.cpp), so they run
+# without the original data: every command that can, and the errors for a missing, truncated or
+# foreign file. tests/tool/expect.cmake checks the exit code and the output together.
+if(TARGET o1602-tool)
+    add_executable(o1602_tool_files tool/write_tool_files.cpp)
+    target_link_libraries(o1602_tool_files PRIVATE o1602::assets)
+    o1602_set_warnings(o1602_tool_files)
+
+    set(_files "${CMAKE_CURRENT_BINARY_DIR}/tool-files")
+    add_test(NAME tool:files COMMAND o1602_tool_files "${_files}")
+    set_tests_properties(tool:files PROPERTIES FIXTURES_SETUP o1602_tool_files)
+
+    # o1602_tool_test(NAME EXIT_CODE [STDOUT regex] [STDERR regex] ARGS ...): "\n" in a regex is a
+    # line end; a regex must not contain ";".
+    function(o1602_tool_test name exit_code)
+        cmake_parse_arguments(PARSE_ARGV 2 arg "" "STDOUT;STDERR" "ARGS")
+        set(expect "-DEXIT_CODE=${exit_code}")
+        if(DEFINED arg_STDOUT)
+            list(APPEND expect "-DSTDOUT=${arg_STDOUT}")
+        endif()
+        if(DEFINED arg_STDERR)
+            list(APPEND expect "-DSTDERR=${arg_STDERR}")
+        endif()
+        add_test(NAME tool:${name}
+                 COMMAND ${CMAKE_COMMAND} ${expect} -P "${CMAKE_CURRENT_SOURCE_DIR}/tool/expect.cmake"
+                         -- $<TARGET_FILE:o1602-tool> ${arg_ARGS})
+        set_tests_properties(tool:${name} PROPERTIES FIXTURES_REQUIRED o1602_tool_files)
+    endfunction()
+
+    o1602_tool_test(usage 2 STDERR "^usage:\\n  o1602-tool chunks ")
+    o1602_tool_test(unknown-command 2 STDERR "^usage:\\n" ARGS no-such-command)
+    o1602_tool_test(missing-argument 2 STDERR "^usage:\\n" ARGS chunks)
+    o1602_tool_test(missing-file 1 STDERR "^error: [^\\n]*no-such-file.gam" ARGS chunks "${_files}/no-such-file.gam")
+    o1602_tool_test(truncated-file 1 STDERR "^error: [^\\n]*truncated.gam: chunk at offset 0 exceeds file size\\n$" ARGS chunks "${_files}/truncated.gam")
+    o1602_tool_test(chunks 0
+        STDOUT "^name +offset +size\\nINSEL5 +20 +116\\nINSELHAUS +156 +16\\nPLAYER4 +192 +1072\\nWIFF +[0-9]+ +4\\n4 chunks\\n$"
+        ARGS chunks "${_files}/world.gam")
+    o1602_tool_test(islands 0
+        STDOUT "^INSEL5 #3  size 20x15  pos \\(40,30\\)  layers 1\\n  layer 0: 2 tiles, 1 distinct ids. most common: 21201\\(x2\\)\\n1 islands\\n$"
+        ARGS islands "${_files}/world.gam")
+    o1602_tool_test(state 0
+        STDOUT "^player 0: kind 0x00, colour 1, money 12345 Tester\\ndeer: 0 on 0 islands\\n$"
+        ARGS state "${_files}/world.gam")
+    o1602_tool_test(cod 0
+        STDOUT "^Nahrung = 4\\nVersion: 2\\nObjekt: HAUS\\n  @Nummer: 0\\n  Id: 7\\n  @Nummer: \\+1\\n  Id: 8\\nEndObj.\\n$"
+        ARGS cod "${_files}/haeuser.cod")
+    o1602_tool_test(cod-dump 0
+        STDOUT "^Version: 2\\n\\[HAUS #0\\]\\n  Id: 7\\n\\[HAUS #1\\]\\n  Id: 8\\n$"
+        STDERR " 0 diagnostics \\(predefined: haeuser\\)\\n$"
+        ARGS cod-dump "${_files}/haeuser.cod")
+    o1602_tool_test(bsh-info 0
+        STDOUT "^ index  width height  type   length     offset\\n     0      4      2     1       28          4\\n1 sprites\\n$"
+        ARGS bsh-info "${_files}/sprites.bsh")
+    o1602_tool_test(bsh-export 0
+        STDOUT "^wrote [^\\n]*sprites_sheet.png \\(4x2, 1 sprites\\)\\n$"
+        ARGS bsh-export "${_files}/sprites.bsh" "${_files}/sprites" --palette "${_files}/palette.col" --sheet)
+    # Commands that need the installation say so.
+    o1602_tool_test(new-world-without-data 1
+        STDERR "^error: [^\\n]*does not look like an Anno 1602 installation \\(missing haeuser.cod\\)\\n$"
+        ARGS new-world "${_files}/new.gam")
+    set_tests_properties(tool:new-world-without-data PROPERTIES ENVIRONMENT "ANNO1602_DIR=${_files}/no-installation")
+endif()

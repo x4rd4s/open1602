@@ -15,12 +15,13 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
-ctest knows two tests:
+ctest knows these tests:
 
 | ctest test | Runs | Command |
 |---|---|---|
 | `unit` | every test whose name does not start with `data:` | `o1602_tests --no-data` |
 | `data` | only the `data:` tests (time limit one hour: some play whole games) | `o1602_tests --only-data` |
+| `tool:*` | smoke tests of `o1602-tool` (built with the tools): its commands on small synthetic files | see below |
 
 The executable returns 0 when everything selected passed, 1 when a test failed or nothing matched the
 filter, and 77 when every selected test skipped. ctest reports exit code 77 as "Skipped", so without
@@ -37,6 +38,21 @@ is a filter: only tests whose name contains that text run.
 ```
 
 Each test prints `[  OK  ]`, `[ FAIL ]` or `[ SKIP ]` with the reason for a skip, and a summary at the end.
+
+## Smoke tests of o1602-tool
+
+`tool:files` runs `o1602_tool_files` ([tool/write_tool_files.cpp](tool/write_tool_files.cpp)), which
+writes small synthetic files into `tests/tool-files/` of the build folder: a savegame-like chunk file
+with one island and one player, a `.cod` script, a sprite sheet, a palette, a truncated chunk file
+and a folder that is no installation. The other `tool:` tests run `o1602-tool` on them (`chunks`,
+`islands`, `state`, `cod`, `cod-dump`, `bsh-info`, `bsh-export`, the usage text, and the errors for
+a missing file, a truncated file and a folder that is no installation) through
+[tool/expect.cmake](tool/expect.cmake), which checks the exit code and the output together. They
+need no original data.
+
+```sh
+ctest --preset debug -R tool:
+```
 
 ## Tests against the original data
 

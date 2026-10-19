@@ -84,9 +84,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux,   os: ubuntu-24.04 }
-          - { name: Windows, os: windows-2022 }
-          - { name: macOS,   os: macos-14 }
+          - { name: Linux,      os: ubuntu-24.04, preset: ci }
+          - { name: Linux ASan, os: ubuntu-24.04, preset: asan }  # the game's start under ASan/UBSan
+          - { name: Windows,    os: windows-2022, preset: ci }
+          - { name: macOS,      os: macos-14,     preset: ci }
     env:
       SDL_VERSION: 3.2.24
     steps:
@@ -147,15 +148,17 @@ jobs:
       - name: Configure
         shell: bash
         run: >
-          cmake --preset ci -DO1602_BUILD_GAME=ON -DCMAKE_PREFIX_PATH="${{ runner.temp }}/sdl3;${{ runner.temp }}/zlib"
+          cmake --preset ${{ matrix.preset }} -DO1602_BUILD_GAME=ON
+          -DCMAKE_PREFIX_PATH="${{ runner.temp }}/sdl3;${{ runner.temp }}/zlib"
           ${{ runner.os == 'Windows' && '-DZLIB_USE_STATIC_LIBS=ON' || '' }}
 
       - name: Build
-        run: cmake --build --preset ci -- -k 0
+        run: cmake --build --preset ${{ matrix.preset }} -- -k 0
 
-      - name: Start the game once
+      - name: Start the game without data
         shell: bash
-        run: .github/workflows/start-game.sh build/ci/engine/app/open1602
+        timeout-minutes: 5
+        run: .github/workflows/start-game.sh build/${{ matrix.preset }}/engine/app/open1602
 
   vcpkg:
     name: Game (vcpkg preset, Windows)
@@ -194,8 +197,9 @@ jobs:
       - name: Test
         run: ctest --preset vcpkg
 
-      - name: Start the game once
+      - name: Start the game without data
         shell: bash
+        timeout-minutes: 5
         run: .github/workflows/start-game.sh build/vcpkg/engine/app/open1602
 
   checks:
