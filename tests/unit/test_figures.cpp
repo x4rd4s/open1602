@@ -414,3 +414,41 @@ TEST_CASE("figures: soldiers keep their animations from frame to frame and are f
     CHECK(soldiers.find(12)->x == 8.0);
     CHECK(soldiers.find(12)->frame == std::optional<std::uint8_t>(render::start_animation(deer, 0, 12).frame));
 }
+
+TEST_CASE("figures: soldiers are drawn on their way between two ticks") {
+    const auto figures = make_deer();
+    const assets::BuildingTable buildings;
+    sim::World world;
+    sim::Soldier s;
+    s.id = 4;
+    s.pos_x = 10 * sim::kPosUnit;
+    s.pos_y = 3 * sim::kPosUnit;
+    s.figure = 89;
+    world.add_soldier(s);
+    render::SoldierFigures soldiers;
+    soldiers.reset(world, buildings, figures);
+    // Before the tick the trail keeps where it was; the tick moves it half a tile.
+    soldiers.capture(world);
+    world.soldiers()[0].pos_x += sim::kPosUnit / 2;
+    soldiers.sync(world, buildings, figures, 0.0);
+    CHECK(soldiers.find(4)->x == 10.0);
+    soldiers.sync(world, buildings, figures, 0.5);
+    CHECK(soldiers.find(4)->x == 10.25);
+    CHECK(soldiers.find(4)->y == 3.0);
+    soldiers.sync(world, buildings, figures, 1.0);
+    CHECK(soldiers.find(4)->x == 10.5);
+    // A unit set down far away, and one that was not there before the tick, are drawn where they are.
+    world.soldiers()[0].pos_x = 30 * sim::kPosUnit;
+    s.id = 6;
+    s.pos_x = 12 * sim::kPosUnit;
+    world.add_soldier(s);
+    soldiers.sync(world, buildings, figures, 0.5);
+    CHECK(soldiers.find(4)->x == 30.0);
+    CHECK(soldiers.find(6)->x == 12.0);
+    // A reset forgets the trail.
+    soldiers.capture(world);
+    world.soldiers()[0].pos_x += sim::kPosUnit;
+    soldiers.reset(world, buildings, figures);
+    soldiers.sync(world, buildings, figures, 0.5);
+    CHECK(soldiers.find(4)->x == 31.0);
+}

@@ -34,6 +34,10 @@ namespace o1602::render {
 struct AmbientView {
     std::vector<bool> islands;     ///< by index into World::islands()
     std::uint32_t game_speed = 1;  ///< sounds play only at normal speed, as in the original
+    /// Share of the next tick that has passed (Simulation::tick_fraction): townsfolk and sea
+    /// creatures are drawn at the game time of the last tick but one plus this share of a tick,
+    /// so that they move between ticks like the units of the game (TickTrail). Only the picture.
+    double tick_fraction = 1.0;
 };
 
 /// A sound of the scenery to play at a world point (no sound output yet).

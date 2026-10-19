@@ -7,10 +7,31 @@
 
 namespace o1602::render {
 
+namespace {
+
+std::uint64_t trail_key(sim::Handle h) noexcept {
+    return std::uint64_t{h.index} << 32U | h.generation;
+}
+
+}  // namespace
+
+void WalkerFigures::capture(const sim::Logistics& logistics, const sim::World& world) {
+    m_trail.capture([&](const auto& add) {
+        logistics.walkers().for_each([&](sim::Handle h, const sim::Walker& w) {
+            if (w.island < world.islands().size()) {
+                const sim::WorldIsland& island = world.islands()[w.island];
+                const sim::WalkerPosition p = sim::walker_position(w);
+                add(trail_key(h), island.x + p.x, island.y + p.y);
+            }
+        });
+    });
+}
+
 void WalkerFigures::update(const sim::Logistics& logistics, const sim::World& world,
                            const assets::BuildingTable& buildings, const assets::FigureTable& figures,
-                           std::uint32_t dt_ms) {
+                           std::uint32_t dt_ms, double fraction) {
     m_instances.clear();
+    m_trail.set_fraction(fraction);
     for (Slot& s : m_slots) {
         s.used = false;
     }
@@ -63,6 +84,7 @@ void WalkerFigures::update(const sim::Logistics& logistics, const sim::World& wo
         FigureInstance f;
         f.x = island.x + p.x;
         f.y = island.y + p.y;
+        m_trail.position(trail_key(h), f.x, f.y);
         f.figure = w.figure;
         f.z = slot.z;
         // Workers, hunters, grazing animals and deer are cut by the crops and trees they stand in

@@ -200,11 +200,20 @@ void SoldierFigures::reset(const sim::World& world, const assets::BuildingTable&
     clear();
     m_sim_anims.clear();
     m_index.clear();
+    m_trail.clear();
     sync(world, buildings, figures);
 }
 
+void SoldierFigures::capture(const sim::World& world) {
+    m_trail.capture([&world](const auto& add) {
+        for (const sim::Soldier& s : world.soldiers()) {
+            add(s.id, s.x(), s.y());
+        }
+    });
+}
+
 void SoldierFigures::sync(const sim::World& world, const assets::BuildingTable& buildings,
-                          const assets::FigureTable& figures) {
+                          const assets::FigureTable& figures, double fraction) {
     // The last frame's animations, as they ran since.
     std::swap(m_states, m_last_states);
     std::swap(m_sim_anims, m_last_sim_anims);
@@ -213,6 +222,7 @@ void SoldierFigures::sync(const sim::World& world, const assets::BuildingTable& 
     m_states.clear();
     m_sim_anims.clear();
     m_index.clear();
+    m_trail.set_fraction(fraction);
     for (const sim::Soldier& s : world.soldiers()) {
         if (s.motion.phase == sim::SoldierMotion::Phase::Healing) {
             continue;
@@ -220,6 +230,7 @@ void SoldierFigures::sync(const sim::World& world, const assets::BuildingTable& 
         FigureInstance f;
         f.x = s.x();
         f.y = s.y();
+        m_trail.position(s.id, f.x, f.y);
         f.figure = s.figure;
         f.direction = s.direction;
         f.owner = s.owner;

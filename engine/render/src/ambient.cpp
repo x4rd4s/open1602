@@ -9,6 +9,7 @@
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/render/land_figures.hpp"
+#include "o1602/sim/logistics.hpp"
 
 namespace o1602::render {
 
@@ -288,6 +289,10 @@ void Ambient::city_round(const sim::World& world, const assets::BuildingTable& b
 void Ambient::frame(const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
                     const AmbientView& view) {
     const std::uint64_t now = world.time_ms();
+    // Where the townsfolk and creatures are drawn: up to a tick behind, like the units of the game.
+    constexpr double kTickMs = sim::Logistics::kTickMs;
+    const double drawn =
+        std::max(0.0, static_cast<double>(now) - kTickMs + std::clamp(view.tick_fraction, 0.0, 1.0) * kTickMs);
     const auto catch_up = [&](AnimState& anim, std::uint64_t& anim_ms, std::uint16_t figure) {
         if (now > anim_ms) {
             if (const assets::FigureType* type = figures.get(figure)) {
@@ -304,13 +309,13 @@ void Ambient::frame(const sim::World& world, const assets::BuildingTable& buildi
         }
         catch_up(w.anim, w.anim_ms, w.figure);
         // On the straight line between the centres of two tiles of its path (0x00459F40).
-        const auto elapsed = static_cast<std::uint32_t>(now - std::min(now, w.start_ms));
-        const auto next = std::upper_bound(w.arrive.begin(), w.arrive.end(), elapsed);
+        const double elapsed = std::max(0.0, drawn - static_cast<double>(w.start_ms));
+        const auto next = std::upper_bound(w.arrive.begin(), w.arrive.end(), elapsed,
+                                           [](double e, std::uint32_t a) { return e < a; });
         const auto step = static_cast<std::size_t>(std::max<std::ptrdiff_t>(next - w.arrive.begin(), 1) - 1);
         const std::size_t to = std::min(step + 1, w.path.size() - 1);
-        const double t = to == step ? 0.0
-                                    : static_cast<double>(elapsed - w.arrive[step]) /
-                                          static_cast<double>(w.arrive[to] - w.arrive[step]);
+        const double t =
+            to == step ? 0.0 : (elapsed - w.arrive[step]) / static_cast<double>(w.arrive[to] - w.arrive[step]);
         const sim::TilePos a = w.path[step];
         const sim::TilePos b = w.path[to];
         const sim::WorldIsland& island = world.islands()[w.island];
@@ -336,7 +341,7 @@ void Ambient::frame(const sim::World& world, const assets::BuildingTable& buildi
             continue;
         }
         catch_up(c.anim, c.anim_ms, c.figure);
-        const auto age = static_cast<double>(now - std::min(now, c.start_ms));
+        const double age = std::max(0.0, drawn - static_cast<double>(c.start_ms));
         EffectFigure e;
         e.x = c.x + c.vx * age;
         e.y = c.y + c.vy * age;

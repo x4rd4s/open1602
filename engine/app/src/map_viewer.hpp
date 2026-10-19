@@ -406,6 +406,7 @@ private:
     render::SoldierFigures m_soldiers;              ///< land units in their owners' colours
     render::WalkerFigures m_walkers;                ///< carriers, carts, workers, deer and hunters
     render::ShipTrail m_ship_trail;                 ///< ships drawn between two ticks
+    double m_tick_fraction = 1.0;                   ///< share of the next tick that has passed
     std::uint64_t m_title_real_ms = 0;              ///< real and game time of the last title (the speed reached)
     std::uint64_t m_title_game_ms = 0;
     bool m_debug_title = core::environment_variable("O1602_DEBUG_TITLE").has_value();

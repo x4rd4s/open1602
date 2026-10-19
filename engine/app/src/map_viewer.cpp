@@ -831,9 +831,9 @@ void MapViewer::update(std::uint32_t delta_ms) {
         selection_changed(false);
     }
     // While the game is paused this only carries out the commands (building is possible then).
-    // Ticks run while the frame has time (at least one); before each, the ships' positions are
-    // kept so that they move smoothly between ticks. A computer too slow for the speed runs the
-    // game slower instead of stalling (review point 20).
+    // Ticks run while the frame has time (at least one); before each, the positions of the ships,
+    // soldiers and walkers are kept so that they move smoothly between ticks. A computer too slow
+    // for the speed runs the game slower instead of stalling (review point 20).
     const auto frame_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(kTickBudgetMs);
     bool first = true;
     const auto before_tick = [&] {
@@ -842,28 +842,30 @@ void MapViewer::update(std::uint32_t delta_ms) {
         }
         first = false;
         m_ship_trail.capture(m_state->world);
+        m_soldiers.capture(m_state->world);
+        m_walkers.capture(m_state->simulation.logistics(), m_state->world);
         return true;
     };
     if (m_session) {
         // A multiplayer game runs the frames the host has closed (ADR 0011).
         m_session->update(delta_ms, before_tick);
         update_lan_beacon();
-        const double fraction = m_session->tick_fraction();
+        m_tick_fraction = m_session->tick_fraction();
         apply_session_events();  // may end the session
-        m_ship_trail.set_fraction(fraction);
     } else {
         m_state->simulation.advance(delta_ms, before_tick);
-        m_ship_trail.set_fraction(m_state->simulation.tick_fraction());
+        m_tick_fraction = m_state->simulation.tick_fraction();
     }
+    m_ship_trail.set_fraction(m_tick_fraction);
     if (!m_state->simulation.paused()) {
         place_listener();
         apply_production_events();
         apply_game_events();
         m_clock.advance(delta_ms);
-        m_soldiers.sync(m_state->world, m_buildings, m_figures);
+        m_soldiers.sync(m_state->world, m_buildings, m_figures, m_tick_fraction);
         m_soldiers.advance(static_cast<std::uint32_t>(delta_ms), m_figures);
         m_walkers.update(m_state->simulation.logistics(), m_state->world, m_buildings, m_figures,
-                         static_cast<std::uint32_t>(delta_ms) * m_state->simulation.speed());
+                         static_cast<std::uint32_t>(delta_ms) * m_state->simulation.speed(), m_tick_fraction);
         update_ambient();
         m_sound->figures({&m_walkers.instances(), &m_soldiers.instances(), &m_ambient.walkers()}, m_effects, m_figures,
                          m_state->world.time_ms(), m_state->simulation.speed());
@@ -1413,6 +1415,7 @@ void MapViewer::update_ambient() {
     m_window->output_size(w, h);
     render::AmbientView view;
     view.game_speed = m_state->simulation.speed();
+    view.tick_fraction = m_tick_fraction;
     // Islands on screen: those overlapping the box of the tiles at the screen's corners and edges.
     std::uint32_t x0 = m_state->world.width();
     std::uint32_t y0 = m_state->world.height();
@@ -2442,6 +2445,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     m_formation = 0;
     m_field_source.reset();
     m_ship_trail = render::ShipTrail{};
+    m_tick_fraction = 1.0;
     m_tool.set_mode(BuildTool::Mode::Off);
     m_state = std::move(next);
     m_command_sink.set_simulation(&m_state->simulation);

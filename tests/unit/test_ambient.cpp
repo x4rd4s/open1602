@@ -192,6 +192,25 @@ TEST_CASE("ambient: townsfolk walk from their house along the road to a tavern a
     CHECK(ambient.walkers().size() <= 1);
 }
 
+TEST_CASE("ambient: townsfolk are drawn between two ticks by the share of the next one") {
+    Scene s;
+    render::Ambient ambient(5);
+    s.run(ambient, 40'000'000, [&] { return ambient.walkers().empty(); });
+    REQUIRE(!ambient.walkers().empty());
+    s.run(ambient, 2'000);  // well on the road
+    REQUIRE(!ambient.walkers().empty());
+    const auto x_at = [&](double fraction) {
+        s.view.tick_fraction = fraction;
+        ambient.frame(s.world, s.buildings, s.figures, s.view);
+        return ambient.walkers().front().x;
+    };
+    const double now = x_at(1.0);
+    const double before = x_at(0.0);
+    // 0.4 tiles per second: 0.02 tiles in a tick of 50 ms, on the way to the tavern in the east.
+    CHECK(std::abs(now - before - 0.02) < 1e-3);
+    CHECK(std::abs(x_at(0.5) - (now + before) / 2) < 1e-9);
+}
+
 TEST_CASE("ambient: no townsfolk in small cities or with foreign soldiers") {
     Scene s;
     s.city().inhabitants = {50, 29, 0, 0, 0};  // settlers and better: 29

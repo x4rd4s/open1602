@@ -23,6 +23,7 @@
 #include "o1602/render/sprite_atlas.hpp"
 #include "o1602/render/sprite_hit_mask.hpp"
 #include "o1602/render/text_cache.hpp"
+#include "o1602/render/tick_trail.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/rules.hpp"
 #include "o1602/sim/world.hpp"
@@ -744,6 +745,58 @@ TEST_CASE("render: a ship is drawn on its way between two ticks, a jump is not s
     trail.position(world.ships().back(), x, y);
     CHECK(x == 3.0);
     CHECK(y == 4.0);
+}
+
+TEST_CASE("render: a unit is drawn on its way between two ticks, keyed by any number") {
+    double x = 0.0;
+    double y = 0.0;
+    // The share of the way, clamped; a move beyond the jump limit on either axis is not smoothed.
+    render::tick_lerp(4.0, 2.0, 5.0, 1.0, 0.25, 2.0, x, y);
+    CHECK(x == 4.25);
+    CHECK(y == 1.75);
+    render::tick_lerp(4.0, 2.0, 5.0, 1.0, 1.5, 2.0, x, y);
+    CHECK(x == 5.0);
+    render::tick_lerp(4.0, 2.0, 5.0, 1.0, -1.0, 2.0, x, y);
+    CHECK(x == 4.0);
+    render::tick_lerp(4.0, 2.0, 4.5, 4.5, 0.5, 2.0, x, y);
+    CHECK(x == 4.5);
+    CHECK(y == 4.5);
+
+    // Keys come in any order; the trail finds each one.
+    render::TickTrail trail;
+    trail.capture([](const auto& add) {
+        add(std::uint64_t{7} << 32U, 1.0, 1.0);
+        add(3, 10.0, 20.0);
+        add(5, 0.0, 0.0);
+    });
+    trail.set_fraction(0.5);
+    x = 11.0;
+    y = 20.0;
+    trail.position(3, x, y);
+    CHECK(x == 10.5);
+    CHECK(y == 20.0);
+    x = 1.0;
+    y = 2.0;
+    trail.position(std::uint64_t{7} << 32U, x, y);
+    CHECK(x == 1.0);
+    CHECK(y == 1.5);
+    // One it has not seen stays where it is.
+    x = 9.0;
+    y = 9.0;
+    trail.position(4, x, y);
+    CHECK(x == 9.0);
+    CHECK(y == 9.0);
+    // A new capture forgets the old positions.
+    trail.capture([](const auto& add) { add(4, 8.0, 9.0); });
+    trail.position(4, x, y);
+    CHECK(x == 8.5);
+    x = 11.0;
+    trail.position(3, x, y);
+    CHECK(x == 11.0);
+    trail.clear();
+    x = 9.0;
+    trail.position(4, x, y);
+    CHECK(x == 9.0);
 }
 
 TEST_CASE("render: the text cache gives up the least recently used texts, never those of this frame") {

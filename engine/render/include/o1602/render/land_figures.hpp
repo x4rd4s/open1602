@@ -2,7 +2,8 @@
 //
 // Figures on land as the renderer sees them, with their animations running in real time:
 // - wild animals graze (deer: ANIM 1, which continues randomly with the eating animations),
-// - soldiers walk, stand, strike and die where the simulation has them.
+// - soldiers walk, stand, strike and die where the simulation has them, drawn on their way between
+//   two ticks (TickTrail).
 #pragma once
 
 #include <cstddef>
@@ -12,6 +13,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/render/figure_animation.hpp"
+#include "o1602/render/tick_trail.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -64,9 +66,14 @@ class SoldierFigures : public LandFigures {
 public:
     /// One figure per soldier of `world`, drawn from SOLDAT.BSH in the colour of its owner.
     void reset(const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures);
+    /// Before a tick: the positions the soldiers leave.
+    void capture(const sim::World& world);
     /// Follows the simulation: positions and directions of the soldiers, and a new animation when
     /// a soldier's changes (walk, stand, strike, die). Soldiers in a doctor's house are not drawn.
-    void sync(const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures);
+    /// `fraction` is the share of the next tick that has passed (Simulation::tick_fraction): a
+    /// soldier is drawn that far on its way from before the last tick (capture) to where it is.
+    void sync(const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
+              double fraction = 1.0);
     /// The figure of a soldier (Soldier::id), nothing if it is not drawn.
     [[nodiscard]] const FigureInstance* find(std::uint32_t id) const noexcept;
 
@@ -81,6 +88,7 @@ private:
 
     std::vector<std::uint8_t> m_sim_anims;  ///< Soldier::anim per instance, when its animation started
     std::vector<Entry> m_index;             ///< by Soldier::id
+    TickTrail m_trail;                      ///< by Soldier::id
     // The last frame's, kept to reuse their memory.
     std::vector<AnimState> m_last_states;
     std::vector<std::uint8_t> m_last_sim_anims;
