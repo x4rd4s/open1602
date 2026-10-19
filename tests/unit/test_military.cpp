@@ -177,6 +177,22 @@ TEST_CASE("military: a soldier walks to a place over open ground at its speed") 
     CHECK(s->target.empty());
 }
 
+TEST_CASE("military: next to a unit with a lower number a soldier walks slower (also across squares)") {
+    // Cells 47 and 48 lie in different squares of the units' grid (16 cells, review AU7).
+    const auto walked = [](bool crowded) {
+        Field f;
+        f.start();
+        if (crowded) {
+            f.add(kSword, 0, 47, 30);  // stands; the lower number
+        }
+        const std::uint32_t id = f.add(kSword, 0, 48, 30).id;
+        REQUIRE(f.military->order(sim::SoldierOrder{0, {id}, sim::Target::spot(60, 30)}));
+        f.run(300);
+        return f.world.soldier(id)->pos_x;
+    };
+    CHECK(walked(true) < walked(false));
+}
+
 TEST_CASE("military: soldiers walk around forest and buildings") {
     Field f;
     // A wall of forest across the island with a gap at the bottom.

@@ -59,11 +59,14 @@ void Military::tick(std::uint32_t dt_ms, std::vector<ConstructionEvent>* constru
     for (const Soldier& s : m_world->soldiers()) {
         m_ids.push_back(s.id);
     }
+    grid_build();
     for (const std::uint32_t id : m_ids) {
         if (Soldier* s = m_world->soldier(id)) {
             advance(*s, budget);
+            grid_moved(*s);
         }
     }
+    m_grid_data = nullptr;
     // The dead are gone at the end of their animation.
     std::erase_if(m_world->soldiers(), [](const Soldier& s) { return s.owner == kNoPlayer; });
     m_castle_ms += dt_ms;

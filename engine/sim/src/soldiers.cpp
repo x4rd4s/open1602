@@ -36,6 +36,7 @@ constexpr std::uint8_t kAnimAttack = 2;
 constexpr std::uint8_t kAnimDie = 3;
 constexpr std::uint64_t kStraightCellUs = 3'125'000;  // half a tile at Speed 1, Wegspeed 1
 constexpr std::uint64_t kDiagonalCellUs = 4'419'417;
+constexpr std::int32_t kSquareShift = 4;  // squares of 16 x 16 cells for near_units()
 
 bool computer_controlled(const World& world, PlayerId p) noexcept {
     const Player* player = world.player(p);
@@ -44,6 +45,76 @@ bool computer_controlled(const World& world, PlayerId p) noexcept {
 }
 
 }  // namespace
+
+void Military::grid_build() {
+    const std::vector<Soldier>& all = m_world->soldiers();
+    m_grid_w = static_cast<std::int32_t>((2 * m_world->width()) >> kSquareShift) + 1;
+    m_grid_h = static_cast<std::int32_t>((2 * m_world->height()) >> kSquareShift) + 1;
+    m_grid.resize(static_cast<std::size_t>(m_grid_w) * static_cast<std::size_t>(m_grid_h));
+    for (std::vector<std::uint32_t>& square : m_grid) {
+        square.clear();
+    }
+    m_square_of.clear();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        const std::int32_t sx = std::clamp(all[i].cell_x() >> kSquareShift, 0, m_grid_w - 1);
+        const std::int32_t sy = std::clamp(all[i].cell_y() >> kSquareShift, 0, m_grid_h - 1);
+        const auto square = static_cast<std::uint32_t>(sy * m_grid_w + sx);
+        m_grid[square].push_back(static_cast<std::uint32_t>(i));
+        m_square_of.push_back(square);
+    }
+    m_grid_data = all.data();
+}
+
+bool Military::grid_valid() const noexcept {
+    const std::vector<Soldier>& all = m_world->soldiers();
+    return m_grid_data != nullptr && m_grid_data == all.data() && m_square_of.size() == all.size();
+}
+
+void Military::grid_moved(const Soldier& s) {
+    if (!grid_valid()) {
+        return;
+    }
+    const auto i = static_cast<std::uint32_t>(&s - m_grid_data);
+    const std::int32_t sx = std::clamp(s.cell_x() >> kSquareShift, 0, m_grid_w - 1);
+    const std::int32_t sy = std::clamp(s.cell_y() >> kSquareShift, 0, m_grid_h - 1);
+    const auto square = static_cast<std::uint32_t>(sy * m_grid_w + sx);
+    if (square == m_square_of[i]) {
+        return;
+    }
+    std::vector<std::uint32_t>& old = m_grid[m_square_of[i]];
+    const auto it = std::find(old.begin(), old.end(), i);
+    *it = old.back();
+    old.pop_back();
+    m_grid[square].push_back(i);
+    m_square_of[i] = square;
+}
+
+template <typename Visit>
+void Military::near_units(std::int32_t cx, std::int32_t cy, std::int32_t r, Visit&& visit) const {
+    const std::vector<Soldier>& all = m_world->soldiers();
+    if (!grid_valid()) {
+        for (const Soldier& o : all) {
+            if (visit(o)) {
+                return;
+            }
+        }
+        return;
+    }
+    // Clamped like the units' squares, so a unit beyond the edge is still found.
+    const std::int32_t x0 = std::clamp((cx - r) >> kSquareShift, 0, m_grid_w - 1);
+    const std::int32_t x1 = std::clamp((cx + r) >> kSquareShift, 0, m_grid_w - 1);
+    const std::int32_t y0 = std::clamp((cy - r) >> kSquareShift, 0, m_grid_h - 1);
+    const std::int32_t y1 = std::clamp((cy + r) >> kSquareShift, 0, m_grid_h - 1);
+    for (std::int32_t sy = y0; sy <= y1; ++sy) {
+        for (std::int32_t sx = x0; sx <= x1; ++sx) {
+            for (const std::uint32_t i : m_grid[static_cast<std::size_t>(sy * m_grid_w + sx)]) {
+                if (visit(all[i])) {
+                    return;
+                }
+            }
+        }
+    }
+}
 
 const assets::FigureType* Military::type_of(const Soldier& s) const {
     return m_figures->get(s.figure);
@@ -110,11 +181,14 @@ std::uint32_t Military::run_us(const Soldier& s, std::uint8_t direction, std::ui
     (void)m_combat->land().cell(s.cell_x(), s.cell_y(), type != nullptr ? type->speed_type : 0, &ways);
     std::uint32_t w = ways;
     // Next to another figure with a lower number the soldier walks slower (0x00458770).
-    for (const Soldier& o : m_world->soldiers()) {
-        if (o.id < s.id && !o.away() && sea_distance(o.cell_x() - s.cell_x(), o.cell_y() - s.cell_y()) < kCrowded) {
-            w = std::min<std::uint32_t>(126, w * 5 / 4);
-            break;
-        }
+    // Whether there is one matters, not which: the order of the units does not.
+    bool crowded = false;
+    near_units(s.cell_x(), s.cell_y(), kCrowded, [&](const Soldier& o) {
+        crowded = o.id < s.id && !o.away() && sea_distance(o.cell_x() - s.cell_x(), o.cell_y() - s.cell_y()) < kCrowded;
+        return crowded;
+    });
+    if (crowded) {
+        w = std::min<std::uint32_t>(126, w * 5 / 4);
     }
     const std::uint64_t per_cell = (direction & 1U) != 0 ? kDiagonalCellUs : kStraightCellUs;
     return static_cast<std::uint32_t>(std::max<std::uint64_t>(1, per_cell * w * cells / speed));
@@ -325,11 +399,13 @@ bool Military::plan_to(Soldier& s, const Target& target, std::int32_t radius, bo
     }
     r.speed_type = type->speed_type;
     r.max_run = type->combat.max_step;
-    for (const Soldier& o : m_world->soldiers()) {
+    // Only a set of cells to the planner: the order of the units does not matter.
+    near_units(r.start_x, r.start_y, kOthersRange, [&](const Soldier& o) {
         if (o.id != s.id && !o.away() && sea_distance(o.cell_x() - r.start_x, o.cell_y() - r.start_y) <= kOthersRange) {
             r.blocked.emplace_back(o.cell_x(), o.cell_y());
         }
-    }
+        return false;
+    });
     const auto [ax, ay] = cells->nearest(r.start_x, r.start_y);
     r.aim_x = ax;
     r.aim_y = ay;

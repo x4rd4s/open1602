@@ -203,6 +203,16 @@ private:
     [[nodiscard]] const assets::FigureType* type_of(const Soldier& s) const;
     [[nodiscard]] std::uint32_t run_us(const Soldier& s, std::uint8_t direction, std::uint8_t cells) const;
     void kill(Soldier& s, PlayerId killer, bool disband);
+    /// The units list in squares (review AU7), for the units' loop of tick(): built before it and
+    /// kept up to date as each unit moves. Outside the loop, or once the list has changed, the
+    /// queries look at all units. Never saved.
+    void grid_build();
+    void grid_moved(const Soldier& s);
+    [[nodiscard]] bool grid_valid() const noexcept;
+    /// Calls `visit` for every unit whose cell may be within `r` cells of (cx, cy) in both axes
+    /// (and maybe others), until it returns true. The order is not that of the list.
+    template <typename Visit>
+    void near_units(std::int32_t cx, std::int32_t cy, std::int32_t r, Visit&& visit) const;
 
     // Castles and ships (castles.cpp)
     void castles_tick();
@@ -233,6 +243,12 @@ private:
     LandPlanner m_planner;
     std::vector<MilitaryEvent> m_events;
     std::vector<std::uint32_t> m_ids;  ///< scratch of tick(): the units in their order
+    // The squares of grid_build(): the units of each by their place in World::soldiers().
+    std::vector<std::vector<std::uint32_t>> m_grid;
+    std::vector<std::uint32_t> m_square_of;  ///< per unit: its square
+    const Soldier* m_grid_data = nullptr;    ///< the list the squares were built for
+    std::int32_t m_grid_w = 0;
+    std::int32_t m_grid_h = 0;
     std::vector<PendingHit> m_due;     ///< scratch of resolve_hits()
     std::uint32_t m_regen_ms = 0;      ///< game time since the building damage last healed
     std::uint32_t m_castle_ms = 0;     ///< game time since the castles' last second
