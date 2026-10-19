@@ -191,14 +191,14 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-5 | Medium | Flooding players crowd out other players' commands, which are dropped silently | `net/src/host_session.cpp` | Fixed #20 |
 | MP-6 | Medium | Connections that never send `Hello` keep their slot forever | `net/src/host_session.cpp` | Fixed #20 |
 | MP-7 | Low | Rejoining in a loop makes the host serialize and send the whole game repeatedly | `net/src/host_session.cpp` | Fixed #21 |
-| MP-8 | Low | LAN discovery can be abused and spoofed | `net/src/lan.cpp` | Partly (#21: bounded reads, nonce check, at most 64 games; a host name is still looked up on the main thread) |
+| MP-8 | Low | LAN discovery can be abused and spoofed | `net/src/lan.cpp` | Fixed #21, #25 (#21: bounded reads, nonce check, at most 64 games; #25: host names are looked up beside the game) |
 | MP-9 | Low | German and English installations cannot play together | `app/src/multiplayer.cpp` | Fixed #20 |
 | MP-10 | Low | "Main menu" or "New game" on the end screen does not leave the session | `app/src/hud.cpp`, `map_viewer.cpp` | Fixed #20 |
 | MP-11 | Low | The end screen handles only 4 colours; players 5 to 12 cannot be selected | `app/src/end_screen.cpp` | Fixed #20 |
 | MP-12 | Low | English default names and engine error texts reach players and the sim state | `net/src/host_session.cpp`, `app/src/main.cpp`, `app/src/multiplayer.cpp` | Fixed #21 |
 | MP-13 | Low | The fingerprint serializes the game every 100 frames, so its cost grows with speed | `net/src/session.cpp` | Fixed #21 |
 | MP-14 | Low | Names and chat accept control characters; a newline breaks the high-score file | `net/src/protocol.cpp`, `assets/src/high_scores.cpp` | Fixed #20 |
-| MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Partly (#21: a repeated staller waits a quarter of the time; spectators cannot be kicked yet) |
+| MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Fixed #21, #25 (#21: a repeated staller waits a quarter of the time; #25: the host can remove spectators) |
 | MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Fixed #20 |
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Open |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 2 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 0 | 3 | 9 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 0 | 2 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 1 | 10 | 24 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 1 | 2 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 9 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 2 | 1 | 8 | 24 |
 
 ## Open work, in order
 
@@ -261,10 +261,8 @@ taken from the area reports (S, M, L).
 **1. Determinism and multiplayer leftovers**
 1. IO-6 rest (M): a savegame fingerprint over everything that drives the simulation (multiplayer
    already compares the whole `.cod` files in its Hello).
-2. MP-15 rest (S): a way to kick spectators (the host's roster has no seat for them).
-3. MP-8 rest (S): look host names up off the main thread.
 (Fixed in #21: AU6 one hold rule, MP-7 games rationed, MP-12 no English default names, MP-13
-fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
+fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #25: MP-15 spectators can be removed, MP-8 names looked up beside the game. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
 `Pool::for_each` guard and money saturation are fixed in #20.)
 
 **2. Architecture and tests**

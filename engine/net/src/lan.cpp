@@ -3,11 +3,15 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <deque>
 #include <enet/enet.h>
 #include <map>
+#include <memory>
 #include <set>
+#include <system_error>
+#include <thread>
 #include <utility>
 
 #ifdef _WIN32
@@ -224,6 +228,17 @@ public:
 
     void update(std::uint32_t real_ms, std::uint32_t forget_ms) override {
         m_clock_ms += real_ms;
+        // Names whose lookup finished since the last search are asked at once.
+        if (!m_searches.empty()) {
+            for (auto& [name, lookup] : m_resolved) {
+                if (!lookup->asked && lookup->done.load(std::memory_order_acquire)) {
+                    lookup->asked = true;
+                    if (lookup->address) {
+                        send_to(m_socket.get(), *lookup->address, encode_search(m_searches.back()));
+                    }
+                }
+            }
+        }
         for (FoundGame& g : m_games) {
             g.age_ms += real_ms;
         }
@@ -266,19 +281,48 @@ public:
     [[nodiscard]] const std::vector<FoundGame>& games() const override { return m_games; }
 
 private:
-    /// A name looked up once (lookups may wait on the network); nothing if it is unknown.
+    /// A host name being looked up, or looked up.
+    struct Lookup {
+        std::atomic<bool> done{false};
+        std::optional<ENetAddress> address;  ///< written before `done`; nothing if the name is unknown
+        bool asked = false;                  ///< the search went to it (main thread only)
+    };
+
+    /// The address of a name, looked up once. An IPv4 address is known at once; a name may wait on
+    /// the network (DNS), so it is looked up beside the game and is asked as soon as it is known.
     std::optional<ENetAddress> resolve(const std::string& name) {
         auto it = m_resolved.find(name);
         if (it == m_resolved.end()) {
+            auto lookup = std::make_shared<Lookup>();
             ENetAddress address{};
-            std::optional<ENetAddress> found;
-            if (enet_address_set_host(&address, name.c_str()) == 0) {
+            if (enet_address_set_host_ip(&address, name.c_str()) == 0) {
                 address.port = m_port;
-                found = address;
+                lookup->address = address;
+                lookup->done.store(true, std::memory_order_release);
+            } else {
+                const std::uint16_t port = m_port;
+                const auto look_up = [lookup, name, port] {
+                    ENetAddress found{};
+                    if (enet_address_set_host(&found, name.c_str()) == 0) {
+                        found.port = port;
+                        lookup->address = found;
+                    }
+                    lookup->done.store(true, std::memory_order_release);
+                };
+                try {
+                    std::thread(look_up).detach();
+                } catch (const std::system_error&) {
+                    look_up();  // no thread to be had: wait for the answer here
+                }
             }
-            it = m_resolved.emplace(name, found).first;
+            it = m_resolved.emplace(name, std::move(lookup)).first;
         }
-        return it->second;
+        Lookup& lookup = *it->second;
+        if (!lookup.done.load(std::memory_order_acquire)) {
+            return std::nullopt;
+        }
+        lookup.asked = true;
+        return lookup.address;
     }
 
     Socket m_socket;
@@ -286,7 +330,7 @@ private:
     std::uint32_t m_clock_ms = 0;
     std::deque<std::uint32_t> m_searches;  ///< the nonces of the last searches
     std::vector<FoundGame> m_games;
-    std::map<std::string, std::optional<ENetAddress>> m_resolved;
+    std::map<std::string, std::shared_ptr<Lookup>> m_resolved;
     LocalNetworks m_networks;
 };
 

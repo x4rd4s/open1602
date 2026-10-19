@@ -4,6 +4,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -229,6 +230,37 @@ TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
     const auto back = menu.back();
     REQUIRE(back.has_value());
     CHECK(back->kind == MultiplayerEvent::Kind::Leave);
+}
+
+TEST_CASE("multiplayer menu: the host sends a spectator away") {
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.game = "Endless game";
+    lobby.seats.resize(1);  // only the host's: whoever comes watches
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    net::Hello hello;
+    hello.content = 1;
+    hello.name = "Wilma";
+    net::ClientSession wilma(network.connect(), hello, [](std::span<const std::uint8_t>) { return nullptr; });
+    for (int i = 0; i < 20; ++i) {
+        host.update(50);
+        wilma.update(50);
+    }
+    REQUIRE(host.roster().size() == 2);
+    REQUIRE(host.roster()[1].seat == sim::kNoPlayer);
+
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.name = "Anna";
+    model.session = &host;
+    model.hosting = true;
+    menu.show_lobby();
+    CHECK(find_text(menu, model, "Wilma").has_value());
+    const auto events = click(menu, model, "Remove");
+    REQUIRE(events.size() == 1);
+    CHECK(events[0].kind == MultiplayerEvent::Kind::KickMember);
+    CHECK(events[0].member == 1);
 }
 
 TEST_CASE("multiplayer menu: four to twelve players, the factions' slots left out of the lobby") {

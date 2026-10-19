@@ -14,7 +14,8 @@ add_library(o1602_net
 add_library(o1602::net ALIAS o1602_net)
 
 target_include_directories(o1602_net PUBLIC include)
-target_link_libraries(o1602_net PUBLIC o1602::sim PRIVATE o1602_enet)
+find_package(Threads REQUIRED)  # host names are looked up beside the game (lan.cpp)
+target_link_libraries(o1602_net PUBLIC o1602::sim PRIVATE o1602_enet Threads::Threads)
 o1602_set_warnings(o1602_net)
 if(WIN32)
     # enet.h pulls in windows.h: no min/max macros, and only what sockets need.

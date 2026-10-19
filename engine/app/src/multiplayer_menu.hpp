@@ -76,18 +76,19 @@ struct MultiplayerModel {
 
 struct MultiplayerEvent {
     enum class Kind : std::uint8_t {
-        Close,     ///< back to the main menu
-        Search,    ///< look for games again
-        Join,      ///< connect to `address`:`port` with `password`
-        Host,      ///< open a lobby for `setup`
-        Leave,     ///< out of the session (back to the search)
-        Start,     ///< (host) start the game
-        TakeSeat,  ///< take slot `seat` (kNoPlayer: watch)
-        SetSeat,   ///< (host) slot `seat` becomes `seat_kind`
-        Kick,      ///< (host) send the player of `seat` away
-        Ready,     ///< ready (`ready`) or not
-        Say,       ///< chat `text`
-        Name,      ///< the player's name changed to `text`
+        Close,       ///< back to the main menu
+        Search,      ///< look for games again
+        Join,        ///< connect to `address`:`port` with `password`
+        Host,        ///< open a lobby for `setup`
+        Leave,       ///< out of the session (back to the search)
+        Start,       ///< (host) start the game
+        TakeSeat,    ///< take slot `seat` (kNoPlayer: watch)
+        SetSeat,     ///< (host) slot `seat` becomes `seat_kind`
+        Kick,        ///< (host) send the player of `seat` away
+        KickMember,  ///< (host) send the computer of roster entry `member` away (a spectator too)
+        Ready,       ///< ready (`ready`) or not
+        Say,         ///< chat `text`
+        Name,        ///< the player's name changed to `text`
     };
     Kind kind = Kind::Close;
     std::string address{};
@@ -95,6 +96,7 @@ struct MultiplayerEvent {
     std::string password{};
     HostSetup setup{};
     sim::PlayerId seat = sim::kNoPlayer;
+    std::size_t member = 0;
     net::LobbySeat::Kind seat_kind = net::LobbySeat::Kind::Open;
     bool ready = false;
     std::string text{};
@@ -185,6 +187,7 @@ private:
     // Lobby
     std::string m_chat;
     bool m_ready = false;
+    std::vector<std::size_t> m_watchers;  ///< (host) roster entries of the spectators shown with a kick button
 };
 
 }  // namespace o1602::app

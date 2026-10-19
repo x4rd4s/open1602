@@ -299,6 +299,11 @@ void MapViewer::handle_multiplayer(const MultiplayerEvent& e) {
                 host->kick(e.seat);
             }
             break;
+        case MultiplayerEvent::Kind::KickMember:
+            if (host != nullptr) {
+                host->kick_member(e.member);
+            }
+            break;
         case MultiplayerEvent::Kind::Ready:
             if (client != nullptr) {
                 client->set_ready(e.ready);

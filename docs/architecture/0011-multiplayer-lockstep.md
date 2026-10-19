@@ -84,7 +84,9 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     address can be typed, hosts joined before are remembered), creating one (a new endless game with
     its level and world number, a scenario or a savegame; title, password, shown on the local
     network, joining the running game, spectators, host without a player, port) and the lobby
-    (slots, ready, chat, start). Its texts follow the language of the installation.
+    (slots, ready, chat, start; the host removes players and spectators). Its texts follow the
+    language of the installation. Host names are looked up beside the game, so a slow name server
+    does not stop the menu.
 
 ## Rationale
 

@@ -714,7 +714,9 @@ Seat HostSession::free_seat(Seat wanted) const {
 void HostSession::refresh_roster() {
     m_roster_changed = false;
     m_roster.clear();
+    m_roster_links.clear();
     m_roster.push_back(Member{m_seat, m_name, Member::State::Playing, true});
+    m_roster_links.push_back(LinkId{});  // the host itself: never sent away
     for (const auto& p : m_peers) {
         if (p->gone || !p->welcomed) {
             continue;
@@ -723,6 +725,7 @@ void HostSession::refresh_roster() {
                                     : p->state == Peer::State::Playing ? Member::State::Playing
                                                                        : Member::State::Loading;
         m_roster.push_back(Member{p->seat, p->name, state, false});
+        m_roster_links.push_back(p->link);
     }
     broadcast(Roster{m_roster});
 }
@@ -860,6 +863,21 @@ void HostSession::kick(Seat seat) {
                                      [&](const auto& p) { return !p->gone && p->welcomed && p->seat == seat; });
     if (seat != sim::kNoPlayer && holder != m_peers.end()) {
         drop(**holder, RefuseReason::Kicked);
+        forget_token(seat);  // and it cannot come back with it
+    }
+}
+
+void HostSession::kick_member(std::size_t member) {
+    if (member == 0 || member >= m_roster_links.size()) {
+        return;
+    }
+    Peer* peer = peer_of(m_roster_links[member]);
+    if (peer == nullptr || peer->gone || !peer->welcomed) {
+        return;
+    }
+    const Seat seat = peer->seat;
+    drop(*peer, RefuseReason::Kicked);
+    if (seat != sim::kNoPlayer) {
         forget_token(seat);  // and it cannot come back with it
     }
 }

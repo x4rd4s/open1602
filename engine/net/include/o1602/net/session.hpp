@@ -201,6 +201,8 @@ public:
     bool take_seat(Seat seat);
     /// Sends the computer playing `seat` away.
     void kick(Seat seat);
+    /// Sends the computer of roster()[`member`] away, a spectator too (0, the host itself: nothing).
+    void kick_member(std::size_t member);
     /// Every human slot of another computer is ready (the host starts when it wants).
     [[nodiscard]] bool everyone_ready() const;
     /// Begins the game made from the lobby: every computer in the lobby gets it.
@@ -283,6 +285,7 @@ private:
     std::vector<Seat> m_computer_held;  ///< open at the start: the computer plays it while nobody does
     std::uint64_t m_compared = 0;
     std::uint64_t m_matched = 0;
+    std::vector<LinkId> m_roster_links;  ///< the link of each roster() entry (unused for the host's own)
     bool m_roster_changed = true;
     bool m_lobby_changed = true;
     std::uint32_t m_chat_ms = 0;  ///< into the current second of the chat limit

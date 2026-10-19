@@ -505,6 +505,36 @@ TEST_CASE("net: a slot's token is good only for the one it was given to") {
     CHECK(c->session->local_seat() != seat);
 }
 
+TEST_CASE("net: the host sends a spectator away by its place in the roster") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    Computer a(network, "Anna");
+    Computer b(network, "Bernd");
+    Computer c(network, "Clara");
+    Computer w(network, "Wilma");  // every slot taken: Wilma watches
+    run_for(network, host, {&a, &b, &c, &w}, 1000);
+    REQUIRE(w.session->playing());
+    REQUIRE(w.session->local_seat() == sim::kNoPlayer);
+    const auto& roster = host.session->roster();
+    REQUIRE(roster.size() == 5);
+    std::size_t wilma = 0;
+    for (std::size_t i = 0; i < roster.size(); ++i) {
+        wilma = roster[i].name == "Wilma" ? i : wilma;
+    }
+    REQUIRE(wilma != 0);
+
+    host.session->kick_member(0);  // the host itself: nothing
+    host.session->kick_member(99);
+    host.session->kick_member(wilma);
+    run_for(network, host, {&a, &b, &c, &w}, 1000);
+    CHECK(w.session->ended());
+    REQUIRE(!w.events.empty());
+    CHECK(w.events.back().refused == net::RefuseReason::Kicked);
+    CHECK(host.session->roster().size() == 4);
+    CHECK(!a.session->ended());
+    CHECK(!c.session->ended());
+}
+
 TEST_CASE("net: a flooding player leaves room for the others' commands") {
     net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;

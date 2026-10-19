@@ -54,6 +54,8 @@ constexpr Id kSeatKind = 300;           ///< + slot
 constexpr Id kSeatTake = 400;           ///< + slot
 constexpr Id kSeatKick = 500;           ///< + slot
 constexpr std::size_t kMaxSeats = 100;  ///< slot numbers the ids above leave room for
+constexpr Id kWatcherKick = 700;        ///< + row of the spectators the host can send away
+constexpr std::size_t kWatcherRows = 5;
 constexpr Id kChat = 60;
 constexpr Id kLeave = 61;
 constexpr Id kReady = 62;
@@ -470,6 +472,19 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     if (lobby.spectators && me != sim::kNoPlayer) {
         f.button(kWatch, Rect{688, 290, 284, 38}, tr(MpText::Watch));
     }
+    if (model.hosting) {
+        // The host can send spectators away too (they hold no slot to kick).
+        m_watchers.clear();
+        const auto& roster = session->roster();
+        for (std::size_t i = 1; i < roster.size() && m_watchers.size() < kWatcherRows; ++i) {
+            if (roster[i].seat == sim::kNoPlayer) {
+                const auto y = static_cast<std::int32_t>(340 + m_watchers.size() * 40);
+                f.label(Rect{688, y, 130, 38}, roster[i].name, Align::Left, Tone::Dim);
+                f.button(kWatcherKick + static_cast<Id>(m_watchers.size()), Rect{822, y, 150, 38}, tr(MpText::Kick));
+                m_watchers.push_back(i);
+            }
+        }
+    }
     f.paragraph(Rect{684, 560, 292, 100}, tr(model.hosting ? MpText::StartHint : MpText::WaitHostStart), Tone::Dim);
 
     f.button(kLeave, Rect{40, kBottomY, 180, 44}, tr(MpText::Leave));
@@ -637,6 +652,9 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
             } else if (id >= kSeatTake && id < kSeatTake + static_cast<Id>(kMaxSeats)) {
                 event(MultiplayerEvent::Kind::TakeSeat)->seat = static_cast<sim::PlayerId>(id - kSeatTake);
                 m_ready = false;
+            } else if (id >= kWatcherKick && id < kWatcherKick + static_cast<Id>(m_watchers.size())) {
+                event(MultiplayerEvent::Kind::KickMember)->member =
+                    m_watchers[static_cast<std::size_t>(id - kWatcherKick)];
             } else if (id >= kSeatKick && id < kSeatKick + static_cast<Id>(kMaxSeats)) {
                 event(MultiplayerEvent::Kind::Kick)->seat = static_cast<sim::PlayerId>(id - kSeatKick);
             } else if (id >= kSeatKind && id < kSeatKind + static_cast<Id>(kMaxSeats) && session != nullptr) {
