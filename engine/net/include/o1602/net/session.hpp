@@ -271,10 +271,13 @@ private:
     std::uint32_t m_open_own = 0;                          ///< commands of the host's player in m_open
     std::deque<std::pair<Seat, sim::Command>> m_overflow;  ///< no room in m_open: for the next frames
     std::uint16_t m_lead = 0;
-    std::uint32_t m_lead_ms = 0;                           ///< time since the lead last shrank
-    std::deque<FrameHash> m_hashes;                        ///< the host's latest fingerprints
-    std::uint32_t m_held_ms = 0;                           ///< how long the host has been waiting for a computer
-    std::optional<Snapshot> m_game;                        ///< the game as sent in this update
+    std::uint32_t m_lead_ms = 0;     ///< time since the lead last shrank
+    std::deque<FrameHash> m_hashes;  ///< the host's latest fingerprints
+    std::uint32_t m_held_ms = 0;     ///< how long the host has been waiting for a computer
+    std::optional<Snapshot> m_game;  ///< the game as sent in this update
+    /// Games the host may still write for computers that join or resync, in milliseconds of credit
+    /// (kGameCostMs a game, kGameCreditMs at most; it grows with real time).
+    std::uint32_t m_game_credit_ms = 4'000;
     std::vector<std::pair<Seat, std::uint64_t>> m_tokens;  ///< seat and token, to come back to it
     std::vector<Seat> m_computer_held;  ///< open at the start: the computer plays it while nobody does
     std::uint64_t m_compared = 0;

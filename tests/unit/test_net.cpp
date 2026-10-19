@@ -618,6 +618,12 @@ TEST_CASE("net: the host waits for a slow computer, then goes on without a froze
     CHECK(b.session->frames() + 10 > host.session->frames());
     CHECK(host.session->roster()[2].state == net::Member::State::Playing);
     CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
+
+    // Frozen again: the others wait a quarter of the time now (a computer that stalls on purpose
+    // cannot stop the game for the full time again and again).
+    run_for(network, host, {&a}, 2200);  // the full time would be 1000 ms ahead and 2000 ms held
+    CHECK(host.count(net::SessionEvent::Kind::Lagging) == 2);
+    CHECK(!host.session->waiting());
 }
 
 TEST_CASE("net: a long session keeps its memory and its frames in step") {
@@ -945,4 +951,23 @@ TEST_CASE("net: the computer holds an open slot until someone comes, and takes i
     tick(3000, {&bernd});
     CHECK(bernd.session->local_seat() == 1);
     CHECK(host_game.world->player(1)->role == sim::PlayerRole::Human);
+}
+
+TEST_CASE("net: a computer that joins in a loop gets the game at most once a second") {
+    net::LoopbackNetwork network(10, 0);
+    Host host(network);
+    int loads = 0;
+    for (int i = 0; i < 12; ++i) {
+        Computer c(network, "Rex");
+        run_for(network, host, {&c}, 150);
+        loads += c.game.loads;
+    }
+    // A few at once, then one for every second that passed (1.8 s).
+    CHECK(loads >= 4);
+    CHECK(loads <= 5);
+    // Someone who comes and stays still gets in.
+    Computer a(network, "Anna");
+    run_for(network, host, {&a}, 1500);
+    CHECK(a.session->playing());
+    CHECK(a.game.loads == 1);
 }

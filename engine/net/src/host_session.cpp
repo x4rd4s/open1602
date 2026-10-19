@@ -31,6 +31,10 @@ constexpr std::uint32_t kWaitingFrames = 4;
 constexpr std::uint32_t kMaxGameOrdersPerSecond = 4;
 /// Time a new connection has to send its Hello.
 constexpr std::uint32_t kGreetingMs = 10'000;
+/// Games written for computers that join or resync: a few at once, then one a second. A computer
+/// that leaves and comes back in a loop cannot make the host write the whole game more often.
+constexpr std::uint32_t kGameCostMs = 1'000;
+constexpr std::uint32_t kGameCreditMs = 4 * kGameCostMs;
 
 /// A name or chat line from the network without control characters (line breaks would split the
 /// lists and files they end up in).
@@ -57,6 +61,7 @@ struct HostSession::Peer {
     std::uint32_t epoch = 0;   ///< of the last game sent
     std::uint64_t frames = 0;  ///< run, as last reported
     bool lagging = false;
+    std::uint32_t stalls = 0;       ///< times the others stopped waiting for it
     std::uint64_t token = 0;        ///< to come back to its slot (0: it watches)
     std::uint32_t chat_lines = 0;   ///< in the current second
     std::uint32_t game_orders = 0;  ///< pauses and renames in the current second
@@ -226,9 +231,16 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
         run(real_ms, before_tick);
         broadcast_frames();
         m_game.reset();
-        for (std::size_t i = 0; i < m_peers.size(); ++i) {
-            if (m_peers[i]->game_due) {
-                send_game(*m_peers[i]);
+        m_game_credit_ms = std::min(kGameCreditMs, m_game_credit_ms + std::min(real_ms, kGameCreditMs));
+        if (m_game_credit_ms >= kGameCostMs) {
+            // Without credit, who waits for a game gets it with the next one (game_due stays set).
+            for (std::size_t i = 0; i < m_peers.size(); ++i) {
+                if (m_peers[i]->game_due) {
+                    send_game(*m_peers[i]);
+                }
+            }
+            if (m_game) {
+                m_game_credit_ms -= kGameCostMs;  // one game written for all who got it now
             }
         }
         m_game.reset();
@@ -519,13 +531,22 @@ void HostSession::run(std::uint32_t real_ms, const sim::Simulation::BeforeTick& 
 }
 
 void HostSession::watch_stalls(std::uint32_t real_ms, bool held) {
+    const auto holding = [&](const Peer& p) {
+        return !p.gone && p.state == Peer::State::Playing && !p.lagging && p.frames + ahead_frames() <= m_frames;
+    };
+    // A computer that has held everyone up before gets a quarter of the time: one that stalls
+    // again and again would otherwise stop the game for the full time each time.
+    const bool again =
+        std::any_of(m_peers.begin(), m_peers.end(), [&](const auto& p) { return holding(*p) && p->stalls > 0; });
+    const std::uint32_t limit = again ? m_config.stall_ms / 4 : m_config.stall_ms;
     if (!held) {
         m_held_ms = 0;
-    } else if (m_held_ms += real_ms; m_held_ms >= m_config.stall_ms) {
+    } else if (m_held_ms += real_ms; m_held_ms >= limit) {
         m_held_ms = 0;
         for (const auto& p : m_peers) {
-            if (!p->gone && p->state == Peer::State::Playing && !p->lagging && p->frames + ahead_frames() <= m_frames) {
+            if (holding(*p)) {
                 p->lagging = true;
+                ++p->stalls;
                 m_roster_changed = true;
                 SessionEvent e;
                 e.kind = SessionEvent::Kind::Lagging;
