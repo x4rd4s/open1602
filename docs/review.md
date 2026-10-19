@@ -120,7 +120,7 @@ and localized names are part of the sim state (see UI-2).
 | IO-3 | Medium | `core::read_file` throws on a directory and has no size limit | `core/src/file.cpp` | Fixed #19 |
 | IO-4 | Medium | Ship and unit ids are not validated; `next_*_id` can stick at `0xFFFFFFFF` | `sim/src/validate.cpp` | Fixed #19 |
 | IO-5 | Medium | The documented island limits are not enforced on load; the `.GAM` export truncates silently | `sim/src/savegame_extension.cpp` | Fixed #19 |
-| IO-6 | Medium | Load warnings go to stderr only; the building-data fingerprint is weak and only warns | `sim/src/savegame_extension.cpp`, `app/src/map_viewer.cpp` | Partly (#21: a status-line notice; multiplayer already compares the whole `.cod` files; the savegame fingerprint stays weak) |
+| IO-6 | Medium | Load warnings go to stderr only; the building-data fingerprint is weak and only warns | `sim/src/savegame_extension.cpp`, `app/src/map_viewer.cpp` | Won't fix rest (#21: a status-line notice; multiplayer compares the whole `.cod` files before anyone joins; see "Open work") |
 | IO-7 | Low | Mixer interpolation overflows signed `int` | `audio/src/mixer.cpp` | Fixed #19 |
 | IO-8 | Low | The sub-tile of a saved tile is not checked against its building | `sim/src/savegame_extension.cpp` | Fixed #19 |
 | IO-9 | Low | A ship's tile position is truncated from `pos_x`/`pos_y` | `sim/src/savegame_extension.cpp` | Fixed #19 |
@@ -245,12 +245,12 @@ had no slot to join, because every other start player is a computer. Those slots
 | Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Won't fix | Partly | Open |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 0 | 1 | 2 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 2 |
 | AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 5 |
 | UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 9 |
 | MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 3 |
 | BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 2 | 1 | 8 | 24 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 2 | 2 | 7 | 24 |
 
 ## Open work, in order
 
@@ -259,8 +259,10 @@ tests, then moddability, then performance, and finally cosmetic and documentatio
 taken from the area reports (S, M, L).
 
 **1. Determinism and multiplayer leftovers**
-1. IO-6 rest (M): a savegame fingerprint over everything that drives the simulation (multiplayer
-   already compares the whole `.cod` files in its Hello).
+Nothing left here. (IO-6 rest is not done on purpose: a stronger savegame fingerprint would have
+to list every field of `BuildingType` and `FigureType` and be kept in step with them, and it would
+only change a warning. Multiplayer, where a difference matters, already refuses a computer whose
+`.cod` files differ, and single-player loads show the warning as a notice since #21.)
 (Fixed in #21: AU6 one hold rule, MP-7 games rationed, MP-12 no English default names, MP-13
 fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #25: MP-15 spectators can be removed, MP-8 names looked up beside the game. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
 `Pool::for_each` guard and money saturation are fixed in #20.)
