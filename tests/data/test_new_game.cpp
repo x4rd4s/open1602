@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "fixtures.hpp"
 
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -292,7 +293,7 @@ TEST_CASE("data: endless games the original started come out of the same islands
     };
     std::size_t compared = 0;
     for (const Start& s : {Start{"SAVEGAME/game06.gam", 2, 399}, Start{"SAVEGAME/game07.gam", 0, 22}}) {
-        const auto path = game.resolve(s.file);
+        const auto path = test::fixture(game, s.file);
         if (!path) {
             continue;
         }

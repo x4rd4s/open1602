@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "fixtures.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
@@ -39,7 +40,7 @@ TEST_CASE("data: soldiers, towers, castles and diplomacy of a savegame, written 
     auto figures = assets::FigureTable::load(game);
     REQUIRE(buildings.ok());
     REQUIRE(figures.ok());
-    auto file = assets::ChunkFile::load(*game.resolve("SAVEGAME/game00.gam"));
+    auto file = assets::ChunkFile::load(test::fixture_or_skip(game, "SAVEGAME/game00.gam"));
     REQUIRE(file.ok());
     auto world = sim::load_world(*file, *buildings, game);
     REQUIRE(world.ok());

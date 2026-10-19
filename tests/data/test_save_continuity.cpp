@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "fixtures.hpp"
 
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -111,7 +112,7 @@ TEST_CASE("data: games of the original, saved and loaded again and again, contin
     const Data d = data_or_skip();
     bool any = false;
     for (const char* name : {"SAVEGAME/game00.gam", "SAVEGAME/game10.gam"}) {
-        const auto path = d.game.resolve(name);
+        const auto path = test::fixture(d.game, name);
         if (!path) {
             continue;
         }

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "fixtures.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
@@ -166,7 +167,7 @@ TEST_CASE("data: a game loaded from Open1602's savegame exports the same .GAM as
     // Every savegame of the installation: the export through the own format loses nothing.
     std::size_t tested = 0;
     for (const char* name : {"SAVEGAME/game00.gam", "SAVEGAME/game10.gam"}) {
-        const auto path = s.game.resolve(name);
+        const auto path = test::fixture(s.game, name);
         if (!path) {
             continue;
         }

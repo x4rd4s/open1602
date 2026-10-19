@@ -50,8 +50,20 @@ there, for example:
   exists after the game has been started once;
 - the videos in `VideoSmk/` and the interface files.
 
-Several tests were written against specific savegames of the maintainers' installation; on another
-installation they skip or test what the savegames there contain.
+Several tests check what particular savegames contain. Those savegames come from a maintainer's
+installation and are listed with size and CRC-32 in [data/fixtures.hpp](data/fixtures.hpp); a test
+uses one only when the file in that slot matches, and otherwise skips it (or the check that needs
+it). Tests that only load, save and compare work with whatever savegames an installation has.
+
+| Fixture | What the tests expect of it |
+|---|---|
+| `SAVEGAME/game00.gam` | Late game: seven free traders, trade routes, soldiers, towers and castles |
+| `SAVEGAME/game03.gam` | Game with busy trade at sea |
+| `SAVEGAME/game06.gam`, `game07.gam` | Endless games saved about 8 s after the start ("Durchschnittlich", player Merlin, yellow) |
+| `SAVEGAME/game10.gam` | Endless game "Endlos_Laufend" with explored islands and known deposits |
+
+To add a fixture, put its path, size and CRC-32 (for example `python3 -c 'import zlib,sys; print(hex(zlib.crc32(open(sys.argv[1],"rb").read())))' file`)
+into `kFixtures` and load it with `test::fixture()` or `test::fixture_or_skip()`.
 
 ## Environment variables
 

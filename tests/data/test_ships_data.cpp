@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "fixtures.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
@@ -37,7 +38,7 @@ TEST_CASE("data: ships of a savegame with their routes, the trader's goods and t
     const auto game = game_or_skip("SAVEGAME/game00.gam");
     auto buildings = assets::BuildingTable::load(game);
     REQUIRE(buildings.ok());
-    auto file = assets::ChunkFile::load(*game.resolve("SAVEGAME/game00.gam"));
+    auto file = assets::ChunkFile::load(test::fixture_or_skip(game, "SAVEGAME/game00.gam"));
     REQUIRE(file.ok());
     auto world = sim::load_world(*file, *buildings, game);
     REQUIRE(world.ok());
@@ -78,14 +79,15 @@ TEST_CASE("data: ships of a savegame with their routes, the trader's goods and t
 TEST_CASE("data: twenty minutes at sea: ships stay on water, traders trade, nobody gives up") {
     const auto game = game_or_skip("SAVEGAME/game00.gam");
     for (const char* name : {"SAVEGAME/game00.gam", "SAVEGAME/game03.gam"}) {
-        if (!game.resolve(name)) {
+        const auto path = test::fixture(game, name);
+        if (!path) {
             continue;
         }
         auto buildings = assets::BuildingTable::load(game);
         auto figures = assets::FigureTable::load(game);
         REQUIRE(buildings.ok());
         REQUIRE(figures.ok());
-        auto file = assets::ChunkFile::load(*game.resolve(name));
+        auto file = assets::ChunkFile::load(*path);
         REQUIRE(file.ok());
         auto world = sim::load_world(*file, *buildings, game);
         REQUIRE(world.ok());
@@ -134,7 +136,7 @@ TEST_CASE("data: explored islands and known deposits (game10) come back byte for
         REQUIRE(file.ok());
         auto world = sim::load_world(*file, *buildings, *game);
         REQUIRE(world.ok());
-        if (n == 10) {
+        if (n == 10 && test::fixture(*game, name)) {
             // Endlos_Laufend: player 0 explored islands 8, 9, 11, 13 and 14 with a ship; the iron
             // ore of island 10 belongs to computer 2's mine without anybody having explored it.
             std::set<unsigned> explored;
