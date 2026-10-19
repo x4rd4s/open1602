@@ -766,19 +766,15 @@ private:
             put32(r, 0x0C, static_cast<std::uint32_t>(std::clamp<std::int64_t>(c.sales, 0, 0xFFFFFFFFLL)));
             for (std::size_t k = 0; k < 5; ++k) {
                 put32(r, 0x5C + 4 * k, k < c.inhabitants.size() ? c.inhabitants[k] : 0);
-                // The loader turns 0 into 128.
-                const std::uint8_t sat = k < c.satisfaction.size() ? c.satisfaction[k] : 128;
-                if (!(r[0x78 + k] == 0 && sat == 128)) {
-                    r[0x78 + k] = sat;
-                }
+                // The satisfaction and the food supply (below) load as stored, a 0 too.
+                r[0x78 + k] = k < c.satisfaction.size() ? c.satisfaction[k] : std::uint8_t{128};
+                // The loader turns a tax rate of 0 into 128.
                 const std::uint8_t tax = k < c.tax_rate.size() ? c.tax_rate[k] : 128;
                 if (!(r[0x7F + k] == 0 && tax == 128)) {
                     r[0x7F + k] = tax;
                 }
             }
-            if (!(r[0x86] == 0 && c.food_ratio == 128)) {
-                r[0x86] = c.food_ratio;
-            }
+            r[0x86] = c.food_ratio;
             for (std::size_t k = 0; k < assets::kOriginalPlayerSlots && k < c.goodwill.size(); ++k) {
                 put32(r, 0x18 + 4 * k, c.goodwill[k]);
             }

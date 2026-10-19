@@ -47,6 +47,7 @@ add_executable(o1602_tests
     unit/test_world_generator.cpp
     unit/test_ai.cpp
     unit/test_save_fuzz.cpp
+    unit/test_savegame_writer.cpp
     data/test_original_data.cpp
     data/test_new_game.cpp
     data/test_ai_data.cpp
