@@ -11,16 +11,26 @@ Status: accepted · 2026-10-16
               ▲
    net, render, audio, ui   Lockstep multiplayer, draw lists, sound, interface (each on sim)
               ▲
-   video (on audio), render_sdl (on render, ui, platform), platform (on core and SDL3)
+   video (on audio)         Smacker films
+   menus (on audio, ui,     The game's parts that need no platform: menus, settings files, build
+          net)              tool, command sink (sources in engine/app/src, tested without SDL)
+   platform (on core, SDL3) Window, renderer, audio output
+   render_sdl (on render,   Draws sprites and panels with SDL3
+          ui, platform)
               ▲
              app            The game executable, links all of them
 ```
 
-The exact links of every target are listed at the top of `engine/CMakeLists.txt`.
+The exact links of every target are listed at the top of `engine/CMakeLists.txt`. Only the game build
+(`O1602_BUILD_GAME`) adds `platform`, `render_sdl` and `app`.
 
 Rules:
 - Arrows point to dependencies; cycles are forbidden.
 - `sim` **never** depends on `platform`, `render`, `audio`, `ui` (headless capability, determinism).
+- A module includes only headers of modules it links (directly or through them), and only
+  `platform`, `render_sdl` and `app` include SDL. The ctest `layering` (`cmake/CheckLayering.cmake`)
+  checks this on the sources, since the include directories of all modules are visible to the tests
+  and tools through `PUBLIC` links and a stray include would otherwise compile.
 - Every module is its own CMake library `o1602::<module>` with `include/o1602/<module>/` as its
   public interface; internals live in `src/`.
 - Namespace `o1602::<module>`.

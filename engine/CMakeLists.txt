@@ -12,7 +12,8 @@
 # and is tested without SDL.
 #
 # 'sim' must never depend on platform, render, audio or ui: the simulation has to stay
-# deterministic and runnable headless (tests, dedicated server, replays).
+# deterministic and runnable headless (tests, dedicated server, replays). The ctest "layering"
+# (cmake/CheckLayering.cmake) checks the includes of every module against these links.
 
 add_subdirectory(core)
 add_subdirectory(assets)
