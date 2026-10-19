@@ -97,7 +97,7 @@ rest stays open, as noted.
 | SC-10 | Low | `load_world` is one function of about 515 lines | `sim/src/world.cpp` | Open |
 | SC-11 | Low | `find_case_insensitive` resolves `..` and absolute paths | `core/src/file.cpp` | Fixed #19 |
 | SC-12 | Low (uncertain) | An in-place upgrade keeps the old `Production::rate`; `raw` can underflow | `sim/src/production_cycle.cpp` | Fixed #20 |
-| SC-13 | Low | Crater and deer spot coordinates are `uint8_t` in the runtime model | `sim/include/o1602/sim/world.hpp` | Open (since #19, loads of islands wider than 255 tiles are refused) |
+| SC-13 | Low | Crater and deer spot coordinates are `uint8_t` in the runtime model | `sim/include/o1602/sim/world.hpp` | Fixed #28 (16-bit in the runtime model and in the own format's section version 2; the `.GAM` writer refuses islands wider than 255 tiles) |
 | SC-14 | Low | Small per-call costs: `state_hash()` serializes the game, linear city lookups, `vector<bool>` in `PathFinder` | `sim/src/simulation.cpp`, `consumption.cpp` | Open |
 
 For SC-7, the identifiers "Trader4", "Pirat5", "Native6" and "Endlosspiel" stay as they are. They
@@ -165,7 +165,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-2 | Medium | Sim state depends on the local Text.cod city and ship names | `app/src/map_viewer.cpp`, `sim/src/trader.cpp` | Fixed #20 |
 | UI-3 | Medium | Control groups survive loading another game and select unrelated units | `ui/src/unit_selection.cpp` | Fixed #19 |
 | UI-4 | Low | `replace_world` rebuilds the simulation in place and misses per-game state | `app/src/map_viewer.cpp` | Fixed #24 (`GameState` built whole, then swapped; out of memory keeps the old game) |
-| UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Open |
+| UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Partly (#24: `GameState` built whole and swapped in; #28: `CommandSink` is the only path to `Simulation::submit`) |
 | UI-6 | Low | The window title receives Windows-1252 bytes, but SDL expects UTF-8 | `app/src/map_viewer.cpp` | Fixed #20 |
 | UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Open |
 | UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Open |
@@ -176,7 +176,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Fixed #26 |
-| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21: see BD-7) |
+| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21, #24, #28: see BD-7) |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Fixed #26 |
 | UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Fixed #20 |
 
@@ -218,7 +218,7 @@ bought-ship item.
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
 | BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours; #27: unit tests round-trip a synthetic world through the `.GAM` writer, which found and fixed a city satisfaction bug) |
-| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; platform, render_sdl and o1602-tool remain) |
+| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; #28: the command sink with three tests, 14 o1602-tool smoke tests and a game start without data in CI, also under ASan; platform and render_sdl remain) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
 | BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20 |
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 1 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 2 | 6 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 2 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 4 | 1 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 2 | 6 | 18 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 1 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 0 | 3 | 5 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 2 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 4 | 1 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 2 | 7 | 16 |
 
 ## Open work, in order
 
@@ -268,23 +268,23 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #
 `Pool::for_each` guard and money saturation are fixed in #20.)
 
 **2. Architecture and tests**
-1. UI-5 (L): the running game is a `GameState` built whole and then swapped in since #24 (UI-4).
-   Next a `CommandSink` as the only path to `Simulation::submit`, then `MapInput`,
+1. UI-5 (L): the running game is a `GameState` built whole and then swapped in since #24 (UI-4),
+   and since #28 a `CommandSink` is the only path to `Simulation::submit`. Next `MapInput`,
    `EventPresenter`, `VideoController` and a screen stack.
 2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool since
-   #21 and the questions before orders since #24 are there, with tests). Next smoke tests for
-   o1602-tool and an ASan game run with the dummy video driver.
+   #21, the questions before orders since #24 and the command sink since #28 are there, with
+   tests). Since #28 o1602-tool has smoke tests and CI starts the game without data, also under
+   ASan. Platform and render_sdl remain.
 3. BD-6 rest (M): unit tests for the AI and `new_game` without original data, and coverage in CI.
-   (Since #27 unit tests round-trip a synthetic world through `savegame_writer`.) (Since #23 a data test runs the computers of a new endless game for three game hours and
-   checks that they keep their cities and that the game saves and goes on the same. Since #26 the
+   (Since #27 unit tests round-trip a synthetic world through `savegame_writer`. Since #23 a data
+   test runs the computers of a new endless game for three game hours and checks that they keep their cities and that the game saves and goes on the same. Since #26 the
    data tests check their savegame fixtures by size and CRC-32 and skip on another file: BD-3.)
 4. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
    symmetric `io()` descriptions in files per section.
 
 **3. Moddability: game numbers in one place**
-1. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
-   format. The load-side refusal from #19 then becomes a writer-side check.
-(Fixed in #22: IO-12 the numbers live in `assets/game_data.hpp` and sim re-exports them; SC-9 and
+Nothing left here. (Fixed in #28: SC-13 crater and deer spot coordinates are 16-bit in the runtime
+model and the own format; the `.GAM` writer refuses islands wider than 255 tiles. Fixed in #22: IO-12 the numbers live in `assets/game_data.hpp` and sim re-exports them; SC-9 and
 AU10 the simulation's literals; IO-10 saturating casts and the GAD size limit, documented in
 `docs/modding/data-limits.md`. Fixed in #25: UI-14 the game-setting bits, the message icons' banner
 limit and tile spots named. Fixed in #27: MP-17 the score curves and the monument rule. MP-11 was
