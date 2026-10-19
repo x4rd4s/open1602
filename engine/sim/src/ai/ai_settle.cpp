@@ -4,8 +4,8 @@
 // test (task 2), the Kontor site and the free cargo (task 3), the landing (task 4), later colonies
 // (0x00426290) and giving a city up (task 0x2E).
 #include <algorithm>
-#include <limits>
 #include <array>
+#include <limits>
 
 #include "ai_engine.hpp"
 
