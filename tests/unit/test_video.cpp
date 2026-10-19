@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
-#include "video_placement.hpp"
+#include "video_queue.hpp"
 
 #include "o1602/video/smacker.hpp"
 
@@ -434,4 +434,99 @@ TEST_CASE("videos: messages in the minimap, the rest and messages without a mini
     }
     CHECK(!video_plays_in_minimap(6, true, false, true));   // the pause loops
     CHECK(!video_plays_in_minimap(58, false, true, true));  // the intro
+}
+
+namespace {
+
+app::VideoRequest queued(std::uint16_t number, bool intro = false) {
+    app::VideoRequest r;
+    r.number = number;
+    r.intro = intro;
+    return r;
+}
+
+std::vector<std::uint16_t> drain(app::VideoQueue& queue) {
+    std::vector<std::uint16_t> out;
+    while (const auto r = queue.take_next()) {
+        out.push_back(r->number);
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("videos: the logos and the intro queue, any other request replaces what waits") {
+    app::VideoQueue queue;
+    // The start of the original: 8 -> 9 -> 58, none stops the one before.
+    CHECK(!queue.request(queued(8, true)));
+    CHECK(!queue.request(queued(9, true)));
+    CHECK(!queue.request(queued(58, true)));
+    CHECK((drain(queue) == std::vector<std::uint16_t>{8, 9, 58}));
+    CHECK(!queue.waiting());
+
+    // Video_Request 0x00488C00: the latest request wins and stops the running one.
+    CHECK(!queue.request(queued(8, true)));
+    CHECK(!queue.request(queued(9, true)));
+    CHECK(queue.request(queued(63)));
+    CHECK(queue.request(queued(998)));
+    CHECK((drain(queue) == std::vector<std::uint16_t>{998}));
+}
+
+TEST_CASE("videos: Escape in a logo skips the whole start, in a message only that video") {
+    app::VideoQueue queue;
+    for (const std::uint16_t n : {std::uint16_t{8}, std::uint16_t{9}, std::uint16_t{58}}) {
+        (void)queue.request(queued(n, true));
+    }
+    queue.started(*queue.take_next(), false);
+    queue.skip_start();
+    CHECK(!queue.waiting());
+
+    (void)queue.request(queued(63));
+    (void)queue.request(queued(58, true));  // the intro from the menu after a message
+    queue.started(*queue.take_next(), true);
+    queue.skip_start();  // the message is no part of the start
+    CHECK((drain(queue) == std::vector<std::uint16_t>{58}));
+}
+
+TEST_CASE("videos: where a video plays is decided when it starts") {
+    app::VideoQueue queue;
+    queue.started(queued(63), true);
+    CHECK(queue.now().in_minimap);
+    queue.started(queued(63), false);  // the main menu: no minimap
+    CHECK(!queue.now().in_minimap);
+
+    app::VideoRequest credits = queued(10);
+    credits.in_frame = true;
+    queue.started(credits, true);
+    CHECK(queue.now().in_frame);
+    CHECK(!queue.now().in_minimap);
+
+    app::VideoRequest pause = queued(app::kPauseVideo);
+    pause.loop = true;
+    pause.tracks = 2;
+    queue.started(pause, true);
+    CHECK(!queue.now().in_minimap);
+    CHECK(queue.now().loop);
+    CHECK(queue.now().tracks == 2);
+}
+
+TEST_CASE("videos: the pause follows the game") {
+    app::PauseVideo pause;
+    CHECK(pause.toggle(false));
+    CHECK(pause.on());
+    // The command has not arrived yet: the game still runs, the pause stays.
+    CHECK(!pause.ended_elsewhere(false));
+    CHECK(pause.on());
+    CHECK(!pause.ended_elsewhere(true));
+    // F3 or another player resumed the game: the pause (and its video) ends.
+    CHECK(pause.ended_elsewhere(false));
+    CHECK(!pause.on());
+    CHECK(!pause.ended_elsewhere(false));
+
+    // The key in a game paused another way resumes it and shows no pause video.
+    CHECK(!pause.toggle(true));
+    CHECK(pause.toggle(false));
+    CHECK(!pause.toggle(true));  // pressed again: off
+    pause.reset();
+    CHECK(!pause.on());
 }

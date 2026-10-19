@@ -256,19 +256,21 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_window = std::move(window).value();
     // The viewer's own copy: GameSound keeps a pointer, and `game` may be a temporary (UI-15).
     viewer->m_sound = std::make_unique<GameSound>(viewer->m_game, options.effects, options.music);
+    viewer->m_video = std::make_unique<VideoController>(
+        options.videos ? std::make_unique<VideoPlayer>(viewer->m_window->sdl_renderer(), viewer->m_game) : nullptr,
+        *viewer->m_sound);
     if (options.videos) {
-        viewer->m_video = std::make_unique<VideoPlayer>(viewer->m_window->sdl_renderer(), viewer->m_game);
         viewer->m_sound->set_video_check(
             [self = viewer.get()](std::uint16_t n) { return self->m_video->available(n); });
         if (options.intro) {
             // The start of the original: the two logos and the intro (0x004959AA, chained 8 -> 9 -> 58).
             for (const std::uint16_t n : std::array<std::uint16_t, 3>{8, 9, 58}) {
-                viewer->request_video(n, 0, false, true);
+                viewer->m_video->request(n, 0, false, true);
             }
         }
         if (options.video) {
             const std::uint16_t n = *options.video;
-            viewer->request_video(n, 0, false, n == 8 || n == 9 || n == 58);
+            viewer->m_video->request(n, 0, false, n == 8 || n == 9 || n == 58);
         }
     }
     if (options.frame) {
@@ -541,43 +543,26 @@ int MapViewer::run() {
             SDL_PushEvent(&e);
         }
         while (SDL_PollEvent(&event)) {
-            if (m_video && m_video->playing() && !video_windowed()) {
-                handle_video_event(event);
-            } else if (video_in_frame() && (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
-                                            (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE))) {
-                stop_video();  // the credits end with a click or Escape
-            } else if (video_in_minimap() && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
-                       m_hud->minimap_area().contains(static_cast<std::int32_t>(event.button.x),
-                                                      static_cast<std::int32_t>(event.button.y))) {
-                stop_video();  // a click on the video ends it
-            } else {
-                handle_event(event);
+            switch (m_video->route(event, m_hud.get())) {
+                case VideoController::Input::Game:
+                    handle_event(event);
+                    break;
+                case VideoController::Input::TogglePause:
+                    toggle_pause_video();
+                    break;
+                case VideoController::Input::LeftReleased:
+                    m_left_down = false;
+                    break;
+                case VideoController::Input::Taken:
+                    break;
             }
         }
         const std::uint64_t now = platform::ticks_ms();
         const auto delta = static_cast<std::uint32_t>(std::min<std::uint64_t>(now - last, 1000));
         last = now;
-        // Messages of the scenery and the sound itself may ask for a video too.
-        if (const auto n = m_sound->take_video()) {
-            request_video(*n);
-        }
-        bool video = m_video && (m_video->playing() || start_next_video(now));
-        if (video) {
-            switch (m_video->update(now)) {
-                case VideoPlayer::Step::Playing:
-                    break;
-                case VideoPlayer::Step::Restarted:
-                    if (const video::Smacker* v = m_video->video()) {
-                        m_sound->start_video(*v, m_video_now.tracks);
-                    }
-                    break;
-                case VideoPlayer::Step::Ended:
-                    m_sound->stop_video();
-                    video = start_next_video(now);
-                    break;
-            }
-        }
-        if (video && !video_windowed()) {
+        // A video that starts now plays in the minimap's window only while one is on screen.
+        const bool video = m_video->frame(now, m_hud && !m_hud->menu_active());
+        if (video && m_video->full_screen()) {
             // The game stands still while a video fills the screen (the original's main loop
             // 0x00408293); the time does not reach the simulation afterwards. Not in a multiplayer
             // game: the others would wait (M-018).
@@ -643,7 +628,7 @@ int MapViewer::run() {
     if (!m_options.screenshot.empty()) {
         // Read back a complete frame.
         m_screenshot = ScreenshotRequest{m_options.screenshot};
-        if (m_video && m_video->playing() && !video_windowed()) {
+        if (m_video->full_screen()) {
             std::int32_t w = 0;
             std::int32_t h = 0;
             m_window->output_size(w, h);
@@ -862,16 +847,7 @@ void MapViewer::zoom_by(int steps, double sx, double sy) {
 void MapViewer::update(std::uint32_t delta_ms) {
     scroll_with_keys(delta_ms);
     // The pause of the video ended another way (F3, another player): the video goes too.
-    if (m_pause_video) {
-        if (m_state->simulation.paused()) {
-            m_pause_seen = true;
-        } else if (m_pause_seen) {
-            m_pause_video = false;
-            if (m_video && m_video->playing() && m_video->number() == 6 && m_video_now.loop) {
-                stop_video();
-            }
-        }
-    }
+    m_video->follow_pause(m_state->simulation.paused());
     // A window changed the selection (filters, formations): the windows follow.
     if (m_units.take_changed()) {
         selection_changed(false);
@@ -1114,9 +1090,8 @@ void MapViewer::render() {
     SDL_RenderClear(r);
     if (m_hud && m_hud->menu_active()) {
         m_hud->draw_menu();
-        if (video_in_frame()) {
-            const ui::Rect f = m_hud->menu_video_rect();
-            m_video->draw_in(f.x, f.y, f.w, f.h);
+        if (m_video->in_frame()) {
+            m_video->draw_in(m_hud->menu_video_rect());
         }
         present();
         return;
@@ -1298,10 +1273,9 @@ void MapViewer::render() {
         m_hud->set_points(m_player_points, humans() <= 1);
         m_hud->draw(m_state->world, m_buildings, m_banners, corners, now, m_player_figures,
                     static_cast<std::uint8_t>(local != nullptr ? std::min<int>(local->banner, 255) : 0));
-        if (video_in_minimap()) {
+        if (m_video->in_minimap()) {
             // The video of a message over the minimap; the game goes on (ADR 0010).
-            const ui::Rect a = m_hud->minimap_area();
-            m_video->draw_in(a.x, a.y, a.w, a.h);
+            m_video->draw_in(m_hud->minimap_area());
         }
     }
     present();
@@ -1525,118 +1499,22 @@ void MapViewer::announce(std::uint16_t message, std::optional<std::pair<double, 
                          std::optional<sim::PlayerId> about) {
     m_sound->message(message, tile, about);  // the listener puts it into the status bar
     if (const auto n = m_sound->take_video()) {
-        request_video(*n);
+        m_video->request(*n);
     }
 }
 
 void MapViewer::announce_with_tracks(std::uint16_t message, std::uint8_t tracks) {
     m_sound->message(message, std::nullopt);
     if (const auto n = m_sound->take_video()) {
-        request_video(*n, tracks);
-    }
-}
-
-void MapViewer::request_video(std::uint16_t number, std::uint8_t tracks, bool loop, bool intro) {
-    if (!m_video) {
-        return;
-    }
-    if (!intro) {
-        // Video_Request 0x00488C00: the latest request wins.
-        m_videos.clear();
-        if (m_video->playing()) {
-            stop_video();
-        }
-    }
-    m_videos.push_back(VideoRequest{number, tracks, loop, intro});
-}
-
-bool MapViewer::video_in_minimap() const {
-    return m_video && m_video->playing() && m_video_now.in_minimap && m_hud;
-}
-
-bool MapViewer::video_in_frame() const {
-    return m_video && m_video->playing() && m_video_now.in_frame && m_hud;
-}
-
-bool MapViewer::start_next_video(std::uint64_t now_ms) {
-    while (m_video && !m_videos.empty()) {
-        const VideoRequest r = m_videos.front();
-        m_videos.pop_front();
-        // Reading the file and decoding its sound stand the frames still.
-        m_sound->prefill();
-        // A missing file goes on with the next one (the original drops the rest of the chain, U-022).
-        if (m_video->start(r.number, r.loop, now_ms)) {
-            m_video_now = r;
-            // A message's video plays in the minimap; with none on screen (the main menu, also
-            // after --video N) it fills the screen.
-            const bool minimap_shown = m_hud && !m_hud->menu_active();
-            m_video_now.in_minimap = !r.in_frame && video_plays_in_minimap(r.number, r.loop, r.intro, minimap_shown);
-            if (const video::Smacker* v = m_video->video()) {
-                m_sound->start_video(*v, r.tracks);
-                // The picture waits for the sound, which plays after what the device holds.
-                m_video->hold_until(platform::ticks_ms() + m_sound->queued_ms());
-            }
-            return true;
-        }
-        std::fprintf(stderr, "video %u is missing\n", static_cast<unsigned>(r.number));
-    }
-    return false;
-}
-
-void MapViewer::stop_video() {
-    if (m_video) {
-        m_video->stop();
-    }
-    m_sound->stop_video();
-}
-
-void MapViewer::handle_video_event(const SDL_Event& event) {
-    switch (event.type) {
-        case SDL_EVENT_QUIT:
-        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-        case SDL_EVENT_RENDER_DEVICE_RESET:
-        case SDL_EVENT_RENDER_DEVICE_LOST:
-            handle_event(event);
-            break;
-        case SDL_EVENT_KEY_DOWN:
-            if (event.key.key == SDLK_PAUSE || (event.key.key == SDLK_ESCAPE && m_pause_video)) {
-                toggle_pause_video();
-            } else if (event.key.key == SDLK_ESCAPE) {
-                // Skipping a logo or the intro skips the whole start (0x00492690).
-                if (m_video_now.intro) {
-                    std::erase_if(m_videos, [](const VideoRequest& r) { return r.intro; });
-                }
-                stop_video();
-            }
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                m_left_down = false;
-            }
-            break;
-        default:
-            break;  // clicks on the game are swallowed while a video plays
+        m_video->request(*n, tracks);
     }
 }
 
 void MapViewer::toggle_pause_video() {
-    // Follows the game: paused another way (F3, another player), the Pause key goes on.
-    m_pause_video = !m_state->simulation.paused() && !m_pause_video;
-    m_pause_seen = false;
-    if (m_pause_video) {
-        m_command_sink.submit(
-            sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Pause, m_state->simulation.speed()});
-        if (m_video && m_video->available(6)) {
-            request_video(6, 0, true);
-        }
-    } else {
-        m_command_sink.submit(
-            sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Resume, m_state->simulation.speed()});
-        if (m_video && m_video->playing() && m_video->number() == 6 && m_video_now.loop) {
-            stop_video();
-        }
-    }
+    const bool on = m_video->toggle_pause(m_state->simulation.paused());
+    m_command_sink.submit(sim::GameSpeedOrder{m_local_player,
+                                              on ? sim::GameSpeedOrder::Op::Pause : sim::GameSpeedOrder::Op::Resume,
+                                              m_state->simulation.speed()});
 }
 
 void MapViewer::lay_out() {
@@ -1679,9 +1557,7 @@ void MapViewer::recreate_textures() {
     if (m_hud) {
         m_hud->release_textures();
     }
-    if (m_video) {
-        m_video->recreate_texture();
-    }
+    m_video->recreate_texture();
 }
 
 void MapViewer::select_building_at_mouse() {
@@ -1948,9 +1824,9 @@ void MapViewer::apply_game_events() {
                     announce(0x53);
                     // The defeat videos come directly, whatever the video switches say (0x004766A0):
                     // bankruptcy 998, otherwise 1010 or 2020.
-                    request_video(e.reason == sim::GameEvent::Reason::Bankrupt ? 998
-                                  : (m_defeat_variant++ & 1U) == 0             ? 1010
-                                                                               : 2020);
+                    m_video->request(e.reason == sim::GameEvent::Reason::Bankrupt ? 998
+                                     : (m_defeat_variant++ & 1U) == 0             ? 1010
+                                                                                  : 2020);
                 } else {
                     announce(e.reason == sim::GameEvent::Reason::Bankrupt ? 0x59 : 0x5A);
                 }
@@ -2483,9 +2359,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
         return core::make_error(core::ErrorCode::PlatformError, "not enough memory for the game");
     }
     // What belongs to the old game goes: videos, selection, orders waiting for an answer, tools.
-    stop_video();
-    m_videos.clear();
-    m_pause_video = false;
+    m_video->reset();
     m_end_pending.reset();
     m_end_shown = false;
     m_quit_pending = false;
@@ -2607,15 +2481,10 @@ void MapViewer::apply_menu() {
                 }
                 continue;
             case MenuEvent::Kind::Credits:
-                if (m_video) {
-                    request_video(10);
-                    if (!m_videos.empty()) {
-                        m_videos.back().in_frame = true;
-                    }
-                }
+                m_video->request(10, 0, false, false, true);
                 continue;
             case MenuEvent::Kind::Intro:
-                request_video(58, 0, false, true);
+                m_video->request(58, 0, false, true);
                 continue;
             case MenuEvent::Kind::Multiplayer:
                 open_multiplayer_menu();
@@ -2755,7 +2624,7 @@ void MapViewer::check_end_screen(std::uint64_t now) {
     const std::uint64_t step = now >= e.last_ms ? now - e.last_ms : 0;
     e.last_ms = now;
     // WinMain runs no game frame while a video plays, the next video of a chain included.
-    if ((m_video && m_video->playing()) || !m_videos.empty()) {
+    if (m_video->busy()) {
         e.after_video = true;
         return;
     }

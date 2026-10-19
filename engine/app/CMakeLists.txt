@@ -18,6 +18,7 @@ add_executable(open1602
     src/side_panels.cpp
     src/map_viewer.cpp
     src/map_input.cpp
+    src/video_controller.cpp
     src/video_player.cpp
 )
 target_link_libraries(open1602 PRIVATE o1602::sim o1602::render_sdl o1602::platform o1602::audio o1602::ui o1602::video o1602::net o1602::menus)

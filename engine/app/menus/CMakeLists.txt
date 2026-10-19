@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # The game's parts that need no platform: the main menu's lists, the multiplayer menu and its
-# texts, the settings files, the build tool, the command sink, the questions before orders. Built without the game too, so that the tests have them.
+# texts, the settings files, the build tool, the command sink, the questions before orders, which
+# video plays when. Built without the game too, so that the tests have them.
 
 add_library(o1602_menus
     ../src/app_settings.cpp
@@ -11,6 +12,7 @@ add_library(o1602_menus
     ../src/multiplayer_menu.cpp
     ../src/multiplayer_texts.cpp
     ../src/order_questions.cpp
+    ../src/video_queue.cpp
 )
 add_library(o1602::menus ALIAS o1602_menus)
 

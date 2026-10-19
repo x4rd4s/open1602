@@ -6,7 +6,6 @@
 
 #include <array>
 #include <cstdint>
-#include <deque>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -20,8 +19,7 @@
 #include "game_sound.hpp"
 #include "hud.hpp"
 #include "multiplayer_menu.hpp"
-#include "video_placement.hpp"
-#include "video_player.hpp"
+#include "video_controller.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -367,17 +365,8 @@ private:
     /// The same with the tracks of its video (bit i = track i, 0 = all): the messages 0x6B..0x6E
     /// speak to the winner on track 1 and to the others on track 2.
     void announce_with_tracks(std::uint16_t message, std::uint8_t tracks);
-    /// Videos (docs/re/videos.md): a new request replaces the running video and the waiting ones,
-    /// `intro` ones only queue after each other.
-    void request_video(std::uint16_t number, std::uint8_t tracks = 0, bool loop = false, bool intro = false);
-    /// Starts the next waiting video, if any; false if none plays.
-    bool start_next_video(std::uint64_t now_ms);
-    void stop_video();
-    /// Input while a video plays: Escape skips (the logos and the intro together), Pause and
-    /// Escape end the pause video; clicks on the game are swallowed.
-    void handle_video_event(const SDL_Event& event);
-    /// The pause of the original (Pause key): the pause video loops; without it the game still
-    /// stops (U-018).
+    /// The pause of the original (Pause key) while a video fills the window: the game stops or
+    /// goes on, the pause video loops (VideoController::toggle_pause).
     void toggle_pause_video();
     void zoom_by(int steps, double sx, double sy);
     /// Island tile under the mouse, nullopt over the sea.
@@ -498,30 +487,12 @@ private:
         std::uint32_t field = 0;  ///< id of the field
     };
     std::optional<FieldSource> m_field_source;
-    struct VideoRequest {
-        std::uint16_t number = 0;
-        std::uint8_t tracks = 0;
-        bool loop = false;
-        bool intro = false;
-        /// In the minimap's window while the game goes on (video_plays_in_minimap); set when the
-        /// video starts, by whether there is a minimap on screen then.
-        bool in_minimap = false;
-        bool in_frame = false;  ///< in the picture frame of the main menu (the credits)
-    };
-    /// Whether the running video plays in the minimap's window.
-    [[nodiscard]] bool video_in_minimap() const;
-    /// ... in the main menu's picture frame; either: the screen is not filled.
-    [[nodiscard]] bool video_in_frame() const;
-    [[nodiscard]] bool video_windowed() const { return video_in_minimap() || video_in_frame(); }
     std::optional<sim::BuildBill> m_pending_bill;  ///< costs of the order the build tool shows
     sim::PlayerFigures m_player_figures;           ///< the info panel's figures, refreshed once a second
     std::int64_t m_player_points = 0;              ///< the info panel's "Punkte", refreshed with them
     std::uint64_t m_figures_ms = 0;
-    std::unique_ptr<VideoPlayer> m_video;  ///< after the window; null without videos
-    std::deque<VideoRequest> m_videos;     ///< waiting
-    VideoRequest m_video_now;              ///< playing
-    bool m_pause_video = false;            ///< the original's pause is on
-    bool m_pause_seen = false;             ///< and the game has stood still since (the command arrived)
+    /// The videos (after the window and the sound); plays none without videos.
+    std::unique_ptr<VideoController> m_video;
     struct EndPending {
         sim::GameOutcome outcome = sim::GameOutcome::Lost;
         /// Real time left while the game runs: the original waits game speed * 5 s of game time.
