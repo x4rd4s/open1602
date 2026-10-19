@@ -421,6 +421,9 @@ core::Status MapViewer::ensure_graphics(render::Zoom zoom) {
     if (slot) {
         return core::Ok{};
     }
+    if (m_sound) {
+        m_sound->prefill();  // the frames stand still while the sprites load
+    }
     const std::int32_t max_texture = m_window->max_texture_size();
     render::GraphicsOptions options;
     options.page_size = max_texture >= 4096 ? 4096U : 2048U;
@@ -1503,11 +1506,15 @@ bool MapViewer::start_next_video(std::uint64_t now_ms) {
     while (m_video && !m_videos.empty()) {
         const VideoRequest r = m_videos.front();
         m_videos.pop_front();
+        // Reading the file and decoding its sound stand the frames still.
+        m_sound->prefill();
         // A missing file goes on with the next one (the original drops the rest of the chain, U-022).
         if (m_video->start(r.number, r.loop, now_ms)) {
             m_video_now = r;
             if (const video::Smacker* v = m_video->video()) {
                 m_sound->start_video(*v, r.tracks);
+                // The picture waits for the sound, which plays after what the device holds.
+                m_video->hold_until(platform::ticks_ms() + m_sound->queued_ms());
             }
             return true;
         }

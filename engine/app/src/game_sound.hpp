@@ -95,8 +95,11 @@ public:
 
     /// Every frame: plays what was asked for, the next voice, the music, and tops up the device.
     void frame(std::uint64_t game_ms, std::uint32_t real_ms);
-    /// Before a known pause of the frames (loading a game): fills the device's queue for longer.
+    /// Before a known pause of the frames (loading a game, a zoom level, a video): fills the
+    /// device's queue for longer.
     void prefill();
+    /// How long the device plays what it holds now: a sound started now is heard that much later.
+    [[nodiscard]] std::uint32_t queued_ms() const noexcept;
 
 private:
     /// Opens the device and the music; false without a device.

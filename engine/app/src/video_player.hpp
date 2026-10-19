@@ -34,6 +34,8 @@ public:
     /// Opens a video and shows its first frame at `now_ms`; a running one stops. False if the
     /// file is missing or damaged.
     bool start(std::uint16_t number, bool loop, std::uint64_t now_ms);
+    /// The first frame stays until `ms`: the video's sound comes after what the device holds.
+    void hold_until(std::uint64_t ms) noexcept;
     void stop();
     [[nodiscard]] bool playing() const noexcept { return m_video.has_value(); }
     [[nodiscard]] std::uint16_t number() const noexcept { return m_number; }

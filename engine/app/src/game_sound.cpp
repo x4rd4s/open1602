@@ -501,6 +501,10 @@ void GameSound::prefill() {
     }
 }
 
+std::uint32_t GameSound::queued_ms() const noexcept {
+    return m_output != nullptr ? static_cast<std::uint32_t>(m_output->queued_frames() * 1000 / kRate) : 0;
+}
+
 void GameSound::top_up(std::uint32_t ms) {
     const std::size_t target = std::size_t{kRate} * ms / 1000;
     const std::size_t queued = m_output->queued_frames();

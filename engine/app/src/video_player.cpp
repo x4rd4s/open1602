@@ -80,6 +80,10 @@ bool VideoPlayer::start(std::uint16_t number, bool loop, std::uint64_t now_ms) {
     return true;
 }
 
+void VideoPlayer::hold_until(std::uint64_t ms) noexcept {
+    m_start_ms = std::max(m_start_ms, ms);
+}
+
 void VideoPlayer::stop() {
     m_video.reset();
     m_number = 0;
@@ -88,6 +92,9 @@ void VideoPlayer::stop() {
 VideoPlayer::Step VideoPlayer::update(std::uint64_t now_ms) {
     if (!m_video) {
         return Step::Ended;
+    }
+    if (now_ms < m_start_ms) {
+        return Step::Playing;  // held on the first frame
     }
     const auto& info = m_video->info();
     const std::uint64_t elapsed_us = (now_ms - m_start_ms) * 1000;
