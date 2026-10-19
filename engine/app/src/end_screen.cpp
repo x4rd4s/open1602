@@ -89,7 +89,7 @@ void EndScreen::show(std::size_t row) {
     p.set_text(kName, r.name.empty() ? ui::tr("end.player", {std::to_string(r.player + 1)}) : r.name);
     // The four colours of the original have coats of arms; the further players show none.
     p.set_visible(kArms, r.banner <= 3);
-    p.set_graphic(kArms, m_arms + std::min<std::int32_t>(r.banner, 3), 0);
+    p.set_graphic(kArms, m_arms + sim::four_colour_index(r.banner), 0);
     for (std::size_t c = 0; c < m_by_colour.size(); ++c) {
         p.set_selected(kColours + static_cast<std::int32_t>(c), m_by_colour[c] == row);
     }

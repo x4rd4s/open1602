@@ -1294,7 +1294,8 @@ void MapViewer::apply_production_events() {
                 break;
             case sim::ShipEvent::Kind::DepositFound:
                 std::fprintf(stderr, "%s on island %u (%u,%u)!\n",
-                             e.ware == 3 ? "you discovered a gold vein" : "an ore deposit lies", number, e.x, e.y);
+                             e.ware == sim::ware::kGold ? "you discovered a gold vein" : "an ore deposit lies", number,
+                             e.x, e.y);
                 break;
             case sim::ShipEvent::Kind::ExploreFinished:
                 std::fprintf(stderr, "island %u explored\n", number);
@@ -1582,7 +1583,8 @@ void MapViewer::select_building_at_mouse() {
         // screen for the tiles they stand on.
         const auto selectable = [](const assets::BuildingType& b) {
             const std::int32_t k = b.prod_kind;
-            return (k >= 1 && k <= 8) || (k >= 13 && k <= 0x1B) || k == 0x1E;
+            return (k >= sim::prod::kWorkshop && k <= sim::prod::kKontor) ||
+                   (k >= sim::prod::kHouse && k <= sim::prod::kPublicLast) || k == sim::prod::kHaupt;
         };
         const double step = render::tile_height(m_camera.view().zoom) * m_camera.pixel_scale() / 2.0;
         for (int i = 0; i <= 4 && sel.kind == Selection::Kind::None; ++i) {
@@ -1651,7 +1653,7 @@ Hud::Resources MapViewer::resources() const {
         return r;
     }
     if (city->owner == m_local_player) {
-        constexpr std::array<std::uint8_t, 3> kWares{22, 23, 24};  // WERKZEUG, HOLZ, ZIEGEL
+        constexpr std::array<std::uint8_t, 3> kWares{sim::ware::kTools, sim::ware::kWood, sim::ware::kBricks};
         std::array<std::int64_t, 3> goods{};
         for (std::size_t i = 0; i < 3; ++i) {
             goods[i] = city->stock(kWares[i]) >> 5U;
@@ -1796,7 +1798,8 @@ void MapViewer::apply_game_events() {
                     // 0x6B is the multiplayer message with the winner's colour (0x6B..0x6E); its
                     // video speaks to the winner on track 1.
                     if (e.message == audio::kMessageMultiplayerWin && p != nullptr) {
-                        announce_with_tracks(static_cast<std::uint16_t>(e.message + std::min<int>(p->banner, 3)), 0x03);
+                        announce_with_tracks(static_cast<std::uint16_t>(e.message + sim::four_colour_index(p->banner)),
+                                             0x03);
                     } else {
                         announce(e.message);
                     }
@@ -1815,9 +1818,9 @@ void MapViewer::apply_game_events() {
                     const sim::Mission* m = p != nullptr ? m_world.mission_of(*p) : nullptr;
                     if (m != nullptr && m->success_message == audio::kMessageMultiplayerWin) {
                         // A race: "the red player fulfilled his task", the others' voice (track 2).
-                        announce_with_tracks(
-                            static_cast<std::uint16_t>(audio::kMessageMultiplayerWin + std::min<int>(p->banner, 3)),
-                            0x05);
+                        announce_with_tracks(static_cast<std::uint16_t>(audio::kMessageMultiplayerWin +
+                                                                        sim::four_colour_index(p->banner)),
+                                             0x05);
                     } else {
                         announce(0x53);  // "Ihr wurdet besiegt!"
                     }

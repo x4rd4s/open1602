@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "o1602/audio/game_audio.hpp"
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/ui/localization.hpp"
 #include "o1602/ui/text_format.hpp"
@@ -548,7 +549,7 @@ void Hud::reset_game() {
 
 std::string Hud::crops_line(const std::array<std::pair<std::uint8_t, std::uint32_t>, 3>& crops) const {
     constexpr std::size_t kGameSuited = 22;
-    constexpr std::uint8_t kFirstRaw = 45;  // [ROHST] starts with grain (ware 45)
+    constexpr std::uint8_t kFirstRaw = sim::ware::kCornField;  // [ROHST] starts with grain
     if (!m_texts) {
         return {};
     }

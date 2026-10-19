@@ -250,7 +250,7 @@ private:
             return;
         }
         p.set_text(name + row, player->name);
-        const std::int32_t colour = m_shield + std::min<std::int32_t>(player->banner, 3);
+        const std::int32_t colour = m_shield + sim::four_colour_index(player->banner);
         p.set_graphic(shield + row, colour, 0);
         p.set_graphic(shadow + row, colour, 0);
         const sim::Diplomacy& d = c.world().diplomacy();

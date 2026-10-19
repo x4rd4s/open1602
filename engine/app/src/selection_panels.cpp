@@ -8,6 +8,7 @@
 #include "panel_common.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 #include "o1602/sim/ships.hpp"
@@ -1269,7 +1270,7 @@ public:
         }
         m_panel.set_text(40002, city->name);
         const std::int32_t places = std::min<std::int32_t>(b->max_wares, 9);
-        const std::int32_t colour = std::min<std::int32_t>(owner->banner, 3);
+        const std::int32_t colour = sim::four_colour_index(owner->banner);
         for (std::int32_t k = 0; k < 9; ++k) {
             const bool place = k < places;
             const bool used = place && static_cast<std::size_t>(k) < castle->slots.size();
@@ -1347,7 +1348,7 @@ public:
         switch (e.id) {
             case 40009:
                 o.op = sim::CastleOrder::Op::Recruit;
-                o.figure = unit_figure(std::min<std::int32_t>(owner->banner, 3));
+                o.figure = unit_figure(sim::four_colour_index(owner->banner));
                 out.emplace_back(o);
                 break;
             case 40003:
@@ -1408,7 +1409,7 @@ public:
             const sim::City* city = city_at(s, c);
             const sim::Player* owner = city != nullptr ? c.world().player(city->owner) : nullptr;
             const assets::FigureType* unit =
-                owner != nullptr ? c.figures.get(unit_figure(std::min<std::int32_t>(owner->banner, 3))) : nullptr;
+                owner != nullptr ? c.figures.get(unit_figure(sim::four_colour_index(owner->banner))) : nullptr;
             if (unit == nullptr) {
                 return std::nullopt;
             }
@@ -1608,40 +1609,41 @@ SelectionPanel* SelectionPanels::panel_for(const Selection& s, const PanelContex
     if (top.owner != c.local) {
         // Foreign buildings: only Kontor and market, and only with a trade treaty.
         const sim::City* city = city_at(s, c);
-        if ((b->prod_kind == 7 || b->prod_kind == 8) && city != nullptr && c.local != sim::kNoPlayer &&
-            c.world().diplomacy().may_trade(c.local, city->owner)) {
+        if ((b->prod_kind == sim::prod::kMarket || b->prod_kind == sim::prod::kKontor) && city != nullptr &&
+            c.local != sim::kNoPlayer && c.world().diplomacy().may_trade(c.local, city->owner)) {
             return get("HANDEL");
         }
         return nullptr;
     }
     // Panel_UpdateSelection 0x0043AA00: the building's HAUS_PRODTYP Kind decides.
     switch (b->prod_kind) {
-        case 1:
+        case sim::prod::kWorkshop:
             return c.world().production(s.island, s.x, s.y) != nullptr ? get("PROD") : nullptr;
-        case 2:
-        case 4:
-        case 5:
-        case 6:
+        case sim::prod::kFarm:
+        case sim::prod::kPasture:
+        case sim::prod::kHunter:
+        case sim::prod::kFisher:
             return c.world().production(s.island, s.x, s.y) != nullptr ? get("PLANTAGE") : nullptr;
-        case 3:
+        case sim::prod::kMine:
             return c.world().production(s.island, s.x, s.y) != nullptr ? get("BERGWERK") : nullptr;
         default:
             break;
     }
-    if (b->prod_kind >= 0x11 && b->prod_kind <= 0x1B) {
+    if (b->prod_kind >= sim::prod::kPublicFirst && b->prod_kind <= sim::prod::kPublicLast) {
         return get("INFRA");
     }
-    if (b->prod_kind == 14 && cost_building_at(s, c, sim::CostBuilding::Kind::Shipyard) != nullptr) {
+    if (b->prod_kind == sim::prod::kShipyard && cost_building_at(s, c, sim::CostBuilding::Kind::Shipyard) != nullptr) {
         return get("WERFT");
     }
-    if (b->prod_kind == 15 && cost_building_at(s, c, sim::CostBuilding::Kind::Castle) != nullptr &&
+    if (b->prod_kind == sim::prod::kMilitary && cost_building_at(s, c, sim::CostBuilding::Kind::Castle) != nullptr &&
         city_at(s, c) != nullptr) {
         return get("MILITAR");
     }
-    if (b->prod_kind == 13 && c.world().house(s.island, s.x, s.y) != nullptr && city_at(s, c) != nullptr) {
+    if (b->prod_kind == sim::prod::kHouse && c.world().house(s.island, s.x, s.y) != nullptr &&
+        city_at(s, c) != nullptr) {
         return get("SIEDLER");
     }
-    if ((b->prod_kind == 7 || b->prod_kind == 8) && city_at(s, c) != nullptr) {
+    if ((b->prod_kind == sim::prod::kMarket || b->prod_kind == sim::prod::kKontor) && city_at(s, c) != nullptr) {
         return get("STADT");  // market or Kontor
     }
     return nullptr;

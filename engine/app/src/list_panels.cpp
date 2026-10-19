@@ -42,7 +42,7 @@ public:
         m_panel.set_text(m_base + kHeading,
                          panel_detail::help_line(c, m_ships ? 214 : 215) + " (" + std::to_string(m_rows.size()) + ")");
         const sim::Player* local = c.world().player(c.local);
-        const std::int32_t colour = local != nullptr ? std::min<std::int32_t>(local->banner, 3) : 0;
+        const std::int32_t colour = local != nullptr ? sim::four_colour_index(local->banner) : 0;
         m_panel.set_graphic(m_base + kArms, m_arms + colour, 0);
         m_panel.set_graphic(m_base + kArmsShadow, m_arms + colour, 0);
         m_panel.set_visible(m_base + kPageDown, m_first + kRows < m_rows.size());
@@ -163,7 +163,7 @@ private:
             const sim::WorldIsland& island = w.islands()[city.island];
             Row r;
             r.name = city.name;
-            r.icon = 4 + std::min<std::int32_t>(owner->banner, 3);
+            r.icon = 4 + sim::four_colour_index(owner->banner);
             r.x = island.x + (city.warehouse_x ? *city.warehouse_x : island.map.width() / 2.0);
             r.y = island.y + (city.warehouse_y ? *city.warehouse_y : island.map.height() / 2.0);
             m_rows.push_back(std::move(r));

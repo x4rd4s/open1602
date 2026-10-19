@@ -6,6 +6,7 @@
 #include <string>
 
 #include "o1602/core/file.hpp"
+#include "o1602/sim/game_data.hpp"
 
 namespace o1602::app {
 
@@ -360,7 +361,7 @@ void GameSound::ships(const sim::World& world, const assets::FigureTable& figure
                 break;
             case sim::ShipEvent::Kind::DepositFound:
                 if (e.player == local) {
-                    message(e.ware == 3 ? kMsgGold : kMsgOre, island_tile());
+                    message(e.ware == sim::ware::kGold ? kMsgGold : kMsgOre, island_tile());
                 }
                 break;
             case sim::ShipEvent::Kind::NativesFound:
