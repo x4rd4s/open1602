@@ -432,32 +432,24 @@ PlayerId first_human_player(const World& world) noexcept {
     return kNoPlayer;
 }
 
-core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
-                               const assets::GameDirectory& game, std::vector<std::string>* warnings,
-                               const WorldStart& start) {
-    if (plans_islands(file)) {
-        // The SZENE handler of the original makes the islands while the scenario loads (0x0048C5C0).
-        auto generated = generate_islands(file, game, buildings, start, warnings);
-        if (!generated) {
-            return generated.error();
-        }
-        return load_world(generated->file, buildings, game, warnings, start);
-    }
-    auto islands = assets::load_islands(file);
-    if (!islands) {
-        return islands.error();
-    }
-    const auto warn = [&](std::string message) {
+namespace {
+
+/// Collects the warnings of a load, if the caller asked for them.
+struct WarningSink {
+    std::vector<std::string>* warnings = nullptr;
+
+    void operator()(std::string message) const {
         if (warnings != nullptr) {
             warnings->push_back(std::move(message));
         }
-    };
+    }
+};
 
+/// INSEL5 and the island templates: adds the islands with their maps to the world.
+void add_islands(World& world, const std::vector<assets::Island>& islands, const assets::BuildingTable& buildings,
+                 const assets::GameDirectory& game, std::vector<std::string>* warnings, const WarningSink& warn) {
     std::map<std::string, std::vector<assets::Island>> templates;  // cache: many islands share one
-    // The original's map is always 500 x 350; Open1602's own worlds name their size.
-    const auto size = map_size(file);
-    World world(size ? size->first : World::kOriginalWidth, size ? size->second : World::kOriginalHeight);
-    for (const auto& island : *islands) {
+    for (const auto& island : islands) {
         const assets::Island* base = nullptr;
         if (const std::string path = island.header.template_path(); !path.empty()) {
             auto it = templates.find(path);
@@ -485,13 +477,12 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             warn(status.error().message);
         }
     }
+}
 
-    auto players = assets::load_players(file);
-    if (!players) {
-        return players.error();
-    }
+/// PLAYER4: the players with their money, names and counters.
+void add_players(World& world, const std::vector<assets::PlayerRecord>& players) {
     std::vector<Player> slots;
-    for (const auto& p : *players) {
+    for (const auto& p : players) {
         Player player{role_from_original(p.kind), banner_from_original(p.color), p.money, p.name};
         player.infra_mask = p.infra_mask;
         player.castles_built = p.castles_built;
@@ -507,10 +498,14 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         slots.push_back(std::move(player));
     }
     world.set_players(std::move(slots));
-    // Diplomacy (PLAYER4 +0x40 .. +0x1FF): times in 1/10 s.
+}
+
+/// PLAYER4 +0x40 .. +0x1FF: treaties, diplomacy events and blame between the players.
+void load_diplomacy(World& world, const std::vector<assets::PlayerRecord>& players) {
+    // Times in 1/10 s.
     Diplomacy& dipl = world.diplomacy();
-    for (std::size_t a = 0; a < players->size() && a < world.players().size(); ++a) {
-        const auto& p = (*players)[a];
+    for (std::size_t a = 0; a < players.size() && a < world.players().size(); ++a) {
+        const auto& p = players[a];
         const auto pa = static_cast<PlayerId>(a);
         for (std::size_t b = 0; b < 7 && b < world.players().size(); ++b) {
             Relation& r = dipl.relation(pa, static_cast<PlayerId>(b));
@@ -532,12 +527,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         dipl.set_events(pa, events);
         dipl.set_blamed(pa, player_from_original(p.blamed));
     }
+}
 
-    auto state = assets::load_game_state(file);
-    if (!state) {
-        return state.error();
-    }
-    for (const auto& c : state->cities) {
+/// STADT4 and KONTOR2: the cities, then their warehouses with stock and trade settings.
+void load_cities(World& world, const assets::GameState& state, const WarningSink& warn) {
+    for (const auto& c : state.cities) {
         // STADT4 names the island by its number; find its index in the world.
         const auto island = world.island_index(c.island);
         if (!island) {
@@ -562,7 +556,7 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         city.goodwill.assign(c.goodwill.begin(), c.goodwill.end());
         world.add_city(std::move(city));
     }
-    for (const auto& w : state->warehouses) {
+    for (const auto& w : state.warehouses) {
         const auto island = world.island_index(w.island);
         City* city = island ? world.city(*island, w.city) : nullptr;
         if (city == nullptr) {
@@ -581,10 +575,14 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
                                                  slot.buy_price(), slot.keep(),   slot.limit()};
         }
     }
-    load_ships(world, file, buildings, warn);
-    // Houses: only on a dwelling (HAUS_PRODTYP Kind WOHNUNG); the class is the building's, as in
-    // the loader of the original (0x00483EE0).
-    for (const auto& r : state->houses) {
+}
+
+/// SIEDLER: the houses that stand on a dwelling of the map.
+void load_houses(World& world, const assets::GameState& state, const assets::BuildingTable& buildings,
+                 const WarningSink& warn) {
+    // Only on a dwelling (HAUS_PRODTYP Kind WOHNUNG); the class is the building's, as in the loader
+    // of the original (0x00483EE0).
+    for (const auto& r : state.houses) {
         const auto island = world.island_index(r.island);
         if (!island || !world.islands()[*island].map.contains(r.x, r.y)) {
             warn("house outside its island " + std::to_string(r.island));
@@ -611,15 +609,23 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         h.services = r.services;
         world.add_house(h);
     }
-    if (state->game_time) {
-        world.set_time_ms(std::uint64_t{*state->game_time} * 100);
+}
+
+/// TIMERS: the game time, the island phase and the next city name.
+void load_world_clocks(World& world, const assets::GameState& state) {
+    if (state.game_time) {
+        world.set_time_ms(std::uint64_t{*state.game_time} * 100);
     }
-    if (state->island_phase) {
-        world.set_island_phase(*state->island_phase);
+    if (state.island_phase) {
+        world.set_island_phase(*state.island_phase);
     }
-    if (state->city_name_index) {
-        world.set_city_name_index(*state->city_name_index);
+    if (state.city_name_index) {
+        world.set_city_name_index(*state.city_name_index);
     }
+}
+
+/// INSEL5 header: deer phase, drought, discovery and the craters of each island.
+void load_island_states(World& world, const assets::ChunkFile& file, const assets::BuildingTable& buildings) {
     const bool scenario = file.find("SZENE") != nullptr;
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
         WorldIsland& island = world.island(i);
@@ -649,11 +655,15 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         }
         island.volcano_erupted = island.header.volcano_erupted;
     }
-    // Volcanoes. The crater count is not taken from TIMERS +0xD0 but follows the islands (a
-    // scenario may carry a stale one, S-063).
+}
+
+/// TIMERS: the volcano clock, the last eruption, and a running eruption started anew.
+void load_volcanoes(World& world, const assets::GameState& state, const WarningSink& warn) {
+    // The crater count is not taken from TIMERS +0xD0 but follows the islands (a scenario may carry
+    // a stale one, S-063).
     VolcanoState& volcanoes = world.volcanoes();
-    if (state->next_volcano) {
-        volcanoes.next_ms = std::uint64_t{*state->next_volcano} * 100;
+    if (state.next_volcano) {
+        volcanoes.next_ms = std::uint64_t{*state.next_volcano} * 100;
     }
     const auto crater_ref = [&](const assets::GameState::CraterRef& r) -> std::optional<CraterRef> {
         const auto island = world.island_index(r.island);
@@ -662,69 +672,78 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         }
         return CraterRef{*island, r.x, r.y};
     };
-    if (state->last_volcano) {
-        volcanoes.last = crater_ref(*state->last_volcano);
+    if (state.last_volcano) {
+        volcanoes.last = crater_ref(*state.last_volcano);
     }
-    if (state->running_volcano) {
+    if (state.running_volcano) {
         // The original keeps no lava in its savegames and starts a running eruption anew, with a
         // new pattern and without the message (0x0048C0F0, S-062).
-        if (const auto ref = crater_ref(*state->running_volcano)) {
+        if (const auto ref = crater_ref(*state.running_volcano)) {
             const auto seed = static_cast<std::uint16_t>(world.random(RandomStream::Islands).below(0x8000));
             if (!erupt(world, *ref, seed, false, nullptr)) {
                 warn("running eruption on an island without that crater");
             }
         }
     }
-    if (state->difficulty) {
-        world.set_game_settings(World::GameSettings{*state->difficulty, state->settings.value_or(0),
-                                                    state->pirate_interval.value_or(1500)});
+}
+
+/// TIMERS: the game settings, the drought clock and the clocks of the house groups.
+void load_timers(World& world, const assets::GameState& state) {
+    if (state.difficulty) {
+        world.set_game_settings(
+            World::GameSettings{*state.difficulty, state.settings.value_or(0), state.pirate_interval.value_or(1500)});
     }
-    if (state->next_drought) {
+    if (state.next_drought) {
         // A stored 0 becomes 60 minutes, as in the original's loader (0x00484E3C).
-        const std::uint32_t next = *state->next_drought != 0 ? *state->next_drought : 36'000U;
+        const std::uint32_t next = *state.next_drought != 0 ? *state.next_drought : 36'000U;
         world.set_next_drought_ms(std::uint64_t{next} * 100);
     }
-    if (state->house_clocks) {
+    if (state.house_clocks) {
         HouseClocks& clocks = world.house_clocks();
         for (std::size_t g = 0; g < HouseClocks::kGroups; ++g) {
-            clocks.epoch[g] = state->house_clocks->epoch[g];
-            clocks.time_ms[g] = state->house_clocks->time_ms[g] % (15'000U + 64U * static_cast<std::uint32_t>(g));
+            clocks.epoch[g] = state.house_clocks->epoch[g];
+            clocks.time_ms[g] = state.house_clocks->time_ms[g] % (15'000U + 64U * static_cast<std::uint32_t>(g));
         }
     }
-    const auto add_costs = [&](const std::vector<assets::CostRecord>& records, CostBuilding::Kind kind) {
-        for (const auto& r : records) {
-            const auto island = world.island_index(r.island);
-            if (!island || !world.islands()[*island].map.contains(r.x, r.y)) {
-                continue;
-            }
-            CostBuilding b{kind, *island, r.x, r.y, r.enabled};
-            if (kind == CostBuilding::Kind::Shipyard) {
-                b.order = r.order < 4 ? r.order : CostBuilding::kNoOrder;
-                b.progress = r.progress;
-                b.wood = r.wood;
-                b.countdown = r.countdown;
-                b.repair_ship = r.repair != 0xFFFF ? ship_id_of_slot(r.repair) : 0U;
-            } else {
-                b.countdown = r.countdown;
-                for (std::size_t w = 0; w < b.weapons.size(); ++w) {
-                    b.weapons[w] = r.weapons[w];
-                }
-                // Used slots are kept together at the front (removing one shifts the rest down).
-                for (const auto& slot : r.slots) {
-                    if (slot.figure != 0) {
-                        // Units by family, as soldiers (the colour follows the owner's banner).
-                        const auto variant = assets::FigureTable::unit_variant(slot.figure);
-                        const auto figure = static_cast<std::uint16_t>(variant ? variant->family : slot.figure);
-                        b.slots.push_back(CastleSlot{figure, slot.training, slot.armed, slot.health, slot.progress});
-                    }
-                }
-            }
-            world.add_cost_building(b);
+}
+
+/// WERFT and MILITAR: the buildings of one kind with running costs (shipyards or castles).
+void add_cost_buildings(World& world, const std::vector<assets::CostRecord>& records, CostBuilding::Kind kind) {
+    for (const auto& r : records) {
+        const auto island = world.island_index(r.island);
+        if (!island || !world.islands()[*island].map.contains(r.x, r.y)) {
+            continue;
         }
-    };
-    add_costs(state->shipyards, CostBuilding::Kind::Shipyard);
-    add_costs(state->castles, CostBuilding::Kind::Castle);
-    for (const auto& m : state->consumption) {
+        CostBuilding b{kind, *island, r.x, r.y, r.enabled};
+        if (kind == CostBuilding::Kind::Shipyard) {
+            b.order = r.order < 4 ? r.order : CostBuilding::kNoOrder;
+            b.progress = r.progress;
+            b.wood = r.wood;
+            b.countdown = r.countdown;
+            b.repair_ship = r.repair != 0xFFFF ? ship_id_of_slot(r.repair) : 0U;
+        } else {
+            b.countdown = r.countdown;
+            for (std::size_t w = 0; w < b.weapons.size(); ++w) {
+                b.weapons[w] = r.weapons[w];
+            }
+            // Used slots are kept together at the front (removing one shifts the rest down).
+            for (const auto& slot : r.slots) {
+                if (slot.figure != 0) {
+                    // Units by family, as soldiers (the colour follows the owner's banner).
+                    const auto variant = assets::FigureTable::unit_variant(slot.figure);
+                    const auto figure = static_cast<std::uint16_t>(variant ? variant->family : slot.figure);
+                    b.slots.push_back(CastleSlot{figure, slot.training, slot.armed, slot.health, slot.progress});
+                }
+            }
+        }
+        world.add_cost_building(b);
+    }
+}
+
+/// MARKT2: demand and supply of each city per ware.
+void load_consumption(World& world, const assets::GameState& state, const assets::BuildingTable& buildings,
+                      const WarningSink& warn) {
+    for (const auto& m : state.consumption) {
         const auto island = world.island_index(m.island);
         City* city = island ? world.city(*island, m.city) : nullptr;
         if (city == nullptr) {
@@ -746,7 +765,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             s.ratio = g.ratio;
         }
     }
-    for (const auto& p : state->production) {
+}
+
+/// PRODLIST2: the production buildings with their stores and cycles.
+void load_production(World& world, const assets::GameState& state, const WarningSink& warn) {
+    for (const auto& p : state.production) {
         const auto island = world.island_index(p.island);
         if (!island || p.x >= world.islands()[*island].map.width() || p.y >= world.islands()[*island].map.height()) {
             warn("production building outside its island " + std::to_string(p.island));
@@ -769,8 +792,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         q.elapsed = p.elapsed;
         world.set_production(q);
     }
-    // Towers before the soldiers: references to them name their slot.
-    for (const auto& r : state->towers) {
+}
+
+/// TURM: the towers, placed on the building they name.
+void load_towers(World& world, const assets::GameState& state, const WarningSink& warn) {
+    for (const auto& r : state.towers) {
         const Target building = target_from_ref(world, r.building);
         if (building.kind != Target::Kind::Building) {
             warn("tower without its building");
@@ -786,7 +812,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         t.source_slot = r.slot;
         world.towers().push_back(t);
     }
-    for (const auto& r : state->soldiers) {
+}
+
+/// SOLDAT3: the soldiers, then their homes, targets and waypoints.
+void load_soldiers(World& world, const assets::GameState& state, const WarningSink& warn) {
+    for (const auto& r : state.soldiers) {
         Soldier soldier;
         soldier.id = soldier_id_of_slot(r.slot);
         if (world.soldier(soldier.id) != nullptr) {
@@ -815,7 +845,7 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         world.add_soldier(soldier);
     }
     // References after all units are known (they may name each other).
-    for (const auto& r : state->soldiers) {
+    for (const auto& r : state.soldiers) {
         for (Soldier& s : world.soldiers()) {
             if (s.source_slot == r.slot) {
                 s.home = target_from_ref(world, r.home);
@@ -825,9 +855,13 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             }
         }
     }
+}
+
+/// HIRSCH2: the animals and the deer spots they take.
+void load_animals(World& world, const assets::GameState& state, const WarningSink& warn) {
     // HIRSCH2 stores only position and timer; the kind follows the island's climate: deer
     // (HIRSCH) in the north, antelopes (ANTILOPE) in the south (confirmed in the running game).
-    for (const auto& a : state->animals) {
+    for (const auto& a : state.animals) {
         const auto island = world.island_index(a.island);
         if (!island || a.x >= world.islands()[*island].map.width() || a.y >= world.islands()[*island].map.height()) {
             warn("animal outside its island " + std::to_string(a.island));
@@ -842,16 +876,20 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             }
         }
     }
-    // Growth: the clocks of TIMERS and the entries of ROHWACHS2; growing tiles the file lists no
-    // entry for get one (add_missing_growth).
+}
+
+/// TIMERS and ROHWACHS2: the growth clocks and the growing tiles.
+void load_growth(World& world, const assets::GameState& state, const assets::BuildingTable& buildings,
+                 const WarningSink& warn) {
+    // Growing tiles the file lists no entry for get one (add_missing_growth).
     GrowthState& growth = world.growth();
-    if (state->growth_clocks) {
-        growth.counter = state->growth_clocks->counter;
+    if (state.growth_clocks) {
+        growth.counter = state.growth_clocks->counter;
         for (std::size_t c = 0; c < GrowthState::kClasses; ++c) {
-            growth.time_ms[c] = state->growth_clocks->time_ms[c] % growth_period_ms(static_cast<std::uint32_t>(c));
+            growth.time_ms[c] = state.growth_clocks->time_ms[c] % growth_period_ms(static_cast<std::uint32_t>(c));
         }
     }
-    for (const auto& r : state->growth) {
+    for (const auto& r : state.growth) {
         const auto island = world.island_index(r.island);
         if (!island || !world.islands()[*island].map.contains(r.x, r.y)) {
             warn("growing tile outside its island " + std::to_string(r.island));
@@ -867,9 +905,12 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
         growth.entries.push_back(e);
     }
     add_missing_growth(world, buildings);
-    // Open1602's own chunk: the state the original's chunks cannot hold.
-    // Missions (AUFTRAG4, docs/re/missions.md): the record of slot s goes to mission s; players
-    // name theirs by slot.
+}
+
+/// AUFTRAG4: the missions, with a slot for each one a player names.
+void load_missions(World& world, const assets::ChunkFile& file, const std::vector<assets::PlayerRecord>& players,
+                   std::vector<std::string>* warnings, const WarningSink& warn) {
+    // docs/re/missions.md: the record of slot s goes to mission s; players name theirs by slot.
     if (auto records = assets::load_missions(file); !records) {
         warn(records.error().message);
     } else {
@@ -889,15 +930,19 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
     // The original always has its 4 slots (empty ones zeroed): a player may name one the file
     // does not fill.
     constexpr std::uint8_t kOriginalMissionSlots = 4;
-    for (const auto& r : *players) {
+    for (const auto& r : players) {
         if (r.mission < kOriginalMissionSlots && r.mission >= world.missions().size()) {
             auto missions = world.missions();
             missions.resize(std::size_t{r.mission} + 1);
             world.set_missions(std::move(missions));
         }
     }
-    for (std::size_t i = 0; i < players->size() && i < world.players().size(); ++i) {
-        const auto& r = (*players)[i];
+}
+
+/// PLAYER4: status, mission and defeat counters, once the cities, ships and missions are known.
+void load_player_states(World& world, const std::vector<assets::PlayerRecord>& players, const WarningSink& warn) {
+    for (std::size_t i = 0; i < players.size() && i < world.players().size(); ++i) {
+        const auto& r = players[i];
         Player* pp = world.player(static_cast<PlayerId>(i));
         if (pp == nullptr) {
             continue;
@@ -918,12 +963,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             p.status = PlayerStatus::Absent;
         }
     }
-    prepare_missions(world);
-    // The generators of the simulation (fires, plague, houses, computer players ...) follow the
-    // seed of this start, so that games differ by more than their islands; seed 0 keeps the
-    // streams of earlier versions. A game that carries Open1602's state continues its own
-    // generators (the extension chunk below).
-    world.reseed(start.seed + kDefaultSimulationSeed);
+}
+
+/// O1602: Open1602's own chunk, the state the original's chunks cannot hold.
+void load_extension(World& world, const assets::ChunkFile& file, const assets::BuildingTable& buildings,
+                    std::vector<std::string>* warnings, const WarningSink& warn) {
     for (const assets::Chunk& c : file.chunks()) {
         if (c.name == kExtensionChunk) {
             constexpr std::size_t kHeader = 20;
@@ -934,8 +978,11 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             break;
         }
     }
-    // 0x00481EE0 on loading: a city that sells or buys more wares than its Kontor allows loses all
-    // its trade settings.
+}
+
+/// Clears the trade settings of each player city that trades more wares than its Kontor allows.
+void trim_all_trade_settings(World& world, const assets::BuildingTable& buildings) {
+    // 0x00481EE0 on loading: such a city loses all its trade settings.
     for (const City& c : world.cities()) {
         const Player* owner = world.player(c.owner);
         const assets::BuildingType* kontor = kontor_of(world, buildings, c);
@@ -944,6 +991,70 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             trim_trade_settings(*world.city(c.island, c.index), *kontor);
         }
     }
+}
+
+}  // namespace
+
+core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
+                               const assets::GameDirectory& game, std::vector<std::string>* warnings,
+                               const WorldStart& start) {
+    if (plans_islands(file)) {
+        // The SZENE handler of the original makes the islands while the scenario loads (0x0048C5C0).
+        auto generated = generate_islands(file, game, buildings, start, warnings);
+        if (!generated) {
+            return generated.error();
+        }
+        return load_world(generated->file, buildings, game, warnings, start);
+    }
+    auto islands = assets::load_islands(file);
+    if (!islands) {
+        return islands.error();
+    }
+    const WarningSink warn{warnings};
+    // The stages run in this order, and later ones rely on earlier ones: cities, houses, production
+    // and growth need the islands; ships name cities; soldiers name towers by slot; the player
+    // states look at cities, ships and missions; the running eruption draws its pattern before the
+    // reseed; the extension chunk overwrites what the original's chunks hold; the trade trim sees
+    // the final cities.
+    // The original's map is always 500 x 350; Open1602's own worlds name their size.
+    const auto size = map_size(file);
+    World world(size ? size->first : World::kOriginalWidth, size ? size->second : World::kOriginalHeight);
+    add_islands(world, *islands, buildings, game, warnings, warn);
+    auto players = assets::load_players(file);
+    if (!players) {
+        return players.error();
+    }
+    add_players(world, *players);
+    load_diplomacy(world, *players);
+    auto state = assets::load_game_state(file);
+    if (!state) {
+        return state.error();
+    }
+    load_cities(world, *state, warn);
+    load_ships(world, file, buildings, warn);
+    load_houses(world, *state, buildings, warn);
+    load_world_clocks(world, *state);
+    load_island_states(world, file, buildings);
+    load_volcanoes(world, *state, warn);
+    load_timers(world, *state);
+    add_cost_buildings(world, state->shipyards, CostBuilding::Kind::Shipyard);
+    add_cost_buildings(world, state->castles, CostBuilding::Kind::Castle);
+    load_consumption(world, *state, buildings, warn);
+    load_production(world, *state, warn);
+    load_towers(world, *state, warn);
+    load_soldiers(world, *state, warn);
+    load_animals(world, *state, warn);
+    load_growth(world, *state, buildings, warn);
+    load_missions(world, file, *players, warnings, warn);
+    load_player_states(world, *players, warn);
+    prepare_missions(world);
+    // The generators of the simulation (fires, plague, houses, computer players ...) follow the
+    // seed of this start, so that games differ by more than their islands; seed 0 keeps the
+    // streams of earlier versions. A game that carries Open1602's state continues its own
+    // generators (the extension chunk, loaded next).
+    world.reseed(start.seed + kDefaultSimulationSeed);
+    load_extension(world, file, buildings, warnings, warn);
+    trim_all_trade_settings(world, buildings);
     if (auto status = validate(world); !status) {
         return status.error();
     }
