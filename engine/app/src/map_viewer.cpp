@@ -1534,11 +1534,7 @@ void MapViewer::request_video(std::uint16_t number, std::uint8_t tracks, bool lo
             stop_video();
         }
     }
-    // Messages play in the minimap's window; the logos and the intro, the credits (10), the pause (6)
-    // and the ends of the game (defeat 998, 1010, 2020; missions fulfilled from 2500) fill the screen.
-    const bool full =
-        intro || loop || number == 10 || number == 998 || number == 1010 || number == 2020 || number >= 2500;
-    m_videos.push_back(VideoRequest{number, tracks, loop, intro, !full});
+    m_videos.push_back(VideoRequest{number, tracks, loop, intro});
 }
 
 bool MapViewer::video_in_minimap() const {
@@ -1558,6 +1554,10 @@ bool MapViewer::start_next_video(std::uint64_t now_ms) {
         // A missing file goes on with the next one (the original drops the rest of the chain, U-022).
         if (m_video->start(r.number, r.loop, now_ms)) {
             m_video_now = r;
+            // A message's video plays in the minimap; with none on screen (the main menu, also
+            // after --video N) it fills the screen.
+            const bool minimap_shown = m_hud && !m_hud->menu_active();
+            m_video_now.in_minimap = !r.in_frame && video_plays_in_minimap(r.number, r.loop, r.intro, minimap_shown);
             if (const video::Smacker* v = m_video->video()) {
                 m_sound->start_video(*v, r.tracks);
                 // The picture waits for the sound, which plays after what the device holds.
@@ -2596,7 +2596,6 @@ void MapViewer::apply_menu() {
                 if (m_video) {
                     request_video(10);
                     if (!m_videos.empty()) {
-                        m_videos.back().in_minimap = false;
                         m_videos.back().in_frame = true;
                     }
                 }

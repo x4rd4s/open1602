@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Smacker videos (docs/formats/smk.md), with small files built bit by bit.
+// Smacker videos (docs/formats/smk.md), with small files built bit by bit, and where the game
+// shows them.
 
 #include <cstring>
 #include <initializer_list>
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "video_placement.hpp"
 
 #include "o1602/video/smacker.hpp"
 
@@ -416,4 +418,20 @@ TEST_CASE("smacker: audio tracks, 8-bit DPCM, 16-bit stereo and plain PCM") {
     CHECK(!(video->audio(7).ok()));
     // The frames still decode with the audio chunks in front.
     REQUIRE(video->next().ok());
+}
+
+TEST_CASE("videos: messages in the minimap, the rest and messages without a minimap on the whole screen") {
+    using app::video_plays_in_minimap;
+    for (const std::uint16_t message : {std::uint16_t{1}, std::uint16_t{63}, std::uint16_t{2499}}) {
+        CHECK(video_plays_in_minimap(message, false, false, true));
+        // The main menu (--video N from there) or no panel: no minimap, so not a sound without picture.
+        CHECK(!video_plays_in_minimap(message, false, false, false));
+    }
+    // The credits, the defeats and the missions fulfilled.
+    for (const std::uint16_t full : {std::uint16_t{10}, std::uint16_t{998}, std::uint16_t{1010}, std::uint16_t{2020},
+                                     std::uint16_t{2500}, std::uint16_t{4000}}) {
+        CHECK(!video_plays_in_minimap(full, false, false, true));
+    }
+    CHECK(!video_plays_in_minimap(6, true, false, true));   // the pause loops
+    CHECK(!video_plays_in_minimap(58, false, true, true));  // the intro
 }

@@ -20,6 +20,7 @@
 #include "game_sound.hpp"
 #include "hud.hpp"
 #include "multiplayer_menu.hpp"
+#include "video_placement.hpp"
 #include "video_player.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -499,8 +500,8 @@ private:
         std::uint8_t tracks = 0;
         bool loop = false;
         bool intro = false;
-        /// In the minimap's window while the game goes on (videos of messages, ADR 0010); the
-        /// start, the credits, the pause and the ends of the game fill the screen.
+        /// In the minimap's window while the game goes on (video_plays_in_minimap); set when the
+        /// video starts, by whether there is a minimap on screen then.
         bool in_minimap = false;
         bool in_frame = false;  ///< in the picture frame of the main menu (the credits)
     };
