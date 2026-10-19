@@ -124,18 +124,19 @@ void Mixer::mix(std::int16_t* out, std::size_t frames) {
             }
             // Linear interpolation between neighbouring source frames.
             const auto i = static_cast<std::size_t>(v.pos >> 16);
-            const auto frac = static_cast<std::int32_t>(v.pos & 0xFFFF);
+            // 64 bit: a full-scale step (65535) times frac (up to 65535) overflows 32 bits.
+            const auto frac = static_cast<std::int64_t>(v.pos & 0xFFFF);
             const std::size_t j = i + 1 < s.frames() ? i + 1 : (v.loop ? 0 : i);
             std::int32_t l = 0;
             std::int32_t r = 0;
             if (stereo) {
                 const std::int32_t l0 = s.samples[2 * i];
                 const std::int32_t r0 = s.samples[2 * i + 1];
-                l = l0 + (((s.samples[2 * j] - l0) * frac) >> 16);
-                r = r0 + (((s.samples[2 * j + 1] - r0) * frac) >> 16);
+                l = l0 + static_cast<std::int32_t>(((s.samples[2 * j] - l0) * frac) >> 16);
+                r = r0 + static_cast<std::int32_t>(((s.samples[2 * j + 1] - r0) * frac) >> 16);
             } else {
                 const std::int32_t m0 = s.samples[i];
-                l = r = m0 + (((s.samples[j] - m0) * frac) >> 16);
+                l = r = m0 + static_cast<std::int32_t>(((s.samples[j] - m0) * frac) >> 16);
             }
             m_accum[2 * f] += (l * v.left) / kUnity;
             m_accum[2 * f + 1] += (r * v.right) / kUnity;

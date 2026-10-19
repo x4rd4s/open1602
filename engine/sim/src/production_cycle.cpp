@@ -133,7 +133,7 @@ void advance_production(World& world, const assets::BuildingTable& buildings, st
     std::vector<Production>& list = world.productions();
     for (std::size_t i = 0; i < list.size(); ++i) {
         Production& p = list[i];
-        if (!p.enabled) {
+        if (!p.used || !p.enabled) {
             continue;
         }
         if (p.countdown != 0) {

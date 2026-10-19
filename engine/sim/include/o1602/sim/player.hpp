@@ -16,6 +16,8 @@ namespace o1602::sim {
 /// Index into World::players(). 0xFF means "nobody", so a game can have up to 254 players.
 using PlayerId = std::uint8_t;
 inline constexpr PlayerId kNoPlayer = 0xFF;
+/// Most players a world can hold (every PlayerId but kNoPlayer).
+inline constexpr std::size_t kMaxPlayerCount = kNoPlayer;
 
 /// Banner of a player: display colour and flag sprites (render::BannerTable). The base game
 /// provides the original colours 0..6 as banners 0..6; mods add more.

@@ -59,6 +59,11 @@ std::optional<std::string> environment_variable(const char* name) {
 }
 
 Result<Bytes> read_file(const fs::path& path) {
+    // A directory opens as a stream on some platforms and reports a size of 2^63 - 1.
+    std::error_code ec;
+    if (fs::exists(path, ec) && !fs::is_regular_file(path, ec)) {
+        return make_error(ErrorCode::IoError, "not a file: " + path_to_utf8(path));
+    }
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         return make_error(ErrorCode::NotFound, "cannot open file: " + path_to_utf8(path));
@@ -67,6 +72,9 @@ Result<Bytes> read_file(const fs::path& path) {
     const auto end = in.tellg();
     if (end < 0) {
         return make_error(ErrorCode::IoError, "cannot determine size: " + path_to_utf8(path));
+    }
+    if (static_cast<std::uint64_t>(end) > kMaxReadSize) {
+        return make_error(ErrorCode::IoError, "file too large: " + path_to_utf8(path));
     }
     in.seekg(0, std::ios::beg);
     Bytes data(static_cast<std::size_t>(end));
@@ -148,6 +156,11 @@ bool iequals(std::string_view a, std::string_view b) {
 std::optional<fs::path> find_case_insensitive(const fs::path& root, std::string_view relative) {
     std::string normalized(relative);
     std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    // Only paths inside `root`: names come from data files and mods, which must not reach elsewhere.
+    if (normalized.starts_with('/') || path_from_utf8(normalized).has_root_name() ||
+        ("/" + normalized + "/").find("/../") != std::string::npos) {
+        return std::nullopt;
+    }
 
     std::error_code ec;
     if (fs::path exact = root / path_from_utf8(normalized); fs::exists(exact, ec)) {

@@ -27,7 +27,10 @@ std::string path_to_utf8(const std::filesystem::path& path);
 /// The value of an environment variable as UTF-8 text; nothing if it is unset or empty.
 std::optional<std::string> environment_variable(const char* name);
 
-/// Reads a whole file into memory.
+/// Largest file read_file reads (the biggest files of the game, its videos, are far smaller).
+inline constexpr std::uint64_t kMaxReadSize = std::uint64_t{1} << 30;
+
+/// Reads a whole regular file of at most kMaxReadSize bytes into memory.
 Result<Bytes> read_file(const std::filesystem::path& path);
 
 /// Writes a whole file (creates or truncates).
@@ -43,6 +46,7 @@ Status write_file_atomic(const std::filesystem::path& path, std::span<const std:
 /// files with inconsistent casing, e.g. "mgfx\stadtfld.bsh" while the file is "MGFX/Stadtfld.bsh".
 /// Both '/' and '\\' are accepted as separators in `relative`.
 /// An exact match is tried first, so the common case does not touch the directory listing.
+/// Absolute paths and ".." components find nothing: the result always lies inside `root`.
 std::optional<std::filesystem::path> find_case_insensitive(const std::filesystem::path& root,
                                                            std::string_view relative);
 

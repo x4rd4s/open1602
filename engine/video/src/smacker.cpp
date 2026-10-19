@@ -526,6 +526,11 @@ core::Status decode_dpcm(std::span<const std::uint8_t> data, const SmackerTrack&
         return make_error(ErrorCode::InvalidFormat, "Smacker: audio chunk too short");
     }
     const std::uint32_t unpacked = load_u32(data, 0);
+    // One frame of sound: a second of 16-bit stereo at 48 kHz is 192 000 bytes.
+    constexpr std::uint32_t kMaxUnpacked = 1U << 20;
+    if (unpacked > kMaxUnpacked) {
+        return make_error(ErrorCode::InvalidFormat, "Smacker: audio chunk too large");
+    }
     BitReader in(data.subspan(4));
     if (in.bit() == 0) {
         return core::Ok{};  // no data in this chunk
@@ -546,7 +551,7 @@ core::Status decode_dpcm(std::span<const std::uint8_t> data, const SmackerTrack&
     if (values < channels) {
         return core::Ok{};
     }
-    out.reserve(out.size() + values);
+    // No reserve per chunk: an exact reserve on every frame would copy the whole track each time.
     if (bits16) {
         // Start values: right channel first, high byte first.
         std::array<std::uint16_t, 2> pred{};
@@ -558,7 +563,7 @@ core::Status decode_dpcm(std::span<const std::uint8_t> data, const SmackerTrack&
         for (std::size_t c = 0; c < channels; ++c) {
             out.push_back(static_cast<std::int16_t>(pred[c]));
         }
-        for (std::size_t i = channels; i < values; ++i) {
+        for (std::size_t i = channels; i < values && !in.overrun(); ++i) {
             const std::size_t c = i % channels;
             const std::uint32_t lo = trees[c * 2].decode(in);
             const std::uint32_t hi = trees[c * 2 + 1].decode(in);
@@ -574,7 +579,7 @@ core::Status decode_dpcm(std::span<const std::uint8_t> data, const SmackerTrack&
         for (std::size_t c = 0; c < channels; ++c) {
             out.push_back(widen(pred[c]));
         }
-        for (std::size_t i = channels; i < values; ++i) {
+        for (std::size_t i = channels; i < values && !in.overrun(); ++i) {
             const std::size_t c = i % channels;
             pred[c] = static_cast<std::uint8_t>(pred[c] + trees[c].decode(in));
             out.push_back(widen(pred[c]));

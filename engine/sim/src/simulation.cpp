@@ -116,6 +116,11 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     const std::uint32_t disaster = in.u32();
     const std::uint32_t upkeep = in.u32();
     const std::uint32_t island = in.u32();
+    // A clock at or past its period would fire on every tick until it has caught up.
+    if (production >= kProductionPeriodMs || city >= kCityTickMs || disaster >= kDisasterEpochMs ||
+        upkeep >= kUpkeepPeriodMs || island >= Logistics::kIslandEpochMs) {
+        return false;
+    }
     if (!in.ok() || !m_logistics.load(reader, version)) {
         return false;
     }

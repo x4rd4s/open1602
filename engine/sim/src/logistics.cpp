@@ -633,6 +633,9 @@ void Logistics::pick_up(Walker& w) {
     if (!w.source) {
         return;
     }
+    if (*w.source >= m_world->productions().size()) {
+        return;
+    }
     Production& q = m_world->productions()[*w.source];
     const auto at = building_of(*w.source);
     q.reserved = static_cast<std::uint16_t>(q.reserved - std::min(w.reserved, q.reserved));
@@ -969,11 +972,11 @@ void Logistics::deliver(Walker& w) {
     if (responds(w.kind) || w.home == kNoHome) {
         return;  // doctors and firemen bring nothing
     }
-    Production& home = m_world->productions()[w.home];
     const auto hb = building_of(w.home);
     if (!hb) {
         return;
     }
+    Production& home = m_world->productions()[w.home];
     if (w.kind == WalkerKind::Cart) {
         City* city = m_world->city(w.island, w.city);
         if (city == nullptr) {
@@ -2076,11 +2079,20 @@ bool Logistics::load(core::ByteReader& reader, std::uint16_t version) {
                 (on_way && (w->speed == 0 || w->step >= w->path.size() || w->progress >= w->length))) {
                 in.fail();
             }
+            // Production entries it indexes: its home (where it delivers, kNoHome for deer, robbers
+            // and pack donkeys) and its source.
+            const std::size_t productions = m_world->productions().size();
+            if ((w->home != kNoHome && w->home >= productions) || (w->source && *w->source >= productions)) {
+                in.fail();
+            }
         }
         slots.emplace_back(std::move(w), generation);
     }
     std::vector<std::uint8_t> jobs;
     in.list(jobs, 1, [&](std::uint8_t& j) { j = in.u8(); });
+    if (jobs.size() > m_world->productions().size()) {
+        in.fail();
+    }
     std::unordered_set<std::uint64_t> tiles;
     const std::uint32_t reserved = in.count(8);
     for (std::uint32_t i = 0; i < reserved; ++i) {

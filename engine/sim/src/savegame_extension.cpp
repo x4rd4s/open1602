@@ -140,8 +140,8 @@ MapCell get_cell(StateIn& in, const assets::BuildingTable& buildings) {
     c.random = in.u8();
     if (id != 0) {
         const assets::BuildingType* b = buildings.by_id(id);
-        if (b == nullptr) {
-            in.fail();  // the game's data changed
+        if (b == nullptr || sub >= b->tile_count()) {
+            in.fail();  // the game's data changed, or the part lies outside the building
             return c;
         }
         c.sprite = static_cast<std::uint16_t>(b->gfx + sub);
@@ -485,6 +485,10 @@ core::Result<World> read_map(StateIn& in, const assets::BuildingTable& buildings
                     if (b == nullptr) {
                         return make_error(ErrorCode::InvalidFormat,
                                           "save: building " + std::to_string(ids[k]) + " is not in the game's data");
+                    }
+                    if (sub >= b->tile_count()) {
+                        return make_error(ErrorCode::InvalidFormat, "save: part " + std::to_string(sub) +
+                                                                        " outside building " + std::to_string(ids[k]));
                     }
                     cells[k].sprite = static_cast<std::uint16_t>(b->gfx + sub);
                 }
@@ -997,6 +1001,10 @@ Ship get_ship(StateIn& in) {
     s.name = in.string();
     s.pos_x = in.i32();
     s.pos_y = in.i32();
+    // validate() checks the tile against the world; a position beyond 16 bits of tiles is never on it.
+    if (s.pos_x < 0 || s.pos_y < 0 || s.pos_x / kShipUnit > 0xFFFF || s.pos_y / kShipUnit > 0xFFFF) {
+        in.fail();
+    }
     s.x = static_cast<std::uint16_t>(std::max(0, s.pos_x / kShipUnit));
     s.y = static_cast<std::uint16_t>(std::max(0, s.pos_y / kShipUnit));
     s.figure = in.u16();
@@ -1379,7 +1387,7 @@ void write_diplomacy(Out& out, const World& w) {
 Diplomacy read_diplomacy(StateIn& in) {
     Diplomacy d;
     const std::uint32_t n = in.u32();
-    if (n > 254) {
+    if (n > kMaxPlayerCount) {
         in.fail();
         return d;
     }
@@ -1503,6 +1511,9 @@ std::vector<T> get_u8s(StateIn& in) {
 Decoded::WorldPart read_world(StateIn& in) {
     Decoded::WorldPart w;
     w.time_ms = in.u64();
+    if (w.time_ms % Simulation::kTickMs != 0) {
+        in.fail();  // game time moves in ticks of 50 ms; the 5 s steps (diplomacy, players) rely on it
+    }
     w.city_name_index = in.u32();
     w.settings.difficulty = in.u8();
     w.settings.flags = in.u32();
@@ -1589,6 +1600,9 @@ std::vector<Player> read_players(StateIn& in) {
         p.monuments_allowed = in.u16();
         p.monuments_built = in.u16();
     });
+    if (list.size() > kMaxPlayerCount) {
+        in.fail();  // before the diplomacy table (players squared) is sized for them
+    }
     return list;
 }
 
@@ -1759,6 +1773,9 @@ std::pair<std::vector<Production>, std::vector<std::uint32_t>> read_productions(
         p.produced = in.u16();
         p.elapsed = in.u16();
         p.reserved = in.u16();
+        if (!p.used) {
+            p.enabled = false;  // a free slot never runs (World::remove_production switches it off)
+        }
     });
     std::vector<std::uint32_t> free = get_u32s<std::uint32_t>(in);
     for (const std::uint32_t f : free) {

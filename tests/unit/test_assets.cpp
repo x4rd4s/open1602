@@ -236,6 +236,13 @@ TEST_CASE("file: paths go to and from UTF-8 unchanged (a user named Juergen)") {
     const auto found = core::find_case_insensitive(dir, "j\xC3\xBCrgen/KEYS.CFG");
     REQUIRE(found.has_value());
     CHECK(*core::read_file(*found) == data);
+    // Nothing outside the root: no "..", no absolute path.
+    CHECK(!core::find_case_insensitive(folder, "../j\xC3\xBCrgen/keys.cfg").has_value());
+    CHECK(!core::find_case_insensitive(folder, "..\\j\xC3\xBCrgen\\keys.cfg").has_value());
+    CHECK(!core::find_case_insensitive(dir, core::path_to_utf8(folder / "keys.cfg")).has_value());
+    // A folder is no file.
+    const auto folder_read = core::read_file(folder);
+    CHECK(!folder_read.ok());
     fs::remove_all(dir, ec);
 
     CHECK(core::environment_variable("PATH").has_value());

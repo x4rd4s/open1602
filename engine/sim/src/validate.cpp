@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "o1602/sim/validate.hpp"
 
+#include <algorithm>
+#include <array>
+#include <limits>
 #include <string>
+#include <vector>
 
 namespace o1602::sim {
 
@@ -35,13 +39,45 @@ private:
     const World& m_w;
 };
 
+/// Ids of a list are unique, not 0, and below the next id the world hands out.
+template <typename List>
+[[nodiscard]] bool ids_unique(const List& list, std::uint32_t next) {
+    if (next == std::numeric_limits<std::uint32_t>::max()) {
+        return false;  // the next new unit would share its id with the one after it
+    }
+    std::vector<std::uint32_t> ids;
+    ids.reserve(list.size());
+    for (const auto& e : list) {
+        if (e.id == 0 || e.id >= next) {
+            return false;
+        }
+        ids.push_back(e.id);
+    }
+    std::sort(ids.begin(), ids.end());
+    return std::adjacent_find(ids.begin(), ids.end()) == ids.end();
+}
+
 }  // namespace
 
 core::Status validate(const World& w) {
     const Check c(w);
+    if (w.players().size() > kMaxPlayerCount) {
+        return bad("more than " + std::to_string(kMaxPlayerCount) + " players");
+    }
+    // Islands are addressed by their 8-bit number (state sections, the original's format), and
+    // their coordinates are 8 bit wide in places (craters, deer spots, deposits).
+    constexpr std::size_t kMaxIslandSide = 255;
+    std::array<bool, 256> numbers{};
     for (std::size_t i = 0; i < w.islands().size(); ++i) {
         const WorldIsland& island = w.islands()[i];
         const IslandMap& map = island.map;
+        if (numbers[island.header.number]) {
+            return bad("two islands with the number " + std::to_string(island.header.number));
+        }
+        numbers[island.header.number] = true;
+        if (map.width() > kMaxIslandSide || map.height() > kMaxIslandSide) {
+            return bad("island " + std::to_string(i) + " is wider or higher than 255 tiles");
+        }
         if (std::uint64_t{island.x} + map.width() > w.width() || std::uint64_t{island.y} + map.height() > w.height()) {
             return bad("island " + std::to_string(i) + " lies outside the map");
         }
@@ -75,6 +111,9 @@ core::Status validate(const World& w) {
         if (!inside || !c.owner(s.owner) || (s.island != 0xFFFF && !c.island(s.island))) {
             return bad("unit " + std::to_string(s.id) + " outside the map or of an unknown player");
         }
+    }
+    if (!ids_unique(w.ships(), w.next_ship_id()) || !ids_unique(w.soldiers(), w.next_soldier_id())) {
+        return bad("ship or unit ids twice, 0 or not below the next id");
     }
     for (const Tower& t : w.towers()) {
         if (!c.tile(t.island, t.x, t.y) || !c.owner(t.owner)) {

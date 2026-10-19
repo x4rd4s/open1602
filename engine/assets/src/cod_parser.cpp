@@ -542,7 +542,11 @@ private:
         const auto it = records.find(source_index);
         const Object source = it == records.end() ? Object{} : it->second;
         for (std::int32_t i = 0; i < count; ++i) {
-            records[level.nummer + i] = source;
+            const std::int64_t nummer = std::int64_t{level.nummer} + i;
+            if (nummer > std::numeric_limits<std::int32_t>::max()) {
+                break;
+            }
+            records[static_cast<std::int32_t>(nummer)] = source;
         }
     }
 

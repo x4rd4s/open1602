@@ -1437,8 +1437,10 @@ bool Fleet::load(core::ByteReader& reader) {
         }
     }
     m_market = std::move(market);
-    m_trader_ms = trader;
-    m_yard_ms = yard;
+    // Within their periods (trader check 10 s, shipyard second), like the pirates' clock: a larger
+    // value would make the first tick catch up millions of shipyard seconds.
+    m_trader_ms = trader % 10'000U;
+    m_yard_ms = yard % 1000U;
     m_tools_given = tools;
     m_tools_quota = quota;
     m_name_index = name;

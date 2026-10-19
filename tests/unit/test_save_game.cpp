@@ -105,7 +105,7 @@ sim::World make_world(const assets::BuildingTable& buildings) {
         }
         world.add_soldier(soldier);
     }
-    world.set_time_ms(123'456'789);
+    world.set_time_ms(123'456'750);
     return world;
 }
 
@@ -137,7 +137,7 @@ TEST_CASE("save game: a world beyond the original's limits comes back whole") {
     CHECK(loaded->cities()[0].name == "Neustadt");
     CHECK(loaded->cities()[0].purchases == 480 * 75);  // CSTA
     CHECK(loaded->cities()[0].sales == 480 * 1234);
-    CHECK(loaded->time_ms() == 123'456'789);
+    CHECK(loaded->time_ms() == 123'456'750);
     // Queued orders (QUEU).
     CHECK(loaded->ships()[3].queue == world.ships()[3].queue);
     CHECK(loaded->ships()[3].queue.size() == 2);
@@ -301,6 +301,15 @@ TEST_CASE("save game: a world whose references do not hold is refused (validate)
     CHECK(refused([](sim::World& w) { w.soldiers()[3].island = 2; }));
     CHECK(refused([](sim::World& w) { w.soldiers()[4].pos_x = 900 * 4096; }));
     CHECK(refused([](sim::World& w) { w.island(1).craters.push_back(sim::Crater{30, 0, 0}); }));
+    // Ids are unique and below the next one; island numbers are unique; at most 254 players.
+    CHECK(refused([](sim::World& w) { w.ships()[6].id = w.ships()[5].id; }));
+    CHECK(refused([](sim::World& w) { w.set_next_ship_id(0xFFFFFFFFU); }));
+    CHECK(refused([](sim::World& w) { w.island(1).header.number = w.island(0).header.number; }));
+    CHECK(refused([](sim::World& w) {
+        std::vector<sim::Player> players = w.players();
+        players.resize(300, players.back());
+        w.set_players(std::move(players));
+    }));
     CHECK(refused([](sim::World& w) {
         sim::House house;
         house.island = 0;
