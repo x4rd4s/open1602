@@ -114,6 +114,17 @@ TEST_CASE("ui: a GAD layout with include, relative numbers and pairs that keep t
     CHECK(!missing.warnings.empty());
 }
 
+TEST_CASE("ui: a GAD file that includes itself again and again stays bounded") {
+    // Each level includes the next 40 times: 40^4 copies of the text without a limit.
+    std::string bomb;
+    for (int i = 0; i < 40; ++i) {
+        bomb += "Include: \"BOMB.INC\"\n";
+    }
+    bomb += std::string(1000, ';') + "\n";
+    const auto l = assets::parse_gad(bomb, [&](std::string_view) -> std::optional<std::string> { return bomb; });
+    CHECK(!l.warnings.empty());
+}
+
 TEST_CASE("ui: regions of the screen and the original's rounding") {
     const auto r = ui::screen_regions(1024, 768);
     CHECK((r.side_panel == ui::Rect{768, 0, 256, 768}));

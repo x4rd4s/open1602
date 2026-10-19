@@ -12,6 +12,8 @@ namespace o1602::assets {
 namespace {
 
 constexpr std::size_t kMaxIncludeDepth = 4;
+/// The text of a layout with all its includes: the original's are a few kilobytes.
+constexpr std::size_t kMaxExpandedBytes = 1U << 20;
 
 // Symbols the GAD loader defines before parsing (0x004054D6..0x00405582).
 constexpr CodPredefinedSymbol kPredefined[] = {
@@ -53,6 +55,11 @@ std::string expand_includes(std::string_view text,
                 } else {
                     out += expand_includes(*body, include, warnings, depth + 1);
                     out += '\n';
+                    if (out.size() > kMaxExpandedBytes) {
+                        // A file that includes itself again and again would grow without end.
+                        warnings.push_back("includes too large, the rest is left out: " + name);
+                        return out;
+                    }
                 }
             }
         }
