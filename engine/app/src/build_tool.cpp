@@ -4,31 +4,25 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include "o1602/sim/game_data.hpp"
+
 namespace o1602::app {
 
 namespace {
 
-constexpr std::int32_t kKindRoad = 1;
-constexpr std::int32_t kKindWall = 4;
-constexpr std::int32_t kKindWallBeach = 5;
-constexpr std::int32_t kKindForest = 10;
-constexpr std::int32_t kKindGround = 11;
-constexpr std::int32_t kKindSquare = 13;
-constexpr std::int32_t kKindHq = 35;
-constexpr std::int32_t kProdGrowing = 10;
 constexpr std::size_t kMaxItems = 512;  // the original's drag list holds 0x200 entries
 
 std::optional<sim::DragLine> line_kind(const assets::BuildingType& b) noexcept {
-    if (b.kind == kKindRoad) {
+    if (b.kind == sim::kind::kRoad) {
         return sim::DragLine::Road;
     }
-    if (b.kind == kKindWall || b.kind == kKindWallBeach) {
+    if (b.kind == sim::kind::kWall || b.kind == sim::kind::kWallBeach) {
         return sim::DragLine::Wall;
     }
     return std::nullopt;
 }
 bool area_kind(const assets::BuildingType& b) noexcept {
-    return b.prod_kind == kProdGrowing || b.kind == kKindGround || b.kind == kKindSquare;
+    return b.prod_kind == sim::prod::kGrowing || b.kind == sim::kind::kGround || b.kind == sim::kind::kSquare;
 }
 
 /// A well mixed number for a tile (splitmix64 finaliser): the same tile and seed always give the
@@ -98,7 +92,7 @@ bool BuildTool::select(std::uint32_t id) noexcept {
 bool BuildTool::select_kontor(std::uint32_t ship) noexcept {
     std::optional<std::size_t> best;
     for (std::size_t i = 0; i < m_list.size(); ++i) {
-        if (m_list[i]->kind == kKindHq && (!best || m_list[i]->id < m_list[*best]->id)) {
+        if (m_list[i]->kind == sim::kind::kHq && (!best || m_list[i]->id < m_list[*best]->id)) {
             best = i;
         }
     }
@@ -120,7 +114,7 @@ const assets::BuildingType* BuildTool::selected() const noexcept {
 
 bool BuildTool::hatched_drag() const noexcept {
     const assets::BuildingType* b = selected();
-    return m_mode == Mode::Build && m_drag_start && b != nullptr && b->prod_kind == kProdGrowing;
+    return m_mode == Mode::Build && m_drag_start && b != nullptr && b->prod_kind == sim::prod::kGrowing;
 }
 
 std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, sim::PlayerId player,
@@ -137,7 +131,7 @@ std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, s
     // Trees come in RandAnz variants RandAdd records apart; the original's menu draws one per tile
     // with rand() (docs/re/construction.md: the variant is part of the order).
     const auto variant = [&](std::int32_t x, std::int32_t y) {
-        if (b->kind != kKindForest || b->rand_count <= 1) {
+        if (b->kind != sim::kind::kForest || b->rand_count <= 1) {
             return b->id;
         }
         const std::uint32_t pick = tile_hash(m_variant_seed, spot.island, x, y) % b->rand_count;
@@ -167,7 +161,7 @@ std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, s
         add(spot.x, spot.y);
     }
     // A Kontor outside every city is built from the player's nearest ship.
-    if (b->kind == kKindHq) {
+    if (b->kind == sim::kind::kHq) {
         const sim::WorldIsland& island = world.islands()[spot.island];
         const std::int64_t wx = static_cast<std::int64_t>(island.x) + spot.x;
         const std::int64_t wy = static_cast<std::int64_t>(island.y) + spot.y;

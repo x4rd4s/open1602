@@ -7,6 +7,7 @@
 #include <limits>
 #include <queue>
 
+#include "o1602/assets/game_data.hpp"
 #include "o1602/render/land_figures.hpp"
 
 namespace o1602::render {
@@ -21,9 +22,6 @@ constexpr std::int32_t kBridge = 18;
 constexpr std::int32_t kPier = 30;
 constexpr std::int32_t kBeachInnerCorner = 26;  // STRANDECKI
 // HAUS_PRODTYP Kind values.
-constexpr std::int32_t kProdMarket = 7;
-constexpr std::int32_t kProdRipe = 9;
-constexpr std::uint8_t kWareTree = 53;
 
 // Townsfolk (figuren.cod).
 constexpr std::uint16_t kAdelweibl = 93;
@@ -363,7 +361,7 @@ void Ambient::frame(const sim::World& world, const assets::BuildingTable& buildi
             }
             const sim::MapCell& cell = island.map.top(x, y);
             const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
-            if (b == nullptr || b->prod_kind != kProdMarket) {
+            if (b == nullptr || b->prod_kind != assets::prod::kMarket) {
                 continue;  // torn down since the last look
             }
             catch_up(j.anim, j.anim_ms, kFigureJuggler);
@@ -677,7 +675,7 @@ void Ambient::jugglers(const sim::World& world, const assets::BuildingTable& bui
         const sim::WorldIsland& island = world.islands()[p.island];
         const sim::MapCell& cell = island.map.top(p.x, p.y);
         const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
-        if (b == nullptr || b->prod_kind != kProdMarket || b->attached_figures[1] != kFigureJuggler) {
+        if (b == nullptr || b->prod_kind != assets::prod::kMarket || b->attached_figures[1] != kFigureJuggler) {
             continue;
         }
         const sim::City* city = world.city(p.island, cell.city);
@@ -725,7 +723,7 @@ void Ambient::sounds(const sim::World& world, const assets::BuildingTable& build
                     if (b == nullptr) {
                         continue;
                     }
-                    const bool tree = b->prod_kind == kProdRipe && b->ware == kWareTree;
+                    const bool tree = b->prod_kind == assets::prod::kRipe && b->ware == assets::ware::kTree;
                     const bool corner = b->kind == kBeachInnerCorner;
                     const std::uint32_t h = tile_hash(i, x, y);
                     if ((tree && h % kBirdTrees == 0) || (corner && h % kSurfCorners == 0)) {

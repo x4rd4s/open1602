@@ -7,6 +7,7 @@
 #include <numbers>
 #include <unordered_map>
 
+#include "o1602/assets/game_data.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/ships.hpp"
 
@@ -402,9 +403,6 @@ constexpr std::uint16_t kFigureBrandMarkt = 47;  // BRANDMARKT: fire on a market
 constexpr std::uint16_t kFigureSensenmann = 56;  // SENSENMANN: plague and fire on houses
 constexpr std::uint16_t kFigureShowEisen = 57;   // SHOWEISEN: ore deposit symbol
 constexpr std::uint16_t kFigureShowGold = 58;    // SHOWGOLD: gold vein symbol
-constexpr std::int32_t kProdRohsterz = 12;       // HAUS_PRODTYP Kind ROHSTERZ: ore mountain
-constexpr std::uint8_t kWareIronOre = 2;
-constexpr std::uint8_t kWareGold = 3;
 
 }  // namespace
 
@@ -461,11 +459,6 @@ std::vector<BuildingFigure> collect_building_figures(const sim::World& world, co
 void collect_island_building_figures(const sim::World& world, const assets::BuildingTable& buildings,
                                      const assets::FigureTable& figures, std::uint16_t index,
                                      std::vector<BuildingFigure>& out) {
-    constexpr std::int32_t kProdMarkt = 7;      // HAUS_PRODTYP Kind MARKT
-    constexpr std::int32_t kProdKontor = 8;     // KONTOR
-    constexpr std::int32_t kProdWachturm = 16;  // WACHTURM: same branch in 0x00486B60
-    constexpr std::int32_t kProdHouse = 13;     // WOHNUNG
-    constexpr std::int32_t kProdWerft = 14;     // WERFT
     {
         const sim::WorldIsland& island = world.islands()[index];
         const sim::IslandMap& map = island.map;
@@ -507,14 +500,15 @@ void collect_island_building_figures(const sim::World& world, const assets::Buil
                     f.origin_y = static_cast<std::uint16_t>(y);
                     out.push_back(f);
                 };
-                if (b.prod_kind == kProdMarkt || b.prod_kind == kProdKontor || b.prod_kind == kProdWachturm) {
+                if (b.prod_kind == assets::prod::kMarket || b.prod_kind == assets::prod::kKontor ||
+                    b.prod_kind == assets::prod::kTower) {
                     add(BuildingFigureRole::Flag, b.attached_figures[0]);
-                    if (b.prod_kind == kProdMarkt) {
+                    if (b.prod_kind == assets::prod::kMarket) {
                         add(BuildingFigureRole::MarketFire, kFigureBrandMarkt);
                     }
-                } else if (b.prod_kind == kProdHouse) {
+                } else if (b.prod_kind == assets::prod::kHouse) {
                     add(BuildingFigureRole::Disaster, kFigureSensenmann);
-                } else if (b.prod_kind == kProdWerft) {
+                } else if (b.prod_kind == assets::prod::kShipyard) {
                     // Shipyards of the local player: the same icon as kind 0x19 (0x00486E91).
                     add(BuildingFigureRole::Status, kFigureNoAktiv);
                 } else if (sim::is_producer(b)) {
@@ -526,15 +520,16 @@ void collect_island_building_figures(const sim::World& world, const assets::Buil
         // Ore and gold symbols: on the origin of the ore mountain a deposit lies at (0x00487076);
         // whether the local player sees one is decided when drawing.
         for (const auto& d : island.header.deposits) {
-            if ((d.ware != kWareIronOre && d.ware != kWareGold) || d.x >= map.width() || d.y >= map.height()) {
+            if ((d.ware != assets::ware::kOre && d.ware != assets::ware::kGold) || d.x >= map.width() ||
+                d.y >= map.height()) {
                 continue;
             }
             const sim::SubTile sub = map.sub_tile(buildings, d.x, d.y);
-            if (sub.building == nullptr || sub.building->prod_kind != kProdRohsterz || sub.origin_x != d.x ||
-                sub.origin_y != d.y) {
+            if (sub.building == nullptr || sub.building->prod_kind != assets::prod::kOreMountain ||
+                sub.origin_x != d.x || sub.origin_y != d.y) {
                 continue;
             }
-            const std::uint16_t number = d.ware == kWareGold ? kFigureShowGold : kFigureShowEisen;
+            const std::uint16_t number = d.ware == assets::ware::kGold ? kFigureShowGold : kFigureShowEisen;
             if (figures.get(number) == nullptr) {
                 continue;
             }

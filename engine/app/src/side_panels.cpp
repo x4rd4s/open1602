@@ -5,6 +5,8 @@
 #include <array>
 #include <utility>
 
+#include "o1602/sim/game_data.hpp"
+
 namespace o1602::app {
 
 namespace {
@@ -24,8 +26,6 @@ constexpr std::int32_t kChainLast = 31068;
 constexpr std::int32_t kPreviewBlock = 3;  // BAUHAUS
 constexpr std::int32_t kPreviewW = 160;    // the preview's box (gadget size)
 constexpr std::int32_t kPreviewH = 110;
-constexpr std::int32_t kProdWorkshop = 1;  // HAUS_PRODTYP Kind HANDWERK
-constexpr std::int32_t kProdLastRaw = 6;   // farm, mine, cattle, hunter, fisher: only the product
 
 /// LEISTE lines of the build menu's gadgets (Hud_UpdateTooltip 0x0042DA80).
 std::optional<std::size_t> bau_help(std::int32_t id, bool auto_align) {
@@ -270,7 +270,7 @@ void BuildPanel::draw(render::SdlUiRenderer& renderer, const assets::BuildingTab
             }
             m_bau.set_graphic(gadget, m_gfx_ware + ware, 0);
         };
-        if (b->prod_kind == kProdWorkshop && b->ware != 0) {
+        if (b->prod_kind == sim::prod::kWorkshop && b->ware != 0) {
             const std::int32_t shift = b->raw2_ware != 0 ? 0 : 36;
             if (b->raw2_ware != 0) {
                 ware_icon(kChainFirst, b->raw2_ware, 0);
@@ -279,7 +279,7 @@ void BuildPanel::draw(render::SdlUiRenderer& renderer, const assets::BuildingTab
                 ware_icon(kChainFirst + 3, b->raw_ware, shift);
             }
             ware_icon(kChainFirst + 6, b->ware, shift);
-        } else if (b->prod_kind > kProdWorkshop && b->prod_kind <= kProdLastRaw && b->ware != 0) {
+        } else if (b->prod_kind > sim::prod::kWorkshop && b->prod_kind <= sim::prod::kFisher && b->ware != 0) {
             ware_icon(kChainFirst + 6, b->ware, 73);
         }
     }

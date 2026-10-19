@@ -24,6 +24,7 @@
 #include "o1602/core/text.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/construction.hpp"
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -867,8 +868,6 @@ std::optional<BuildTool::Spot> MapViewer::spot_at_mouse() const {
 }
 
 std::string MapViewer::crops_status() const {
-    constexpr std::uint8_t kWareGrass = 52;
-    constexpr std::uint8_t kWareTree = 53;
     if (!m_hud ||
         !m_hud->game_view().contains(static_cast<std::int32_t>(m_mouse_x), static_cast<std::int32_t>(m_mouse_y))) {
         return {};
@@ -883,7 +882,7 @@ std::string MapViewer::crops_status() const {
     }
     const assets::BuildingType* b = m_buildings.by_sprite(
         island.map.top(static_cast<std::uint32_t>(spot->x), static_cast<std::uint32_t>(spot->y)).sprite);
-    if (b == nullptr || (b->ware != kWareGrass && b->ware != kWareTree)) {
+    if (b == nullptr || (b->ware != sim::ware::kGrass && b->ware != sim::ware::kTree)) {
         return {};
     }
     return m_hud->crops_line(island_crops(island));
@@ -900,7 +899,6 @@ std::optional<render::TileLighting> MapViewer::building_lighting(std::uint16_t i
                                                                  std::uint16_t y) const {
     // A catchment worth showing: production and public buildings, not houses (their Radius is
     // only how far they look for a market).
-    constexpr std::int32_t kProdHouse = 13;
     if (island >= m_world.islands().size() || !m_world.islands()[island].map.contains(x, y)) {
         return std::nullopt;
     }
@@ -908,7 +906,7 @@ std::optional<render::TileLighting> MapViewer::building_lighting(std::uint16_t i
     const sim::MapCell& cell = map.top(x, y);
     const sim::SubTile t = map.sub_tile(m_buildings, x, y);
     if (t.building == nullptr || cell.owner != m_local_player || t.building->radius <= 0 ||
-        t.building->prod_kind == kProdHouse) {
+        t.building->prod_kind == sim::prod::kHouse) {
         return std::nullopt;
     }
     render::TileLighting l = render::TileLighting::circle(
@@ -934,9 +932,8 @@ render::TileLighting MapViewer::tile_lighting() const {
         }
         render::TileLighting l = render::TileLighting::territory(m_local_player);
         // A building with a catchment being placed: the border of its circle at the mouse.
-        constexpr std::int32_t kProdHouse = 13;
         const auto spot = spot_at_mouse();
-        if (b != nullptr && spot && b->radius > 0 && b->prod_kind != kProdHouse) {
+        if (b != nullptr && spot && b->radius > 0 && b->prod_kind != sim::prod::kHouse) {
             l.outline(world_catchment(spot->island,
                                       sim::catchment_of(*b, m_tool.rotation(), sim::TilePos{spot->x, spot->y})));
         }
@@ -1618,10 +1615,9 @@ void MapViewer::select_building_at_mouse() {
         // (BuildMenu_SelectFarmByWare 0x004331B0): the field whose grown stage gives the raw material.
         const sim::SubTile t = m_world.islands()[sel.island].map.sub_tile(m_buildings, sel.x, sel.y);
         if (t.building != nullptr && t.building->raw_ware != 0) {
-            constexpr std::int32_t kProdGrowing = 10;
             for (const assets::BuildingType& field : m_buildings.types()) {
                 const assets::BuildingType* ripe =
-                    field.prod_kind == kProdGrowing ? sim::ripe_record(m_buildings, field) : nullptr;
+                    field.prod_kind == sim::prod::kGrowing ? sim::ripe_record(m_buildings, field) : nullptr;
                 if (ripe != nullptr && ripe->ware == t.building->raw_ware && m_hud->show_in_build_menu(field.id)) {
                     m_field_source = FieldSource{sel.island, sel.x, sel.y, field.id};
                     break;

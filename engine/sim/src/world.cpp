@@ -827,8 +827,6 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
     }
     // HIRSCH2 stores only position and timer; the kind follows the island's climate: deer
     // (HIRSCH) in the north, antelopes (ANTILOPE) in the south (confirmed in the running game).
-    constexpr std::uint16_t kFigureHirsch = 89;
-    constexpr std::uint16_t kFigureAntilope = 91;
     for (const auto& a : state->animals) {
         const auto island = world.island_index(a.island);
         if (!island || a.x >= world.islands()[*island].map.width() || a.y >= world.islands()[*island].map.height()) {
@@ -836,7 +834,7 @@ core::Result<World> load_world(const assets::ChunkFile& file, const assets::Buil
             continue;
         }
         const bool south = (world.islands()[*island].header.climate & 1U) != 0;
-        world.add_animal(Animal{*island, a.x, a.y, south ? kFigureAntilope : kFigureHirsch});
+        world.add_animal(Animal{*island, a.x, a.y, south ? figure::kAntelope : figure::kDeer});
         for (DeerSpot& spot : world.island(*island).deer_spots) {
             if (!spot.used) {
                 spot = DeerSpot{true, a.x, a.y, std::uint64_t{a.timer} * 100};

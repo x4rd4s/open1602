@@ -37,8 +37,6 @@ constexpr std::uint32_t kBigVeinShared = 0xF00;
 /// Below 40 t computer players stop exhausting small veins.
 constexpr std::uint32_t kComputerKeeps = 0x500;
 // Deer and hunters (docs/re/deer.md).
-constexpr std::uint16_t kFigureDeer = 89;         // HIRSCH
-constexpr std::uint16_t kFigureAntelope = 91;     // ANTILOPE (southern islands)
 constexpr std::uint8_t kDeerRange = 6;            // 13 x 13 square around the spot
 constexpr std::uint32_t kDeerFallMs = 5'000;      // falls when it finds no way
 constexpr std::uint32_t kDeerShotMs = 10'000;     // lies after the shot
@@ -46,7 +44,6 @@ constexpr std::uint32_t kDeerRespawnMs = 60'000;  // a spot waits a minute for i
 constexpr std::uint32_t kShotSteps = 3;           // the hunter shoots from 3 tiles
 constexpr std::int32_t kHuntReach = 8;            // lodges within 8 tiles answer
 constexpr std::uint8_t kGrassStops = 2;           // grass, grass, then a tree
-constexpr std::uint16_t kFigureRobber = 92;       // RAEUBER
 constexpr std::uint32_t kRobberWaitMs = 1'000;    // looks for a victim every second
 constexpr std::uint8_t kRobberPatience = 30;      // seconds in the house before he gives up
 constexpr std::uint8_t kRobberChase = 49;         // tiles of chase (with the seconds waited)
@@ -1141,7 +1138,7 @@ bool Logistics::spawn_deer(std::uint16_t island, TilePos spot) {
     Walker w;
     w.kind = WalkerKind::Deer;
     w.island = island;
-    w.figure = south ? kFigureAntelope : kFigureDeer;
+    w.figure = south ? figure::kAntelope : figure::kDeer;
     w.city = MapCell::kNoCity;
     w.home = kNoHome;
     w.home_tile = spot;
@@ -1761,7 +1758,7 @@ void Logistics::spawn_robber(const RobberSpawn& s) {
         return;
     }
     const auto house = building_at(*m_world, *m_buildings, s.island, s.house);
-    const assets::FigureType* fig = m_figures->get(kFigureRobber);
+    const assets::FigureType* fig = m_figures->get(figure::kRobber);
     if (!house || fig == nullptr || fig->speed == 0) {
         return;
     }
@@ -1777,7 +1774,7 @@ void Logistics::spawn_robber(const RobberSpawn& s) {
     Walker w;
     w.kind = WalkerKind::Robber;
     w.island = s.island;
-    w.figure = kFigureRobber;
+    w.figure = figure::kRobber;
     w.city = s.city;
     w.home = kNoHome;
     w.home_tile = centre;

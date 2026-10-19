@@ -6,6 +6,7 @@
 
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/cod_predefined.hpp"
+#include "o1602/assets/game_data.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/savegame.hpp"
 #include "o1602/core/file.hpp"
@@ -21,7 +22,6 @@ constexpr std::uint32_t kMaxId = 23500;  // Haus_GetById (0x004630F0) accepts 20
 // Sprites of the island map are 16 bit, 0xFFFF marks an empty tile (sim::MapCell). The original's
 // grid word has only 13 bits, but savegames store buildings, not sprites, so mods may go beyond.
 constexpr std::uint32_t kMaxSprite = 0xFFFF;
-constexpr std::int32_t kProdKindGrowing = 10;  // HAUS_PRODTYP Kind ROHSTWACHS
 
 std::uint32_t non_negative(std::int32_t v) {
     return v < 0 ? 0U : static_cast<std::uint32_t>(v);
@@ -150,7 +150,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             b.build_cost.cannons = goods("Kanon");
             b.build_cost.money = c.integer("Money");
         }
-        if (b.prod_kind == kProdKindGrowing && b.anim_count > 0) {
+        if (b.prod_kind == prod::kGrowing && b.anim_count > 0) {
             // 0x00462F1D: the number of k in 1..32 with 40 s + 7 s * k <= Interval / AnimAnz,
             // clamped to 31 when an entry is added (0x0047C760).
             const std::uint64_t stage_ms = std::uint64_t{b.interval} * 1000U / b.anim_count;
@@ -282,10 +282,8 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
     }
     table.m_infra.resize(max_infra);
 
-    constexpr std::int32_t kKindMeer = 19;
-    constexpr std::int32_t kProdKindOpenSea = 9;
     for (std::size_t i = 0; i < table.m_types.size(); ++i) {
-        if (table.m_types[i].kind == kKindMeer && table.m_types[i].prod_kind == kProdKindOpenSea) {
+        if (table.m_types[i].kind == kind::kSea && table.m_types[i].prod_kind == prod::kRipe) {
             table.m_open_sea = static_cast<std::int32_t>(i);
             break;
         }
@@ -302,9 +300,8 @@ const BuildingType* BuildingTable::by_id(std::uint32_t id) const noexcept {
 }
 
 const BuildingType* BuildingTable::first_house(std::size_t resident_class) const noexcept {
-    constexpr std::int32_t kProdKindHouse = 13;  // WOHNUNG
     for (const BuildingType& b : m_types) {
-        if (b.prod_kind == kProdKindHouse && b.resident_class == resident_class) {
+        if (b.prod_kind == prod::kHouse && b.resident_class == resident_class) {
             return &b;
         }
     }
