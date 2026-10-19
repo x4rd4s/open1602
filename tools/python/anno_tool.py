@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Python counterpart of o1602-tool for quick experiments.
+"""Python counterpart of o1602-tool for quick experiments (unmaintained prototype; o1602-tool and
+the C++ readers in engine/assets are authoritative, see anno_formats.py).
 
   anno_tool.py chunks <file>
   anno_tool.py cod <file.cod> [out.txt]

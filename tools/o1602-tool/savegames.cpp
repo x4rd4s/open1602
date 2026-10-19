@@ -1,0 +1,333 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// o1602-tool: scenarios and savegames (listing, state, islands) and writing new ones.
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include "tool.hpp"
+
+#include "o1602/assets/building_table.hpp"
+#include "o1602/assets/chunk_file.hpp"
+#include "o1602/assets/game_directory.hpp"
+#include "o1602/assets/island.hpp"
+#include "o1602/assets/savegame.hpp"
+#include "o1602/assets/scenario.hpp"
+#include "o1602/assets/text_table.hpp"
+#include "o1602/core/file.hpp"
+#include "o1602/core/text.hpp"
+#include "o1602/sim/new_game.hpp"
+#include "o1602/sim/save_game.hpp"
+#include "o1602/sim/savegame_writer.hpp"
+#include "o1602/sim/world.hpp"
+
+namespace o1602::tool {
+
+namespace {
+
+/// "none|few|normal|many" of the world options.
+std::optional<sim::WorldSettings::Amount> amount(const Args& args, std::string_view name) {
+    const auto it = args.options.find(name);
+    if (it == args.options.end()) {
+        return sim::WorldSettings::Amount::Normal;
+    }
+    static constexpr std::array<std::string_view, 4> kNames = {"none", "few", "normal", "many"};
+    for (std::size_t i = 0; i < kNames.size(); ++i) {
+        if (it->second == kNames[i]) {
+            return static_cast<sim::WorldSettings::Amount>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
+int cmd_savegames(const Args& args) {
+    if (!args.positional.empty()) {
+        return usage();
+    }
+    auto game = assets::GameDirectory::from_environment();
+    if (!game) {
+        return fail(game.error());
+    }
+    const auto dat = game->resolve("Game.dat");
+    if (!dat) {
+        return fail(core::make_error(core::ErrorCode::NotFound, "Game.dat not found (the game was never started?)"));
+    }
+    auto bytes = core::read_file(*dat);
+    if (!bytes) {
+        return fail(bytes.error());
+    }
+    const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+    for (const auto& slot : assets::parse_savegame_slots(text)) {
+        const auto path = game->resolve(slot.file);
+        std::printf("%2u  %-24s %s", slot.slot, core::cp1252_to_utf8(slot.name).c_str(), slot.file.c_str());
+        if (!path) {
+            std::printf("  (missing)\n");
+            continue;
+        }
+        auto file = assets::ChunkFile::load(*path);
+        std::string scenario;
+        std::string player;
+        if (file) {
+            if (const auto* name = file->find("NAME")) {
+                const auto p = file->payload(*name);
+                scenario.assign(p.begin(), std::find(p.begin(), p.end(), std::uint8_t{0}));
+            }
+            if (auto players = assets::load_players(*file); players && !players->empty()) {
+                player = players->front().name;
+            }
+        }
+        std::printf("  scenario \"%s\", player \"%s\"\n", core::cp1252_to_utf8(scenario).c_str(),
+                    core::cp1252_to_utf8(player).c_str());
+    }
+    return 0;
+}
+
+int cmd_state(const Args& args) {
+    if (args.positional.size() != 1) {
+        return usage();
+    }
+    auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
+    if (!file) {
+        return fail(file.error());
+    }
+    auto players = assets::load_players(*file);
+    auto ships = assets::load_ships(*file);
+    auto state = assets::load_game_state(*file);
+    if (!players || !ships || !state) {
+        return fail(!players ? players.error() : !ships ? ships.error() : state.error());
+    }
+    for (const auto& p : *players) {
+        std::printf("player %u: kind 0x%02X, colour %u, money %d %s\n", p.slot, static_cast<unsigned>(p.kind),
+                    static_cast<unsigned>(p.color), p.money, p.name.c_str());
+    }
+    for (const auto& c : state->cities) {
+        std::printf("city: island %u #%u, owner %u, \"%s\"\n", c.island, c.index, c.owner, c.name.c_str());
+    }
+    for (const auto& w : state->warehouses) {
+        std::size_t used = 0;
+        for (const auto& s : w.wares) {
+            used += (s.raw[0] | s.raw[1] | s.raw[2] | (s.raw[3] & 0xFFFFU)) != 0 ? 1U : 0U;
+        }
+        std::printf("warehouse: island %u #%u at %u,%u, %zu goods with data\n", w.island, w.city, w.x, w.y, used);
+        if (args.flag("--wares")) {
+            for (const auto& s : w.wares) {
+                std::printf("  ware %2u (producer %u): %6.2f t   raw %08X %08X %08X %08X\n", s.ware, s.producer_id,
+                            s.stock() / static_cast<double>(assets::kStockUnitsPerTon), s.raw[0], s.raw[1], s.raw[2],
+                            s.raw[3]);
+            }
+        }
+    }
+    struct Counts {
+        std::size_t buildings = 0;
+        std::size_t working = 0;
+        std::size_t disabled = 0;
+    };
+    std::map<unsigned, Counts> production;
+    for (const auto& p : state->production) {
+        Counts& c = production[p.island];
+        ++c.buildings;
+        c.working += p.enabled && p.rate != 0 ? 1U : 0U;
+        c.disabled += p.enabled ? 0U : 1U;
+        if (args.flag("--production")) {
+            constexpr double kTon = assets::kStockUnitsPerTon;
+            std::printf(
+                "  production %u: %2u,%2u %-3s rate %3u, next %3u s, raw %5.2f/%5.2f t, stock %5.2f t, idle %2u, "
+                "produced %5.2f t in %3u s\n",
+                p.island, p.x, p.y, p.enabled ? "on" : "off", p.rate, p.countdown, p.raw / kTon, p.raw2 / kTon,
+                p.stock / kTon, p.idle_cycles, p.produced / kTon, p.elapsed);
+        }
+    }
+    for (const auto& [island, c] : production) {
+        std::printf("production: island %u, %zu buildings, %zu working, %zu switched off\n", island, c.buildings,
+                    c.working, c.disabled);
+    }
+    std::map<unsigned, std::size_t> deer;
+    for (const auto& a : state->animals) {
+        ++deer[a.island];
+    }
+    std::printf("deer: %zu on %zu islands\n", state->animals.size(), deer.size());
+    for (const auto& s : *ships) {
+        std::printf("ship \"%s\": figure %u, owner %u, at %u,%u, direction %u, island %s\n", s.name.c_str(), s.figure,
+                    s.owner, s.x, s.y, s.direction, s.island == 0xFF ? "-" : std::to_string(s.island).c_str());
+    }
+    return 0;
+}
+
+int cmd_islands(const Args& args) {
+    if (args.positional.size() != 1) {
+        return usage();
+    }
+    auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
+    if (!file) {
+        return fail(file.error());
+    }
+    auto islands = assets::load_islands(*file);
+    if (!islands) {
+        return fail(islands.error());
+    }
+    for (const auto& island : *islands) {
+        const auto& h = island.header;
+        std::printf("%s #%u  size %ux%u  pos (%u,%u)  layers %zu\n", h.chunk_name.c_str(), h.number, h.width, h.height,
+                    h.pos_x, h.pos_y, island.layers.size());
+        for (std::size_t l = 0; l < island.layers.size(); ++l) {
+            std::map<std::uint16_t, std::size_t> histogram;
+            for (const auto& tile : island.layers[l]) {
+                ++histogram[tile.id];
+            }
+            std::vector<std::pair<std::size_t, std::uint16_t>> top;
+            for (const auto& [id, n] : histogram) {
+                top.emplace_back(n, id);
+            }
+            std::sort(top.rbegin(), top.rend());
+            std::printf("  layer %zu: %zu tiles, %zu distinct ids; most common:", l, island.layers[l].size(),
+                        histogram.size());
+            for (std::size_t i = 0; i < std::min<std::size_t>(5, top.size()); ++i) {
+                std::printf(" %u(x%zu)", top[i].second + assets::IslandTile::kCodIdOffset, top[i].first);
+            }
+            std::printf("\n");
+        }
+    }
+    std::printf("%zu islands\n", islands->size());
+    return 0;
+}
+
+int cmd_new_world(const Args& args) {
+    if (args.positional.size() != 1) {
+        return usage();
+    }
+    auto game = assets::GameDirectory::from_environment();
+    if (!game) {
+        return fail(game.error());
+    }
+    auto buildings = assets::BuildingTable::load(*game);
+    if (!buildings) {
+        return fail(buildings.error());
+    }
+    auto texts = assets::TextTable::load(*game);
+    if (!texts) {
+        return fail(texts.error());
+    }
+    sim::NewGameOptions options;
+    options.name = "Spieler";
+    options.difficulty = static_cast<std::uint8_t>(std::min<std::size_t>(args.number("--level").value_or(0), 3));
+    options.world.seed = args.number("--seed").value_or(1);
+    options.world.guarantee_resources = true;
+    sim::WorldSettings w;
+    if (const auto size = args.pair("--world", 'x')) {
+        w.width = static_cast<std::uint32_t>(std::max(0, size->first));
+        w.height = static_cast<std::uint32_t>(std::max(0, size->second));
+    }
+    w.players = static_cast<std::uint8_t>(std::clamp<std::size_t>(args.number("--players").value_or(4), 1, 16));
+    const auto islands = amount(args, "--island-count");
+    const auto villages = amount(args, "--villages");
+    const auto volcanoes = amount(args, "--volcano-islands");
+    if (!islands || !villages || !volcanoes) {
+        return usage();
+    }
+    w.islands = *islands;
+    w.natives = *villages;
+    w.volcanoes = *volcanoes;
+    if (const auto it = args.options.find("--island-sizes"); it != args.options.end()) {
+        w.sizes = it->second == "small"   ? sim::WorldSettings::Sizes::Small
+                  : it->second == "large" ? sim::WorldSettings::Sizes::Large
+                                          : sim::WorldSettings::Sizes::Mixed;
+    }
+    if (args.flag("--together")) {
+        w.starts = sim::WorldSettings::Starts::Together;
+    }
+    options.custom = w;
+    std::vector<std::string> warnings;
+    auto world = sim::start_new_game(*game, *buildings, *texts, options, &warnings);
+    if (!world) {
+        return fail(world.error());
+    }
+    for (const auto& text : warnings) {
+        std::fprintf(stderr, "warning: %s\n", text.c_str());
+    }
+    std::printf("world %ux%u, %zu islands, %zu ships\n", world->width(), world->height(), world->islands().size(),
+                world->ships().size());
+    std::size_t villages_made = 0;
+    for (const sim::City& c : world->cities()) {
+        const sim::Player* p = world->player(c.owner);
+        villages_made += p != nullptr && p->role == sim::PlayerRole::Natives ? 1U : 0U;
+    }
+    std::printf("native villages %zu\n", villages_made);
+    auto bytes = sim::write_savegame(*world, *buildings);
+    if (!bytes) {
+        return fail(bytes.error());
+    }
+    if (auto status = core::write_file(std::filesystem::path(args.positional[0]), *bytes); !status) {
+        return fail(status.error());
+    }
+    std::printf("-> %s\n", std::string(args.positional[0]).c_str());
+    return 0;
+}
+
+/// A savegame of the original or of Open1602 exported as a .GAM; with --via-own first through
+/// Open1602's own format (as a game saved and loaded again), to see what the export loses.
+int cmd_export(const Args& args) {
+    if (args.positional.size() != 2) {
+        return usage();
+    }
+    auto game = assets::GameDirectory::from_environment();
+    if (!game) {
+        return fail(game.error());
+    }
+    auto buildings = assets::BuildingTable::load(*game);
+    if (!buildings) {
+        return fail(buildings.error());
+    }
+    auto bytes = core::read_file(fs::path(args.positional[0]));
+    if (!bytes) {
+        return fail(bytes.error());
+    }
+    std::vector<std::string> warnings;
+    const auto load = [&]() -> core::Result<sim::World> {
+        if (sim::is_open1602_save(*bytes)) {
+            return sim::read_game(*bytes, *buildings, &warnings);
+        }
+        auto file = assets::ChunkFile::from_bytes(*bytes);
+        if (!file) {
+            return file.error();
+        }
+        return sim::load_world(*file, *buildings, *game, &warnings);
+    };
+    core::Result<sim::World> world = load();
+    if (!world) {
+        return fail(world.error());
+    }
+    if (args.flag("--via-own")) {
+        auto own = sim::write_game(*world, *buildings);
+        if (!own) {
+            return fail(own.error());
+        }
+        world = sim::read_game(*own, *buildings, &warnings);
+        if (!world) {
+            return fail(world.error());
+        }
+    }
+    for (const auto& text : warnings) {
+        std::fprintf(stderr, "warning: %s\n", text.c_str());
+    }
+    auto out = sim::write_savegame(*world, *buildings);
+    if (!out) {
+        return fail(out.error());
+    }
+    if (auto status = core::write_file(fs::path(args.positional[1]), *out); !status) {
+        return fail(status.error());
+    }
+    std::printf("-> %s\n", std::string(args.positional[1]).c_str());
+    return 0;
+}
+
+}  // namespace o1602::tool

@@ -158,12 +158,18 @@ o1602-tool export     game.o1602 game.gam            # export a game for the ori
 
 Without arguments `o1602-tool` lists every command with its options.
 
+`tools/python/` holds Python prototypes from the reverse engineering: `anno_formats.py` and
+`anno_tool.py` read chunks, `.cod` and BSH files again in Python for quick experiments, and
+`compare_screenshot.py` lines up a screenshot of the original with a `render-world` image. They are not
+tested and not kept in step with the engine; where they disagree with `engine/assets` (and
+`o1602-tool`), the C++ is right.
+
 ## Project layout
 
 | Folder | Contents |
 |---|---|
 | `engine/` | Engine modules: `core`, `assets`, `sim`, `net`, `render`, `platform`, `audio`, `video`, `ui`, `app`; each has a README |
-| `tools/` | `o1602-tool` (C++) and Python prototypes |
+| `tools/` | `o1602-tool` (C++, one file per command group) and unmaintained Python prototypes from reverse engineering (`tools/python/`; the C++ readers in `engine/assets` are authoritative) |
 | `tests/` | Unit tests and tests against the original data ([how to run them](tests/README.md)) |
 | `docs/` | [Plan](docs/00-plan.md), [status](docs/status.md), [file formats](docs/formats/README.md), [architecture decisions](docs/architecture/README.md), [languages](docs/modding/languages.md) and [data limits](docs/modding/data-limits.md) for modding |
 | `re/` | Analysis scripts and notes |

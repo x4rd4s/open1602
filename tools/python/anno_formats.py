@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Reference readers for Anno 1602 data formats (prototyping / research).
 
-The C++ implementation in engine/assets is authoritative for the engine; this module is meant
-for quick experiments while reverse engineering. Keep both in sync with docs/formats/.
+Unmaintained prototype: the C++ readers in engine/assets (and o1602-tool) are authoritative and
+tested; this module is not tested and may lag behind them and docs/formats/. Where they disagree,
+the C++ is right. Use it for quick experiments while reverse engineering.
 Only the Python standard library is required (Pillow optional for PNG export).
 """
 from __future__ import annotations
