@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <iterator>
 #include <numbers>
-#include <unordered_map>
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/houses.hpp"
@@ -880,8 +880,15 @@ bool effect_figure_sprites(const EffectFigure& figure, const sim::World& world, 
 }
 
 void build_world_draw_list(const sim::World& world, const assets::BuildingTable& buildings, const AnimationClock& clock,
-                           const WorldView& view_in, const Viewport& viewport, const WorldLayers& layers,
+                           const WorldView& view, const Viewport& viewport, const WorldLayers& layers,
                            std::vector<DrawCommand>& commands) {
+    DrawListScratch scratch;
+    build_world_draw_list(world, buildings, clock, view, viewport, layers, commands, scratch);
+}
+
+void build_world_draw_list(const sim::World& world, const assets::BuildingTable& buildings, const AnimationClock& clock,
+                           const WorldView& view_in, const Viewport& viewport, const WorldLayers& layers,
+                           std::vector<DrawCommand>& commands, DrawListScratch& scratch) {
     const WorldView view = fit_view(view_in, world);
     const SpriteExtent& extent = layers.extent;
     commands.clear();
@@ -916,7 +923,8 @@ void build_world_draw_list(const sim::World& world, const assets::BuildingTable&
     // Figures of the visible rows (ships, building flags, land figures), sorted by row and within
     // a row by depth, as the original sorts its one list by Y (0x00452190); equal depths keep this
     // order (the original's radix sort leaves them in an order that depends on the other keys).
-    std::vector<FigureSprites> figures;
+    std::vector<FigureSprites>& figures = scratch.figures;
+    figures.clear();
     const auto add_figure = [&](const FigureSprites& f) {
         if (f.row >= d_begin && f.row <= d_end) {
             figures.push_back(f);
@@ -973,15 +981,22 @@ void build_world_draw_list(const sim::World& world, const assets::BuildingTable&
     std::size_t next_figure = 0;
 
     // Ownership view: a translucent diamond on the tile surface, after the flat pass of the row.
-    std::vector<DrawCommand> overlays;
+    std::vector<DrawCommand>& overlays = scratch.overlays;
+    overlays.clear();
     // Marked tiles go on top of everything, so buildings do not hide them; hatched ones lie on the
-    // ground like the ownership view.
-    std::unordered_map<std::uint64_t, TileMark> marks;
-    std::vector<DrawCommand> marked;
+    // ground like the ownership view. A tile marked twice shows its last mark.
+    const auto mark_key = [](std::uint16_t island, std::uint16_t x, std::uint16_t y) {
+        return (std::uint64_t{island} << 32U) | (std::uint64_t{x} << 16U) | y;
+    };
+    auto& marks = scratch.marks;
+    marks.clear();
+    std::vector<DrawCommand>& marked = scratch.marked;
+    marked.clear();
     if (layers.tile_marks != nullptr) {
         for (const TileMark& m : *layers.tile_marks) {
-            marks[(std::uint64_t{m.island} << 32U) | (std::uint64_t{m.x} << 16U) | m.y] = m;
+            marks.emplace_back(mark_key(m.island, m.x, m.y), m);
         }
+        std::stable_sort(marks.begin(), marks.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
     }
     const auto add_overlay = [&](const sim::MapCell& cell, std::int32_t sx, std::int32_t row_bottom,
                                  std::uint16_t island, std::uint16_t lx, std::uint16_t ly) {
@@ -995,9 +1010,11 @@ void build_world_draw_list(const sim::World& world, const assets::BuildingTable&
                                            static_cast<std::uint8_t>(tw)});
         }
         if (!marks.empty()) {
-            if (const auto it = marks.find((std::uint64_t{island} << 32U) | (std::uint64_t{lx} << 16U) | ly);
-                it != marks.end()) {
-                const TileMark& m = it->second;
+            const std::uint64_t key = mark_key(island, lx, ly);
+            if (const auto it = std::upper_bound(marks.begin(), marks.end(), key,
+                                                 [](std::uint64_t k, const auto& e) { return k < e.first; });
+                it != marks.begin() && std::prev(it)->first == key) {
+                const TileMark& m = std::prev(it)->second;
                 (m.hatched ? overlays : marked)
                     .push_back(DrawCommand{m.hatched ? DrawCommand::kOverlayHatch : DrawCommand::kOverlayDiamond, sx,
                                            row_bottom - elevation, m.color, static_cast<std::uint8_t>(tw)});
@@ -1007,7 +1024,8 @@ void build_world_draw_list(const sim::World& world, const assets::BuildingTable&
     // The border of a catchment circle: the edges of its tiles towards tiles outside, on top of
     // everything, so neither buildings nor the island's edge cut it off.
     const bool circle = layers.lighting != nullptr && layers.lighting->outlined();
-    std::vector<DrawCommand> outline;
+    std::vector<DrawCommand>& outline = scratch.outline;
+    outline.clear();
     const auto add_outline = [&](std::int32_t vx, std::int32_t vy, std::uint32_t wx, std::uint32_t wy, std::int32_t sx,
                                  std::int32_t row_bottom, const sim::MapCell* cell) {
         if (!layers.lighting->in_circle(wx, wy)) {

@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
@@ -308,6 +309,16 @@ struct FigureSprites {
     std::uint8_t count = 0;
 };
 
+/// Working memory of build_world_draw_list. A caller that draws every frame keeps one, so that a
+/// frame allocates nothing once its containers have grown.
+struct DrawListScratch {
+    std::vector<FigureSprites> figures;
+    std::vector<DrawCommand> overlays;
+    std::vector<std::pair<std::uint64_t, TileMark>> marks;  ///< by island and tile
+    std::vector<DrawCommand> marked;
+    std::vector<DrawCommand> outline;
+};
+
 /// Shadow and body of a land figure (exposed for tests). The original keeps every figure at
 /// Y = y + Posoffs[1] * w/64 (0x00451CC5), which is also its depth; the height z lifts body and
 /// shadow by trunc(z * w/2) without changing Y. Body: Gfx + animation (0x0044F8F0), centred, bottom
@@ -327,6 +338,10 @@ struct FigureSprites {
 void build_world_draw_list(const sim::World& world, const assets::BuildingTable& buildings, const AnimationClock& clock,
                            const WorldView& view, const Viewport& viewport, const WorldLayers& layers,
                            std::vector<DrawCommand>& out);
+/// Same, with working memory kept by the caller.
+void build_world_draw_list(const sim::World& world, const assets::BuildingTable& buildings, const AnimationClock& clock,
+                           const WorldView& view, const Viewport& viewport, const WorldLayers& layers,
+                           std::vector<DrawCommand>& out, DrawListScratch& scratch);
 
 /// Sprite, position and flag of one ship (exposed for tests).
 struct ShipSprites {

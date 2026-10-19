@@ -422,6 +422,7 @@ private:
     render::AnimationClock m_clock;
     render::ProductionPhases m_production_phases;  ///< animation phases, presentation only
     std::vector<render::DrawCommand> m_commands;   ///< reused every frame
+    render::DrawListScratch m_draw_scratch;        ///< reused every frame
 
     bool m_running = true;
     bool m_show_owners = false;  ///< ownership overlay (key O)

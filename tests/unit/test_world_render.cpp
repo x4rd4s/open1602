@@ -264,6 +264,63 @@ TEST_CASE("world renderer: a hatched tile lies on the ground, under what stands 
     CHECK(it->overlay());
 }
 
+TEST_CASE("world renderer: a tile marked twice shows its last mark; kept working memory changes nothing") {
+    const auto table = make_table();
+    sim::World world;
+    auto island = make_island(10, 20, 2, 2);
+    REQUIRE(island.map.place(*table.by_id(20100), 0, 0, 0, 0).ok());
+    REQUIRE(world.add_island(std::move(island)).ok());
+    const render::AnimationClock clock(table);
+    render::WorldView view;
+    view.zoom = render::Zoom::Small;
+    render::Viewport all;
+    render::world_pixel_size(view, all.width, all.height);
+    render::TileMark hatched{0, 0, 0, render::kDragHatch};
+    hatched.hatched = true;
+    const std::vector<render::TileMark> marks{{0, 1, 0, assets::Rgba{220, 30, 30, 140}},
+                                              {0, 0, 1, assets::Rgba{30, 30, 220, 140}},
+                                              hatched,
+                                              {0, 1, 0, assets::Rgba{30, 220, 30, 140}}};
+    render::WorldLayers layers;
+    layers.extent = render::SpriteExtent{16, 8};
+    layers.tile_marks = &marks;
+    std::vector<render::DrawCommand> fresh;
+    render::build_world_draw_list(world, table, clock, view, all, layers, fresh);
+    REQUIRE(fresh.size() == std::size_t{500} * 350 + 3);
+    CHECK(std::count_if(fresh.begin(), fresh.end(), [](const render::DrawCommand& c) {
+              return c.sprite == render::DrawCommand::kOverlayHatch;
+          }) == 1);
+    std::set<std::uint8_t> reds;
+    for (std::size_t i = fresh.size() - 2; i < fresh.size(); ++i) {
+        CHECK(fresh[i].sprite == render::DrawCommand::kOverlayDiamond);
+        reds.insert(fresh[i].tint.r);
+    }
+    CHECK((reds == std::set<std::uint8_t>{30}));  // green and blue, not the first red
+
+    // The same lists with working memory kept from a frame with other marks and from itself.
+    const auto same = [](const std::vector<render::DrawCommand>& a, const std::vector<render::DrawCommand>& b) {
+        return std::equal(a.begin(), a.end(), b.begin(), b.end(),
+                          [](const render::DrawCommand& x, const render::DrawCommand& y) {
+                              return x.sprite == y.sprite && x.x == y.x && x.y == y.y && x.tint == y.tint &&
+                                     x.tint_size == y.tint_size && x.mode == y.mode && x.cut_bottom == y.cut_bottom &&
+                                     x.edges == y.edges;
+                          });
+    };
+    render::DrawListScratch scratch;
+    std::vector<render::DrawCommand> kept;
+    const std::vector<render::TileMark> other{{0, 1, 1, assets::Rgba{1, 2, 3, 4}}};
+    layers.tile_marks = &other;
+    render::build_world_draw_list(world, table, clock, view, all, layers, kept, scratch);
+    std::vector<render::DrawCommand> other_fresh;
+    render::build_world_draw_list(world, table, clock, view, all, layers, other_fresh);
+    CHECK(same(kept, other_fresh));
+    layers.tile_marks = &marks;
+    for (int frame = 0; frame < 2; ++frame) {
+        render::build_world_draw_list(world, table, clock, view, all, layers, kept, scratch);
+        CHECK(same(kept, fresh));
+    }
+}
+
 TEST_CASE("world renderer: a catchment circle lights the land, its border is dashed over land and sea") {
     const auto table = make_table();
     sim::World world;

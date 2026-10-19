@@ -1192,7 +1192,7 @@ void MapViewer::render() {
             }
         }
         render::build_world_draw_list(m_state->world, m_buildings, m_clock, m_camera.view(), m_camera.viewport(),
-                                      layers, m_commands);
+                                      layers, m_commands, m_draw_scratch);
         preview.restore();
         std::int32_t ox = 0;
         std::int32_t oy = 0;
