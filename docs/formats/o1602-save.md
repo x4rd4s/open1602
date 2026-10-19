@@ -9,7 +9,8 @@ computer opponents.
 
 In Open1602: `engine/sim/include/o1602/sim/save_game.hpp` (`write_game`, `read_game`, `save_info`).
 The format shares its sections with the extra chunk of exported `.GAM` files
-([o1602-chunk.md](o1602-chunk.md)), `engine/sim/src/savegame_extension.cpp`.
+([o1602-chunk.md](o1602-chunk.md)); they are written and read in `engine/sim/src/save/` (see
+[In the code](#in-the-code)).
 
 Open1602 still reads the files of the original (`.SZS`, `.SZM`, `.GAM`). A game can be
 exported as `.GAM` as long as it fits within the limits of the original ([savegame-writer.md](../re/savegame-writer.md)).
@@ -65,7 +66,7 @@ see [o1602-chunk.md](o1602-chunk.md) for the rules.
 The writer emits the sections in this order: `META`, `MAPW`, `RULE`, `WRLD`, `WRL2`, `ISLE`, `PLAY`,
 `PSTA`, `MISN`, `CITY`, `CSTA`, `SCOR`, `PROD`, `HOUS`, `GROW`, `COST`, `ANIM`, `DISA`, `VOLC`, `FLEE`,
 `EPOC`, `ARMY`, `DIPL`, `XPLR`, `QUEU`, `STNC`, `ORIG` (only for a game that came from a file of the
-original) and `SIMU` (`engine/sim/src/savegame_extension.cpp`, `encode_sections`). `SHIP` and `SOLD`,
+original) and `SIMU` (`engine/sim/src/save/sections.cpp`, `encode_sections`). `SHIP` and `SOLD`,
 the lists of older versions, are only read. The details of the sections from `RULE` onwards are in
 [o1602-chunk.md](o1602-chunk.md).
 
@@ -92,7 +93,27 @@ makes the savegame unreadable (instead of wrong buildings).
   (`tests/unit/test_save_fuzz.cpp`) changes the sections of a saved game at random (bits, bytes, counts,
   sizes, sections cut, left out, doubled or moved) with a correct checksum: every such file loads
   nothing or a world that validates, saves again and runs.
+- **Fixed bytes:** `tests/unit/test_save_format.cpp` writes a world with every saved field set to a
+  value of its own, as the own savegame and as the chunk of a `.GAM` (`ISLE` and `VOLC` in version 1
+  and 2), and compares every section with its recorded size and CRC-32; reading those bytes and
+  writing them again gives the same bytes. A change of a section's bytes needs a new version of it.
 - **Small:** Merlin04 (130 minutes, two cities) needs 248 KB instead of 885 KB as a `.GAM` with the extra chunk.
+
+## In the code
+
+`engine/sim/src/save/` holds the sections, a file per group: `map.cpp` (`MAPW`, `TILE`), `world.cpp`
+(`RULE`, `WRLD`, `EPOC`), `islands.cpp` (`ISLE`, `XPLR`), `players.cpp` (`PLAY`, `PSTA`, `MISN`,
+`SCOR`, `DIPL`), `cities.cpp` (`CITY`, `CSTA`, `PROD`, `HOUS`, `GROW`, `COST`), `ships.cpp` (`SHIP`,
+`FLEE`), `army.cpp` (`SOLD`, `ARMY`), `nature.cpp` (`ANIM`, `DISA`, `VOLC`) and `orders.cpp` (`QUEU`,
+`STNC`). Each record is described once, as a function `io_...(a, record)` that writes it with a
+`save::Writer` and reads it with a `save::Reader` (`archive.hpp`); the method names give the width in
+the file (`a.u16(x)`). What only the reader does (checks, values rebuilt from others) stands in an
+`if constexpr (A::kReading)` block in the description. Written by hand on each side are only `RULE`
+(keys and values; the reader skips unknown keys and clamps), `META` (the reader takes only the
+fingerprint), the old lists `SHIP` (holds that are filled only) and `SOLD` (read only), and the raw
+bytes of `ORIG` and `SIMU`. `sections.cpp` puts the sections together (order, versions, flags) and
+reads them all; `apply.cpp` checks what was read against the world and applies it.
+`savegame_extension.cpp` wraps them as the chunk of a `.GAM`, `save_game.cpp` as the own file.
 
 ## In the viewer
 

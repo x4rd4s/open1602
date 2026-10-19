@@ -30,6 +30,17 @@ add_library(o1602_sim
     src/pathfinding.cpp
     src/pirates.cpp
     src/explore.cpp
+    src/save/apply.cpp
+    src/save/army.cpp
+    src/save/cities.cpp
+    src/save/islands.cpp
+    src/save/map.cpp
+    src/save/nature.cpp
+    src/save/orders.cpp
+    src/save/players.cpp
+    src/save/sections.cpp
+    src/save/ships.cpp
+    src/save/world.cpp
     src/savegame_extension.cpp
     src/score.cpp
     src/save_game.cpp

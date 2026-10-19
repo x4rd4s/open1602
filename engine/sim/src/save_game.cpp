@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <array>
 
-#include "save_sections.hpp"
+#include "save/sections.hpp"
 
 #include "o1602/core/byte_reader.hpp"
 #include "o1602/core/byte_writer.hpp"
@@ -73,7 +73,7 @@ bool is_open1602_save(std::span<const std::uint8_t> bytes) noexcept {
 core::Result<core::Bytes> write_game(const World& world, const assets::BuildingTable& buildings,
                                      const Simulation* simulation, const SaveOptions& options) {
     const core::Bytes sections =
-        detail::encode_sections(world, buildings, simulation, detail::TileMode::Full, std::span<const std::uint8_t>{});
+        save::encode_sections(world, buildings, simulation, save::TileMode::Full, std::span<const std::uint8_t>{});
     std::uint16_t flags = 0;
     core::Bytes stored;
     if (options.compress && core::has_zlib()) {
@@ -131,12 +131,12 @@ core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets:
     if (core::crc32(sections) != h->crc) {
         return make_error(ErrorCode::InvalidFormat, "savegame: damaged (checksum)");
     }
-    auto world = detail::world_from_sections(sections, buildings, warnings);
+    auto world = save::world_from_sections(sections, buildings, warnings);
     if (!world) {
         return world.error();
     }
     // world_from_sections already reported the sections it skipped.
-    if (auto status = detail::apply_sections(*world, buildings, sections, nullptr); !status) {
+    if (auto status = save::apply_sections(*world, buildings, sections, nullptr); !status) {
         return status.error();
     }
     if (auto status = validate(*world); !status) {

@@ -18,7 +18,7 @@ namespace o1602::sim {
 
 class Simulation;
 
-namespace detail {
+namespace save {
 
 /// How the tiles are saved: all of them with the world's size (own savegame), or only those that
 /// loading the original's chunks in front (`before`) would not give back (chunk in a .GAM).
@@ -38,5 +38,5 @@ enum class TileMode : std::uint8_t { Full, Differences };
 core::Status apply_sections(World& world, const assets::BuildingTable& buildings,
                             std::span<const std::uint8_t> sections, std::vector<std::string>* warnings);
 
-}  // namespace detail
+}  // namespace save
 }  // namespace o1602::sim

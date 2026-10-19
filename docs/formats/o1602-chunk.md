@@ -10,7 +10,8 @@ with an additional chunk `O1602` after `WIFF`. The original does not know the na
 it; if it saves the game again, the chunk is dropped. Open1602 reads it after the chunks of the original and
 uses it to replace whatever it contains.
 
-In Open1602: `engine/sim/include/o1602/sim/savegame_extension.hpp`.
+In Open1602: `engine/sim/include/o1602/sim/savegame_extension.hpp`; the sections are written and read
+in `engine/sim/src/save/` ([o1602-save.md](o1602-save.md#in-the-code)).
 
 ## What it contains and why
 

@@ -22,6 +22,8 @@ Game systems: `construction`, `drag_path`, `production`, `production_cycle`, `lo
 (the numbers of the original's data from `assets/game_data.hpp` in this namespace).
 
 New games and saving: `new_game`, `world_plan`, `world_generator`; `save_game` (the file of the own
-format `.o1602`: header, zlib, CRC-32), `savegame_extension` (its sections, which the `O1602` chunk of
-an exported `.GAM` shares) with `state_io` (bounds-checked reading and writing of the state),
+format `.o1602`: header, zlib, CRC-32), `savegame_extension` (the `O1602` chunk of an exported `.GAM`),
+both made of the sections in `src/save/` (one `io_...` description per record that writes and reads
+it, a file per group of sections; see [o1602-save.md](../../docs/formats/o1602-save.md#in-the-code)),
+with `state_io` (bounds-checked reading and writing of the state),
 `savegame_writer` (export as `.GAM` for the original), `validate` (the last check of every load).
