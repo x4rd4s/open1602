@@ -294,7 +294,7 @@ public:
         o.point = sim::Target::spot(static_cast<std::uint32_t>(s->cell_x()), static_cast<std::uint32_t>(s->cell_y()));
         out.emplace_back(o);
         o.index = 1;
-        o.point = sim::Target::spot(2 * x, 2 * y);
+        o.point = sim::Target::tile_spot(x, y);
         out.emplace_back(o);
         o.op = sim::SoldierCommand::Op::Patrol;
         o.on = true;

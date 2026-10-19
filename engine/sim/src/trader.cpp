@@ -20,7 +20,6 @@ constexpr std::uint32_t kMaxHeld = 50 * kTon;     // per ware
 constexpr std::uint32_t kMaxBuy = 10 * kTon;      // per ware and visit
 constexpr std::uint8_t kAgeLimit = 5;
 constexpr std::size_t kCandidates = 12;
-constexpr std::uint32_t kNoTraderFlag = 1U << 6;  // TIMERS +0xA8 bit 6
 
 TraderGood* good_of(Ship& ship, std::uint8_t ware) {
     if (ship.trader_goods.size() <= ware) {
@@ -281,9 +280,8 @@ void Fleet::trader_restock(Ship& ship, std::uint32_t dt_ms) {
         ship.trader_ore_ms += dt_ms;
         if (ship.trader_ore_ms >= kRestockMs) {
             ship.trader_ore_ms = 0;
-            // Settings bit 4, set for good when an iron mine is built (0x00481450).
-            constexpr std::uint32_t kIronMinedFlag = 1U << 4;
-            bool iron_mined = (m_world->game_settings().flags & kIronMinedFlag) != 0;
+            // Set for good when an iron mine is built (0x00481450).
+            bool iron_mined = (m_world->game_settings().flags & World::GameSettings::kIronMined) != 0;
             for (const Production& p : m_world->productions()) {
                 if (iron_mined) {
                     break;
@@ -300,7 +298,7 @@ void Fleet::trader_restock(Ship& ship, std::uint32_t dt_ms) {
                 if (b != nullptr && b->ware == ware::kOre && b->prod_kind == prod::kMine) {
                     iron_mined = true;
                     World::GameSettings settings = m_world->game_settings();
-                    settings.flags |= kIronMinedFlag;
+                    settings.flags |= World::GameSettings::kIronMined;
                     m_world->set_game_settings(settings);
                 }
             }
@@ -404,7 +402,7 @@ void Fleet::trader_tick(std::uint32_t dt_ms) {
             }
         }
     }
-    if ((m_world->game_settings().flags & kNoTraderFlag) != 0) {
+    if ((m_world->game_settings().flags & World::GameSettings::kNoTrader) != 0) {
         return;
     }
     // One trader for every three Kontors (none with fewer than two), at most one new per pass.

@@ -32,14 +32,15 @@ constexpr std::size_t kEvents = 3;
 constexpr std::int32_t kGfxParchment = 17;
 constexpr std::int32_t kGfxCompass = 18;
 constexpr std::int32_t kGfxLeiste = 253;
-constexpr std::int32_t kLeistArt = 101001;   // the status bar's art (drawn widened instead)
-constexpr std::int32_t kLeistTextX = 750;    // its line ends here, 18 before the art's right edge
-constexpr std::int32_t kTutorArt = 111001;   // the mission window's art (drawn widened instead)
-constexpr std::int32_t kGfxTutor = 645;      // GFXTUTOR of TOOLS.INC
-constexpr std::int32_t kTutorText = 110002;  // its flowing text
-constexpr std::int32_t kDesignViewW = 768;   // game view, status bar and mission window at 1024 x 768
-constexpr std::uint64_t kEventMs = 45'000;   // an icon stays this long (449 time units of 0x00430F20)
-constexpr std::uint64_t kMinimapMs = 500;    // the minimap texture is uploaded at most this often
+constexpr std::int32_t kLeisteLastBanner = 4;  // its message icons have colours for banners 0..4, 12 apart
+constexpr std::int32_t kLeistArt = 101001;     // the status bar's art (drawn widened instead)
+constexpr std::int32_t kLeistTextX = 750;      // its line ends here, 18 before the art's right edge
+constexpr std::int32_t kTutorArt = 111001;     // the mission window's art (drawn widened instead)
+constexpr std::int32_t kGfxTutor = 645;        // GFXTUTOR of TOOLS.INC
+constexpr std::int32_t kTutorText = 110002;    // its flowing text
+constexpr std::int32_t kDesignViewW = 768;     // game view, status bar and mission window at 1024 x 768
+constexpr std::uint64_t kEventMs = 45'000;     // an icon stays this long (449 time units of 0x00430F20)
+constexpr std::uint64_t kMinimapMs = 500;      // the minimap texture is uploaded at most this often
 
 /// Help text line of [LEISTE] for the gadgets of the panel's head (in the order of the texts).
 std::optional<std::size_t> help_line(std::int32_t id) {
@@ -800,7 +801,7 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down)
     return action;
 }
 
-void Hud::message(std::uint16_t id, std::uint8_t banner, std::optional<std::pair<double, double>> tile,
+void Hud::message(std::uint16_t id, sim::BannerId banner, std::optional<std::pair<double, double>> tile,
                   std::uint64_t now_ms) {
     // Event_Post 0x00430D50: the same message at the same place only refreshes its time; a new one
     // pushes the oldest out.
@@ -917,7 +918,8 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
         const Event& e = m_events[i];
         const std::uint8_t type = event_type(e.id);
         if (type < 4) {
-            m_leist.set_graphic(id, kGfxLeiste + 1 + std::min<std::int32_t>(e.banner, 4) + type * 12, 6);
+            m_leist.set_graphic(id, kGfxLeiste + 1 + std::min<std::int32_t>(e.banner, kLeisteLastBanner) + type * 12,
+                                6);
         } else {
             m_leist.set_graphic(id, kGfxLeiste + 1 + 0x28 + type * 2, 1);
         }

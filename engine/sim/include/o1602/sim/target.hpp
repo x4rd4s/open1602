@@ -50,6 +50,8 @@ struct Target {
     [[nodiscard]] static Target spot(std::uint32_t x2, std::uint32_t y2) noexcept {
         return {Kind::Spot, 0, 0, x2, y2, 0, 0};
     }
+    /// The spot at the top corner of world tile `x`, `y` (spots are half tiles).
+    [[nodiscard]] static Target tile_spot(std::uint32_t x, std::uint32_t y) noexcept { return spot(2 * x, 2 * y); }
     [[nodiscard]] bool empty() const noexcept { return kind == Kind::None; }
     /// A unit that moves (its position is not fixed).
     [[nodiscard]] bool moving() const noexcept { return kind == Kind::Ship || kind == Kind::Soldier; }

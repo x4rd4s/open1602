@@ -84,7 +84,7 @@ public:
     std::optional<Action> mouse(std::int32_t x, std::int32_t y, bool down);
 
     /// A message for the local player (MELDUNG number) at a world tile, in the colour of `banner`.
-    void message(std::uint16_t id, std::uint8_t banner, std::optional<std::pair<double, double>> tile,
+    void message(std::uint16_t id, sim::BannerId banner, std::optional<std::pair<double, double>> tile,
                  std::uint64_t now_ms);
     /// What the resource bar at the top of the map shows (Hud_DrawResourceBar 0x0040D160): the
     /// player's money, and of the city under the mouse its tools, wood and bricks (own city) and
@@ -287,7 +287,7 @@ private:
 
     struct Event {
         std::uint16_t id = 0;
-        std::uint8_t banner = 0;
+        sim::BannerId banner = 0;
         std::optional<std::pair<double, double>> tile;
         std::uint64_t time_ms = 0;
     };

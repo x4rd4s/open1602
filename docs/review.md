@@ -174,7 +174,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Open |
 | UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Open |
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
-| UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Partly (#22: building kinds, production kinds, wares and the four-colour rule named; the banner count and half-tile coordinates remain) |
+| UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Open |
 | UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21: see BD-7) |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Open |
@@ -247,10 +247,10 @@ had no slot to join, because every other start player is a computer. Those slots
 | SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 3 |
 | IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 2 |
 | AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 9 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 0 | 2 | 9 |
 | MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 3 |
 | BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 2 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 2 | 2 | 7 | 24 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 2 | 6 | 24 |
 
 ## Open work, in order
 
@@ -285,11 +285,10 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #
 1. MP-17 (S): score curves and the monument rule into `Rules` or data.
 2. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
    format. The load-side refusal from #19 then becomes a writer-side check.
-3. UI-14 rest (S): the banner count from `BannerTable`, the half-tile coordinates in one helper,
-   and the settings-flag bits left as literals in island_events, trader, volcanoes and ai_planner.
 (Fixed in #22: IO-12 the numbers live in `assets/game_data.hpp` and sim re-exports them; SC-9 and
 AU10 the simulation's literals; IO-10 saturating casts and the GAD size limit, documented in
-`docs/modding/data-limits.md`. MP-11 was fixed in #20.)
+`docs/modding/data-limits.md`. Fixed in #25: UI-14 the game-setting bits, the message icons' banner
+limit and tile spots named. MP-11 was fixed in #20.)
 
 **4. Performance in long sessions**
 1. AU7 (M): spatial buckets for the crowd and blocked checks, and a tower index for combat.

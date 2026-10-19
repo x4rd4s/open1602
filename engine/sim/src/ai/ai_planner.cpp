@@ -1647,7 +1647,7 @@ bool Engine::need_castle(AiPlayer& p) {
     // 0x00420720: a castle in the home city while the computer trails the leading human.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
-    if (c == nullptr || r == nullptr || (m_world.game_settings().flags & 0x200U) != 0) {
+    if (c == nullptr || r == nullptr || (m_world.game_settings().flags & World::GameSettings::kNoMilitary) != 0) {
         return false;
     }
     if (!(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
@@ -1792,7 +1792,7 @@ bool Engine::iron_tools(AiPlayer& p) {
 
 bool Engine::weapons(AiPlayer& p) {
     // 0x00422610: the weapon workshops in the home city.
-    if ((m_world.game_settings().flags & 0x200U) != 0 ||
+    if ((m_world.game_settings().flags & World::GameSettings::kNoMilitary) != 0 ||
         !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
         return false;
     }

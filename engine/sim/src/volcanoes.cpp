@@ -13,14 +13,13 @@ namespace {
 
 constexpr std::uint64_t kTenthMs = 100;  // the original counts game time in 1/10 s
 constexpr std::uint64_t kUsPerMs = 1000;
-constexpr std::uint64_t kLegUs = 500'000;          // a flight leg: 25 ticks of 20 ms
-constexpr std::uint64_t kTenthUs = 100'000;        // the flight formula counts in 1/10 s
-constexpr std::uint32_t kNoVolcanoFlag = 1U << 8;  // game settings: no volcanoes
-constexpr std::uint32_t kSeedRange = 0x8000;       // rand() % 0xFFFF with RAND_MAX 0x7FFF
-constexpr std::int64_t kOne = 1 << 16;             // fixed point of the lava: 1/65536
-constexpr std::int64_t kLaunchHeight = 258'867;    // 3.95 half tile widths over the mountain centre
-constexpr std::int64_t kHalfGravity10 = 321'126;   // 4.9 * 65536: g/2 of the throw
-constexpr std::int64_t kGroundPerPixel = 1835;     // 0.028 * 65536: Posoffs to height
+constexpr std::uint64_t kLegUs = 500'000;         // a flight leg: 25 ticks of 20 ms
+constexpr std::uint64_t kTenthUs = 100'000;       // the flight formula counts in 1/10 s
+constexpr std::uint32_t kSeedRange = 0x8000;      // rand() % 0xFFFF with RAND_MAX 0x7FFF
+constexpr std::int64_t kOne = 1 << 16;            // fixed point of the lava: 1/65536
+constexpr std::int64_t kLaunchHeight = 258'867;   // 3.95 half tile widths over the mountain centre
+constexpr std::int64_t kHalfGravity10 = 321'126;  // 4.9 * 65536: g/2 of the throw
+constexpr std::int64_t kGroundPerPixel = 1835;    // 0.028 * 65536: Posoffs to height
 constexpr std::uint8_t kLastStep = kLavaThrows - 1;
 
 /// Earliest next eruption by the craters in the world (0x004692F0, time in 1/10 s): linear from
@@ -339,7 +338,7 @@ bool volcanoes_enabled(const World& world, const Rules& rules) noexcept {
         case Volcanoes::Game:
             break;
     }
-    return (world.game_settings().flags & kNoVolcanoFlag) == 0;
+    return (world.game_settings().flags & World::GameSettings::kNoVolcanoes) == 0;
 }
 
 void roll_eruptions(World& world, const Rules& rules, std::vector<VolcanoEvent>* events) {

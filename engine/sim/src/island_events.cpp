@@ -14,8 +14,7 @@ constexpr std::uint64_t kTenth = 100;                     // the original counts
 constexpr std::uint64_t kDroughtMs = 6'000 * kTenth;      // 10 minutes
 constexpr std::uint64_t kLongDroughtMs = 9'000 * kTenth;  // 15 minutes on "hard"
 constexpr std::uint64_t kHalfHourTenths = 18'000;
-constexpr std::uint32_t kNoDroughtFlag = 1U << 2;  // game settings: no droughts
-constexpr std::uint8_t kWeakest = 12;              // weaker droughts are over
+constexpr std::uint8_t kWeakest = 12;  // weaker droughts are over
 
 /// The drought tables (0x0049AD78 and the bytes before it): rows by difficulty, a drought where
 /// the bit of the index is set. Difficulty 1 only meets one stray byte before the table (S-043).
@@ -165,7 +164,7 @@ std::uint8_t drought_level(const World& world, const Rules& rules) noexcept {
             break;
     }
     const World::GameSettings& s = world.game_settings();
-    if ((s.flags & kNoDroughtFlag) != 0) {
+    if ((s.flags & World::GameSettings::kNoDroughts) != 0) {
         return 0;
     }
     return s.difficulty < kDroughtTable.size() ? s.difficulty : 3;

@@ -298,8 +298,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         if (self->m_hud) {
             // The icon in the colour of the player the message is about (a rival's new city).
             const sim::Player* p = self->m_state->world.player(about.value_or(self->m_local_player));
-            self->m_hud->message(message, p != nullptr ? static_cast<std::uint8_t>(std::min<int>(p->banner, 4)) : 0,
-                                 tile, platform::ticks_ms());
+            self->m_hud->message(message, p != nullptr ? p->banner : 0, tile, platform::ticks_ms());
         }
     });
     viewer->load_key_settings();
