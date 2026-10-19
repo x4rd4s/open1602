@@ -3,6 +3,8 @@
 // Open1602's own settings and savegame names in the user's data folder (never Game.dat, never the
 // installation): settings.cfg with the sounds of the panels MUSIK and ANNO, and saves/slots.cfg with
 // the names of the savegames of the panel DISK (the original has twelve, Open1602 any number).
+// Both files are UTF-8 (a byte order mark is passed over); the names are converted to and from the
+// Windows-1252 the game keeps them in. Files of older versions with Windows-1252 bytes still read.
 #pragma once
 
 #include <array>

@@ -5,6 +5,8 @@
 #include <cctype>
 #include <utility>
 
+#include "o1602/core/text.hpp"
+
 namespace o1602::ui {
 
 namespace {
@@ -230,7 +232,7 @@ std::optional<KeyChord> KeyBindings::parse_chord(std::string_view text, const Ke
 
 std::string KeyBindings::write_text(const KeyName& key_name, bool as_comments) const {
     std::string out =
-        "# Open1602: key bindings (ADR 0010). Lines: context action [number] = key\n"
+        "# Open1602: key bindings (ADR 0010), UTF-8. Lines: context action [number] = key\n"
         "# Context: general (always), building (while building), units (units selected).\n"
         "# An action listed here has only the keys of its lines; \"= none\" takes every key from it.\n"
         "# Actions that are missing keep their default. Keys: names like F, Space, PageUp, Keypad +,\n"
@@ -261,6 +263,7 @@ std::vector<std::string> KeyBindings::read_text(std::string_view text, const Key
     };
     std::vector<Seen> seen;
     std::size_t line_no = 0;
+    text = core::skip_utf8_bom(text);
     while (!text.empty()) {
         const std::size_t nl = text.find('\n');
         std::string_view line = text.substr(0, nl);

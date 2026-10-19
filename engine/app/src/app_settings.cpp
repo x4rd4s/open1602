@@ -55,6 +55,13 @@ void flags(std::string_view v, std::array<bool, 8>& out) {
     }
 }
 
+// The files are UTF-8; the names in them are kept in Windows-1252 like all typed text (the game's
+// fonts). A value that is not UTF-8 comes from an older version, which wrote the bytes as they
+// were: it is taken as Windows-1252.
+std::string from_file(std::string_view value) {
+    return core::is_utf8(value) ? core::utf8_to_cp1252(value) : std::string(value);
+}
+
 std::string flags_text(const std::array<bool, 8>& a) {
     std::string s;
     for (const bool b : a) {
@@ -69,7 +76,7 @@ std::string flags_text(const std::array<bool, 8>& a) {
 AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
     AppSettings s = defaults;
     bool songs_listed = false;
-    for_lines(text, [&](std::string_view line) {
+    for_lines(core::skip_utf8_bom(text), [&](std::string_view line) {
         if (line.empty() || line.front() == '#') {
             return;
         }
@@ -103,10 +110,10 @@ AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
         } else if (key == "language") {
             s.language = value.empty() ? std::string("auto") : std::string(value);
         } else if (key == "player_name") {
-            s.player_name = std::string(value);
+            s.player_name = from_file(value);
         } else if (key == "remembered_host") {
             if (!value.empty() && s.remembered_hosts.size() < AppSettings::kMaxHosts) {
-                s.remembered_hosts.emplace_back(value);
+                s.remembered_hosts.push_back(from_file(value));
             }
         } else if (key == "mission_window") {
             s.mission_window = flag(value, s.mission_window);
@@ -119,7 +126,7 @@ AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
 
 std::string write_settings(const AppSettings& s) {
     const audio::AudioSettings& a = s.audio;
-    std::string out = "# Open1602: settings (written by the game)\n";
+    std::string out = "# Open1602: settings (written by the game, UTF-8)\n";
     out += std::string("music = ") + (a.music ? "on" : "off") + "\n";
     out += std::string("effects = ") + (a.effects ? "on" : "off") + "\n";
     out += std::string("random_music = ") + (a.random_music ? "on" : "off") + "\n";
@@ -137,10 +144,10 @@ std::string write_settings(const AppSettings& s) {
         "# Whales, dolphins, krakens: on average one per screen of sea every this many seconds (original 5, 0 = off)\n";
     out += "sea_creatures_every = " + std::to_string(s.sea_creatures_every) + "\n";
     if (!s.player_name.empty()) {
-        out += "player_name = " + s.player_name + "\n";
+        out += "player_name = " + core::cp1252_to_utf8(s.player_name) + "\n";
     }
     for (const std::string& host : s.remembered_hosts) {
-        out += "remembered_host = " + host + "\n";
+        out += "remembered_host = " + core::cp1252_to_utf8(host) + "\n";
     }
     return out;
 }
@@ -169,7 +176,7 @@ void SaveSlots::set(std::size_t slot, std::string name, std::uint8_t human_playe
 
 SaveSlots parse_slots(std::string_view text) {
     SaveSlots slots;
-    for_lines(text, [&](std::string_view line) {
+    for_lines(core::skip_utf8_bom(text), [&](std::string_view line) {
         if (line.empty() || line.front() == '#') {
             return;
         }
@@ -183,17 +190,18 @@ SaveSlots parse_slots(std::string_view text) {
         if (slot < 0 || static_cast<std::size_t>(slot) >= SaveSlots::kMaxCount) {
             return;
         }
-        slots.set(static_cast<std::size_t>(slot), std::string(line.substr(b + 1)),
+        slots.set(static_cast<std::size_t>(slot), from_file(line.substr(b + 1)),
                   static_cast<std::uint8_t>(std::clamp(humans, 0, 255)));
     });
     return slots;
 }
 
 std::string write_slots(const SaveSlots& slots) {
-    std::string out = "# Open1602: savegame names (slot, humans, name)\n";
+    std::string out = "# Open1602: savegame names (slot, humans, name; UTF-8)\n";
     for (std::size_t i = 0; i < slots.size(); ++i) {
         if (!slots.names[i].empty()) {
-            out += std::to_string(i) + " " + std::to_string(slots.humans[i]) + " " + slots.names[i] + "\n";
+            out += std::to_string(i) + " " + std::to_string(slots.humans[i]) + " " +
+                   core::cp1252_to_utf8(slots.names[i]) + "\n";
         }
     }
     return out;

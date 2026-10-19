@@ -127,6 +127,23 @@ TEST_CASE("png: chunks carry the CRC-32 of core::crc32 (IEEE, as zlib's)") {
     CHECK(be32(png.size() - 4) == 0xAE426082U);  // the CRC every IEND chunk has
 }
 
+TEST_CASE("text: well-formed utf8 and the byte order mark") {
+    CHECK(core::is_utf8(""));
+    CHECK(core::is_utf8("plain"));
+    CHECK(core::is_utf8("J\xc3\xbcrgen"));      // ue
+    CHECK(core::is_utf8("\xe2\x82\xac"));       // euro sign
+    CHECK(core::is_utf8("\xf0\x9f\x8f\xb0"));   // U+1F3F0, four bytes
+    CHECK(!core::is_utf8("J\xfcrgen"));         // Windows-1252
+    CHECK(!core::is_utf8("\xc3"));              // cut short
+    CHECK(!core::is_utf8("\x80"));              // a stray continuation byte
+    CHECK(!core::is_utf8("\xc0\xaf"));          // overlong
+    CHECK(!core::is_utf8("\xed\xa0\x80"));      // a surrogate
+    CHECK(!core::is_utf8("\xf4\x90\x80\x80"));  // beyond U+10FFFF
+    CHECK(core::skip_utf8_bom("\xef\xbb\xbfx = 1") == "x = 1");
+    CHECK(core::skip_utf8_bom("x = 1") == "x = 1");
+    CHECK(core::skip_utf8_bom("\xef\xbb") == "\xef\xbb");
+}
+
 TEST_CASE("palette: reads 256 RGBX entries") {
     std::vector<std::uint8_t> payload;
     for (int i = 0; i < 256; ++i) {

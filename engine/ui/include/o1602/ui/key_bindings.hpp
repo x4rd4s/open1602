@@ -141,9 +141,10 @@ public:
     [[nodiscard]] static std::string chord_text(const KeyChord& chord, const KeyName& key_name);
     [[nodiscard]] static std::optional<KeyChord> parse_chord(std::string_view text, const KeyFromName& key_from_name);
 
-    /// The settings file (keys.cfg): one line per key, "context action [number] = keys". An action
-    /// that appears there has only the keys of its lines in that context ("= none": no key); the
-    /// others keep their defaults, so a file of an older version misses nothing new.
+    /// The settings file (keys.cfg, UTF-8 like the key names): one line per key, "context action
+    /// [number] = keys". An action that appears there has only the keys of its lines in that
+    /// context ("= none": no key); the others keep their defaults, so a file of an older version
+    /// misses nothing new.
     /// `as_comments`: every line behind "#", the defaults to look up and change one by one.
     [[nodiscard]] std::string write_text(const KeyName& key_name, bool as_comments = false) const;
     /// Applies a settings file; returns what it could not read (line by line), the rest counts.

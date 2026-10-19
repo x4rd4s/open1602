@@ -433,6 +433,10 @@ TEST_CASE("ui: key bindings: the settings file changes only the actions it names
     CHECK(copy.read_text(text, from_name).empty());
     CHECK(copy.all().size() == keys.all().size());
     CHECK(copy.find(ui::KeyContext::Units, {'f'})->action == ui::KeyAction::AttackMove);
+    // Saved by an editor that puts a byte order mark first: the same.
+    ui::KeyBindings with_bom;
+    CHECK(with_bom.read_text("\xEF\xBB\xBF" + text, from_name).empty());
+    CHECK(with_bom.all().size() == keys.all().size());
     // As comments it changes nothing.
     ui::KeyBindings same = keys;
     CHECK(same.read_text(keys.write_text(name, true), from_name).empty());
