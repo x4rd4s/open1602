@@ -94,11 +94,11 @@ rest stays open, as noted.
 | SC-7 | Low | German fallback player names in the sim | `sim/src/new_game.cpp` | Fixed #20 |
 | SC-8 | Low | `refusal_name()` English text is shown as build status | `sim/src/construction.cpp` | Fixed #20 |
 | SC-9 | Low | Leftover magic numbers and local copies of `game_data.hpp` constants | `sim/src/production_cycle.cpp`, `drag_path.cpp`, others | Fixed #22 |
-| SC-10 | Low | `load_world` is one function of about 515 lines | `sim/src/world.cpp` | Open |
+| SC-10 | Low | `load_world` is one function of about 515 lines | `sim/src/world.cpp` | Fixed #29 (`load_world` calls about 20 documented stages in order) |
 | SC-11 | Low | `find_case_insensitive` resolves `..` and absolute paths | `core/src/file.cpp` | Fixed #19 |
 | SC-12 | Low (uncertain) | An in-place upgrade keeps the old `Production::rate`; `raw` can underflow | `sim/src/production_cycle.cpp` | Fixed #20 |
 | SC-13 | Low | Crater and deer spot coordinates are `uint8_t` in the runtime model | `sim/include/o1602/sim/world.hpp` | Fixed #28 (16-bit in the runtime model and in the own format's section version 2; the `.GAM` writer refuses islands wider than 255 tiles) |
-| SC-14 | Low | Small per-call costs: `state_hash()` serializes the game, linear city lookups, `vector<bool>` in `PathFinder` | `sim/src/simulation.cpp`, `consumption.cpp` | Open |
+| SC-14 | Low | Small per-call costs: `state_hash()` serializes the game, linear city lookups, `vector<bool>` in `PathFinder` | `sim/src/simulation.cpp`, `consumption.cpp` | Won't fix (measured in #29: `state_hash` runs only every few frames in multiplayer, the city lookups cost about 0.2 ms every 10 s, and bytes instead of `vector<bool>` gave no wall-time gain) |
 
 For SC-7, the identifiers "Trader4", "Pirat5", "Native6" and "Endlosspiel" stay as they are. They
 are the original's internal names, not player-facing text. For SC-3, the multiplayer review found
@@ -127,7 +127,7 @@ and localized names are part of the sim state (see UI-2).
 | IO-10 | Low | COD and mod data: `ObjFill` blow-up, unbounded `Nummer`, `Size` wrap, double-to-int casts, GAD include size | `assets/src/cod_parser.cpp`, `building_table.cpp` | Fixed #22 (`Size`, `Nummer`, `ObjFill` in #19; saturating casts, the GAD size limit and docs/modding/data-limits.md in #22) |
 | IO-11 | Low | `find_case_insensitive` resolves `..` (same as SC-11) | `core/src/file.cpp` | Fixed #19 |
 | IO-12 | Low | Building and production kind numbers are duplicated in assets and sim | `assets/src/building_table.cpp` | Fixed #22 |
-| IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Open |
+| IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Partly #29 (sections of the wrong size are refused; the PNG writer uses `core::crc32`; per-section files with symmetric `io()` remain) |
 | IO-14 | Low | Load and save error messages are English text inside localized notices | `app/src/map_input.cpp`, `map_viewer.cpp` | Fixed #20 |
 | IO-15 | Low | Stale format docs: limits, section table, string encoding | `docs/formats/o1602-save.md`, `o1602-chunk.md` | Fixed #26 |
 
@@ -141,8 +141,8 @@ and localized names are part of the sim state (see UI-2).
 | AU4 | Medium | Shipyards never set `fetching`, so they send a new pack donkey every cycle | `sim/src/shipyards.cpp` | Fixed #19 |
 | AU5 | Medium | `Fleet::load` takes `m_yard_ms` and `m_trader_ms` unbounded, so a crafted save can stall the game | `sim/src/ships.cpp` | Fixed #19 |
 | AU6 | Medium | Ships from original files keep 8 holds; about ten code paths ignore the type's hold count | `sim/src/world.cpp`, `ships.cpp`, `castles.cpp` | Fixed #21 |
-| AU7 | Low | O(n) scans per soldier run and per combat candidate | `sim/src/soldiers.cpp`, `combat.cpp` | Open |
-| AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Open |
+| AU7 | Low | O(n) scans per soldier run and per combat candidate | `sim/src/soldiers.cpp`, `combat.cpp` | Fixed #29 (soldiers in 16 x 16 squares for the crowd and blocked checks: -25% instructions in a 2,000-unit battle; a tower index measured no gain and was left out) |
+| AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Won't fix (measured in #29: about 0.1% of a large battle's instructions; the path search itself dominates) |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Open |
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
 | AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Open |
@@ -167,13 +167,13 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-4 | Low | `replace_world` rebuilds the simulation in place and misses per-game state | `app/src/map_viewer.cpp` | Fixed #24 (`GameState` built whole, then swapped; out of memory keeps the old game) |
 | UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Partly (#24: `GameState` built whole and swapped in; #28: `CommandSink` is the only path to `Simulation::submit`) |
 | UI-6 | Low | The window title receives Windows-1252 bytes, but SDL expects UTF-8 | `app/src/map_viewer.cpp` | Fixed #20 |
-| UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Open |
-| UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Open |
-| UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Open |
+| UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Partly #29 (a render device reset rebuilds all textures; a lost device is only logged) |
+| UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Fixed #29 (the pixel scale follows display-scale changes, a Ctrl +/- offset is kept) |
+| UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Fixed #29 (LRU text cache, sorted soldier index, reused draw-list containers; the mission text is still wrapped each frame) |
 | UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Open |
-| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Open |
+| UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Fixed #29 (audio is prefilled before zoom-level loads and videos; a video holds its first frame until the queued sound has played) |
 | UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Fixed #26 |
-| UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
+| UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Fixed #20, #29 (#20: atomic writes and logged errors; #29: the files are UTF-8, older Windows-1252 files still read) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Fixed #26 |
 | UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21, #24, #28: see BD-7) |
@@ -202,7 +202,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Fixed #20 |
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Fixed #27 (score curves, money steps and the monument rule named in `assets/game_data.hpp`) |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
-| MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Open |
+| MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Fixed #29 (binary search, the same cuts as before) |
 | MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Open |
 
 MP-3 is the earlier review's `SoldierOrder` item. In the new numbering it is not AU14, which is the
@@ -219,16 +219,16 @@ bought-ship item.
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
 | BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours; #27: unit tests round-trip a synthetic world through the `.GAM` writer, which found and fixed a city satisfaction bug) |
 | BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; #28: the command sink with three tests, 14 o1602-tool smoke tests and a game start without data in CI, also under ASan; platform and render_sdl remain) |
-| BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
+| BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Fixed #19, #29 (#19: `_GLIBCXX_ASSERTIONS`; #29: actions pinned by SHA with Dependabot, clang-format-18 by name) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
-| BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20 |
+| BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20, #29 (#29: `menus` in ADR 0005 and a layering check in ctest) |
 | BD-11 | Medium | Contradictory counts and stale status in `status.md` and `00-plan.md` | `docs/status.md`, `docs/00-plan.md` | Fixed #20 |
 | BD-12 | Medium | `setup-arch.md` documents controls and start behaviour that no longer exist | `docs/setup-arch.md` | Fixed #20 |
 | BD-13 | Low | Module READMEs still describe the M1/M2 state | `*/README.md` | Fixed #20 |
 | BD-14 | Low | Duplicated and overlapping documents | `docs/00-plan.md`, `docs/requests.md` | Fixed #20 |
 | BD-15 | Low | Non-English text left in the repository | `.gitignore`, `docs/00-plan.md`, `docs/setup-arch.md` | Partly (#20: folders and docs; test names and private anchors stay) |
 | BD-16 | Low | Links into the private repository are not explained; newcomer guides missing | `README.md`, `docs/status.md` | Fixed #20 |
-| BD-17 | Low | o1602-tool is one 1,139-line `main.cpp`; the Python tools duplicate the C++ parsers | `tools/o1602-tool/main.cpp`, `tools/python/` | Open |
+| BD-17 | Low | o1602-tool is one 1,139-line `main.cpp`; the Python tools duplicate the C++ parsers | `tools/o1602-tool/main.cpp`, `tools/python/` | Fixed #29 (o1602-tool split by command group; the Python tools are marked as unmaintained prototypes) |
 
 The private catalogue's three open bugs of Open1602 itself were still present at the review and
 are fixed in #20:
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 1 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 0 | 3 | 5 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 0 | 2 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 4 | 1 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 2 | 7 | 16 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 0 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 3 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 4 | 0 | 3 | 1 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 0 | 0 | 1 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 | 0 | 3 | 0 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 9 | 4 | 7 | 5 |
 
 ## Open work, in order
 
@@ -279,8 +279,9 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #
    (Since #27 unit tests round-trip a synthetic world through `savegame_writer`. Since #23 a data
    test runs the computers of a new endless game for three game hours and checks that they keep their cities and that the game saves and goes on the same. Since #26 the
    data tests check their savegame fixtures by size and CRC-32 and skip on another file: BD-3.)
-4. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
-   symmetric `io()` descriptions in files per section.
+4. IO-13 rest (L): symmetric `io()` descriptions for the save sections, in files per section.
+   (Fixed in #29: SC-10 `load_world` in documented stages; IO-13 sections of the wrong size are
+   refused and the PNG writer uses `core::crc32`.)
 
 **3. Moddability: game numbers in one place**
 Nothing left here. (Fixed in #28: SC-13 crater and deer spot coordinates are 16-bit in the runtime
@@ -291,25 +292,22 @@ limit and tile spots named. Fixed in #27: MP-17 the score curves and the monumen
 fixed in #20.)
 
 **4. Performance in long sessions**
-1. AU7 (M): spatial buckets for the crowd and blocked checks, and a tower index for combat.
-2. UI-9 (M): scratch containers as members, an LRU text cache with heterogeneous lookup, and an
-   id-to-index map in `SoldierFigures`.
-3. AU8, SC-14, MP-19 (S each): planner scratch objects, indexed city lookups, binary-search text
-   fitting. The earlier AI whole-world scans belong here too, and only if profiling confirms them.
-4. UI-11 (S): prefill audio before zoom-atlas loads and video starts. UI-10 (M): interpolate land
-   units like ships.
+1. UI-10 (M): interpolate land units like ships.
+(Fixed in #29: AU7 soldiers in squares for the crowd and blocked checks, UI-9 the LRU text cache,
+the soldier index and reused draw-list containers, MP-19 binary-search text fitting, UI-11 audio
+prefilled before loads and videos. AU8 and SC-14 were measured in #29 and left: their cost is a
+fraction of a percent. The earlier AI whole-world scans stay until profiling shows them.)
 
 **5. Remaining low items and documentation**
-1. Platform: UI-7 (render device loss, M), UI-8 (display-scale changes), UI-13 encoding (declare
-   the files UTF-8). (Fixed in #26: UI-17 fatal errors on macOS and Linux, UI-15 the
-   `GameDirectory` pointer, UI-12 scroll clamping.)
+1. Platform: UI-7 rest (recover from a lost render device by recreating the renderer).
+   (Fixed in #26: UI-17, UI-15, UI-12. Fixed in #29: UI-8 display-scale changes, UI-13 UTF-8
+   files, UI-7 textures rebuilt after a device reset.)
 2. Sim cleanups: AU9 (dead state), AU11 and AU12 (check against the original first), MP-20 (offer
    "save this game" when the host leaves).
-3. Build: BD-8 rest (pin actions by SHA, pin clang-format), BD-10 rest (dependency diagram,
-   layering check), BD-17.
-(Docs: BD-11 to BD-16 were fixed in #20; #26 fixed what was still stale after it and IO-15.
-[status.md](status.md) is the single place for counts and open items. ADR 0005's dependency
-diagram belongs to BD-10.)
+(Build: fixed in #29: BD-8 actions pinned by SHA and clang-format-18, BD-10 the dependency diagram
+and a layering check, BD-17 o1602-tool split. Docs: BD-11 to BD-16 were fixed in #20; #26 fixed
+what was still stale after it and IO-15. [status.md](status.md) is the single place for counts and
+open items.)
 
 ## Known gaps not covered by this review
 
