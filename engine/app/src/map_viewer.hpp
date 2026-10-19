@@ -333,6 +333,9 @@ private:
     void place_listener();
     /// Gives the map the window without the frame.
     void lay_out();
+    /// The window went to a screen with another scale (or the desktop's scale changed): the map's
+    /// pixel scale follows; a change the player made with the keys stays on top of it.
+    void follow_display_scale();
     /// What a click on the frame asked for.
     void apply_hud(const Hud::Action& action);
     /// The resource bar: money, and goods and inhabitants of the city under the mouse.
@@ -383,6 +386,8 @@ private:
     void update_ambient();
 
     static constexpr std::int32_t kMaxPixelScale = 4;
+    /// The pixel scale the screen asked for, last time it was looked at.
+    std::int32_t m_display_pixel_scale = 1;
 
     assets::GameDirectory m_game;
     assets::BuildingTable m_buildings;

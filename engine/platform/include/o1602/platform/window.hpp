@@ -52,6 +52,9 @@ public:
     void output_size(std::int32_t& width, std::int32_t& height) const;
     /// Physical pixels per window coordinate (2 on typical HiDPI screens).
     [[nodiscard]] float pixel_density() const;
+    /// The size the desktop wants things drawn at, per window coordinate times the pixel density:
+    /// 2 on a HiDPI screen, 1.5 on Windows at 150 % (SDL_GetWindowDisplayScale).
+    [[nodiscard]] float display_scale() const;
     void set_title(const std::string& title);
     /// Name of the active render backend (e.g. "vulkan", "opengl", "direct3d11", "software").
     [[nodiscard]] std::string renderer_name() const;

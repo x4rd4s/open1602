@@ -27,6 +27,9 @@ struct TilePos {
 /// the map: for the frame of the visible part on the minimap.
 [[nodiscard]] std::pair<double, double> world_point_at(const WorldView& view, double px, double py);
 
+/// The integer pixel scale for a display scale (Window::display_scale): rounded, 1..max_scale.
+[[nodiscard]] std::int32_t pixel_scale_for(float display_scale, std::int32_t max_scale) noexcept;
+
 class Camera {
 public:
     Camera() = default;

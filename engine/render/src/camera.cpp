@@ -191,6 +191,11 @@ void Camera::set_rotation(std::uint8_t rotation, double sx, double sy) {
     change_view(sx, sy, [&] { m_view.rotation = static_cast<std::uint8_t>(rotation & 3U); });
 }
 
+std::int32_t pixel_scale_for(float display_scale, std::int32_t max_scale) noexcept {
+    const float s = std::isfinite(display_scale) ? std::clamp(display_scale, 1.0F, 64.0F) : 1.0F;
+    return std::clamp(static_cast<std::int32_t>(std::lround(s)), 1, std::max(max_scale, 1));
+}
+
 void Camera::set_pixel_scale(std::int32_t scale, double sx, double sy) {
     double px = 0;
     double py = 0;

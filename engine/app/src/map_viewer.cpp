@@ -323,9 +323,9 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     std::int32_t w = 0;
     std::int32_t h = 0;
     viewer->m_window->output_size(w, h);
-    const auto scale = static_cast<std::int32_t>(std::lround(viewer->m_window->pixel_density()));
+    viewer->m_display_pixel_scale = render::pixel_scale_for(viewer->m_window->display_scale(), kMaxPixelScale);
     viewer->m_camera.set_world_size(viewer->m_state->world.width(), viewer->m_state->world.height());
-    viewer->m_camera.set_screen(w, h, std::clamp(scale, 1, kMaxPixelScale));
+    viewer->m_camera.set_screen(w, h, viewer->m_display_pixel_scale);
     viewer->lay_out();
     viewer->m_camera.set_zoom(options.zoom, w / 2.0, h / 2.0);
     // Start over the player's own city.
@@ -621,8 +621,12 @@ void MapViewer::handle_event(const SDL_Event& original) {
             m_window->output_size(w, h);
             m_camera.set_screen(w, h, m_camera.pixel_scale());
             lay_out();
+            follow_display_scale();  // a move to another screen may change both
             break;
         }
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+            follow_display_scale();
+            break;
         case SDL_EVENT_KEY_DOWN:
             if (m_hud && m_hud->typing()) {
                 // A savegame's name is typed: the keys go there, not to the key table.
@@ -1523,6 +1527,7 @@ void MapViewer::handle_video_event(const SDL_Event& event) {
     switch (event.type) {
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             handle_event(event);
             break;
         case SDL_EVENT_KEY_DOWN:
@@ -1574,6 +1579,21 @@ void MapViewer::lay_out() {
     m_window->output_size(w, h);
     const ui::Rect view = m_hud->layout(w, h);
     m_camera.set_screen(view.w, view.h, m_camera.pixel_scale());
+}
+
+void MapViewer::follow_display_scale() {
+    const std::int32_t scale = render::pixel_scale_for(m_window->display_scale(), kMaxPixelScale);
+    if (scale == m_display_pixel_scale) {
+        return;
+    }
+    const std::int32_t own = m_camera.pixel_scale() - m_display_pixel_scale;  // Ctrl +/- of the player
+    m_display_pixel_scale = scale;
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    m_window->output_size(w, h);
+    m_camera.set_pixel_scale(std::clamp(scale + own, 1, kMaxPixelScale), w / 2.0, h / 2.0);
+    std::fprintf(stderr, "display scale %.2f: pixel scale %d\n", static_cast<double>(m_window->display_scale()),
+                 m_camera.pixel_scale());
 }
 
 void MapViewer::select_building_at_mouse() {

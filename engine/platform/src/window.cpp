@@ -60,6 +60,11 @@ float Window::pixel_density() const {
     return density > 0.0F ? density : 1.0F;
 }
 
+float Window::display_scale() const {
+    const float scale = SDL_GetWindowDisplayScale(m_window);
+    return scale > 0.0F ? scale : pixel_density();
+}
+
 void Window::set_title(const std::string& title) {
     SDL_SetWindowTitle(m_window, title.c_str());
 }

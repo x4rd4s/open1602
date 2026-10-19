@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <limits>
 #include <set>
 #include <string>
 #include <string_view>
@@ -559,6 +560,17 @@ TEST_CASE("camera: zoom, rotation and pixel scale keep the anchored tile in plac
     const render::Viewport vp = camera.viewport();
     CHECK(vp.width == 641);  // 1280 / 2 + 1
     CHECK(vp.height == 401);
+}
+
+TEST_CASE("camera: the pixel scale of a display scale") {
+    CHECK(render::pixel_scale_for(1.0F, 4) == 1);
+    CHECK(render::pixel_scale_for(1.25F, 4) == 1);
+    CHECK(render::pixel_scale_for(1.5F, 4) == 2);  // Windows at 150 %
+    CHECK(render::pixel_scale_for(2.0F, 4) == 2);  // a HiDPI screen
+    CHECK(render::pixel_scale_for(6.0F, 4) == 4);
+    CHECK(render::pixel_scale_for(0.5F, 4) == 1);
+    CHECK(render::pixel_scale_for(0.0F, 4) == 1);
+    CHECK(render::pixel_scale_for(std::numeric_limits<float>::quiet_NaN(), 4) == 1);
 }
 
 TEST_CASE("camera: scrolling is clamped to the map") {
