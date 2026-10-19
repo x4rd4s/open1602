@@ -13,6 +13,7 @@
 #include <tuple>
 
 #include "map_viewer.hpp"
+#include "order_questions.hpp"
 
 #include "o1602/core/file.hpp"
 #include "o1602/render/island_renderer.hpp"
@@ -25,32 +26,6 @@ namespace {
 
 constexpr std::uint64_t kDoubleGroupMs = 500;  // a group key twice in this time goes there
 constexpr double kScrollSpeed = 900.0;         // pixels per second
-
-sim::PlayerId target_owner(const sim::World& world, const sim::Target& t) {
-    switch (t.kind) {
-        case sim::Target::Kind::Ship: {
-            const sim::Ship* s = world.ship(t.ship);
-            return s != nullptr ? s->owner : sim::kNoPlayer;
-        }
-        case sim::Target::Kind::Soldier: {
-            const sim::Soldier* s = world.soldier(t.ship);
-            return s != nullptr ? s->owner : sim::kNoPlayer;
-        }
-        case sim::Target::Kind::Building:
-            if (t.island < world.islands().size() &&
-                world.islands()[t.island].map.contains(static_cast<std::int32_t>(t.x),
-                                                       static_cast<std::int32_t>(t.y))) {
-                return world.islands()[t.island].map.top(t.x, t.y).owner;
-            }
-            return sim::kNoPlayer;
-        case sim::Target::Kind::City: {
-            const sim::City* c = world.city(t.island, t.city);
-            return c != nullptr ? c->owner : sim::kNoPlayer;
-        }
-        default:
-            return sim::kNoPlayer;
-    }
-}
 
 /// What an action does, for the key overview: keys.action.<its name in keys.cfg>.
 const std::string& action_label(ui::KeyAction a) {
@@ -1043,50 +1018,7 @@ void MapViewer::selection_changed(bool box) {
 }
 
 std::optional<std::string> MapViewer::question_for(const sim::Command& command) const {
-    if (const auto* c = std::get_if<sim::ShipCommand>(&command);
-        c != nullptr && c->op == sim::ShipCommand::Op::Scuttle) {
-        const sim::Ship* s = m_state->world.ship(c->ship);
-        // Windows-1252, as the fonts of the game have it.
-        return ui::tr("dialog.scuttle_ship", {s != nullptr ? std::string_view(s->name) : std::string_view()});
-    }
-    if (const auto* c = std::get_if<sim::SoldierCommand>(&command);
-        c != nullptr && c->op == sim::SoldierCommand::Op::Disband) {
-        const sim::Soldier* s = m_state->world.soldier(c->soldier);
-        const assets::FigureType* t = s != nullptr ? m_figures.get(s->figure) : nullptr;
-        const std::uint32_t cost = t != nullptr ? m_figures.unit_cost(t->kind) : 0;
-        return ui::tr("dialog.disband_unit", {std::to_string(cost)});
-    }
-    if (const auto* o = std::get_if<sim::DiplomacyOrder>(&command);
-        o != nullptr && o->kind == sim::DiplomacyOrder::Kind::Peace && o->value == sim::Treaty::None) {
-        // Breaking a peace treaty is a declaration of war (the original does not ask, U-033).
-        const sim::Diplomacy& d = m_state->world.diplomacy();
-        const sim::Player* p = m_state->world.player(o->partner);
-        if (p != nullptr && o->player < d.size() && o->partner < d.size() &&
-            d.relation(o->player, o->partner).peace == sim::Treaty::Signed) {
-            return ui::tr("dialog.break_peace", {p->name});
-        }
-    }
-    sim::Target target;
-    bool attack = false;
-    if (const auto* o = std::get_if<sim::ShipOrder>(&command)) {
-        target = o->target;
-        attack = o->attack;
-    } else if (const auto* so = std::get_if<sim::SoldierOrder>(&command)) {
-        target = so->target;
-        attack = so->attack;
-    }
-    if (!attack) {
-        return std::nullopt;
-    }
-    // An attack that means war (0x0044D540): not on the free trader, not at war already.
-    const sim::PlayerId other = target_owner(m_state->world, target);
-    const sim::Player* p = m_state->world.player(other);
-    const sim::Diplomacy& d = m_state->world.diplomacy();
-    if (p == nullptr || other == m_local_player || p->role == sim::PlayerRole::Trader || m_local_player >= d.size() ||
-        other >= d.size() || d.relation(m_local_player, other).peace == sim::Treaty::None) {
-        return std::nullopt;
-    }
-    return ui::tr("dialog.declare_war", {p->name});
+    return order_question(m_state->world, m_figures, m_local_player, command);
 }
 
 void MapViewer::submit_orders(std::vector<sim::Command> orders, bool sound) {
