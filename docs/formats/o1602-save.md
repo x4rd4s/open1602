@@ -16,7 +16,11 @@ exported as `.GAM` as long as it fits within the limits of the original ([savega
 
 ## Structure
 
-All numbers little-endian.
+All numbers little-endian. A **string** is a u32 byte count followed by that many bytes, without a
+terminating zero. The bytes are **Windows-1252**, not UTF-8: names of players, cities and ships are
+kept as the game's fonts draw them, the same encoding as the original's savegames and texts. Typed
+text is converted from UTF-8 when it is entered (`core::utf8_to_cp1252`); a reader that shows a name
+elsewhere converts it back (`core::cp1252_to_utf8`).
 
 | Offset | Type | Contents |
 |---|---|---|
@@ -48,6 +52,7 @@ see [o1602-chunk.md](o1602-chunk.md) for the rules.
 | `WRL2` | further settings of the world: interval between two pirate ships |
 | `ISLE` | per island: deer spots, drought, craters, deposits, fertility |
 | `PLAY` `CITY` `PROD` `HOUS` `GROW` `COST` `ANIM` `DISA` `VOLC` | players, cities, production list with free slots, houses, growth, shipyards and castles, animals, fires and plagues, volcanoes with lava in flight |
+| `TILE` | not in the own savegame (`MAPW` holds every tile); only in the chunk of an exported `.GAM` |
 | `PSTA` | per player (order as in `PLAY`): mission, status (playing, defeated, absent), won, defeated opponents, the two counters of the defeat rules, trade statistics (purchases, sales) |
 | `CSTA` | per city (island, number): trade statistics of the warehouse (purchases, sales, as city + 0x1F0/+0x1F4); if the section is missing, the values from `STADT4` apply |
 | `SCOR` | per player (order as in `PLAY`): soldiers killed and lost, ships sunk and lost (`PLAYER4` +0x14..+0x1A); then per city (island, number): growth of the house looked at last and the game time since it grows (monument allowances, city + 0x1F8/+0x1E4); if the section is missing, the counters from `PLAYER4` apply and the cities start without growth |
@@ -57,7 +62,12 @@ see [o1602-chunk.md](o1602-chunk.md) for the rules.
 | `SIMU` | clocks of the simulation, all active figures and the state of the computer opponents |
 | `ORIG` | the file of the original the game comes from (savegame, scenario or the template of a new game), as chunks without the island tiles (`INSELHAUS`), about 12 KB packed. Only for the export as `.GAM`: it takes from it the bytes that Open1602 does not track, exactly as for a game loaded directly from the file. If the section is missing, the export writes defaults like a new game |
 
-The details of the sections from `RULE` onwards are in [o1602-chunk.md](o1602-chunk.md).
+The writer emits the sections in this order: `META`, `MAPW`, `RULE`, `WRLD`, `WRL2`, `ISLE`, `PLAY`,
+`PSTA`, `MISN`, `CITY`, `CSTA`, `SCOR`, `PROD`, `HOUS`, `GROW`, `COST`, `ANIM`, `DISA`, `VOLC`, `FLEE`,
+`EPOC`, `ARMY`, `DIPL`, `XPLR`, `QUEU`, `STNC`, `ORIG` (only for a game that came from a file of the
+original) and `SIMU` (`engine/sim/src/savegame_extension.cpp`, `encode_sections`). `SHIP` and `SOLD`,
+the lists of older versions, are only read. The details of the sections from `RULE` onwards are in
+[o1602-chunk.md](o1602-chunk.md).
 
 **Buildings** are stored as Id from `haeuser.cod` with sub-tile, never as image number. If the fingerprint
 of the building data does not match, Open1602 loads anyway and reports it; an Id that the data does not know

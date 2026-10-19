@@ -45,7 +45,9 @@ minutes later it is byte for byte the same savegame as without interruption.
 
 ## Structure
 
-All numbers little-endian.
+All numbers little-endian. A **string** is a u32 byte count followed by that many bytes, without a
+terminating zero. The bytes are **Windows-1252** (not UTF-8), as in the original's chunks: names of
+players, cities and ships are kept as the game's fonts draw them.
 
 | Field | Type | Contents |
 |---|---|---|
@@ -60,10 +62,16 @@ skips sections it does not know and versions it cannot read and reports them; fo
 chunks of the original say then applies. Later versions can thus add parts without invalidating older
 savegames.
 
+In the chunk the writer emits `RULE` (when the settings are known), `WRLD`, `ISLE`, `TILE`, `PLAY`,
+`PSTA`, `MISN`, `CITY`, `CSTA`, `SCOR`, `PROD`, `HOUS`, `GROW`, `COST`, `SHIP`, `ANIM`, `DISA`, `VOLC`,
+`FLEE`, `EPOC`, `ARMY`, `DIPL`, `XPLR`, `QUEU`, `STNC` and `SIMU`, in this order. `META`, `MAPW`,
+`WRL2` and `ORIG` exist only in the own savegame ([o1602-save.md](o1602-save.md)).
+
 Flag bit 0 (**required**): the section holds state the game cannot do without. A reader that cannot
 read it (unknown identifier or later version) does not apply the chunk at all, and the game loads from
 the original's chunks alone, with a warning. Open1602 sets it on every section except `META`, `ORIG`
-and `SHIP` (the copy for readers older than `FLEE`). Files written before the flags existed have 0
+and `SHIP` (the copy for readers older than `FLEE`), so a reader older than a required section (for
+example `QUEU` or `STNC`) refuses the chunk. Files written before the flags existed have 0
 there; every section of theirs is known. A section that changes in a way an older reader cannot follow
 gets the next version number (not a new identifier); the old version can be written next to it for
 older readers, marked optional.
@@ -75,12 +83,17 @@ older readers, marked optional.
 | `ISLE` | per island in the order of the world, with island number for checking |
 | `TILE` | differing tiles: island number, x, y, layer, building id, sub-tile, rotation, phase, owner, city, random value |
 | `PLAY` `CITY` `PROD` `HOUS` `GROW` `COST` `SHIP` `ANIM` `DISA` `VOLC` | the lists of the world, complete (`SOLD`, the soldiers of older versions, is still read) |
+| `PSTA` | per player (order as in `PLAY`): mission, status (playing, defeated, absent), won, defeated opponents, the two counters of the defeat rules, trade statistics |
+| `MISN` | the missions (goals, loss conditions, values, text, the islands of the island goals recorded at the start) and the end of the game (time, winner) ([missions.md](../re/missions.md)) |
 | `CSTA` | trade statistics per city (island, number, purchases, sales) |
+| `SCOR` | the score's counters per player (soldiers killed and lost, ships sunk and lost), then per city the growth of the house looked at last and the game time since it grows |
 | `FLEE` | ships in full (position in 1/4096 tile, course, holds with price, trade route, destinations with the original's reference, the trader's goods), next ship number, discovered islands, trade settings and affection of the cities, shipyard fields (order, build points, wood, cloth, tick, repair); `SHIP` remains for older readers |
 | `ARMY` | soldiers in full (position in 1/4096 tile, hit points, home, destination, planning, clocks, patrol, path), next soldier number, cannon towers, building damage, shots in flight, weapons and slots of the castles |
 | `EPOC` | phase of the island epochs and, per island, the phase last seen |
 | `XPLR` | exploring: per island "growing explored" per player, and per deposit the player mask (32 bit) ([ships.md](../re/ships.md#exploring)) |
 | `DIPL` | diplomacy: per player pair peace, trade, time of war, tribute, trade and damage; per player all 32 events and the culprit ([diplomacy.md](../re/diplomacy.md)) |
+| `QUEU` | command chains: per ship, then per soldier with a queue, the id and up to 16 waiting destinations (Shift+right-click) |
+| `STNC` | per ship, then per soldier with a stance, the id and the flags attack move (bit 0) and hold position (bit 1) (ADR 0010) |
 | `SIMU` | clocks of the simulation and figures (own version number at the start; from version 2 with the shipyards' pack mules and the fleet clocks, from 3 with the military, from 4 with the state of the computer opponents, itself with a version number) |
 
 Buildings are stored as **Id** (from `haeuser.cod`) and sub-tile, not as image number, so that a savegame

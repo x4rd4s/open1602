@@ -29,8 +29,16 @@ Open1602 savegames is not important to him (2026-10-18).
    as long as it fits; the previous writer with the additional chunk is kept for that.
 
 ## Consequences
-- No limits other than memory; new parts are added as new sections, older readers
-  skip them.
+- None of the original's limits on players, ships, soldiers, towers or map size. The format has
+  limits of its own: a world at most 4096 tiles per side, at most 256 MiB of unpacked sections, and
+  island numbers of 8 bits in some sections ([o1602-save.md](../formats/o1602-save.md#limits-of-this-version)).
+- New parts are added as new sections. A section an older reader does not know is skipped only when
+  it is optional (`META`, `ORIG`); every other section is marked required, and a reader that does not
+  know it refuses the file instead of running a different game. Since the first version the writer has added
+  `PSTA`, `MISN`, `CSTA`, `SCOR`, `QUEU` and `STNC` this way; the full list is in
+  [o1602-save.md](../formats/o1602-save.md).
+- Strings (names of players, cities and ships) are stored as Windows-1252 bytes, the encoding of the
+  original's files and fonts.
 - Savegames are about a quarter of the size.
 - Existing Open1602 `.GAM` savegames still load (with their additional chunk exactly as before).
 - A game loaded from a `.o1602` carries its source file without the island tiles in the section
