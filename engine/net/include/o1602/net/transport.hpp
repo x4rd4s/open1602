@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace o1602::net {
@@ -44,6 +45,8 @@ public:
     virtual void disconnect(LinkId link) = 0;
     /// Time for a message there and back, as far as the transport knows (0 if not).
     [[nodiscard]] virtual std::uint32_t round_trip_ms(LinkId link) const = 0;
+    /// The other side's address as this end sees it (IPv4 in dots), empty if the transport has none.
+    [[nodiscard]] virtual std::string address(LinkId /*link*/) const { return {}; }
 };
 
 }  // namespace o1602::net

@@ -208,6 +208,42 @@ struct FrameProbe {
     }
 };
 
+/// The host left: `c` follows the successor the host named, on `next` (host migration).
+void follow(net::LoopbackNetwork& next, Computer& c) {
+    REQUIRE(c.session->can_migrate());
+    REQUIRE(!c.session->hosts_next());
+    auto session = std::make_unique<net::ClientSession>(*c.session, [&next] { return next.connect(); });
+    c.session = std::move(session);
+    c.transport = nullptr;
+}
+
+/// Time passes after the host changed: the new host (the successor's game) and its computers.
+void step_moved(net::LoopbackNetwork& next, net::HostSession& host, const std::vector<Computer*>& computers,
+                std::uint32_t total_ms) {
+    for (std::uint32_t t = 0; t < total_ms; t += kStepMs) {
+        next.advance(kStepMs);
+        host.update(kStepMs);
+        (void)host.take_events();
+        for (Computer* c : computers) {
+            c->update(kStepMs);
+        }
+    }
+}
+
+/// The computers hear that the host is gone.
+void notice_host_left(net::LoopbackNetwork& network, const std::vector<Computer*>& computers) {
+    for (int i = 0; i < 50; ++i) {
+        network.advance(kStepMs);
+        for (Computer* c : computers) {
+            c->update(kStepMs);
+        }
+    }
+    for (Computer* c : computers) {
+        REQUIRE(c->session->ended());
+        CHECK(c->session->end_reason() == net::EndReason::HostLeft);
+    }
+}
+
 std::string random_name(sim::Random& r) {
     std::string name = "N";
     const std::uint32_t n = 1 + r.below(12);
@@ -222,6 +258,7 @@ std::string random_name(sim::Random& r) {
 TEST_CASE("net: every message goes to bytes and back") {
     std::vector<net::Message> all;
     all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "geheim"});
+    all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "", true});
     all.emplace_back(net::CommandBatch{{sim::PlayerRename{1, "Zweiter"}, sim::GameSpeedOrder{1, {}, 4}}});
     all.emplace_back(net::Progress{3, 1000, net::FrameHash{900, 0xABCDEF}});
     all.emplace_back(net::Progress{1, 5, std::nullopt});
@@ -236,7 +273,9 @@ TEST_CASE("net: every message goes to bytes and back") {
                    net::FrameCommands{19, {sim::PlayerRename{1, "B"}, sim::PlayerRename{2, "C"}}}};
     all.emplace_back(turn);
     all.emplace_back(net::Roster{{net::Member{0, "Gastgeber", net::Member::State::Playing, true},
-                                  net::Member{sim::kNoPlayer, "Zuschauer", net::Member::State::Lagging, false}}});
+                                  net::Member{sim::kNoPlayer, "Zuschauer", net::Member::State::Lagging, false}},
+                                 1,
+                                 "192.168.1.20"});
     all.emplace_back(net::Desync{300, {1, 2}});
     net::Lobby lobby;
     lobby.title = "Merlins Inselwelt";
@@ -252,6 +291,7 @@ TEST_CASE("net: every message goes to bytes and back") {
     all.emplace_back(net::SetReady{true});
     all.emplace_back(net::Chat{1, "Anna", "Hallo!"});
     all.emplace_back(net::Refused{net::RefuseReason::Kicked});
+    all.emplace_back(net::Standby{{net::SeatToken{1, 0x1234567890ULL}, net::SeatToken{3, 7}}, {3}});
     for (const net::Message& m : all) {
         const auto bytes = net::encode(m);
         const auto back = net::decode(bytes);
@@ -297,7 +337,7 @@ TEST_CASE("net: damaged or hostile bytes give no message") {
         for (auto& b : noise) {
             b = static_cast<std::uint8_t>(r.next());
         }
-        noise[0] = static_cast<std::uint8_t>(r.below(14));
+        noise[0] = static_cast<std::uint8_t>(r.below(15));
         if (const auto m = net::decode(noise)) {
             CHECK(net::encode(*m).size() <= noise.size() + 1024);
         }
@@ -1000,4 +1040,210 @@ TEST_CASE("net: a computer that joins in a loop gets the game at most once a sec
     run_for(network, host, {&a}, 1500);
     CHECK(a.session->playing());
     CHECK(a.game.loads == 1);
+}
+
+// --- Host migration ---
+
+TEST_CASE("net: the host names the playing computer with the lowest slot its successor") {
+    net::LoopbackNetwork network(10, 0);
+    auto host = std::make_unique<Host>(network);
+    Computer a(network, "Anna");
+    Computer b(network, "Bernd");
+    Computer c(network, "Clara");
+    Computer w(network, "Wilma");  // watches: never the successor
+    run_for(network, *host, {&a, &b, &c, &w}, 1500);
+    REQUIRE(a.session->playing());
+    REQUIRE(w.session->local_seat() == sim::kNoPlayer);
+    CHECK(host->session->successor() == 1);
+    CHECK(host->session->successor_address() == "loopback:1");
+    for (const Computer* x : {&a, &b, &c, &w}) {
+        CHECK(x->session->successor() == 1);
+        CHECK(x->session->successor_address() == "loopback:1");
+    }
+    CHECK(b.session->successor_name() == "Anna");
+
+    // Anna's connection breaks: Bernd is next; back again, she is the successor again.
+    const std::uint64_t token = a.session->token();
+    network.cut(*a.transport);
+    run_for(network, *host, {&b, &c, &w}, 500);
+    CHECK(host->session->successor() == 2);
+    CHECK(c.session->successor() == 2);
+    Computer back(network, "Anna", token);
+    run_for(network, *host, {&back, &b, &c, &w}, 1500);
+    REQUIRE(back.session->playing());
+    CHECK(c.session->successor() == 1);
+
+    // The host goes: only the successor hosts next, the others can follow it.
+    host.reset();
+    notice_host_left(network, {&back, &b, &c, &w});
+    CHECK(back.session->hosts_next());
+    CHECK(back.session->can_migrate());
+    CHECK(!b.session->hosts_next());
+    CHECK(b.session->can_migrate());
+    CHECK(w.session->can_migrate());  // a spectator follows too
+}
+
+TEST_CASE("net: the host leaves; its successor hosts on, the others follow, all games stay the same") {
+    net::LoopbackNetwork network(20, 0);  // Anna first, in slot 1
+    net::LoopbackNetwork next(20, 10);
+    net::SessionConfig config;
+    config.hash_interval = 20;
+    auto host = std::make_unique<Host>(network, config);
+    Computer a(network, "Anna", 0, kContent, config);
+    Computer b(network, "Bernd", 0, kContent, config);
+    run_for(network, *host, {&a, &b}, 2000);
+    REQUIRE(a.session->playing());
+    REQUIRE(b.session->playing());
+    const std::uint64_t token = b.session->token();
+
+    // Orders on the way when the host goes: what it closed reaches everyone or no one.
+    host->session->submit(sim::PlayerRename{0, "Weg"});
+    a.session->submit(sim::PlayerRename{1, "Anna I"});
+    b.session->submit(sim::PlayerRename{2, "Bernd I"});
+    step(network, *host, {&a, &b});
+    host.reset();
+    notice_host_left(network, {&a, &b});
+    REQUIRE(a.session->hosts_next());
+    const std::uint64_t frames = a.session->frames();
+
+    auto moved = std::make_unique<net::HostSession>(next.listen(), *a.session, buildings());
+    follow(next, b);
+    a.session.reset();
+    step_moved(next, *moved, {&b}, 3000);
+    REQUIRE(b.session->playing());
+    CHECK(b.session->local_seat() == 2);
+    CHECK(b.session->token() == token);  // its own slot, by its token
+    CHECK(b.game.loads == 2);
+    CHECK(moved->frames() > frames + 20);
+    CHECK(moved->local_seat() == 1);
+    REQUIRE(moved->roster().size() == 2);
+    CHECK(moved->roster()[0].name == "Anna");
+    CHECK(moved->roster()[0].host);
+    CHECK(b.session->roster() == moved->roster());
+    // The old host's slot: the computer plays it, on every computer.
+    CHECK(a.game.world->player(0)->role == sim::PlayerRole::Computer);
+    CHECK(b.game.world->player(0)->role == sim::PlayerRole::Computer);
+    CHECK(a.game.world->players()[2].name == b.game.world->players()[2].name);
+
+    // The game goes on: orders of both players, and the fingerprints match.
+    b.session->submit(sim::PlayerRename{2, "Bernd II"});
+    moved->submit(sim::PlayerRename{1, "Anna II"});
+    step_moved(next, *moved, {&b}, 2000);
+    CHECK(a.game.world->players()[2].name == "Bernd II");
+    CHECK(b.game.world->players()[1].name == "Anna II");
+    FrameProbe pa{moved->frames() + 40, {}};
+    FrameProbe pb = pa;
+    for (int i = 0; i < 400 && !(pa.hash && pb.hash); ++i) {
+        next.advance(kStepMs);
+        moved->update(kStepMs, pa.at(*moved, a.game));
+        b.update(kStepMs, pb.at(*b.session, b.game));
+    }
+    REQUIRE(pa.hash.has_value());
+    CHECK(pb.hash == pa.hash);
+    CHECK(moved->fingerprints_compared() > 3);
+    CHECK(moved->fingerprints_matched() == moved->fingerprints_compared());
+    CHECK(b.count(net::SessionEvent::Kind::Desync) == 0);
+}
+
+TEST_CASE("net: the host leaves and nobody hosts on: the others give up after a while") {
+    net::LoopbackNetwork network(20, 0);
+    net::LoopbackNetwork next(20, 0);  // the successor never hosts there (its port is taken)
+    net::SessionConfig config;
+    config.migration_ms = 3000;
+    auto host = std::make_unique<Host>(network, config);
+    Computer a(network, "Anna", 0, kContent, config);
+    Computer b(network, "Bernd", 0, kContent, config);
+    run_for(network, *host, {&a, &b}, 1500);
+    REQUIRE(b.session->playing());
+    host.reset();
+    notice_host_left(network, {&a, &b});
+    const auto before = b.game.simulation->state_hash();
+    follow(next, b);
+    for (std::uint32_t t = 0; t < 2500; t += kStepMs) {
+        next.advance(kStepMs);
+        b.update(kStepMs);
+    }
+    CHECK(!b.session->ended());  // still trying
+    for (std::uint32_t t = 0; t < 1000; t += kStepMs) {
+        next.advance(kStepMs);
+        b.update(kStepMs);
+    }
+    CHECK(b.session->ended());
+    CHECK(b.session->end_reason() == net::EndReason::ConnectFailed);
+    CHECK(!b.session->playing());
+    CHECK(!b.session->can_migrate());
+    CHECK(b.game.loads == 1);  // the game stands as it was, to be saved
+    CHECK(b.game.simulation->state_hash() == before);
+
+    // A host that leaves before its game starts leaves nothing to carry on.
+    net::LoopbackNetwork lobby_network(5, 0);
+    net::Lobby setup;
+    setup.seats = {net::LobbySeat{}, net::LobbySeat{}};
+    auto lobby = std::make_unique<net::HostSession>(lobby_network.listen(), setup, 0, "Merlin", kContent);
+    Computer c(lobby_network, "Clara");
+    for (int i = 0; i < 30; ++i) {
+        lobby_network.advance(kStepMs);
+        lobby->update(kStepMs);
+        c.update(kStepMs);
+    }
+    REQUIRE(c.session->welcomed());
+    lobby.reset();
+    notice_host_left(lobby_network, {&c});
+    CHECK(!c.session->can_migrate());
+}
+
+TEST_CASE("net: after the host changed, players come back into their slots, newcomers take the old host's") {
+    net::LoopbackNetwork network(15, 0);  // Anna first, in slot 1
+    net::LoopbackNetwork next(15, 5);
+    auto host = std::make_unique<Host>(network);
+    Computer a(network, "Anna");
+    Computer b(network, "Bernd");
+    run_for(network, *host, {&a, &b}, 2000);
+    Computer c(network, "Clara");  // joins the running game: the computer's slot
+    run_for(network, *host, {&a, &b, &c}, 1500);
+    Computer w(network, "Wilma");  // every slot taken: she watches
+    run_for(network, *host, {&a, &b, &c, &w}, 1500);
+    REQUIRE(c.session->playing());
+    REQUIRE(c.session->local_seat() == 3);
+    REQUIRE(w.session->local_seat() == sim::kNoPlayer);
+    const std::uint64_t token = c.session->token();
+
+    host.reset();
+    notice_host_left(network, {&a, &b, &c, &w});
+    // The others notice first and knock in vain until the successor hosts, two seconds later.
+    follow(next, b);
+    follow(next, c);
+    follow(next, w);
+    for (std::uint32_t t = 0; t < 2000; t += kStepMs) {
+        next.advance(kStepMs);
+        for (Computer* x : {&b, &c, &w}) {
+            x->update(kStepMs);
+        }
+    }
+    CHECK(!c.session->welcomed());
+    REQUIRE(a.session->hosts_next());
+    net::HostSession moved(next.listen(), *a.session, buildings());
+    step_moved(next, moved, {&b, &c, &w}, 3000);
+    REQUIRE(c.session->playing());
+    CHECK(c.session->local_seat() == 3);
+    CHECK(c.session->token() == token);
+    CHECK(b.session->local_seat() == 2);
+    REQUIRE(w.session->playing());
+    CHECK(w.session->local_seat() == sim::kNoPlayer);  // not the free slot of the old host
+    CHECK(moved.roster().size() == 4);
+    CHECK(a.game.world->player(3)->role == sim::PlayerRole::Human);
+
+    // Someone new gets the old host's slot from the computer ...
+    Computer d(next, "Dora");
+    step_moved(next, moved, {&b, &c, &w, &d}, 3000);
+    REQUIRE(d.session->playing());
+    CHECK(d.session->local_seat() == 0);
+    CHECK(a.game.world->player(0)->role == sim::PlayerRole::Human);
+    CHECK(b.game.world->player(0)->name == "Dora");
+    // ... and Clara's slot, the computer's at the start, goes back to it when she leaves.
+    c.session.reset();
+    step_moved(next, moved, {&b, &w, &d}, 1000);
+    CHECK(a.game.world->player(3)->role == sim::PlayerRole::Computer);
+    CHECK(b.game.world->player(3)->role == sim::PlayerRole::Computer);
+    CHECK(moved.fingerprints_matched() == moved.fingerprints_compared());
 }

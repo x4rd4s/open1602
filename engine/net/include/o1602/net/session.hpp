@@ -17,6 +17,12 @@
 // Before the game there may be a lobby: the host has no game yet, only the slots of the game to
 // come (Lobby). Computers come in, take slots, say they are ready and chat; when the host starts,
 // it makes the game from the lobby and every computer gets it as it would get a running one.
+//
+// When the host leaves a running game, the game moves on (host migration): the host names one of
+// the computers as its successor in the Roster and hands it the slots' tokens (Standby). That
+// computer hosts the game from where its own is (a HostSession made from its ClientSession); the
+// others follow it (a ClientSession made from theirs), come back into their slots with their tokens
+// and get its game, as after a lost connection.
 #pragma once
 
 #include <cstdint>
@@ -69,6 +75,9 @@ struct SessionConfig {
     std::string password;
     /// Chat lines one computer may send per second; more are dropped.
     std::uint32_t max_chat_per_second = 5;
+    /// (Host migration) How long a computer whose host left tries to get into the successor's game;
+    /// the successor may notice the host's leaving a few seconds later than the others.
+    std::uint32_t migration_ms = 30'000;
 };
 
 enum class EndReason : std::uint8_t {
@@ -137,6 +146,10 @@ public:
     [[nodiscard]] const std::vector<Member>& roster() const noexcept { return m_roster; }
     /// The game as set up before the start (Lobby::started tells whether it runs).
     [[nodiscard]] const Lobby& lobby() const noexcept { return m_lobby; }
+    /// Who carries the game on if the host leaves (kNoPlayer: nobody), and where the others then
+    /// connect (Roster::successor).
+    [[nodiscard]] Seat successor() const noexcept { return m_successor; }
+    [[nodiscard]] const std::string& successor_address() const noexcept { return m_successor_address; }
     [[nodiscard]] bool ended() const noexcept { return m_ended; }
     [[nodiscard]] EndReason end_reason() const noexcept { return m_end_reason; }
     /// What happened since the last call.
@@ -166,9 +179,13 @@ protected:
     bool m_ended = false;
     EndReason m_end_reason = EndReason::None;
     std::vector<Member> m_roster;
+    Seat m_successor = sim::kNoPlayer;
+    std::string m_successor_address;
     Lobby m_lobby;
     std::vector<SessionEvent> m_events;
 };
+
+class ClientSession;
 
 /// The host: runs its own game, takes the other computers in and decides the frames. Its player is
 /// `seat` (kNoPlayer: a host without a player of its own).
@@ -182,6 +199,11 @@ public:
     /// Human); start() begins the game.
     HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat seat, std::string name, std::uint64_t content,
                 SessionConfig config = {});
+    /// Host migration: carries on the game of `client`, whose host left and named this computer its
+    /// successor (client.hosts_next()). The game goes on from where this computer's is, with the
+    /// frames the old host closed beyond it, the slots and tokens it handed over, the same password
+    /// and options; the old host's slot goes to the computer. The others come back with their tokens.
+    HostSession(std::unique_ptr<Transport> transport, ClientSession& client, const assets::BuildingTable& buildings);
     ~HostSession() override;
 
     void submit(sim::Command command) override;
@@ -254,6 +276,8 @@ private:
     [[nodiscard]] std::uint32_t frame_share() const;
     /// The slot's token is no longer good: the slot changed hands.
     void forget_token(Seat seat);
+    /// Tells the successor what it needs to carry the game on, if that changed (Standby).
+    void hand_over();
     [[nodiscard]] Peer* peer_of(LinkId link);
     [[nodiscard]] Seat free_seat(Seat wanted) const;
     [[nodiscard]] bool seat_taken(Seat seat) const;
@@ -285,7 +309,10 @@ private:
     std::vector<Seat> m_computer_held;  ///< open at the start: the computer plays it while nobody does
     std::uint64_t m_compared = 0;
     std::uint64_t m_matched = 0;
-    std::vector<LinkId> m_roster_links;  ///< the link of each roster() entry (unused for the host's own)
+    std::vector<LinkId> m_roster_links;    ///< the link of each roster() entry (unused for the host's own)
+    std::optional<LinkId> m_standby_link;  ///< the successor, as last told
+    Standby m_standby;                     ///< what it was told
+    bool m_standby_changed = true;
     bool m_roster_changed = true;
     bool m_lobby_changed = true;
     std::uint32_t m_chat_ms = 0;  ///< into the current second of the chat limit
@@ -296,8 +323,14 @@ private:
 class ClientSession final : public Session {
 public:
     using Loader = std::function<sim::Simulation*(std::span<const std::uint8_t> save)>;
+    /// A connection to the successor (nullptr if none can be made now).
+    using Connect = std::function<std::unique_ptr<Transport>()>;
 
     ClientSession(std::unique_ptr<Transport> transport, Hello hello, Loader load, SessionConfig config = {});
+    /// Host migration: follows `old`, whose host left, to the successor: the same name and slot (its
+    /// token), the game anew from there. Connects with `connect`, again and again until it is taken
+    /// in, for SessionConfig::migration_ms; then it ends with ConnectFailed.
+    ClientSession(const ClientSession& old, Connect connect);
 
     void submit(sim::Command command) override;
     void update(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick = {}) override;
@@ -315,8 +348,17 @@ public:
     [[nodiscard]] std::uint64_t token() const noexcept { return m_token; }
     /// Frames received but not run yet.
     [[nodiscard]] std::uint64_t frames_in_hand() const noexcept { return m_closed - m_frames; }
+    /// The host left the running game and it can move on: this computer hosts it next
+    /// (hosts_next()), or follows the successor at successor_address().
+    [[nodiscard]] bool can_migrate() const noexcept;
+    /// The host left and named this computer its successor, with what it needs (Standby).
+    [[nodiscard]] bool hosts_next() const noexcept;
+    /// The name of the successor as the roster has it.
+    [[nodiscard]] std::string successor_name() const;
 
 private:
+    friend class HostSession;  // made from a ClientSession when the host leaves
+
     void receive(std::span<const std::uint8_t> bytes);
     void load(Snapshot& m);
     void turn(Turn& m);
@@ -337,6 +379,10 @@ private:
     std::vector<sim::Command> m_outgoing;
     std::uint64_t m_reported = 0;      ///< frames last told the host
     std::uint32_t m_since_report = 0;  ///< ms
+    std::optional<Standby> m_standby;  ///< from the host, if it named this computer its successor
+    Connect m_connect;                 ///< following a successor: connects again after a failure
+    std::uint32_t m_migration_ms = 0;  ///< since it began to follow
+    std::uint32_t m_retry_ms = 0;      ///< since the last connection failed
 };
 
 }  // namespace o1602::net

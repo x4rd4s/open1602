@@ -2,6 +2,7 @@
 #include "o1602/net/loopback.hpp"
 
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -116,6 +117,7 @@ public:
         }
     }
     [[nodiscard]] std::uint32_t round_trip_ms(LinkId /*link*/) const override { return 2 * m_impl->latency; }
+    [[nodiscard]] std::string address(LinkId link) const override { return "loopback:" + std::to_string(link); }
 
 private:
     std::shared_ptr<LoopbackNetwork::Impl> m_impl;

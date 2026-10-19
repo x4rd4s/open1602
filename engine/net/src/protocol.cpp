@@ -30,6 +30,7 @@ void put(core::ByteWriter& out, const Hello& m) {
     out.u8(m.seat);
     out.u64(m.token);
     out.string(m.password);
+    out.boolean(m.returning);
 }
 
 void put(core::ByteWriter& out, const CommandBatch& m) {
@@ -84,6 +85,8 @@ void put(core::ByteWriter& out, const Roster& m) {
         out.u8(static_cast<std::uint8_t>(member.state));
         out.boolean(member.host);
     }
+    out.u8(m.successor);
+    out.string(m.successor_address);
 }
 
 void put(core::ByteWriter& out, const Desync& m) {
@@ -125,6 +128,18 @@ void put(core::ByteWriter& out, const Chat& m) {
     out.string(m.text);
 }
 
+void put(core::ByteWriter& out, const Standby& m) {
+    out.u32(static_cast<std::uint32_t>(m.tokens.size()));
+    for (const SeatToken& t : m.tokens) {
+        out.u8(t.seat);
+        out.u64(t.token);
+    }
+    out.u32(static_cast<std::uint32_t>(m.computer_held.size()));
+    for (const Seat s : m.computer_held) {
+        out.u8(s);
+    }
+}
+
 Hello get_hello(In& in) {
     Hello m;
     m.protocol = in.u16();
@@ -133,6 +148,7 @@ Hello get_hello(In& in) {
     m.seat = in.u8();
     m.token = in.u64();
     m.password = in.text(kMaxPasswordLength);
+    m.returning = in.boolean();
     return m;
 }
 
@@ -222,6 +238,8 @@ Roster get_roster(In& in) {
         member.host = in.boolean();
         m.members.push_back(std::move(member));
     }
+    m.successor = in.u8();
+    m.successor_address = in.text(kMaxAddressLength);
     return m;
 }
 
@@ -266,6 +284,24 @@ Lobby get_lobby(In& in) {
     return m;
 }
 
+Standby get_standby(In& in) {
+    Standby m;
+    const std::uint32_t n = in.count(kMaxLobbySeats);
+    m.tokens.reserve(n);
+    for (std::uint32_t i = 0; i < n && in.ok(); ++i) {
+        SeatToken t;
+        t.seat = in.u8();
+        t.token = in.u64();
+        m.tokens.push_back(t);
+    }
+    const std::uint32_t held = in.count(kMaxLobbySeats);
+    m.computer_held.reserve(held);
+    for (std::uint32_t i = 0; i < held && in.ok(); ++i) {
+        m.computer_held.push_back(in.u8());
+    }
+    return m;
+}
+
 Chat get_chat(In& in) {
     Chat m;
     m.seat = in.u8();
@@ -302,12 +338,14 @@ std::optional<Message> get(In& in, std::uint8_t type) {
             return SetReady{in.boolean()};
         case 12:
             return get_chat(in);
+        case 13:
+            return get_standby(in);
         default:
             return std::nullopt;
     }
 }
 
-static_assert(std::variant_size_v<Message> == 13, "a new message needs its case in get()");
+static_assert(std::variant_size_v<Message> == 14, "a new message needs its case in get()");
 
 }  // namespace
 

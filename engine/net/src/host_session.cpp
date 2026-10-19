@@ -52,6 +52,7 @@ struct HostSession::Peer {
         Playing,
     };
     LinkId link = 0;
+    std::string address;  ///< as the transport sees it, for the others if this one hosts next
     State state = State::Greeting;
     bool gone = false;  ///< dropped; removed at the end of the update
     bool welcomed = false;
@@ -126,6 +127,58 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat
     init_lobby();
 }
 
+HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& client,
+                         const assets::BuildingTable& buildings)
+    : Session(std::move(transport), client.m_config),
+      m_simulation(client.m_simulation),
+      m_buildings(&buildings),
+      m_name(client.m_hello.name),
+      m_content(client.m_hello.content),
+      m_lead(m_config.min_lead) {
+    m_config.password = client.m_hello.password;
+    m_config.join_running = client.m_lobby.join_running;
+    m_config.spectators = client.m_lobby.spectators;
+    m_seat = client.m_seat;
+    // The game goes on from this computer's frame. The frames the old host closed beyond it are
+    // as good as any: every computer gets them with this game. What the others had beyond them
+    // goes with the game they load from here.
+    m_frames = client.m_frames;
+    m_log_start = m_frames;
+    for (const std::vector<sim::Command>& commands : client.m_frames_ahead) {
+        m_log.push_back(Frame{commands});
+    }
+    m_closed = client.m_closed;
+    m_broadcast = m_closed;
+    if (client.m_standby) {
+        for (const SeatToken& t : client.m_standby->tokens) {
+            m_tokens.emplace_back(t.seat, t.token);
+        }
+        m_computer_held = client.m_standby->computer_held;
+    }
+    const auto old_host =
+        std::find_if(client.m_roster.begin(), client.m_roster.end(), [](const Member& m) { return m.host; });
+    const Seat left = old_host != client.m_roster.end() ? old_host->seat : sim::kNoPlayer;
+    m_lobby = client.m_lobby;
+    m_lobby.started = true;
+    for (std::size_t s = 0; s < m_lobby.seats.size(); ++s) {
+        if (s == m_seat) {
+            m_lobby.seats[s] = LobbySeat{LobbySeat::Kind::Human, m_name, true};
+        } else if (m_lobby.seats[s].kind == LobbySeat::Kind::Human) {
+            m_lobby.seats[s] = LobbySeat{};  // until its player is back
+        }
+    }
+    // The old host's slot: the computer plays it until someone takes it, as a slot left open.
+    if (left != sim::kNoPlayer && left < m_lobby.seats.size() && left != m_seat) {
+        forget_token(left);
+        m_open.emplace_back(sim::PlayerControl{left, true});
+        if (std::find(m_computer_held.begin(), m_computer_held.end(), left) == m_computer_held.end()) {
+            m_computer_held.push_back(left);
+        }
+    }
+    forget_token(m_seat);
+    init_lobby();
+}
+
 void HostSession::init_lobby() {
     m_lobby.join_running = m_config.join_running;
     m_lobby.spectators = m_config.spectators;
@@ -195,6 +248,7 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
             case TransportEvent::Kind::Connected: {
                 auto peer = std::make_unique<Peer>();
                 peer->link = e.link;
+                peer->address = m_transport->address(e.link);
                 m_peers.push_back(std::move(peer));
                 break;
             }
@@ -249,6 +303,9 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
     std::erase_if(m_peers, [](const auto& p) { return p->gone; });
     if (m_roster_changed) {
         refresh_roster();
+    }
+    if (started()) {
+        hand_over();
     }
     m_transport->flush();
 }
@@ -322,7 +379,10 @@ void HostSession::hello(Peer& peer, const Hello& m) {
             }
         }
     }
-    if (seat == sim::kNoPlayer) {
+    if (seat == sim::kNoPlayer && m.returning && m_config.spectators) {
+        // After the host changed, without its slot (it watched, or someone took the slot): it
+        // watches, rather than taking a slot it did not have.
+    } else if (seat == sim::kNoPlayer) {
         if (started() && !m_config.join_running) {
             drop(peer, RefuseReason::Closed);
             return;
@@ -727,7 +787,44 @@ void HostSession::refresh_roster() {
         m_roster.push_back(Member{p->seat, p->name, state, false});
         m_roster_links.push_back(p->link);
     }
-    broadcast(Roster{m_roster});
+    // The successor: of the computers that play a slot and run the game, the one with the lowest
+    // slot, so that it does not change while the same computers play.
+    m_successor = sim::kNoPlayer;
+    m_successor_address.clear();
+    for (const auto& p : m_peers) {
+        if (!p->gone && p->welcomed && p->seat != sim::kNoPlayer && p->seat < m_successor &&
+            p->state == Peer::State::Playing && !p->lagging && !p->address.empty()) {
+            m_successor = p->seat;
+            m_successor_address = p->address;
+        }
+    }
+    m_standby_changed = true;
+    broadcast(Roster{m_roster, m_successor, m_successor_address});
+}
+
+void HostSession::hand_over() {
+    if (!m_standby_changed) {
+        return;
+    }
+    m_standby_changed = false;
+    const auto successor = std::find_if(m_peers.begin(), m_peers.end(), [&](const auto& p) {
+        return !p->gone && p->welcomed && p->seat != sim::kNoPlayer && p->seat == m_successor;
+    });
+    if (successor == m_peers.end()) {
+        m_standby_link.reset();
+        return;
+    }
+    Standby standby;
+    for (const auto& [seat, token] : m_tokens) {
+        standby.tokens.push_back(SeatToken{seat, token});
+    }
+    standby.computer_held = m_computer_held;
+    if (m_standby_link == (*successor)->link && standby == m_standby) {
+        return;
+    }
+    send((*successor)->link, standby);
+    m_standby_link = (*successor)->link;
+    m_standby = std::move(standby);
 }
 
 void HostSession::broadcast(const Message& message) {
@@ -750,11 +847,12 @@ std::uint64_t HostSession::token_of(Seat seat) {
         token = random_token();
     }
     m_tokens.emplace_back(seat, token);
+    m_standby_changed = true;
     return token;
 }
 
 void HostSession::forget_token(Seat seat) {
-    std::erase_if(m_tokens, [&](const auto& t) { return t.first == seat; });
+    m_standby_changed |= std::erase_if(m_tokens, [&](const auto& t) { return t.first == seat; }) > 0;
 }
 
 // --- The lobby ---
@@ -896,6 +994,7 @@ void HostSession::start(sim::Simulation& simulation, const assets::BuildingTable
     m_buildings = &buildings;
     m_lobby.started = true;
     m_lobby_changed = true;
+    m_standby_changed = true;
     const auto& players = simulation.world().players();
     for (std::size_t s = 0; s < m_lobby.seats.size() && s < players.size(); ++s) {
         if (m_lobby.seats[s].kind == LobbySeat::Kind::Open && players[s].role == sim::PlayerRole::Computer) {

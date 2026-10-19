@@ -116,6 +116,15 @@ public:
         return it == m_links.end() ? 0 : it->second->roundTripTime;
     }
 
+    [[nodiscard]] std::string address(LinkId link) const override {
+        const auto it = m_links.find(link);
+        char text[64] = {};
+        if (it == m_links.end() || enet_address_get_host_ip(&it->second->address, text, sizeof text) != 0) {
+            return {};
+        }
+        return text;
+    }
+
 private:
     // The link id lives in the peer's data pointer (ids start at 1 there, so null means none).
     static LinkId id(const ENetPeer* peer) {

@@ -24,7 +24,7 @@
 namespace o1602::net {
 
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
-inline constexpr std::uint16_t kProtocolVersion = 2;
+inline constexpr std::uint16_t kProtocolVersion = 3;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -40,6 +40,7 @@ inline constexpr std::size_t kMaxTitleLength = 64;
 inline constexpr std::size_t kMaxChatLength = 200;
 inline constexpr std::uint32_t kMaxLobbySeats = 255;
 inline constexpr std::uint32_t kMaxSetupBytes = 64U << 10;
+inline constexpr std::size_t kMaxAddressLength = 64;
 
 /// Which player of the world a computer plays: kNoPlayer watches only.
 using Seat = sim::PlayerId;
@@ -56,6 +57,9 @@ struct Hello {
     Seat seat = sim::kNoPlayer;  ///< the player slot wanted, kNoPlayer for any
     std::uint64_t token = 0;     ///< from an earlier Welcome: takes the same slot again
     std::string password;        ///< the game's password, if it has one
+    /// Comes after its host left, to the computer that carries the game on (host migration): back
+    /// into its slot with `token`, else it watches.
+    bool returning = false;
 };
 
 /// Commands of the computer's player, in the order given; the host puts them into the next frame
@@ -147,6 +151,10 @@ struct Member {
 
 struct Roster {
     std::vector<Member> members;
+    /// Who carries the game on if the host leaves (host migration): a member's slot, kNoPlayer for
+    /// nobody, and its address as the host sees it, where the others then connect.
+    Seat successor = sim::kNoPlayer;
+    std::string successor_address;
 };
 
 /// The fingerprints of these players differed from the host's after frame `frame`; they get the
@@ -207,8 +215,25 @@ struct Chat {
     std::string text;  ///< 1 to kMaxChatLength bytes (Windows-1252)
 };
 
+// --- Host migration ---
+
+struct SeatToken {
+    Seat seat = sim::kNoPlayer;
+    std::uint64_t token = 0;
+    friend bool operator==(const SeatToken&, const SeatToken&) = default;
+};
+
+/// (Host, to its successor only) What the successor needs to carry the game on when the host leaves:
+/// the slots' tokens, so that the others get their slots back, and the slots the computer plays
+/// until someone comes. Sent again whenever it changes.
+struct Standby {
+    std::vector<SeatToken> tokens;
+    std::vector<Seat> computer_held;
+    friend bool operator==(const Standby&, const Standby&) = default;
+};
+
 using Message = std::variant<Hello, CommandBatch, Progress, Welcome, Refused, Snapshot, Turn, Roster, Desync, Lobby,
-                             TakeSeat, SetReady, Chat>;
+                             TakeSeat, SetReady, Chat, Standby>;
 
 [[nodiscard]] std::vector<std::uint8_t> encode(const Message& message);
 /// Nothing if the bytes are cut off, too long, of an unknown type or out of range.

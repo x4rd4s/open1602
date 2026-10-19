@@ -6,11 +6,44 @@
 
 namespace o1602::net {
 
+namespace {
+
+/// Following a successor: the wait before connecting again after an attempt failed.
+constexpr std::uint32_t kRetryMs = 500;
+
+}  // namespace
+
 ClientSession::ClientSession(std::unique_ptr<Transport> transport, Hello hello, Loader load, SessionConfig config)
     : Session(std::move(transport), config), m_hello(std::move(hello)), m_load(std::move(load)) {
     m_hello.protocol = kProtocolVersion;
     m_hello.name.resize(std::min(m_hello.name.size(), kMaxNameLength));
     m_hello.password.resize(std::min(m_hello.password.size(), kMaxPasswordLength));
+}
+
+ClientSession::ClientSession(const ClientSession& old, Connect connect)
+    : Session(connect(), old.m_config), m_hello(old.m_hello), m_load(old.m_load), m_connect(std::move(connect)) {
+    m_hello.seat = old.m_seat;
+    m_hello.token = old.m_token;
+    m_hello.returning = true;
+}
+
+bool ClientSession::hosts_next() const noexcept {
+    return m_ended && m_end_reason == EndReason::HostLeft && m_simulation != nullptr && m_lobby.started &&
+           m_seat != sim::kNoPlayer && m_successor == m_seat && m_standby.has_value();
+}
+
+bool ClientSession::can_migrate() const noexcept {
+    if (!m_ended || m_end_reason != EndReason::HostLeft || m_simulation == nullptr || !m_lobby.started ||
+        m_successor == sim::kNoPlayer) {
+        return false;
+    }
+    return m_successor == m_seat ? hosts_next() : !m_successor_address.empty();
+}
+
+std::string ClientSession::successor_name() const {
+    const auto it = std::find_if(m_roster.begin(), m_roster.end(),
+                                 [&](const Member& m) { return !m.host && m.seat == m_successor; });
+    return it != m_roster.end() ? it->name : std::string{};
 }
 
 void ClientSession::say(std::string text) {
@@ -44,10 +77,26 @@ void ClientSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeT
     if (m_ended) {
         return;
     }
+    if (m_connect && !m_welcomed) {
+        // Following a successor that may not host yet: connect again until it takes this computer in.
+        m_migration_ms += real_ms;
+        if (m_migration_ms >= m_config.migration_ms) {
+            end(EndReason::ConnectFailed);
+            m_transport.reset();
+            return;
+        }
+        if (!m_transport && (m_retry_ms += real_ms) >= kRetryMs) {
+            m_retry_ms = 0;
+            m_transport = m_connect();
+        }
+    }
+    if (!m_transport) {
+        return;
+    }
     m_incoming.clear();
     m_transport->poll(m_incoming);
     for (TransportEvent& e : m_incoming) {
-        if (m_ended) {
+        if (m_ended || !m_transport) {
             break;
         }
         switch (e.kind) {
@@ -56,12 +105,20 @@ void ClientSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeT
                 send(kHost, m_hello);
                 break;
             case TransportEvent::Kind::Disconnected:
+                if (m_connect && !m_welcomed) {
+                    m_connected = false;
+                    m_transport.reset();  // and again in a moment
+                    break;
+                }
                 end(m_welcomed ? EndReason::HostLeft : EndReason::ConnectFailed);
                 break;
             case TransportEvent::Kind::Received:
                 receive(e.data);
                 break;
         }
+    }
+    if (!m_transport) {
+        return;
     }
     if (m_ended) {
         m_transport->disconnect(kHost);
@@ -129,6 +186,13 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
         turn(*frames);
     } else if (auto* roster = std::get_if<Roster>(&*message)) {
         m_roster = std::move(roster->members);
+        m_successor = roster->successor;
+        m_successor_address = std::move(roster->successor_address);
+        if (m_successor != m_seat) {
+            m_standby.reset();
+        }
+    } else if (auto* standby = std::get_if<Standby>(&*message)) {
+        m_standby = std::move(*standby);
     } else if (auto* lobby = std::get_if<Lobby>(&*message)) {
         m_lobby = std::move(*lobby);
         lobby_event();
