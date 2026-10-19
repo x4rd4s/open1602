@@ -16,6 +16,7 @@
 
 #include "app_settings.hpp"
 #include "build_tool.hpp"
+#include "command_sink.hpp"
 #include "game_sound.hpp"
 #include "hud.hpp"
 #include "multiplayer_menu.hpp"
@@ -293,9 +294,6 @@ private:
     void selection_changed(bool box);
     /// Orders to the simulation; those that cannot be taken back wait for an answer (ADR 0010).
     void submit_orders(std::vector<sim::Command> orders, bool sound = true);
-    /// A command of the local player: to the simulation, or in a multiplayer game to the session,
-    /// which carries it out on every computer at the same frame.
-    void submit(sim::Command command);
 
     // ---- Multiplayer (multiplayer.cpp, ADR 0011) ----
     /// Hosts or joins the multiplayer game of the command line.
@@ -407,6 +405,8 @@ private:
     std::unique_ptr<GameState> m_state;  ///< the running game (after m_buildings, m_figures, m_options)
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
+    /// The local player's commands: to m_state's simulation, or to m_session while there is one.
+    CommandSink m_command_sink;
     std::unique_ptr<net::LanBrowser> m_lan_browser;  ///< while the multiplayer menu looks for games
     std::unique_ptr<net::LanBeacon> m_lan_beacon;    ///< while this computer hosts a game shown on the network
     std::uint64_t m_lan_search_ms = 0;               ///< real time of the last search

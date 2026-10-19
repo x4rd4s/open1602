@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # The game's parts that need no platform: the main menu's lists, the multiplayer menu and its
-# texts, the settings files, the build tool, the questions before orders. Built without the game too, so that the tests have them.
+# texts, the settings files, the build tool, the command sink, the questions before orders. Built without the game too, so that the tests have them.
 
 add_library(o1602_menus
     ../src/app_settings.cpp
     ../src/build_tool.cpp
+    ../src/command_sink.cpp
     ../src/high_score_file.cpp
     ../src/main_menu.cpp
     ../src/multiplayer_menu.cpp

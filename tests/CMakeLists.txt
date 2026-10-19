@@ -26,6 +26,7 @@ add_executable(o1602_tests
     unit/test_construction.cpp
     unit/test_build_tool.cpp
     unit/test_order_questions.cpp
+    unit/test_command_sink.cpp
     unit/test_drag_path.cpp
     unit/test_deer.cpp
     unit/test_disasters.cpp

@@ -65,7 +65,8 @@ core::Status MapViewer::start_multiplayer() {
         }
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_state->simulation, m_buildings,
                                                        m_local_player, name, content_fingerprint());
-        m_session->submit(sim::PlayerRename{m_local_player, name});
+        m_command_sink.set_session(m_session.get());
+        m_command_sink.submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
                      static_cast<unsigned>(m_local_player));
         return core::Ok{};
@@ -326,6 +327,7 @@ void MapViewer::update_lan_beacon() {
 
 void MapViewer::end_session() {
     m_session.reset();
+    m_command_sink.set_session(nullptr);
     m_lan_beacon.reset();
     m_hosted.reset();
     m_hosted_world.reset();
@@ -416,6 +418,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     const std::string name = m_hud ? m_hud->multiplayer()->name() : m_app_settings.player_name;
     m_session = std::make_unique<net::HostSession>(std::move(transport).value(), std::move(lobby), seat, name,
                                                    content_fingerprint(), config);
+    m_command_sink.set_session(m_session.get());
     m_hosted = setup;
     m_hosted_world = std::move(world);
     if (setup.lan) {
@@ -531,7 +534,7 @@ core::Status MapViewer::start_hosted_game() {
     }
     host->start(m_state->simulation, m_buildings);
     if (own != sim::kNoPlayer && own < lobby.seats.size()) {
-        m_session->submit(sim::PlayerRename{own, lobby.seats[own].name});
+        m_command_sink.submit(sim::PlayerRename{own, lobby.seats[own].name});
     }
     std::fprintf(stderr, "multiplayer: the game starts\n");
     if (m_hud) {
@@ -577,6 +580,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     m_session = std::make_unique<net::ClientSession>(
         std::move(transport).value(), hello,
         [this](std::span<const std::uint8_t> save) { return load_from_host(save); });
+    m_command_sink.set_session(m_session.get());
     if (m_hud && m_hud->multiplayer() != nullptr) {
         m_hud->multiplayer_model().chat.clear();
         m_hud->multiplayer()->show_connecting(address + ":" + std::to_string(port));

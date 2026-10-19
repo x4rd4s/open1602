@@ -294,7 +294,8 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         if ((flags & audio::kMessageNormalSpeed) != 0 && self->m_state->simulation.speed() > 1) {
             // Fires, plagues and attacks: back to normal speed (0x004893F0), as a command like any
             // other change of the speed.
-            self->submit(sim::GameSpeedOrder{self->m_local_player, sim::GameSpeedOrder::Op::SetSpeed, 1});
+            self->m_command_sink.submit(
+                sim::GameSpeedOrder{self->m_local_player, sim::GameSpeedOrder::Op::SetSpeed, 1});
         }
         if (self->m_hud) {
             // The icon in the colour of the player the message is about (a rival's new city).
@@ -389,6 +390,7 @@ MapViewer::MapViewer(assets::GameDirectory game, assets::BuildingTable buildings
       m_state(std::make_unique<GameState>(std::move(world), m_buildings, m_figures, m_options.rules)),
       m_clock(m_buildings),
       m_tool(m_buildings) {
+    m_command_sink.set_simulation(&m_state->simulation);
     setup_keys();
     warn_if_state_damaged();
 }
@@ -755,12 +757,12 @@ void MapViewer::handle_event(const SDL_Event& original) {
                             order->ship &&
                             std::ranges::all_of(sim::plan_build(m_state->world, m_buildings, *order).items,
                                                 [](const sim::PlannedBuild& i) { return i.ok(); });
-                        submit(std::move(*order));
+                        m_command_sink.submit(std::move(*order));
                         if (founded) {
                             m_tool.set_mode(BuildTool::Mode::Off);
                         }
                     } else if (auto demolish = m_tool.demolish_order(m_local_player, *spot)) {
-                        submit(*demolish);
+                        m_command_sink.submit(*demolish);
                     }
                 }
                 m_tool.release();
@@ -1549,12 +1551,14 @@ void MapViewer::toggle_pause_video() {
     m_pause_video = !m_state->simulation.paused() && !m_pause_video;
     m_pause_seen = false;
     if (m_pause_video) {
-        submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Pause, m_state->simulation.speed()});
+        m_command_sink.submit(
+            sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Pause, m_state->simulation.speed()});
         if (m_video && m_video->available(6)) {
             request_video(6, 0, true);
         }
     } else {
-        submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Resume, m_state->simulation.speed()});
+        m_command_sink.submit(
+            sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Resume, m_state->simulation.speed()});
         if (m_video && m_video->playing() && m_video->number() == 6 && m_video_now.loop) {
             stop_video();
         }
@@ -2387,6 +2391,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     m_ship_trail = render::ShipTrail{};
     m_tool.set_mode(BuildTool::Mode::Off);
     m_state = std::move(next);
+    m_command_sink.set_simulation(&m_state->simulation);
     m_options.scenario = source;
     m_title_real_ms = 0;  // loading took real time the game did not run: no "too slow" for it
     warn_if_state_damaged();
@@ -2513,7 +2518,7 @@ void MapViewer::apply_menu() {
                 started = load_game(e.path);
                 if (started && !e.name.empty()) {
                     // The stored name goes to the human (0x0048A680).
-                    submit(sim::PlayerRename{m_local_player, e.name});
+                    m_command_sink.submit(sim::PlayerRename{m_local_player, e.name});
                 }
                 break;
             case MenuEvent::Kind::LoadSlot:
@@ -2609,14 +2614,6 @@ core::Status MapViewer::save_screenshot(const std::filesystem::path& path) {
         std::filesystem::create_directories(path.parent_path(), ec);
     }
     return core::write_png_rgba(path, width, height, pixels);
-}
-
-void MapViewer::submit(sim::Command command) {
-    if (m_session) {
-        m_session->submit(std::move(command));
-    } else {
-        m_state->simulation.submit(std::move(command));
-    }
 }
 
 sim::GameOutcome MapViewer::local_outcome() const {

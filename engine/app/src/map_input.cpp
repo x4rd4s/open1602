@@ -393,19 +393,19 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             }
             break;
         case KeyAction::Pause:
-            submit(sim::GameSpeedOrder{
+            m_command_sink.submit(sim::GameSpeedOrder{
                 m_local_player,
                 m_state->simulation.paused() ? sim::GameSpeedOrder::Op::Resume : sim::GameSpeedOrder::Op::Pause,
                 m_state->simulation.speed()});
             break;
         case KeyAction::SpeedUp:
-            submit(sim::GameSpeedOrder{
+            m_command_sink.submit(sim::GameSpeedOrder{
                 m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
                 std::min(m_state->simulation.rules().max_game_speed, m_state->simulation.speed() * 2)});
             break;
         case KeyAction::SpeedDown:
-            submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
-                                       std::max(1U, m_state->simulation.speed() / 2)});
+            m_command_sink.submit(sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::SetSpeed,
+                                                      std::max(1U, m_state->simulation.speed() / 2)});
             break;
         case KeyAction::QuickSave: {
             const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
@@ -595,7 +595,7 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
         }
         case KeyAction::Explore:
             if (m_units.size() == 1 && m_units.kind() == ui::UnitRef::Kind::Ship) {
-                submit(sim::ExploreOrder{m_local_player, m_units.units().front().id});
+                m_command_sink.submit(sim::ExploreOrder{m_local_player, m_units.units().front().id});
             }
             break;
         case KeyAction::Trade:
@@ -1043,7 +1043,7 @@ void MapViewer::submit_orders(std::vector<sim::Command> orders, bool sound) {
         }
     }
     for (sim::Command& c : orders) {
-        submit(std::move(c));
+        m_command_sink.submit(std::move(c));
     }
     // One acknowledgement of the first unit (0x0044D540).
     if (sound && !m_units.empty()) {
