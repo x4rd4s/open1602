@@ -15,7 +15,6 @@ namespace {
 constexpr std::uint32_t kProductionPeriodMs = 1000;  // 0x0047DAF0: once per game second
 constexpr std::uint32_t kUpkeepPeriodMs = 5000;      // 0x00476350: each player once per 5 s
 constexpr std::uint32_t kDiplomacyTickMs = 5000;     // 0x00476350: the diplomacy counters fade
-constexpr std::uint32_t kPirateGoalFlag = 1U << 5;   // game settings: defeat the pirates
 constexpr std::uint8_t kDefeatChecks = 40;           // 0x00476350: 40 checks of 5 s
 constexpr std::size_t kArchClass = 2;                // 0x004805D0(K, 2): inhabitants of class 2 and up
 constexpr std::uint64_t kArchInhabitants = 200;      // more than 199
@@ -766,7 +765,7 @@ void Simulation::players_tick() {
         switch (p.role) {
             case PlayerRole::Pirates:
                 // Only when a mission asks to defeat them (settings bit 5).
-                if ((m_world->game_settings().flags & kPirateGoalFlag) != 0 && !city && !ship) {
+                if ((m_world->game_settings().flags & World::GameSettings::kPirateGoal) != 0 && !city && !ship) {
                     defeat(id, GameEvent::Reason::Retired, true);
                 }
                 break;

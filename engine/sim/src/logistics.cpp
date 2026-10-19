@@ -1221,9 +1221,9 @@ bool Logistics::plan_deer(Walker& w) {
         std::int32_t wait;
     };
     constexpr std::int32_t kRound = 64;
-    constexpr std::int32_t kOrth = 64;     // ORTH[32]
-    constexpr std::int32_t kDiag = 91;     // DIAG[32]
-    constexpr std::int32_t kExtra = 0xC0;  // the deer planner's extra rounds
+    constexpr auto kOrth = static_cast<std::int32_t>(kStepStraight);  // ORTH[32]
+    constexpr auto kDiag = static_cast<std::int32_t>(kStepDiagonal);  // DIAG[32]
+    constexpr std::int32_t kExtra = 0xC0;                             // the deer planner's extra rounds
     const std::int32_t sx = w.tile.x - corner.x;
     const std::int32_t sy = w.tile.y - corner.y;
     state[at(sx, sy)] = kStart;

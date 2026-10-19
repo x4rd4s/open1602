@@ -3,22 +3,11 @@
 
 #include <algorithm>
 
+#include "o1602/sim/game_data.hpp"
+
 namespace o1602::sim {
 
 namespace {
-
-// HAUS Kind values a dragged line looks at.
-constexpr std::int32_t kRoad = 1;
-constexpr std::int32_t kGate = 3;
-constexpr std::int32_t kTowerBeach = 7;
-constexpr std::int32_t kForest = 10;
-constexpr std::int32_t kRuin = 12;
-constexpr std::int32_t kSquare = 13;
-constexpr std::int32_t kRiver = 16;
-constexpr std::int32_t kBridge = 18;
-constexpr std::int32_t kBeach = 23;
-constexpr std::int32_t kBeachLast = 27;
-constexpr std::int32_t kBeachRuin = 29;
 
 // The search spends 0x40 of 0x4000 per round and stops below 0: 257 rounds.
 constexpr std::uint32_t kMaxSteps = 257;
@@ -43,13 +32,15 @@ constexpr Neighbour kNeighbours[] = {
 
 bool drag_passable(DragLine line, std::int32_t kind, bool gate_centre) noexcept {
     if (line == DragLine::Road) {
-        if (kind == kGate) {
+        if (kind == sim::kind::kGate) {
             return gate_centre;
         }
-        return kind == kRoad || (kind >= kForest && kind <= kSquare) || kind == kRiver || kind == kBridge;
+        return kind == sim::kind::kRoad || (kind >= sim::kind::kForest && kind <= sim::kind::kSquare) ||
+               kind == sim::kind::kRiver || kind == sim::kind::kBridge;
     }
-    return (kind >= kGate && kind <= kTowerBeach) || (kind >= kForest && kind <= kRuin) ||
-           (kind >= kBeach && kind <= kBeachLast) || kind == kBeachRuin;
+    return (kind >= sim::kind::kGate && kind <= sim::kind::kTowerBeach) ||
+           (kind >= sim::kind::kForest && kind <= sim::kind::kRuin) ||
+           (kind >= sim::kind::kBeach && kind <= sim::kind::kBeachVariant) || kind == sim::kind::kBeachRuin;
 }
 
 std::vector<DragStep> drag_path(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,

@@ -7,6 +7,7 @@
 #include <tuple>
 #include <utility>
 
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/sea_paths.hpp"
 
@@ -101,7 +102,7 @@ std::optional<Fighter> Combat::fighter(const Target& unit) const {
             f.range8 = static_cast<std::int32_t>(type->combat.range8);
             f.damage = scaled_damage(type->combat.hit, f.health, f.max_health);
             f.threat = f.damage * 1000 / std::max<std::uint32_t>(1, type->work_time_ms);
-            f.cannon = type->kind == 4;  // FIGTYP_KANONIER
+            f.cannon = type->kind == figtype::kGunner;
             return f;
         }
         case Target::Kind::Ship: {

@@ -12,8 +12,8 @@ namespace {
 
 constexpr std::uint8_t kBlocked = 1;
 constexpr std::uint8_t kVisited = 4;
-constexpr std::uint32_t kStraight = 64;  // open sea (0x0046F8A0 class 0)
-constexpr std::uint32_t kDiagonal = 91;
+constexpr std::uint32_t kStraight = kStepStraight;  // open sea (0x0046F8A0 class 0)
+constexpr std::uint32_t kDiagonal = kStepDiagonal;
 constexpr std::uint32_t kSoftStraight = 500;  // around a ship lying still (cost class 0x7E)
 constexpr std::uint32_t kSoftDiagonal = 711;
 constexpr std::uint32_t kDangerStraight = 504;  // near hostile towers (cost class 0x7F)

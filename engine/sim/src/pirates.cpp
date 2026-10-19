@@ -16,11 +16,8 @@ constexpr std::uint8_t kMaxPirateCannons = 10;   // Maxkanon of PIRAT
 constexpr std::int32_t kWanderRange = 90;        // tiles: random places at sea (0x004455F0)
 constexpr std::uint32_t kNestFoodMin = 25 * 32;  // the nest sells when it holds more food
 constexpr std::uint32_t kNestFoodCost = 10 * 32;
-constexpr std::uint8_t kFood = 14;       // NAHRUNG
 constexpr std::uint16_t kValuable = 35;  // base price of Tabak: plunder is worth at least this
 constexpr std::uint32_t kPlunderAmount = 50 * 32;
-constexpr std::uint32_t kNoPirates = 1U << 0;   // game settings: no pirates
-constexpr std::uint32_t kPirateGoal = 1U << 5;  // game settings: defeat the pirates
 
 }  // namespace
 
@@ -78,7 +75,7 @@ void Fleet::pirates_step() {
     const PlayerId p = pirates();
     const World::GameSettings& settings = m_world->game_settings();
     const std::uint32_t max = pirate_max_ships(*m_world);
-    if (p == kNoPlayer || (settings.flags & kNoPirates) != 0 || max <= 1) {
+    if (p == kNoPlayer || (settings.flags & World::GameSettings::kNoPirates) != 0 || max <= 1) {
         return;
     }
     std::uint32_t ships = 0;
@@ -89,7 +86,7 @@ void Fleet::pirates_step() {
     Random& random = m_world->random(RandomStream::Pirates);
     // A new ship at a random edge of the map, unarmed for one step.
     if (ships < max && m_pirate_armed && m_pirate_spawn_ms == 0 &&
-        ((settings.flags & kPirateGoal) == 0 || !bases.empty())) {
+        ((settings.flags & World::GameSettings::kPirateGoal) == 0 || !bases.empty())) {
         for (int tries = 0; tries < 16; ++tries) {
             const std::uint32_t r = random.next();
             std::int32_t x = 0;
@@ -160,8 +157,8 @@ void Fleet::pirates_step() {
     if (ships != 0 && !bases.empty()) {
         const City& found = m_world->cities()[bases.front()];
         City* nest = m_world->city(found.island, found.index);
-        if (nest != nullptr && nest->stock(kFood) > kNestFoodMin) {
-            nest->goods[kFood] -= kNestFoodCost;
+        if (nest != nullptr && nest->stock(ware::kFood) > kNestFoodMin) {
+            nest->goods[ware::kFood] -= kNestFoodCost;
             pirate_nest_sales(*nest);
         }
     }
@@ -177,12 +174,12 @@ void Fleet::pirate_nest_sales(City& nest) {
         }
     }
     std::vector<std::pair<std::uint64_t, std::uint8_t>> values;
-    for (std::uint8_t w = 2; w <= 24; ++w) {
+    for (std::uint8_t w = ware::kFirstTrade; w <= ware::kLastTrade; ++w) {
         values.emplace_back(std::uint64_t{base_price(w)} * nest.stock(w), w);
     }
     std::stable_sort(values.begin(), values.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
-    if (nest.trade.size() < 25) {
-        nest.trade.resize(25);
+    if (nest.trade.size() < ware::kLastTrade + 1U) {
+        nest.trade.resize(ware::kLastTrade + 1U);
     }
     for (City::Trade& t : nest.trade) {
         t.sell = false;

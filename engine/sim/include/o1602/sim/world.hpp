@@ -494,6 +494,9 @@ public:
     /// Settings the original keeps with a game (TIMERS): the difficulty 0..3 (how often droughts
     /// come) and the settings word (bit 2: no droughts).
     struct GameSettings {
+        static constexpr std::uint32_t kNoPirates = 1U << 0;   ///< flags: no pirates
+        static constexpr std::uint32_t kPirateGoal = 1U << 5;  ///< flags: defeat the pirates
+
         std::uint8_t difficulty = 2;
         std::uint32_t flags = 0;                 ///< bit 0: no pirates, bit 2: no droughts, bit 5: defeat the pirates
         std::uint32_t pirate_interval_s = 1500;  ///< TIMERS +0xB8: time between two new pirate ships

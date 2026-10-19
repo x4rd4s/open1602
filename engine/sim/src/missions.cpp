@@ -14,9 +14,8 @@ namespace o1602::sim {
 
 namespace {
 
-constexpr std::uint32_t kPirateGoal = 1U << 5;  // game settings: defeat the pirates
-constexpr std::uint8_t kFirstCrop = 45;         // GETREIDE: resources 45..58 are fertility bits
-constexpr std::uint8_t kLastCrop = 58;
+constexpr std::uint8_t kFirstCrop = ware::kCornField;  // GETREIDE: resources 45..58 are fertility bits
+constexpr std::uint8_t kLastCrop = ware::kTreasure;
 constexpr std::uint16_t kMinDeposit = 32;  // a deposit counts with at least a ton left
 
 std::uint64_t city_key(std::uint16_t island, std::uint8_t index) noexcept {
@@ -257,7 +256,7 @@ void prepare_missions(World& world) {
         for (const PlayerId q : m->defeat) {
             const Player* target = world.player(q);
             if (target != nullptr && target->role == PlayerRole::Pirates) {
-                settings.flags |= kPirateGoal;
+                settings.flags |= World::GameSettings::kPirateGoal;
             }
         }
     }

@@ -37,17 +37,17 @@ void emit(std::vector<ProductionEvent>* events, ProductionEvent::Kind kind, std:
 /// cattle farms, markets and warehouses (carts) and two kinds that need city money.
 bool asks_for_main_raw(const assets::BuildingType& b, const Production& p) noexcept {
     switch (b.prod_kind) {
-        case 1:   // HANDWERK
-        case 3:   // BERGWERK
-        case 4:   // WEIDETIER
-        case 7:   // MARKT
-        case 8:   // KONTOR
-        case 22:  // (kinds 0x16, 0x1A: only if the city has money, +0x1FE - checked by the logistics)
-        case 26:
-        case 30:  // HAUPT
+        case prod::kWorkshop:
+        case prod::kMine:
+        case prod::kPasture:
+        case prod::kMarket:
+        case prod::kKontor:
+        case prod::kKlinik:  // (kinds 0x16, 0x1A: only if the city has money, +0x1FE - checked by the logistics)
+        case prod::kBrunnen:
+        case prod::kHaupt:
             return true;
-        case 2:  // PLANTAGE
-        case 6:  // FISCHEREI
+        case prod::kFarm:
+        case prod::kFisher:
             return p.rate == 0;
         default:
             return false;

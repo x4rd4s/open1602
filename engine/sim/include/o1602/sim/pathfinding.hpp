@@ -187,13 +187,18 @@ private:
     std::optional<std::uint32_t> m_start;
 };
 
+/// Cost of a step on a road or the open sea, the original's ORTH[32] and DIAG[32]: straight and
+/// diagonal. The land search, the sea search and the deer planner all count in these units.
+inline constexpr std::uint32_t kStepStraight = 64;
+inline constexpr std::uint32_t kStepDiagonal = 91;
+
 /// Cost of leaving a tile of Wegspeed class `cost` (0x0046F8A0): straight 2 * cost, diagonal
 /// 91 * cost / 32, never less than a road (64 / 91).
 [[nodiscard]] constexpr std::uint32_t straight_cost(std::uint8_t cost) noexcept {
-    return cost < 32 ? 64U : 2U * cost;
+    return cost < 32 ? kStepStraight : 2U * cost;
 }
 [[nodiscard]] constexpr std::uint32_t diagonal_cost(std::uint8_t cost) noexcept {
-    return cost < 32 ? 91U : 91U * cost / 32U;
+    return cost < 32 ? kStepDiagonal : kStepDiagonal * cost / 32U;
 }
 
 }  // namespace o1602::sim

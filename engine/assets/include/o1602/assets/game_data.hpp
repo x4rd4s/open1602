@@ -157,6 +157,7 @@ inline constexpr std::int32_t kDenkmal = 28;
 inline constexpr std::int32_t kTriumph = 29;
 inline constexpr std::int32_t kHaupt = 30;
 inline constexpr std::int32_t kPirateHouse = 31;  ///< PIRATWOHN
+inline constexpr std::int32_t kWall = 32;         ///< pMAUER
 /// The public buildings, WIRT to SCHLOSS.
 inline constexpr std::int32_t kPublicFirst = kWirt;
 inline constexpr std::int32_t kPublicLast = kSchloss;
@@ -175,6 +176,14 @@ inline constexpr std::uint16_t kDeer = 89;      ///< HIRSCH: the northern island
 inline constexpr std::uint16_t kAntelope = 91;  ///< ANTILOPE: the southern islands' game
 inline constexpr std::uint16_t kRobber = 92;    ///< RAEUBER
 }  // namespace figure
+
+/// FIGURE Kind values of the land units (figuren.cod FIGTYP_*).
+namespace figtype {
+inline constexpr std::int32_t kSwordsman = 1;  ///< FIGTYP_SCHWERT
+inline constexpr std::int32_t kRider = 2;      ///< FIGTYP_KAVALERIE
+inline constexpr std::int32_t kMusketeer = 3;  ///< FIGTYP_MUSKETIER
+inline constexpr std::int32_t kGunner = 4;     ///< FIGTYP_KANONIER
+}  // namespace figtype
 
 /// Buildings of the base game named by Id, mostly by the computer players.
 namespace id {

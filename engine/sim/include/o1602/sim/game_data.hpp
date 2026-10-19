@@ -12,6 +12,7 @@ namespace ware = assets::ware;
 namespace kind = assets::kind;
 namespace prod = assets::prod;
 namespace figure = assets::figure;
+namespace figtype = assets::figtype;
 namespace id = assets::id;
 using assets::base_price;
 using assets::is_soldier_ware;

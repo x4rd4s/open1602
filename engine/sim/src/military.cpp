@@ -23,18 +23,18 @@ constexpr std::int32_t kTowerSight8 = 0x60;      // towers score entries within 
 /// HAUS kinds that take only 51/128 of the damage of a shot that is not a cannon's (0x0047A650).
 bool sturdy(std::int32_t kind) noexcept {
     switch (kind) {
-        case 3:   // TOR
-        case 4:   // MAUER
-        case 5:   // MAUERSTRAND
-        case 6:   // TURM
-        case 7:   // TURMSTRAND
-        case 14:  // GEBAEUDE
-        case 28:  // STRANDHAUS
-        case 30:  // PIER
-        case 34:  // MINE
-        case 35:  // HQ
-        case 36:  // HAFEN
-        case 37:  // WMUEHLE
+        case sim::kind::kGate:
+        case sim::kind::kWall:
+        case sim::kind::kWallBeach:
+        case sim::kind::kTower:
+        case sim::kind::kTowerBeach:
+        case sim::kind::kBuilding:
+        case sim::kind::kBeachHouse:
+        case sim::kind::kPier:
+        case sim::kind::kMine:
+        case sim::kind::kHq:
+        case sim::kind::kHarbour:
+        case sim::kind::kMill:
             return true;
         default:
             return false;
@@ -515,7 +515,6 @@ void Military::curse(std::uint16_t island, std::uint8_t city, bool dissolved) {
         if (c->cursed || !city_defenceless(*m_world, *m_buildings, island, city)) {
             return;
         }
-        constexpr std::int32_t kDwelling = 31;  // PIRATWOHN
         std::uint32_t dwellings = 0;
         const IslandMap& map = m_world->islands()[island].map;
         for (std::uint32_t y = 0; y < map.height(); ++y) {
@@ -526,7 +525,8 @@ void Military::curse(std::uint16_t island, std::uint8_t city, bool dissolved) {
                 }
                 const auto b = building_at(*m_world, *m_buildings, island,
                                            {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
-                dwellings += b && b->type->prod_kind == kDwelling && b->origin.x == static_cast<std::int32_t>(x) &&
+                dwellings += b && b->type->prod_kind == prod::kPirateHouse &&
+                                     b->origin.x == static_cast<std::int32_t>(x) &&
                                      b->origin.y == static_cast<std::int32_t>(y)
                                  ? 1U
                                  : 0U;

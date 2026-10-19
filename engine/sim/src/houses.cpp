@@ -464,7 +464,7 @@ private:
                     const MapCell& ground = map.ground(tx, ty);
                     const assets::BuildingType* g = ground.empty() ? nullptr : m_buildings.by_sprite(ground.sprite);
                     // Ruins on a beach (STRAND .. STRANDVARI, 23..27) look different.
-                    const bool beach = g != nullptr && g->kind >= 23 && g->kind <= 27;
+                    const bool beach = g != nullptr && g->kind >= kind::kBeach && g->kind <= kind::kBeachVariant;
                     const assets::BuildingType* ruin = m_buildings.ruin_record(type->ruin, beach);
                     if (ruin == nullptr) {
                         continue;

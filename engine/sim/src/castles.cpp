@@ -16,7 +16,7 @@ namespace {
 constexpr std::uint16_t kTrained = 320;               // training points of a finished unit
 constexpr std::uint16_t kTickSeconds = 10;            // Interval of the castles; 11 s when nothing was trained
 constexpr std::uint8_t kFirstWeapon = ware::kSwords;  // SCHWERTER, MUSKETEN, KANONEN
-constexpr std::uint32_t kFullHold = 1600;             // a soldier at full health fills a hold ("50 t")
+constexpr std::uint32_t kFullHold = kHoldCapacity;    // a soldier at full health fills a hold ("50 t")
 constexpr std::int32_t kUnloadRange = 6;              // tiles from the ship
 
 }  // namespace

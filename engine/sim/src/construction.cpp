@@ -606,8 +606,8 @@ const char* refusal_name(BuildRefusal r) noexcept {
 }
 
 std::uint32_t island_fertility(const WorldIsland& island, std::uint8_t ware) noexcept {
-    constexpr std::uint8_t kFirst = 45;
-    constexpr std::uint8_t kLast = 58;
+    constexpr std::uint8_t kFirst = sim::ware::kCornField;
+    constexpr std::uint8_t kLast = sim::ware::kTreasure;
     if (ware < kFirst || ware > kLast) {
         // Ore: by its deposits, a big vein 128, a small one 64.
         std::uint32_t f = 0;
@@ -624,11 +624,14 @@ std::uint32_t island_fertility(const WorldIsland& island, std::uint8_t ware) noe
     if ((island.header.fertility >> (ware - kFirst) & 1U) != 0) {
         return 128;
     }
-    // Without the bit, the crops of the climate still grow half: 46, 48, 50 in the north,
-    // 47, 49, 51 in the south.
+    // Without the bit, the crops of the climate still grow half: tobacco, sugar cane and wine in
+    // the north, spices, cotton and cocoa in the south.
     const bool north = island.header.climate == 0;
     const bool south = island.header.climate == 1;
-    if ((north && (ware == 46 || ware == 48 || ware == 50)) || (south && (ware == 47 || ware == 49 || ware == 51))) {
+    if ((north &&
+         (ware == sim::ware::kTobaccoField || ware == sim::ware::kSugarField || ware == sim::ware::kWineField)) ||
+        (south &&
+         (ware == sim::ware::kSpiceField || ware == sim::ware::kCottonField || ware == sim::ware::kCocoaField))) {
         return 64;
     }
     return 0;
