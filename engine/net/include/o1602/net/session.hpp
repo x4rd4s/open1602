@@ -246,6 +246,8 @@ private:
     void init_lobby();
     /// The token of a slot (made when it is first needed).
     [[nodiscard]] std::uint64_t token_of(Seat seat);
+    /// The slot's token is no longer good: the slot changed hands.
+    void forget_token(Seat seat);
     [[nodiscard]] Peer* peer_of(LinkId link);
     [[nodiscard]] Seat free_seat(Seat wanted) const;
     [[nodiscard]] bool seat_taken(Seat seat) const;
@@ -271,7 +273,6 @@ private:
     std::optional<Snapshot> m_game;                        ///< the game as sent in this update
     std::vector<std::pair<Seat, std::uint64_t>> m_tokens;  ///< seat and token, to come back to it
     std::vector<Seat> m_computer_held;  ///< open at the start: the computer plays it while nobody does
-    std::uint64_t m_next_token;
     std::uint64_t m_compared = 0;
     std::uint64_t m_matched = 0;
     bool m_roster_changed = true;

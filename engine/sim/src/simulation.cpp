@@ -375,8 +375,10 @@ bool Simulation::game_speed(const GameSpeedOrder& order) {
 
 bool Simulation::rename_player(const PlayerRename& order) {
     Player* p = m_world->player(order.player);
-    if (p == nullptr || order.name.empty() || order.name.size() > PlayerRename::kMaxNameLength) {
-        return false;
+    if (p == nullptr || order.name.empty() || order.name.size() > PlayerRename::kMaxNameLength ||
+        std::any_of(order.name.begin(), order.name.end(),
+                    [](char c) { return static_cast<unsigned char>(c) < 0x20; })) {
+        return false;  // names come from the network too: no line breaks in lists and files
     }
     p->name = order.name;
     return true;

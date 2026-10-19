@@ -72,12 +72,22 @@ void ClientSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeT
         run(real_ms, before_tick);
     }
     while (!m_outgoing.empty()) {
-        const std::size_t n = std::min<std::size_t>(m_outgoing.size(), kMaxCommandsPerMessage);
-        CommandBatch batch;
-        batch.commands.assign(std::make_move_iterator(m_outgoing.begin()),
-                              std::make_move_iterator(m_outgoing.begin() + static_cast<std::ptrdiff_t>(n)));
+        // As many as fit into one message the host takes (large build orders take room).
+        std::size_t n = std::min<std::size_t>(m_outgoing.size(), kMaxCommandsPerMessage);
+        std::vector<std::uint8_t> bytes;
+        for (;;) {
+            CommandBatch batch;
+            batch.commands.assign(m_outgoing.begin(), m_outgoing.begin() + static_cast<std::ptrdiff_t>(n));
+            bytes = encode(batch);
+            if (bytes.size() <= kMaxMessageToHost || n == 1) {
+                break;
+            }
+            n /= 2;
+        }
         m_outgoing.erase(m_outgoing.begin(), m_outgoing.begin() + static_cast<std::ptrdiff_t>(n));
-        send(kHost, batch);
+        if (bytes.size() <= kMaxMessageToHost) {
+            m_transport->send(kHost, bytes);
+        }
     }
     report(real_ms);
     m_transport->flush();

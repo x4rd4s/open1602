@@ -6,8 +6,11 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "enet_library.hpp"
+
+#include "o1602/net/protocol.hpp"
 
 namespace o1602::net {
 
@@ -16,8 +19,9 @@ namespace {
 using detail::EnetLibrary;
 
 constexpr std::size_t kChannels = 1;
-/// A computer's messages to the host are small (commands, progress); the host's carry whole games.
-constexpr std::size_t kMaxToHost = 1U << 20;
+/// ENet applies its packet limit to what a host sends and receives alike, and the host sends whole
+/// games (a snapshot and its header). HostSession refuses large messages from computers itself.
+constexpr std::size_t kMaxPacket = kMaxSnapshotBytes + (64U << 10);
 constexpr enet_uint32 kTimeoutMinMs = 5000;
 constexpr enet_uint32 kTimeoutMaxMs = 15000;
 
@@ -40,6 +44,10 @@ public:
     void expect(ENetPeer* peer) { add(peer); }
 
     void poll(std::vector<TransportEvent>& events) override {
+        for (const LinkId link : m_broken) {
+            events.push_back({TransportEvent::Kind::Disconnected, link, {}});
+        }
+        m_broken.clear();
         ENetEvent e;
         while (enet_host_service(m_host, &e, 0) > 0) {
             switch (e.type) {
@@ -77,8 +85,17 @@ public:
             return;
         }
         ENetPacket* packet = enet_packet_create(message.data(), message.size(), ENET_PACKET_FLAG_RELIABLE);
-        if (packet != nullptr && enet_peer_send(it->second, 0, packet) != 0) {
-            enet_packet_destroy(packet);  // not taken: the link is going down
+        if (packet == nullptr || enet_peer_send(it->second, 0, packet) != 0) {
+            if (packet != nullptr) {
+                enet_packet_destroy(packet);
+            }
+            // Delivered whole or the link breaks (Transport::send): a message lost here would
+            // leave the other side waiting for it forever.
+            const LinkId broken = it->first;
+            it->second->data = nullptr;
+            enet_peer_disconnect_later(it->second, 0);
+            m_links.erase(it);
+            m_broken.push_back(broken);
         }
     }
 
@@ -115,6 +132,7 @@ private:
     ENetHost* m_host;
     LinkId m_next;
     std::unordered_map<LinkId, ENetPeer*> m_links;  // lookups only, never walked for the game
+    std::vector<LinkId> m_broken;                   ///< failed to send: reported at the next poll
 };
 
 }  // namespace
@@ -132,7 +150,8 @@ core::Result<std::unique_ptr<Transport>> enet_listen(std::uint16_t port, std::si
         return core::make_error(core::ErrorCode::PlatformError,
                                 "cannot listen on UDP port " + std::to_string(port) + " (in use?)");
     }
-    host->maximumPacketSize = kMaxToHost;
+    host->maximumPacketSize = kMaxPacket;
+    host->maximumWaitingData = kMaxPacket;
     return std::unique_ptr<Transport>(std::make_unique<EnetTransport>(host, false));
 }
 

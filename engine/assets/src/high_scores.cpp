@@ -39,6 +39,8 @@ std::string write_high_scores(const std::vector<HighScore>& scores) {
         const HighScore h = i < scores.size() ? scores[i] : HighScore{};
         std::string name = h.name.substr(0, kHighScoreNameLength);
         std::replace(name.begin(), name.end(), '"', '\'');  // the reader stops at the next quote
+        // A line break would split the entry; other control characters have no place in a name.
+        std::replace_if(name.begin(), name.end(), [](char c) { return static_cast<unsigned char>(c) < 0x20; }, ' ');
         // "%2d": the index right-aligned in two places.
         const std::string index = (i < 10 ? " " : "") + std::to_string(i);
         out += "    Entry:   " + index + ", \"" + name + "\", " + std::to_string(h.points) + ", " +

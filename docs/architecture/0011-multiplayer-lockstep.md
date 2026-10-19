@@ -37,10 +37,14 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    (another version) is sent away after two tries. An epoch number per game sent keeps old reports of
    a computer from touching the new game.
 7. **Senders.** Every command names its player; the host takes from a computer only commands for its
-   own slot (review point 6), none from spectators, and at most 256 per frame and player. A message
-   that makes no sense disconnects the computer.
+   own slot (review point 6), none from spectators, and at most 256 per frame and player. Only the
+   host sets the game speed and hands slots to the computer (`PlayerControl`); every player may pause,
+   go on and rename himself, at most four times a second. A message that makes no sense, a message to
+   the host larger than 1 MiB and a connection without `Hello` after 10 s disconnect the computer.
 8. **Slots.** A computer gets a free human slot of the world (or the one it asks for) and a token with
-   which it gets the same slot back after a lost connection. Without a free slot it watches. A slot
+   which it gets the same slot back after a lost connection. Tokens are random and belong to whoever
+   holds the slot: a slot that changes hands (in the lobby, after a kick, to a newcomer) gets a new
+   one, and the host's own slot takes none. Without a free slot it watches. A slot
    that was left stays in the game and gives no commands until someone comes back. The player's name
    is set as a `PlayerRename` of that player.
 9. **Same data.** When a computer joins, the host checks the protocol version and a fingerprint of the
@@ -94,7 +98,7 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 ## Consequences
 
 - Videos, menus and windows do not pause the game in multiplayer (M-018); only pause commands do, for
-  everyone.
+  everyone. The automatic return to speed 1 at a fire or an attack works only on the host.
 - Loading savegames and starting new games is blocked during a session.
 - The fingerprint costs an unpacked savegame on every computer every 100 frames.
 - A host behind a router needs UDP port 16020 (or the one it chose) forwarded for players on the

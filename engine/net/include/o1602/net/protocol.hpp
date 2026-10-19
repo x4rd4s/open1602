@@ -10,6 +10,7 @@
 // the host refuses a computer of another version.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -30,6 +31,8 @@ inline constexpr std::uint32_t kMaxCommandsPerMessage = 1024;
 inline constexpr std::uint32_t kMaxFramesPerTurn = 1U << 16;
 inline constexpr std::uint32_t kMaxRosterMembers = 256;
 inline constexpr std::uint32_t kMaxSnapshotBytes = 32U << 20;
+/// The largest message a computer sends the host (its commands and reports; the host refuses more).
+inline constexpr std::size_t kMaxMessageToHost = 1U << 20;
 inline constexpr std::size_t kMaxPasswordLength = 64;
 inline constexpr std::size_t kMaxTitleLength = 64;
 inline constexpr std::size_t kMaxChatLength = 200;

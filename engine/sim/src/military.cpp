@@ -2,6 +2,8 @@
 #include "o1602/sim/military.hpp"
 
 #include <algorithm>
+#include <unordered_set>
+#include <vector>
 
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/logistics.hpp"
@@ -81,11 +83,17 @@ void Military::tick(std::uint32_t dt_ms, std::vector<ConstructionEvent>* constru
 // ---- Orders ------------------------------------------------------------------------------------
 
 bool Military::order(const SoldierOrder& o) {
+    // Each unit once, in the order given, with the place of its id in the order (for its offset):
+    // an order from the network may name a unit many times.
     std::vector<Soldier*> units;
-    for (const std::uint32_t id : o.soldiers) {
-        Soldier* s = m_world->soldier(id);
-        if (s != nullptr && !s->away() && (o.player == kNoPlayer || s->owner == o.player)) {
+    std::vector<std::size_t> given_at;
+    std::unordered_set<std::uint32_t> seen;
+    for (std::size_t i = 0; i < o.soldiers.size(); ++i) {
+        Soldier* s = m_world->soldier(o.soldiers[i]);
+        if (s != nullptr && !s->away() && (o.player == kNoPlayer || s->owner == o.player) &&
+            seen.insert(s->id).second) {
             units.push_back(s);
+            given_at.push_back(i);
         }
     }
     if (units.empty() || (!o.target.empty() && !target_valid(o.target))) {
@@ -128,8 +136,7 @@ bool Military::order(const SoldierOrder& o) {
     // The shape of the group: each unit to the spot plus its offset (1/8 tile = 1/4 cell).
     if (o.target.kind == Target::Kind::Spot && o.offsets.size() == o.soldiers.size() && o.formation == 0xFF) {
         for (std::size_t u = 0; u < units.size(); ++u) {
-            const auto it = std::find(o.soldiers.begin(), o.soldiers.end(), units[u]->id);
-            const auto& off = o.offsets[static_cast<std::size_t>(it - o.soldiers.begin())];
+            const auto& off = o.offsets[given_at[u]];
             const auto floor_div = [](std::int32_t a, std::int32_t b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
             const std::int32_t x = static_cast<std::int32_t>(o.target.x) + floor_div(off.first, 4);
             const std::int32_t y = static_cast<std::int32_t>(o.target.y) + floor_div(off.second, 4);

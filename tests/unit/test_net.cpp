@@ -476,6 +476,46 @@ TEST_CASE("net: into a running game, out and back into the same slot") {
     CHECK(host.session->fingerprints_matched() == host.session->fingerprints_compared());
 }
 
+TEST_CASE("net: a slot's token is good only for the one it was given to") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    Computer a(network, "Anna");
+    auto c = std::make_unique<Computer>(network, "Clara");
+    run_for(network, host, {&a, c.get()}, 3000);
+    REQUIRE(c->session->playing());
+    const net::Seat seat = c->session->local_seat();
+    const std::uint64_t old = c->session->token();
+    CHECK(old != 0);
+    CHECK(a.session->token() != old + 1);  // drawn at random, not one after the other
+    CHECK(a.session->token() + 1 != old);
+
+    // Sent away: someone new takes the slot under a new token, and the old one is worthless.
+    host.session->kick(seat);
+    run_for(network, host, {&a, c.get()}, 1000);
+    CHECK(c->session->ended());
+    Computer d(network, "Dora");
+    run_for(network, host, {&a, &d}, 2000);
+    REQUIRE(d.session->playing());
+    CHECK(d.session->local_seat() == seat);
+    CHECK(d.session->token() != old);
+    c = std::make_unique<Computer>(network, "Clara", old);
+    run_for(network, host, {&a, c.get(), &d}, 2000);
+    CHECK(!d.session->ended());
+    CHECK(d.session->local_seat() == seat);
+    CHECK(c->session->local_seat() != seat);
+}
+
+TEST_CASE("net: a connection that never says hello is let go") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    auto silent = network.connect();
+    run_for(network, host, {}, 12'000);
+    std::vector<net::TransportEvent> events;
+    silent->poll(events);
+    CHECK(std::any_of(events.begin(), events.end(),
+                      [](const auto& e) { return e.kind == net::TransportEvent::Kind::Disconnected; }));
+}
+
 TEST_CASE("net: without a free slot a computer watches; other data or versions are refused") {
     net::LoopbackNetwork network(5, 0);
     Host host(network);
@@ -564,7 +604,7 @@ TEST_CASE("net: a long session keeps its memory and its frames in step") {
     host.session->submit(sim::GameSpeedOrder{0, sim::GameSpeedOrder::Op::SetSpeed, 4});
     for (std::uint32_t t = 0; t < 10 * 60 * 1000; t += kStepMs) {
         if (t == 5 * 60 * 1000) {
-            a.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 8});
+            host.session->submit(sim::GameSpeedOrder{0, sim::GameSpeedOrder::Op::SetSpeed, 8});
         }
         if (r.below(100) == 0) {
             a.session->submit(sim::PlayerRename{1, random_name(r)});
@@ -723,8 +763,20 @@ TEST_CASE("net: a lobby: slots, password, chat and ready, then the game starts o
     CHECK(anna.session->lobby().started);
     CHECK(anna.game.world->player(3)->name == "Bernd");
     CHECK(host_game->world->player(1)->name == "Anna");
-    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 4});
+    // Only the host sets the speed; a player may pause and go on, for everyone.
+    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 8});
+    anna.session->submit(sim::PlayerControl{1, true});
+    tick(2000);
+    CHECK(host_game->simulation->speed() == 1);
+    CHECK(host_game->world->player(1)->role == sim::PlayerRole::Human);
+    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::Pause, 1});
+    tick(2000);
+    CHECK(host_game->simulation->paused());
+    CHECK(anna.game.simulation->paused());
+    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::Resume, 1});
+    host.submit(sim::GameSpeedOrder{0, sim::GameSpeedOrder::Op::SetSpeed, 4});
     tick(5000);
+    CHECK(!host_game->simulation->paused());
     CHECK(host_game->simulation->speed() == 4);
     CHECK(host.fingerprints_compared() > 0);
     CHECK(host.fingerprints_matched() == host.fingerprints_compared());

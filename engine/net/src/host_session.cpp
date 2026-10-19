@@ -25,6 +25,18 @@ std::uint64_t random_token() {
     return t;
 }
 
+/// Pauses, resumes and renames a computer may send per second.
+constexpr std::uint32_t kMaxGameOrdersPerSecond = 4;
+/// Time a new connection has to send its Hello.
+constexpr std::uint32_t kGreetingMs = 10'000;
+
+/// A name or chat line from the network without control characters (line breaks would split the
+/// lists and files they end up in).
+std::string printable(std::string text) {
+    std::replace_if(text.begin(), text.end(), [](char c) { return static_cast<unsigned char>(c) < 0x20; }, ' ');
+    return text;
+}
+
 }  // namespace
 
 struct HostSession::Peer {
@@ -43,11 +55,13 @@ struct HostSession::Peer {
     std::uint32_t epoch = 0;   ///< of the last game sent
     std::uint64_t frames = 0;  ///< run, as last reported
     bool lagging = false;
-    std::uint64_t token = 0;       ///< to come back to its slot (0: it watches)
-    std::uint32_t chat_lines = 0;  ///< in the current second
-    std::uint32_t resyncs = 0;     ///< games sent after desyncs without a matching fingerprint since
-    std::uint32_t this_frame = 0;  ///< commands in the open frame
-    std::deque<FrameHash> hashes;  ///< reported ahead of the host, not compared yet
+    std::uint64_t token = 0;        ///< to come back to its slot (0: it watches)
+    std::uint32_t chat_lines = 0;   ///< in the current second
+    std::uint32_t game_orders = 0;  ///< pauses and renames in the current second
+    std::uint32_t greeting_ms = 0;  ///< connected without a Hello this long
+    std::uint32_t resyncs = 0;      ///< games sent after desyncs without a matching fingerprint since
+    std::uint32_t this_frame = 0;   ///< commands in the open frame
+    std::deque<FrameHash> hashes;   ///< reported ahead of the host, not compared yet
 };
 
 HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& simulation,
@@ -58,8 +72,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& 
       m_buildings(&buildings),
       m_name(std::move(name)),
       m_content(content),
-      m_lead(m_config.min_lead),
-      m_next_token(random_token()) {
+      m_lead(m_config.min_lead) {
     m_seat = seat;
     // The lobby of a running game: its human slots are open, the computer players stay.
     m_lobby.started = true;
@@ -87,8 +100,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat
       m_buildings(nullptr),
       m_name(std::move(name)),
       m_content(content),
-      m_lead(m_config.min_lead),
-      m_next_token(random_token()) {
+      m_lead(m_config.min_lead) {
     m_lobby = std::move(lobby);
     if (m_lobby.seats.size() > kMaxLobbySeats) {
         m_lobby.seats.resize(kMaxLobbySeats);
@@ -175,6 +187,13 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
         m_chat_ms = 0;
         for (const auto& p : m_peers) {
             p->chat_lines = 0;
+            p->game_orders = 0;
+        }
+    }
+    // A connection that never says who it is would hold one of the few connections for good.
+    for (const auto& p : m_peers) {
+        if (!p->gone && !p->welcomed && (p->greeting_ms += real_ms) > kGreetingMs) {
+            drop(*p, std::nullopt);
         }
     }
     if (m_lobby_changed) {
@@ -211,6 +230,10 @@ HostSession::Peer* HostSession::peer_of(LinkId link) {
 void HostSession::receive(LinkId link, std::span<const std::uint8_t> bytes) {
     Peer* peer = peer_of(link);
     if (peer == nullptr) {
+        return;
+    }
+    if (bytes.size() > kMaxMessageToHost) {
+        drop(*peer, RefuseReason::Invalid);  // a computer sends commands and reports, never games
         return;
     }
     auto message = decode(bytes);
@@ -255,7 +278,8 @@ void HostSession::hello(Peer& peer, const Hello& m) {
         const auto it =
             std::find_if(m_tokens.begin(), m_tokens.end(), [&](const auto& t) { return t.second == m.token; });
         // In the lobby a slot is only kept while the computer is in.
-        if (it != m_tokens.end() && (started() || free_seat(it->first) == it->first)) {
+        // Never the host's own slot (it has no token, but one handed out before the host took it).
+        if (it != m_tokens.end() && it->first != m_seat && (started() || free_seat(it->first) == it->first)) {
             seat = it->first;
             // Its old connection has not timed out yet: this is the same player, back.
             const auto old = std::find_if(m_peers.begin(), m_peers.end(), [&](const auto& p) {
@@ -276,11 +300,16 @@ void HostSession::hello(Peer& peer, const Hello& m) {
             drop(peer, RefuseReason::Full);
             return;
         }
+        // Someone new in the slot: whoever had it before cannot come back with the old token.
+        forget_token(seat);
     }
     peer.welcomed = true;
     peer.game_due = started();
     peer.seat = seat;
-    peer.name = m.name.empty() ? std::string("Player") : m.name;
+    peer.name = printable(m.name);
+    if (peer.name.empty()) {
+        peer.name = "Player";  // replaced by the player's own name (PlayerRename) once the game runs
+    }
     if (seat != sim::kNoPlayer) {
         peer.token = token_of(seat);
         m_lobby.seats[seat] = LobbySeat{LobbySeat::Kind::Human, peer.name, false};
@@ -307,6 +336,22 @@ void HostSession::commands(Peer& peer, CommandBatch& m) {
         return;  // spectators give no orders, and nobody without a game
     }
     for (sim::Command& c : m.commands) {
+        // Only the host hands slots to the computer and sets the speed (ADR 0011); everyone may
+        // pause and resume and name himself, a few times a second.
+        if (std::holds_alternative<sim::PlayerControl>(c)) {
+            continue;
+        }
+        if (const auto* speed = std::get_if<sim::GameSpeedOrder>(&c)) {
+            if (speed->op == sim::GameSpeedOrder::Op::SetSpeed) {
+                continue;
+            }
+        }
+        if (std::holds_alternative<sim::GameSpeedOrder>(c) || std::holds_alternative<sim::PlayerRename>(c)) {
+            if (peer.game_orders >= kMaxGameOrdersPerSecond) {
+                continue;
+            }
+            ++peer.game_orders;
+        }
         queue(peer.seat, std::move(c));
     }
 }
@@ -649,8 +694,17 @@ std::uint64_t HostSession::token_of(Seat seat) {
     if (it != m_tokens.end()) {
         return it->second;
     }
-    m_tokens.emplace_back(seat, m_next_token);
-    return m_next_token++;
+    // Drawn at random, so that one token tells nothing about the others.
+    std::uint64_t token = random_token();
+    while (std::any_of(m_tokens.begin(), m_tokens.end(), [&](const auto& t) { return t.second == token; })) {
+        token = random_token();
+    }
+    m_tokens.emplace_back(seat, token);
+    return token;
+}
+
+void HostSession::forget_token(Seat seat) {
+    std::erase_if(m_tokens, [&](const auto& t) { return t.first == seat; });
 }
 
 // --- The lobby ---
@@ -659,7 +713,9 @@ void HostSession::move(Peer* peer, Seat seat) {
     Seat& current = peer != nullptr ? peer->seat : m_seat;
     if (current != sim::kNoPlayer) {
         m_lobby.seats[current] = LobbySeat{};
-        // The token stays with the slot it was made for: whoever takes the slot later gets it.
+        // Whoever takes the slot later gets a new token, so that nobody collects the tokens of
+        // the slots he passes through.
+        forget_token(current);
     }
     current = seat;
     if (seat != sim::kNoPlayer) {
@@ -707,7 +763,7 @@ void HostSession::chat(Peer& peer, const Chat& m) {
         return;
     }
     ++peer.chat_lines;
-    const Chat line{peer.seat, peer.name, m.text};
+    const Chat line{peer.seat, peer.name, printable(m.text)};
     broadcast(line);
     chat_event(line);
 }
@@ -757,6 +813,7 @@ void HostSession::kick(Seat seat) {
                                      [&](const auto& p) { return !p->gone && p->welcomed && p->seat == seat; });
     if (seat != sim::kNoPlayer && holder != m_peers.end()) {
         drop(**holder, RefuseReason::Kicked);
+        forget_token(seat);  // and it cannot come back with it
     }
 }
 
