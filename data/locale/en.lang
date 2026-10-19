@@ -227,3 +227,48 @@ player.colour.brown = Brown player
 # {1}: the number of the player's slot, for a player without a name
 end.player = Player {1}
 end.continue_hint = Esc: keep playing
+
+# Window title
+title.paused = paused
+# {1}: the game speed, as 2, 4 or 8
+title.speed = speed x{1}
+# {1}: the speed this computer reaches, as 1.4
+title.too_slow = too slow: x{1}
+# {1}: the number of players
+title.multiplayer = multiplayer: {1} players
+title.multiplayer_ended = game over
+title.multiplayer_waiting = waiting for players
+
+# Status line while building. {1}: the cost in gold
+build.cost = {1} gold
+# Why a building cannot be placed
+build.refusal.ok = can be built
+build.refusal.unknown = unknown building
+build.refusal.outside_island = outside the island
+build.refusal.terrain = cannot be built on this ground
+build.refusal.territory = outside your city
+build.refusal.foreign_city = another player's city
+build.refusal.city_limit = no further city on this island
+build.refusal.second_kontor = the city already has a warehouse
+build.refusal.no_coast = needs the coast
+build.refusal.no_deposit = no ore here
+build.refusal.no_rock = needs a rock face
+build.refusal.no_river = needs a river
+build.refusal.unit_in_the_way = a unit is in the way
+build.refusal.locked = not available yet
+build.refusal.limit = no more of these allowed
+build.refusal.infertile = does not grow here
+build.refusal.overlap = overlaps
+build.refusal.money = not enough gold
+build.refusal.tools = not enough tools
+build.refusal.wood = not enough wood
+build.refusal.bricks = not enough bricks
+build.refusal.cannons = not enough cannons
+build.refusal.ship_too_far = the ship is too far away
+
+# Why a file could not be loaded or saved (the details go to the log)
+error.io = the file could not be read or written
+error.not_found = the file does not exist
+error.damaged = the file is damaged or no savegame
+error.unsupported = the file needs a newer Open1602 or other game data
+error.platform = the system refused

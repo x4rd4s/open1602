@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <system_error>
 
 #include "o1602/assets/game_directory.hpp"
@@ -249,6 +250,24 @@ std::string tr(std::string_view key, std::initializer_list<std::string_view> arg
         out.push_back(pattern[i]);
     }
     return out;
+}
+
+std::string error_text(const core::Error& error, std::string_view context) {
+    std::fprintf(stderr, "%.*s: %s\n", static_cast<int>(context.size()), context.data(), error.message.c_str());
+    switch (error.code) {
+        case core::ErrorCode::IoError:
+            return tr("error.io");
+        case core::ErrorCode::NotFound:
+            return tr("error.not_found");
+        case core::ErrorCode::InvalidFormat:
+        case core::ErrorCode::OutOfRange:
+            return tr("error.damaged");
+        case core::ErrorCode::Unsupported:
+            return tr("error.unsupported");
+        case core::ErrorCode::PlatformError:
+            break;
+    }
+    return tr("error.platform");
 }
 
 }  // namespace o1602::ui

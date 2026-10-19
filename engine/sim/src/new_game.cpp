@@ -46,8 +46,8 @@ std::vector<std::uint8_t> players(std::span<const std::uint8_t> data, const asse
                                   const NewGameOptions& options) {
     std::vector<std::uint8_t> out(data.begin(), data.end());
     const std::vector<std::string>& colour_names = text.section("PLAYCOL");
-    static constexpr std::array<const char*, kOriginalColours> kFallback = {"Roter Spieler", "Blauer Spieler",
-                                                                            "Gelber Spieler", "Weisser Spieler"};
+    static constexpr std::array<const char*, kOriginalColours> kFallback = {"Red player", "Blue player",
+                                                                            "Yellow player", "White player"};
     const std::uint8_t human = static_cast<std::uint8_t>(options.colour % kOriginalColours);
     std::array<bool, kOriginalColours> taken{};
     taken[human] = true;

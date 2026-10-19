@@ -30,6 +30,62 @@ namespace o1602::app {
 
 namespace {
 
+/// Why a building cannot go here, in the player's language, for the status line.
+std::string refusal_text(sim::BuildRefusal refusal) {
+    const char* key = [refusal] {
+        switch (refusal) {
+            case sim::BuildRefusal::None:
+                return "build.refusal.ok";
+            case sim::BuildRefusal::UnknownBuilding:
+                return "build.refusal.unknown";
+            case sim::BuildRefusal::OutsideIsland:
+                return "build.refusal.outside_island";
+            case sim::BuildRefusal::Terrain:
+                return "build.refusal.terrain";
+            case sim::BuildRefusal::Territory:
+                return "build.refusal.territory";
+            case sim::BuildRefusal::ForeignCity:
+                return "build.refusal.foreign_city";
+            case sim::BuildRefusal::CityLimit:
+                return "build.refusal.city_limit";
+            case sim::BuildRefusal::SecondKontor:
+                return "build.refusal.second_kontor";
+            case sim::BuildRefusal::NoCoast:
+                return "build.refusal.no_coast";
+            case sim::BuildRefusal::NoDeposit:
+                return "build.refusal.no_deposit";
+            case sim::BuildRefusal::NoRock:
+                return "build.refusal.no_rock";
+            case sim::BuildRefusal::NoRiver:
+                return "build.refusal.no_river";
+            case sim::BuildRefusal::UnitInTheWay:
+                return "build.refusal.unit_in_the_way";
+            case sim::BuildRefusal::Locked:
+                return "build.refusal.locked";
+            case sim::BuildRefusal::Limit:
+                return "build.refusal.limit";
+            case sim::BuildRefusal::Infertile:
+                return "build.refusal.infertile";
+            case sim::BuildRefusal::Overlap:
+                return "build.refusal.overlap";
+            case sim::BuildRefusal::Money:
+                return "build.refusal.money";
+            case sim::BuildRefusal::Tools:
+                return "build.refusal.tools";
+            case sim::BuildRefusal::Wood:
+                return "build.refusal.wood";
+            case sim::BuildRefusal::Bricks:
+                return "build.refusal.bricks";
+            case sim::BuildRefusal::Cannons:
+                return "build.refusal.cannons";
+            case sim::BuildRefusal::ShipTooFar:
+                return "build.refusal.ship_too_far";
+        }
+        return "build.refusal.unknown";
+    }();
+    return ui::tr(key);
+}
+
 /// Ground under a building that cannot be built there.
 constexpr assets::Rgba kRefusedTint{220, 30, 30, 140};
 /// Real time a frame may spend on ticks; the rest of the frame draws.
@@ -1035,7 +1091,7 @@ void MapViewer::render() {
                     }
                     for (const sim::PlannedBuild& item : plan.items) {
                         if (!item.ok() && m_tool_status.empty()) {
-                            m_tool_status = sim::refusal_name(item.refusal);
+                            m_tool_status = refusal_text(item.refusal);
                         }
                         if (item.type == nullptr || hatched) {
                             continue;
@@ -1107,7 +1163,7 @@ void MapViewer::render() {
                         }
                     }
                     if (m_tool_status.empty()) {
-                        m_tool_status = std::to_string(plan.bill.money) + " gold";
+                        m_tool_status = ui::tr("build.cost", {std::to_string(plan.bill.money)});
                     }
                 }
             }
@@ -1791,7 +1847,8 @@ render::TilePos MapViewer::home_tile() const {
     return render::TilePos{m_world.width() / 2, m_world.height() / 2};
 }
 
-void MapViewer::update_title(double fps) {
+std::string MapViewer::debug_title(double fps) {
+    // For development (O1602_DEBUG_TITLE): what lies under the mouse and is selected, in English.
     const auto& view = m_camera.view();
     std::string title = "Open1602 - " + core::path_to_utf8(m_options.scenario.stem()) + " | " + zoom_name(view.zoom) +
                         " x" + std::to_string(m_camera.pixel_scale()) + " | rotation " + std::to_string(view.rotation);
@@ -1803,7 +1860,7 @@ void MapViewer::update_title(double fps) {
             const auto& island = m_world.islands()[cell.island];
             const sim::MapCell& top = island.map.top(cell.local_x, cell.local_y);
             if (const sim::City* city = m_world.city(cell.island, top.city)) {
-                title += ", " + city->name;  // Windows-1252; the UI will convert it
+                title += ", " + core::cp1252_to_utf8(city->name);
             }
             if (const sim::Player* p = m_world.player(top.owner)) {
                 title += ", " + player_label(*p, top.owner, m_banners);
@@ -1833,7 +1890,7 @@ void MapViewer::update_title(double fps) {
                                          ? m_world.ship(m_units.units().front().id)
                                          : nullptr;
     if (const sim::Ship* ship = selected_ship) {
-        title += " | ship " + ship->name;
+        title += " | ship " + core::cp1252_to_utf8(ship->name);
         if (const sim::Player* p = m_world.player(ship->owner)) {
             title += " (" + player_label(*p, ship->owner, m_banners) + ")";
         }
@@ -1871,10 +1928,23 @@ void MapViewer::update_title(double fps) {
     char perf[64];
     std::snprintf(perf, sizeof perf, " | %.0f fps, %zu sprites", fps, m_sprites_drawn);
     title += perf;
+    return title;
+}
+
+void MapViewer::update_title(double fps) {
+    // The window title: the game, its time and speed, in the player's language. With
+    // O1602_DEBUG_TITLE set it also shows what lies under the mouse, the selection and the frame rate.
+    std::string title =
+        m_debug_title ? debug_title(fps) : "Open1602 - " + core::path_to_utf8(m_options.scenario.stem());
+    const std::uint64_t seconds = m_simulation.game_time_ms() / 1000;
+    char clock[32];
+    std::snprintf(clock, sizeof clock, " | %02llu:%02llu:%02llu", static_cast<unsigned long long>(seconds / 3600),
+                  static_cast<unsigned long long>(seconds / 60 % 60), static_cast<unsigned long long>(seconds % 60));
+    title += clock;
     if (m_simulation.paused()) {
-        title += " | paused";
+        title += " | " + ui::tr("title.paused");
     } else if (m_simulation.speed() != 1) {
-        title += " | speed x" + std::to_string(m_simulation.speed());
+        title += " | " + ui::tr("title.speed", {std::to_string(m_simulation.speed())});
     }
     // A computer too slow for the speed lets the game run slower (Simulation::behind()): the speed
     // reached since the last title.
@@ -1884,29 +1954,23 @@ void MapViewer::update_title(double fps) {
         const double reached =
             static_cast<double>(game_ms - m_title_game_ms) / static_cast<double>(now - m_title_real_ms);
         if (reached < 0.9 * m_simulation.speed()) {
-            char slow[48];
-            std::snprintf(slow, sizeof slow, " (too slow: x%.1f)", reached);
-            title += m_simulation.speed() == 1 ? " | speed x1" : "";
-            title += slow;
+            char speed[16];
+            std::snprintf(speed, sizeof speed, "%.1f", reached);
+            title += " | " + ui::tr("title.too_slow", {speed});
         }
     }
     m_title_real_ms = now;
     m_title_game_ms = game_ms;
-    const std::uint64_t seconds = m_simulation.game_time_ms() / 1000;
-    char clock[32];
-    std::snprintf(clock, sizeof clock, " | %02llu:%02llu:%02llu", static_cast<unsigned long long>(seconds / 3600),
-                  static_cast<unsigned long long>(seconds / 60 % 60), static_cast<unsigned long long>(seconds % 60));
-    title += clock;
     if (m_session) {
         std::size_t players = 0;
         for (const net::Member& m : m_session->roster()) {
             players += m.seat != sim::kNoPlayer ? 1 : 0;
         }
-        title += " | multiplayer: " + std::to_string(players) + (players == 1 ? " player" : " players");
+        title += " | " + ui::tr("title.multiplayer", {std::to_string(players)});
         if (m_session->ended()) {
-            title += ", ended";
+            title += ", " + ui::tr("title.multiplayer_ended");
         } else if (m_session->waiting()) {
-            title += ", waiting";
+            title += ", " + ui::tr("title.multiplayer_waiting");
         }
     }
     m_window->set_title(title);
@@ -2011,7 +2075,7 @@ void MapViewer::save_settings() {
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+    if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
         std::fprintf(stderr, "settings: %s\n", status.error().message.c_str());
     }
 }
@@ -2105,7 +2169,7 @@ void MapViewer::apply_options() {
                     e.text.empty() ? ui::tr("save.default_name", {std::to_string(e.value + 1)}) : e.text;
                 const auto status = save_game(slot_file(save_folder(), e.value));
                 if (!status) {
-                    notify(ui::tr("notice.save_failed", {utf8_to_cp1252(status.error().message)}));
+                    notify(ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}));
                     break;
                 }
                 std::uint8_t humans = 0;
@@ -2117,7 +2181,11 @@ void MapViewer::apply_options() {
                 model.slot_humans = m_slots.humans;
                 const std::string text = write_slots(m_slots);
                 const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-                (void)core::write_file(save_folder() / "slots.cfg", std::span<const std::uint8_t>(data, text.size()));
+                if (auto written = core::write_file_atomic(save_folder() / "slots.cfg",
+                                                           std::span<const std::uint8_t>(data, text.size()));
+                    !written) {
+                    std::fprintf(stderr, "slots: %s\n", written.error().message.c_str());
+                }
                 // The voice confirms it (0x0043F71E: Speech_Queue(0x79, 2): files 121 or 123).
                 m_sound->speak(121, 2);
                 // As the original: after saving, the info mode (0x0043F751).
@@ -2134,7 +2202,7 @@ void MapViewer::apply_options() {
                     break;
                 }
                 if (const auto status = load_game(path); !status) {
-                    notify(ui::tr("notice.load_failed", {utf8_to_cp1252(status.error().message)}));
+                    notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}));
                 } else {
                     std::fprintf(stderr, "game loaded: %s\n", core::path_to_utf8(path).c_str());
                 }
@@ -2405,7 +2473,7 @@ void MapViewer::present() {
         if (request->notify) {
             notify(status ? ui::tr("notice.screenshot_saved",
                                    {utf8_to_cp1252(core::path_to_utf8(request->path.filename()))})
-                          : ui::tr("notice.screenshot_failed", {utf8_to_cp1252(status.error().message)}));
+                          : ui::tr("notice.screenshot_failed", {ui::error_text(status.error(), "screenshot")}));
         }
     }
     SDL_RenderPresent(m_window->sdl_renderer());

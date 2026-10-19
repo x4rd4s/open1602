@@ -18,6 +18,8 @@
 #include <string_view>
 #include <vector>
 
+#include "o1602/core/result.hpp"
+
 namespace o1602::assets {
 class GameDirectory;
 class TextTable;
@@ -70,5 +72,9 @@ void set_language(std::string_view code, const std::filesystem::path& user_folde
 /// The same with {1}, {2}, ... replaced by the arguments (Windows-1252 as well); the translation
 /// decides where each argument stands.
 [[nodiscard]] std::string tr(std::string_view key, std::initializer_list<std::string_view> args);
+
+/// What went wrong, for the player: the kind of error in the current language (Windows-1252). The
+/// technical message, which is English, goes to the log (stderr) with `context` before it.
+[[nodiscard]] std::string error_text(const core::Error& error, std::string_view context);
 
 }  // namespace o1602::ui

@@ -207,3 +207,44 @@ player.colour.brown = Brauner Spieler
 # End screen
 end.player = Spieler {1}
 end.continue_hint = Esc: Weiterspielen
+
+# Window title
+title.paused = Pause
+title.speed = Tempo x{1}
+title.too_slow = zu langsam: x{1}
+title.multiplayer = Mehrspieler: {1} Spieler
+title.multiplayer_ended = Spiel beendet
+title.multiplayer_waiting = warte auf Mitspieler
+
+# Status line while building
+build.cost = {1} Gold
+build.refusal.ok = kann gebaut werden
+build.refusal.unknown = unbekanntes Gebäude
+build.refusal.outside_island = außerhalb der Insel
+build.refusal.terrain = auf diesem Boden nicht baubar
+build.refusal.territory = außerhalb Eurer Stadt
+build.refusal.foreign_city = Stadt eines anderen Spielers
+build.refusal.city_limit = keine weitere Stadt auf dieser Insel
+build.refusal.second_kontor = die Stadt hat schon ein Kontor
+build.refusal.no_coast = braucht die Küste
+build.refusal.no_deposit = hier gibt es kein Erz
+build.refusal.no_rock = braucht eine Felswand
+build.refusal.no_river = braucht einen Fluss
+build.refusal.unit_in_the_way = eine Einheit steht im Weg
+build.refusal.locked = noch nicht verfügbar
+build.refusal.limit = keine weiteren erlaubt
+build.refusal.infertile = wächst hier nicht
+build.refusal.overlap = überschneidet sich
+build.refusal.money = nicht genug Gold
+build.refusal.tools = nicht genug Werkzeug
+build.refusal.wood = nicht genug Holz
+build.refusal.bricks = nicht genug Ziegel
+build.refusal.cannons = nicht genug Kanonen
+build.refusal.ship_too_far = das Schiff ist zu weit entfernt
+
+# Why a file could not be loaded or saved
+error.io = die Datei ließ sich nicht lesen oder schreiben
+error.not_found = die Datei gibt es nicht
+error.damaged = die Datei ist beschädigt oder kein Spielstand
+error.unsupported = die Datei braucht ein neueres Open1602 oder andere Spieldaten
+error.platform = das System hat abgelehnt

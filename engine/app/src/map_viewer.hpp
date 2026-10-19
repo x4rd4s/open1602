@@ -25,6 +25,7 @@
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/palette.hpp"
+#include "o1602/core/file.hpp"
 #include "o1602/core/result.hpp"
 #include "o1602/net/enet_transport.hpp"
 #include "o1602/net/lan.hpp"
@@ -159,6 +160,8 @@ private:
     void update(std::uint32_t delta_ms);
     void render();
     void update_title(double fps);
+    /// The English developer readout under O1602_DEBUG_TITLE: the map under the mouse, the selection, fps.
+    [[nodiscard]] std::string debug_title(double fps);
     /// Where the camera starts and Home goes: the local player's Kontor, else his first ship,
     /// else the first island.
     [[nodiscard]] render::TilePos home_tile() const;
@@ -377,6 +380,7 @@ private:
     render::ShipTrail m_ship_trail;                 ///< ships drawn between two ticks
     std::uint64_t m_title_real_ms = 0;              ///< real and game time of the last title (the speed reached)
     std::uint64_t m_title_game_ms = 0;
+    bool m_debug_title = core::environment_variable("O1602_DEBUG_TITLE").has_value();
     ViewerOptions m_options;
     sim::Simulation m_simulation;  ///< runs the economy on m_world (after m_world, m_buildings, m_figures)
     /// A multiplayer game: drives m_simulation in place of Simulation::advance().

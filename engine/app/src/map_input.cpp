@@ -225,7 +225,7 @@ void MapViewer::load_key_settings() {
         const std::string text = m_keys.write_text(key_name, true);
         std::filesystem::create_directories(path.parent_path(), ec);
         const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-        if (auto status = core::write_file(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+        if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
             std::fprintf(stderr, "keys: %s\n", status.error().message.c_str());
         }
         return;
@@ -431,14 +431,14 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
             const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
             const auto status = save_game(path);
             notify(status ? ui::tr("notice.game_saved", {utf8_to_cp1252(core::path_to_utf8(path.filename()))})
-                          : ui::tr("notice.save_failed", {utf8_to_cp1252(status.error().message)}));
+                          : ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}));
             break;
         }
         case KeyAction::QuickLoad: {
             const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
             const auto status = load_game(path);
             notify(status ? ui::tr("notice.game_loaded", {utf8_to_cp1252(core::path_to_utf8(path.filename()))})
-                          : ui::tr("notice.load_failed", {utf8_to_cp1252(status.error().message)}));
+                          : ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}));
             break;
         }
         case KeyAction::GameMenu:
