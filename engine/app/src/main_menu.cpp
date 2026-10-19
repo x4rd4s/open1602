@@ -427,7 +427,6 @@ void MainMenu::refresh_mission() {
         p.set_disabled(kChoice + k, i > campaign_parts_open(s));
     }
     p.set_text(kBriefing, m_briefing);
-    p.set_scroll(kBriefing, m_briefing_line);
     p.set_visible(kBriefing2, false);
     p.set_visible(kBriefingTrack, false);
     p.set_visible(kBriefingSlider, false);
@@ -472,6 +471,9 @@ std::vector<ui::DrawItem> MainMenu::draw(const std::array<const ui::Font*, 3>& f
         refresh_host();
     } else if (m_screen == Screen::Mission && m_chosen < m_scenarios.size()) {
         refresh_mission();
+        // The briefing's end is known only with the fonts: "down" past it would blank the text.
+        m_briefing_line = std::min(m_briefing_line, p->max_scroll(kBriefing, fonts));
+        p->set_scroll(kBriefing, m_briefing_line);
     } else if (m_screen == Screen::Colour) {
         refresh_colour();
     }

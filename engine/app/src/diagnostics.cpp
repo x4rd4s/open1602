@@ -19,6 +19,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <SDL3/SDL_messagebox.h>
+#include <unistd.h>
 #endif
 
 namespace o1602::app {
@@ -57,6 +60,13 @@ void report_fatal(std::string_view message) {
     std::fprintf(stderr, "error: %s\n", text.c_str());
 #if defined(_WIN32)
     (void)SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Open1602", text.c_str(), nullptr);
+#else
+    // Started from a terminal, the message is there already; from the Finder or a desktop
+    // launcher, stderr leads nowhere and the program would end without a word. SDL shows the box
+    // without a window and before SDL_Init.
+    if (isatty(fileno(stderr)) == 0) {
+        (void)SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Open1602", text.c_str(), nullptr);
+    }
 #endif
 }
 

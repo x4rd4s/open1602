@@ -138,6 +138,31 @@ void Panel::set_scroll(std::int32_t id, std::int32_t line) {
     }
 }
 
+std::int32_t Panel::max_scroll(std::int32_t id, const std::array<const Font*, 3>& fonts) const {
+    const auto i = m_layout.index_of(id);
+    const auto flow = i ? flow_lines(*i, fonts) : std::nullopt;
+    if (!flow) {
+        return 0;
+    }
+    return std::max(0, static_cast<std::int32_t>(flow->first.size()) - flow->second);
+}
+
+std::optional<std::pair<std::vector<std::string>, std::int32_t>> Panel::flow_lines(
+    std::size_t index, const std::array<const Font*, 3>& fonts) const {
+    // 0x00407D7D: width Size.x, line height Posoffs.y, lines Size.y / Posoffs.y.
+    const assets::Gadget& g = m_layout.gadgets[index];
+    const State& s = m_state[index];
+    const Font* font = g.block >= 0 && g.block < 3 ? fonts[static_cast<std::size_t>(g.block)] : nullptr;
+    if (g.kind != GadgetKind::TextFlow || font == nullptr || g.offset[1] <= 0 || s.text.empty()) {
+        return std::nullopt;
+    }
+    // The width in the font's own pixels: the renderer stretches glyphs to the screen itself, so
+    // the panel's scale must not widen the lines (they ran past the window).
+    auto lines = wrap_text(*font, s.text,
+                           static_cast<std::uint32_t>(std::max(0, trunc_scaled(g.size[0] * font->design_scale()))));
+    return std::make_pair(std::move(lines), g.size[1] / g.offset[1]);
+}
+
 std::optional<std::size_t> Panel::hit(std::int32_t x, std::int32_t y) const {
     // The last gadget under the mouse is on top; hidden ones still answer (0x00406660).
     std::optional<std::size_t> found;
@@ -321,16 +346,11 @@ void Panel::draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint
             break;
         }
         case GadgetKind::TextFlow: {
-            // 0x00407D7D: width Size.x, line height Posoffs.y, lines Size.y / Posoffs.y.
-            const Font* font = g.block >= 0 && g.block < 3 ? fonts[static_cast<std::size_t>(g.block)] : nullptr;
-            if (font == nullptr || g.offset[1] <= 0 || s.text.empty()) {
+            const auto flow = flow_lines(index, fonts);
+            if (!flow) {
                 break;
             }
-            // The width in the font's own pixels: the renderer stretches glyphs to the screen
-            // itself, so the panel's scale must not widen the lines (they ran past the window).
-            const auto lines = wrap_text(
-                *font, s.text, static_cast<std::uint32_t>(std::max(0, trunc_scaled(g.size[0] * font->design_scale()))));
-            const std::int32_t shown = g.size[1] / g.offset[1];
+            const auto& [lines, shown] = *flow;
             for (std::int32_t n = 0; n < shown; ++n) {
                 const auto line = static_cast<std::size_t>(s.scroll + n);
                 if (line >= lines.size()) {

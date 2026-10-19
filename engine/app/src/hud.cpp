@@ -533,6 +533,9 @@ void Hud::draw_mission(const sim::World& world) {
         m_tutor->set_visible(id, false);
     }
     m_tutor->set_visible(110031, false);  // the arrows pressed
+    // Clamped here, where the text and the window's width are known: "down" past the end would
+    // blank the window and take as many clicks back up.
+    m_tutor_line = std::min(m_tutor_line, m_tutor->max_scroll(110002, m_renderer->fonts()));
     m_tutor->set_scroll(110002, m_tutor_line);
     m_renderer->draw(m_tutor->draw(m_renderer->fonts()), m_regions.tutor.x, m_regions.tutor.y, m_regions.scale);
 }

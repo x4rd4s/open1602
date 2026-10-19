@@ -254,7 +254,8 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         return window.error();
     }
     viewer->m_window = std::move(window).value();
-    viewer->m_sound = std::make_unique<GameSound>(game, options.effects, options.music);
+    // The viewer's own copy: GameSound keeps a pointer, and `game` may be a temporary (UI-15).
+    viewer->m_sound = std::make_unique<GameSound>(viewer->m_game, options.effects, options.music);
     if (options.videos) {
         viewer->m_video = std::make_unique<VideoPlayer>(viewer->m_window->sdl_renderer(), viewer->m_game);
         viewer->m_sound->set_video_check(

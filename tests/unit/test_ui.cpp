@@ -244,6 +244,35 @@ TEST_CASE("ui: text width, colours, wrapping with hyphens and hard breaks") {
     CHECK(canvas.opaque[2 * 20 + 5] == 0);
 }
 
+TEST_CASE("ui: a flowing text scrolls no further than its last full window (UI-12)") {
+    // 20 pixels wide (5 characters of the test font), two lines of 6.
+    const auto flow = assets::parse_gad(
+        "  Objekt: GADGET\n"
+        "    @Nummer:    0\n"
+        "    Id:         110002\n"
+        "    Kind:       GAD_TEXTFL\n"
+        "    Blocknr:    0\n"
+        "    Size:       20, 12\n"
+        "    Posoffs:    0, 6\n"
+        "  EndObj\n",
+        [](std::string_view) -> std::optional<std::string> { return std::nullopt; });
+    const ui::Font font = test_font();
+    const std::array<const ui::Font*, 3> fonts{&font, nullptr, nullptr};
+    ui::Panel panel(flow, 1.0);
+    CHECK(panel.max_scroll(110002, fonts) == 0);  // no text yet
+    panel.set_text(110002, "aa bb cc dd ee");     // three lines
+    CHECK(panel.max_scroll(110002, fonts) == 1);
+    CHECK(panel.max_scroll(110002, {}) == 0);  // no font: nothing drawn
+    CHECK(panel.max_scroll(4711, fonts) == 0);
+    panel.set_scroll(110002, panel.max_scroll(110002, fonts));
+    const auto items = panel.draw(fonts);
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "cc dd");
+    CHECK(items[1].text == "ee");
+    panel.set_text(110002, "aa");
+    CHECK(panel.max_scroll(110002, fonts) == 0);
+}
+
 TEST_CASE("ui: the build menu's categories and the pop-up of a category") {
     const ui::BuildMenuDefinition& menu = ui::original_build_menu();
     CHECK(menu.categories.size() == 8);

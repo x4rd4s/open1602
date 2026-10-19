@@ -110,6 +110,9 @@ public:
     void set_slider(std::int32_t id, std::size_t axis, std::int32_t value, std::int32_t range);
     /// First line of a flowing text shown (TEXTFL scrolling).
     void set_scroll(std::int32_t id, std::int32_t line);
+    /// Last first line that still fills the flowing text's box (0 if the text fits); callers clamp
+    /// their scroll to it so "down" past the end does not blank the window (UI-12).
+    [[nodiscard]] std::int32_t max_scroll(std::int32_t id, const std::array<const Font*, 3>& fonts) const;
     /// Another sprite and pressed step for a gadget (0x004077C0, 0x00407840): message icons.
     void set_graphic(std::int32_t id, std::int32_t gfx, std::int32_t press_offset);
     /// Another draw offset (Posoffs) for a gadget: art centred in its box, groups moved together.
@@ -142,6 +145,9 @@ private:
         std::string text;
         std::optional<std::pair<std::int32_t, std::int32_t>> graphic;  ///< gfx, press offset
     };
+    /// A flowing text's wrapped lines and how many fit its box; nothing if it draws no text.
+    [[nodiscard]] std::optional<std::pair<std::vector<std::string>, std::int32_t>> flow_lines(
+        std::size_t index, const std::array<const Font*, 3>& fonts) const;
     [[nodiscard]] std::optional<std::size_t> hit(std::int32_t x, std::int32_t y) const;
     void draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint8_t state,
                      const std::array<const Font*, 3>& fonts) const;
