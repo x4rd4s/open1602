@@ -4,6 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -14,8 +15,10 @@
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
+#include "o1602/core/compress.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/core/numeric.hpp"
+#include "o1602/core/png_writer.hpp"
 #include "o1602/core/text.hpp"
 
 using namespace o1602;
@@ -86,6 +89,42 @@ TEST_CASE("text: cp1252 to utf8") {
     CHECK(core::cp1252_to_utf8("T\xfcrme") == "T\xc3\xbcrme");  // ue
     CHECK(core::cp1252_to_utf8("\x80") == "\xe2\x82\xac");      // euro sign
     CHECK(core::cp1252_to_utf8("plain") == "plain");
+}
+
+TEST_CASE("png: chunks carry the CRC-32 of core::crc32 (IEEE, as zlib's)") {
+    // The check value of the CRC-32 of zlib and PNG.
+    const std::string check = "123456789";
+    CHECK(core::crc32(std::span(reinterpret_cast<const std::uint8_t*>(check.data()), check.size())) == 0xCBF43926U);
+    // A bit-by-bit CRC-32 independent of the table of core::crc32.
+    const auto reference = [](std::span<const std::uint8_t> data) {
+        std::uint32_t c = 0xFFFFFFFFU;
+        for (const std::uint8_t b : data) {
+            c ^= b;
+            for (int k = 0; k < 8; ++k) {
+                c = (c & 1U) != 0 ? 0xEDB88320U ^ (c >> 1) : c >> 1;
+            }
+        }
+        return ~c;
+    };
+    const std::vector<std::uint8_t> rgba(std::size_t{3} * 2 * 4, 0x7F);
+    const std::vector<std::uint8_t> png = core::encode_png_rgba(3, 2, rgba);
+    const auto be32 = [&](std::size_t at) {
+        return std::uint32_t{png[at]} << 24 | std::uint32_t{png[at + 1]} << 16 | std::uint32_t{png[at + 2]} << 8 |
+               std::uint32_t{png[at + 3]};
+    };
+    std::size_t at = 8;  // after the signature
+    int chunks = 0;
+    while (at + 12 <= png.size()) {
+        const std::uint32_t size = be32(at);
+        REQUIRE(at + 12 + size <= png.size());
+        const auto typed = std::span(png).subspan(at + 4, 4 + std::size_t{size});
+        CHECK(be32(at + 8 + size) == reference(typed));
+        at += 12 + size;
+        ++chunks;
+    }
+    CHECK(at == png.size());
+    CHECK(chunks == 3);                          // IHDR, IDAT, IEND
+    CHECK(be32(png.size() - 4) == 0xAE426082U);  // the CRC every IEND chunk has
 }
 
 TEST_CASE("palette: reads 256 RGBX entries") {

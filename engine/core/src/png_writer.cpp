@@ -2,10 +2,10 @@
 #include "o1602/core/png_writer.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <string_view>
 
+#include "o1602/core/compress.hpp"
 #include "o1602/core/file.hpp"
 
 #if defined(O1602_HAVE_ZLIB)
@@ -15,28 +15,6 @@
 namespace o1602::core {
 
 namespace {
-
-constexpr std::array<std::uint32_t, 256> make_crc_table() {
-    std::array<std::uint32_t, 256> table{};
-    for (std::uint32_t n = 0; n < 256; ++n) {
-        std::uint32_t c = n;
-        for (int k = 0; k < 8; ++k) {
-            c = (c & 1U) ? 0xEDB88320U ^ (c >> 1) : c >> 1;
-        }
-        table[n] = c;
-    }
-    return table;
-}
-
-constexpr auto kCrcTable = make_crc_table();
-
-std::uint32_t crc32(std::span<const std::uint8_t> data, std::uint32_t crc = 0) {
-    crc = ~crc;
-    for (const auto b : data) {
-        crc = kCrcTable[(crc ^ b) & 0xFFU] ^ (crc >> 8);
-    }
-    return ~crc;
-}
 
 void put_u32_be(std::vector<std::uint8_t>& out, std::uint32_t v) {
     out.push_back(static_cast<std::uint8_t>(v >> 24));
@@ -50,7 +28,7 @@ void put_chunk(std::vector<std::uint8_t>& out, std::string_view type, std::span<
     const std::size_t type_pos = out.size();
     out.insert(out.end(), type.begin(), type.end());
     out.insert(out.end(), payload.begin(), payload.end());
-    put_u32_be(out, crc32(std::span(out).subspan(type_pos)));
+    put_u32_be(out, crc32(std::span(out).subspan(type_pos)));  // over type and data
 }
 
 std::vector<std::uint8_t> zlib_compress(std::span<const std::uint8_t> raw) {

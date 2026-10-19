@@ -1995,6 +1995,29 @@ core::Status check(const World& w, const Decoded& d) {
             }
         }
     }
+    // Sections that complete others must match them in size. A damaged file is refused instead of
+    // losing the section without a word (a DIPL of another size would load as peace for everyone).
+    if (d.explored && d.explored->size() != w.islands().size()) {
+        return bad("explored islands do not match");
+    }
+    if (d.explored) {
+        for (std::size_t i = 0; i < w.islands().size(); ++i) {
+            const std::size_t deposits =
+                d.islands ? (*d.islands)[i].deposits.size() : w.islands()[i].header.deposits.size();
+            if ((*d.explored)[i].deposit_masks.size() != deposits) {
+                return bad("deposits do not match");
+            }
+        }
+    }
+    const std::size_t players = d.players ? d.players->size() : w.players().size();
+    if ((d.player_state && d.player_state->size() != players) || (d.scores && d.scores->players.size() != players) ||
+        (d.diplomacy && d.diplomacy->size() != players)) {
+        return bad("player sections do not match");
+    }
+    const std::size_t costs = d.costs ? d.costs->size() : w.cost_buildings().size();
+    if ((d.fleet && d.fleet->yards.size() != costs) || (d.army && d.army->castles.size() != costs)) {
+        return bad("shipyards or castles do not match");
+    }
     if (d.tiles) {
         for (const auto& t : *d.tiles) {
             const auto i = w.island_index(t.island);
@@ -2102,15 +2125,13 @@ core::Status apply_decoded(World& world, Decoded& d) {
             island.header.fertility = part.fertility;
         }
     }
-    if (d.explored && d.explored->size() == world.islands().size()) {
+    if (d.explored) {
         for (std::size_t i = 0; i < d.explored->size(); ++i) {
             const auto& part = (*d.explored)[i];
             WorldIsland& island = world.island(i);
             island.explored = part.explored;
-            if (part.deposit_masks.size() == island.header.deposits.size()) {
-                for (std::size_t k = 0; k < part.deposit_masks.size(); ++k) {
-                    island.header.deposits[k].mask = part.deposit_masks[k];
-                }
+            for (std::size_t k = 0; k < part.deposit_masks.size(); ++k) {
+                island.header.deposits[k].mask = part.deposit_masks[k];
             }
         }
     }
@@ -2142,7 +2163,7 @@ core::Status apply_decoded(World& world, Decoded& d) {
         world.set_missions(std::move(d.missions->missions));
         world.set_game_end(d.missions->end);
     }
-    if (d.player_state && d.player_state->size() == world.players().size()) {
+    if (d.player_state) {
         for (std::size_t i = 0; i < d.player_state->size(); ++i) {
             const Player& from = (*d.player_state)[i];
             Player* pp = world.player(static_cast<PlayerId>(i));
@@ -2160,7 +2181,7 @@ core::Status apply_decoded(World& world, Decoded& d) {
             p.sales = from.sales;
         }
     }
-    if (d.scores && d.scores->players.size() == world.players().size()) {
+    if (d.scores) {
         for (std::size_t i = 0; i < d.scores->players.size(); ++i) {
             Player* pp = world.player(static_cast<PlayerId>(i));
             if (pp == nullptr) {
@@ -2257,21 +2278,19 @@ core::Status apply_decoded(World& world, Decoded& d) {
                 city->trader_inbound = c.trader_inbound;
             }
         }
-        if (d.fleet->yards.size() == world.cost_buildings().size()) {
-            for (std::size_t i = 0; i < d.fleet->yards.size(); ++i) {
-                CostBuilding& b = world.cost_buildings()[i];
-                const CostBuilding& y = d.fleet->yards[i];
-                b.order = y.order;
-                b.progress = y.progress;
-                b.wood = y.wood;
-                b.cloth = y.cloth;
-                b.rate = y.rate;
-                b.countdown = y.countdown;
-                b.repair_ship = y.repair_ship;
-                b.failed_launches = y.failed_launches;
-                b.idle_cycles = y.idle_cycles;
-                b.fetching = y.fetching;
-            }
+        for (std::size_t i = 0; i < d.fleet->yards.size(); ++i) {
+            CostBuilding& b = world.cost_buildings()[i];
+            const CostBuilding& y = d.fleet->yards[i];
+            b.order = y.order;
+            b.progress = y.progress;
+            b.wood = y.wood;
+            b.cloth = y.cloth;
+            b.rate = y.rate;
+            b.countdown = y.countdown;
+            b.repair_ship = y.repair_ship;
+            b.failed_launches = y.failed_launches;
+            b.idle_cycles = y.idle_cycles;
+            b.fetching = y.fetching;
         }
         world.ships() = std::move(d.fleet->ships);
         for (const Ship& ship : world.ships()) {
@@ -2304,14 +2323,12 @@ core::Status apply_decoded(World& world, Decoded& d) {
                 city->cursed = part.cursed;
             }
         }
-        if (d.army->castles.size() == world.cost_buildings().size()) {
-            for (std::size_t i = 0; i < d.army->castles.size(); ++i) {
-                world.cost_buildings()[i].weapons = d.army->castles[i].first;
-                world.cost_buildings()[i].slots = std::move(d.army->castles[i].second);
-            }
+        for (std::size_t i = 0; i < d.army->castles.size(); ++i) {
+            world.cost_buildings()[i].weapons = d.army->castles[i].first;
+            world.cost_buildings()[i].slots = std::move(d.army->castles[i].second);
         }
     }
-    if (d.diplomacy && d.diplomacy->size() == world.players().size()) {
+    if (d.diplomacy) {
         world.diplomacy() = std::move(*d.diplomacy);
     }
     if (d.animals) {
@@ -2418,6 +2435,8 @@ core::Bytes encode_sections(const World& world, const assets::BuildingTable& bui
     section(out, kDiplomacy, [&](Out& o) { write_diplomacy(o, world); });
     section(out, kExplored, [&](Out& o) { write_explored(o, world); });
     section(out, kQueues, [&](Out& o) {
+        // The commands keep a queue at kMaxQueuedOrders, so its length fits the byte.
+        static_assert(kMaxQueuedOrders <= 0xFF);
         const auto put = [&](std::uint32_t id, const std::vector<Target>& queue) {
             o.u32(id);
             o.u8(static_cast<std::uint8_t>(queue.size()));

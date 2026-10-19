@@ -121,8 +121,10 @@ islands wider or higher than 255 tiles.
 - **Fingerprint:** if it does not match (another tool has changed the chunks of the original), Open1602
   loads only the chunks of the original and reports it.
 - **Check before applying:** first everything is read and checked against the world (islands, tiles
-  within their island, free slots of the production list, number of random generators); only if everything
-  is correct is it applied. A damaged or truncated chunk changes nothing.
+  within their island, free slots of the production list, number of random generators, and that `PSTA`,
+  `SCOR` and `DIPL` have as many players as `PLAY`, `FLEE` and `ARMY` as many buildings as `COST`, and
+  `XPLR` as many islands and deposits as `ISLE`); only if everything is correct is it applied. A
+  damaged or truncated chunk changes nothing.
 - Every count is checked before memory is reserved: lists against the remaining length, the player
   count of `DIPL` (one entry per pair of players) against the player limit.
 

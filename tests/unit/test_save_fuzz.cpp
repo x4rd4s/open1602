@@ -462,6 +462,31 @@ TEST_CASE("save fuzz: a section of a later version is skipped and reported, a re
     CHECK(loaded->ships()[3].attack_move);
 }
 
+TEST_CASE("save fuzz: a section that does not match the size of the one it completes refuses the file") {
+    Game game;
+    const std::vector<Section> sections = sections_of(game.file);
+    // Replaces one section by a body that names no entries (a count of 0).
+    const auto emptied = [&](std::string_view tag) {
+        const Section* s = find(sections, tag);
+        REQUIRE(s != nullptr);
+        core::Bytes file(game.file.begin(), game.file.begin() + static_cast<std::ptrdiff_t>(s->at));
+        const core::Bytes empty = make_section(tag, s->version, s->flags, {0, 0, 0, 0});
+        file.insert(file.end(), empty.begin(), empty.end());
+        file.insert(file.end(), game.file.begin() + static_cast<std::ptrdiff_t>(s->at + kSectionHeader + s->size),
+                    game.file.end());
+        reseal(file);
+        return file;
+    };
+    REQUIRE(sim::read_game(game.file, game.buildings, nullptr, &game.figures).ok());
+    // Diplomacy of no players for four: once it loaded as peace between everyone.
+    auto refused = sim::read_game(emptied("DIPL"), game.buildings, nullptr, &game.figures);
+    REQUIRE(!refused.ok());
+    CHECK(refused.error().message.find("player sections do not match") != std::string::npos);
+    refused = sim::read_game(emptied("XPLR"), game.buildings, nullptr, &game.figures);
+    REQUIRE(!refused.ok());
+    CHECK(refused.error().message.find("explored islands do not match") != std::string::npos);
+}
+
 TEST_CASE("save fuzz: the chunk in a .GAM refuses a required section of a later version, unchanged world") {
     Game game;
     const std::vector<std::uint8_t> before = {'s', 'o', 'm', 'e', ' ', 'c', 'h', 'u', 'n', 'k', 's'};
