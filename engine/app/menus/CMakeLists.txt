@@ -10,6 +10,7 @@ add_library(o1602_menus
     ../src/command_sink.cpp
     ../src/event_presenter.cpp
     ../src/high_score_file.cpp
+    ../src/map_gestures.cpp
     ../src/main_menu.cpp
     ../src/multiplayer_menu.cpp
     ../src/multiplayer_texts.cpp

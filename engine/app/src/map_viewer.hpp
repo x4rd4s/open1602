@@ -18,9 +18,12 @@
 #include "command_sink.hpp"
 #include "event_presenter.hpp"
 #include "game_sound.hpp"
+#include "game_state.hpp"
 #include "hud.hpp"
+#include "map_input.hpp"
 #include "multiplayer_menu.hpp"
 #include "video_controller.hpp"
+#include "zoom_graphics.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -126,25 +129,14 @@ struct ViewerOptions {
 /// game's language; players named otherwise keep their names.
 void name_more_players(sim::World& world);
 
-/// One game: the world and the simulation that runs on it. A game that is loaded or started is
-/// built whole first and then takes the place of the old one, which stays as it was if building
-/// fails. Not movable: the simulation keeps a reference to the world next to it.
-struct GameState {
-    GameState(sim::World w, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
-              const sim::Rules& rules)
-        : world(std::move(w)), simulation(world, buildings, figures, rules) {}
-    GameState(const GameState&) = delete;
-    GameState& operator=(const GameState&) = delete;
-
-    sim::World world;
-    sim::Simulation simulation;
-};
-
-class MapViewer {
+/// The running program: the window, the game and its presentation. Coordinates the parts that
+/// take the input (MapInput), present the game's events (EventPresenter) and play the videos
+/// (VideoController), and runs the frames.
+class MapViewer : private MapInput::Host {
 public:
     static core::Result<std::unique_ptr<MapViewer>> create(const assets::GameDirectory& game,
                                                            const ViewerOptions& options);
-    ~MapViewer();
+    ~MapViewer() override;
     MapViewer(const MapViewer&) = delete;
     MapViewer& operator=(const MapViewer&) = delete;
 
@@ -155,12 +147,6 @@ private:
     MapViewer(assets::GameDirectory game, assets::BuildingTable buildings, sim::World world, assets::Palette palette,
               assets::FigureTable figures, ViewerOptions options);
 
-    /// Sprites of one zoom level: atlas (CPU side only rects remain) and its GPU textures.
-    struct ZoomGraphics {
-        render::WorldGraphics graphics;
-        std::unique_ptr<render::SdlSpriteRenderer> renderer;
-        render::SpriteHitMask hit_mask;  ///< visible pixels of the figures, for picking units
-    };
     /// Starts loading the zoom levels in the background (window and banners must be there).
     void start_preloading();
     /// The graphics of `zoom` on the GPU; waits for the background if it is not done yet.
@@ -175,12 +161,19 @@ private:
     [[nodiscard]] render::WorldLayers world_layers(const ZoomGraphics& graphics) const;
     /// The pictures of a unit as drawn (ship: hull and flag; land unit: body), with the row and
     /// depth that order them; nothing if it is not drawn.
-    [[nodiscard]] std::optional<render::FigureSprites> unit_sprites(const ui::UnitRef& ref) const;
+    [[nodiscard]] std::optional<render::FigureSprites> unit_sprites(const ui::UnitRef& ref) const override;
+    /// The graphics of the zoom level shown; null while they are not there.
+    [[nodiscard]] const ZoomGraphics* graphics() const override;
 
+    // What the input asks of the viewer (MapInput::Host).
+    void quick_save() override;
+    void quick_load() override;
+    void request_screenshot() override;
+    void quit() override { m_running = false; }
+    void toggle_owners() override { m_show_owners = !m_show_owners; }
+
+    /// The window's events; the rest goes to the input.
     void handle_event(const SDL_Event& event);
-    void handle_key(int key, int scancode, std::uint16_t mod);
-    /// F1: the keys as they are bound now, over the map.
-    void show_key_help();
     void update(std::uint32_t delta_ms);
     void render();
     void update_title(double fps);
@@ -188,7 +181,7 @@ private:
     [[nodiscard]] std::string debug_title(double fps);
     /// Where the camera starts and Home goes: the local player's Kontor, else his first ship,
     /// else the first island.
-    [[nodiscard]] render::TilePos home_tile() const;
+    [[nodiscard]] render::TilePos home_tile() const override;
     core::Status save_screenshot(const std::filesystem::path& path);
     /// Shows the drawn frame. A screenshot asked for since the last one is read first: SDL can read
     /// the picture back only before it is presented.
@@ -206,20 +199,6 @@ private:
     void apply_language();
     /// What the settings panel asked for this frame (save, load, quit, sounds, window size).
     void apply_options();
-    /// The platform's text input runs exactly while a name is typed (in the menu or the settings).
-    void sync_text_input();
-    /// A building (or the demolish tool) was taken from the menu: the selected ships and units
-    /// are let go, so a right click puts the building away instead of giving them an order.
-    void drop_units();
-    /// Closes the open pop-up of a build category, else lays the building in hand away (the
-    /// original's right click). False if there was neither.
-    bool cancel_build_step();
-    /// A right click on the panel, or on the map with nothing to order: straight back to the
-    /// player status, the general status page, from any mode, window or page of one. False if it
-    /// was showing already (the click is an order then).
-    bool back_to_status();
-    /// Pages a window or the settings go back at most in one click (a guard against a loop).
-    static constexpr int kMaxBackSteps = 8;
     /// How often the scenery shows itself, from the settings.
     [[nodiscard]] render::Ambient::Config ambient_config() const;
     void save_settings();
@@ -264,42 +243,8 @@ private:
     /// Open1602's own folder for savegames (the user's data folder, not the installation).
     [[nodiscard]] static std::filesystem::path save_folder();
 
-    /// Tells the panel which building is under the mouse for its window (none: the player status).
-    void select_building_at_mouse();
-
-    // ---- Input (map_input.cpp, ADR 0010) ----
-    /// The keys of ADR 0010.
-    void setup_keys();
-    /// Applies the key settings file over the defaults (or writes it with them).
-    void load_key_settings();
     /// The user's data folder of Open1602 (settings; the savegames in "saves" below it).
     [[nodiscard]] static std::filesystem::path data_folder();
-    [[nodiscard]] ui::KeyContext key_context() const;
-    void run_action(const ui::KeyBinding& binding);
-    /// The map scrolls while its keys are held.
-    void scroll_with_keys(std::uint32_t delta_ms);
-    /// Screen position of a world position in tiles.
-    [[nodiscard]] std::pair<double, double> screen_of(double tx, double ty) const;
-    /// Where a unit is drawn on screen: its box (x, y, w, h).
-    [[nodiscard]] std::optional<std::array<double, 4>> unit_box(const ui::UnitRef& ref) const;
-    /// Ships and land units whose picture lies in the rectangle (screen), with the part inside.
-    [[nodiscard]] std::vector<ui::UnitCandidate> units_in(double x0, double y0, double x1, double y1) const;
-    /// The unit under a screen point, the local player's first.
-    [[nodiscard]] std::optional<ui::UnitRef> unit_at(double sx, double sy) const;
-    /// Left button released on the map (no tool): a click or the end of a rectangle.
-    void map_left_up(double x, double y, std::uint16_t mod, int clicks);
-    /// An order of the selection to the screen point (right button; the left one with the
-    /// original's mouse); `queue` with Shift.
-    void map_order(double x, double y, bool queue);
-    /// An order of the selection to a world position (the minimap).
-    void order_to_tile(double tx, double ty, bool queue);
-    /// Escape or the right button (original mouse): out of a pick, back a page, deselect.
-    void cancel_action();
-    /// The selection changed: the windows follow (a single ship in the info mode, groups and land
-    /// units in the military mode).
-    void selection_changed(bool box);
-    /// Orders to the simulation; those that cannot be taken back wait for an answer (ADR 0010).
-    void submit_orders(std::vector<sim::Command> orders, bool sound = true);
 
     // ---- Multiplayer (multiplayer.cpp, ADR 0011) ----
     /// Hosts or joins the multiplayer game of the command line.
@@ -335,9 +280,6 @@ private:
     [[nodiscard]] net::HostSession* host_session() const noexcept;
     [[nodiscard]] net::ClientSession* client_session() const noexcept;
 
-    [[nodiscard]] std::optional<std::string> question_for(const sim::Command& command) const;
-    /// Health bars over the selected units and the selection rectangle.
-    void draw_selection_overlay();
     /// Tells the sound where the view is (every frame, before events are heard).
     void place_listener();
     /// Gives the map the window without the frame.
@@ -349,7 +291,7 @@ private:
     /// texture lost its contents, all are made again.
     void recreate_textures();
     /// What a click on the frame asked for.
-    void apply_hud(const Hud::Action& action);
+    void apply_hud(const Hud::Action& action) override;
     /// The resource bar: money, and goods and inhabitants of the city under the mouse.
     [[nodiscard]] Hud::Resources resources() const;
     /// Shots, hits, victory and defeat: sounds, messages and lines in the terminal.
@@ -360,9 +302,7 @@ private:
     /// The pause of the original (Pause key) while a video fills the window: the game stops or
     /// goes on, the pause video loops (VideoController::toggle_pause).
     void toggle_pause_video();
-    void zoom_by(int steps, double sx, double sy);
-    /// Island tile under the mouse, nullopt over the sea.
-    [[nodiscard]] std::optional<BuildTool::Spot> spot_at_mouse() const;
+    void zoom_by(int steps, double sx, double sy) override;
     /// What the world dims: while building the land the player cannot build on, or everything
     /// outside the circle of the building being placed or of the player's clicked building.
     [[nodiscard]] render::TileLighting tile_lighting() const;
@@ -383,7 +323,6 @@ private:
     /// Townsfolk, sea creatures and jugglers of the game time since the last frame.
     void update_ambient();
 
-    static constexpr std::int32_t kMaxPixelScale = 4;
     /// The pixel scale the screen asked for, last time it was looked at.
     std::int32_t m_display_pixel_scale = 1;
 
@@ -433,26 +372,10 @@ private:
     render::DrawListScratch m_draw_scratch;        ///< reused every frame
 
     bool m_running = true;
-    bool m_show_owners = false;  ///< ownership overlay (key O)
-    bool m_dragging = false;
-    double m_drag_distance = 0.0;  ///< mouse travel while the right button is held (a click if small)
-    ui::UnitSelection m_units;     ///< the selected ships or land units
-    ui::KeyBindings m_keys;
-    /// A pick the next click on the map answers: an attack (A) or a patrol (P).
-    enum class Pick : std::uint8_t { None, Attack, Patrol };
-    Pick m_pick = Pick::None;
-    std::optional<std::pair<double, double>> m_press;  ///< left button pressed on the map, screen
-    bool m_rubber_band = false;                        ///< the press became a selection rectangle
-    std::vector<sim::Command> m_pending_orders;        ///< waiting for the answer to a question
-    bool m_quit_pending = false;                       ///< "Ende" waits for the answer to its question
-    AppSettings m_app_settings;                        ///< settings.cfg in the user's data folder
-    SaveSlots m_slots;                                 ///< names of the savegames of the panel DISK
-    bool m_text_input = false;                         ///< the platform's text input is on (a name is typed)
-    std::size_t m_last_group = 0xFF;                   ///< the group key pressed last (twice: go there)
-    std::uint64_t m_last_group_ms = 0;
-    std::size_t m_formation = 0;  ///< the next formation of the F key
-    double m_mouse_x = 0.0;       ///< in output pixels
-    double m_mouse_y = 0.0;
+    bool m_show_owners = false;   ///< ownership overlay (key O)
+    bool m_quit_pending = false;  ///< "Ende" waits for the answer to its question
+    AppSettings m_app_settings;   ///< settings.cfg in the user's data folder
+    SaveSlots m_slots;            ///< names of the savegames of the panel DISK
     std::size_t m_sprites_drawn = 0;
     BuildTool m_tool;
     std::string m_tool_status;        ///< what the build tool would do at the mouse
@@ -467,18 +390,10 @@ private:
     render::Ambient m_ambient;                      ///< life in the picture, no part of the game
     std::unique_ptr<GameSound> m_sound;             ///< effects, voices and music (after the window)
     std::unique_ptr<Hud> m_hud;                     ///< panel and status bar (after the window), may be null
-    bool m_left_down = false;                       ///< the left mouse button, for the frame's buttons
-    std::vector<render::TileMark> m_tile_marks;     ///< red ground under what cannot be built, a dragged field
-    render::TileLighting m_lighting;                ///< tiles drawn darker this frame
-    /// The building looked at when the build menu picked its field: its circle stays lit while
-    /// that field is placed.
-    struct FieldSource {
-        std::uint16_t island = 0;
-        std::uint16_t x = 0;
-        std::uint16_t y = 0;
-        std::uint32_t field = 0;  ///< id of the field
-    };
-    std::optional<FieldSource> m_field_source;
+    /// Mouse and keys on the map, the selection (after the window, the sound and the panel).
+    std::unique_ptr<MapInput> m_input;
+    std::vector<render::TileMark> m_tile_marks;    ///< red ground under what cannot be built, a dragged field
+    render::TileLighting m_lighting;               ///< tiles drawn darker this frame
     std::optional<sim::BuildBill> m_pending_bill;  ///< costs of the order the build tool shows
     sim::PlayerFigures m_player_figures;           ///< the info panel's figures, refreshed once a second
     std::int64_t m_player_points = 0;              ///< the info panel's "Punkte", refreshed with them
