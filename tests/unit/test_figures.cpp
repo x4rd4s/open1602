@@ -363,3 +363,54 @@ TEST_CASE("figures: workers and animals vanish into crops and trees") {
     CHECK(at(8) == render::kCropHidden);               // inside any other building
     CHECK(render::crop_cut(world, b, 5.5, 5.5) == 0);  // open sea
 }
+
+TEST_CASE("figures: soldiers keep their animations from frame to frame and are found by id") {
+    const auto figures = make_deer();
+    const assets::FigureType& deer = *figures.get(89);
+    const assets::BuildingTable buildings;
+    sim::World world;
+    const auto add = [&world](std::uint32_t id, std::int32_t x, std::uint8_t anim) {
+        sim::Soldier s;
+        s.id = id;
+        s.pos_x = x * sim::kPosUnit;
+        s.pos_y = 3 * sim::kPosUnit;
+        s.figure = 89;
+        s.anim = anim;
+        world.add_soldier(s);
+    };
+    add(9, 1, 0);
+    add(5, 2, 0);
+    add(7, 4, 0);
+    world.soldiers().back().motion.phase = sim::SoldierMotion::Phase::Healing;  // in a doctor's house
+
+    render::SoldierFigures soldiers;
+    soldiers.reset(world, buildings, figures);
+    REQUIRE(soldiers.instances().size() == 2);
+    REQUIRE(soldiers.find(5) != nullptr);
+    CHECK(soldiers.find(5)->x == 2.0);
+    CHECK(soldiers.find(9)->x == 1.0);
+    CHECK(soldiers.find(7) == nullptr);
+    CHECK(soldiers.find(6) == nullptr);
+    // New units start somewhere in their animation; it runs on across a sync.
+    CHECK(soldiers.find(5)->frame == std::optional<std::uint8_t>(render::start_animation(deer, 0, 5).frame));
+    soldiers.advance(135 * 3, figures);
+    const auto frame5 = soldiers.find(5)->frame;
+    world.soldiers()[1].pos_x = 6 * sim::kPosUnit;
+    soldiers.sync(world, buildings, figures);
+    CHECK(soldiers.find(5)->x == 6.0);
+    CHECK(soldiers.find(5)->frame == frame5);
+    // A unit that changes its animation starts it from the first frame.
+    world.soldiers()[0].anim = 3;
+    soldiers.sync(world, buildings, figures);
+    CHECK(soldiers.find(9)->anim == 3);
+    CHECK(soldiers.find(9)->frame == std::optional<std::uint8_t>(0));
+    CHECK(soldiers.find(5)->frame == frame5);
+    // Gone and new units.
+    world.soldiers().erase(world.soldiers().begin() + 1);
+    add(12, 8, 0);
+    soldiers.sync(world, buildings, figures);
+    CHECK(soldiers.find(5) == nullptr);
+    REQUIRE(soldiers.find(12) != nullptr);
+    CHECK(soldiers.find(12)->x == 8.0);
+    CHECK(soldiers.find(12)->frame == std::optional<std::uint8_t>(render::start_animation(deer, 0, 12).frame));
+}

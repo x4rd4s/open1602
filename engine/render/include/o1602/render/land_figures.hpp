@@ -5,8 +5,8 @@
 // - soldiers walk, stand, strike and die where the simulation has them.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
@@ -71,12 +71,20 @@ public:
     [[nodiscard]] const FigureInstance* find(std::uint32_t id) const noexcept;
 
 private:
-    struct Known {
-        AnimState state;
-        std::uint8_t sim_anim = 0;
+    struct Entry {
+        std::uint32_t id = 0;     ///< Soldier::id
+        std::uint32_t index = 0;  ///< its instance
     };
-    std::unordered_map<std::uint32_t, Known> m_known;  ///< by Soldier::id
-    std::vector<std::uint32_t> m_ids;                  ///< Soldier::id per instance
+    /// The instance of a soldier in `index` (sorted by id), kNone if there is none.
+    static constexpr std::size_t kNone = static_cast<std::size_t>(-1);
+    [[nodiscard]] static std::size_t lookup(const std::vector<Entry>& index, std::uint32_t id) noexcept;
+
+    std::vector<std::uint8_t> m_sim_anims;  ///< Soldier::anim per instance, when its animation started
+    std::vector<Entry> m_index;             ///< by Soldier::id
+    // The last frame's, kept to reuse their memory.
+    std::vector<AnimState> m_last_states;
+    std::vector<std::uint8_t> m_last_sim_anims;
+    std::vector<Entry> m_last_index;
 };
 
 }  // namespace o1602::render

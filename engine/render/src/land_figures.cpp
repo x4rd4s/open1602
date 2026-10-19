@@ -198,23 +198,21 @@ void AnimalFigures::reset(const sim::World& world, const assets::BuildingTable& 
 void SoldierFigures::reset(const sim::World& world, const assets::BuildingTable& buildings,
                            const assets::FigureTable& figures) {
     clear();
-    m_known.clear();
-    m_ids.clear();
+    m_sim_anims.clear();
+    m_index.clear();
     sync(world, buildings, figures);
 }
 
 void SoldierFigures::sync(const sim::World& world, const assets::BuildingTable& buildings,
                           const assets::FigureTable& figures) {
-    // What the animations did since the last frame.
-    for (std::size_t i = 0; i < m_ids.size() && i < m_states.size(); ++i) {
-        if (const auto it = m_known.find(m_ids[i]); it != m_known.end()) {
-            it->second.state = m_states[i];
-        }
-    }
+    // The last frame's animations, as they ran since.
+    std::swap(m_states, m_last_states);
+    std::swap(m_sim_anims, m_last_sim_anims);
+    std::swap(m_index, m_last_index);
     m_instances.clear();
     m_states.clear();
-    m_ids.clear();
-    std::unordered_map<std::uint32_t, Known> known;
+    m_sim_anims.clear();
+    m_index.clear();
     for (const sim::Soldier& s : world.soldiers()) {
         if (s.motion.phase == sim::SoldierMotion::Phase::Healing) {
             continue;
@@ -227,39 +225,44 @@ void SoldierFigures::sync(const sim::World& world, const assets::BuildingTable& 
         f.owner = s.owner;
         f.z = spawn_height(world, buildings, f.x, f.y, true);  // 0x0045E1F0 with 0x00451180
         f.sheet = assets::FigureSheet::Soldat;                 // draw kind 4 (0x0044FA90)
-        Known k;
-        const auto it = m_known.find(s.id);
+        AnimState state;
+        std::uint8_t sim_anim = 0;
+        const std::size_t last = lookup(m_last_index, s.id);
         const assets::FigureType* type = figures.get(s.figure);
-        if (it != m_known.end() && it->second.sim_anim == s.anim) {
-            k = it->second;
+        if (last != kNone && m_last_sim_anims[last] == s.anim) {
+            state = m_last_states[last];
+            sim_anim = s.anim;
         } else if (type != nullptr) {
             const std::uint8_t anim = type->anim(s.anim) != nullptr ? s.anim : 0;
             // A unit that was already there starts its animation from the first frame; one that
             // appears (loaded, released) somewhere in it, so that neighbours do not move in step.
-            k.state = start_animation(*type, anim, s.id);
-            if (it != m_known.end()) {
-                k.state.frame = 0;
-                k.state.elapsed_ms = 0;
+            state = start_animation(*type, anim, s.id);
+            if (last != kNone) {
+                state.frame = 0;
+                state.elapsed_ms = 0;
             }
-            k.sim_anim = s.anim;
+            sim_anim = s.anim;
         }
-        f.anim = k.state.anim;
-        f.frame = k.state.frame;
+        f.anim = state.anim;
+        f.frame = state.frame;
+        m_index.push_back(Entry{s.id, static_cast<std::uint32_t>(m_instances.size())});
         m_instances.push_back(f);
-        m_states.push_back(k.state);
-        m_ids.push_back(s.id);
-        known.emplace(s.id, k);
+        m_states.push_back(state);
+        m_sim_anims.push_back(sim_anim);
     }
-    m_known = std::move(known);
+    // The soldiers come in the order of their ids, so this hardly moves anything.
+    std::stable_sort(m_index.begin(), m_index.end(), [](const Entry& a, const Entry& b) { return a.id < b.id; });
+}
+
+std::size_t SoldierFigures::lookup(const std::vector<Entry>& index, std::uint32_t id) noexcept {
+    const auto it =
+        std::lower_bound(index.begin(), index.end(), id, [](const Entry& e, std::uint32_t v) { return e.id < v; });
+    return it != index.end() && it->id == id ? it->index : kNone;
 }
 
 const FigureInstance* SoldierFigures::find(std::uint32_t id) const noexcept {
-    for (std::size_t i = 0; i < m_ids.size() && i < m_instances.size(); ++i) {
-        if (m_ids[i] == id) {
-            return &m_instances[i];
-        }
-    }
-    return nullptr;
+    const std::size_t i = lookup(m_index, id);
+    return i != kNone ? &m_instances[i] : nullptr;
 }
 
 }  // namespace o1602::render
