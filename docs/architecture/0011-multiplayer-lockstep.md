@@ -87,6 +87,37 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     (slots, ready, chat, start; the host removes players and spectators). Its texts follow the
     language of the installation. Host names are looked up beside the game, so a slow name server
     does not stop the menu.
+15. **Host migration.** When the host leaves a running game (it quits or its connection breaks),
+    the game moves on to a successor instead of standing still:
+    - *Who.* The host names the successor in every `Roster`: of the computers that play a slot and
+      run the game (not loading, not lagging), the one with the lowest slot, with its address as
+      the host sees it. Only that computer gets `Standby` from the host: the tokens of all slots
+      and the slots the computer plays until someone comes, sent again whenever they change.
+      Everyone has the same roster, so everyone agrees on the successor.
+    - *The successor* makes a `HostSession` from its ended `ClientSession` and listens on the port
+      of the old host. The game goes on from the frame its own game is at; the frames the old host
+      closed beyond it and that it already has stay closed. Password, joining and spectators stay
+      as they were. The old host's slot goes to the computer (`PlayerControl` in the first new frame)
+      and is open for whoever comes, like a slot the computer held from the start.
+    - *The others* make a `ClientSession` from their ended one: the same name, slot and token,
+      `Hello::returning` set. It connects to the successor's address (the address of the old host if
+      the host saw the successor on its own computer), again every half second while the successor
+      is not there yet, for 30 s; the successor may notice the host's leaving later than they do.
+      The successor takes them back into their slots by their tokens; one without a slot (a
+      spectator, or one whose slot was taken) watches instead of taking a free slot.
+    - *Lockstep.* Every computer that comes back gets the successor's game as a savegame (point 6),
+      with the frames closed after it. So all continue from one state, whatever frames each had
+      received or run when the host left: frames of the old host beyond the successor's are dropped
+      on every computer alike, a computer that was ahead goes back a few frames. Orders the old host
+      had not put into a frame yet are lost, as orders in flight are when a connection breaks. The
+      frame count goes on, so the fingerprints (point 5) keep their frames and are compared by the
+      new host as before.
+    - *Fallback.* If the game cannot move on (the host left before the game started, no successor,
+      the successor cannot listen on the port, or it does not take a computer in within 30 s), that
+      computer saves the game as `hostleft.o1602` as before: it loads with its own slot and the
+      computer plays the other people's slots, and it can be hosted anew as a savegame.
+    - *Protocol.* Version 3: `Hello::returning`, `Roster::successor` and `successor_address`, the
+      message `Standby`.
 
 ## Rationale
 
@@ -111,12 +142,18 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
   host writes games for joining computers a few at once and then at most one a second.
 - A host behind a router needs UDP port 16020 (or the one it chose) forwarded for players on the
   internet; the menu says so.
+- The host tells every computer the address of the successor, and the successor the tokens of all
+  slots (it becomes the host, who knows them anyway). Changing the host costs one savegame sent to
+  every computer, as at the start.
 
 ## Open
 
 - Choosing banners in the lobby, the endless game's own world settings over the network.
 - The computer taking over slots of players who began as humans, waiting for a disconnected player.
-- Changing the host when it leaves (today the game ends for everyone; each client saves it as
-  `hostleft`, so one of them can host it again as a savegame), a relay for hosts behind strict
-  NAT, IPv6 (ENet 1.3 knows IPv4 only), searches beyond the local network.
+- Host migration beyond the local network: the successor is reached at the address the host saw,
+  on the old host's port, so on the internet only when that port is open at the successor too.
+  Players who had left before the host and want to come back still look for the old host; the
+  new host is not shown in the search of the local network (the others reach it by address). A
+  relay for hosts behind strict NAT, IPv6 (ENet 1.3 knows IPv4 only), searches beyond the local
+  network.
 - Replays: the savegame plus the session's frames are already all one needs.

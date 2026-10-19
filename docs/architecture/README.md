@@ -15,4 +15,4 @@ Short, dated decisions with their rationale. New decision = new file
 | [0008](0008-game-settings.md) | Game settings in `sim::Rules` (endless game configurable as in later Anno titles) | accepted |
 | [0009](0009-own-save-format.md) | Own save format `.o1602`; original files only read and exported | accepted |
 | [0010](0010-controls-and-interface.md) | Controls and interface: modern controls (right-click, minimap, command chains), freely assignable keys, confirmations | accepted |
-| [0011](0011-multiplayer-lockstep.md) | Multiplayer: lockstep through the host, resync by savegame, ENet, lobby and LAN search | accepted |
+| [0011](0011-multiplayer-lockstep.md) | Multiplayer: lockstep through the host, resync by savegame, ENet, lobby and LAN search, host migration | accepted |
