@@ -4,7 +4,6 @@
 add_executable(open1602
     src/main.cpp
     src/diagnostics.cpp
-    src/build_tool.cpp
     src/game_sound.cpp
     src/hud.cpp
     src/selection_panels.cpp

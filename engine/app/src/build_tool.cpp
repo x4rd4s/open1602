@@ -173,7 +173,10 @@ std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, s
         const std::int64_t wy = static_cast<std::int64_t>(island.y) + spot.y;
         std::int64_t best = -1;
         const sim::Ship* chosen = m_ship ? world.ship(*m_ship) : nullptr;
-        if (chosen != nullptr && chosen->owner == player) {
+        if (chosen != nullptr && chosen->owner != player) {
+            chosen = nullptr;  // sunk and reused, or taken: the nearest one pays
+        }
+        if (chosen != nullptr) {
             order.ship = chosen->id;
             best = 0;
         }
