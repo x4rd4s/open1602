@@ -114,8 +114,8 @@ struct ViewerOptions {
         Role role = Role::Host;
         std::string address;  ///< Join: the host's name or IPv4 address
         std::uint16_t port = net::kDefaultPort;
-        std::string name;  ///< the player's name for the others; empty: the menu's
-        std::string password;         ///< Join: the game's password, if it has one
+        std::string name;      ///< the player's name for the others; empty: the menu's
+        std::string password;  ///< Join: the game's password, if it has one
     };
     std::optional<Multiplayer> multiplayer;
 };
@@ -205,13 +205,18 @@ private:
     /// program runs (F9); the game goes on as it was if the file cannot be read.
     core::Status load_game(const std::filesystem::path& path);
     /// A savegame or scenario as a world, not started.
-    [[nodiscard]] core::Result<sim::World> read_world(const std::filesystem::path& path) const;
+    /// `warnings`: how many the loader gave (they are written to the log).
+    [[nodiscard]] core::Result<sim::World> read_world(const std::filesystem::path& path,
+                                                      std::size_t* warnings = nullptr) const;
     /// The game goes on in another world (a savegame, a scenario, a new game): everything of the old
     /// one goes, the simulation starts anew on it. noexcept: m_simulation is rebuilt in place, and
     /// a failure halfway (out of memory) must end the program, not leave a destroyed simulation.
     void replace_world(sim::World world) noexcept;
     /// Tells (on stderr) that a savegame's simulation state was damaged (Simulation::state_damaged).
     void warn_if_state_damaged() const;
+    /// A game that loaded with `warnings` (parts skipped, other game data) or without its running
+    /// state: a note in the status line, the details are in the log.
+    void report_load_problems(std::size_t warnings);
     /// What the main menu asked for this frame.
     void apply_menu();
     /// The end screen follows a decided game when the videos of its messages are over and the
@@ -424,8 +429,9 @@ private:
     double m_mouse_y = 0.0;
     std::size_t m_sprites_drawn = 0;
     BuildTool m_tool;
-    std::string m_tool_status;  ///< what the build tool would do at the mouse
-    std::string m_notice;       ///< notify(): quick save, screenshot, their errors
+    std::string m_tool_status;        ///< what the build tool would do at the mouse
+    std::string m_notice;             ///< notify(): quick save, screenshot, their errors
+    std::size_t m_load_problems = 0;  ///< of the game loaded last (report_load_problems)
     std::uint64_t m_notice_until_ms = 0;
     struct ScreenshotRequest {
         std::filesystem::path path;

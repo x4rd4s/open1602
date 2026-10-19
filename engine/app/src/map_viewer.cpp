@@ -304,6 +304,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->load_key_settings();
     viewer->load_options();
     name_more_players(viewer->m_world);  // in the language the options set
+    viewer->report_load_problems(warnings.size());
     if (options.new_game && options.new_game->name.empty() && viewer->m_world.time_ms() == 0) {
         // A new game started without --name: the name typed in the menu before, else "Nameless".
         if (sim::Player* p = viewer->m_world.player(viewer->m_local_player); p != nullptr) {
@@ -2295,15 +2296,24 @@ core::Status MapViewer::load_game(const std::filesystem::path& path) {
     if (m_sound) {
         m_sound->prefill();  // the frames stand still while the game loads
     }
-    auto world = read_world(path);
+    std::size_t warnings = 0;
+    auto world = read_world(path, &warnings);
     if (!world) {
         return world.error();
     }
     replace_world(std::move(world).value());
+    report_load_problems(warnings);
     return core::Ok{};
 }
 
-core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path) const {
+void MapViewer::report_load_problems(std::size_t warnings) {
+    m_load_problems = warnings + (m_simulation.state_damaged() ? 1 : 0);
+    if (m_load_problems != 0) {
+        notify(ui::tr("notice.load_problems", {std::to_string(m_load_problems)}));
+    }
+}
+
+core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path, std::size_t* warning_count) const {
     auto bytes = core::read_file(path);
     if (!bytes) {
         return bytes.error();
@@ -2321,6 +2331,9 @@ core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path
     }
     for (const auto& w : warnings) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
+    }
+    if (warning_count != nullptr) {
+        *warning_count = warnings.size();
     }
     return world;
 }

@@ -28,6 +28,8 @@ notice.screenshot_saved = Screenshot saved: {1}
 # {1}: what went wrong
 notice.save_failed = Saving failed: {1}
 notice.load_failed = Loading failed: {1}
+# {1}: how many problems
+notice.load_problems = Loaded with {1} problem(s): parts of the game could not be used. The log has the details.
 notice.screenshot_failed = Screenshot failed: {1}
 
 # Menus and savegames

@@ -85,6 +85,7 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
     replace_world(std::move(world).value());
+    report_load_problems(warnings.size());
     return &m_simulation;
 }
 

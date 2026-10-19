@@ -441,8 +441,11 @@ void MapViewer::run_action(const ui::KeyBinding& b) {
         case KeyAction::QuickLoad: {
             const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
             const auto status = load_game(path);
-            notify(status ? ui::tr("notice.game_loaded", {utf8_to_cp1252(core::path_to_utf8(path.filename()))})
-                          : ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}));
+            if (!status) {
+                notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}));
+            } else if (m_load_problems == 0) {  // else the note says what went wrong while loading
+                notify(ui::tr("notice.game_loaded", {utf8_to_cp1252(core::path_to_utf8(path.filename()))}));
+            }
             break;
         }
         case KeyAction::GameMenu:

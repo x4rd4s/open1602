@@ -20,6 +20,8 @@ notice.game_loaded = Spiel geladen: {1}
 notice.screenshot_saved = Bildschirmfoto gespeichert: {1}
 notice.save_failed = Speichern fehlgeschlagen: {1}
 notice.load_failed = Laden fehlgeschlagen: {1}
+# {1}: how many problems
+notice.load_problems = Mit {1} Problem(en) geladen: Teile des Spiels ließen sich nicht verwenden. Einzelheiten stehen im Protokoll.
 notice.screenshot_failed = Bildschirmfoto fehlgeschlagen: {1}
 
 # Menus and savegames
