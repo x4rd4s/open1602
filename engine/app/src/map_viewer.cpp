@@ -2101,8 +2101,9 @@ void MapViewer::update_title(double fps) {
     // reached since the last title.
     const std::uint64_t now = platform::ticks_ms();
     const std::uint64_t game_ms = m_state->simulation.game_time_ms();
-    // A multiplayer game that ended stands still on purpose.
-    const bool stands = m_state->simulation.paused() || (m_session && m_session->ended());
+    // A multiplayer game that ended or waits for a player stands still on purpose (the title says
+    // why), not because this computer is too slow.
+    const bool stands = m_state->simulation.paused() || (m_session && (m_session->ended() || m_session->waiting()));
     if (!stands && now > m_title_real_ms && game_ms >= m_title_game_ms && m_title_real_ms != 0) {
         const double reached =
             static_cast<double>(game_ms - m_title_game_ms) / static_cast<double>(now - m_title_real_ms);

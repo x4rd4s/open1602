@@ -247,6 +247,25 @@ TEST_CASE("ai: a computer with a ship founds a city through a build order") {
     CHECK(!view[0].settling);
 }
 
+TEST_CASE("ai: a person who takes a seat over finds its ships standing") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    const std::uint32_t id = g.world.ships().front().id;
+    // The computer sends its ship off to found a city; a person takes the seat over on the way.
+    REQUIRE(run_until(s, 600'000, [&] { return !g.world.ship(id)->target.empty(); }));
+    s.submit(sim::PlayerControl{kComputer, false});
+    run(s, 1'000);
+    const sim::Ship* ship = g.world.ship(id);
+    REQUIRE(ship != nullptr);
+    CHECK(ship->target.empty());
+    const std::int32_t x = ship->x;
+    const std::int32_t y = ship->y;
+    run(s, 60'000);
+    CHECK(g.world.ship(id)->x == x);
+    CHECK(g.world.ship(id)->y == y);
+    CHECK(g.cities_of(kComputer) == 0);
+}
+
 TEST_CASE("ai: the new city gets roads from the computer's own build orders") {
     Game g;
     sim::Simulation s(g.world, g.buildings, g.figures);

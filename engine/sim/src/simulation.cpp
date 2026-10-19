@@ -455,7 +455,17 @@ bool Simulation::control_player(const PlayerControl& order) {
     if (p == nullptr || !p->active() || (p->role != PlayerRole::Human && p->role != PlayerRole::Computer)) {
         return false;
     }
+    const bool to_person = p->role == PlayerRole::Computer && !order.computer;
     p->role = order.computer ? PlayerRole::Computer : PlayerRole::Human;
+    if (to_person) {
+        // The person finds the ships standing where the computer left them, not sailing on to
+        // where it sent them; trade routes keep running (they show in the ship's window).
+        for (const Ship& ship : m_world->ships()) {
+            if (ship.owner == order.player && !ship.route.active && !ship.target.empty()) {
+                (void)m_fleet.order(ShipOrder{order.player, ship.id, {}});
+            }
+        }
+    }
     return true;
 }
 
