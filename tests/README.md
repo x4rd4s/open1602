@@ -93,13 +93,15 @@ into `kFixtures` and load it with `test::fixture()` or `test::fixture_or_skip()`
 
 ## Before a pull request
 
-CI checks the formatting with clang-format 18 (the version of Ubuntu 24.04) and fails on any
-difference. Format the files you changed before you push:
+CI checks the formatting with clang-format 18 (it installs `clang-format-18` and calls it by that
+name) and fails on any difference. Other major versions format some constructs differently, so use
+18: the Ubuntu/Debian package `clang-format-18`, or `pip install clang-format==18.1.8` (which installs
+it as plain `clang-format`). Format the files you changed before you push:
 
 ```sh
-clang-format -i <changed .cpp and .hpp files>
+clang-format-18 -i <changed .cpp and .hpp files>
 # or check everything as CI does:
-find engine tools tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format --dry-run --Werror
+find engine tools tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format-18 --dry-run --Werror
 ```
 
 Then build and run the tests as above; a build with the `ci` preset treats warnings as errors, as CI does.

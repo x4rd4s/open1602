@@ -10,6 +10,8 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Actions are pinned to commit SHAs (the tag in the comment); Dependabot proposes updates
+# (.github/dependabot.yml).
 permissions:
   contents: read
 
@@ -31,7 +33,7 @@ jobs:
           - { name: Windows MSVC, os: windows-2022, cxx: cl,      preset: ci }
           - { name: macOS Clang,  os: macos-14,     cxx: clang++, preset: ci }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -43,14 +45,14 @@ jobs:
 
       - name: Set up MSVC environment
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
         with:
           arch: x64
 
       - name: Cache zlib (Windows)
         if: runner.os == 'Windows'
         id: zlib-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ${{ runner.temp }}/zlib
           key: zlib-1.3.1-${{ matrix.os }}
@@ -91,7 +93,7 @@ jobs:
     env:
       SDL_VERSION: 3.2.24
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -106,13 +108,13 @@ jobs:
 
       - name: Set up MSVC environment
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
         with:
           arch: x64
 
       - name: Cache SDL3
         id: sdl-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ${{ runner.temp }}/sdl3
           key: sdl3-${{ env.SDL_VERSION }}-${{ matrix.os }}
@@ -130,7 +132,7 @@ jobs:
       - name: Cache zlib (Windows)
         if: runner.os == 'Windows'
         id: zlib-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ${{ runner.temp }}/zlib
           key: zlib-1.3.1-${{ matrix.os }}
@@ -166,10 +168,10 @@ jobs:
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
 
       - name: Set up MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
         with:
           arch: x64
 
@@ -183,7 +185,7 @@ jobs:
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
 
       - name: Cache vcpkg packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
           path: ${{ github.workspace }}/vcpkg-cache
           key: vcpkg-${{ hashFiles('vcpkg.json') }}-windows-2022
@@ -206,8 +208,12 @@ jobs:
     name: Formatting
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: Install clang-format 18
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
       - name: Check formatting
+        # Called by its versioned name so that a runner image with another default version cannot
+        # reformat the code (CONTRIBUTING.md names version 18).
         run: |
-          clang-format --version
-          find engine tools tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format --dry-run --Werror
+          clang-format-18 --version
+          find engine tools tests \( -name '*.cpp' -o -name '*.hpp' \) -print0 | xargs -0 clang-format-18 --dry-run --Werror
