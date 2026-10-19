@@ -35,6 +35,7 @@
 #include "o1602/render/ambient.hpp"
 #include "o1602/render/animation_clock.hpp"
 #include "o1602/render/camera.hpp"
+#include "o1602/render/graphics_preloader.hpp"
 #include "o1602/render/land_figures.hpp"
 #include "o1602/render/sdl_sprite_renderer.hpp"
 #include "o1602/render/sprite_atlas.hpp"
@@ -160,7 +161,13 @@ private:
         std::unique_ptr<render::SdlSpriteRenderer> renderer;
         render::SpriteHitMask hit_mask;  ///< visible pixels of the figures, for picking units
     };
+    /// Starts loading the zoom levels in the background (window and banners must be there).
+    void start_preloading();
+    /// The graphics of `zoom` on the GPU; waits for the background if it is not done yet.
     core::Status ensure_graphics(render::Zoom zoom);
+    /// Every frame: uploads the zoom levels the background finished.
+    void adopt_preloaded_graphics();
+    core::Status install_graphics(render::Zoom zoom, render::PreparedGraphics prepared);
     /// The parts of the world's layers that do not change within a frame (graphics of the zoom
     /// level, figures, banners).
     [[nodiscard]] render::WorldLayers world_layers(const ZoomGraphics& graphics) const;
@@ -430,6 +437,7 @@ private:
     std::unique_ptr<platform::SdlSystem> m_sdl;
     std::unique_ptr<platform::Window> m_window;
     std::array<std::optional<ZoomGraphics>, 3> m_graphics;
+    std::unique_ptr<render::GraphicsPreloader> m_preloader;  ///< the CPU side of the zoom levels
 
     render::Camera m_camera;
     render::AnimationClock m_clock;

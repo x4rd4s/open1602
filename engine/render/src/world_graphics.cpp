@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "o1602/render/world_graphics.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -171,6 +173,30 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
         }
     }
     return g;
+}
+
+core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
+                                                      Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
+                                                      const GraphicsOptions& options, const BannerTable* banners,
+                                                      const assets::FigureTable* figures) {
+    const auto start = std::chrono::steady_clock::now();
+    auto graphics = load_world_graphics(game, palette, zoom, figure_sheets, options, banners, figures);
+    if (!graphics) {
+        return graphics.error();
+    }
+    PreparedGraphics p{std::move(graphics).value(), {}, 0};
+    // Units are picked by their visible pixels: the figure sheets keep a mask (the terrain sheet
+    // comes first and is not needed).
+    auto first_figure = static_cast<std::uint32_t>(p.graphics.atlas.sprite_count());
+    for (std::size_t k = 0; k < assets::kFigureSheetCount; ++k) {
+        if (k != static_cast<std::size_t>(assets::FigureSheet::Stadtfld) && p.graphics.base[k]) {
+            first_figure = std::min(first_figure, *p.graphics.base[k]);
+        }
+    }
+    p.hit_mask = SpriteHitMask::build(p.graphics.atlas, first_figure);
+    p.ms = static_cast<std::uint32_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+    return p;
 }
 
 }  // namespace o1602::render

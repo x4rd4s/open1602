@@ -16,6 +16,7 @@
 #include "o1602/core/result.hpp"
 #include "o1602/render/banner.hpp"
 #include "o1602/render/sprite_atlas.hpp"
+#include "o1602/render/sprite_hit_mask.hpp"
 #include "o1602/render/unit_tint.hpp"
 
 namespace o1602::render {
@@ -59,6 +60,22 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
                                                 const GraphicsOptions& options = {},
                                                 const BannerTable* banners = nullptr,
                                                 const assets::FigureTable* figures = nullptr);
+
+/// A zoom level's graphics as far as they are made without the GPU: the atlas with its pixels and
+/// the masks of the figures for picking units. Reads only files and its arguments, so it may run
+/// on another thread while the game goes on (GraphicsPreloader).
+struct PreparedGraphics {
+    WorldGraphics graphics;
+    SpriteHitMask hit_mask;  ///< visible pixels of the figure sheets (not of the terrain)
+    std::uint32_t ms = 0;    ///< time it took
+};
+
+/// load_world_graphics plus the figures' hit mask.
+core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
+                                                      Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
+                                                      const GraphicsOptions& options = {},
+                                                      const BannerTable* banners = nullptr,
+                                                      const assets::FigureTable* figures = nullptr);
 
 /// The sheets the world renderer uses: ships, animals, shadows, effects (smoke, status icons),
 /// soldiers, carriers and carts (TRAEGER.BSH), farm workers (MAEHER.BSH), fish, jugglers and the

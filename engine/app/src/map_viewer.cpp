@@ -363,6 +363,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         viewer->m_camera.center_on(render::TilePos{static_cast<std::uint32_t>(std::max(0.0, s.x())),
                                                    static_cast<std::uint32_t>(std::max(0.0, s.y()))});
     }
+    viewer->start_preloading();
     if (auto status = viewer->ensure_graphics(viewer->m_camera.view().zoom); !status) {
         return status.error();
     }
@@ -406,6 +407,7 @@ void MapViewer::warn_if_state_damaged() const {
 MapViewer::~MapViewer() {
     // GPU resources must go before the renderer/window, which go before SDL_Quit: the textures of
     // the video and the HUD as well as the world's sprites.
+    m_preloader.reset();  // waits for the zoom level being loaded
     m_video.reset();
     m_hud.reset();
     for (auto& g : m_graphics) {
@@ -416,44 +418,78 @@ MapViewer::~MapViewer() {
     m_sdl.reset();
 }
 
+void MapViewer::start_preloading() {
+    render::GraphicsOptions options;
+    options.page_size = m_window->max_texture_size() >= 4096 ? 4096U : 2048U;
+    options.derive_missing_sheets = m_options.derive_small_figures;
+    // The thread works on its own copies: nothing it reads changes under it.
+    m_preloader = std::make_unique<render::GraphicsPreloader>(
+        [game = m_game, palette = m_palette, banners = m_banners, figures = m_figures, options](render::Zoom zoom) {
+            return render::prepare_world_graphics(game, palette, zoom, render::kWorldFigureSheets, options, &banners,
+                                                  &figures);
+        },
+        true);
+    // All zoom levels, the one shown first: switching to another one then waits for nothing.
+    m_preloader->request(render::preload_order(m_camera.view().zoom));
+}
+
 core::Status MapViewer::ensure_graphics(render::Zoom zoom) {
-    auto& slot = m_graphics[static_cast<std::size_t>(zoom)];
-    if (slot) {
+    if (m_graphics[static_cast<std::size_t>(zoom)]) {
         return core::Ok{};
     }
-    if (m_sound) {
-        m_sound->prefill();  // the frames stand still while the sprites load
-    }
-    const std::int32_t max_texture = m_window->max_texture_size();
-    render::GraphicsOptions options;
-    options.page_size = max_texture >= 4096 ? 4096U : 2048U;
-    options.derive_missing_sheets = m_options.derive_small_figures;
+    // Wanted before the background has it: the frames stand still until it is there, the sound
+    // goes on.
     const std::uint64_t start = platform::ticks_ms();
-    auto graphics = render::load_world_graphics(m_game, m_palette, zoom, render::kWorldFigureSheets, options,
-                                                &m_banners, &m_figures);
-    if (!graphics) {
-        return graphics.error();
+    auto prepared = m_preloader->take(zoom, [this] {
+        if (m_sound) {
+            m_sound->prefill();
+        }
+    });
+    if (const std::uint64_t waited = platform::ticks_ms() - start; waited > 0) {
+        std::fprintf(stderr, "%s: waited %llu ms for it\n", zoom_name(zoom), static_cast<unsigned long long>(waited));
     }
-    const std::uint32_t page_size = options.page_size;
-    slot.emplace(ZoomGraphics{std::move(graphics).value(), nullptr, {}});
+    if (!prepared) {
+        return prepared.error();
+    }
+    return install_graphics(zoom, std::move(prepared).value());
+}
+
+void MapViewer::adopt_preloaded_graphics() {
+    while (auto ready = m_preloader->take_ready()) {
+        auto& [zoom, prepared] = *ready;
+        if (!prepared) {
+            // Tried again (and reported) when the player switches to it.
+            std::fprintf(stderr, "warning: %s: %s\n", zoom_name(zoom), prepared.error().message.c_str());
+            continue;
+        }
+        if (m_graphics[static_cast<std::size_t>(zoom)]) {
+            continue;
+        }
+        if (m_sound) {
+            m_sound->prefill();  // the upload stands this frame still for a moment
+        }
+        if (auto status = install_graphics(zoom, std::move(prepared).value()); !status) {
+            std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
+        }
+    }
+}
+
+core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGraphics prepared) {
+    auto& slot = m_graphics[static_cast<std::size_t>(zoom)];
+    const std::uint32_t made_ms = prepared.ms;
+    const std::uint64_t start = platform::ticks_ms();
+    slot.emplace(ZoomGraphics{std::move(prepared.graphics), nullptr, std::move(prepared.hit_mask)});
     slot->renderer = std::make_unique<render::SdlSpriteRenderer>(m_window->sdl_renderer());
     if (auto status = slot->renderer->upload(slot->graphics.atlas); !status) {
         slot.reset();
         return status;
     }
-    // Units are picked by their visible pixels: the figure sheets keep a mask (the terrain sheet
-    // comes first and is not needed).
-    std::uint32_t first_figure = static_cast<std::uint32_t>(slot->graphics.atlas.sprite_count());
-    for (std::size_t k = 0; k < assets::kFigureSheetCount; ++k) {
-        if (k != static_cast<std::size_t>(assets::FigureSheet::Stadtfld) && slot->graphics.base[k]) {
-            first_figure = std::min(first_figure, *slot->graphics.base[k]);
-        }
-    }
-    slot->hit_mask = render::SpriteHitMask::build(slot->graphics.atlas, first_figure);
     slot->graphics.atlas.drop_pixels();
-    std::fprintf(stderr, "%s: %zu sprites in %zu page(s) of %u px, figure masks %zu KB, %llu ms\n", zoom_name(zoom),
-                 slot->graphics.atlas.sprite_count(), slot->graphics.atlas.pages().size(), page_size,
-                 slot->hit_mask.bytes() / 1024, static_cast<unsigned long long>(platform::ticks_ms() - start));
+    std::fprintf(stderr,
+                 "%s: %zu sprites in %zu page(s) of %u px, figure masks %zu KB, made in %u ms, upload %llu ms\n",
+                 zoom_name(zoom), slot->graphics.atlas.sprite_count(), slot->graphics.atlas.pages().size(),
+                 slot->graphics.atlas.page_size(), slot->hit_mask.bytes() / 1024, made_ms,
+                 static_cast<unsigned long long>(platform::ticks_ms() - start));
     return core::Ok{};
 }
 
@@ -465,6 +501,7 @@ int MapViewer::run() {
     std::uint32_t frames = 0;
     update_title(0.0);
     while (m_running) {
+        adopt_preloaded_graphics();
         SDL_Event event;
         for (const ViewerOptions::ScriptedInput& in : m_options.input) {
             if (in.frame != frames) {
@@ -1617,10 +1654,12 @@ void MapViewer::follow_display_scale() {
 
 void MapViewer::recreate_textures() {
     std::fprintf(stderr, "the render device was reset: textures are made again\n");
-    // The world's sprites keep no pixels after the upload (drop_pixels): they are loaded again.
+    // The world's sprites keep no pixels after the upload (drop_pixels): they are loaded again,
+    // the one shown now at once, the others in the background (those still there keep theirs).
     for (auto& g : m_graphics) {
         g.reset();
     }
+    m_preloader->request(render::preload_order(m_camera.view().zoom));
     if (auto status = ensure_graphics(m_camera.view().zoom); !status) {
         std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
     }

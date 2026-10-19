@@ -7,6 +7,7 @@ add_executable(o1602_tests
     unit/test_commands.cpp
     unit/test_island_render.cpp
     unit/test_world_render.cpp
+    unit/test_graphics_preloader.cpp
     unit/test_players_ships.cpp
     unit/test_ships.cpp
     unit/test_diplomacy.cpp

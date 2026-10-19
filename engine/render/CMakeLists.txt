@@ -11,6 +11,7 @@ add_library(o1602_render
     src/camera.cpp
     src/figure_animation.cpp
     src/flag_tint.cpp
+    src/graphics_preloader.cpp
     src/island_renderer.cpp
     src/sprite_atlas.cpp
     src/sprite_hit_mask.cpp
@@ -24,5 +25,6 @@ add_library(o1602_render
 add_library(o1602::render ALIAS o1602_render)
 
 target_include_directories(o1602_render PUBLIC include)
-target_link_libraries(o1602_render PUBLIC o1602::sim o1602::assets)
+find_package(Threads REQUIRED)  # the zoom levels are loaded beside the game (graphics_preloader.cpp)
+target_link_libraries(o1602_render PUBLIC o1602::sim o1602::assets PRIVATE Threads::Threads)
 o1602_set_warnings(o1602_render)
