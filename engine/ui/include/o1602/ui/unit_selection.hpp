@@ -50,6 +50,8 @@ public:
     [[nodiscard]] bool take_changed() noexcept { return std::exchange(m_changed, false); }
 
     void clear();
+    /// Clears the selection and every group: unit ids belong to one game (after loading another).
+    void reset();
     /// Only this unit.
     void select(const sim::World& world, const UnitRef& ref);
     /// Shift + click: a selected unit leaves the selection, another of the same owner and kind joins

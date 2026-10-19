@@ -103,8 +103,9 @@ bool Military::castle(const CastleOrder& o) {
     switch (o.op) {
         case CastleOrder::Op::Recruit: {
             // Op 0x10: no gold, no inhabitants; weapons if the castle holds them.
+            // Only the soldiers a castle trains (the unit families), not ships, towers or natives.
             const assets::FigureType* type = m_figures->get(o.figure);
-            if (type == nullptr || type->combat.max_health == 0) {
+            if (type == nullptr || type->combat.max_health == 0 || !assets::FigureTable::unit_variant(o.figure)) {
                 return false;
             }
             if (m_rules->max_army != 0 && army_size(owner) >= m_rules->max_army) {

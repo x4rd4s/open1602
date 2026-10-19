@@ -352,6 +352,8 @@ TEST_CASE("military: a castle trains units with weapons and sends them out") {
     f.world.cost_buildings().back().weapons[0] = 3 * 32;  // 3 t swords
     f.start();
     using Op = sim::CastleOrder::Op;
+    // Only soldiers: a tower (figure 38) has hit points too, but no castle trains it.
+    CHECK(!f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::Recruit, 38, 0, {}}));
     REQUIRE(f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::Recruit, kSword, 0, {}}));
     REQUIRE(f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::Recruit, kSword, 0, {}}));
     const sim::CostBuilding& castle = f.world.cost_buildings().back();

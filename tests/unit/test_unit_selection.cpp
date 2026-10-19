@@ -152,6 +152,11 @@ TEST_CASE("unit selection: formation, filters and groups") {
     CHECK(sel.recall_group(f.world, 1));
     CHECK(sel.size() == 4);
     CHECK(!sel.recall_group(f.world, 5));
+    // Another game loaded: the groups go with the old one.
+    sel.reset();
+    CHECK(sel.size() == 0);
+    CHECK(!sel.recall_group(f.world, 1));
+    CHECK(!sel.group_of(c));
 }
 
 TEST_CASE("unit selection: Tab narrows to one type after the other, then back to all") {

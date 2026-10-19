@@ -416,6 +416,17 @@ TEST_CASE("construction: a castle makes its city proud, once per player") {
     CHECK(island.world.city(0, 0)->satisfaction_bonus == 800);
 }
 
+TEST_CASE("construction: the castle limit holds anywhere in an order, not only for its first item") {
+    Island island;
+    island.found();
+    island.world.player(0)->infra_mask = 0xFFFFFFFFU;
+    const sim::BuildPlan plan = island.build({{kRoad, 9, 11, 0, 0}, {kCastle, 10, 12, 0, 0}, {kCastle, 10, 15, 0, 0}});
+    CHECK(plan.items[0].refusal == sim::BuildRefusal::None);
+    CHECK(plan.items[1].refusal == sim::BuildRefusal::None);
+    CHECK(plan.items[2].refusal == sim::BuildRefusal::Limit);
+    CHECK(island.world.players()[0].castles_built == 1);
+}
+
 TEST_CASE("construction: walls and towers on the beach, piers in front of a new Kontor") {
     Island island;
     island.found();

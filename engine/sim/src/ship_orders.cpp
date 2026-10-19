@@ -146,7 +146,10 @@ bool Fleet::command(const ShipCommand& c) {
             ship->held = false;
             ship->queue.clear();
             ship->repairing = false;
-            ship->route.active = false;
+            ship->route = TradeRoute{};  // the seller's route, stops and goods are not the buyer's
+            ship->attack_move = false;
+            ship->hold = false;
+            stop_exploring(*ship);
             ship->target = Target{};
             ship->order = Target{};
             ship->motion.path.clear();

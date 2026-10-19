@@ -931,6 +931,14 @@ bool Fleet::edit_route(const RouteEdit& e) {
             if (e.stop >= TradeRoute::kStops || (!e.target.empty() && !target_valid(e.target))) {
                 return false;
             }
+            if (e.player != kNoPlayer && e.target.kind == Target::Kind::Ship) {
+                // Goods between two ships move without payment: a player's route reaches only
+                // their own ships (the pirates' plunder routes are set by the simulation).
+                const Ship* other = m_world->ship(e.target.ship);
+                if (other == nullptr || other->owner != e.player) {
+                    return false;
+                }
+            }
             route.stops[e.stop] = RouteStop{e.target, {}};
             route.current = 0;  // the original starts the route anew (UI 0x00440B30)
             return true;
@@ -944,8 +952,8 @@ bool Fleet::edit_route(const RouteEdit& e) {
             }
             return true;
         case RouteEdit::Op::SetEntry:
-            if (e.stop >= TradeRoute::kStops || e.entry >= 3) {
-                return false;
+            if (e.stop >= TradeRoute::kStops || e.entry >= 3 || (e.value.ware != 0 && !is_trade_ware(e.value.ware))) {
+                return false;  // routes carry goods; soldiers board and land by their own orders
             }
             route.stops[e.stop].entries[e.entry] = e.value;
             return true;
@@ -1318,7 +1326,9 @@ bool Fleet::route_city_stop(Ship& ship, const RouteStop& stop) {
 
 bool Fleet::route_ship_stop(Ship& ship, const RouteStop& stop) {
     Ship* other = m_world->ship(stop.target.ship);
-    if (other == nullptr) {
+    // Only between ships of one owner, or the pirates' plunder (Fleet::plunder).
+    const bool pirate = ship.owner == pirates() && ship.owner != kNoPlayer;
+    if (other == nullptr || other == &ship || (other->owner != ship.owner && !pirate)) {
         return false;
     }
     // 0x004553C0: goods between the two ships, no money (pirates plunder this way).

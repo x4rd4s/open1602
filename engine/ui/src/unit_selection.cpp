@@ -125,6 +125,13 @@ void UnitSelection::clear() {
     m_cycle_step = 0;
 }
 
+void UnitSelection::reset() {
+    clear();
+    for (auto& group : m_groups) {
+        group.clear();
+    }
+}
+
 void UnitSelection::set(const sim::World& world, std::vector<UnitRef> units) {
     std::vector<UnitRef> unique;
     for (const UnitRef& r : units) {

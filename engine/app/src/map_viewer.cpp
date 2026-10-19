@@ -2232,7 +2232,7 @@ void MapViewer::replace_world(sim::World world) noexcept {
     m_pause_video = false;
     m_end_pending.reset();
     m_end_shown = false;
-    m_units.clear();
+    m_units.reset();
     m_pending_orders.clear();
     m_pick = Pick::None;
     m_press.reset();

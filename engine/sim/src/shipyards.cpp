@@ -68,6 +68,11 @@ bool Fleet::shipyard(const ShipyardOrder& o) {
             return false;
         }
         CostBuilding* yard = yard_at(o.island, o.x, o.y);
+        // Only at a yard of the ship's owner: the yard pays the repair with its own material.
+        if (o.on && yard != nullptr &&
+            m_world->islands()[yard->island].map.top(yard->x, yard->y).owner != ship->owner) {
+            return false;
+        }
         if (!o.on) {
             ship->repairing = false;
             if (yard != nullptr && yard->repair_ship == ship->id) {
@@ -278,6 +283,7 @@ void Fleet::yard_cycle(CostBuilding& yard) {
         }
         if (ware != 0) {
             m_fetch.push_back(FetchRequest{yard.island, yard.x, yard.y, ware});
+            yard.fetching = true;  // one pack donkey at a time; yard_delivery clears it
         }
     }
     yard.countdown = wait;

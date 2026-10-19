@@ -344,6 +344,15 @@ TEST_CASE("ships: a trade route loads where it should and delivers at the next s
     REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 1, 0, sim::Target::city_of(1, 0)}));
     REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetEntry, 1, 0, {}, sim::RouteEntry{kWood, true, 50 * kTon}}));
     REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::Start}));
+    // Goods only, and no other player's ship as a stop: goods between ships move without payment.
+    CHECK(!fleet.edit_route(sim::RouteEdit{0, id, Op::SetEntry, 2, 0, {}, sim::RouteEntry{25, false, kTon}}));
+    sim::Ship& stranger = sea.add(40, 25);
+    stranger.owner = 1;
+    const std::uint32_t stranger_id = stranger.id;
+    CHECK(!fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 2, 0, sim::Target::other_ship(stranger_id)}));
+    sea.world.ship(stranger_id)->owner = 0;
+    CHECK(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 2, 0, sim::Target::other_ship(stranger_id)}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::ClearStop, 2}));
     auto events = run(fleet, sea.world, 60000);
     CHECK(count(events, sim::ShipEvent::Kind::RouteWarning) == 0);
     // At the first stop it filled up to 20 t; at the second it delivered all of it.
@@ -416,6 +425,10 @@ TEST_CASE("ships: a shipyard builds a ship from wood and cloth and repairs one l
     if (!sim::building_in_reach(sea.world, sea.buildings, 0, 3, 0, ship.x, ship.y)) {
         sea.world.ship(id)->place(47, 1);
     }
+    // Not at another player's yard: it would pay with its own material.
+    sea.world.ship(id)->owner = 1;
+    CHECK(!fleet.shipyard(sim::ShipyardOrder{1, 0, 3, 0, Op::Repair, 0, true, id}));
+    sea.world.ship(id)->owner = 0;
     REQUIRE(fleet.shipyard(sim::ShipyardOrder{0, 0, 3, 0, Op::Repair, 0, true, id}));
     std::size_t repaired = 0;
     for (int second = 0; second < 60; ++second) {

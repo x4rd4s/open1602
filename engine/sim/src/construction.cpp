@@ -761,7 +761,28 @@ BuildPlan plan_build(const World& world, const assets::BuildingTable& buildings,
     BuildBill bill;
     BuildRefusal budget = BuildRefusal::None;  // sticky once something did not fit
     std::size_t placed = 0;
-    std::size_t limit = order.items.size();
+    std::array<std::size_t, 4> placed_limited{};  // castles, cathedrals, arches, monuments placed
+    const auto counted = [&](std::uint8_t infra) {
+        return player != nullptr && infra >= kInfraCastle && infra <= kInfraMonument;
+    };
+    const auto limit_of = [&](std::uint8_t infra) -> std::size_t {
+        if (!counted(infra)) {
+            return order.items.size();
+        }
+        const auto left = [](std::uint32_t allowed, std::uint32_t built) -> std::size_t {
+            return allowed > built ? allowed - built : 0;
+        };
+        switch (infra) {
+            case kInfraCastle:
+                return player->castles_built > 0 ? 0 : 1;
+            case kInfraCathedral:
+                return player->cathedrals_built > 0 ? 0 : 1;
+            case kInfraArch:
+                return left(player->arches_allowed, player->arches_built);
+            default:
+                return left(player->monuments_allowed, player->monuments_built);
+        }
+    };
     for (std::size_t i = 0; i < order.items.size(); ++i) {
         const BuildItem& item = order.items[i];
         PlannedBuild& out = plan.items[i];
@@ -775,29 +796,9 @@ BuildPlan plan_build(const World& world, const assets::BuildingTable& buildings,
             continue;
         }
         out.type = type;
-        if (i == 0 && player != nullptr && type->infra != 0) {
-            // Castle, cathedral: one each; monuments and arches by allowance (0x004084D0).
-            switch (type->infra) {
-                case kInfraCastle:
-                    limit = player->castles_built > 0 ? 0 : 1;
-                    break;
-                case kInfraCathedral:
-                    limit = player->cathedrals_built > 0 ? 0 : 1;
-                    break;
-                case kInfraArch:
-                    limit = player->arches_allowed > player->arches_built
-                                ? player->arches_allowed - player->arches_built
-                                : 0;
-                    break;
-                case kInfraMonument:
-                    limit = player->monuments_allowed > player->monuments_built
-                                ? player->monuments_allowed - player->monuments_built
-                                : 0;
-                    break;
-                default:
-                    break;
-            }
-        }
+        // Castle, cathedral: one each; monuments and arches by allowance (0x004084D0). Counted per
+        // kind over the whole order, whatever else it holds.
+        const std::size_t limit = limit_of(type->infra);
         if (planner.foreign) {
             out.refusal = BuildRefusal::ForeignCity;  // S-006: no building in other players' cities
             continue;
@@ -891,7 +892,7 @@ BuildPlan plan_build(const World& world, const assets::BuildingTable& buildings,
         BuildBill next = bill;
         next.add(ordered_cost(buildings, *type));
         if (budget == BuildRefusal::None) {
-            if (placed >= limit) {
+            if (counted(type->infra) && placed_limited[type->infra - kInfraCastle] >= limit) {
                 budget = BuildRefusal::Limit;
             } else if (next.tools > available.tools) {
                 budget = BuildRefusal::Tools;
@@ -911,6 +912,9 @@ BuildPlan plan_build(const World& world, const assets::BuildingTable& buildings,
         }
         bill = next;
         ++placed;
+        if (counted(type->infra)) {
+            ++placed_limited[type->infra - kInfraCastle];
+        }
         const Footprint f = footprint_of(*out.type, out.x, out.y, out.rotation);
         for (std::uint32_t j = 0; j < f.h; ++j) {
             for (std::uint32_t k = 0; k < f.w; ++k) {
@@ -930,7 +934,11 @@ class Builder {
 public:
     Builder(World& world, const assets::BuildingTable& buildings, std::uint16_t island,
             std::vector<ConstructionEvent>* events)
-        : m_world(world), m_buildings(buildings), m_island(island), m_events(events) {}
+        : m_world(world),
+          m_buildings(buildings),
+          m_island(island),
+          m_events(events),
+          m_growth_before(world.growth().entries.size()) {}
 
     IslandMap& map() { return m_world.island(m_island).map; }
 
@@ -991,9 +999,7 @@ public:
             emit(e);
         }
         if (p == prod::kGrowing) {
-            auto& entries = m_world.growth().entries;
-            std::erase_if(entries,
-                          [&](const GrowthEntry& g) { return g.island == m_island && g.x == ox && g.y == oy; });
+            m_forgotten.push_back(old.origin);  // its growth entry goes in finish(), all in one pass
         }
         if (p == prod::kHouse) {
             if (House* h = m_world.house(m_island, ox, oy)) {
@@ -1740,6 +1746,9 @@ public:
 
     /// After the changes: territory, services and warehouse room.
     void finish() {
+        // Growth entries of removed crops and trees; entries added by this change stay.
+        forget_growth(m_world, m_island, m_forgotten, m_growth_before);
+        m_forgotten.clear();
         if (m_territory) {
             recheck_territory();
         }
@@ -1762,6 +1771,8 @@ private:
     bool m_territory = false;
     bool m_services = false;
     std::set<std::uint8_t> m_storage_cities;
+    std::size_t m_growth_before;       ///< growth entries before this change
+    std::vector<TilePos> m_forgotten;  ///< removed growing tiles
 };
 
 }  // namespace
