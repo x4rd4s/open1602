@@ -304,6 +304,13 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->load_key_settings();
     viewer->load_options();
     name_more_players(viewer->m_world);  // in the language the options set
+    if (options.new_game && options.new_game->name.empty() && viewer->m_world.time_ms() == 0) {
+        // A new game started without --name: the name typed in the menu before, else "Nameless".
+        if (sim::Player* p = viewer->m_world.player(viewer->m_local_player); p != nullptr) {
+            p->name = viewer->m_app_settings.player_name.empty() ? ui::tr("menu.default_name")
+                                                                 : viewer->m_app_settings.player_name;
+        }
+    }
     if (options.menu && viewer->m_hud) {
         viewer->m_hud->open_menu();
     }

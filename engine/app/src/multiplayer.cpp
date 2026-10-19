@@ -58,9 +58,14 @@ core::Status MapViewer::start_multiplayer() {
         if (m_local_player == sim::kNoPlayer) {
             return core::make_error(core::ErrorCode::Unsupported, "the game has no human player to host with");
         }
+        // Hosting from the command line without --name: the menu's name, else "Nameless".
+        std::string name = mp.name.empty() ? m_app_settings.player_name : mp.name;
+        if (name.empty()) {
+            name = ui::tr("menu.default_name");
+        }
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_simulation, m_buildings,
-                                                       m_local_player, mp.name, content_fingerprint());
-        m_session->submit(sim::PlayerRename{m_local_player, mp.name});
+                                                       m_local_player, name, content_fingerprint());
+        m_session->submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
                      static_cast<unsigned>(m_local_player));
         return core::Ok{};

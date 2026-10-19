@@ -114,7 +114,7 @@ struct ViewerOptions {
         Role role = Role::Host;
         std::string address;  ///< Join: the host's name or IPv4 address
         std::uint16_t port = net::kDefaultPort;
-        std::string name = "Player";  ///< the player's name for the others
+        std::string name;  ///< the player's name for the others; empty: the menu's
         std::string password;         ///< Join: the game's password, if it has one
     };
     std::optional<Multiplayer> multiplayer;
