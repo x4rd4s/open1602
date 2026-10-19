@@ -61,6 +61,10 @@ public:
     void draw_in(const ui::Rect& area);
     /// The render device was reset: the texture is made again.
     void recreate_texture();
+    /// The render device was lost: the texture goes before the renderer does, and comes again
+    /// from the new one.
+    void release_texture();
+    void set_renderer(SDL_Renderer* renderer);
 
     /// What an input event does while a video is on screen.
     enum class Input : std::uint8_t {

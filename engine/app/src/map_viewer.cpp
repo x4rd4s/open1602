@@ -623,6 +623,18 @@ void MapViewer::handle_event(const SDL_Event& original) {
     SDL_Event event = original;
     // Mouse positions in output pixels, independent of the screen's pixel density.
     SDL_ConvertEventToRenderCoordinates(m_window->sdl_renderer(), &event);
+    // SDL_EVENT_RENDER_TARGETS_RESET needs nothing: no texture is drawn into.
+    switch (m_window->render_reset(event)) {
+        case platform::RenderReset::Textures:
+            std::fprintf(stderr, "the render device was reset: textures are made again\n");
+            recreate_textures();
+            return;
+        case platform::RenderReset::Renderer:
+            recreate_renderer();
+            return;
+        case platform::RenderReset::None:
+            break;
+    }
     switch (event.type) {
         case SDL_EVENT_QUIT:
             m_running = false;
@@ -638,13 +650,6 @@ void MapViewer::handle_event(const SDL_Event& original) {
         }
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             follow_display_scale();
-            break;
-        // SDL_EVENT_RENDER_TARGETS_RESET needs nothing: no texture is drawn into.
-        case SDL_EVENT_RENDER_DEVICE_RESET:
-            recreate_textures();
-            break;
-        case SDL_EVENT_RENDER_DEVICE_LOST:
-            std::fprintf(stderr, "error: the render device was lost and cannot be recovered\n");
             break;
         default:
             m_input->handle_event(event);
@@ -1271,8 +1276,31 @@ void MapViewer::follow_display_scale() {
                  m_camera.pixel_scale());
 }
 
-void MapViewer::recreate_textures() {
-    std::fprintf(stderr, "the render device was reset: textures are made again\n");
+void MapViewer::recreate_renderer() {
+    std::fprintf(stderr, "the render device was lost: the renderer is made again\n");
+    // Every texture goes before the old renderer does; the world's sprites with their renderers.
+    for (auto& g : m_graphics) {
+        g.reset();
+    }
+    if (m_hud) {
+        m_hud->release_textures();
+    }
+    m_video->release_texture();
+    if (auto status = m_window->recreate_renderer(); !status) {
+        std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
+        m_running = false;
+        return;
+    }
+    SDL_Renderer* renderer = m_window->sdl_renderer();
+    if (m_hud) {
+        m_hud->set_renderer(renderer);
+    }
+    m_video->set_renderer(renderer);
+    std::fprintf(stderr, "renderer: %s\n", m_window->renderer_name().c_str());
+    reload_graphics();
+}
+
+void MapViewer::reload_graphics() {
     // The world's sprites keep no pixels after the upload (drop_pixels): they are loaded again,
     // the one shown now at once, the others in the background (those still there keep theirs).
     for (auto& g : m_graphics) {
@@ -1282,6 +1310,10 @@ void MapViewer::recreate_textures() {
     if (auto status = in_menu() ? core::Status(core::Ok{}) : ensure_graphics(m_camera.view().zoom); !status) {
         std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
     }
+}
+
+void MapViewer::recreate_textures() {
+    reload_graphics();
     if (m_hud) {
         m_hud->release_textures();
     }

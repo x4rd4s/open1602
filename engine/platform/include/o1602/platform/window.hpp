@@ -12,6 +12,7 @@
 
 struct SDL_Window;
 struct SDL_Renderer;
+union SDL_Event;
 
 namespace o1602::platform {
 
@@ -37,6 +38,13 @@ struct WindowConfig {
     bool vsync = true;
 };
 
+/// What a render event asks of everything that draws with the window's renderer.
+enum class RenderReset : std::uint8_t {
+    None,      ///< another event, another window's, or the render targets were reset
+    Textures,  ///< the device was reset: every texture lost its contents
+    Renderer,  ///< the device was lost: the renderer is made again (Window::recreate_renderer)
+};
+
 /// A resizable, HiDPI-aware window with an SDL_Renderer (GPU accelerated where available).
 class Window {
 public:
@@ -46,7 +54,14 @@ public:
     Window& operator=(const Window&) = delete;
 
     [[nodiscard]] SDL_Window* sdl_window() const noexcept { return m_window; }
+    /// Another one after recreate_renderer(): keep neither it nor its textures past that.
     [[nodiscard]] SDL_Renderer* sdl_renderer() const noexcept { return m_renderer; }
+
+    /// What an event of the queue asks for this window's renderer.
+    [[nodiscard]] RenderReset render_reset(const SDL_Event& event) const;
+    /// Destroys the renderer and makes a new one (the device was lost). Every texture of the old
+    /// one must be destroyed before. On an error the window has no renderer.
+    core::Status recreate_renderer();
 
     /// Drawable size in physical pixels.
     void output_size(std::int32_t& width, std::int32_t& height) const;
@@ -63,8 +78,10 @@ public:
 
 private:
     Window() = default;
+    core::Status make_renderer();
     SDL_Window* m_window = nullptr;
     SDL_Renderer* m_renderer = nullptr;
+    bool m_vsync = true;
 };
 
 /// Milliseconds since SDL_Init (monotonic).

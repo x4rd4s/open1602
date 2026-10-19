@@ -24,33 +24,11 @@ inline void use_dummy_drivers() {
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
 }
 
-/// An SDL software renderer drawing into an RGBA surface of its own; needs no video driver.
-class Canvas {
+/// Pixels read back from a renderer (SDL_RenderReadPixels), as the game's screenshots do.
+class Pixels {
 public:
-    Canvas(int width, int height) {
-        m_surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
-        REQUIRE(m_surface != nullptr);
-        m_renderer = SDL_CreateSoftwareRenderer(m_surface);
-        REQUIRE(m_renderer != nullptr);
-    }
-    ~Canvas() {
-        SDL_DestroyRenderer(m_renderer);
-        SDL_DestroySurface(m_surface);
-    }
-    Canvas(const Canvas&) = delete;
-    Canvas& operator=(const Canvas&) = delete;
-
-    [[nodiscard]] SDL_Renderer* renderer() const noexcept { return m_renderer; }
-
-    void clear(assets::Rgba c) {
-        SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_NONE);
-        SDL_SetRenderDrawColor(m_renderer, c.r, c.g, c.b, c.a);
-        SDL_RenderClear(m_renderer);
-    }
-
-    /// Reads the drawn pixels back (SDL_RenderReadPixels), as the game's screenshots do.
-    void read() {
-        SDL_Surface* shot = SDL_RenderReadPixels(m_renderer, nullptr);
+    void read(SDL_Renderer* renderer) {
+        SDL_Surface* shot = SDL_RenderReadPixels(renderer, nullptr);
         REQUIRE(shot != nullptr);
         SDL_Surface* rgba = SDL_ConvertSurface(shot, SDL_PIXELFORMAT_RGBA32);
         SDL_DestroySurface(shot);
@@ -73,10 +51,44 @@ public:
     }
 
 private:
-    SDL_Surface* m_surface = nullptr;
-    SDL_Renderer* m_renderer = nullptr;
     int m_width = 0;
     std::vector<std::uint8_t> m_pixels;
+};
+
+/// Fills the renderer's whole output with one colour.
+inline void clear(SDL_Renderer* renderer, assets::Rgba c) {
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
+    SDL_RenderClear(renderer);
+}
+
+/// An SDL software renderer drawing into an RGBA surface of its own; needs no video driver.
+class Canvas {
+public:
+    Canvas(int width, int height) {
+        m_surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
+        REQUIRE(m_surface != nullptr);
+        m_renderer = SDL_CreateSoftwareRenderer(m_surface);
+        REQUIRE(m_renderer != nullptr);
+    }
+    ~Canvas() {
+        SDL_DestroyRenderer(m_renderer);
+        SDL_DestroySurface(m_surface);
+    }
+    Canvas(const Canvas&) = delete;
+    Canvas& operator=(const Canvas&) = delete;
+
+    [[nodiscard]] SDL_Renderer* renderer() const noexcept { return m_renderer; }
+
+    void clear(assets::Rgba c) { test::clear(m_renderer, c); }
+    void read() { m_pixels.read(m_renderer); }
+    /// A pixel of the last read(); its alpha is left out.
+    [[nodiscard]] assets::Rgba at(int x, int y) const { return m_pixels.at(x, y); }
+
+private:
+    SDL_Surface* m_surface = nullptr;
+    SDL_Renderer* m_renderer = nullptr;
+    Pixels m_pixels;
 };
 
 /// Whether two colours differ by at most `tolerance` in every channel (blending rounds).

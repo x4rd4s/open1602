@@ -62,6 +62,9 @@ public:
     /// The render device was reset and the textures lost their contents: all go and are made
     /// again when next drawn (an image from the pixels given then).
     void release_textures();
+    /// The renderer was made again (the device was lost): textures come from `renderer` from now
+    /// on. release_textures() goes before the old renderer does.
+    void set_renderer(SDL_Renderer* renderer) noexcept { m_renderer = renderer; }
 
 private:
     struct Texture {
@@ -83,7 +86,7 @@ private:
     std::map<std::tuple<std::int32_t, std::int32_t, int, std::int32_t>, Texture> m_sprites;
     TextCache<Texture> m_texts;
     std::map<int, Texture> m_images;
-    Texture m_checker;
+    Texture m_checker;  ///< made when first needed
 };
 
 }  // namespace o1602::render

@@ -52,6 +52,10 @@ public:
     void draw_in(std::int32_t x, std::int32_t y, std::int32_t width, std::int32_t height);
     /// The render device was reset: the texture is made again, the current frame uploaded anew.
     void recreate_texture();
+    /// The device was lost: the texture goes before the renderer does ...
+    void release_texture();
+    /// ... and is made again with the new one, the current frame uploaded anew.
+    void set_renderer(SDL_Renderer* renderer);
 
 private:
     /// A texture of the video's size; the one before goes.

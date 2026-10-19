@@ -92,6 +92,21 @@ void VideoPlayer::recreate_texture() {
     m_dirty = m_video.has_value();
 }
 
+void VideoPlayer::release_texture() {
+    if (m_texture != nullptr) {
+        SDL_DestroyTexture(m_texture);
+        m_texture = nullptr;
+    }
+}
+
+void VideoPlayer::set_renderer(SDL_Renderer* renderer) {
+    m_renderer = renderer;
+    if (m_texture_w > 0 && m_texture_h > 0) {
+        make_texture(m_texture_w, m_texture_h);
+    }
+    m_dirty = m_video.has_value();
+}
+
 void VideoPlayer::hold_until(std::uint64_t ms) noexcept {
     m_start_ms = std::max(m_start_ms, ms);
 }

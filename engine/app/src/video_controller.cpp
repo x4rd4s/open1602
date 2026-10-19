@@ -114,6 +114,18 @@ void VideoController::recreate_texture() {
     }
 }
 
+void VideoController::release_texture() {
+    if (m_player) {
+        m_player->release_texture();
+    }
+}
+
+void VideoController::set_renderer(SDL_Renderer* renderer) {
+    if (m_player) {
+        m_player->set_renderer(renderer);
+    }
+}
+
 VideoController::Input VideoController::route(const SDL_Event& event, const Hud* hud) {
     if (full_screen()) {
         switch (event.type) {

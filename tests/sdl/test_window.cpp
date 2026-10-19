@@ -117,3 +117,65 @@ TEST_CASE("window: ticks_ms counts up from SDL_Init") {
     const std::uint64_t after = platform::ticks_ms();
     CHECK(after >= before + 5);
 }
+
+TEST_CASE("window: render events say whether textures or the renderer must be made again") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    REQUIRE(window.ok());
+    const SDL_WindowID id = SDL_GetWindowID((*window)->sdl_window());
+    // As the GPU backends of SDL send them: pushed to the queue, read by the main loop.
+    const auto delivered = [&](SDL_EventType type, SDL_WindowID window_id) {
+        SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
+        SDL_Event event{};
+        event.type = type;
+        event.render.windowID = window_id;
+        REQUIRE(SDL_PushEvent(&event));
+        SDL_Event polled{};
+        while (SDL_PollEvent(&polled)) {
+            if (polled.type == type) {
+                return (*window)->render_reset(polled);
+            }
+        }
+        REQUIRE(polled.type == type);  // the event did not arrive
+        return platform::RenderReset::None;
+    };
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id) == platform::RenderReset::Renderer);
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_RESET, id) == platform::RenderReset::Textures);
+    CHECK(delivered(SDL_EVENT_RENDER_TARGETS_RESET, id) == platform::RenderReset::None);
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id + 1) == platform::RenderReset::None);
+    CHECK(delivered(SDL_EVENT_USER, id) == platform::RenderReset::None);
+}
+
+TEST_CASE("window: after a lost device the window draws with a new renderer") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    REQUIRE(window.ok());
+    platform::Window& w = **window;
+    const std::string name = w.renderer_name();
+    REQUIRE(w.recreate_renderer().ok());
+    REQUIRE(w.sdl_renderer() != nullptr);
+    CHECK(SDL_GetRenderWindow(w.sdl_renderer()) == w.sdl_window());
+    CHECK(w.renderer_name() == name);
+    int vsync = -1;
+    CHECK(SDL_GetRenderVSync(w.sdl_renderer(), &vsync));
+    CHECK(vsync == 0);
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    w.output_size(width, height);
+    CHECK(width == 64);
+    CHECK(height == 48);
+
+    test::clear(w.sdl_renderer(), assets::Rgba{10, 20, 30, 255});
+    SDL_SetRenderDrawColor(w.sdl_renderer(), 200, 100, 50, 255);
+    const SDL_FRect rect{8.0F, 4.0F, 16.0F, 8.0F};
+    SDL_RenderFillRect(w.sdl_renderer(), &rect);
+    test::Pixels pixels;
+    pixels.read(w.sdl_renderer());
+    CHECK(pixels.at(8, 4) == (assets::Rgba{200, 100, 50, 255}));
+    CHECK(pixels.at(24, 11) == (assets::Rgba{10, 20, 30, 255}));
+    CHECK(SDL_RenderPresent(w.sdl_renderer()));
+}

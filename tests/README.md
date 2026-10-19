@@ -79,7 +79,9 @@ ctest entry `sdl` sets `SDL_VIDEO_DRIVER=dummy` and `SDL_AUDIO_DRIVER=dummy`, an
 for the dummy drivers itself when those variables are not set. The renderers draw with SDL's
 software renderer into a surface, and the tests read the pixels back (`SDL_RenderReadPixels`) to
 check where sprites, text and rectangles land and in which colour. The interface's sheet and font
-are small synthetic files written into a temporary game folder. CI runs them in every game job
+are small synthetic files written into a temporary game folder. A lost render device is simulated:
+the window's renderer is made again (as on `SDL_EVENT_RENDER_DEVICE_LOST`, pushed to the event queue)
+and both renderers must draw the same with the new one. CI runs them in every game job
 (Linux, Linux ASan, Windows, macOS, and the Windows vcpkg build).
 
 ```sh
@@ -88,7 +90,7 @@ ctest --preset ci -R '^sdl$'
 ```
 
 Not covered headless: a real HiDPI screen (the dummy driver has a pixel density and display scale of
-1) and the GPU render backends.
+1) and the GPU render backends, among them a real reset or loss of the device.
 
 ## Tests against the original data
 

@@ -49,7 +49,6 @@ SdlUiRenderer::SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory
     for (std::size_t c = 0; c < m_colours.size(); ++c) {
         m_colours[c] = ui::text_recolour(palette, c);
     }
-    m_checker = make(checker_pixels(), kCheckerSize, kCheckerSize);
 }
 
 SdlUiRenderer::~SdlUiRenderer() {
@@ -61,7 +60,9 @@ SdlUiRenderer::~SdlUiRenderer() {
     destroy(m_sprites);
     m_texts.for_each([](const Texture& t) { SDL_DestroyTexture(t.texture); });
     destroy(m_images);
-    SDL_DestroyTexture(m_checker.texture);
+    if (m_checker.texture != nullptr) {
+        SDL_DestroyTexture(m_checker.texture);
+    }
 }
 
 void SdlUiRenderer::release_textures() {
@@ -75,8 +76,10 @@ void SdlUiRenderer::release_textures() {
     m_texts.for_each([](const Texture& t) { SDL_DestroyTexture(t.texture); });
     m_texts = TextCache<Texture>(kMaxTexts);
     destroy(m_images);
-    SDL_DestroyTexture(m_checker.texture);
-    m_checker = make(checker_pixels(), kCheckerSize, kCheckerSize);
+    if (m_checker.texture != nullptr) {
+        SDL_DestroyTexture(m_checker.texture);
+    }
+    m_checker = Texture{};
 }
 
 std::array<const ui::Font*, 3> SdlUiRenderer::fonts() const noexcept {
@@ -295,6 +298,9 @@ void SdlUiRenderer::draw(const std::vector<ui::DrawItem>& items, std::int32_t ox
                 break;
             }
             case ui::DrawItem::Kind::Raster:
+                if (m_checker.texture == nullptr) {
+                    m_checker = make(checker_pixels(), kCheckerSize, kCheckerSize);
+                }
                 if (m_checker.texture != nullptr && d.w > 0 && d.h > 0) {
                     SDL_SetTextureAlphaMod(m_checker.texture, 255);
                     const SDL_FRect src{0.0F, 0.0F, static_cast<float>(std::min(d.w, kCheckerSize)),

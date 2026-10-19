@@ -28,14 +28,40 @@ core::Result<std::unique_ptr<Window>> Window::create(const WindowConfig& config)
     if (window->m_window == nullptr) {
         return sdl_error("SDL_CreateWindow");
     }
-    window->m_renderer = SDL_CreateRenderer(window->m_window, nullptr);
-    if (window->m_renderer == nullptr) {
-        return sdl_error("SDL_CreateRenderer");
-    }
-    if (config.vsync) {
-        SDL_SetRenderVSync(window->m_renderer, 1);  // not fatal if unsupported
+    window->m_vsync = config.vsync;
+    if (auto status = window->make_renderer(); !status) {
+        return status.error();
     }
     return window;
+}
+
+core::Status Window::make_renderer() {
+    m_renderer = SDL_CreateRenderer(m_window, nullptr);
+    if (m_renderer == nullptr) {
+        return sdl_error("SDL_CreateRenderer");
+    }
+    if (m_vsync) {
+        SDL_SetRenderVSync(m_renderer, 1);  // not fatal if unsupported
+    }
+    return core::Ok{};
+}
+
+core::Status Window::recreate_renderer() {
+    if (m_renderer != nullptr) {
+        SDL_DestroyRenderer(m_renderer);
+        m_renderer = nullptr;
+    }
+    return make_renderer();
+}
+
+RenderReset Window::render_reset(const SDL_Event& event) const {
+    if (event.type != SDL_EVENT_RENDER_DEVICE_RESET && event.type != SDL_EVENT_RENDER_DEVICE_LOST) {
+        return RenderReset::None;
+    }
+    if (event.render.windowID != SDL_GetWindowID(m_window)) {
+        return RenderReset::None;
+    }
+    return event.type == SDL_EVENT_RENDER_DEVICE_LOST ? RenderReset::Renderer : RenderReset::Textures;
 }
 
 Window::~Window() {

@@ -9,6 +9,7 @@
 #include "../unit/test_support.hpp"
 #include "sdl_support.hpp"
 
+#include "o1602/platform/window.hpp"
 #include "o1602/render/sdl_sprite_renderer.hpp"
 #include "o1602/render/sprite_atlas.hpp"
 
@@ -204,4 +205,32 @@ TEST_CASE("sdl sprite renderer: uploading another atlas replaces the previous on
     canvas.read();
     CHECK(box(canvas, 4, 7, 7, 10, assets::Rgba{120, 0, 0, 255}));
     CHECK(canvas.at(20, 9) == kBackground);
+}
+
+TEST_CASE("sdl sprite renderer: after the window's renderer is made again a new one draws the sprites") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 32, .height = 32, .vsync = false});
+    REQUIRE(window.ok());
+    const auto atlas = test_atlas();
+    test::Pixels pixels;
+    const auto draws_sprites = [&](render::SdlSpriteRenderer& renderer) {
+        SDL_Renderer* r = (*window)->sdl_renderer();
+        test::clear(r, kBackground);
+        CHECK(renderer.draw({sprite(0, 10, 20), sprite(1, 2, 5)}, 0, 0, 1) == 2);
+        pixels.read(r);
+        return pixels.at(10, 17) == kRed50 && pixels.at(13, 19) == kRed50 && pixels.at(14, 19) == kBackground &&
+               pixels.at(2, 3) == kRed90 && pixels.at(3, 4) == kRed90 && pixels.at(4, 4) == kBackground;
+    };
+    auto renderer = std::make_unique<render::SdlSpriteRenderer>((*window)->sdl_renderer());
+    REQUIRE(renderer->upload(atlas).ok());
+    CHECK(draws_sprites(*renderer));
+
+    // As the game does when the device is lost: the textures go first, then the renderer.
+    renderer.reset();
+    REQUIRE((*window)->recreate_renderer().ok());
+    renderer = std::make_unique<render::SdlSpriteRenderer>((*window)->sdl_renderer());
+    REQUIRE(renderer->upload(atlas).ok());
+    CHECK(draws_sprites(*renderer));
 }

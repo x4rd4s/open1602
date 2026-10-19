@@ -12,6 +12,7 @@
 
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/platform/window.hpp"
 #include "o1602/render/sdl_ui_renderer.hpp"
 #include "o1602/ui/font.hpp"
 
@@ -262,4 +263,44 @@ TEST_CASE("sdl ui renderer: after the textures are released everything is drawn 
     CHECK(s.canvas.at(0, 0) == (assets::Rgba{60, 0, 0, 255}));
     CHECK(s.canvas.at(10, 39) != kBackground);
     CHECK(s.canvas.at(30, 30) == (assets::Rgba{0, 0, 0, 255}));
+}
+
+TEST_CASE("sdl ui renderer: after the window's renderer is made again it draws with the new one") {
+    test::use_dummy_drivers();
+    auto sdl = platform::SdlSystem::init();
+    REQUIRE(sdl.ok());
+    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    REQUIRE(window.ok());
+    const GameFolder folder;
+    render::SdlUiRenderer ui{(*window)->sdl_renderer(), folder.game(), test::make_palette(), ui::ArtSize::Large};
+    auto text = item(ui::DrawItem::Kind::Text, 10, 40);
+    text.text = "A";
+    auto raster = item(ui::DrawItem::Kind::Raster, 30, 30);
+    raster.w = 2;
+    raster.h = 2;
+    const std::vector<ui::DrawItem> items = {item(ui::DrawItem::Kind::Sprite, 0, 0), text, raster};
+    const std::vector<std::uint8_t> red = {255, 0, 0, 255};
+    test::Pixels pixels;
+    const auto draw = [&] {
+        SDL_Renderer* r = (*window)->sdl_renderer();
+        test::clear(r, kBackground);
+        ui.draw(items, 0, 0, 1.0);
+        ui.image(1, red, 1, 1, ui::Rect{50, 10, 4, 4}, false);
+        ui.next_frame();
+        pixels.read(r);
+        CHECK(pixels.at(0, 0) == (assets::Rgba{60, 0, 0, 255}));
+        CHECK(pixels.at(5, 3) == (assets::Rgba{60, 0, 0, 255}));
+        CHECK(pixels.at(6, 3) == kBackground);
+        CHECK(pixels.at(10, 39) != kBackground);
+        CHECK(pixels.at(30, 30) == (assets::Rgba{0, 0, 0, 255}));
+        CHECK(pixels.at(31, 30) == kBackground);
+        CHECK(pixels.at(50, 10) == (assets::Rgba{255, 0, 0, 255}));
+    };
+    draw();
+
+    // As the game does when the device is lost: the textures go first, then the renderer.
+    ui.release_textures();
+    REQUIRE((*window)->recreate_renderer().ok());
+    ui.set_renderer((*window)->sdl_renderer());
+    draw();
 }

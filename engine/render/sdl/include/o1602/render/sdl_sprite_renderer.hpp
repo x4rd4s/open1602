@@ -20,6 +20,7 @@ namespace o1602::render {
 
 class SdlSpriteRenderer {
 public:
+    /// Its textures are `renderer`'s: it goes before the renderer does.
     explicit SdlSpriteRenderer(SDL_Renderer* renderer);
     ~SdlSpriteRenderer();
     SdlSpriteRenderer(const SdlSpriteRenderer&) = delete;

@@ -290,6 +290,11 @@ private:
     /// The render device was reset (a driver update, a GPU timeout, sleep on some laptops): every
     /// texture lost its contents, all are made again.
     void recreate_textures();
+    /// The render device was lost: the window's renderer is made again, everything that draws
+    /// takes the new one and makes its textures again. Without a renderer the game ends.
+    void recreate_renderer();
+    /// The world's sprites of every zoom level go and are loaded again.
+    void reload_graphics();
     /// What a click on the frame asked for.
     void apply_hud(const Hud::Action& action) override;
     /// The resource bar: money, and goods and inhabitants of the city under the mouse.
