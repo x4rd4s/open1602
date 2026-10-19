@@ -8,6 +8,7 @@
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/savegame.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/core/numeric.hpp"
 
 namespace o1602::assets {
 
@@ -45,18 +46,18 @@ core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
         f.speed_type = static_cast<std::uint8_t>(std::clamp(r.integer("Speedtyp"), 0, 3));
         f.max_carry = static_cast<std::uint32_t>(std::max(0, r.integer("Maxtrag"))) * kStockUnitsPerTon;
         if (const cod::Field* work = r.field("Worktime"); work != nullptr && !work->values.empty()) {
-            f.work_time_ms = static_cast<std::uint32_t>(std::max(0.0, work->values[0].real * 1000.0 + 0.5));
+            f.work_time_ms = core::saturating_cast<std::uint32_t>(work->values[0].real * 1000.0 + 0.5);
         }
         const auto seconds_ms = [&](const char* key) -> std::uint32_t {
             const cod::Field* field = r.field(key);
             return field != nullptr && !field->values.empty()
-                       ? static_cast<std::uint32_t>(std::max(0.0, field->values[0].real * 1000.0 + 0.5))
+                       ? core::saturating_cast<std::uint32_t>(field->values[0].real * 1000.0 + 0.5)
                        : 0U;
         };
         const auto tons = [&](const char* key) -> std::uint32_t {
             const cod::Field* field = r.field(key);
             return field != nullptr && !field->values.empty()
-                       ? static_cast<std::uint32_t>(std::max(0.0, field->values[0].real * kStockUnitsPerTon))
+                       ? core::saturating_cast<std::uint32_t>(field->values[0].real * kStockUnitsPerTon)
                        : 0U;
         };
         f.ship.cargo_slots = static_cast<std::uint8_t>(std::clamp(r.integer("Maxware"), 0, 255));
@@ -73,7 +74,7 @@ core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
         f.combat.max_health = f.ship.max_health;
         f.combat.hit = f.ship.hit;
         if (const cod::Field* radius = r.field("Shotradius"); radius != nullptr && !radius->values.empty()) {
-            f.combat.range8 = static_cast<std::uint32_t>(std::max(0.0, radius->values[0].real * 8.0));
+            f.combat.range8 = core::saturating_cast<std::uint32_t>(radius->values[0].real * 8.0);
         }
         f.combat.hit_delay_ms = f.ship.shot_ms;
         if (r.field("Stirbtime") != nullptr) {

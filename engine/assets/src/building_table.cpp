@@ -10,6 +10,7 @@
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/savegame.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/core/numeric.hpp"
 
 namespace o1602::assets {
 
@@ -73,7 +74,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
         b.door_on_edge = (r.integer("Tuerflg") & 1) != 0;
         b.blocks_shots = (r.integer("NoShotFlg") & 1) != 0;
         if (const cod::Field* energy = r.field("Maxenergy"); energy != nullptr && !energy->values.empty()) {
-            b.max_health = static_cast<std::uint32_t>(std::max(0.0, energy->values[0].real * kStockUnitsPerTon));
+            b.max_health = core::saturating_cast<std::uint32_t>(energy->values[0].real * kStockUnitsPerTon);
         }
         if (const cod::Field* ruin = r.field("Ruinenr"); ruin != nullptr && !ruin->values.empty()) {
             b.ruin = static_cast<std::uint8_t>(ruin->values[0].integer);
@@ -107,7 +108,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
                 const cod::Field* f = prodtyp.field(name);
                 const double v = f != nullptr && !f->values.empty() ? f->values[0].real : 0.0;
                 // The original truncates (_ftol); the values in haeuser.cod are exact multiples of 1/32.
-                return v > 0.0 ? static_cast<std::uint32_t>(v * kStockUnitsPerTon) : 0U;
+                return core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
             };
             b.ware = static_cast<std::uint8_t>(non_negative(prodtyp.integer("Ware")));
             b.raw_ware = static_cast<std::uint8_t>(non_negative(prodtyp.integer("Rohstoff")));
@@ -142,7 +143,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             const auto goods = [&](const char* name) {
                 const cod::Field* f = c.field(name);
                 const double v = f != nullptr && !f->values.empty() ? f->values[0].real : 0.0;
-                return v > 0.0 ? static_cast<std::uint32_t>(v * kStockUnitsPerTon) : 0U;
+                return core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
             };
             b.build_cost.tools = goods("Werkzeug");
             b.build_cost.wood = goods("Holz");
@@ -208,7 +209,8 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
 
     // Classes of inhabitants and their needs (0x00460750: k = trunc(v * 8192) / 600).
     const auto per_tick = [](double v) -> std::uint32_t {
-        return v > 0.0 ? static_cast<std::uint32_t>(static_cast<std::int64_t>(v * 8192.0) / 600) : 0U;
+        return core::saturating_cast<std::uint32_t>(
+            static_cast<double>(core::saturating_cast<std::int64_t>(v * 8192.0) / 600));
     };
     if (const cod::Field* food = haeuser.root.field("Nahrung"); food != nullptr && !food->values.empty()) {
         table.m_food_need = per_tick(food->values[0].real);
@@ -235,7 +237,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             c.share = non_negative(g.integer("Prozent")) * 128U / 100U;
             c.max_per_house = non_negative(g.integer("Maxwohn"));
             if (const cod::Field* tax = g.field("Steuer"); tax != nullptr && !tax->values.empty()) {
-                c.tax = tax->values[0].real > 0.0 ? static_cast<std::uint32_t>(tax->values[0].real * 16.0 / 3.0) : 0U;
+                c.tax = core::saturating_cast<std::uint32_t>(tax->values[0].real * 16.0 / 3.0);
             }
             c.hiscore = non_negative(g.integer("Hiscore"));
             if (const auto* wares = g.records("BGRUPPE_WARE")) {

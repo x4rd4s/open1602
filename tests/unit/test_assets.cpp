@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/core/numeric.hpp"
 #include "o1602/core/text.hpp"
 
 using namespace o1602;
@@ -247,4 +249,14 @@ TEST_CASE("file: paths go to and from UTF-8 unchanged (a user named Juergen)") {
 
     CHECK(core::environment_variable("PATH").has_value());
     CHECK(!core::environment_variable("O1602_TEST_VARIABLE_THAT_IS_NOT_SET").has_value());
+}
+
+TEST_CASE("core: doubles from data files become integers the same way everywhere") {
+    CHECK(core::saturating_cast<std::uint32_t>(2.9) == 2u);
+    CHECK(core::saturating_cast<std::uint32_t>(-3.5) == 0u);
+    CHECK(core::saturating_cast<std::uint32_t>(1e10) == 0xFFFFFFFFu);
+    CHECK(core::saturating_cast<std::int32_t>(-1e10) == std::numeric_limits<std::int32_t>::min());
+    CHECK(core::saturating_cast<std::int32_t>(-2.9) == -2);
+    CHECK(core::saturating_cast<std::uint8_t>(std::numeric_limits<double>::quiet_NaN()) == 0);
+    CHECK(core::saturating_cast<std::int64_t>(1e30) == std::numeric_limits<std::int64_t>::max());
 }
