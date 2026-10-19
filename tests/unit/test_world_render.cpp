@@ -5,7 +5,10 @@
 #include <array>
 #include <bit>
 #include <set>
+#include <string>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "../test_framework.hpp"
 
@@ -18,6 +21,7 @@
 #include "o1602/render/ship_trail.hpp"
 #include "o1602/render/sprite_atlas.hpp"
 #include "o1602/render/sprite_hit_mask.hpp"
+#include "o1602/render/text_cache.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/rules.hpp"
 #include "o1602/sim/world.hpp"
@@ -671,4 +675,42 @@ TEST_CASE("render: a ship is drawn on its way between two ticks, a jump is not s
     trail.position(world.ships().back(), x, y);
     CHECK(x == 3.0);
     CHECK(y == 4.0);
+}
+
+TEST_CASE("render: the text cache gives up the least recently used texts, never those of this frame") {
+    render::TextCache<int> cache(3);
+    std::vector<int> evicted;
+    const auto evict = [&evicted](int v) { evicted.push_back(v); };
+    // A text by text, font and colour; the lookup copies nothing and needs no std::string.
+    cache.insert("gold", 0, 4, 1, evict);
+    cache.insert("gold", 1, 4, 2, evict);
+    cache.insert("gold", 0, 3, 3, evict);
+    const std::string_view gold = "gold and more";
+    REQUIRE(cache.find(gold.substr(0, 4), 1, 4) != nullptr);
+    CHECK(*cache.find(gold.substr(0, 4), 1, 4) == 2);
+    CHECK(cache.find("tools", 0, 4) == nullptr);
+    // All three were used in this frame: the cache grows instead of evicting.
+    cache.insert("tools", 0, 4, 4, evict);
+    CHECK(cache.size() == 4);
+    CHECK(evicted.empty());
+    // Next frame: (gold, 1, 4) and "tools" are used again; inserting evicts the least recently
+    // used of the rest, oldest first, down to the capacity.
+    cache.next_frame();
+    CHECK(cache.find("gold", 1, 4) != nullptr);
+    CHECK(cache.find("tools", 0, 4) != nullptr);
+    cache.insert("wood", 0, 4, 5, evict);
+    CHECK((evicted == std::vector<int>{1, 3}));
+    CHECK(cache.size() == 3);
+    CHECK(cache.find("gold", 0, 4) == nullptr);
+    CHECK(cache.find("gold", 0, 3) == nullptr);
+    // A frame later the least recently used of all goes first: (gold, 1, 4).
+    cache.next_frame();
+    CHECK(cache.find("wood", 0, 4) != nullptr);
+    CHECK(cache.find("tools", 0, 4) != nullptr);
+    cache.insert("fish", 0, 4, 6, evict);
+    CHECK((evicted == std::vector<int>{1, 3, 2}));
+    std::vector<int> left;
+    cache.for_each([&left](int v) { left.push_back(v); });
+    std::sort(left.begin(), left.end());
+    CHECK((left == std::vector<int>{4, 5, 6}));
 }

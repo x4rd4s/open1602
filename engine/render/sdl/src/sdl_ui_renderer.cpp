@@ -13,7 +13,7 @@ namespace {
 constexpr int kModeSprite = 0;
 constexpr int kModeMask = 1;
 constexpr int kModeRaster = 2;
-constexpr std::size_t kMaxTexts = 512;  // cached text textures before the cache starts over
+constexpr std::size_t kMaxTexts = 512;  // cached text textures before the least recently used go
 constexpr std::int32_t kCheckerSize = 64;
 constexpr std::uint8_t kMaskAlpha = 110;  // opacity of a GraphicFill shadow
 
@@ -21,7 +21,7 @@ constexpr std::uint8_t kMaskAlpha = 110;  // opacity of a GraphicFill shadow
 
 SdlUiRenderer::SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets::Palette& palette,
                              ui::ArtSize size)
-    : m_renderer(renderer), m_palette(palette), m_size(size) {
+    : m_renderer(renderer), m_palette(palette), m_size(size), m_texts(kMaxTexts) {
     for (std::int32_t b = 0; b < static_cast<std::int32_t>(m_sheets.size()); ++b) {
         if (const auto path = game.resolve(ui::sheet_file(b, size))) {
             if (auto sheet = assets::SpriteSheet::load(*path)) {
@@ -55,7 +55,7 @@ SdlUiRenderer::~SdlUiRenderer() {
         }
     };
     destroy(m_sprites);
-    destroy(m_texts);
+    m_texts.for_each([](const Texture& t) { SDL_DestroyTexture(t.texture); });
     destroy(m_images);
     SDL_DestroyTexture(m_checker.texture);
 }
@@ -141,15 +141,8 @@ SdlUiRenderer::Texture SdlUiRenderer::sprite(std::int32_t block, std::int32_t gf
 }
 
 SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t font, std::int32_t colour) {
-    const auto key = std::make_tuple(s, font, colour);
-    if (const auto it = m_texts.find(key); it != m_texts.end()) {
-        return it->second;
-    }
-    if (m_texts.size() >= kMaxTexts) {
-        for (auto& [k, t] : m_texts) {
-            SDL_DestroyTexture(t.texture);
-        }
-        m_texts.clear();
+    if (const Texture* cached = m_texts.find(s, font, colour)) {
+        return *cached;
     }
     Texture t;
     const ui::Font* f = font >= 0 && font < 3 && m_fonts[static_cast<std::size_t>(font)]
@@ -166,7 +159,7 @@ SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t fo
         t = make(canvas.to_rgba(m_palette), static_cast<std::int32_t>(canvas.width),
                  static_cast<std::int32_t>(canvas.height));
     }
-    m_texts.emplace(key, t);
+    m_texts.insert(s, font, colour, t, [](const Texture& old) { SDL_DestroyTexture(old.texture); });
     return t;
 }
 

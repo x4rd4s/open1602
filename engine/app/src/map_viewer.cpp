@@ -2563,6 +2563,9 @@ void MapViewer::present() {
         }
     }
     SDL_RenderPresent(m_window->sdl_renderer());
+    if (m_hud) {
+        m_hud->next_frame();
+    }
 }
 
 std::filesystem::path MapViewer::next_screenshot_path() {

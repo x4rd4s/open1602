@@ -2,7 +2,8 @@
 //
 // Draws the interface's draw lists (ui::Panel) with an SDL_Renderer: sprites of the interface's
 // sheets, their shapes in one colour, text in the original fonts and colours, filled and
-// checkered rectangles. Textures are made when first needed and kept.
+// checkered rectangles. Textures are made when first needed and kept (texts: the 512 most recently
+// used, and all of the current frame).
 #pragma once
 
 #include <array>
@@ -17,6 +18,7 @@
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
+#include "o1602/render/text_cache.hpp"
 #include "o1602/ui/font.hpp"
 #include "o1602/ui/panel.hpp"
 #include "o1602/ui/resources.hpp"
@@ -55,6 +57,8 @@ public:
     /// kept under `key` and replaced when the image changes size or `update` is set.
     void image(int key, const std::vector<std::uint8_t>& rgba, std::int32_t width, std::int32_t height,
                const ui::Rect& at, bool update);
+    /// After a frame is shown: its texts' textures may be given up again when the cache is full.
+    void next_frame() noexcept { m_texts.next_frame(); }
 
 private:
     struct Texture {
@@ -74,7 +78,7 @@ private:
     std::array<std::optional<ui::Font>, 3> m_fonts;
     std::array<ui::Recolour, ui::kTextColours> m_colours{};
     std::map<std::tuple<std::int32_t, std::int32_t, int, std::int32_t>, Texture> m_sprites;
-    std::map<std::tuple<std::string, std::int32_t, std::int32_t>, Texture> m_texts;
+    TextCache<Texture> m_texts;
     std::map<int, Texture> m_images;
     Texture m_checker;
 };
