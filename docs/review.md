@@ -200,7 +200,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-14 | Low | Names and chat accept control characters; a newline breaks the high-score file | `net/src/protocol.cpp`, `assets/src/high_scores.cpp` | Fixed #20 |
 | MP-15 | Low | A spectator cannot be kicked; a stalling player can freeze the game for 10 s repeatedly | `net/src/host_session.cpp` | Fixed #21, #25 (#21: a repeated staller waits a quarter of the time; #25: the host can remove spectators) |
 | MP-16 | Low | High-score and progress files fall back to the current directory | `app/src/map_viewer.cpp` | Fixed #20 |
-| MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Open |
+| MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Fixed #27 (score curves, money steps and the monument rule named in `assets/game_data.hpp`) |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
 | MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Open |
 | MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Open |
@@ -217,7 +217,7 @@ bought-ship item.
 | BD-3 | Medium | Data tests use the maintainer's own savegame slots as fixtures | `tests/data/` | Fixed #26 |
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
-| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours) |
+| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours; #27: unit tests round-trip a synthetic world through the `.GAM` writer, which found and fixed a city satisfaction bug) |
 | BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; platform, render_sdl and o1602-tool remain) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
@@ -242,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 1 | 0 | 1 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 2 | 6 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 4 | 1 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 2 | 6 | 19 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 1 | 0 | 1 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 2 | 6 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 0 | 2 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 4 | 1 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 2 | 6 | 18 |
 
 ## Open work, in order
 
@@ -274,21 +274,21 @@ fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. Fixed in #
 2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool since
    #21 and the questions before orders since #24 are there, with tests). Next smoke tests for
    o1602-tool and an ASan game run with the dummy video driver.
-3. BD-6 rest (M): round-trip a synthetic world through `savegame_writer` and track coverage in
-   CI. (Since #23 a data test runs the computers of a new endless game for three game hours and
+3. BD-6 rest (M): unit tests for the AI and `new_game` without original data, and coverage in CI.
+   (Since #27 unit tests round-trip a synthetic world through `savegame_writer`.) (Since #23 a data test runs the computers of a new endless game for three game hours and
    checks that they keep their cities and that the game saves and goes on the same. Since #26 the
    data tests check their savegame fixtures by size and CRC-32 and skip on another file: BD-3.)
 4. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
    symmetric `io()` descriptions in files per section.
 
 **3. Moddability: game numbers in one place**
-1. MP-17 (S): score curves and the monument rule into `Rules` or data.
-2. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
+1. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
    format. The load-side refusal from #19 then becomes a writer-side check.
 (Fixed in #22: IO-12 the numbers live in `assets/game_data.hpp` and sim re-exports them; SC-9 and
 AU10 the simulation's literals; IO-10 saturating casts and the GAD size limit, documented in
 `docs/modding/data-limits.md`. Fixed in #25: UI-14 the game-setting bits, the message icons' banner
-limit and tile spots named. MP-11 was fixed in #20.)
+limit and tile spots named. Fixed in #27: MP-17 the score curves and the monument rule. MP-11 was
+fixed in #20.)
 
 **4. Performance in long sessions**
 1. AU7 (M): spatial buckets for the crowd and blocked checks, and a tower index for combat.
