@@ -224,10 +224,12 @@ private:
                                                       std::size_t* warnings = nullptr) const;
     /// The game goes on in another world (a savegame, a scenario, a new game): the new game is
     /// built whole, then everything of the old one goes. `source`: the file it came from, for the
-    /// window title (empty: the game's own name). Out of memory leaves the old game running.
+    /// window title when the game has no name of its own. Out of memory leaves the old game running.
     core::Status replace_world(sim::World world, const std::filesystem::path& source = {});
     /// The name of the game for the window title (UTF-8).
     [[nodiscard]] std::string game_title() const;
+    /// The multiplayer part of the window title (players, ended, waiting), or nothing.
+    [[nodiscard]] std::string session_title() const;
     /// Tells (on stderr) that a savegame's simulation state was damaged (Simulation::state_damaged).
     void warn_if_state_damaged() const;
     /// A game that loaded with `warnings` (parts skipped, other game data) or without its running

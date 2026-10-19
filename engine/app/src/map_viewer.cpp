@@ -1957,15 +1957,23 @@ std::string MapViewer::debug_title(double fps) {
 }
 
 std::string MapViewer::game_title() const {
-    if (!m_options.scenario.empty()) {
-        return core::path_to_utf8(m_options.scenario.stem());
+    // The game's own name, the same on every computer of a multiplayer game; else its file.
+    if (const std::string name = sim::game_identity(m_state->world).name; !name.empty()) {
+        return core::cp1252_to_utf8(name);
     }
-    return core::cp1252_to_utf8(sim::game_identity(m_state->world).name);
+    return core::path_to_utf8(m_options.scenario.stem());
 }
 
 void MapViewer::update_title(double fps) {
     // The window title: the game, its time and speed, in the player's language. With
     // O1602_DEBUG_TITLE set it also shows what lies under the mouse, the selection and the frame rate.
+    // In the menus no game is played (the world behind them is only a backdrop): the name alone.
+    const bool in_menu = m_hud && m_hud->menu_active() && !m_debug_title;
+    if (in_menu) {
+        m_title_real_ms = 0;  // the time in the menus does not count as a slow game
+        m_window->set_title("Open1602" + session_title());
+        return;
+    }
     std::string title = m_debug_title ? debug_title(fps) : "Open1602 - " + game_title();
     const std::uint64_t seconds = m_state->simulation.game_time_ms() / 1000;
     char clock[32];
@@ -1992,19 +2000,24 @@ void MapViewer::update_title(double fps) {
     }
     m_title_real_ms = now;
     m_title_game_ms = game_ms;
-    if (m_session) {
-        std::size_t players = 0;
-        for (const net::Member& m : m_session->roster()) {
-            players += m.seat != sim::kNoPlayer ? 1 : 0;
-        }
-        title += " | " + ui::tr("title.multiplayer", {std::to_string(players)});
-        if (m_session->ended()) {
-            title += ", " + ui::tr("title.multiplayer_ended");
-        } else if (m_session->waiting()) {
-            title += ", " + ui::tr("title.multiplayer_waiting");
-        }
+    m_window->set_title(title + session_title());
+}
+
+std::string MapViewer::session_title() const {
+    if (!m_session) {
+        return {};
     }
-    m_window->set_title(title);
+    std::size_t players = 0;
+    for (const net::Member& m : m_session->roster()) {
+        players += m.seat != sim::kNoPlayer ? 1 : 0;
+    }
+    std::string title = " | " + ui::tr("title.multiplayer", {std::to_string(players)});
+    if (m_session->ended()) {
+        title += ", " + ui::tr("title.multiplayer_ended");
+    } else if (m_session->waiting()) {
+        title += ", " + ui::tr("title.multiplayer_waiting");
+    }
+    return title;
 }
 
 std::filesystem::path MapViewer::data_folder() {
@@ -2373,6 +2386,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     m_tool.set_mode(BuildTool::Mode::Off);
     m_state = std::move(next);
     m_options.scenario = source;
+    m_title_real_ms = 0;  // loading took real time the game did not run: no "too slow" for it
     warn_if_state_damaged();
     m_state->simulation.offer_names(m_city_names, m_ship_names);  // a saved game keeps its own
     m_state->simulation.set_tick_observer(
