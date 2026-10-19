@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <deque>
 #include <enet/enet.h>
 #include <map>
 #include <set>
@@ -34,6 +35,10 @@ using detail::In;
 constexpr std::array<std::uint8_t, 6> kSearchMagic = {'O', '1', '6', '0', '2', '?'};
 constexpr std::array<std::uint8_t, 6> kAnswerMagic = {'O', '1', '6', '0', '2', '!'};
 constexpr std::size_t kMaxDatagram = 1024;
+/// Datagrams read in one update, games kept in the list, searches whose answers are taken.
+constexpr std::size_t kMaxDatagramsPerUpdate = 64;
+constexpr std::size_t kMaxGames = 64;
+constexpr std::size_t kKeptSearches = 16;
 
 bool starts_with(std::span<const std::uint8_t> bytes, const std::array<std::uint8_t, 6>& magic) {
     return bytes.size() >= magic.size() && std::equal(magic.begin(), magic.end(), bytes.begin());
@@ -168,7 +173,13 @@ public:
 
     void update() override {
         ENetAddress from{};
-        while (const auto bytes = receive_from(m_socket.get(), from)) {
+        // A bounded number each frame: a flood of searches must not stop the host's game. The rest
+        // waits in the socket (and is dropped by the system when it is full).
+        for (std::size_t n = 0; n < kMaxDatagramsPerUpdate; ++n) {
+            const auto bytes = receive_from(m_socket.get(), from);
+            if (!bytes) {
+                break;
+            }
             if (const auto nonce = decode_search(*bytes)) {
                 send_to(m_socket.get(), from, encode_answer(*nonce, m_info));
             }
@@ -185,6 +196,13 @@ public:
     EnetBrowser(ENetSocket socket, std::uint16_t port) : m_socket(socket), m_port(port) {}
 
     void search(const std::vector<std::string>& addresses) override {
+        // The nonce is the time of the search: answers to other nonces are not to this computer.
+        if (m_searches.empty() || m_searches.back() != m_clock_ms) {
+            m_searches.push_back(m_clock_ms);
+            if (m_searches.size() > kKeptSearches) {
+                m_searches.pop_front();
+            }
+        }
         const std::vector<std::uint8_t> bytes = encode_search(m_clock_ms);
         // Everyone on every network of this computer, and this computer itself.
         m_networks = local_networks(m_socket.get());
@@ -210,9 +228,13 @@ public:
             g.age_ms += real_ms;
         }
         ENetAddress from{};
-        while (const auto bytes = receive_from(m_socket.get(), from)) {
+        for (std::size_t n = 0; n < kMaxDatagramsPerUpdate; ++n) {
+            const auto bytes = receive_from(m_socket.get(), from);
+            if (!bytes) {
+                break;
+            }
             const auto answer = decode_answer(*bytes);
-            if (!answer) {
+            if (!answer || std::find(m_searches.begin(), m_searches.end(), answer->first) == m_searches.end()) {
                 continue;
             }
             // A host on this computer answers on each of its addresses: one game, at 127.0.0.1.
@@ -228,6 +250,9 @@ public:
                 return g.address == address && g.info.port == answer->second.port;
             });
             if (it == m_games.end()) {
+                if (m_games.size() >= kMaxGames) {
+                    continue;  // a list nobody could read; and someone flooding answers
+                }
                 m_games.push_back(FoundGame{address, {}, 0, 0});
                 it = m_games.end() - 1;
             }
@@ -259,6 +284,7 @@ private:
     Socket m_socket;
     std::uint16_t m_port;
     std::uint32_t m_clock_ms = 0;
+    std::deque<std::uint32_t> m_searches;  ///< the nonces of the last searches
     std::vector<FoundGame> m_games;
     std::map<std::string, std::optional<ENetAddress>> m_resolved;
     LocalNetworks m_networks;
