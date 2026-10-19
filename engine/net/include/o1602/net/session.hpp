@@ -37,7 +37,8 @@
 namespace o1602::net {
 
 struct SessionConfig {
-    /// Frames between two fingerprints (100 = 5 s at normal speed). Each costs a savegame in memory.
+    /// Frames between two fingerprints at normal speed (100 = 5 s), times the speed rounded up to a
+    /// power of two at higher speeds. Each costs a savegame in memory.
     std::uint32_t hash_interval = 100;
     /// Frames the host closes ahead of its own game, at least and at most: more than the slowest
     /// connection needs one way, so that the frames are there when a computer wants to run them.

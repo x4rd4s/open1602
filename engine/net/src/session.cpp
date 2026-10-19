@@ -2,6 +2,7 @@
 #include "o1602/net/session.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <utility>
 
 namespace o1602::net {
@@ -96,7 +97,12 @@ std::optional<FrameHash> Session::run_frame(sim::Simulation& simulation, std::sp
     }
     simulation.tick();
     ++m_frames;
-    if (m_frames % m_config.hash_interval != 0) {
+    // Fewer fingerprints at higher speed, so that their cost stays the same in real time. Every
+    // computer runs the same speed at the same frame, and the speed is rounded up to a power of
+    // two so that the frames of a higher speed are among those of a lower one.
+    if (m_frames %
+            (std::uint64_t{m_config.hash_interval} * std::bit_ceil(std::max<std::uint32_t>(simulation.speed(), 1))) !=
+        0) {
         return std::nullopt;
     }
     const auto hash = simulation.state_hash();

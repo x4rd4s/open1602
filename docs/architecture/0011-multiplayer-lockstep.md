@@ -25,8 +25,9 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 4. **Slow computers.** The host runs at most one second of game time (plus the lead) ahead of the
    slowest computer; then it waits, and the game gets slower for everyone instead of unfair. If a
    computer stands completely still for 10 s (a debugger, a window being dragged), the game goes on
-   without it; it catches up, or gets the game anew once it is more than 30 s behind.
-5. **Fingerprints.** Every 100 frames (5 s at normal speed) each computer sends the host its
+   without it (2.5 s for a computer that held everyone up before); it catches up, or gets the game anew once it is more than 30 s behind.
+5. **Fingerprints.** Every 100 frames (5 s at normal speed; at higher speeds 100 times the speed
+   rounded up to a power of two, so about every 5 s of real time) each computer sends the host its
    `Simulation::state_hash()`. The host compares it with its own; not every tick, because each
    fingerprint costs a savegame in memory.
 6. **One way for the start, joining, reconnecting and desyncs: the savegame.** The host sends a
@@ -104,7 +105,8 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 - Videos, menus and windows do not pause the game in multiplayer (M-018); only pause commands do, for
   everyone. The automatic return to speed 1 at a fire or an attack works only on the host.
 - Loading savegames and starting new games is blocked during a session.
-- The fingerprint costs an unpacked savegame on every computer every 100 frames.
+- The fingerprint costs an unpacked savegame on every computer about every 5 s of real time. The
+  host writes games for joining computers a few at once and then at most one a second.
 - A host behind a router needs UDP port 16020 (or the one it chose) forwarded for players on the
   internet; the menu says so.
 
