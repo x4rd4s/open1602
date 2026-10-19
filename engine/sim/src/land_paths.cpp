@@ -259,6 +259,9 @@ LandCourse LandPlanner::plan(const LandMap& map, const LandPlan& r) {
     std::int32_t goal_distance = 0x7FFFFFFF;
     std::optional<std::size_t> edge;
     std::int32_t edge_distance = sea_distance(r.aim_x - r.start_x, r.aim_y - r.start_y);
+    // Only an aim beyond the window is approached over its edge; one inside it that cannot be
+    // reached gives no way at all, as at sea.
+    const bool aim_outside = r.aim_x < x0 || r.aim_y < y0 || r.aim_x >= x_end || r.aim_y >= y_end;
     while (!m_heap.empty()) {
         std::pop_heap(m_heap.begin(), m_heap.end(), later);
         const Node n = m_heap.back();
@@ -280,7 +283,7 @@ LandCourse LandPlanner::plan(const LandMap& map, const LandPlan& r) {
                 goal = n.cell;
             }
         }
-        if (cx == x0 || cy == y0 || cx == x_end - 1 || cy == y_end - 1) {
+        if (aim_outside && (cx == x0 || cy == y0 || cx == x_end - 1 || cy == y_end - 1)) {
             const std::int32_t d = sea_distance(r.aim_x - cx, r.aim_y - cy);
             if (d < edge_distance) {
                 edge_distance = d;

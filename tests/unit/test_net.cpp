@@ -521,17 +521,26 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
-    Computer c(network, "Clara");  // three humans in the world, all taken
-    run_for(network, host, {&a, &b, &c}, 1000);
+    Computer c(network, "Clara");  // the computer's slot: Clara takes it over
+    Computer w(network, "Wilma");  // three humans and a computer in the world, all taken
+    run_for(network, host, {&a, &b, &c, &w}, 1000);
     REQUIRE(c.session->playing());
-    CHECK(c.session->local_seat() == sim::kNoPlayer);
-    c.session->submit(sim::PlayerRename{3, "Zuschauer"});
-    run_for(network, host, {&a, &b, &c}, 500);
-    CHECK(host.game.world->players()[3].name == "Spieler 3");
-    CHECK(host.session->roster().size() == 4);
+    CHECK(c.session->local_seat() == 3);
+    CHECK(host.game.world->players()[3].role == sim::PlayerRole::Human);
+    REQUIRE(w.session->playing());
+    CHECK(w.session->local_seat() == sim::kNoPlayer);
+    w.session->submit(sim::PlayerRename{3, "Zuschauer"});
+    run_for(network, host, {&a, &b, &c, &w}, 500);
+    CHECK(host.game.world->players()[3].name == "Clara");
+    CHECK(host.session->roster().size() == 5);
+
+    // Clara leaves: the computer plays her slot again.
+    network.cut(*c.transport);
+    run_for(network, host, {&a, &b, &c, &w}, 500);
+    CHECK(host.game.world->players()[3].role == sim::PlayerRole::Computer);
 
     Computer other(network, "Dora", 0, kContent + 1);
-    run_for(network, host, {&a, &b, &c, &other}, 500);
+    run_for(network, host, {&a, &b, &w, &other}, 500);
     CHECK(other.session->ended());
     CHECK(other.session->end_reason() == net::EndReason::Refused);
     REQUIRE(!other.events.empty());
@@ -544,8 +553,9 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
     Host host2(network2, closed);
     Computer x(network2, "X");
     Computer y(network2, "Y");
+    Computer v(network2, "V");
     Computer z(network2, "Z");
-    run_for(network2, host2, {&x, &y, &z}, 500);
+    run_for(network2, host2, {&x, &y, &v, &z}, 500);
     CHECK(z.session->ended());
     CHECK(z.events.back().refused == net::RefuseReason::Full);
 

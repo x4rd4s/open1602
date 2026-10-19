@@ -74,7 +74,8 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& 
       m_content(content),
       m_lead(m_config.min_lead) {
     m_seat = seat;
-    // The lobby of a running game: its human slots are open, the computer players stay.
+    // The lobby of a running game: its human slots are open, and so are the computer players'
+    // (the computer plays one until someone comes and again when he leaves).
     m_lobby.started = true;
     const auto& players = simulation.world().players();
     for (std::size_t s = 0; s < players.size() && s < kMaxLobbySeats; ++s) {
@@ -86,7 +87,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& 
         } else if (!players[s].active()) {
             lobby_seat.kind = LobbySeat::Kind::Closed;
         } else if (players[s].role == sim::PlayerRole::Computer) {
-            lobby_seat.kind = LobbySeat::Kind::Computer;
+            m_computer_held.push_back(static_cast<Seat>(s));
         }
         m_lobby.seats.push_back(std::move(lobby_seat));
     }

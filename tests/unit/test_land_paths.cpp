@@ -429,6 +429,18 @@ TEST_CASE("land paths: ways are as cheap as a reference Dijkstra finds, on walka
     CHECK(unreachable > 0);
 }
 
+TEST_CASE("land paths: an aim inside the window that cannot be reached gives no way") {
+    // A hole in the island at tile (5, 9), cells 18..19 x 26..27; the window (radius 10 around
+    // the start) has land on its edges.
+    Field f(40, 30, 4, 4, 24, 16, std::pair{5, 9});
+    sim::LandPlanner planner;
+    sim::LandPlan plan = request(12, 30, 18, 26);
+    plan.radius = 10;
+    const sim::LandCourse course = planner.plan(f.land, plan);
+    CHECK(!course.reached_goal);
+    CHECK(course.path.empty());
+}
+
 TEST_CASE("land paths: the same request gives the same way on a reused and on a fresh planner") {
     Field f;
     for (std::int32_t y = 2; y < 14; ++y) {

@@ -4,6 +4,7 @@
 // test (task 2), the Kontor site and the free cargo (task 3), the landing (task 4), later colonies
 // (0x00426290) and giving a city up (task 0x2E).
 #include <algorithm>
+#include <limits>
 #include <array>
 
 #include "ai_engine.hpp"
@@ -147,7 +148,8 @@ void Engine::pick_island(AiPlayer& p) {
     for (std::uint32_t k = 0; k <= n; ++k) {
         s.cursor = static_cast<std::uint16_t>(s.cursor + 1);
         if (s.cursor >= n) {
-            s.cursor = 0;
+            // Before island 0, so that the next search tests it first (it was passed over).
+            s.cursor = std::numeric_limits<std::uint16_t>::max();
             if (s.need <= s.floor) {
                 if (s.crop != 0) {
                     // Drop the crop and search again from 1800 tiles.

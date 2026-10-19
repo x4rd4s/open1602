@@ -44,7 +44,9 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 8. **Slots.** A computer gets a free human slot of the world (or the one it asks for) and a token with
    which it gets the same slot back after a lost connection. Tokens are random and belong to whoever
    holds the slot: a slot that changes hands (in the lobby, after a kick, to a newcomer) gets a new
-   one, and the host's own slot takes none. Without a free slot it watches. A slot
+   one, and the host's own slot takes none. In a game hosted while it runs (`--host`), the computer
+   players' slots are open as well: the computer plays such a slot until someone takes it and again
+   after he leaves. Without a free slot it watches. A slot
    that was left stays in the game and gives no commands until someone comes back. The player's name
    is set as a `PlayerRename` of that player.
 9. **Same data.** When a computer joins, the host checks the protocol version and a fingerprint of the
