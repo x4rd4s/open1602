@@ -327,9 +327,8 @@ struct CostBuilding {
     std::uint8_t rate = 0;          ///< of the running cycle, 128 = full
     std::uint16_t countdown = 0;    ///< game seconds to the end of the cycle
     std::uint32_t repair_ship = 0;  ///< Ship::id being repaired, 0 = none
-    std::uint8_t failed_launches = 0;
-    std::uint8_t idle_cycles = 0;  ///< cycles without material, at most 15
-    bool fetching = false;         ///< its pack donkey is out
+    std::uint8_t idle_cycles = 0;   ///< cycles without material, at most 15
+    bool fetching = false;          ///< its pack donkey is out
     /// Castles (MILITAR, 0x0055EB80): weapons in store (swords, muskets, cannons, 1/32 t) and the
     /// training slots (3, 5 or 8 used by castle size). `countdown` counts the seconds to the next
     /// training step.

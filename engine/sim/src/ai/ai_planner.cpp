@@ -917,7 +917,6 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
-    const bool no_colonies = false;  // scenario flag P+0x70 & 2 (docs/re/ai.md)
     const auto needs = [&](std::span<const StageNeed> o) { return first_need(p, c, r, money, o); };
 
     switch (r.stage) {
@@ -985,8 +984,10 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 (r.slots[kSlotHouses].count > 23 && population(c, 1) >= 95) || now_ms() - r.stage_ms > 3'000'000;
             if (grown) {
                 // A first colony before the city grows on (the original waits for it forever if no
-                // island is found, S-097; Open1602 goes on once the search has failed).
-                if (kontor_level(c) == 1 && !no_colonies && p.cities < 2 && !p.colony_failed) {
+                // island is found, S-097; Open1602 goes on once the search has failed). The original
+                // also skips colonies when a scenario sets player +0x70 bit 1; that switch is not read
+                // from PLAYER4 yet (docs/re/ai.md), so colonies are always allowed.
+                if (kontor_level(c) == 1 && p.cities < 2 && !p.colony_failed) {
                     want_colony(p, 1, true, true);
                 } else if (money > 8000 || incomes_ok(p, 11)) {
                     const std::int32_t rank = land_rank(p);
@@ -1031,7 +1032,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kMain: {
             if ((population(c, 1) >= 170 && money >= 8001) || money >= 15001) {
-                if (kontor_level(c) < 3 && !no_colonies && p.cities < 3 && want_colony(p, 2, false, true)) {
+                if (kontor_level(c) < 3 && p.cities < 3 && want_colony(p, 2, false, true)) {
                     return;
                 }
                 set_stage(p, r, stage::kMain2);

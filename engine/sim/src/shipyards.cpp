@@ -16,7 +16,6 @@ constexpr std::uint32_t kSecondMs = 1000;
 constexpr std::uint16_t kIdleSeconds = 11;        // a cycle that could not start waits this long
 constexpr std::uint32_t kFetchThreshold = 0x180;  // material for three cycles or less: fetch more
 constexpr std::uint8_t kMaxIdle = 15;
-constexpr std::uint8_t kLaunchRetries = 100;
 constexpr std::uint8_t kSmallYardSize = 3;
 constexpr auto kShipTypes = static_cast<std::uint8_t>(figure::kShips.size());
 
@@ -229,9 +228,6 @@ void Fleet::yard_cycle(CostBuilding& yard) {
                 yard.order = CostBuilding::kNoOrder;
                 yard.progress = 0;
                 yard.enabled = false;
-                yard.failed_launches = 0;
-            } else if (++yard.failed_launches >= kLaunchRetries) {
-                yard.failed_launches = 0;
             }
             yard.countdown = kIdleSeconds;
             return;

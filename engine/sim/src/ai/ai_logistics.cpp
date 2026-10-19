@@ -14,10 +14,6 @@ namespace {
 
 constexpr std::uint32_t kHealthy = 0x5F;  // health * 128 / max above this: at least 75 %
 
-bool moving(const Ship& s) {
-    return !s.target.empty() || s.motion.phase == ShipMotion::Phase::Run || s.motion.phase == ShipMotion::Phase::Turn;
-}
-
 bool carries_goods(const Ship& s) {
     for (const CargoSlot& c : s.cargo) {
         if (c.ware != 0 && c.ware <= ware::kLastTrade && c.amount != 0) {
@@ -66,7 +62,7 @@ bool Engine::ship_at_city(const Ship& s, const City& c) const {
 
 bool Engine::ship_idle(AiPlayer& p, const Ship& s) {
     const ShipNote& n = note(p, s.id);
-    return !moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.id != p.settle.ship && !s.held;
+    return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.id != p.settle.ship && !s.held;
 }
 
 void Engine::send_to_city(AiPlayer& p, Ship& s, const City& c) {
@@ -110,7 +106,7 @@ void Engine::logistics(AiPlayer& p) {
         if (s != nullptr && n.patrol && !s->route.active) {
             n.patrol = false;
         }
-        if (s != nullptr && n.supply && !s->route.active && !moving(*s)) {
+        if (s != nullptr && n.supply && !s->route.active && !ship_moving(*s)) {
             n.supply = false;
         }
     }

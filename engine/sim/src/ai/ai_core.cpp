@@ -261,10 +261,6 @@ void Engine::run_task(AiPlayer& p) {
     }
 }
 
-void Engine::run_pirate_task(AiPlayer& p) {
-    run_task(p);
-}
-
 // ---------------------------------------------------------------------------------------------
 // Task stack (0x0040FB80..0x0040FC30)
 

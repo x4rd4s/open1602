@@ -22,6 +22,7 @@
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
+#include "o1602/sim/ship.hpp"
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -36,6 +37,11 @@ namespace o1602::sim::ai {
 
 // The ware, Kind and production numbers and the building Ids the AI refers to are in
 // o1602/sim/game_data.hpp.
+
+/// A ship that has a target or is running or turning: the AI leaves it alone.
+[[nodiscard]] inline bool ship_moving(const Ship& s) noexcept {
+    return !s.target.empty() || s.motion.phase == ShipMotion::Phase::Run || s.motion.phase == ShipMotion::Phase::Turn;
+}
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
@@ -136,7 +142,6 @@ private:
     // ---- ai_core.cpp ----
     void step(AiPlayer& p);
     void run_task(AiPlayer& p);
-    void run_pirate_task(AiPlayer& p);
     void root(AiPlayer& p);
     [[nodiscard]] std::uint8_t top(const AiPlayer& p) const;
     void pop(AiPlayer& p);

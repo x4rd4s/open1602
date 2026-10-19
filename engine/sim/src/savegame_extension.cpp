@@ -1143,7 +1143,7 @@ void write_fleet(Out& out, const World& w) {
         out.u8(b.rate);
         out.u16(b.countdown);
         out.u32(b.repair_ship);
-        out.u8(b.failed_launches);
+        out.u8(0);  // reserved: was a launch retry counter without effect; kept for the format
         out.u8(b.idle_cycles);
         out.boolean(b.fetching);
     }
@@ -1186,7 +1186,7 @@ Decoded::FleetPart read_fleet(StateIn& in) {
         b.rate = in.u8();
         b.countdown = in.u16();
         b.repair_ship = in.u32();
-        b.failed_launches = in.u8();
+        static_cast<void>(in.u8());  // reserved, see write_fleet
         b.idle_cycles = in.u8();
         b.fetching = in.boolean();
     });
@@ -2288,7 +2288,6 @@ core::Status apply_decoded(World& world, Decoded& d) {
             b.rate = y.rate;
             b.countdown = y.countdown;
             b.repair_ship = y.repair_ship;
-            b.failed_launches = y.failed_launches;
             b.idle_cycles = y.idle_cycles;
             b.fetching = y.fetching;
         }

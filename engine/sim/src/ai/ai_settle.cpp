@@ -28,10 +28,6 @@ bool in_circle(std::int32_t dx, std::int32_t dy, std::uint32_t r) {
     return static_cast<std::uint32_t>(ay) <= r && ax <= circle[static_cast<std::size_t>(ay)];
 }
 
-bool ship_moving(const Ship& s) {
-    return !s.target.empty() || s.motion.phase == ShipMotion::Phase::Run || s.motion.phase == ShipMotion::Phase::Turn;
-}
-
 /// Land a settlement may claim (task 2): forest, ground, ruins, slopes.
 bool settle_ground(std::int32_t k) {
     return k == kind::kForest || k == kind::kGround || k == kind::kRuin || k == kind::kSlope || k == kind::kSlopeCorner;

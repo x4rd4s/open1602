@@ -28,10 +28,6 @@ std::uint32_t city_param(const City& c) {
     return std::uint32_t{c.island} << 8 | c.index;
 }
 
-bool moving(const Ship& s) {
-    return !s.target.empty() || s.motion.phase == ShipMotion::Phase::Run || s.motion.phase == ShipMotion::Phase::Turn;
-}
-
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
@@ -551,7 +547,7 @@ void Engine::missions(AiPlayer& p) {
         if (s == nullptr || s->held || s->repairing) {
             continue;
         }
-        if (moving(*s)) {
+        if (ship_moving(*s)) {
             continue;
         }
         const Target target = s->order;
