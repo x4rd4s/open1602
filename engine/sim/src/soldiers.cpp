@@ -518,6 +518,8 @@ bool Military::wander(Soldier& s) {
     const std::int32_t hx = home->x0 / 2;
     const std::int32_t hy = home->y0 / 2;
     for (int tries = 0; tries < 5; ++tries) {
+        // As the original's helper (Island_RandomX 0x00443320, base + r - 2 * (rand() % r)): only
+        // offsets of one parity, from -7 to +9. Kept on purpose for faithful wandering.
         const std::int32_t x = hx + kWanderRange - 2 * static_cast<std::int32_t>(random.below(kWanderRange));
         const std::int32_t y = hy + kWanderRange - 2 * static_cast<std::int32_t>(random.below(kWanderRange));
         const std::uint16_t island = m_combat->land().island_at(x, y);
