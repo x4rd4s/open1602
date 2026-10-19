@@ -279,3 +279,73 @@ TEST_CASE("data: a game with computer players saved in between goes on exactly t
     }
     CHECK(*third == *fourth);
 }
+
+// Several game hours (review BD-6): the computers keep their cities and keep building, nothing
+// leaves the map or loses its owner, and the game still saves and goes on exactly the same.
+TEST_CASE("data: the computers of a new endless game stay sound over three game hours") {
+    const Setup s = setup_or_skip();
+    sim::World world = new_game(s, 23);
+    sim::Simulation sim(world, s.buildings, s.figures);
+    const auto houses_of = [&](sim::PlayerId owner) {
+        std::size_t n = 0;
+        for (const sim::House& h : world.houses()) {
+            for (const sim::City& c : world.cities()) {
+                n += c.owner == owner && h.island == c.island && h.city == c.index ? 1U : 0U;
+            }
+        }
+        return n;
+    };
+    const auto sound = [&] {
+        bool ok = true;
+        for (const sim::Ship& ship : world.ships()) {
+            ok = ok && ship.x < world.width() && ship.y < world.height();
+            ok = ok && (ship.owner == sim::kNoPlayer || world.player(ship.owner) != nullptr);
+        }
+        for (const sim::Soldier& soldier : world.soldiers()) {
+            ok = ok && (soldier.owner == sim::kNoPlayer || world.player(soldier.owner) != nullptr);
+        }
+        return ok;
+    };
+
+    run_minutes(sim, 30);
+    std::vector<std::size_t> early;
+    for (const auto& v : sim.computers().view()) {
+        early.push_back(houses_of(v.player));
+    }
+    for (int quarter = 0; quarter < 10; ++quarter) {
+        run_minutes(sim, 15);
+        CHECK(sound());
+    }
+    const auto view = sim.computers().view();
+    REQUIRE(view.size() == early.size());
+    for (std::size_t i = 0; i < view.size(); ++i) {
+        const sim::Player* p = world.player(view[i].player);
+        REQUIRE(p != nullptr);
+        if (p->role != sim::PlayerRole::Computer) {
+            continue;
+        }
+        std::printf("  computer %u: %zu cities, stage 0x%02x, %zu houses (%zu after 30 min), money %lld\n",
+                    static_cast<unsigned>(view[i].player), static_cast<std::size_t>(view[i].cities),
+                    static_cast<unsigned>(view[i].max_stage), houses_of(view[i].player), early[i],
+                    static_cast<long long>(p->money));
+        CHECK(view[i].cities >= 1);
+        CHECK(houses_of(view[i].player) >= early[i]);  // the cities grew, or at least kept their houses
+    }
+
+    auto saved = sim::write_game(world, s.buildings, &sim);
+    REQUIRE(saved.ok());
+    auto loaded = sim::read_game(*saved, s.buildings);
+    REQUIRE(loaded.ok());
+    sim::Simulation again(*loaded, s.buildings, s.figures);
+    CHECK(!again.state_damaged());
+    run_minutes(sim, 2);
+    run_minutes(again, 2);
+    auto first = sim::write_game(world, s.buildings, &sim);
+    auto second = sim::write_game(*loaded, s.buildings, &again);
+    REQUIRE(first.ok());
+    REQUIRE(second.ok());
+    if (*first != *second) {
+        report(*first, *second);
+    }
+    CHECK(*first == *second);
+}

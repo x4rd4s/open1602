@@ -126,7 +126,7 @@ void Simulation::offer_names(std::vector<std::string> cities, std::vector<std::s
 }
 
 void Simulation::save_state(core::ByteWriter& out) const {
-    constexpr std::uint16_t kVersion = 5;
+    constexpr std::uint16_t kVersion = 6;
     out.u16(kVersion);
     out.u32(m_production_ms);
     out.u32(m_city_ms);
@@ -139,6 +139,8 @@ void Simulation::save_state(core::ByteWriter& out) const {
     m_ai.save(out);
     write_names(out, m_city_names);
     write_names(out, m_fleet.ship_names());
+    out.u32(m_speed);
+    out.u8(m_paused ? 1 : 0);
 }
 
 bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
@@ -148,7 +150,7 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     core::ByteReader reader(state);
     StateIn in(reader);
     const std::uint16_t version = in.u16();
-    if (version < 1 || version > 5) {
+    if (version < 1 || version > 6) {
         return false;
     }
     const std::uint32_t production = in.u32();
@@ -182,6 +184,17 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     if (version >= 5 && (!read_names(in, cities) || !read_names(in, ships))) {
         return false;
     }
+    // Games of earlier versions did not keep the speed and the pause: they load running at speed 1.
+    std::uint32_t speed = 1;
+    bool paused = false;
+    if (version >= 6) {
+        speed = in.u32();
+        const std::uint8_t pause = in.u8();
+        if (!in.ok() || speed == 0 || pause > 1) {
+            return false;
+        }
+        paused = pause != 0;
+    }
     m_production_ms = production;
     m_city_ms = city;
     m_disaster_ms = disaster;
@@ -191,6 +204,8 @@ bool Simulation::restore_state(const std::vector<std::uint8_t>& state) {
         m_city_names = std::move(cities);
         m_fleet.set_ship_names(std::move(ships));
     }
+    set_speed(speed);
+    m_paused = paused;
     return true;
 }
 

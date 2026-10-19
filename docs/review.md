@@ -87,7 +87,7 @@ rest stays open, as noted.
 |---|---|---|---|---|
 | SC-1 | High | `Logistics::load` trusts walker indices: out-of-bounds write or ~4 GiB allocation from a crafted save | `sim/src/logistics.cpp` | Fixed #19 |
 | SC-2 | Medium | `advance_production` runs free production slots that no load check covers | `sim/src/production_cycle.cpp` | Fixed #19 |
-| SC-3 | Medium | Commands run in frame-sized batches while paused; the pause is not saved | `sim/src/simulation.cpp` | Partly (network sessions order paused commands; the pause flag is not saved) |
+| SC-3 | Medium | Commands run in frame-sized batches while paused; the pause is not saved | `sim/src/simulation.cpp` | Fixed #23 (state version 6 keeps speed and pause; network sessions order paused commands) |
 | SC-4 | Medium | Castle, cathedral, arch and monument limits are checked against the first item of a `BuildOrder` only | `sim/src/construction.cpp` | Fixed #19 |
 | SC-5 | Low | Clocks from a save are unchecked; a `time_ms` off the tick grid stops diplomacy and player checks | `sim/src/simulation.cpp` | Fixed #19 |
 | SC-6 | Low | Removing growing tiles erases from the whole growth list once per tile | `sim/src/construction.cpp` | Fixed #19 |
@@ -103,7 +103,9 @@ rest stays open, as noted.
 For SC-7, the identifiers "Trader4", "Pirat5", "Native6" and "Endlosspiel" stay as they are. They
 are the original's internal names, not player-facing text. For SC-3, the multiplayer review found
 that `Session::run_frame` drains commands frame by frame, so command order while paused is the
-same on every computer in a network session. The unsaved pause flag is still open.
+same on every computer in a network session. Since #23 the simulation state (version 6) keeps the
+game speed and the pause, so a game saved while paused loads paused. A single player's commands
+while paused need no turn rule: there is no second computer to agree with.
 
 Earlier items still present: money is an unsaturated `int32` (`sim/include/o1602/sim/player.hpp`),
 `Pool::for_each` has no guard against `add()` during iteration (`sim/include/o1602/sim/pool.hpp`),
@@ -215,7 +217,7 @@ bought-ship item.
 | BD-3 | Medium | Data tests use the maintainer's own savegame slots as fixtures | `tests/data/` | Open |
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
-| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Open |
+| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours) |
 | BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; platform, render_sdl and o1602-tool remain) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Partly #19 (`_GLIBCXX_ASSERTIONS` in debug and asan) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
@@ -240,15 +242,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 0 | 1 | 3 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 1 | 2 |
-| AU | 15 | 6 | 1 | 1 | 1 | 1 | 0 | 5 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 3 | 10 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 2 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 3 | 3 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 10 | 26 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 1 | 2 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 0 | 3 | 10 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 4 | 2 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 10 | 25 |
 
 ## Open work, in order
 
@@ -257,15 +259,12 @@ tests, then moddability, then performance, and finally cosmetic and documentatio
 taken from the area reports (S, M, L).
 
 **1. Determinism and multiplayer leftovers**
-1. SC-3 (M): save the pause flag (and the speed if wanted) with a section version bump. Network
-   sessions already order commands while paused. Single-player and replay paths should follow the
-   same turn rule.
-2. IO-6 rest (M): a savegame fingerprint over everything that drives the simulation (multiplayer
+1. IO-6 rest (M): a savegame fingerprint over everything that drives the simulation (multiplayer
    already compares the whole `.cod` files in its Hello).
-3. MP-15 rest (S): a way to kick spectators (the host's roster has no seat for them).
-4. MP-8 rest (S): look host names up off the main thread.
+2. MP-15 rest (S): a way to kick spectators (the host's roster has no seat for them).
+3. MP-8 rest (S): look host names up off the main thread.
 (Fixed in #21: AU6 one hold rule, MP-7 games rationed, MP-12 no English default names, MP-13
-fingerprints per real time. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
+fingerprints per real time. Fixed in #23: SC-3 speed and pause saved. AU15 stays by design. The robustness leftovers SC-12, AU13, UI-18, the
 `Pool::for_each` guard and money saturation are fixed in #20.)
 
 **2. Architecture and tests**
@@ -275,9 +274,9 @@ fingerprints per real time. AU15 stays by design. The robustness leftovers SC-12
 2. BD-7 and UI-16 (M): more of the app in the SDL-free `o1602_menus` library (the build tool is
    there since #21, with tests). Next tests for `question_for`, smoke tests for o1602-tool, and an
    ASan game run with the dummy video driver.
-3. BD-6 (M): run the synthetic AI world for several game hours so the AI reaches site search,
-   building, military and logistics. Round-trip a synthetic world through `savegame_writer`. Track
-   coverage in CI.
+3. BD-6 rest (M): round-trip a synthetic world through `savegame_writer` and track coverage in
+   CI. (Since #23 a data test runs the computers of a new endless game for three game hours and
+   checks that they keep their cities and that the game saves and goes on the same.)
 4. BD-3 (S to M): identify data-test fixtures by size and checksum, and skip on mismatch.
 5. SC-10 (M) and IO-13 (L): split `load_world` into documented stages, and give the save sections
    symmetric `io()` descriptions in files per section.

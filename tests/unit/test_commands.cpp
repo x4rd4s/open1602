@@ -3,8 +3,11 @@
 // from damaged bytes, carried out at the tick they name, and a fingerprint of the game that tells
 // whether two computers still compute the same.
 
+#include <algorithm>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../test_framework.hpp"
@@ -240,6 +243,52 @@ TEST_CASE("commands: while paused, the commands of the waiting tick still apply,
     CHECK(!g.simulation.paused());
     g.simulation.advance(2 * sim::Simulation::kTickMs);
     CHECK(g.name(1) == "Später");
+}
+
+TEST_CASE("commands: a saved game keeps its speed and its pause; older saves load running") {
+    Game a;
+    a.simulation.submit(sim::GameSpeedOrder{0, sim::GameSpeedOrder::Op::SetSpeed, 4});
+    a.simulation.submit(sim::GameSpeedOrder{0, sim::GameSpeedOrder::Op::Pause, 0});
+    a.simulation.tick();
+    REQUIRE(a.simulation.paused());
+    REQUIRE(a.simulation.speed() == 4);
+    core::ByteWriter out;
+    a.simulation.save_state(out);
+    const std::vector<std::uint8_t> state = out.take();
+    REQUIRE(state.size() > 5);
+
+    // As a loaded game does: the world hands the saved state to a new simulation.
+    const auto load = [](std::vector<std::uint8_t> bytes) {
+        auto g = std::make_unique<Game>();
+        g->world.set_simulation_state(std::move(bytes));
+        auto s = std::make_unique<sim::Simulation>(g->world, g->buildings, g->figures);
+        return std::make_pair(std::move(g), std::move(s));
+    };
+    const auto [gb, b] = load(state);
+    CHECK(!b->state_damaged());
+    CHECK(b->paused());
+    CHECK(b->speed() == 4);
+
+    // Version 5 ended after the names: without the speed and the pause the game runs at speed 1.
+    std::vector<std::uint8_t> v5 = state;
+    v5.resize(v5.size() - 5);
+    v5[0] = 5;
+    v5[1] = 0;
+    const auto [gc, c] = load(v5);
+    CHECK(!c->state_damaged());
+    CHECK(!c->paused());
+    CHECK(c->speed() == 1);
+
+    // A pause flag other than 0 or 1, or speed 0, marks the state as damaged.
+    std::vector<std::uint8_t> bad = state;
+    bad[state.size() - 1] = 2;
+    const auto [gd, d] = load(bad);
+    CHECK(d->state_damaged());
+    CHECK(!d->paused());
+    bad = state;
+    std::fill(bad.end() - 5, bad.end() - 1, std::uint8_t{0});
+    const auto [ge, e] = load(bad);
+    CHECK(e->state_damaged());
 }
 
 TEST_CASE("commands: the fingerprint of the game is the same for the same game, and only then") {

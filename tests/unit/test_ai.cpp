@@ -295,7 +295,7 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     run(s, 90'000);
     const auto hash = s.state_hash();
     REQUIRE(hash.has_value());
-    constexpr std::uint64_t kExpected = 0x7e7fc0d6d363168aULL;
+    constexpr std::uint64_t kExpected = 0xf639170d718624deULL;
     if (*hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(*hash));
     }

@@ -59,7 +59,7 @@ see [o1602-chunk.md](o1602-chunk.md) for the rules.
 | `MISN` | the missions (goals, loss conditions, values, text, the islands of the island goals recorded at the start) and the end of the game (time, winner) ([missions.md](../re/missions.md)) |
 | `FLEE` `ARMY` `DIPL` `EPOC` `XPLR` | ships with course, route and cargo, shipyard orders, trade settings; soldiers, towers, building damage, shots in flight, castle slots; diplomacy; island epochs; exploring |
 | `QUEU` `STNC` | command chains of the ships and units (Shift+right-click, up to 16 destinations each); attack move and "hold position" (ADR 0010, does not exist in the original) |
-| `SIMU` | clocks of the simulation, all active figures, the state of the computer opponents and (from state version 5) the names for new cities and ships |
+| `SIMU` | clocks of the simulation, all active figures, the state of the computer opponents, (from state version 5) the names for new cities and ships, and (from state version 6) the game speed and whether the game is paused |
 | `ORIG` | the file of the original the game comes from (savegame, scenario or the template of a new game), as chunks without the island tiles (`INSELHAUS`), about 12 KB packed. Only for the export as `.GAM`: it takes from it the bytes that Open1602 does not track, exactly as for a game loaded directly from the file. If the section is missing, the export writes defaults like a new game |
 
 The writer emits the sections in this order: `META`, `MAPW`, `RULE`, `WRLD`, `WRL2`, `ISLE`, `PLAY`,

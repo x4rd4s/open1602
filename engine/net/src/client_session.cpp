@@ -155,7 +155,7 @@ void ClientSession::load(Snapshot& m) {
         return;
     }
     m_simulation = simulation;
-    // Speed and pause are no part of the savegame.
+    // The savegame carries speed and pause too; the snapshot's values win (older saves lack them).
     m_simulation->set_speed(std::max<std::uint32_t>(m.speed, 1));
     if (m.paused != m_simulation->paused()) {
         m_simulation->execute(sim::GameSpeedOrder{
