@@ -12,7 +12,7 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PR #19 and PR #20 (both merged) and PR #21. The status column says
+The fixes since then are in PRs #19, #20 and #21 (merged) and #22. The status column says
 which one fixes each finding.
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
@@ -93,7 +93,7 @@ rest stays open, as noted.
 | SC-6 | Low | Removing growing tiles erases from the whole growth list once per tile | `sim/src/construction.cpp` | Fixed #19 |
 | SC-7 | Low | German fallback player names in the sim | `sim/src/new_game.cpp` | Fixed #20 |
 | SC-8 | Low | `refusal_name()` English text is shown as build status | `sim/src/construction.cpp` | Fixed #20 |
-| SC-9 | Low | Leftover magic numbers and local copies of `game_data.hpp` constants | `sim/src/production_cycle.cpp`, `drag_path.cpp`, others | Open |
+| SC-9 | Low | Leftover magic numbers and local copies of `game_data.hpp` constants | `sim/src/production_cycle.cpp`, `drag_path.cpp`, others | Fixed #22 |
 | SC-10 | Low | `load_world` is one function of about 515 lines | `sim/src/world.cpp` | Open |
 | SC-11 | Low | `find_case_insensitive` resolves `..` and absolute paths | `core/src/file.cpp` | Fixed #19 |
 | SC-12 | Low (uncertain) | An in-place upgrade keeps the old `Production::rate`; `raw` can underflow | `sim/src/production_cycle.cpp` | Fixed #20 |
@@ -122,9 +122,9 @@ and localized names are part of the sim state (see UI-2).
 | IO-7 | Low | Mixer interpolation overflows signed `int` | `audio/src/mixer.cpp` | Fixed #19 |
 | IO-8 | Low | The sub-tile of a saved tile is not checked against its building | `sim/src/savegame_extension.cpp` | Fixed #19 |
 | IO-9 | Low | A ship's tile position is truncated from `pos_x`/`pos_y` | `sim/src/savegame_extension.cpp` | Fixed #19 |
-| IO-10 | Low | COD and mod data: `ObjFill` blow-up, unbounded `Nummer`, `Size` wrap, double-to-int casts, GAD include size | `assets/src/cod_parser.cpp`, `building_table.cpp` | Partly #19 (`Size`, `Nummer`, `ObjFill` fixed; saturating casts and GAD size open) |
+| IO-10 | Low | COD and mod data: `ObjFill` blow-up, unbounded `Nummer`, `Size` wrap, double-to-int casts, GAD include size | `assets/src/cod_parser.cpp`, `building_table.cpp` | Fixed #22 (`Size`, `Nummer`, `ObjFill` in #19; saturating casts, the GAD size limit and docs/modding/data-limits.md in #22) |
 | IO-11 | Low | `find_case_insensitive` resolves `..` (same as SC-11) | `core/src/file.cpp` | Fixed #19 |
-| IO-12 | Low | Building and production kind numbers are duplicated in assets and sim | `assets/src/building_table.cpp` | Open |
+| IO-12 | Low | Building and production kind numbers are duplicated in assets and sim | `assets/src/building_table.cpp` | Fixed #22 |
 | IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Open |
 | IO-14 | Low | Load and save error messages are English text inside localized notices | `app/src/map_input.cpp`, `map_viewer.cpp` | Fixed #20 |
 | IO-15 | Low | Stale format docs: limits, section table, string encoding | `docs/formats/o1602-save.md`, `o1602-chunk.md` | Open |
@@ -142,7 +142,7 @@ and localized names are part of the sim state (see UI-2).
 | AU7 | Low | O(n) scans per soldier run and per combat candidate | `sim/src/soldiers.cpp`, `combat.cpp` | Open |
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Open |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Open |
-| AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Open |
+| AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
 | AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Open |
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Open |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
@@ -172,7 +172,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-11 | Low | Audio hitches on synchronous loads other than savegames | `app/src/map_viewer.cpp`, `game_sound.cpp` | Open |
 | UI-12 | Low | Text scroll positions are unbounded | `ui/src/panel.cpp`, `app/src/hud.cpp` | Open |
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Partly #20 (atomic writes and logged errors; encoding open) |
-| UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Open |
+| UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Partly (#22: building kinds, production kinds, wares and the four-colour rule named; the banner count and half-tile coordinates remain) |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Open |
 | UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21: see BD-7) |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Open |
@@ -240,15 +240,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 0 | 1 | 4 |
-| IO | 15 | 9 | 1 | 0 | 0 | 2 | 3 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 6 |
-| UI | 18 | 1 | 4 | 0 | 0 | 2 | 11 |
-| MP | 20 | 0 | 12 | 3 | 0 | 2 | 3 |
-| BD | 17 | 6 | 5 | 0 | 0 | 3 | 3 |
-| All | 99 | 28 | 26 | 4 | 1 | 10 | 30 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 0 | 1 | 3 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 1 | 2 |
+| AU | 15 | 6 | 1 | 1 | 1 | 1 | 0 | 5 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 3 | 10 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 2 | 3 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 3 | 3 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 10 | 26 |
 
 ## Open work, in order
 
@@ -283,16 +283,14 @@ fingerprints per real time. AU15 stays by design. The robustness leftovers SC-12
    symmetric `io()` descriptions in files per section.
 
 **3. Moddability: game numbers in one place**
-1. IO-12 first (S): move the `kind::`/`prod::` constants into an assets header that sim re-exports,
-   so the following items have one home.
-2. SC-9, AU10, UI-14 (S to M): replace the remaining literals and local copies with `kind::`,
-   `prod::`, `ware::` and `figure::` constants. Take the banner count from `BannerTable`.
-3. MP-17 (S): score curves and the monument rule into `Rules` or data.
-4. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
+1. MP-17 (S): score curves and the monument rule into `Rules` or data.
+2. SC-13 (S): `uint16_t` coordinates in the runtime model, clamped only when writing the original
    format. The load-side refusal from #19 then becomes a writer-side check.
-5. IO-10 remainder (M): a `saturating_cast` helper for double-to-integer conversions, and a cap on
-   the expanded GAD size. Document the limits in `docs/modding`.
-6. MP-11 (S): end screen for more than four players.
+3. UI-14 rest (S): the banner count from `BannerTable`, the half-tile coordinates in one helper,
+   and the settings-flag bits left as literals in island_events, trader, volcanoes and ai_planner.
+(Fixed in #22: IO-12 the numbers live in `assets/game_data.hpp` and sim re-exports them; SC-9 and
+AU10 the simulation's literals; IO-10 saturating casts and the GAD size limit, documented in
+`docs/modding/data-limits.md`. MP-11 was fixed in #20.)
 
 **4. Performance in long sessions**
 1. AU7 (M): spatial buckets for the crowd and blocked checks, and a tower index for combat.
