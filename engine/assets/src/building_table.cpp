@@ -55,7 +55,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
         b.gfx = non_negative(r.integer("Gfx"));
         b.size_x = std::max(1U, non_negative(r.integer("Size", 0, 1)));
         b.size_y = std::max(1U, non_negative(r.integer("Size", 1, 1)));
-        // Islands are at most 255 tiles wide; record numbers index a table.
+        // The original's islands are at most 255 tiles wide; record numbers index a table.
         if (b.size_x > 255 || b.size_y > 255 || nummer > 0xFFFF) {
             return make_error(ErrorCode::InvalidFormat,
                               "HAUS #" + std::to_string(nummer) + " has an invalid Size or Nummer");

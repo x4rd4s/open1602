@@ -4,15 +4,18 @@
 // that does not hold together.
 
 #include <algorithm>
+#include <string_view>
 
 #include "../test_framework.hpp"
 
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/core/compress.hpp"
 #include "o1602/sim/save_game.hpp"
+#include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/state_io.hpp"
 #include "o1602/sim/validate.hpp"
+#include "o1602/sim/volcanoes.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -171,6 +174,99 @@ TEST_CASE("save game: a world beyond the original's limits comes back whole") {
     auto plain_again = sim::write_game(*from_plain, buildings);
     REQUIRE(plain_again.ok());
     CHECK(*plain_again == *bytes);
+}
+
+namespace {
+
+/// The version of the first section `tag` in an unpacked save (header of 32 bytes, then sections).
+std::uint16_t section_version(const core::Bytes& bytes, std::string_view tag) {
+    std::size_t at = 32;
+    while (at + 12 <= bytes.size()) {
+        const std::string_view id(reinterpret_cast<const char*>(bytes.data() + at), 4);
+        const auto version = static_cast<std::uint16_t>(bytes[at + 4] | bytes[at + 5] << 8);
+        const std::uint32_t size = std::uint32_t{bytes[at + 8]} | std::uint32_t{bytes[at + 9]} << 8 |
+                                   std::uint32_t{bytes[at + 10]} << 16 | std::uint32_t{bytes[at + 11]} << 24;
+        if (id == tag) {
+            return version;
+        }
+        at += 12 + size;
+    }
+    return 0;
+}
+
+}  // namespace
+
+TEST_CASE("save game: craters and deer spots beyond 255 tiles come back whole (SC-13)") {
+    const auto buildings = make_buildings();
+    // A world that fits 8 bits keeps version 1 of ISLE and VOLC: the bytes of earlier versions.
+    {
+        auto narrow = sim::write_game(make_world(buildings), buildings, nullptr, sim::SaveOptions{false});
+        REQUIRE(narrow.ok());
+        CHECK(section_version(*narrow, "ISLE") == 1);
+        CHECK(section_version(*narrow, "VOLC") == 1);
+    }
+    // One island 300 tiles wide, one player: within the original's limits but for the island.
+    sim::World world(400, 100);
+    sim::IslandMap map(300, 20);
+    for (std::int32_t y = 0; y < 20; ++y) {
+        for (std::int32_t x = 0; x < 300; ++x) {
+            REQUIRE(map.place(*buildings.by_id(kGround), x, y, 0, 0).ok());
+        }
+    }
+    map.capture_ground();
+    assets::IslandHeader header;
+    header.number = 0;  // header.width is the original's byte; the map holds the real size
+    REQUIRE(world.add_island(sim::WorldIsland{header, std::move(map), 50, 40}).ok());
+    std::vector<sim::Player> players(1);
+    players[0].role = sim::PlayerRole::Human;
+    world.set_players(players);
+    sim::WorldIsland& island = world.island(0);
+    island.craters.push_back(sim::Crater{280, 5, 0});
+    island.deer_spots[0] = sim::DeerSpot{true, 290, 12, 60'000};
+    island.deer_spots[1] = sim::DeerSpot{true, 7, 3, 0};
+    // The eruption finds its crater at x = 280 (an 8-bit model kept it at 24).
+    REQUIRE(sim::erupt(world, sim::CraterRef{0, 280, 5}, 77, false, nullptr));
+    world.volcanoes().last = sim::CraterRef{0, 280, 5};
+    CHECK(sim::validate(world).ok());
+
+    auto bytes = sim::write_game(world, buildings, nullptr, sim::SaveOptions{false});
+    REQUIRE(bytes.ok());
+    CHECK(section_version(*bytes, "ISLE") == 2);
+    CHECK(section_version(*bytes, "VOLC") == 2);
+    std::vector<std::string> warnings;
+    auto loaded = sim::read_game(*bytes, buildings, &warnings);
+    REQUIRE(loaded.ok());
+    CHECK(warnings.empty());
+    const sim::WorldIsland& back = loaded->islands()[0];
+    CHECK(back.map.width() == 300);
+    REQUIRE(back.craters.size() == 1);
+    CHECK(back.craters[0].x == 280);
+    CHECK(back.craters[0].y == 5);
+    CHECK(back.craters[0].steps_left == island.craters[0].steps_left);
+    CHECK(back.deer_spots[0].used);
+    CHECK(back.deer_spots[0].x == 290);
+    CHECK(back.deer_spots[0].y == 12);
+    CHECK(back.deer_spots[0].respawn_ms == 60'000);
+    CHECK(back.deer_spots[1].x == 7);
+    REQUIRE(loaded->volcanoes().eruptions.size() == 1);
+    CHECK(loaded->volcanoes().eruptions[0].crater == (sim::CraterRef{0, 280, 5}));
+    CHECK(loaded->volcanoes().last == std::optional<sim::CraterRef>(sim::CraterRef{0, 280, 5}));
+    auto again = sim::write_game(*loaded, buildings, nullptr, sim::SaveOptions{false});
+    REQUIRE(again.ok());
+    CHECK(*again == *bytes);
+
+    // A deer spot outside its island is refused like a crater outside it.
+    sim::World outside = std::move(loaded).value();
+    outside.island(0).deer_spots[2] = sim::DeerSpot{true, 300, 0, 0};
+    CHECK(!sim::validate(outside).ok());
+
+    // The original's format has one byte per island coordinate: the export refuses the island
+    // instead of cutting x = 280 down to 24.
+    auto chunks = sim::savegame_chunks(world, buildings);
+    REQUIRE(!chunks.ok());
+    CHECK(chunks.error().code == core::ErrorCode::OutOfRange);
+    CHECK(chunks.error().message.find("255") != std::string::npos);
+    CHECK(!sim::write_savegame(world, buildings).ok());
 }
 
 TEST_CASE("save game: a damaged, cut off or newer file loads nothing") {

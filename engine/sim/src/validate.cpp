@@ -64,9 +64,9 @@ core::Status validate(const World& w) {
     if (w.players().size() > kMaxPlayerCount) {
         return bad("more than " + std::to_string(kMaxPlayerCount) + " players");
     }
-    // Islands are addressed by their 8-bit number (state sections, the original's format), and
-    // their coordinates are 8 bit wide in places (craters, deer spots, deposits).
-    constexpr std::size_t kMaxIslandSide = 255;
+    // Islands are addressed by their 8-bit number (state sections, the original's format). Their
+    // size is not bound here: craters and deer spots keep 16-bit coordinates, and only the export
+    // to the original's format (8-bit coordinates) refuses islands wider than 255 tiles.
     std::array<bool, 256> numbers{};
     for (std::size_t i = 0; i < w.islands().size(); ++i) {
         const WorldIsland& island = w.islands()[i];
@@ -75,15 +75,17 @@ core::Status validate(const World& w) {
             return bad("two islands with the number " + std::to_string(island.header.number));
         }
         numbers[island.header.number] = true;
-        if (map.width() > kMaxIslandSide || map.height() > kMaxIslandSide) {
-            return bad("island " + std::to_string(i) + " is wider or higher than 255 tiles");
-        }
         if (std::uint64_t{island.x} + map.width() > w.width() || std::uint64_t{island.y} + map.height() > w.height()) {
             return bad("island " + std::to_string(i) + " lies outside the map");
         }
         for (const Crater& crater : island.craters) {
             if (crater.x >= map.width() || crater.y >= map.height()) {
                 return bad("crater outside island " + std::to_string(i));
+            }
+        }
+        for (const DeerSpot& spot : island.deer_spots) {
+            if (spot.used && (spot.x >= map.width() || spot.y >= map.height())) {
+                return bad("deer spot outside island " + std::to_string(i));
             }
         }
         for (std::uint32_t y = 0; y < map.height(); ++y) {

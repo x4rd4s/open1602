@@ -30,17 +30,18 @@
 namespace o1602::sim {
 
 /// A spot in a forest where deer live (island + 0x6C, HIRSCH2): the island keeps up to 8.
+/// Coordinates are 16 bit like the islands; the original's 8 bits only bind the .GAM export.
 struct DeerSpot {
     bool used = false;
-    std::uint8_t x = 0;  ///< island tile
-    std::uint8_t y = 0;
+    std::uint16_t x = 0;  ///< island tile
+    std::uint16_t y = 0;
     std::uint64_t respawn_ms = 0;  ///< game time before which no new deer comes
 };
 
 /// A volcano crater: the origin tile of a volcano mountain (docs/re/volcanoes.md).
 struct Crater {
-    std::uint8_t x = 0;
-    std::uint8_t y = 0;
+    std::uint16_t x = 0;  ///< island tile (8 bit in the original's format, 16 here)
+    std::uint16_t y = 0;
     std::uint16_t steps_left = 0;  ///< lava throws left of a running eruption (shown nowhere)
 };
 
@@ -231,8 +232,8 @@ struct Disaster {
 /// A crater named by island and position (the original's object ref of type 0x33).
 struct CraterRef {
     std::uint16_t island = 0;  ///< index into World::islands()
-    std::uint8_t x = 0;        ///< origin of the volcano mountain
-    std::uint8_t y = 0;
+    std::uint16_t x = 0;       ///< origin of the volcano mountain
+    std::uint16_t y = 0;
     friend bool operator==(const CraterRef&, const CraterRef&) = default;
 };
 

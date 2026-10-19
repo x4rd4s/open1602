@@ -1606,7 +1606,7 @@ void Logistics::census(std::uint16_t island) {
         if (free == std::make_reverse_iterator(first)) {
             continue;
         }
-        *free = DeerSpot{true, static_cast<std::uint8_t>(pick.x), static_cast<std::uint8_t>(pick.y),
+        *free = DeerSpot{true, static_cast<std::uint16_t>(pick.x), static_cast<std::uint16_t>(pick.y),
                          m_world->time_ms() + kDeerRespawnMs};
         const assets::BuildingType* centre = record_at(*m_world, *m_buildings, island, pick.x, pick.y);
         if (centre != nullptr && centre->prod_kind != prod::kGrowing) {

@@ -296,7 +296,7 @@ std::vector<Crater> find_craters(const IslandMap& map, const assets::BuildingTab
             }
             const SubTile sub = map.sub_tile(buildings, x, y);
             if (sub.origin_x == static_cast<std::int32_t>(x) && sub.origin_y == static_cast<std::int32_t>(y)) {
-                craters.push_back(Crater{static_cast<std::uint8_t>(x), static_cast<std::uint8_t>(y), 0});
+                craters.push_back(Crater{static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y), 0});
             }
         }
     }

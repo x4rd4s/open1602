@@ -99,6 +99,23 @@ older readers, marked optional.
 Buildings are stored as **Id** (from `haeuser.cod`) and sub-tile, not as image number, so that a savegame
 also fits with changed graphics; an unknown Id makes the chunk invalid.
 
+## Section versions
+
+All sections are of version 1, except two that have a version 2 since islands can be wider or
+higher than 255 tiles (SC-13):
+
+| Section | Version 1 | Version 2 |
+|---|---|---|
+| `ISLE` | x and y of the eight deer spots and of the craters as u8 | the same as u16 |
+| `VOLC` | x and y of the last crater and of each eruption's crater as u8 (after the u16 island) | the same as u16 |
+
+The writer takes version 2 only when one of these coordinates is above 255. A world whose
+coordinates fit one byte (every world of the original, and every one written before) gives the
+bytes of version 1 as before, which older readers still load; a reader of this version reads both.
+A file with version 2 needs an Open1602 that knows it: an older one refuses it, since both
+sections are required. Version 2 never occurs in the chunk of a `.GAM`: the export refuses
+islands wider or higher than 255 tiles.
+
 ## Safety when loading
 
 - **Fingerprint:** if it does not match (another tool has changed the chunks of the original), Open1602
@@ -113,8 +130,9 @@ also fits with changed graphics; an unknown Id makes the chunk invalid.
 
 - A map larger than the original's (own world) carries its size in the chunk `O1602MAP`
   (u32 width, u32 height; after `WIFF`, before `O1602`), with up to 255 islands. Such savegames are loaded only by Open1602.
-- The chunk cannot yet carry more than 7 players, 150 ships, 400 soldiers or 350 towers; the
-  writer rejects such worlds. With Open1602's rules (fleet limit 100 per player,
+- The chunk cannot yet carry more than 7 players, 150 ships, 400 soldiers or 350 towers, nor an
+  island wider or higher than 255 tiles (the original's records keep island coordinates in one
+  byte); the writer rejects such worlds. With Open1602's rules (fleet limit 100 per player,
   unit limit 250) this is reachable ([savegame-writer.md](../re/savegame-writer.md#open)).
 - Commands not yet executed between two ticks are not saved (saving
   happens between the ticks).

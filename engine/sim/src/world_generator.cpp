@@ -931,8 +931,9 @@ std::vector<std::uint8_t> Generator::header(const Slot& slot, const std::vector<
         if (full) {
             std::copy_n(loaded.begin() + static_cast<std::ptrdiff_t>(o), 8, h.begin() + static_cast<std::ptrdiff_t>(o));
         }
-        h[o + 1] = craters[i].x;
-        h[o + 2] = craters[i].y;
+        // The original's header: islands of templates are at most 255 tiles wide.
+        h[o + 1] = static_cast<std::uint8_t>(craters[i].x);
+        h[o + 2] = static_cast<std::uint8_t>(craters[i].y);
     }
     h[0x5C] = static_cast<std::uint8_t>(slot.fertility);
     h[0x5D] = static_cast<std::uint8_t>(slot.fertility >> 8);

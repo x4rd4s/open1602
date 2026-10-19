@@ -32,7 +32,7 @@ constexpr std::uint32_t tag(const char (&s)[5]) noexcept {
            static_cast<std::uint32_t>(static_cast<unsigned char>(s[3])) << 24;
 }
 
-// Sections (each with version 1 so far). A section that changes in a way older readers cannot
+// Sections (version 1 unless said otherwise). A section that changes in a way older readers cannot
 // follow gets the next version; a reader skips what it cannot read unless the section is required.
 constexpr std::uint32_t kRules = tag("RULE");
 constexpr std::uint32_t kWorld = tag("WRLD");
@@ -103,11 +103,21 @@ enum RuleKey : std::uint16_t {
 
 using Out = core::ByteWriter;
 
+/// Version 2 of ISLE and VOLC: the island coordinates of deer spots and craters are 16 bit instead
+/// of 8 (islands wider or higher than 255 tiles, SC-13). The writer takes it only when a coordinate
+/// needs it, so a world that fits 8 bits writes the bytes of version 1 as before.
+constexpr std::uint16_t kWideCoordinates = 2;
+
+/// The highest version of a section this version reads.
+constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
+    return id == kIslands || id == kVolcanoes ? kWideCoordinates : 1;
+}
+
 /// Writes a section: tag, version, flags, size, payload.
 template <class Fn>
-void section(Out& out, std::uint32_t id, Fn&& body, Need need = Need::Required) {
+void section(Out& out, std::uint32_t id, Fn&& body, Need need = Need::Required, std::uint16_t version = 1) {
     out.u32(id);
-    out.u16(1);
+    out.u16(version);
     out.u16(need == Need::Required ? kRequired : 0);
     const std::size_t size_at = out.size();
     out.u32(0);
@@ -580,15 +590,46 @@ std::vector<Decoded::ExplorePart> read_explored(StateIn& in) {
     return list;
 }
 
-void write_islands(Out& out, const World& w) {
+/// An island coordinate of ISLE and VOLC: 8 bit up to version 1, 16 bit from kWideCoordinates.
+void put_coordinate(Out& out, std::uint16_t v, std::uint16_t version) {
+    if (version >= kWideCoordinates) {
+        out.u16(v);
+    } else {
+        out.u8(static_cast<std::uint8_t>(v));
+    }
+}
+
+std::uint16_t get_coordinate(StateIn& in, std::uint16_t version) {
+    return version >= kWideCoordinates ? in.u16() : in.u8();
+}
+
+constexpr bool wide(std::uint16_t x, std::uint16_t y) noexcept {
+    return x > 0xFF || y > 0xFF;
+}
+
+/// The version of ISLE: kWideCoordinates if a deer spot or a crater lies beyond 8 bits.
+std::uint16_t islands_version(const World& w) {
+    for (const WorldIsland& i : w.islands()) {
+        const bool spots =
+            std::any_of(i.deer_spots.begin(), i.deer_spots.end(), [](const DeerSpot& s) { return wide(s.x, s.y); });
+        const bool craters =
+            std::any_of(i.craters.begin(), i.craters.end(), [](const Crater& c) { return wide(c.x, c.y); });
+        if (spots || craters) {
+            return kWideCoordinates;
+        }
+    }
+    return 1;
+}
+
+void write_islands(Out& out, const World& w, std::uint16_t version) {
     out.u32(static_cast<std::uint32_t>(w.islands().size()));
     for (const WorldIsland& i : w.islands()) {
         out.u8(i.header.number);
         out.u8(i.deer_phase);
         for (const DeerSpot& s : i.deer_spots) {
             out.boolean(s.used);
-            out.u8(s.x);
-            out.u8(s.y);
+            put_coordinate(out, s.x, version);
+            put_coordinate(out, s.y, version);
             out.u64(s.respawn_ms);
         }
         out.u8(i.drought.strength);
@@ -596,8 +637,8 @@ void write_islands(Out& out, const World& w) {
         out.boolean(i.drought.curse_pending);
         out.u32(static_cast<std::uint32_t>(i.craters.size()));
         for (const Crater& c : i.craters) {
-            out.u8(c.x);
-            out.u8(c.y);
+            put_coordinate(out, c.x, version);
+            put_coordinate(out, c.y, version);
             out.u16(c.steps_left);
         }
         out.boolean(i.volcano_erupted);
@@ -1459,20 +1500,29 @@ void write_disasters(Out& out, const World& w) {
     }
 }
 
-void put_crater(Out& out, const CraterRef& c) {
+void put_crater(Out& out, const CraterRef& c, std::uint16_t version) {
     out.u16(c.island);
-    out.u8(c.x);
-    out.u8(c.y);
+    put_coordinate(out, c.x, version);
+    put_coordinate(out, c.y, version);
 }
 
-void write_volcanoes(Out& out, const World& w) {
+/// The version of VOLC: kWideCoordinates if the last or an erupting crater lies beyond 8 bits.
+std::uint16_t volcanoes_version(const World& w) {
+    const VolcanoState& v = w.volcanoes();
+    const bool last = v.last && wide(v.last->x, v.last->y);
+    const bool running = std::any_of(v.eruptions.begin(), v.eruptions.end(),
+                                     [](const Eruption& e) { return wide(e.crater.x, e.crater.y); });
+    return last || running ? kWideCoordinates : 1;
+}
+
+void write_volcanoes(Out& out, const World& w, std::uint16_t version) {
     const VolcanoState& v = w.volcanoes();
     out.u64(v.next_ms);
     out.boolean(v.last.has_value());
-    put_crater(out, v.last.value_or(CraterRef{}));
+    put_crater(out, v.last.value_or(CraterRef{}), version);
     out.u32(static_cast<std::uint32_t>(v.eruptions.size()));
     for (const Eruption& e : v.eruptions) {
-        put_crater(out, e.crater);
+        put_crater(out, e.crater, version);
         out.u16(e.seed);
         out.u8(e.step);
         out.u64(e.next_us);
@@ -1540,23 +1590,23 @@ Decoded::WorldPart read_world(StateIn& in) {
     return w;
 }
 
-std::vector<Decoded::IslandPart> read_islands(StateIn& in) {
+std::vector<Decoded::IslandPart> read_islands(StateIn& in, std::uint16_t version) {
     std::vector<Decoded::IslandPart> list;
     in.list(list, 2, [&](Decoded::IslandPart& i) {
         i.number = in.u8();
         i.deer_phase = in.u8();
         for (DeerSpot& s : i.deer_spots) {
             s.used = in.boolean();
-            s.x = in.u8();
-            s.y = in.u8();
+            s.x = get_coordinate(in, version);
+            s.y = get_coordinate(in, version);
             s.respawn_ms = in.u64();
         }
         i.drought.strength = in.u8();
         i.drought.end_ms = in.u64();
         i.drought.curse_pending = in.boolean();
-        in.list(i.craters, 4, [&](Crater& c) {
-            c.x = in.u8();
-            c.y = in.u8();
+        in.list(i.craters, version >= kWideCoordinates ? 6 : 4, [&](Crater& c) {
+            c.x = get_coordinate(in, version);
+            c.y = get_coordinate(in, version);
             c.steps_left = in.u16();
         });
         i.volcano_erupted = in.boolean();
@@ -1887,24 +1937,24 @@ std::vector<Disaster> read_disasters(StateIn& in) {
     return list;
 }
 
-CraterRef get_crater(StateIn& in) {
+CraterRef get_crater(StateIn& in, std::uint16_t version) {
     CraterRef c;
     c.island = in.u16();
-    c.x = in.u8();
-    c.y = in.u8();
+    c.x = get_coordinate(in, version);
+    c.y = get_coordinate(in, version);
     return c;
 }
 
-VolcanoState read_volcanoes(StateIn& in) {
+VolcanoState read_volcanoes(StateIn& in, std::uint16_t version) {
     VolcanoState v;
     v.next_ms = in.u64();
     const bool has_last = in.boolean();
-    const CraterRef last = get_crater(in);
+    const CraterRef last = get_crater(in, version);
     if (has_last) {
         v.last = last;
     }
-    in.list(v.eruptions, 15, [&](Eruption& e) {
-        e.crater = get_crater(in);
+    in.list(v.eruptions, version >= kWideCoordinates ? 17 : 15, [&](Eruption& e) {
+        e.crater = get_crater(in, version);
         e.seed = in.u16();
         e.step = in.u8();
         e.next_us = in.u64();
@@ -2340,7 +2390,8 @@ core::Bytes encode_sections(const World& world, const assets::BuildingTable& bui
     if (tiles == TileMode::Full) {
         section(out, kWorld2, [&](Out& o) { o.u32(world.game_settings().pirate_interval_s); });
     }
-    section(out, kIslands, [&](Out& o) { write_islands(o, world); });
+    const std::uint16_t islands_at = islands_version(world);
+    section(out, kIslands, [&](Out& o) { write_islands(o, world, islands_at); }, Need::Required, islands_at);
     if (tiles == TileMode::Differences) {
         section(out, kTiles, [&](Out& o) { write_tiles(o, world, buildings, before); });
     }
@@ -2359,7 +2410,8 @@ core::Bytes encode_sections(const World& world, const assets::BuildingTable& bui
     }
     section(out, kAnimals, [&](Out& o) { write_animals(o, world); });
     section(out, kDisasters, [&](Out& o) { write_disasters(o, world); });
-    section(out, kVolcanoes, [&](Out& o) { write_volcanoes(o, world); });
+    const std::uint16_t volcanoes_at = volcanoes_version(world);
+    section(out, kVolcanoes, [&](Out& o) { write_volcanoes(o, world, volcanoes_at); }, Need::Required, volcanoes_at);
     section(out, kFleet, [&](Out& o) { write_fleet(o, world); });
     section(out, kEpochs, [&](Out& o) { write_epochs(o, world); });
     section(out, kArmy, [&](Out& o) { write_army(o, world); });
@@ -2456,7 +2508,11 @@ std::string tag_name(std::uint32_t id) {
     return name;
 }
 
-/// Calls `fn(id, body)` for every section this version reads (version 1 of a known identifier);
+/// The data of a section.
+using Body = std::span<const std::uint8_t>;
+
+/// Calls `fn(id, version, body)` for every section this version reads (a known identifier up to its
+/// max_version);
 /// an error if the sections are damaged or `fn` returns false. A section of a later version is
 /// skipped and reported in `warnings`, or fails the load if it is required (kRequired).
 template <class Fn>
@@ -2474,7 +2530,7 @@ core::Status for_each_section(std::span<const std::uint8_t> data, std::vector<st
         if (!body) {
             return make_error(ErrorCode::InvalidFormat, "O1602: damaged section header");
         }
-        if (*section_version != 1 ||
+        if (*section_version == 0 || *section_version > max_version(*id) ||
             std::find(kKnownSections.begin(), kKnownSections.end(), *id) == kKnownSections.end()) {
             const std::string what = "section " + tag_name(*id) + " (version " + std::to_string(*section_version) + ")";
             if ((*flags & kRequired) != 0) {
@@ -2485,7 +2541,7 @@ core::Status for_each_section(std::span<const std::uint8_t> data, std::vector<st
             }
             continue;
         }
-        if (!fn(*id, *body)) {
+        if (!fn(*id, *section_version, *body)) {
             return make_error(ErrorCode::InvalidFormat, "O1602: damaged section " + tag_name(*id));
         }
     }
@@ -2498,7 +2554,7 @@ core::Result<World> world_from_sections(std::span<const std::uint8_t> sections, 
                                         std::vector<std::string>* warnings) {
     std::optional<core::Result<World>> world;
     bool meta_ok = true;
-    const auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::span<const std::uint8_t> body) {
+    const auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::uint16_t, Body body) {
         core::ByteReader sr(body);
         StateIn in(sr);
         if (id == kMeta) {
@@ -2533,7 +2589,7 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
     std::vector<std::pair<std::uint32_t, std::uint8_t>> ship_stances;
     std::vector<std::pair<std::uint32_t, std::uint8_t>> soldier_stances;
     bool damaged = false;
-    const auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::span<const std::uint8_t> body) {
+    const auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::uint16_t version, Body body) {
         core::ByteReader sr(body);
         StateIn in(sr);
         switch (id) {
@@ -2547,7 +2603,7 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                 d.pirate_interval_s = in.u32();
                 break;
             case kIslands:
-                d.islands = read_islands(in);
+                d.islands = read_islands(in, version);
                 break;
             case kTiles:
                 d.tiles = read_tiles(in, buildings);
@@ -2610,7 +2666,7 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                 d.disasters = read_disasters(in);
                 break;
             case kVolcanoes:
-                d.volcanoes = read_volcanoes(in);
+                d.volcanoes = read_volcanoes(in, version);
                 break;
             case kSimulation:
                 d.simulation = std::vector<std::uint8_t>(body.begin(), body.end());

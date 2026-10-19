@@ -50,7 +50,7 @@ see [o1602-chunk.md](o1602-chunk.md) for the rules.
 | `RULE` | settings (`sim::Rules`) as pairs (u16 key, u32 value); unknown keys are skipped |
 | `WRLD` | game time, city name counter, difficulty and settings word, drought date and seed, random generators, clocks of the houses and of growth, next disaster number |
 | `WRL2` | further settings of the world: interval between two pirate ships |
-| `ISLE` | per island: deer spots, drought, craters, deposits, fertility |
+| `ISLE` | per island: deer spots, drought, craters, deposits, fertility (version 2: 16-bit coordinates, see [o1602-chunk.md](o1602-chunk.md#section-versions)) |
 | `PLAY` `CITY` `PROD` `HOUS` `GROW` `COST` `ANIM` `DISA` `VOLC` | players, cities, production list with free slots, houses, growth, shipyards and castles, animals, fires and plagues, volcanoes with lava in flight |
 | `TILE` | not in the own savegame (`MAPW` holds every tile); only in the chunk of an exported `.GAM` |
 | `PSTA` | per player (order as in `PLAY`): mission, status (playing, defeated, absent), won, defeated opponents, the two counters of the defeat rules, trade statistics (purchases, sales) |
@@ -81,8 +81,8 @@ makes the savegame unreadable (instead of wrong buildings).
 - **Robust:** the loader first checks header, size and CRC-32, then reads all sections and checks them
   against the world (islands, tiles within their island, ships in the world, units on known
   islands, random generators). Then `validate(World)` (`validate.hpp`) checks the finished world as a whole,
-  as after every load, also of a file of the original: islands on the map, cities, buildings, units and
-  craters on known islands and within their tiles, owners that exist. If the loader is given the
+  as after every load, also of a file of the original: islands on the map, cities, buildings, units,
+  craters and deer spots on known islands and within their tiles, owners that exist. If the loader is given the
   figure table (the game does that), it also reads `SIMU` as a trial run
   (`Simulation::state_readable`). Only if everything is correct is the world created; a damaged, truncated
   or newer savegame loads nothing. Every count is checked before memory is reserved: lists against
@@ -107,7 +107,9 @@ makes the savegame unreadable (instead of wrong buildings).
 - A world has at most 4096 tiles per side (a larger one is refused when reading). The unpacked
   sections have at most 256 MiB; a larger game is neither written nor read.
 - Islands are addressed by their number (8 bit) in some sections: every island needs a number of its
-  own, and an island has at most 255 × 255 tiles. `validate` refuses anything else.
+  own (`validate` refuses two with the same number). An island can be larger than 255 × 255 tiles (up to the
+  world size): its craters and deer spots then use version 2 of `ISLE` and `VOLC`. Such a game cannot
+  be exported as `.GAM`, whose records keep island coordinates in one byte; the writer refuses it.
 - Commands not yet executed between two ticks are not saved (saving
   happens between the ticks).
 - The `.GAM` export of a game loaded from an `.o1602` equals that of a directly loaded one

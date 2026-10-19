@@ -8,7 +8,7 @@ size memory and refuse or cut what lies outside. These are the limits.
 |---|---|---|---|
 | `haeuser.cod` | `Id` | 20000 to 23500 (as `Haus_GetById` of the original) | the file is refused |
 | `haeuser.cod` | `Nummer` | 0 to 65535 | the file is refused |
-| `haeuser.cod` | `Size` | 1 to 255 tiles each way (an island is at most 255 wide) | the file is refused |
+| `haeuser.cod` | `Size` | 1 to 255 tiles each way (an island of the original is at most 255 wide) | the file is refused |
 | `haeuser.cod` | `Arbeiter` | 65535 | clamped |
 | `figuren.cod` | `Nummer` | 0 to 1023 | the file is refused |
 | both | `ObjFill` | 10000 copies | clamped, with a warning |

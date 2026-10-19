@@ -28,6 +28,10 @@ namespace {
 // Limits of the original (docs/re/savegame-writer.md, section 7).
 constexpr std::size_t kMaxIslands = 50;
 constexpr std::size_t kMaxOwnIslands = 255;  // island numbers are one byte
+/// Island coordinates are one byte in the original's records (INSELHAUS, SIEDLER, KONTOR2, HIRSCH2,
+/// craters, object refs), so an island is at most 255 tiles wide and high. Open1602 itself keeps
+/// 16 bits (SC-13): the limit binds only this export.
+constexpr std::uint32_t kMaxIslandSide = 255;
 constexpr std::size_t kMaxCities = 75;
 constexpr std::size_t kMaxShips = 150;
 constexpr std::size_t kMaxSoldiers = 400;
@@ -186,10 +190,32 @@ private:
         if (m_world.islands().size() > max_islands) {
             return make_error(ErrorCode::OutOfRange, "more than " + std::to_string(max_islands) + " islands");
         }
+        const auto fits = [](std::uint32_t x, std::uint32_t y) { return x <= 0xFF && y <= 0xFF; };
         for (const WorldIsland& i : m_world.islands()) {
             if (i.header.number >= max_islands) {
                 return make_error(ErrorCode::OutOfRange, "island number " + std::to_string(i.header.number));
             }
+            if (i.map.width() > kMaxIslandSide || i.map.height() > kMaxIslandSide) {
+                return make_error(ErrorCode::OutOfRange,
+                                  "island " + std::to_string(i.header.number) + " is wider or higher than 255 tiles");
+            }
+            // Within such an island a valid world's craters and deer spots fit one byte; a world
+            // built in code is checked all the same rather than written with cut coordinates.
+            const bool craters =
+                std::all_of(i.craters.begin(), i.craters.end(), [&](const Crater& c) { return fits(c.x, c.y); });
+            const bool spots = std::all_of(i.deer_spots.begin(), i.deer_spots.end(),
+                                           [&](const DeerSpot& d) { return !d.used || fits(d.x, d.y); });
+            if (!craters || !spots) {
+                return make_error(ErrorCode::OutOfRange, "a crater or deer spot of island " +
+                                                             std::to_string(i.header.number) + " beyond 255 tiles");
+            }
+        }
+        const VolcanoState& volcanoes = m_world.volcanoes();
+        const bool last = !volcanoes.last || fits(volcanoes.last->x, volcanoes.last->y);
+        const bool running = std::all_of(volcanoes.eruptions.begin(), volcanoes.eruptions.end(),
+                                         [&](const Eruption& e) { return fits(e.crater.x, e.crater.y); });
+        if (!last || !running) {
+            return make_error(ErrorCode::OutOfRange, "an erupting crater beyond 255 tiles");
         }
         if (m_world.width() > 0xFFFF || m_world.height() > 0xFFFF) {
             return make_error(ErrorCode::OutOfRange, "the world is too large for the file format");
@@ -435,8 +461,8 @@ private:
             if (k < island.craters.size()) {
                 const Crater& c = island.craters[k];
                 r[o] = 0;
-                r[o + 1] = c.x;
-                r[o + 2] = c.y;
+                r[o + 1] = static_cast<std::uint8_t>(c.x);  // fits: check()
+                r[o + 2] = static_cast<std::uint8_t>(c.y);
                 r[o + 3] = r[o + 4] = r[o + 5] = 0;
                 put16(r, o + 6, c.steps_left);
             } else {
@@ -560,8 +586,8 @@ private:
             }
             core::Bytes r = start(raw, key3(island.header.number, s.x, s.y), kDeerSize);
             r[0] = island.header.number;
-            r[1] = s.x;
-            r[2] = s.y;
+            r[1] = static_cast<std::uint8_t>(s.x);  // fits: check()
+            r[2] = static_cast<std::uint8_t>(s.y);
             put32(r, 4, clamp32(s.respawn_ms / 100));
             out.insert(out.end(), r.begin(), r.end());
         }
@@ -1186,8 +1212,8 @@ private:
             if (c) {
                 r[o] = 0x33;
                 r[o + 1] = number(c->island);
-                r[o + 2] = c->x;
-                r[o + 3] = c->y;
+                r[o + 2] = static_cast<std::uint8_t>(c->x);  // fits: check()
+                r[o + 3] = static_cast<std::uint8_t>(c->y);
             } else if (r[o] != 0) {
                 // Only the low byte tells (0x0048C0F0); a ref that was set is cleared whole so the
                 // file does not depend on what ran before.
@@ -1200,8 +1226,8 @@ private:
             // the running ref keeps the crater of the last eruption.
             r[0xC4] = 0;
             r[0xC5] = number(v.last->island);
-            r[0xC6] = v.last->x;
-            r[0xC7] = v.last->y;
+            r[0xC6] = static_cast<std::uint8_t>(v.last->x);
+            r[0xC7] = static_cast<std::uint8_t>(v.last->y);
         }
         ref(0xC8, v.last);
         put32(r, 0xCC, clamp32(v.next_ms / 100));
