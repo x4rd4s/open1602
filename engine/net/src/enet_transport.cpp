@@ -10,8 +10,6 @@
 
 #include "enet_library.hpp"
 
-#include "o1602/net/protocol.hpp"
-
 namespace o1602::net {
 
 namespace {
@@ -20,8 +18,9 @@ using detail::EnetLibrary;
 
 constexpr std::size_t kChannels = 1;
 /// ENet applies its packet limit to what a host sends and receives alike, and the host sends whole
-/// games (a snapshot and its header). HostSession refuses large messages from computers itself.
-constexpr std::size_t kMaxPacket = kMaxSnapshotBytes + (64U << 10);
+/// games. HostSession refuses large messages from computers itself. (protocol.hpp is not included
+/// here: on Windows ENet brings windows.h, whose macros near and far break the game's headers.)
+constexpr std::size_t kMaxPacket = kMaxMessageBytes;
 constexpr enet_uint32 kTimeoutMinMs = 5000;
 constexpr enet_uint32 kTimeoutMaxMs = 15000;
 

@@ -5,11 +5,16 @@
 // network of the tests (loopback.hpp) or later another library can carry them.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <vector>
 
 namespace o1602::net {
+
+/// The largest message a transport carries: a whole game (protocol.hpp kMaxSnapshotBytes) and the
+/// header of its message.
+inline constexpr std::size_t kMaxMessageBytes = (32U << 20) + (64U << 10);
 
 /// One connection of a transport; the host has one per computer, a computer one to the host.
 using LinkId = std::uint32_t;
