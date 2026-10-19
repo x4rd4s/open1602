@@ -13,7 +13,8 @@ Status: accepted · 2026-10-16
               ▲
    video (on audio)         Smacker films
    menus (on audio, ui,     The game's parts that need no platform: menus, settings files, build
-          net)              tool, command sink (sources in engine/app/src, tested without SDL)
+          net)              tool, command sink, event presenter, video queue, map gestures
+                            (sources in engine/app/src, tested without SDL)
    platform (on core, SDL3) Window, renderer, audio output
    render_sdl (on render,   Draws sprites and panels with SDL3
           ui, platform)
