@@ -132,13 +132,15 @@ TEST_CASE("window: render events say whether textures or the renderer must be ma
         event.type = type;
         event.render.windowID = window_id;
         REQUIRE(SDL_PushEvent(&event));
+        // SDL_Event::type is a Uint32, SDL_EventType an enum of signed type on MSVC.
+        const auto wanted = static_cast<Uint32>(type);
         SDL_Event polled{};
         while (SDL_PollEvent(&polled)) {
-            if (polled.type == type) {
+            if (polled.type == wanted) {
                 return (*window)->render_reset(polled);
             }
         }
-        REQUIRE(polled.type == type);  // the event did not arrive
+        REQUIRE(polled.type == wanted);  // the event did not arrive
         return platform::RenderReset::None;
     };
     CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id) == platform::RenderReset::Renderer);
