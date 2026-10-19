@@ -96,7 +96,7 @@ rest stays open, as noted.
 | SC-9 | Low | Leftover magic numbers and local copies of `game_data.hpp` constants | `sim/src/production_cycle.cpp`, `drag_path.cpp`, others | Open |
 | SC-10 | Low | `load_world` is one function of about 515 lines | `sim/src/world.cpp` | Open |
 | SC-11 | Low | `find_case_insensitive` resolves `..` and absolute paths | `core/src/file.cpp` | Fixed #19 |
-| SC-12 | Low (uncertain) | An in-place upgrade keeps the old `Production::rate`; `raw` can underflow | `sim/src/production_cycle.cpp` | Open |
+| SC-12 | Low (uncertain) | An in-place upgrade keeps the old `Production::rate`; `raw` can underflow | `sim/src/production_cycle.cpp` | Fixed #20 |
 | SC-13 | Low | Crater and deer spot coordinates are `uint8_t` in the runtime model | `sim/include/o1602/sim/world.hpp` | Open (since #19, loads of islands wider than 255 tiles are refused) |
 | SC-14 | Low | Small per-call costs: `state_hash()` serializes the game, linear city lookups, `vector<bool>` in `PathFinder` | `sim/src/simulation.cpp`, `consumption.cpp` | Open |
 
@@ -145,7 +145,7 @@ and localized names are part of the sim state (see UI-2).
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Open |
 | AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Open |
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Open |
-| AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Open |
+| AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
 | AU15 | Low | Fallback ship name `"Ship N"` is not localized | `sim/src/trader.cpp` | Open |
 
@@ -176,7 +176,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Open |
 | UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Open |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Open |
-| UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Partly #20 (host-only speed via MP-4; pause video open) |
+| UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Fixed #20 |
 
 ### Multiplayer and scores (MP)
 
@@ -242,13 +242,13 @@ had no slot to join, because every other start player is a computer. Those slots
 
 | Area | Findings | Fixed #19 | Fixed #20 | Partly | Open |
 |---|---|---|---|---|---|
-| SC | 14 | 6 | 2 | 1 | 5 |
+| SC | 14 | 6 | 3 | 1 | 4 |
 | IO | 15 | 9 | 1 | 1 | 4 |
-| AU | 15 | 6 | 0 | 0 | 9 |
-| UI | 18 | 1 | 3 | 2 | 12 |
+| AU | 15 | 6 | 1 | 0 | 8 |
+| UI | 18 | 1 | 4 | 1 | 12 |
 | MP | 20 | 0 | 12 | 1 | 7 |
 | BD | 17 | 6 | 5 | 2 | 4 |
-| All | 99 | 28 | 23 | 7 | 41 |
+| All | 99 | 28 | 26 | 6 | 39 |
 
 ## Open work, in order
 
@@ -269,8 +269,8 @@ taken from the area reports (S, M, L).
 5. MP-7, MP-15, MP-13, MP-8 (S each): resync and snapshot limits per token, kicking spectators and a
    lag grace period, a hash interval in game time, and a bounded LAN browser that checks nonces.
 6. AU6 (M): one hold-count rule for ships from original files and new ones.
-7. Robustness leftovers (S each): SC-12 saturating subtraction, AU13 no shared static scratch, the
-   `Pool::for_each` guard, the `int32` money saturation (earlier SC and AU items), UI-18 deriving the pause video from `paused()`.
+(The robustness leftovers SC-12, AU13, UI-18, the `Pool::for_each` guard and money saturation are
+fixed in #20.)
 
 **2. Architecture and tests**
 1. UI-4 then UI-5 (M, then L): a `GameSession` that is built completely and then swapped in. After
