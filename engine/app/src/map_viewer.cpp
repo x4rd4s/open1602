@@ -92,38 +92,6 @@ std::string refusal_text(sim::BuildRefusal refusal) {
 constexpr assets::Rgba kRefusedTint{220, 30, 30, 140};
 /// Real time a frame may spend on ticks; the rest of the frame draws.
 constexpr int kTickBudgetMs = 25;
-/// The end screen comes this long after the message of a decided game when it has no video,
-/// after an own defeat without one the shorter time (docs/re/missions.md "Sieg"; with a video it
-/// comes when the video ends).
-constexpr std::uint64_t kEndScreenDelayMs = 5000;
-constexpr std::uint64_t kDefeatDelayMs = 500;
-
-/// What the help bar of the original shows over grass and trees of an explored island
-/// (0x0040A3D0): the three crops of the climate (north sugar cane, grapes, tobacco; south spices,
-/// cotton, cocoa) with their fertility in percent.
-std::array<std::pair<std::uint8_t, std::uint32_t>, 3> island_crops(const sim::WorldIsland& island) {
-    static constexpr std::array<std::uint8_t, 3> kNorth = {48, 50, 46};
-    static constexpr std::array<std::uint8_t, 3> kSouth = {47, 49, 51};
-    std::array<std::pair<std::uint8_t, std::uint32_t>, 3> crops{};
-    const std::array<std::uint8_t, 3>& wares = island.header.climate == 1 ? kSouth : kNorth;
-    for (std::size_t i = 0; i < crops.size(); ++i) {
-        crops[i] = {wares[i], sim::island_fertility(island, wares[i]) * 100 / 128};
-    }
-    return crops;
-}
-
-/// The same for the console and the window title.
-std::string crops_text(const sim::WorldIsland& island) {
-    std::string text;
-    for (const auto& [ware, percent] : island_crops(island)) {
-        if (!text.empty()) {
-            text += ", ";
-        }
-        text += "#" + std::to_string(ware) + " " + std::to_string(percent) + " %";
-    }
-    return text;
-}
-
 const char* zoom_name(render::Zoom zoom) {
     switch (zoom) {
         case render::Zoom::Large:
@@ -395,6 +363,7 @@ MapViewer::MapViewer(assets::GameDirectory game, assets::BuildingTable buildings
       m_figures(std::move(figures)),
       m_options(std::move(options)),
       m_state(std::make_unique<GameState>(std::move(world), m_buildings, m_figures, m_options.rules)),
+      m_events([this](const sim::Player& p, sim::PlayerId id) { return player_label(p, id, m_banners); }),
       m_clock(m_buildings),
       m_tool(m_buildings) {
     m_command_sink.set_simulation(&m_state->simulation);
@@ -993,24 +962,7 @@ render::TileLighting MapViewer::tile_lighting() const {
 }
 
 void MapViewer::apply_construction() {
-    for (const sim::CommandResult& r : m_state->simulation.take_command_results()) {
-        if (!r.build) {
-            if (r.demolished != 0) {
-                std::fprintf(stderr, "demolished %zu, back: %lld gold, %u t tools, %u t wood, %u t bricks\n",
-                             r.demolished, static_cast<long long>(r.refund.money), r.refund.tools / 32,
-                             r.refund.wood / 32, r.refund.bricks / 32);
-            }
-            continue;
-        }
-        std::fprintf(stderr, "built %zu of %zu", r.build->placed, r.build->items.size());
-        for (const sim::PlannedBuild& item : r.build->items) {
-            if (!item.ok()) {
-                std::fprintf(stderr, " - %s", sim::refusal_name(item.refusal));
-                break;
-            }
-        }
-        std::fprintf(stderr, "\n");
-    }
+    m_events.command_results(m_state->simulation.take_command_results());
     const std::vector<sim::ConstructionEvent> events = m_state->simulation.take_construction_events();
     const bool changed = !events.empty();
     m_sound->construction(m_state->world, events);
@@ -1024,16 +976,8 @@ void MapViewer::apply_construction() {
                 m_production_phases.forget(*index);
             }
         }
-        if (e.kind == sim::ConstructionEvent::Kind::CityFounded) {
-            if (const sim::City* c = m_state->world.city(e.island, e.city)) {
-                std::fprintf(stderr, "a new city was founded: %s\n", c->name.c_str());
-                if (c->owner != m_local_player) {
-                    const sim::WorldIsland& i = m_state->world.islands()[e.island];
-                    announce(0x0E, std::make_pair(i.x + i.map.width() / 2.0, i.y + i.map.height() / 2.0), c->owner);
-                }
-            }
-        }
     }
+    show_notices(m_events.construction_events(m_state->world, m_local_player, events));
     if (changed) {
         // Flags, smoke and status icons of the new buildings: only the islands built on are
         // collected again. The list stays ordered by island, as collect_building_figures() gives it.
@@ -1254,8 +1198,8 @@ void MapViewer::render() {
             corners[i] = m_camera.point_at_screen(screen[i].first, screen[i].second);
         }
         const std::uint64_t now = platform::ticks_ms();
-        if (!m_tool.active() && now < m_notice_until_ms) {
-            m_hud->set_status(m_notice);
+        if (const std::string* notice = m_events.notice(now); notice != nullptr && !m_tool.active()) {
+            m_hud->set_status(*notice);
         } else {
             m_hud->set_status(m_tool_status.empty() && !m_tool.active() ? crops_status() : m_tool_status);
         }
@@ -1297,110 +1241,14 @@ void MapViewer::apply_production_events() {
                                                                e.kind == sim::ProductionEvent::Kind::Started));
         }
     }
-    // Messages for the local player until there is an interface for them.
-    for (const sim::CityEvent& e : m_state->simulation.take_city_events()) {
-        if (e.owner != m_local_player) {
-            continue;
-        }
-        const sim::City* city = m_state->world.city(e.island, e.city);
-        const std::string name = city != nullptr ? city->name : std::string("?");
-        if (e.kind == sim::CityEvent::Kind::Hunger) {
-            std::fprintf(stderr, "%s: the people are starving\n", name.c_str());
-            announce(0x33);
-        } else if (e.kind == sim::CityEvent::Kind::Monument) {
-            announce(0x31);
-        } else if (e.kind == sim::CityEvent::Kind::Unlocked) {
-            std::fprintf(stderr, "%s: build level %u reached\n", name.c_str(), e.infra);
-        } else {
-            std::fprintf(stderr, "%s: short of ware %u\n", name.c_str(), e.ware);
-        }
-    }
-    // Ships of the local player: discoveries and exploring (MELDUNG 0x2A-0x30).
+    // Messages for the local player.
+    show_notices(m_events.city_events(m_state->world, m_local_player, m_state->simulation.take_city_events()));
     const std::vector<sim::ShipEvent> ship_events = m_state->simulation.take_ship_events();
     m_sound->ships(m_state->world, m_figures, ship_events, m_local_player, m_state->world.time_ms());
-    for (const sim::ShipEvent& e : ship_events) {
-        if (e.player != m_local_player || e.island >= m_state->world.islands().size()) {
-            continue;
-        }
-        const unsigned number = m_state->world.islands()[e.island].header.number;
-        switch (e.kind) {
-            case sim::ShipEvent::Kind::NativesFound:
-                std::fprintf(stderr, "you discovered a native village! (island %u)\n", number);
-                break;
-            case sim::ShipEvent::Kind::PiratesFound:
-                std::fprintf(stderr, "the pirates' hideout has been found! (island %u)\n", number);
-                break;
-            case sim::ShipEvent::Kind::CropsExplored:
-                std::fprintf(stderr, "the crops of island %u are explored: %s\n", number,
-                             crops_text(m_state->world.islands()[e.island]).c_str());
-                break;
-            case sim::ShipEvent::Kind::DepositFound:
-                std::fprintf(stderr, "%s on island %u (%u,%u)!\n",
-                             e.ware == sim::ware::kGold ? "you discovered a gold vein" : "an ore deposit lies", number,
-                             e.x, e.y);
-                break;
-            case sim::ShipEvent::Kind::ExploreFinished:
-                std::fprintf(stderr, "island %u explored\n", number);
-                break;
-            default:
-                break;
-        }
-    }
-    // Fires and plagues in the player's cities (MELDUNG 1, 2).
-    for (const sim::DisasterEvent& e : m_state->simulation.take_disaster_events()) {
-        if (e.owner != m_local_player) {
-            continue;
-        }
-        const sim::City* city = m_state->world.city(e.island, e.city);
-        const char* name = city != nullptr ? city->name.c_str() : "?";
-        const bool fire = e.disaster == sim::Disaster::Kind::Fire;
-        if (e.kind == sim::DisasterEvent::Kind::Started && !e.spread) {
-            std::fprintf(stderr, "%s: %s (%u,%u)\n", name,
-                         fire ? "a fire broke out!" : "the plague haunts your settlement!", e.x, e.y);
-            const sim::WorldIsland& isl = m_state->world.islands()[e.island];
-            announce(fire ? 0x02 : 0x01,
-                     std::make_pair(static_cast<double>(isl.x + e.x), static_cast<double>(isl.y + e.y)));
-        } else if (e.kind == sim::DisasterEvent::Kind::BurnedDown) {
-            std::fprintf(stderr, "%s: a building burned down (%u,%u)\n", name, e.x, e.y);
-        }
-    }
-    // Droughts: the player hears of those on islands where he has a city (MELDUNG 3).
-    for (const sim::IslandEvent& e : m_state->simulation.take_island_events()) {
-        const sim::City* own = nullptr;
-        for (const sim::City& c : m_state->world.cities()) {
-            if (c.island == e.island && c.owner == m_local_player) {
-                own = &c;
-            }
-        }
-        if (own == nullptr) {
-            continue;
-        }
-        switch (e.kind) {
-            case sim::IslandEvent::Kind::DroughtStarted:
-                std::fprintf(stderr, "%s: the drought destroys your harvest!\n", own->name.c_str());
-                announce(0x03);
-                break;
-            case sim::IslandEvent::Kind::Withered:
-                std::fprintf(stderr, "%s: %u fields withered\n", own->name.c_str(), e.count);
-                break;
-            case sim::IslandEvent::Kind::Recovered:
-                std::fprintf(stderr, "%s: %u fields grow again\n", own->name.c_str(), e.count);
-                break;
-            case sim::IslandEvent::Kind::DroughtOver:
-                std::fprintf(stderr, "%s: the drought is over\n", own->name.c_str());
-                break;
-        }
-    }
-    // Volcanoes (MELDUNG 94): only for players who have discovered the island.
-    for (const sim::VolcanoEvent& e : m_state->simulation.take_volcano_events()) {
-        if (e.kind == sim::VolcanoEvent::Kind::Erupted && e.message &&
-            m_state->world.islands()[e.island].discovered_by(m_local_player)) {
-            std::fprintf(stderr, "a volcano has erupted! (island %u)\n",
-                         static_cast<unsigned>(m_state->world.islands()[e.island].header.number));
-            const sim::WorldIsland& isl = m_state->world.islands()[e.island];
-            announce(0x5E, std::make_pair(isl.x + isl.map.width() / 2.0, isl.y + isl.map.height() / 2.0));
-        }
-    }
+    m_events.ship_events(m_state->world, m_local_player, ship_events);
+    show_notices(m_events.disaster_events(m_state->world, m_local_player, m_state->simulation.take_disaster_events()));
+    show_notices(m_events.island_events(m_state->world, m_local_player, m_state->simulation.take_island_events()));
+    show_notices(m_events.volcano_events(m_state->world, m_local_player, m_state->simulation.take_volcano_events()));
 }
 
 void MapViewer::collect_effects() {
@@ -1495,18 +1343,21 @@ void MapViewer::place_listener() {
         static_cast<float>(v.width), static_cast<float>(v.height));
 }
 
-void MapViewer::announce(std::uint16_t message, std::optional<std::pair<double, double>> tile,
-                         std::optional<sim::PlayerId> about) {
-    m_sound->message(message, tile, about);  // the listener puts it into the status bar
-    if (const auto n = m_sound->take_video()) {
-        m_video->request(*n);
-    }
-}
-
-void MapViewer::announce_with_tracks(std::uint16_t message, std::uint8_t tracks) {
-    m_sound->message(message, std::nullopt);
-    if (const auto n = m_sound->take_video()) {
-        m_video->request(*n, tracks);
+void MapViewer::show_notices(const std::vector<Notice>& notices) {
+    for (const Notice& n : notices) {
+        if (const auto* a = std::get_if<Announcement>(&n)) {
+            m_sound->message(a->message, a->tile, a->about);  // the listener puts it into the status bar
+            if (const auto video = m_sound->take_video()) {
+                m_video->request(*video, a->tracks);
+            }
+        } else if (const auto* v = std::get_if<DirectVideo>(&n)) {
+            m_video->request(v->number);
+        } else if (const auto* u = std::get_if<ScoreUpdate>(&n)) {
+            update_high_scores(u->defeated);
+            if (u->progress) {
+                record_progress();
+            }
+        }
     }
 }
 
@@ -1737,7 +1588,7 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                 // learn that the host left), and the menu can open or join the next one.
                 end_session();
                 if (m_hud && m_hud->menu()) {
-                    m_end_pending.reset();
+                    m_events.drop_end_screen();
                     m_hud->open_menu();
                 } else {
                     m_running = false;
@@ -1764,81 +1615,9 @@ void MapViewer::apply_hud(const Hud::Action& action) {
 void MapViewer::apply_game_events() {
     const std::vector<sim::MilitaryEvent> military = m_state->simulation.take_military_events();
     m_sound->combat(m_state->world, m_figures, military, m_local_player, m_state->world.time_ms());
-    for (const sim::DiplomacyNotice& n : m_state->simulation.take_diplomacy_notices()) {
-        if (n.to != m_local_player) {
-            continue;
-        }
-        static constexpr std::array<std::uint16_t, 6> kMessages = {0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52};
-        announce(kMessages[static_cast<std::size_t>(n.kind)]);
-    }
-    const auto& banners = m_banners;
-    for (const sim::GameEvent& e : m_state->simulation.take_game_events()) {
-        const sim::Player* p = m_state->world.player(e.player);
-        const std::string who =
-            p != nullptr ? player_label(*p, e.player, banners) : std::string("player ") + std::to_string(e.player);
-        switch (e.kind) {
-            case sim::GameEvent::Kind::MissionAccomplished:
-                std::fprintf(stderr, "%s accomplished the mission!\n", who.c_str());
-                if (e.player == m_local_player && !m_end_pending && !m_end_shown) {
-                    m_end_pending = EndPending{sim::GameOutcome::Won, kEndScreenDelayMs, platform::ticks_ms(), false};
-                }
-                if (e.player == m_local_player) {
-                    // 0x6B is the multiplayer message with the winner's colour (0x6B..0x6E); its
-                    // video speaks to the winner on track 1.
-                    if (e.message == audio::kMessageMultiplayerWin && p != nullptr) {
-                        announce_with_tracks(static_cast<std::uint16_t>(e.message + sim::four_colour_index(p->banner)),
-                                             0x03);
-                    } else {
-                        announce(e.message);
-                    }
-                }
-                break;
-            case sim::GameEvent::Kind::GameOver:
-                std::fprintf(stderr, "the game is over\n");
-                update_high_scores(sim::kNoPlayer);  // op 0x3E, after the winners are known
-                record_progress();
-                if (e.player != m_local_player && m_state->world.player(m_local_player) != nullptr &&
-                    !m_state->world.player(m_local_player)->won) {
-                    if (!m_end_pending && !m_end_shown) {
-                        m_end_pending =
-                            EndPending{sim::GameOutcome::Lost, kEndScreenDelayMs, platform::ticks_ms(), false};
-                    }
-                    const sim::Mission* m = p != nullptr ? m_state->world.mission_of(*p) : nullptr;
-                    if (m != nullptr && m->success_message == audio::kMessageMultiplayerWin) {
-                        // A race: "the red player fulfilled his task", the others' voice (track 2).
-                        announce_with_tracks(static_cast<std::uint16_t>(audio::kMessageMultiplayerWin +
-                                                                        sim::four_colour_index(p->banner)),
-                                             0x05);
-                    } else {
-                        announce(0x53);  // "Ihr wurdet besiegt!"
-                    }
-                }
-                break;
-            case sim::GameEvent::Kind::PlayerDefeated:
-                std::fprintf(stderr, "%s is defeated\n", who.c_str());
-                update_high_scores(e.player);  // op 3 sub 9, the defeated one still counted
-                if (e.player == m_local_player) {
-                    if (!m_end_pending && !m_end_shown) {
-                        m_end_pending = EndPending{sim::GameOutcome::Lost, kDefeatDelayMs, platform::ticks_ms(), false};
-                    }
-                    announce(0x53);
-                    // The defeat videos come directly, whatever the video switches say (0x004766A0):
-                    // bankruptcy 998, otherwise 1010 or 2020.
-                    m_video->request(e.reason == sim::GameEvent::Reason::Bankrupt ? 998
-                                     : (m_defeat_variant++ & 1U) == 0             ? 1010
-                                                                                  : 2020);
-                } else {
-                    announce(e.reason == sim::GameEvent::Reason::Bankrupt ? 0x59 : 0x5A);
-                }
-                break;
-            case sim::GameEvent::Kind::ArchAllowed:
-                if (e.player == m_local_player) {
-                    std::fprintf(stderr, "you may build a triumphal arch\n");
-                    announce(0x32);
-                }
-                break;
-        }
-    }
+    show_notices(m_events.diplomacy_notices(m_local_player, m_state->simulation.take_diplomacy_notices()));
+    show_notices(m_events.game_events(m_state->world, m_local_player, m_state->simulation.take_game_events(),
+                                      platform::ticks_ms()));
 }
 
 render::TilePos MapViewer::home_tile() const {
@@ -2211,7 +1990,8 @@ void MapViewer::apply_options() {
                     e.text.empty() ? ui::tr("save.default_name", {std::to_string(e.value + 1)}) : e.text;
                 const auto status = save_game(slot_file(save_folder(), e.value));
                 if (!status) {
-                    notify(ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}));
+                    m_events.notify(ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}),
+                                    platform::ticks_ms());
                     break;
                 }
                 std::uint8_t humans = 0;
@@ -2244,7 +2024,8 @@ void MapViewer::apply_options() {
                     break;
                 }
                 if (const auto status = load_game(path); !status) {
-                    notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}));
+                    m_events.notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}),
+                                    platform::ticks_ms());
                 } else {
                     std::fprintf(stderr, "game loaded: %s\n", core::path_to_utf8(path).c_str());
                 }
@@ -2320,7 +2101,7 @@ core::Status MapViewer::load_game(const std::filesystem::path& path) {
 void MapViewer::report_load_problems(std::size_t warnings) {
     m_load_problems = warnings + (m_state->simulation.state_damaged() ? 1 : 0);
     if (m_load_problems != 0) {
-        notify(ui::tr("notice.load_problems", {std::to_string(m_load_problems)}));
+        m_events.notify(ui::tr("notice.load_problems", {std::to_string(m_load_problems)}), platform::ticks_ms());
     }
 }
 
@@ -2360,8 +2141,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     }
     // What belongs to the old game goes: videos, selection, orders waiting for an answer, tools.
     m_video->reset();
-    m_end_pending.reset();
-    m_end_shown = false;
+    m_events.reset_game();
     m_quit_pending = false;
     m_units.reset();
     m_pending_orders.clear();
@@ -2535,9 +2315,10 @@ void MapViewer::present() {
             m_screenshot_error = status.error().message;
         }
         if (request->notify) {
-            notify(status ? ui::tr("notice.screenshot_saved",
-                                   {utf8_to_cp1252(core::path_to_utf8(request->path.filename()))})
-                          : ui::tr("notice.screenshot_failed", {ui::error_text(status.error(), "screenshot")}));
+            m_events.notify(status ? ui::tr("notice.screenshot_saved",
+                                            {utf8_to_cp1252(core::path_to_utf8(request->path.filename()))})
+                                   : ui::tr("notice.screenshot_failed", {ui::error_text(status.error(), "screenshot")}),
+                            platform::ticks_ms());
         }
     }
     SDL_RenderPresent(m_window->sdl_renderer());
@@ -2559,12 +2340,6 @@ std::filesystem::path MapViewer::next_screenshot_path() {
         path = folder / (std::string(stamp) + "-" + std::to_string(n) + ".png");
     }
     return path;
-}
-
-void MapViewer::notify(const std::string& text) {
-    std::fprintf(stderr, "%s\n", core::cp1252_to_utf8(text).c_str());
-    m_notice = text;
-    m_notice_until_ms = platform::ticks_ms() + 4000;
 }
 
 core::Status MapViewer::save_screenshot(const std::filesystem::path& path) {
@@ -2617,30 +2392,15 @@ std::size_t MapViewer::humans() const {
 }
 
 void MapViewer::check_end_screen(std::uint64_t now) {
-    if (!m_end_pending || !m_hud) {
+    if (!m_hud) {
         return;
     }
-    EndPending& e = *m_end_pending;
-    const std::uint64_t step = now >= e.last_ms ? now - e.last_ms : 0;
-    e.last_ms = now;
-    // WinMain runs no game frame while a video plays, the next video of a chain included.
-    if (m_video->busy()) {
-        e.after_video = true;
-        return;
-    }
-    if (!m_state->simulation.paused()) {
-        e.left_ms -= std::min(e.left_ms, step);
-    }
-    if (!e.after_video && e.left_ms > 0) {
-        return;
-    }
-    const sim::GameOutcome outcome = e.outcome;
-    m_end_pending.reset();
+    const auto outcome = m_events.end_screen_due(now, m_video->busy(), m_state->simulation.paused());
     // Never in the tutorial (mission 0): it goes on.
-    if (sim::game_identity(m_state->world).mission_number == 0) {
+    if (!outcome || sim::game_identity(m_state->world).mission_number == 0) {
         return;
     }
-    show_end_screen(outcome, false);
+    show_end_screen(*outcome, false);
 }
 
 void MapViewer::show_end_screen(sim::GameOutcome outcome, bool view_only) {
@@ -2648,7 +2408,7 @@ void MapViewer::show_end_screen(sim::GameOutcome outcome, bool view_only) {
         return;
     }
     if (!view_only) {
-        m_end_shown = true;
+        m_events.end_screen_shown();
     }
     m_hud->open_end_screen(sim::end_screen_summary(m_state->world, m_buildings, m_local_player, outcome), view_only);
 }

@@ -21,8 +21,6 @@ namespace {
 
 /// How often the menu asks the network for games while it shows the search.
 constexpr std::uint64_t kSearchEveryMs = 3000;
-/// Lines the chat keeps.
-constexpr std::size_t kChatKept = 100;
 
 }  // namespace
 
@@ -94,18 +92,8 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
 }
 
 void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat, bool echo) {
-    if (echo) {
-        std::fprintf(stderr, "multiplayer: %s%s%s\n", core::cp1252_to_utf8(name).c_str(), name.empty() ? "" : ": ",
-                     core::cp1252_to_utf8(text).c_str());
-    }
-    if (!m_hud) {
-        return;
-    }
-    std::deque<ChatLine>& chat = m_hud->multiplayer_model().chat;
-    chat.push_back(ChatLine{std::move(name), std::move(text), seat, platform::ticks_ms()});
-    while (chat.size() > kChatKept) {
-        chat.pop_front();
-    }
+    add_chat_line(m_hud ? &m_hud->multiplayer_model().chat : nullptr,
+                  ChatLine{std::move(name), std::move(text), seat, platform::ticks_ms()}, echo);
 }
 
 void MapViewer::apply_session_events() {
@@ -190,7 +178,7 @@ void MapViewer::save_after_host_left() {
                                  ? mp_text(MpText::HostLeftSaved, utf8_to_cp1252(core::path_to_utf8(path.filename())))
                                  : ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")});
     chat_line({}, text, sim::kNoPlayer, false);  // notify() puts it on stderr
-    notify(text);
+    m_events.notify(text, platform::ticks_ms());
 }
 
 // --- The menu ---

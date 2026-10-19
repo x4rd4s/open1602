@@ -16,6 +16,7 @@
 #include "app_settings.hpp"
 #include "build_tool.hpp"
 #include "command_sink.hpp"
+#include "event_presenter.hpp"
 #include "game_sound.hpp"
 #include "hud.hpp"
 #include "multiplayer_menu.hpp"
@@ -195,8 +196,6 @@ private:
     /// Where F12 puts the next screenshot: screenshots/open1602-YYYYMMDD-HHMMSS.png in the user's
     /// data folder, never over an older one.
     [[nodiscard]] static std::filesystem::path next_screenshot_path();
-    /// A short note in the status line for a few seconds and on stderr (Windows-1252, from ui::tr).
-    void notify(const std::string& text);
     /// Saves the game: Open1602's own savegame, or a .GAM the original loads if the path ends in
     /// .gam. Never into the game's installation.
     core::Status save_game(const std::filesystem::path& path);
@@ -246,9 +245,8 @@ private:
     void report_load_problems(std::size_t warnings);
     /// What the main menu asked for this frame.
     void apply_menu();
-    /// The end screen follows a decided game when the videos of its messages are over and the
-    /// delay ran out while the game was not paused (docs/re/missions.md "Sieg"). Called every
-    /// frame the game runs.
+    /// The end screen of a decided game, when it is due (EventPresenter::end_screen_due). Called
+    /// every frame the game runs.
     void check_end_screen(std::uint64_t now);
     /// The score sheets: the final screen of a decided game, or the "Bewertung" of a running one.
     void show_end_screen(sim::GameOutcome outcome, bool view_only);
@@ -332,8 +330,7 @@ private:
     /// The host of the running game left: there is no host migration, so the client saves the game
     /// it holds as a whole and says where; loaded, it plays on alone or is hosted anew.
     void save_after_host_left();
-    /// A line for the chat: a player's (`name` given) or a notice of the session.
-    /// A line in the chat (Windows-1252, as drawn), also on stderr unless `echo` is off.
+    /// A line for the chat: a player's (`name` given) or a notice of the session (add_chat_line).
     void chat_line(std::string name, std::string text, sim::PlayerId seat = sim::kNoPlayer, bool echo = true);
     [[nodiscard]] net::HostSession* host_session() const noexcept;
     [[nodiscard]] net::ClientSession* client_session() const noexcept;
@@ -357,14 +354,9 @@ private:
     [[nodiscard]] Hud::Resources resources() const;
     /// Shots, hits, victory and defeat: sounds, messages and lines in the terminal.
     void apply_game_events();
-    /// A message for the local player with its voice; a message that asks for it slows the game
-    /// to normal speed (flag 0x02).
-    /// `about`: the player the message is about, if not the local one (the icon's colour).
-    void announce(std::uint16_t message, std::optional<std::pair<double, double>> tile = std::nullopt,
-                  std::optional<sim::PlayerId> about = std::nullopt);
-    /// The same with the tracks of its video (bit i = track i, 0 = all): the messages 0x6B..0x6E
-    /// speak to the winner on track 1 and to the others on track 2.
-    void announce_with_tracks(std::uint16_t message, std::uint8_t tracks);
+    /// Plays what the EventPresenter made of the events: messages with their voices (a message that
+    /// asks for it slows the game to normal speed, flag 0x02) and videos, high score lists.
+    void show_notices(const std::vector<Notice>& notices);
     /// The pause of the original (Pause key) while a video fills the window: the game stops or
     /// goes on, the pause video loops (VideoController::toggle_pause).
     void toggle_pause_video();
@@ -415,6 +407,8 @@ private:
     bool m_debug_title = core::environment_variable("O1602_DEBUG_TITLE").has_value();
     ViewerOptions m_options;
     std::unique_ptr<GameState> m_state;  ///< the running game (after m_buildings, m_figures, m_options)
+    /// Messages, the end screen and the notes of the status line (quick save, screenshot, errors).
+    EventPresenter m_events;
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
     bool m_host_game_loaded = false;  ///< this client runs the game its host sent
@@ -462,9 +456,7 @@ private:
     std::size_t m_sprites_drawn = 0;
     BuildTool m_tool;
     std::string m_tool_status;        ///< what the build tool would do at the mouse
-    std::string m_notice;             ///< notify(): quick save, screenshot, their errors
     std::size_t m_load_problems = 0;  ///< of the game loaded last (report_load_problems)
-    std::uint64_t m_notice_until_ms = 0;
     struct ScreenshotRequest {
         std::filesystem::path path;
         bool notify = false;  ///< say in the status line how it went (F12)
@@ -493,16 +485,6 @@ private:
     std::uint64_t m_figures_ms = 0;
     /// The videos (after the window and the sound); plays none without videos.
     std::unique_ptr<VideoController> m_video;
-    struct EndPending {
-        sim::GameOutcome outcome = sim::GameOutcome::Lost;
-        /// Real time left while the game runs: the original waits game speed * 5 s of game time.
-        std::uint64_t left_ms = 0;
-        std::uint64_t last_ms = 0;  ///< real time of the last check
-        bool after_video = false;   ///< a video played since: the screen follows when it ends
-    };
-    std::optional<EndPending> m_end_pending;
-    bool m_end_shown = false;            ///< once per game (a won game may go on)
-    std::uint32_t m_defeat_variant = 0;  ///< own counter for 1010/2020 (no game random numbers)
 };
 
 }  // namespace o1602::app

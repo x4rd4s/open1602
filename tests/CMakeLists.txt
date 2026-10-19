@@ -29,6 +29,7 @@ add_executable(o1602_tests
     unit/test_order_questions.cpp
     unit/test_app_settings.cpp
     unit/test_command_sink.cpp
+    unit/test_event_presenter.cpp
     unit/test_drag_path.cpp
     unit/test_deer.cpp
     unit/test_disasters.cpp
