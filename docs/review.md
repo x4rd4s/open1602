@@ -12,7 +12,7 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #29 and #32 to #44. The status column says which one fixes each
+The fixes since then are in PRs #19 to #29, #32 to #42 and #44. The status column says which one fixes each
 finding.
 After #44 no finding is fully open: 93 are fixed, 5 are left on purpose and 1 is partly fixed, with
 what remains listed under "Remaining work".
