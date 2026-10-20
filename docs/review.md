@@ -12,9 +12,9 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #29 and #32 to #43. The status column says which one fixes each
+The fixes since then are in PRs #19 to #29 and #32 to #44. The status column says which one fixes each
 finding.
-After #43 no finding is fully open: 93 are fixed, 5 are left on purpose and 1 is partly fixed, with
+After #44 no finding is fully open: 93 are fixed, 5 are left on purpose and 1 is partly fixed, with
 what remains listed under "Remaining work".
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
@@ -37,7 +37,7 @@ together. `MapViewer` is a god class that cannot be tested. The AI, the `.GAM` w
 are barely exercised in CI without original data. The documentation has drifted from the code in
 several places.
 
-Since the review, the fixes in #19 to #43 closed all of these: the simulation no longer depends on
+Since the review, the fixes in #19 to #44 closed all of these: the simulation no longer depends on
 the local city and ship names (UI-2), `MapViewer` is split into tested parts, the AI, `new_game`,
 the `.GAM` writer and the SDL layer have tests without original data, CI measures coverage, and the
 documents were brought up to date. One item remains partly open (see "Remaining work").
@@ -152,7 +152,7 @@ and localized names are part of the sim state (see UI-2).
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Won't fix (measured in #29: about 0.1% of a large battle's instructions; the path search itself dominates) |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Fixed #32 (`failed_launches` and `run_pirate_task` removed, the save keeps a reserved byte; the scenario switch behind `no_colonies` is not located in `PLAYER4` yet, so colonies stay allowed; one shared `ship_moving()`) |
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
-| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Fixed #32, #42, #43 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320, its only caller being the soldiers' wander 0x00456D00; #42: pirates use its world twins, clamped to the map; #43: native warriors go to the first owned road or bridge tile a search within 7 of the hut reaches, as 0x00467820, with no random number) |
+| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Fixed #32, #42, #44 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320, its only caller being the soldiers' wander 0x00456D00; #42: pirates use its world twins, clamped to the map; #44: native warriors go to the first owned road or bridge tile a search within 7 of the hut reaches, as 0x00467820, with no random number) |
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Won't fix (#32: by design, the original writes the war time only into the victim's own entry; documented) |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
@@ -249,7 +249,7 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Fixed #36 to #43 | Won't fix | Partly | Open |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Fixed #36 to #44 | Won't fix | Partly | Open |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 0 | 0 |
 | IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 |
@@ -269,7 +269,7 @@ renderer after a lost render device (UI-7, #40) and host migration (MP-20, #41).
 real installation after #41 found no regression: all data tests pass, own savegames from before #39
 save back byte for byte, and the game moved on to the successor when the host quit or was killed.
 AU11 was settled from the original binary: the pirates' random places at sea clamp to the map
-(#42), and the native warriors go to the first road of theirs a search reaches (#43). What remains:
+(#42), and the native warriors go to the first road of theirs a search reaches (#44). What remains:
 
 1. BD-15: the German test player names and two anchors into the private repository stay on
    purpose (#20).
