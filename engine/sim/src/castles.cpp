@@ -263,7 +263,10 @@ void Military::natives_tick() {
     constexpr std::uint64_t kAlarmMs = 10 * 60'000;       // ten minutes after an attack
     constexpr std::uint32_t kCalm = 3;
     constexpr std::uint32_t kAlarmed = 7;
-    constexpr std::int32_t kSpread = 7;  // tiles around the hut where a warrior goes
+    // Tiles around the hut where a warrior goes. The original draws no random offset here:
+    // 0x0047EB30 asks 0x00467820 for a tile within 7 (a deterministic search); until that search is
+    // read, a random tile of the same range stands in for it (docs/review.md, AU11).
+    constexpr std::int32_t kSpread = 7;
     ++m_native_ticks;
     const std::uint64_t now = m_world->time_ms();
     for (const City& found : m_world->cities()) {

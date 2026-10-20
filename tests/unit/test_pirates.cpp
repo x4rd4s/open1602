@@ -286,3 +286,30 @@ TEST_CASE("natives: goodwill fades towards 49; warriors come out of their huts")
     w.military->natives_tick();
     CHECK(w.world.soldiers().size() == 7);
 }
+
+TEST_CASE("pirates: random places at sea are clamped to the map, as Pirate_RandomSeaPos") {
+    // 90 tiles around a ship on a map 60 tiles high: most draws fall outside and are clamped to
+    // the first or last row (0x004432F0) instead of being thrown away.
+    World w;
+    w.world.set_game_settings(sim::World::GameSettings{2, 0, 1500});
+    w.world.player(0)->infra_mask |= 1U << 24;
+    w.start();
+    std::vector<sim::Target> targets;
+    for (int i = 0; i < 4000 && targets.size() < 12; ++i) {
+        w.run(500);
+        for (const sim::Ship& s : w.world.ships()) {
+            if (s.owner == 2 && s.target.kind == sim::Target::Kind::Position &&
+                (targets.empty() || !(targets.back() == s.target))) {
+                targets.push_back(s.target);
+            }
+        }
+    }
+    REQUIRE(targets.size() >= 4);
+    std::size_t on_edge = 0;
+    for (const sim::Target& t : targets) {
+        CHECK(t.x < 120);
+        CHECK(t.y < 60);
+        on_edge += t.y == 0 || t.y == 59 ? 1U : 0U;
+    }
+    CHECK(on_edge >= 2);
+}

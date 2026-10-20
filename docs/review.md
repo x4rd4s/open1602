@@ -12,9 +12,9 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #29, #32 and #33. The status column says which one fixes each
+The fixes since then are in PRs #19 to #29 and #32 to #41. The status column says which one fixes each
 finding.
-After #32 no finding is fully open: 85 are fixed, 5 are left on purpose and 9 are partly fixed, with
+After #41 no finding is fully open: 92 are fixed, 5 are left on purpose and 2 are partly fixed, with
 what remains listed under "Remaining work".
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
@@ -36,6 +36,11 @@ still stores localized city and ship names, so a German and an English installat
 together. `MapViewer` is a god class that cannot be tested. The AI, the `.GAM` writer and the app
 are barely exercised in CI without original data. The documentation has drifted from the code in
 several places.
+
+Since the review, the fixes in #19 to #42 closed all of these: the simulation no longer depends on
+the local city and ship names (UI-2), `MapViewer` is split into tested parts, the AI, `new_game`,
+the `.GAM` writer and the SDL layer have tests without original data, CI measures coverage, and the
+documents were brought up to date. Two items remain partly open (see "Remaining work").
 
 ## Inventory
 
@@ -129,7 +134,7 @@ and localized names are part of the sim state (see UI-2).
 | IO-10 | Low | COD and mod data: `ObjFill` blow-up, unbounded `Nummer`, `Size` wrap, double-to-int casts, GAD include size | `assets/src/cod_parser.cpp`, `building_table.cpp` | Fixed #22 (`Size`, `Nummer`, `ObjFill` in #19; saturating casts, the GAD size limit and docs/modding/data-limits.md in #22) |
 | IO-11 | Low | `find_case_insensitive` resolves `..` (same as SC-11) | `core/src/file.cpp` | Fixed #19 |
 | IO-12 | Low | Building and production kind numbers are duplicated in assets and sim | `assets/src/building_table.cpp` | Fixed #22 |
-| IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Partly #29 (sections of the wrong size are refused; the PNG writer uses `core::crc32`; per-section files with symmetric `io()` remain) |
+| IO-13 | Low | Hand-written reader/writer pairs in one file of over 2,600 lines, silent size drops, a second CRC-32 | `sim/src/savegame_extension.cpp`, `core/src/png_writer.cpp` | Fixed #29, #39 (sections of the wrong size are refused; the PNG writer uses `core::crc32`; #39: every record is one `io()` description that both writes and reads it, in `sim/src/save/` with a file per group of sections, and a golden test records the bytes of every section) |
 | IO-14 | Low | Load and save error messages are English text inside localized notices | `app/src/map_input.cpp`, `map_viewer.cpp` | Fixed #20 |
 | IO-15 | Low | Stale format docs: limits, section table, string encoding | `docs/formats/o1602-save.md`, `o1602-chunk.md` | Fixed #26 |
 
@@ -147,7 +152,7 @@ and localized names are part of the sim state (see UI-2).
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Won't fix (measured in #29: about 0.1% of a large battle's instructions; the path search itself dominates) |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Fixed #32 (`failed_launches` and `run_pirate_task` removed, the save keeps a reserved byte; the scenario switch behind `no_colonies` is not located in `PLAYER4` yet, so colonies stay allowed; one shared `ship_moving()`) |
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
-| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Partly #32 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320 and documented; native warriors and pirates use the same formula, unconfirmed in the binary) |
+| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Partly #32, #42 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320, its only caller being the soldiers' wander 0x00456D00; #42: pirates use its world twins, clamped to the map; the native warriors' target comes from a deterministic search in the original, see "Remaining work") |
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Won't fix (#32: by design, the original writes the war time only into the victim's own entry; documented) |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
@@ -167,9 +172,9 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-2 | Medium | Sim state depends on the local Text.cod city and ship names | `app/src/map_viewer.cpp`, `sim/src/trader.cpp` | Fixed #20 |
 | UI-3 | Medium | Control groups survive loading another game and select unrelated units | `ui/src/unit_selection.cpp` | Fixed #19 |
 | UI-4 | Low | `replace_world` rebuilds the simulation in place and misses per-game state | `app/src/map_viewer.cpp` | Fixed #24 (`GameState` built whole, then swapped; out of memory keeps the old game) |
-| UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Partly (#24: `GameState` built whole and swapped in; #28: `CommandSink` is the only path to `Simulation::submit`) |
+| UI-5 | Medium | `MapViewer` is a god class (about 66 members, 74 methods) | `app/src/map_viewer.cpp`, `map_input.cpp` | Fixed #24, #28, #38 (#24: `GameState` built whole and swapped in; #28: `CommandSink` is the only path to `Simulation::submit`; #38: `VideoController`, `EventPresenter` and `MapInput` take the videos, the game's messages and the map input out of `MapViewer`, from 85 to 62 members; the tested parts live in `o1602_menus`) |
 | UI-6 | Low | The window title receives Windows-1252 bytes, but SDL expects UTF-8 | `app/src/map_viewer.cpp` | Fixed #20 |
-| UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Partly #29 (a render device reset rebuilds all textures; a lost device is only logged) |
+| UI-7 | Low/Medium | No handling of render device loss | `app/src/map_viewer.cpp`, `render/sdl/src/sdl_ui_renderer.cpp` | Fixed #29, #40 (a render device reset rebuilds all textures; #40: a lost device makes the renderer again and every texture owner takes the new one; if that fails the game ends cleanly) |
 | UI-8 | Low | HiDPI and display-scale changes after start are ignored | `app/src/map_viewer.cpp` | Fixed #29 (the pixel scale follows display-scale changes, a Ctrl +/- offset is kept) |
 | UI-9 | Low | Per-frame allocations and the 512-entry text cache flush | `render/sdl/src/sdl_ui_renderer.cpp`, `render/src/world_renderer.cpp` | Fixed #29 (LRU text cache, sorted soldier index, reused draw-list containers; the mission text is still wrapped each frame) |
 | UI-10 | Low | Land units are not interpolated between ticks | `render/src/land_figures.cpp` | Fixed #32 (soldiers, walkers, townsfolk and sea creatures are drawn between two ticks like ships, through a shared `TickTrail`) |
@@ -178,7 +183,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | UI-13 | Low | Settings, slots and keys files: non-atomic writes, ignored errors, undefined encoding | `app/src/app_settings.cpp`, `map_viewer.cpp` | Fixed #20, #29 (#20: atomic writes and logged errors; #29: the files are UTF-8, older Windows-1252 files still read) |
 | UI-14 | Low | Hard-coded game numbers and duplicated constants in the app | `app/src/build_tool.cpp`, `map_viewer.cpp` | Fixed #22, #25 (#22: building kinds, production kinds, wares and the four-colour rule named; #25: the game-setting bits, the message icons' banner limit and tile spots) |
 | UI-15 | Low | `GameSound` keeps a pointer to the caller's `GameDirectory` | `app/src/map_viewer.cpp` | Fixed #26 |
-| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Partly (#21, #24, #28: see BD-7) |
+| UI-16 | Low | App logic is untested; there is no `o1602_app` library | `app/CMakeLists.txt` | Fixed (#21, #24, #28, #37, #38: see BD-7 and UI-5) |
 | UI-17 | Low | Fatal start-up errors are invisible on macOS and Linux desktop starts | `app/src/diagnostics.cpp` | Fixed #26 |
 | UI-18 | Low | Local triggers become global speed commands; the pause video can disagree with `paused()` | `app/src/map_viewer.cpp` | Fixed #20 |
 
@@ -205,7 +210,7 @@ scans the whole world after every step (`sim/src/ai/ai_core.cpp`, `ai_world.cpp`
 | MP-17 | Low | Score and monument rules are hard-coded | `sim/src/score.cpp`, `consumption.cpp` | Fixed #27 (score curves, money steps and the monument rule named in `assets/game_data.hpp`) |
 | MP-18 | Low | ENet licence notice and third-party register entry missing | `third_party/README.md`, `app/CMakeLists.txt` | Fixed #20 |
 | MP-19 | Low | Text fitting in `ui::Form` is quadratic, every frame | `ui/src/form.cpp` | Fixed #29 (binary search, the same cuts as before) |
-| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Partly #32, #33 (a client saves the game to `saves/hostleft.o1602` when the host leaves; #33: it loads with that player's seat and the computer plays the other people's seats, #34: also when exported as .GAM; no host migration) |
+| MP-20 | Low (informational) | No host migration; the game freezes when the host leaves | `app/src/multiplayer.cpp` | Fixed #32 to #35, #41 (#41: the host names a successor in every roster; when the host leaves, the successor hosts the game on and the others follow it with their seats, ADR 0011 point 15; when that fails, each client saves `saves/hostleft.o1602`, which loads with its own seat, #33, also as .GAM, #34) |
 
 MP-3 is the earlier review's `SoldierOrder` item. In the new numbering it is not AU14, which is the
 bought-ship item.
@@ -219,8 +224,8 @@ bought-ship item.
 | BD-3 | Medium | Data tests use the maintainer's own savegame slots as fixtures | `tests/data/` | Fixed #26 |
 | BD-4 | Medium | zlib is optional, and the Windows CI build has none | `CMakeLists.txt`, `.github/workflows/ci.yml` | Fixed #19 |
 | BD-5 | Medium | No cross-platform determinism check (golden state hash) | `tests/unit/test_ai.cpp` | Fixed #19 |
-| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Partly (#23: a data test runs a new endless game for three game hours; #27: unit tests round-trip a synthetic world through the `.GAM` writer, which found and fixed a city satisfaction bug) |
-| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Partly (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; #28: the command sink with three tests, 14 o1602-tool smoke tests and a game start without data in CI, also under ASan; platform and render_sdl remain) |
+| BD-6 | Medium | AI, `.GAM` writer and `new_game` are barely covered without original data | `sim/src/ai/`, `sim/src/savegame_writer.cpp` | Fixed #23, #27, #36 (#23: a data test runs a new endless game for three game hours; #27: unit tests round-trip a synthetic world through the `.GAM` writer, which found and fixed a city satisfaction bug; #36: unit tests for `new_game` and AI diplomacy without data, and a CI job measures line coverage with gcovr) |
+| BD-7 | Medium | App, platform, render_sdl and o1602-tool have no tests | `app/CMakeLists.txt`, `tools/o1602-tool/main.cpp` | Fixed (#21: the build tool is in the tested library with five tests; #24: the questions before orders, with four tests; #28: the command sink with three tests, 14 o1602-tool smoke tests and a game start without data in CI, also under ASan; #37: `o1602_sdl_tests` covers the window, audio output and both SDL renderers headless in the game's CI jobs) |
 | BD-8 | Low | CI hygiene: actions pinned by tag, unpinned clang-format, no hardening, an untrue bug-ref "CI check" claim | `.github/workflows/ci.yml` | Fixed #19, #29 (#19: `_GLIBCXX_ASSERTIONS`; #29: actions pinned by SHA with Dependabot, clang-format-18 by name) |
 | BD-9 | Low | Tests share fixed temp paths | `tests/unit/test_assets.cpp` and others | Fixed #19 |
 | BD-10 | Low | CMake details: placeholder URL, stale zlib comment, wrong dependency diagram, no layering check | `CMakeLists.txt`, `CMakeLists.txt` in `engine/` | Fixed #19, #20, #29 (#29: `menus` in ADR 0005 and a layering check in ctest) |
@@ -244,40 +249,33 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Won't fix | Partly | Open |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | 0 | 0 |
-| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 3 | 1 | 0 |
-| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 4 | 1 | 0 | 3 | 0 |
-| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 0 | 0 | 1 | 0 |
-| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 | 0 | 0 | 3 | 0 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 9 | 2 | 5 | 9 | 0 |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Fixed #36 to #41 | Won't fix | Partly | Open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 0 | 0 |
+| IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 3 | 1 | 0 |
+| UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 4 | 1 | 3 | 0 | 0 | 0 |
+| MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | 0 |
+| BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 | 0 | 2 | 0 | 1 | 0 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 9 | 2 | 7 | 5 | 2 | 0 |
 
 ## Remaining work
 
-Every finding is fixed, left on purpose or partly fixed. What remains of the partly fixed ones, in
-the order the project's goals suggest (architecture and tests first, then the rest):
+Every finding is fixed, left on purpose or partly fixed. The large structural items were closed in
+#36 to #41: unit tests for `new_game` and the AI with coverage in CI (BD-6, #36), tests for the SDL
+layer (BD-7, UI-16, #37), `MapViewer` split into `VideoController`, `EventPresenter` and `MapInput`
+(UI-5, #38), save sections as symmetric `io()` descriptions with recorded bytes (IO-13, #39), a new
+renderer after a lost render device (UI-7, #40) and host migration (MP-20, #41). A test round on a
+real installation after #41 found no regression: all data tests pass, own savegames from before #39
+save back byte for byte, and the game moved on to the successor when the host quit or was killed.
+What remains:
 
-1. UI-5 (L): `MapViewer` is still large. Done: the running game is a `GameState` built whole and
-   swapped in (#24), and a `CommandSink` is the only path to `Simulation::submit` (#28). Next:
-   `MapInput`, `EventPresenter`, `VideoController` and a screen stack.
-2. BD-7 and UI-16 (M): `engine/platform` and `render_sdl` have no tests. Done: the build tool, the
-   questions before orders and the command sink live in the tested `o1602_menus` library (#21,
-   #24, #28); o1602-tool has smoke tests and CI starts the game without data, also under ASan
-   (#28).
-3. BD-6 (M): unit tests for the AI and `new_game` without original data, and coverage in CI. Done:
-   the `.GAM` writer round-trips a synthetic world (#27), a data test runs the computers of a new
-   endless game for three game hours (#23), and the data tests check their savegame fixtures (#26).
-4. IO-13 (L): symmetric `io()` descriptions for the save sections, in files per section. Done:
-   sections of the wrong size are refused and there is one CRC-32 (#29).
-5. UI-7 (M): recover from a lost render device by recreating the renderer. Done: a device reset
-   rebuilds all textures (#29).
-6. MP-20: host migration. Done: a client saves the game when the host leaves (#32), and that
-   game loads with its own seat while the computer plays the others (#33).
-7. AU11: confirm in the original binary that the native warriors and the pirates use the same
-   random-offset helper as the soldiers (#32 documents the soldiers' one).
-8. BD-15: the German test player names and two anchors into the private repository stay on
+1. AU11: the original's binary shows that the pirates draw their random places at sea with the
+   world twins of `Island_RandomX` (0x004432C0, 0x004432F0, clamped to the map, #42), and that the
+   native warriors draw no random offset at all: `City_TickNatives` 0x0047EB30 asks 0x00467820 for a
+   tile within 7 of the hut, found by a deterministic search. Open1602 still sends them to a random
+   tile of that range until that search is read.
+2. BD-15: the German test player names and two anchors into the private repository stay on
    purpose (#20).
 
 Left on purpose: IO-6 rest (a stronger savegame fingerprint; multiplayer already compares the

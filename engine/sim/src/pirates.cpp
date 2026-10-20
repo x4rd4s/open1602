@@ -244,14 +244,18 @@ void Fleet::pirate_choose(Ship& ship) {
             }
         }
     }
+    // Pirate_RandomSeaPos 0x004455F0 draws with the world twins of Island_RandomX (0x004432C0 and
+    // 0x004432F0): base + r - 2 * (rand() % r), clamped to the map, so only offsets of r's parity.
+    const auto random_coord = [&random](std::uint32_t base, std::uint32_t size) {
+        const std::int32_t v =
+            static_cast<std::int32_t>(base) + kWanderRange - 2 * static_cast<std::int32_t>(random.below(kWanderRange));
+        return static_cast<std::uint32_t>(std::clamp(v, 0, static_cast<std::int32_t>(size) - 1));
+    };
     for (int tries = 0; tries < 3; ++tries) {
-        const std::int32_t x = static_cast<std::int32_t>(ship.x) + kWanderRange -
-                               2 * static_cast<std::int32_t>(random.below(kWanderRange));
-        const std::int32_t y = static_cast<std::int32_t>(ship.y) + kWanderRange -
-                               2 * static_cast<std::int32_t>(random.below(kWanderRange));
-        if (x >= 0 && y >= 0 && m_world->contains(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)) &&
-            m_world->cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)).island == World::kSea) {
-            ship.target = Target::position(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+        const std::uint32_t x = random_coord(ship.x, m_world->width());
+        const std::uint32_t y = random_coord(ship.y, m_world->height());
+        if (m_world->cell(x, y).island == World::kSea) {
+            ship.target = Target::position(x, y);
             ship.order = ship.target;
             return;
         }
