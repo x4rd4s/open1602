@@ -2,7 +2,9 @@
 // Pirates and natives (docs/re/pirates.md).
 
 #include <algorithm>
+#include <initializer_list>
 #include <memory>
+#include <vector>
 
 #include "../test_framework.hpp"
 
@@ -30,7 +32,8 @@ assets::BuildingTable make_buildings() {
         "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Maxware: 6\n  EndObj\n"  // Kontor
         "  @Nummer: 2\n  Id: 20104\n  Kind: 14\n  Gfx: 6\n  Size: 2, 2\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 15\n    Maxware: 8\n    Prodmenge: 1\n    Figurnr: 33\n    Nativflg: 1\n"
-        "  EndObj\n"  // natives' warrior hut
+        "  EndObj\n"                                                       // natives' warrior hut
+        "  @Nummer: 3\n  Id: 20401\n  Kind: 1\n  Gfx: 10\n  Size: 1, 1\n"  // road
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -237,15 +240,28 @@ TEST_CASE("pirates: their mood decides war and peace; buying peace at their Kont
     CHECK(!sim::apply_diplomacy(w.world, order));
 }
 
-TEST_CASE("natives: goodwill fades towards 49; warriors come out of their huts") {
-    World w(false);
-    // A natives' village with a warrior hut holding eight trained spearmen.
+namespace {
+
+/// A natives' village (player 3) on the island with a warrior hut at (5, 4) holding eight trained
+/// spearmen; `roads` are island tiles of road with their owner, placed before the territory.
+struct Road {
+    std::int32_t x;
+    std::int32_t y;
+    sim::PlayerId owner;
+};
+void add_village(World& w, std::initializer_list<Road> roads) {
     sim::IslandMap& map = w.world.island(0).map;
     REQUIRE(map.place(*w.buildings.by_id(20104), 5, 4, 0, 0, 3, 0).ok());
+    for (const Road& r : roads) {
+        REQUIRE(map.place(*w.buildings.by_id(20401), r.x, r.y, 0, 0).ok());
+    }
     for (std::uint32_t y = 0; y < 10; ++y) {
         for (std::uint32_t x = 0; x < 12; ++x) {
             map.set_city(x, y, 0, 3);
         }
+    }
+    for (const Road& r : roads) {
+        map.set_city(static_cast<std::uint32_t>(r.x), static_cast<std::uint32_t>(r.y), 0, r.owner);
     }
     sim::City village;
     village.island = 0;
@@ -261,6 +277,13 @@ TEST_CASE("natives: goodwill fades towards 49; warriors come out of their huts")
     }
     w.world.add_cost_building(hut);
     w.start();
+}
+
+}  // namespace
+
+TEST_CASE("natives: goodwill fades towards 49; warriors come out of their huts") {
+    World w(false);
+    add_village(w, {{8, 5, 3}});
 
     std::vector<sim::CityEvent> city_events;
     for (int i = 0; i < 6; ++i) {
@@ -285,6 +308,46 @@ TEST_CASE("natives: goodwill fades towards 49; warriors come out of their huts")
     w.world.city(0, 0)->last_attacked_ms = w.world.time_ms() - 60'000;
     w.military->natives_tick();
     CHECK(w.world.soldiers().size() == 7);
+}
+
+TEST_CASE("natives: a warrior goes to the first road of the natives a search within 7 reaches") {
+    // 0x00467820: from the hut at (5, 4), over open ground; the road of another player next to the
+    // hut is walked on but is no goal, the far road of the natives is reached after the near one.
+    const auto targets = [] {
+        World w(false);
+        add_village(w, {{4, 4, 1}, {8, 5, 3}, {1, 9, 3}});
+        const sim::Random before = w.world.random(sim::RandomStream::Military);
+        for (int i = 0; i < 3; ++i) {
+            w.military->natives_tick();
+        }
+        CHECK(w.world.random(sim::RandomStream::Military) == before);  // no random number drawn
+        std::vector<sim::Target> t;
+        for (const sim::Soldier& s : w.world.soldiers()) {
+            t.push_back(s.target);
+        }
+        return t;
+    };
+    const std::vector<sim::Target> first = targets();
+    REQUIRE(first.size() == 3);
+    for (const sim::Target& t : first) {
+        CHECK(t == sim::Target::tile_spot(60 + 8, 20 + 5));  // world half tiles of island tile (8, 5)
+    }
+    CHECK(targets() == first);
+}
+
+TEST_CASE("natives: without a road of theirs within 7 tiles no warrior comes out") {
+    // Only roads of another player, one next to the hut: they are walked on but are no goal, and
+    // no random tile stands in for the missing one.
+    World w(false);
+    add_village(w, {{4, 4, 1}, {9, 8, 1}});
+    for (int i = 0; i < 6; ++i) {
+        w.military->natives_tick();
+    }
+    CHECK(w.world.soldiers().empty());
+    // Every place keeps its trained warrior.
+    for (const sim::CastleSlot& slot : w.world.cost_buildings().back().slots) {
+        CHECK(!slot.training);
+    }
 }
 
 TEST_CASE("pirates: random places at sea are clamped to the map, as Pirate_RandomSeaPos") {

@@ -258,15 +258,52 @@ void Military::castle_second(CostBuilding& c) {
     }
 }
 
+std::optional<Target> Military::warrior_target(std::uint16_t island, TilePos origin, std::uint32_t width,
+                                               std::uint32_t height, PlayerId owner) {
+    // 0x00467820, called by 0x0047EB30 with a reach of 7: from the hut's origin, with the hut's
+    // footprint opened as the start area, a search over the 15 x 15 square around it (no circle)
+    // walks on roads, open ground, ruins, squares, bridges, beach ruins, piers and the middle of
+    // gates (the Land class, all at the Wegspeed of speed type 3). The goals are the roads and
+    // bridges of the natives' owner, never the start; the first goal reached is the target. No
+    // random number is drawn; without such a tile the warrior stays in the hut. The original runs
+    // its wavefront in rounds of 64 cost units, Open1602 the exact search of PathFinder on the same
+    // costs (pathfinding.hpp).
+    constexpr std::uint8_t kReach = 7;
+    constexpr std::uint8_t kSpeedType = 3;
+    const WorldIsland& isl = m_world->islands()[island];
+    Catchment area;
+    area.centre = origin;
+    area.radius = kReach;
+    m_finder.begin(isl.map, *m_buildings, area, WalkClass::Land, kSpeedType, false);
+    m_finder.open_footprint(origin, width, height);
+    const TilePos min = m_finder.window_min();
+    for (std::uint32_t j = 0; j < m_finder.window_height(); ++j) {
+        for (std::uint32_t i = 0; i < m_finder.window_width(); ++i) {
+            const TilePos p{min.x + static_cast<std::int32_t>(i), min.y + static_cast<std::int32_t>(j)};
+            if (p == origin || m_finder.cell(p) != PathFinder::Cell::Walkable) {
+                continue;
+            }
+            const MapCell& c = isl.map.top(static_cast<std::uint32_t>(p.x), static_cast<std::uint32_t>(p.y));
+            const assets::BuildingType* t = c.empty() ? nullptr : m_buildings->by_sprite(c.sprite);
+            if (t != nullptr && c.owner == owner &&
+                (t->kind == building_kind::kRoad || t->kind == building_kind::kBridge)) {
+                m_finder.set(p, PathFinder::Cell::Goal);
+            }
+        }
+    }
+    const auto goal = m_finder.search(origin, [](TilePos) { return PathFinder::Answer::Accept; });
+    if (!goal) {
+        return std::nullopt;
+    }
+    return Target::tile_spot(static_cast<std::uint32_t>(static_cast<std::int32_t>(isl.x) + goal->x),
+                             static_cast<std::uint32_t>(static_cast<std::int32_t>(isl.y) + goal->y));
+}
+
 void Military::natives_tick() {
     constexpr std::uint64_t kAlarmAfterMs = 15 * 60'000;  // not in the first 15 minutes
     constexpr std::uint64_t kAlarmMs = 10 * 60'000;       // ten minutes after an attack
     constexpr std::uint32_t kCalm = 3;
     constexpr std::uint32_t kAlarmed = 7;
-    // Tiles around the hut where a warrior goes. The original draws no random offset here:
-    // 0x0047EB30 asks 0x00467820 for a tile within 7 (a deterministic search); until that search is
-    // read, a random tile of the same range stands in for it (docs/review.md, AU11).
-    constexpr std::int32_t kSpread = 7;
     ++m_native_ticks;
     const std::uint64_t now = m_world->time_ms();
     for (const City& found : m_world->cities()) {
@@ -297,6 +334,8 @@ void Military::natives_tick() {
                 continue;
             }
             // From the last place: a trained warrior goes out, a new one starts training in its place.
+            // The map does not change in this loop, so the hut's target is searched once.
+            std::optional<std::optional<Target>> target;
             for (std::size_t k = hut.slots.size(); k-- > 0 && out < wanted;) {
                 if (hut.slots[k].figure == 0 || hut.slots[k].training) {
                     continue;
@@ -305,20 +344,13 @@ void Military::natives_tick() {
                 if (!cell) {
                     break;
                 }
-                Random& random = m_world->random(RandomStream::Military);
-                Target spot =
-                    Target::spot(static_cast<std::uint32_t>(cell->first), static_cast<std::uint32_t>(cell->second));
-                for (int tries = 0; tries < 8; ++tries) {
-                    const std::int32_t x =
-                        cell->first / 2 + kSpread - 2 * static_cast<std::int32_t>(random.below(kSpread));
-                    const std::int32_t y =
-                        cell->second / 2 + kSpread - 2 * static_cast<std::int32_t>(random.below(kSpread));
-                    if (m_combat->land().cell(2 * x, 2 * y, 0) == LandMap::Cell::Walk &&
-                        m_combat->land().island_at(x, y) == hut.island) {
-                        spot = Target::spot(static_cast<std::uint32_t>(2 * x), static_cast<std::uint32_t>(2 * y));
-                        break;
-                    }
+                if (!target) {
+                    target = warrior_target(hut.island, b->origin, b->width, b->height, found.owner);
                 }
+                if (!*target) {
+                    continue;  // no owned road or bridge in reach: this place sends nobody
+                }
+                const Target spot = **target;
                 const CastleSlot slot = hut.slots[k];
                 Soldier s;
                 s.place_cell(cell->first, cell->second);

@@ -12,9 +12,9 @@ multiplayer merge. The multiplayer part of the review covers the difference. An 
 (German, kept outside the repository) was checked item by item. Its open items appear below either
 under a new ID or in the "Earlier items still present" notes.
 
-The fixes since then are in PRs #19 to #29 and #32 to #41. The status column says which one fixes each
+The fixes since then are in PRs #19 to #29 and #32 to #42. The status column says which one fixes each
 finding.
-After #41 no finding is fully open: 92 are fixed, 5 are left on purpose and 2 are partly fixed, with
+After #42 no finding is fully open: 93 are fixed, 5 are left on purpose and 1 is partly fixed, with
 what remains listed under "Remaining work".
 
 Paths in the tables are relative to `engine/` unless they start with `tests/`, `docs/`,
@@ -40,7 +40,7 @@ several places.
 Since the review, the fixes in #19 to #42 closed all of these: the simulation no longer depends on
 the local city and ship names (UI-2), `MapViewer` is split into tested parts, the AI, `new_game`,
 the `.GAM` writer and the SDL layer have tests without original data, CI measures coverage, and the
-documents were brought up to date. Two items remain partly open (see "Remaining work").
+documents were brought up to date. One item remains partly open (see "Remaining work").
 
 ## Inventory
 
@@ -152,7 +152,7 @@ and localized names are part of the sim state (see UI-2).
 | AU8 | Low | Allocations per path plan (`SeaPlan`, `LandPlan`, `std::function` goals) | `sim/src/ships.cpp`, `soldiers.cpp` | Won't fix (measured in #29: about 0.1% of a large battle's instructions; the path search itself dominates) |
 | AU9 | Low | Dead state and flags (`failed_launches`, `no_colonies`, `run_pirate_task`) | `sim/src/shipyards.cpp`, `ai/ai_planner.cpp` | Fixed #32 (`failed_launches` and `run_pirate_task` removed, the save keeps a reserved byte; the scenario switch behind `no_colonies` is not located in `PLAYER4` yet, so colonies stay allowed; one shared `ship_moving()`) |
 | AU10 | Low | Remaining hard-coded game numbers | `sim/src/pirates.cpp`, `military.cpp`, `combat.cpp` | Fixed #22 (some settings-flag bits in island_events, trader, volcanoes and ai_planner remain literals) |
-| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Partly #32, #42 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320, its only caller being the soldiers' wander 0x00456D00; #42: pirates use its world twins, clamped to the map; the native warriors' target comes from a deterministic search in the original, see "Remaining work") |
+| AU11 | Low (uncertain) | Random offsets hit only one parity, with a lopsided range | `sim/src/soldiers.cpp`, `castles.cpp`, `pirates.cpp` | Fixed #32, #42 (the soldiers' one-parity offsets are the original's `Island_RandomX` 0x00443320, its only caller being the soldiers' wander 0x00456D00; #42: pirates use its world twins, clamped to the map, and native warriors now go to the first owned road or bridge tile a search within 7 of the hut reaches, as 0x00467820, with no random number) |
 | AU12 | Low (uncertain) | `war_time_ms` is written on the diagonal but read per pair | `sim/src/diplomacy.cpp` | Won't fix (#32: by design, the original writes the war time only into the victim's own entry; documented) |
 | AU13 | Low | Static scratch `Relation` in `Diplomacy::relation`, and `Engine::m_nobody` | `sim/src/diplomacy.cpp` | Fixed #20 |
 | AU14 | Low | A bought ship keeps the seller's exploring, attack-move and hold state | `sim/src/ship_orders.cpp` | Fixed #19 |
@@ -249,15 +249,15 @@ had no slot to join, because every other start player is a computer. Those slots
 
 ### Totals
 
-| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Fixed #36 to #41 | Won't fix | Partly | Open |
+| Area | Findings | Fixed #19 | Fixed #20 | Fixed #21 | Fixed #22 | Fixed #23 | Fixed #24 | Fixed #25 | Fixed #26 | Fixed #27 | Fixed #28 | Fixed #29 | Fixed #32 | Fixed #36 to #42 | Won't fix | Partly | Open |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | SC | 14 | 6 | 3 | 0 | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 1 | 0 | 0 |
 | IO | 15 | 9 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 0 |
-| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 3 | 1 | 0 |
+| AU | 15 | 6 | 1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 3 | 0 | 0 |
 | UI | 18 | 1 | 4 | 0 | 0 | 0 | 1 | 1 | 3 | 0 | 0 | 4 | 1 | 3 | 0 | 0 | 0 |
 | MP | 20 | 0 | 12 | 3 | 0 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | 0 |
 | BD | 17 | 6 | 5 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 2 | 0 | 2 | 0 | 1 | 0 |
-| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 9 | 2 | 7 | 5 | 2 | 0 |
+| All | 99 | 28 | 26 | 4 | 4 | 1 | 1 | 3 | 5 | 1 | 1 | 9 | 2 | 8 | 5 | 1 | 0 |
 
 ## Remaining work
 
@@ -270,12 +270,7 @@ real installation after #41 found no regression: all data tests pass, own savega
 save back byte for byte, and the game moved on to the successor when the host quit or was killed.
 What remains:
 
-1. AU11: the original's binary shows that the pirates draw their random places at sea with the
-   world twins of `Island_RandomX` (0x004432C0, 0x004432F0, clamped to the map, #42), and that the
-   native warriors draw no random offset at all: `City_TickNatives` 0x0047EB30 asks 0x00467820 for a
-   tile within 7 of the hut, found by a deterministic search. Open1602 still sends them to a random
-   tile of that range until that search is read.
-2. BD-15: the German test player names and two anchors into the private repository stay on
+1. BD-15: the German test player names and two anchors into the private repository stay on
    purpose (#20).
 
 Left on purpose: IO-6 rest (a stronger savegame fingerprint; multiplayer already compares the
