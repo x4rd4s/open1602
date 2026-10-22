@@ -32,6 +32,7 @@ this as well. Until now, `sim::Rules` only had switches for deviations from the 
 | Highest game speed (`max_game_speed`, L-004) | factor | 4 | 8 |
 | Droughts (`droughts`) | as the game (difficulty), off, rare, normal, frequent | as the game | as the game |
 | Volcanoes (`volcanoes`) | as the game (setting), off, on | as the game | as the game |
+| Pirates (`pirates`) | as the game (setting bit 0; the endless games of the two easy levels have none), off, on | as the game | as the game |
 | Free trader prices (`trader_prices`, S-077) | as usual (about half the base price), by the market (as the original intends) | as usual | as usual |
 | Computer players (`classic_ai`, S-097 to S-099) | improved, as the original (with its bugs in settling, counting and site search, so they stall after about two hours) | as the original | improved |
 | Victory conditions of the endless game (`victory`, `VictoryConditions`) | inhabitants, residents of a level or higher, treasury, balance per minute, share of settled islands, defeat all opponents, score, prestige buildings (castle, cathedral, both), time limit (then the most points win); all or any one; computers can win or not | none (the endless game never ends) | none |
@@ -62,7 +63,7 @@ its difficulty, but their bugs stay fixed by default, also in savegames of the o
 start dialog after name and banner (`engine/app/src/game_settings_menu.cpp`, since 2026-10-20): the
 settings in groups (economy, limits, disasters, world, opponents), as in later Anno titles, each a button that
 cycles its values, with presets for the original's rules and Open1602's defaults; the last choice is
-kept in `settings.cfg` (`endless.*`, `endless.world = auto` for the automatic size). The command line (`--refund`, `--droughts`, `--volcanoes`, `--ai`)
+kept in `settings.cfg` (`endless.*`, `endless.world = auto` for the automatic size). The command line (`--refund`, `--droughts`, `--volcanoes`, `--pirates`, `--ai`)
 still sets them for games started from it.
 
 ### Victory conditions

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "game_settings_menu.hpp"
 
+#include <algorithm>
 #include <span>
 #include <string>
 #include <string_view>
@@ -28,6 +29,7 @@ constexpr Id kVictoryOff = 55;  // all of them off
 constexpr Rect kScreen{16, 16, 992, 736};
 constexpr Rect kHeading{40, 28, 760, 40};
 constexpr std::int32_t kBottomY = 690;
+constexpr std::int32_t kHintY = 592;  ///< the hint's top when the groups end above it
 
 constexpr std::int32_t kTop = 84;
 constexpr std::int32_t kGap = 8;
@@ -51,7 +53,7 @@ constexpr Group kGroups[] = {
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
     {"setup.group.disasters", SetupItem::Droughts, SetupItem::Volcanoes, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},
-    {"setup.group.opponents", SetupItem::ClassicAi, SetupItem::ClassicAi, kRight},
+    {"setup.group.opponents", SetupItem::ClassicAi, SetupItem::Pirates, kRight},
 };
 
 // The victory conditions, after the endless games of Anno 1503, 1701 and 1404: population and
@@ -201,7 +203,10 @@ void GameSettingsMenu::layout() {
         const Rect value = row(kLeft, top, ui::tr("setup.victory"), m_setup.rules.victory.active());
         f.button(kVictory, value, ui::tr("setup.victory.open", {victory_summary(m_setup.rules.victory)}));
     }
-    f.paragraph(Rect{40, 592, 944, 90}, ui::tr(victory ? "setup.hint.victory" : hint_key(m_scope)), Tone::Dim);
+    // The hint below the lower column; three lines of it fit above the buttons.
+    const std::int32_t hint_y = std::max({kHintY, left_y, right_y});
+    f.paragraph(Rect{40, hint_y, 944, kBottomY - 4 - hint_y}, ui::tr(victory ? "setup.hint.victory" : hint_key(m_scope)),
+                Tone::Dim);
     f.button(kBack, Rect{40, kBottomY, 180, 44}, ui::tr("setup.back"));
     if (!editable) {
         return;

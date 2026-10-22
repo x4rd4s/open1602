@@ -31,6 +31,9 @@ namespace o1602::sim {
 /// or computer player reached.
 [[nodiscard]] std::uint32_t pirate_max_ships(const World& world) noexcept;
 
+/// Whether pirates come in this game (settings bit 0: no pirates; Rules::pirates can override it).
+[[nodiscard]] bool pirates_enabled(const World& world, const Rules& rules) noexcept;
+
 /// Room of one hold of a ship (0x00446A60).
 inline constexpr std::uint32_t kHoldCapacity = 50 * 32;
 

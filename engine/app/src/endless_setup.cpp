@@ -132,6 +132,7 @@ std::optional<std::uint32_t> parse_number(std::string_view v) {
 // Names of the values in settings.cfg.
 constexpr std::array<std::string_view, 5> kDroughtNames = {"game", "off", "rare", "normal", "frequent"};
 constexpr std::array<std::string_view, 3> kVolcanoNames = {"game", "off", "on"};
+constexpr std::array<std::string_view, 3> kPirateNames = {"game", "off", "on"};
 constexpr std::array<std::string_view, 4> kAmountNames = {"none", "few", "normal", "many"};
 constexpr std::array<std::string_view, 3> kSizeNames = {"small", "mixed", "large"};
 constexpr std::array<std::string_view, 2> kStartNames = {"spread", "together"};
@@ -245,6 +246,8 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kDroughtNames.size();
         case SetupItem::Volcanoes:
             return kVolcanoNames.size();
+        case SetupItem::Pirates:
+            return kPirateNames.size();
         case SetupItem::WorldSize:
             return kSizes.size() + 1;  // first: by the players
         case SetupItem::Players:
@@ -355,6 +358,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return r.guarantee_resources ? 0 : 1;
         case SetupItem::ClassicAi:
             return r.classic_ai ? 1 : 0;
+        case SetupItem::Pirates:
+            return std::min<std::size_t>(static_cast<std::size_t>(r.pirates), kPirateNames.size() - 1);
         case SetupItem::WinInhabitants:
             return condition(kWinInhabitants, v.inhabitants);
         case SetupItem::WinClass:
@@ -458,6 +463,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::ClassicAi:
             r.classic_ai = choice == 1;
+            break;
+        case SetupItem::Pirates:
+            r.pirates = static_cast<sim::Pirates>(choice);
             break;
         case SetupItem::WinInhabitants:
             v.inhabitants = kWinInhabitants[choice];
@@ -625,6 +633,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::Droughts:
         case SetupItem::Volcanoes:
         case SetupItem::ClassicAi:
+        case SetupItem::Pirates:
             return true;
         default:
             return false;
@@ -685,6 +694,7 @@ std::string setup_label(SetupItem item) {
                                                                         "setup.starts",
                                                                         "setup.resources",
                                                                         "setup.ai",
+                                                                        "setup.pirates",
                                                                         "setup.win.inhabitants",
                                                                         "setup.win.class",
                                                                         "setup.win.class_inhabitants",
@@ -760,6 +770,10 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr(choice == 0 ? "setup.on" : "setup.off");
         case SetupItem::ClassicAi:
             return ui::tr(choice == 1 ? "setup.ai.classic" : "setup.ai.open1602");
+        case SetupItem::Pirates: {
+            static constexpr std::array<std::string_view, 3> kKeys = {"setup.pirates.game", "setup.off", "setup.on"};
+            return ui::tr(kKeys[choice]);
+        }
         case SetupItem::WinInhabitants:
             return condition_text(kWinInhabitants, choice, "setup.win.number");
         case SetupItem::WinClass: {
@@ -843,6 +857,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (const auto i = name_index(kVolcanoNames, value)) {
             r.volcanoes = static_cast<sim::Volcanoes>(*i);
         }
+    } else if (key == "pirates") {
+        if (const auto i = name_index(kPirateNames, value)) {
+            r.pirates = static_cast<sim::Pirates>(*i);
+        }
     } else if (key == "resources") {
         if (value == "on" || value == "off") {
             r.guarantee_resources = value == "on";
@@ -918,6 +936,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("volcanoes", kVolcanoNames[std::min<std::size_t>(static_cast<std::size_t>(r.volcanoes), 2)]);
     line("resources", on_off(r.guarantee_resources));
     line("ai", r.classic_ai ? "classic" : "open1602");
+    line("pirates", kPirateNames[std::min<std::size_t>(static_cast<std::size_t>(r.pirates), 2)]);
     line("own_world", on_off(setup.own_world));
     line("world", setup.auto_size ? "auto" : std::to_string(w.width) + "x" + std::to_string(w.height));
     line("players", std::to_string(w.players));

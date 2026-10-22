@@ -27,6 +27,7 @@ enum RuleKey : std::uint16_t {
     kTraderPrices = 8,
     kMaxArmy = 9,
     kClassicAi = 10,
+    kPirateRule = 23,
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -113,6 +114,11 @@ void write_rules(Writer& out, const Rules& r) {
         {kMaxArmy, r.max_army},
         {kClassicAi, r.classic_ai ? 1U : 0U},
     };
+    // The pirates only when they differ from the game's setting: a game without the choice keeps
+    // the bytes of the versions before it.
+    if (r.pirates != Pirates::Game) {
+        values.emplace_back(kPirateRule, static_cast<std::uint32_t>(r.pirates));
+    }
     // The victory conditions only when there are any: a game without them keeps the bytes of the
     // versions before them.
     if (const VictoryConditions& v = r.victory; v != VictoryConditions{}) {
@@ -171,6 +177,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kMaxArmy:
                 r.max_army = v;
+                break;
+            case kPirateRule:
+                r.pirates = static_cast<Pirates>(std::min<std::uint32_t>(v, 2));
                 break;
             case kClassicAi:
                 r.classic_ai = v != 0;

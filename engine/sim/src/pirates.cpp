@@ -48,6 +48,18 @@ std::uint32_t pirate_max_ships(const World& world) noexcept {
     return best;
 }
 
+bool pirates_enabled(const World& world, const Rules& rules) noexcept {
+    switch (rules.pirates) {
+        case Pirates::Off:
+            return false;
+        case Pirates::On:
+            return true;
+        case Pirates::Game:
+            break;
+    }
+    return (world.game_settings().flags & World::GameSettings::kNoPirates) == 0;
+}
+
 std::vector<std::size_t> Fleet::pirate_bases() const {
     std::vector<std::size_t> bases;
     const PlayerId p = pirates();
@@ -75,7 +87,7 @@ void Fleet::pirates_step() {
     const PlayerId p = pirates();
     const World::GameSettings& settings = m_world->game_settings();
     const std::uint32_t max = pirate_max_ships(*m_world);
-    if (p == kNoPlayer || (settings.flags & World::GameSettings::kNoPirates) != 0 || max <= 1) {
+    if (p == kNoPlayer || !pirates_enabled(*m_world, *m_rules) || max <= 1) {
         return;
     }
     std::uint32_t ships = 0;

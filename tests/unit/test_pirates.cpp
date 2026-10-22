@@ -14,6 +14,7 @@
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/military.hpp"
+#include "o1602/sim/save_game.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -181,6 +182,53 @@ TEST_CASE("pirates: none with the setting no pirates") {
     w.start();
     w.run(120'000);
     CHECK(w.pirate_ships() == 0);
+}
+
+TEST_CASE("pirates: the rule switches them on against the setting, or off") {
+    // The endless games of the two easy levels have the setting "no pirates" (newgame.md).
+    sim::World::GameSettings none{1, 1, 1500};
+    sim::World::GameSettings some{2, 0, 1500};
+    sim::World world{10, 10};
+    sim::Rules rules;
+    world.set_game_settings(none);
+    CHECK(!sim::pirates_enabled(world, rules));
+    rules.pirates = sim::Pirates::On;
+    CHECK(sim::pirates_enabled(world, rules));
+    world.set_game_settings(some);
+    rules.pirates = sim::Pirates::Game;
+    CHECK(sim::pirates_enabled(world, rules));
+    rules.pirates = sim::Pirates::Off;
+    CHECK(!sim::pirates_enabled(world, rules));
+
+    // "On" in a game without them: they come as on the harder levels.
+    World on;
+    on.rules.pirates = sim::Pirates::On;
+    on.world.set_game_settings(none);
+    on.world.player(0)->infra_mask |= 1U << 24;
+    on.start();
+    on.run(30'000);
+    CHECK(on.pirate_ships() == 1);
+    // "Off" in a game with them: none come.
+    World off;
+    off.rules.pirates = sim::Pirates::Off;
+    off.world.set_game_settings(some);
+    off.world.player(0)->infra_mask |= 1U << 30;
+    off.start();
+    off.run(120'000);
+    CHECK(off.pirate_ships() == 0);
+
+    // The choice stays with the savegame.
+    for (const sim::Pirates choice : {sim::Pirates::Game, sim::Pirates::Off, sim::Pirates::On}) {
+        sim::Rules saved;
+        saved.pirates = choice;
+        off.world.set_saved_rules(saved);
+        auto bytes = sim::write_game(off.world, off.buildings);
+        REQUIRE(bytes.ok());
+        auto back = sim::read_game(*bytes, off.buildings);
+        REQUIRE(back.ok());
+        REQUIRE(back->saved_rules().has_value());
+        CHECK(back->saved_rules()->pirates == choice);
+    }
 }
 
 TEST_CASE("pirates: a surrendered ship is plundered and the loot goes to the nest") {

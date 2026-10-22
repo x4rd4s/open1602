@@ -1210,7 +1210,7 @@ void Engine::diplomacy(AiPlayer& p) {
 // The pirates' nest (0x00429FD0, every 10 s; task 5 = 0x00429DF0)
 
 void Engine::pirate_step(AiPlayer& p) {
-    if ((m_world.game_settings().flags & World::GameSettings::kNoPirates) != 0) {
+    if (!pirates_enabled(m_world, m_sim.rules())) {
         return;  // no pirates
     }
     // Only once some player has grown.
