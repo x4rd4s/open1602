@@ -106,6 +106,14 @@ add_test(NAME data COMMAND o1602_tests --only-data)
 set_tests_properties(unit data PROPERTIES SKIP_RETURN_CODE 77)
 set_tests_properties(data PROPERTIES TIMEOUT 3600)  # it plays whole games of the original
 
+# Determinism (ADR 0004): a synthetic game with computer players, armed ships and made-up commands,
+# saved and loaded every 997 ticks, goes on exactly as the one that runs through (o1602-replay exits
+# 3 at the first difference). .github/workflows/determinism.yml compares the hashes across platforms.
+if(TARGET o1602-replay)
+    add_test(NAME tool:replay-roundtrip
+             COMMAND o1602-replay --synthetic --minutes 20 --random-commands 60 --check-roundtrip 997 --every 600)
+endif()
+
 # The SDL layer has its own executable, built with the game (tests/sdl).
 if(O1602_BUILD_GAME)
     add_subdirectory(sdl)

@@ -50,6 +50,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Sanitizers)
+include(Fuzzing)
 include(Coverage)
 include(EmbedFiles)
 include(WindowsUtf8)
@@ -58,6 +59,7 @@ option(O1602_BUILD_TESTS  "Build unit tests"                         ON)
 option(O1602_BUILD_TOOLS  "Build command line tools (o1602-tool)"    ON)
 option(O1602_BUILD_GAME   "Build the game executable (needs SDL3)"   OFF)
 option(O1602_WARNINGS_AS_ERRORS "Treat compiler warnings as errors"  OFF)
+option(O1602_REVIEW_TESTS "Build the review's measurement tests (tests/review)" OFF)
 
 # zlib packs savegames (.o1602) and PNG screenshots. The game needs it: without it, it could not
 # load the compressed savegames other builds write. Libraries, tests and tools build without it.
@@ -75,9 +77,19 @@ add_subdirectory(engine)
 
 if(O1602_BUILD_TOOLS)
     add_subdirectory(tools/o1602-tool)
+    add_subdirectory(tools/stress)
+    add_subdirectory(tools/o1602-replay)
 endif()
 
 if(O1602_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+    if(O1602_REVIEW_TESTS)
+        add_subdirectory(tests/review)
+    endif()
+endif()
+
+# The fuzz targets, their seed writer and o1602_mod_limits only with O1602_FUZZ (the targets need Clang).
+if(O1602_FUZZ)
+    add_subdirectory(tests/fuzz)
 endif()

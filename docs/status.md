@@ -10,10 +10,11 @@ Links into `re/` (for example [bugs.md](re/bugs.md)) point to the private compan
 `open1602-re` and only work for maintainers who have it set up (see
 [CONTRIBUTING.md](../CONTRIBUTING.md#reverse-engineering)).
 
-**Review October 2026:** The code review of October 2026 with all findings and their status is in
-[review.md](review.md). Of its 99 findings, 93 are fixed (PRs #19 to #29, #32 to #42 and #44), 5 are left on
-purpose and 1 is partly fixed; what remains of them is listed under
-[Remaining work](review.md#remaining-work).
+**Review of `f5a46dd` (October 2026):** [review.md](review.md) holds the second full code review with
+187 findings (3 Critical, 16 High, 45 Medium, 95 Low, 28 Info), each with evidence and a proposed fix, and
+a [fix order](review.md#proposed-fix-order) in bundles of one pull request each. The 99 findings of the
+first review (`468c58a`) were fixed or left on purpose; those that came back are listed under
+[Earlier review items that regressed](review.md#earlier-review-items-that-regressed).
 
 Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original not confirmed (needs clarification).
 

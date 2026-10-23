@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The clang-tidy checks of the robustness review (bugs, performance, threads, error handling), for
+# `run-clang-tidy -config-file=tools/fuzz/clang-tidy-review.yaml -p <build> engine/`. Not a project
+# .clang-tidy: the checks listed with "-" fire hundreds of times on deliberate code (narrowing in
+# fixed-width formats, swappable int parameters) and drown the rest.
+Checks: >
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  performance-*,
+  concurrency-*,
+  cert-err33-c,
+  cert-err34-c,
+  cert-err52-cpp,
+  cert-err58-cpp,
+  cert-err60-cpp
+HeaderFilterRegex: '.*/engine/.*'
+WarningsAsErrors: ''
