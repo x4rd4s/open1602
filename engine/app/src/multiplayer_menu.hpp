@@ -51,7 +51,8 @@ struct HostSetup {
     bool lan = true;  ///< answer searches on the local network
     bool join_running = true;
     bool spectators = true;
-    bool dedicated = false;  ///< the host plays no slot
+    bool computer_takes_over = true;  ///< the computer plays on for a person who left
+    bool dedicated = false;           ///< the host plays no slot
     std::uint16_t port = net::kDefaultPort;
     /// The game's settings (ADR 0008): rules, and for an endless game its world; a scenario uses
     /// the rules only, a savegame keeps its own.

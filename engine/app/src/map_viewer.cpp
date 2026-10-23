@@ -829,8 +829,10 @@ void MapViewer::update(std::uint32_t delta_ms) {
         m_session->update(delta_ms, before_tick);
         update_lan_beacon();
         m_tick_fraction = m_session->tick_fraction();
+        announce_take_overs();
         apply_session_events();  // may end the session
     } else {
+        m_session_roles.clear();
         m_state->simulation.advance(delta_ms, before_tick);
         m_tick_fraction = m_state->simulation.tick_fraction();
     }

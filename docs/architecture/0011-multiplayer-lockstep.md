@@ -50,9 +50,13 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    holds the slot: a slot that changes hands (in the lobby, after a kick, to a newcomer) gets a new
    one, and the host's own slot takes none. In a game hosted while it runs (`--host`), the computer
    players' slots are open as well: the computer plays such a slot until someone takes it and again
-   after he leaves. Without a free slot it watches. A slot
-   that was left stays in the game and gives no commands until someone comes back. The player's name
-   is set as a `PlayerRename` of that player.
+   after he leaves. Without a free slot it watches. A slot that a person left stands empty for
+   60 s (time to come back after a broken connection); then the computer plays it on under the
+   player's name (`PlayerControl` from the host, announced in the chat), until the player or
+   someone new takes it. The host chooses this on the create screen ("Computer replaces leavers",
+   on by default, shown in the lobby and passed to a successor host); without it, a slot that was
+   left gives no commands until someone comes back. The player's name is set as a `PlayerRename`
+   of that player.
 9. **Same data.** When a computer joins, the host checks the protocol version and a fingerprint of the
    game data the simulation depends on (`haeuser.cod`, `figuren.cod`), and the game's password if it
    has one. The names for new cities and ships (`Text.cod` of the installation that began the game)
@@ -86,7 +90,7 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     stays with the slot when players come and go. At the start each player of the world gets its
     slot's banner, and the computers of an endless game the name of their colour; everything else
     follows from the banner as in a game of one player (flags, units, the coats of arms of
-    `BannerArt`, whose pattern comes from the banner's id). Protocol version 5.
+    `BannerArt`, whose pattern comes from the banner's id). Protocol version 6.
 12. **Finding games.** A host answers searches on UDP port 16021 with what the menu lists (title, host,
     game, players and slots, started, password, joining, spectators, protocol version). A computer
     looking for games asks every network of the computer by broadcast, the computer itself and the
@@ -163,7 +167,6 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 ## Open
 
 - The endless game's own world settings over the network.
-- The computer taking over slots of players who began as humans, waiting for a disconnected player.
 - Host migration beyond the local network: the successor is reached at the address the host saw,
   on the old host's port, so on the internet only when that port is open at the successor too.
   Players who had left before the host and want to come back still look for the old host; the

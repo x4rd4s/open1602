@@ -150,6 +150,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& cl
     m_config.password = client.m_hello.password;
     m_config.join_running = client.m_lobby.join_running;
     m_config.spectators = client.m_lobby.spectators;
+    m_config.computer_takes_over = client.m_lobby.computer_takes_over;
     m_seat = client.m_seat;
     // The game goes on from this computer's frame. The frames the old host closed beyond it are
     // as good as any: every computer gets them with this game. What the others had beyond them
@@ -177,6 +178,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& cl
             occupy(m_lobby.seats[s], LobbySeat::Kind::Human, m_name, true);
         } else if (m_lobby.seats[s].kind == LobbySeat::Kind::Human) {
             occupy(m_lobby.seats[s], LobbySeat::Kind::Open);  // until its player is back
+            vacate(static_cast<Seat>(s));                     // or the computer takes it over
         }
     }
     // The old host's slot: the computer plays it until someone takes it, as a slot left open.
@@ -193,6 +195,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& cl
 
 void HostSession::init_lobby() {
     m_lobby.join_running = m_config.join_running;
+    m_lobby.computer_takes_over = m_config.computer_takes_over;
     m_lobby.spectators = m_config.spectators;
     m_lobby.password = !m_config.password.empty();
     m_lobby.title.resize(std::min(m_lobby.title.size(), kMaxTitleLength));
@@ -293,6 +296,7 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
         lobby_event();
     }
     if (started()) {
+        take_over_vacant(real_ms);
         update_lead(real_ms);
         run(real_ms, before_tick);
         broadcast_frames();
@@ -419,6 +423,7 @@ void HostSession::hello(Peer& peer, const Hello& m) {
     if (seat != sim::kNoPlayer) {
         peer.token = token_of(seat);
         occupy(m_lobby.seats[seat], LobbySeat::Kind::Human, peer.name, false);
+        std::erase_if(m_vacant, [seat](const auto& v) { return v.first == seat; });
         if (started()) {
             // The player takes the slot over from the computer, under the player's name, as
             // commands of that player like any other.
@@ -740,9 +745,12 @@ void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell) {
             m_lobby_changed = true;
             // A slot the computer held before the player came: the computer goes on with it.
             // The host gives it in the player's stead (queue() takes orders only from those here).
-            if (started() && m_open.size() < kMaxCommandsPerMessage &&
-                std::find(m_computer_held.begin(), m_computer_held.end(), peer.seat) != m_computer_held.end()) {
-                m_open.emplace_back(sim::PlayerControl{peer.seat, true});
+            if (std::find(m_computer_held.begin(), m_computer_held.end(), peer.seat) != m_computer_held.end()) {
+                if (started() && m_open.size() < kMaxCommandsPerMessage) {
+                    m_open.emplace_back(sim::PlayerControl{peer.seat, true});
+                }
+            } else if (started()) {
+                vacate(peer.seat);  // a person's own slot: the computer after a while
             }
         }
         SessionEvent e;
@@ -753,6 +761,33 @@ void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell) {
         event(std::move(e));
         m_roster_changed = true;
     }
+}
+
+void HostSession::vacate(Seat seat) {
+    if (m_config.computer_takes_over &&
+        std::none_of(m_vacant.begin(), m_vacant.end(), [seat](const auto& v) { return v.first == seat; })) {
+        m_vacant.emplace_back(seat, 0);
+    }
+}
+
+void HostSession::take_over_vacant(std::uint32_t real_ms) {
+    // A person's slot that has stood empty long enough: the computer plays it on with what it
+    // finds there (ai::Engine), until its player or someone else comes. The host gives the order
+    // like the speed, so every computer runs it in the same frame.
+    std::erase_if(m_vacant, [&](auto& v) {
+        if (seat_taken(v.first)) {
+            return true;
+        }
+        v.second = std::min(v.second + real_ms, m_config.take_over_ms);
+        if (v.second < m_config.take_over_ms || m_open.size() >= kMaxCommandsPerMessage) {
+            return false;
+        }
+        const sim::Player* p = m_simulation->world().player(v.first);
+        if (p != nullptr && p->active() && p->role == sim::PlayerRole::Human) {
+            m_open.emplace_back(sim::PlayerControl{v.first, true});
+        }
+        return true;
+    });
 }
 
 bool HostSession::seat_taken(Seat seat) const {

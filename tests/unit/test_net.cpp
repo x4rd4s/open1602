@@ -288,6 +288,7 @@ TEST_CASE("net: every message goes to bytes and back") {
     lobby.password = true;
     lobby.setup = {9, 8, 7};
     lobby.banners = {0, 1, 2, 3, 7, 8, 0x1234};
+    lobby.computer_takes_over = false;
     all.emplace_back(lobby);
     all.emplace_back(net::TakeSeat{3});
     all.emplace_back(net::SetReady{true});
@@ -517,6 +518,61 @@ TEST_CASE("net: into a running game, out and back into the same slot") {
     CHECK(a.game.world->players()[2].name == "Bernd wieder da");
     CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
     CHECK(host.session->fingerprints_matched() == host.session->fingerprints_compared());
+}
+
+TEST_CASE("net: the computer plays on for someone who left, until he is back") {
+    net::LoopbackNetwork network(25, 10);
+    net::SessionConfig config;
+    config.take_over_ms = 5000;
+    Host host(network, config);
+    Computer a(network, "Anna");
+    run_for(network, host, {&a}, 2000);
+    auto b = std::make_unique<Computer>(network, "Bernd");
+    run_for(network, host, {&a, b.get()}, 2000);
+    REQUIRE(b->session->playing());
+    REQUIRE(b->session->local_seat() == 2);
+    const std::uint64_t token = b->session->token();
+
+    // A broken connection: the slot waits a while for Bernd before the computer takes it.
+    network.cut(*b->transport);
+    run_for(network, host, {&a, b.get()}, 3000);
+    CHECK(b->session->ended());
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(a.game.world->players()[2].role == sim::PlayerRole::Human);
+    run_for(network, host, {&a, b.get()}, 3500);
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Computer);
+    CHECK(a.game.world->players()[2].role == sim::PlayerRole::Computer);
+    CHECK(host.game.world->players()[2].name == "Bernd");
+
+    // Bernd comes back and plays his slot again himself.
+    b = std::make_unique<Computer>(network, "Bernd", token);
+    run_for(network, host, {&a, b.get()}, 2000);
+    REQUIRE(b->session->playing());
+    CHECK(b->session->local_seat() == 2);
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(a.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(b->game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
+    CHECK(host.session->fingerprints_matched() == host.session->fingerprints_compared());
+}
+
+TEST_CASE("net: without the setting, the slot of someone who left gives no orders") {
+    net::LoopbackNetwork network(25, 10);
+    net::SessionConfig config;
+    config.computer_takes_over = false;
+    config.take_over_ms = 1000;
+    Host host(network, config);
+    Computer a(network, "Anna");
+    run_for(network, host, {&a}, 2000);
+    auto b = std::make_unique<Computer>(network, "Bernd");
+    run_for(network, host, {&a, b.get()}, 2000);
+    REQUIRE(b->session->playing());
+    REQUIRE(b->session->local_seat() == 2);
+    CHECK(!a.session->lobby().computer_takes_over);
+    network.cut(*b->transport);
+    run_for(network, host, {&a, b.get()}, 10000);
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(a.game.world->players()[2].role == sim::PlayerRole::Human);
 }
 
 TEST_CASE("net: a slot's token is good only for the one it was given to") {

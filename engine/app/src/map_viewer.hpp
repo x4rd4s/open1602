@@ -271,6 +271,8 @@ private:
     core::Status start_multiplayer();
     /// What the multiplayer session reported this frame: lines of the chat, the menu's screens.
     void apply_session_events();
+    /// A chat line for each person's slot the computer took over since the last frame.
+    void announce_take_overs();
     /// The game a host sent: replaces the world (also after a desync); nullptr if it cannot be read.
     sim::Simulation* load_from_host(std::span<const std::uint8_t> save);
     /// Fingerprint of the game data the simulation depends on: computers of a multiplayer game
@@ -409,6 +411,7 @@ private:
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
     bool m_host_game_loaded = false;                ///< this client runs the game its host sent
+    std::vector<sim::PlayerRole> m_session_roles;   ///< who steered each player last frame (empty: not yet)
     std::string m_host_address;                     ///< of the host joined
     std::uint16_t m_host_port = net::kDefaultPort;  ///< of the host joined: the successor hosts on it too
     bool m_migrating = false;                       ///< following a successor, its game not here yet

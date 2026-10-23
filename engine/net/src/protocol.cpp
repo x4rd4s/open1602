@@ -117,6 +117,7 @@ void put(core::ByteWriter& out, const Lobby& m) {
     for (const sim::BannerId b : m.banners) {
         out.u16(b);
     }
+    out.boolean(m.computer_takes_over);
 }
 
 void put(core::ByteWriter& out, const TakeSeat& m) {
@@ -296,6 +297,7 @@ Lobby get_lobby(In& in) {
     for (std::uint32_t i = 0; i < banners && in.ok(); ++i) {
         m.banners.push_back(in.u16());
     }
+    m.computer_takes_over = in.boolean();
     return m;
 }
 

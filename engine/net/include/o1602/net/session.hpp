@@ -68,6 +68,11 @@ struct SessionConfig {
     bool spectators = true;
     /// Computers may come into a running game (else only back into their own slot).
     bool join_running = true;
+    /// (Host) The computer plays the slot of a person who left the running game, once it has stood
+    /// empty for take_over_ms (time to come back after a broken connection), until someone takes
+    /// it again. Without: the slot gives no orders until its player is back.
+    bool computer_takes_over = true;
+    std::uint32_t take_over_ms = 60'000;
     /// Desyncs of one computer within this many fingerprints after it got the game anew: it
     /// cannot follow the host (another build?) and is sent away.
     std::uint32_t max_resyncs = 2;
@@ -291,6 +296,9 @@ private:
     [[nodiscard]] Peer* peer_of(LinkId link);
     [[nodiscard]] Seat free_seat(Seat wanted) const;
     [[nodiscard]] bool seat_taken(Seat seat) const;
+    /// A person's slot was left: the computer takes it over after a while (m_vacant).
+    void vacate(Seat seat);
+    void take_over_vacant(std::uint32_t real_ms);
     [[nodiscard]] std::uint64_t slowest() const;
     /// Frames the host may be ahead of a computer at the current speed.
     [[nodiscard]] std::uint64_t ahead_frames() const;
@@ -317,6 +325,9 @@ private:
     std::uint32_t m_game_credit_ms = 4'000;
     std::vector<std::pair<Seat, std::uint64_t>> m_tokens;  ///< seat and token, to come back to it
     std::vector<Seat> m_computer_held;  ///< open at the start: the computer plays it while nobody does
+    /// A person's slot left in the running game, and how long it has stood empty: the computer
+    /// takes it over after SessionConfig::take_over_ms.
+    std::vector<std::pair<Seat, std::uint32_t>> m_vacant;
     std::uint64_t m_compared = 0;
     std::uint64_t m_matched = 0;
     std::vector<LinkId> m_roster_links;    ///< the link of each roster() entry (unused for the host's own)

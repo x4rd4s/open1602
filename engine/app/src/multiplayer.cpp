@@ -91,6 +91,7 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     if (m_migrating) {
         m_camera = view;
     }
+    m_session_roles.clear();  // another game: nothing changed hands
     report_load_problems(warnings.size());
     return &m_state->simulation;
 }
@@ -98,6 +99,23 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
 void MapViewer::chat_line(std::string name, std::string text, sim::PlayerId seat, bool echo) {
     add_chat_line(m_hud ? &m_hud->multiplayer_model().chat : nullptr,
                   ChatLine{std::move(name), std::move(text), seat, platform::ticks_ms()}, echo);
+}
+
+void MapViewer::announce_take_overs() {
+    // The host hands a person's slot to the computer some time after the person left (ADR 0011):
+    // the same frame on every computer, so each says so when it sees the slot change hands.
+    const auto& players = m_state->world.players();
+    if (m_session_roles.size() == players.size()) {
+        for (std::size_t i = 0; i < players.size(); ++i) {
+            if (m_session_roles[i] == sim::PlayerRole::Human && players[i].role == sim::PlayerRole::Computer) {
+                chat_line({}, mp_text(MpText::ComputerTookOver, players[i].name), static_cast<sim::PlayerId>(i));
+            }
+        }
+    }
+    m_session_roles.resize(players.size());
+    for (std::size_t i = 0; i < players.size(); ++i) {
+        m_session_roles[i] = players[i].role;
+    }
 }
 
 void MapViewer::apply_session_events() {
@@ -518,6 +536,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     config.password = setup.password;
     config.join_running = setup.join_running;
     config.spectators = setup.spectators;
+    config.computer_takes_over = setup.computer_takes_over;
     auto transport = net::enet_listen(setup.port);
     if (!transport) {
         return transport.error();

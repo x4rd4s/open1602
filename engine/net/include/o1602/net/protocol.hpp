@@ -24,7 +24,7 @@
 namespace o1602::net {
 
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
-inline constexpr std::uint16_t kProtocolVersion = 5;
+inline constexpr std::uint16_t kProtocolVersion = 6;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -201,6 +201,8 @@ struct Lobby {
     /// The banners the players may choose from (SetBanner), in the order the lobby offers them;
     /// empty: every slot keeps its banner (a savegame, a running game).
     std::vector<sim::BannerId> banners;
+    /// The computer plays the slots of persons who left the running game (SessionConfig).
+    bool computer_takes_over = true;
     friend bool operator==(const Lobby&, const Lobby&) = default;
 };
 
