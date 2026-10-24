@@ -198,7 +198,7 @@ tested and not kept in step with the engine; where they disagree with `engine/as
 | `engine/` | Engine modules: `core`, `assets`, `sim`, `net`, `render`, `platform`, `audio`, `video`, `ui`, `app`; each has a README |
 | `tools/` | `o1602-tool` (C++, one file per command group), `make_icons.py` (renders the [application icon](data/icons/README.md)) and unmaintained Python prototypes from reverse engineering (`tools/python/`; the C++ readers in `engine/assets` are authoritative) |
 | `tests/` | Unit tests and tests against the original data ([how to run them](tests/README.md)) |
-| `docs/` | [Plan](docs/00-plan.md), [status](docs/status.md), [file formats](docs/formats/README.md), [architecture decisions](docs/architecture/README.md), [languages](docs/modding/languages.md), [messages](docs/modding/messages.md), [build menu](docs/modding/build-menu.md) and [data limits](docs/modding/data-limits.md) for modding |
+| `docs/` | [Plan](docs/00-plan.md), [status](docs/status.md), [file formats](docs/formats/README.md), [architecture decisions](docs/architecture/README.md), [languages](docs/modding/languages.md), [messages](docs/modding/messages.md), [build menu](docs/modding/build-menu.md), [data limits](docs/modding/data-limits.md) and [open work](docs/modding/open-work.md) for modding |
 | `data/` | Files the engine brings itself: [interface texts](docs/modding/languages.md), the [application icon](data/icons/README.md), the Linux desktop entry |
 | `re/` | Analysis scripts and notes |
 

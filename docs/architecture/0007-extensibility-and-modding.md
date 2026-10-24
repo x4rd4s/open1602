@@ -145,6 +145,9 @@ a clear message.
 
 ## Fixed limits in the code and their removal
 
+The open items of this ADR, in the order to work on them, are in
+[docs/modding/open-work.md](../modding/open-work.md).
+
 | Place | Limit | Status |
 |---|---|---|
 | `sim::MapCell::owner`, `sim::Ship::owner` | owner 0–6, 7 = nobody | ✅ `sim::PlayerId`, `kNoPlayer`; translation when loading |
