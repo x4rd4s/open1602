@@ -9,6 +9,9 @@ if(O1602_COVERAGE)
         message(FATAL_ERROR "O1602_COVERAGE needs GCC or Clang")
     endif()
     add_compile_options(--coverage)
+    # Atomic counters: the atlas decodes on several threads, and racing counters give gcov
+    # negative branch counts that gcovr refuses.
+    add_compile_options(-fprofile-update=atomic)
     add_link_options(--coverage)
     message(STATUS "Open1602: coverage instrumentation enabled")
 endif()

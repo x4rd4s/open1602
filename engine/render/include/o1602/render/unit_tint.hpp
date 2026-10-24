@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -104,16 +105,26 @@ private:
     /// Group and image k of image i of a block.
     [[nodiscard]] const UnitImageGroup* locate(std::uint32_t i, std::uint32_t& k) const noexcept;
     [[nodiscard]] std::size_t body(const UnitImageGroup& g, std::uint32_t i) const noexcept;
+    /// The tint template of image k of a group (unit_template of its variants); false without the
+    /// base or body variant.
+    bool make_template(const UnitImageGroup& g, std::uint32_t k, const UnitTemplateOptions& options,
+                       std::vector<std::uint8_t>& rgba) const;
 
     const SpriteSource& m_sheet;
     std::vector<UnitImageGroup> m_groups;
     std::vector<assets::Rgba> m_variant_colors;
     std::vector<UnitTintColor> m_colors;
     std::uint32_t m_block = 0;
-    /// The templates made so far, by image of a block, body variant and horse brightness: they do
-    /// not depend on the colour, so each is made once, not once per banner (FB-25).
+    /// One template: made by the first thread that asks for it, the others wait for it.
+    struct Template {
+        std::once_flag made;
+        bool ok = false;
+        std::vector<std::uint8_t> rgba;
+    };
+    /// The templates, by image of a block, body variant and horse brightness: they do not depend on
+    /// the colour, so each is made once, not once per banner (FB-25).
     mutable std::mutex m_templates_mutex;
-    mutable std::unordered_map<std::uint64_t, std::vector<std::uint8_t>> m_templates;
+    mutable std::unordered_map<std::uint64_t, std::unique_ptr<Template>> m_templates;
 };
 
 }  // namespace o1602::render

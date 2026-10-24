@@ -2,6 +2,7 @@
 #include "o1602/render/sprite_atlas.hpp"
 
 #include <algorithm>
+#include <thread>
 
 namespace o1602::render {
 
@@ -75,21 +76,70 @@ core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const
         shelf_x = shelf_y = shelf_h = 0;
     };
 
-    std::vector<std::uint8_t> rgba;
-    for (const Entry& e : entries) {
+    // The sprites are decoded in parallel, a batch at a time (at most 1024 sprites or 64 MB), and
+    // placed one after the other in the order above: the atlas is the same on every machine
+    // (FB-25). Sources decode from const data; TintedUnitSource guards its cache.
+    constexpr std::size_t kBatchSprites = 1024;
+    constexpr std::size_t kBatchBytes = std::size_t{64} << 20;
+    const unsigned workers = std::clamp(std::thread::hardware_concurrency(), 1U, 8U);
+    std::vector<std::vector<std::uint8_t>> decoded;
+    std::vector<std::uint8_t> valid;
+    const auto fits = [&](const Entry& e) { return e.width + kPad <= page_size && e.height + kPad <= page_size; };
+    const auto decode_batch = [&](std::size_t first, std::size_t count) {
+        decoded.resize(std::max(decoded.size(), count));
+        valid.assign(count, 0);
+        std::atomic<std::size_t> next{0};
+        const auto work = [&] {
+            for (std::size_t j = next++; j < count; j = next++) {
+                const Entry& e = entries[first + j];
+                if (e.width == 0 || e.height == 0 || !fits(e)) {
+                    continue;
+                }
+                valid[j] =
+                    e.source->pixels(e.local, decoded[j]) && decoded[j].size() >= std::size_t{e.width} * e.height * 4
+                        ? 1
+                        : 0;
+            }
+        };
+        std::vector<std::thread> threads;
+        for (unsigned t = 1; t < std::min<std::size_t>(workers, count); ++t) {
+            threads.emplace_back(work);
+        }
+        work();
+        for (std::thread& t : threads) {
+            t.join();
+        }
+    };
+
+    std::size_t batch_first = 0;
+    std::size_t batch_end = 0;
+    for (std::size_t k = 0; k < entries.size(); ++k) {
+        const Entry& e = entries[k];
         if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) {
             return make_error(ErrorCode::Unsupported, "cancelled");
         }
         if (e.width == 0 || e.height == 0) {
             continue;
         }
-        if (e.width + kPad > page_size || e.height + kPad > page_size) {
+        if (!fits(e)) {
             return make_error(ErrorCode::OutOfRange,
                               "sprite " + std::to_string(e.index) + " does not fit into an atlas page");
         }
-        if (!e.source->pixels(e.local, rgba) || rgba.size() < std::size_t{e.width} * e.height * 4) {
+        if (k >= batch_end) {
+            batch_first = k;
+            batch_end = k;
+            std::size_t bytes = 0;
+            while (batch_end < entries.size() && batch_end - batch_first < kBatchSprites &&
+                   (bytes == 0 || bytes < kBatchBytes)) {
+                bytes += std::size_t{entries[batch_end].width} * entries[batch_end].height * 4;
+                ++batch_end;
+            }
+            decode_batch(batch_first, batch_end - batch_first);
+        }
+        if (valid[k - batch_first] == 0) {
             continue;  // corrupt sprite: drawn as missing
         }
+        const std::vector<std::uint8_t>& rgba = decoded[k - batch_first];
         if (atlas.m_pages.empty()) {
             new_page();
         }

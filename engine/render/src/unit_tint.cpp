@@ -377,18 +377,30 @@ bool TintedUnitSource::pixels(std::uint32_t i, std::vector<std::uint8_t>& rgba) 
     }
     const std::uint64_t key =
         std::uint64_t{g->offset + k} | (std::uint64_t{options.body} << 32U) | (std::uint64_t{brown} << 40U);
+    Template* t = nullptr;
     {
         const std::scoped_lock lock(m_templates_mutex);
-        if (const auto it = m_templates.find(key); it != m_templates.end()) {
-            rgba = it->second;
-            tint_rgba(rgba, m_colors[i / m_block].color);
-            return true;
+        auto& slot = m_templates[key];
+        if (!slot) {
+            slot = std::make_unique<Template>();
         }
+        t = slot.get();
     }
-    std::vector<std::vector<std::uint8_t>> images(g->variants);
-    std::vector<RgbaView> views(g->variants);
-    for (std::uint8_t v = 0; v < g->variants; ++v) {
-        const std::uint32_t image = g->first + v * g->stride + k;
+    std::call_once(t->made, [&] { t->ok = make_template(*g, k, options, t->rgba); });
+    if (!t->ok) {
+        return false;
+    }
+    rgba = t->rgba;
+    tint_rgba(rgba, m_colors[i / m_block].color);
+    return true;
+}
+
+bool TintedUnitSource::make_template(const UnitImageGroup& g, std::uint32_t k, const UnitTemplateOptions& options,
+                                     std::vector<std::uint8_t>& rgba) const {
+    std::vector<std::vector<std::uint8_t>> images(g.variants);
+    std::vector<RgbaView> views(g.variants);
+    for (std::uint8_t v = 0; v < g.variants; ++v) {
+        const std::uint32_t image = g.first + v * g.stride + k;
         std::uint32_t w = 0;
         std::uint32_t h = 0;
         m_sheet.size(image, w, h);
@@ -402,11 +414,6 @@ bool TintedUnitSource::pixels(std::uint32_t i, std::vector<std::uint8_t>& rgba) 
     std::uint32_t w = 0;
     std::uint32_t h = 0;
     unit_template(views, m_variant_colors, options, rgba, w, h);
-    {
-        const std::scoped_lock lock(m_templates_mutex);
-        m_templates.emplace(key, rgba);
-    }
-    tint_rgba(rgba, m_colors[i / m_block].color);
     return true;
 }
 
