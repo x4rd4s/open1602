@@ -119,6 +119,7 @@ enum class MpText : std::uint16_t {
     ChatHintPrivate,
     ChatReadOnly,
     ChatMissed,
+    PackageKept,
 };
 
 /// The catalogue key of a text ("net.player_joined").
@@ -132,5 +133,9 @@ enum class MpText : std::uint16_t {
 [[nodiscard]] std::string mp_text(net::EndReason reason);
 /// `packages` (RefuseReason::Packages): the packages of the game this computer lacks.
 [[nodiscard]] std::string mp_text(net::RefuseReason reason, std::span<const assets::ContentPackage> packages = {});
+/// "2.4 MB", "640 KB": the size of packages a host would send.
+[[nodiscard]] std::string mp_size(std::uint64_t bytes);
+/// The question whether to download `packages` (`bytes` together) from the host.
+[[nodiscard]] std::string mp_package_offer(std::span<const assets::ContentPackage> packages, std::uint64_t bytes);
 
 }  // namespace o1602::app

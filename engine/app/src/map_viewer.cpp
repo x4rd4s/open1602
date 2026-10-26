@@ -265,6 +265,13 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_factions = std::move(rules.factions);
     viewer->m_balance = rules.balance;
     viewer->m_packages = std::move(packages);
+    {
+        std::vector<std::string> problems;
+        viewer->m_cached_packages = assets::cached_packages(data_folder() / "mods-cache", problems);
+        for (const std::string& p : problems) {
+            std::fprintf(stderr, "mods: %s\n", p.c_str());
+        }
+    }
     viewer->m_banners =
         render::BannerTable::original(&viewer->m_figures, render::BannerOptions{options.original_flags});
     viewer->m_banners.add_more_players();
@@ -1853,6 +1860,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
             m_tool.set_orient_to_road(action.step != 0);
             break;
         case Hud::Action::Kind::Answer:
+            if (m_fetch_offer) {
+                answer_package_offer(action.step != 0);
+                break;
+            }
             if (std::exchange(m_quit_pending, false)) {
                 if (action.step == 0) {
                     break;
@@ -2413,8 +2424,8 @@ void MapViewer::give_mod_content(sim::World& world) const {
 void MapViewer::use_game_packages() {
     std::vector<std::string> problems;
     const auto& wanted = m_state->world.packages();
-    const std::vector<assets::ModPackage> used =
-        wanted ? assets::packages_for(m_packages, *wanted, problems) : m_packages;
+    const std::vector<assets::ModPackage> known = known_packages();
+    const std::vector<assets::ModPackage> used = wanted ? assets::packages_for(known, *wanted, problems) : m_packages;
     m_messages = MessageTable();
     m_messages.load_mods(used, problems);
     ui::set_build_menu(ui::load_build_menu_mods(ui::original_build_menu(), used, m_buildings, problems));
@@ -2423,13 +2434,19 @@ void MapViewer::use_game_packages() {
     }
     if (wanted) {
         std::string names;
-        for (const assets::ContentPackage& p : assets::missing_packages(*wanted, assets::content_of(m_packages))) {
+        for (const assets::ContentPackage& p : assets::missing_packages(*wanted, assets::content_of(known))) {
             names += (names.empty() ? "" : ", ") + assets::package_label(p);
         }
         if (!names.empty()) {
             m_events.notify(ui::tr("notice.packages", {names}), "notice.packages " + names, platform::ticks_ms());
         }
     }
+}
+
+std::vector<assets::ModPackage> MapViewer::known_packages() const {
+    std::vector<assets::ModPackage> known = m_packages;
+    known.insert(known.end(), m_cached_packages.begin(), m_cached_packages.end());
+    return known;
 }
 
 void MapViewer::report_load_problems(std::size_t warnings) {

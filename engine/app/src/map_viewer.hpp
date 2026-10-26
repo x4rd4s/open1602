@@ -233,7 +233,20 @@ private:
     core::Status host_lobby(const HostSetup& setup);
     /// The host starts the game of its lobby: makes the world, gives the slots their players.
     core::Status start_hosted_game();
-    core::Status join_game(const std::string& address, std::uint16_t port, const std::string& password);
+    /// Joins the host at `address`; with `fetch_packages` it asks the host for the packages of the
+    /// game this computer lacks, which the person agreed to download (docs/modding/packages.md).
+    core::Status join_game(const std::string& address, std::uint16_t port, const std::string& password,
+                           bool fetch_packages = false);
+    /// The host has packages of its game this computer lacks and would send them: asks the person,
+    /// the answer joins again with them or goes back to the search (m_fetch_offer).
+    void offer_packages(std::span<const assets::ContentPackage> packages, std::uint64_t bytes, std::string refusal);
+    /// The person's answer to offer_packages().
+    void answer_package_offer(bool yes);
+    /// The packages this computer has, its own and those received, as a host sends them to
+    /// computers that lack them.
+    [[nodiscard]] std::vector<net::SharedPackage> shared_packages() const;
+    /// The packages a game may use here: those in `mods`, then those received from hosts.
+    [[nodiscard]] std::vector<assets::ModPackage> known_packages() const;
     /// Drops the session, its beacon and the hosted game; the menus stay as they are.
     void end_session();
     /// Out of the session, back to the search (with `notice`, why).
@@ -351,6 +364,8 @@ private:
     std::vector<sim::Faction> m_factions = sim::base_factions();
     /// The content packages installed in <data folder>/mods, in their load order (docs/modding/packages.md).
     std::vector<assets::ModPackage> m_packages;
+    /// Packages received from hosts, in <data folder>/mods-cache: used only by games that name them.
+    std::vector<assets::ModPackage> m_cached_packages;
     sim::Balance m_balance;  ///< the numbers a new game starts with, as the mods change them (docs/modding/balance.md)
     /// Flags, smoke and icons: buildings do not move, so they are collected once at load.
     std::vector<render::BuildingFigure> m_building_figures;
@@ -384,8 +399,18 @@ private:
         std::uint64_t token = 0;
     };
     std::optional<Rejoin> m_rejoin;
-    bool m_migrating = false;      ///< following a successor, its game not here yet
-    std::string m_successor_name;  ///< the one followed
+    /// Packages a host would send, waiting for the person's answer, and where to join with them.
+    struct FetchOffer {
+        std::string address;
+        std::uint16_t port = net::kDefaultPort;
+        std::string password;
+        std::string refusal;  ///< the host's refusal, shown if the person says no
+    };
+    std::optional<FetchOffer> m_fetch_offer;
+    std::string m_join_password;       ///< of the game joined last, for joining it again with its packages
+    bool m_fetching_packages = false;  ///< the game joined last was asked for its packages
+    bool m_migrating = false;          ///< following a successor, its game not here yet
+    std::string m_successor_name;      ///< the one followed
     /// The local player's commands: to m_state's simulation, or to m_session while there is one.
     CommandSink m_command_sink;
     std::unique_ptr<net::LanBrowser> m_lan_browser;  ///< while the multiplayer menu looks for games

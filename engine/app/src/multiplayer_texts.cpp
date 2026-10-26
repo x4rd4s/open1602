@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "multiplayer_texts.hpp"
 
+#include <algorithm>
 #include <array>
 #include <string>
 
@@ -120,6 +121,7 @@ constexpr std::array kTexts = {
     Entry{MpText::ChatHintPrivate, "net.chat_hint_private"},
     Entry{MpText::ChatReadOnly, "net.chat_read_only"},
     Entry{MpText::ChatMissed, "net.chat_missed"},
+    Entry{MpText::PackageKept, "net.package_kept"},
 };
 
 constexpr bool in_order() {
@@ -131,7 +133,16 @@ constexpr bool in_order() {
     return true;
 }
 static_assert(in_order(), "kTexts must list every MpText in order");
-static_assert(kTexts.size() == static_cast<std::size_t>(MpText::ChatMissed) + 1, "a text is missing");
+static_assert(kTexts.size() == static_cast<std::size_t>(MpText::PackageKept) + 1, "a text is missing");
+
+/// "lighthouse 1.2, weather" in the fonts' Windows-1252.
+std::string package_names(std::span<const assets::ContentPackage> packages) {
+    std::string names;
+    for (const assets::ContentPackage& p : packages) {
+        names += (names.empty() ? "" : ", ") + core::utf8_to_cp1252(assets::package_label(p));
+    }
+    return names;
+}
 
 }  // namespace
 
@@ -195,15 +206,24 @@ std::string mp_text(net::RefuseReason reason, std::span<const assets::ContentPac
             return ui::tr("net.refused.kicked");
         case net::RefuseReason::Taken:
             return ui::tr("net.refused.taken");
-        case net::RefuseReason::Packages: {
-            std::string names;
-            for (const assets::ContentPackage& p : packages) {
-                names += (names.empty() ? "" : ", ") + assets::package_label(p);
-            }
-            return ui::tr("net.refused.packages", {names});
-        }
+        case net::RefuseReason::Packages:
+            return ui::tr("net.refused.packages", {package_names(packages)});
     }
     return {};
+}
+
+std::string mp_size(std::uint64_t bytes) {
+    constexpr std::uint64_t kKb = 1024;
+    constexpr std::uint64_t kMb = kKb * kKb;
+    if (bytes < kMb) {
+        return ui::tr("net.size_kb", {std::to_string(std::max<std::uint64_t>((bytes + kKb - 1) / kKb, 1))});
+    }
+    const std::uint64_t tenths = (bytes * 10 + kMb / 2) / kMb;
+    return ui::tr("net.size_mb", {std::to_string(tenths / 10), std::to_string(tenths % 10)});
+}
+
+std::string mp_package_offer(std::span<const assets::ContentPackage> packages, std::uint64_t bytes) {
+    return ui::tr("net.fetch_question", {package_names(packages), mp_size(bytes)});
 }
 
 }  // namespace o1602::app

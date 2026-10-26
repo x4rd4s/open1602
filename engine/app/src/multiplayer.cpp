@@ -12,6 +12,7 @@
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/text_table.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/core/text.hpp"
 #include "o1602/platform/window.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -58,6 +59,7 @@ core::Status MapViewer::start_multiplayer() {
         config.pack_wait_ms = kPackWaitMs;
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_state->simulation, m_buildings,
                                                        m_local_player, name, content_fingerprint(), config);
+        host_session()->share_packages(shared_packages());
         m_command_sink.set_session(m_session.get());
         m_command_sink.submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
@@ -184,6 +186,11 @@ void MapViewer::apply_session_events() {
     const auto who = [](const net::SessionEvent& e) { return e.name.empty() ? std::to_string(e.seat) : e.name; };
     std::optional<std::string> ended;
     bool host_left = false;
+    struct PackageOffer {
+        std::vector<assets::ContentPackage> packages;
+        std::uint64_t bytes = 0;
+    };
+    std::optional<PackageOffer> offer;
     for (const net::SessionEvent& e : m_session->take_events()) {
         switch (e.kind) {
             case net::SessionEvent::Kind::Welcomed:
@@ -233,6 +240,10 @@ void MapViewer::apply_session_events() {
                              e.reason == net::EndReason::Refused ? net::describe(e.refused) : net::describe(e.reason));
                 ended = e.reason == net::EndReason::Refused ? mp_text(e.refused, e.packages) : mp_text(e.reason);
                 host_left = e.reason == net::EndReason::HostLeft;
+                if (e.reason == net::EndReason::Refused && e.refused == net::RefuseReason::Packages &&
+                    e.share_bytes != 0 && !m_fetching_packages) {
+                    offer = PackageOffer{e.packages, e.share_bytes};
+                }
                 break;
             case net::SessionEvent::Kind::LobbyChanged:
                 break;  // the menu shows the lobby as it is
@@ -248,7 +259,15 @@ void MapViewer::apply_session_events() {
             case net::SessionEvent::Kind::PauseRefused:
                 session_line(MpText::PauseRefused);
                 break;
+            case net::SessionEvent::Kind::PackageKept:
+                session_line(MpText::PackageKept, core::utf8_to_cp1252(assets::package_label(e.packages.at(0))));
+                break;
         }
+    }
+    if (ended && offer && m_hud && m_hud->multiplayer_open()) {
+        // The host would send the packages it refused this computer for: the person decides.
+        offer_packages(offer->packages, offer->bytes, *ended);
+        return;
     }
     // A session that ends before its game ran: back to the search with the reason. One that ends
     // in the game keeps the game standing as it is (the title says so).
@@ -280,6 +299,7 @@ bool MapViewer::migrate() {
         std::fprintf(stderr, "multiplayer: the host left; hosting the game on UDP port %u\n",
                      static_cast<unsigned>(m_host_port));
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), *client, m_buildings);
+        host_session()->share_packages(shared_packages());
     } else {
         // A successor the host saw on its own computer is on the computer this one joined.
         std::string address = client->successor_address();
@@ -625,6 +645,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
                                                    content_fingerprint(), config);
     // A computer needs the packages of the game to join: a savegame's own, else those installed here.
     host_session()->set_packages(world && world->packages() ? *world->packages() : assets::content_of(m_packages));
+    host_session()->share_packages(shared_packages());
     m_command_sink.set_session(m_session.get());
     m_hosted = setup;
     m_hosted_world = std::move(world);
@@ -767,7 +788,8 @@ core::Status MapViewer::start_hosted_game() {
 
 // --- Joining ---
 
-core::Status MapViewer::join_game(const std::string& address, std::uint16_t port, const std::string& password) {
+core::Status MapViewer::join_game(const std::string& address, std::uint16_t port, const std::string& password,
+                                  bool fetch_packages) {
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
@@ -790,7 +812,10 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
 
     net::Hello hello;
     hello.content = content_fingerprint();
-    hello.packages = assets::content_of(m_packages);  // the host asks for those of its game
+    hello.packages = assets::content_of(known_packages());  // the host asks for those of its game
+    hello.fetch_packages = fetch_packages;
+    m_fetching_packages = fetch_packages;
+    m_join_password = password;
     // The name typed in the menu; joining from the command line, the one given there.
     std::string name = m_hud && m_hud->multiplayer() != nullptr ? m_hud->multiplayer()->name() : std::string{};
     if (name.empty()) {
@@ -815,6 +840,20 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
         auto again = net::enet_connect(address, port);
         return again ? std::move(again).value() : nullptr;
     });
+    // Packages the host sends, which the person agreed to: into the cache, before the game that uses
+    // them is loaded.
+    client->keep_packages_with(
+        [this](const assets::ContentPackage& package, std::span<const assets::PackageFile> files) {
+            auto kept = assets::store_package(data_folder() / "mods-cache", package, files);
+            if (!kept) {
+                std::fprintf(stderr, "mods: %s\n", kept.error().message.c_str());
+                return false;
+            }
+            std::fprintf(stderr, "mods: received %s\n", assets::package_label(package).c_str());
+            std::erase_if(m_cached_packages, [&](const assets::ModPackage& p) { return p.content() == package; });
+            m_cached_packages.push_back(std::move(kept).value());
+            return true;
+        });
     m_session = std::move(client);
     m_command_sink.set_session(m_session.get());
     if (m_hud && m_hud->multiplayer() != nullptr) {
@@ -822,6 +861,33 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
         m_hud->multiplayer()->show_connecting(address + ":" + std::to_string(port));
     }
     return core::Ok{};
+}
+
+// --- Packages a host sends ---
+
+void MapViewer::offer_packages(std::span<const assets::ContentPackage> packages, std::uint64_t bytes,
+                               std::string refusal) {
+    end_session();
+    m_fetch_offer = FetchOffer{m_host_address, m_host_port, m_join_password, std::move(refusal)};
+    m_hud->ask(mp_package_offer(packages, bytes));
+}
+
+void MapViewer::answer_package_offer(bool yes) {
+    const FetchOffer offer = std::move(*m_fetch_offer);
+    m_fetch_offer.reset();
+    if (!yes) {
+        leave_session(offer.refusal);
+    } else if (auto status = join_game(offer.address, offer.port, offer.password, true); !status) {
+        leave_session(mp_text(MpText::CannotConnect, status.error().message));
+    }
+}
+
+std::vector<net::SharedPackage> MapViewer::shared_packages() const {
+    std::vector<net::SharedPackage> out;
+    for (const assets::ModPackage& p : known_packages()) {
+        out.push_back(net::SharedPackage{p.content(), p.folder, assets::package_size(p.folder)});
+    }
+    return out;
 }
 
 }  // namespace o1602::app

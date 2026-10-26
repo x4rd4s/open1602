@@ -26,6 +26,7 @@ ClientSession::ClientSession(const ClientSession& old, Connect connect)
     : Session(connect(), old.m_config),
       m_hello(old.m_hello),
       m_load(old.m_load),
+      m_keep_package(old.m_keep_package),
       m_connect(connect),
       m_reconnect(std::move(connect)) {
     m_hello.seat = old.m_seat;
