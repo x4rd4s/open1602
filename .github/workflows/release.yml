@@ -98,12 +98,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
+      # SDL builds a backend only when its headers are there, and loads the library at run time:
+      # sound (PipeWire, PulseAudio, ALSA), controllers (udev), Wayland title bars (libdecor) and
+      # D-Bus (screensaver, IME) are missing from the package without these headers.
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: >
           sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libx11-dev libxext-dev
           libxrandr-dev libxcursor-dev libxi-dev libxss-dev libwayland-dev libxkbcommon-dev wayland-protocols
-          libegl1-mesa-dev libgl1-mesa-dev
+          libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev libpipewire-0.3-dev libudev-dev
+          libdecor-0-dev libdbus-1-dev
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -133,7 +137,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ${{ runner.temp }}/sdl3
-          key: sdl3-static-${{ env.SDL_VERSION }}-${{ matrix.platform }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}
+          key: sdl3-static-v2-${{ env.SDL_VERSION }}-${{ matrix.platform }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}
 
       - name: Build SDL3 (static)
         if: steps.sdl-cache.outputs.cache-hit != 'true'
@@ -235,6 +239,21 @@ jobs:
             echo "::error::$PROGRAM depends on a library the package does not bring along"
             exit 1
           fi
+
+      # The static SDL loads these libraries by name at run time: without them in the program,
+      # the game would run without sound or controllers.
+      - name: Check SDL's backends (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          missing=0
+          for lib in libpipewire-0.3.so libpulse.so libasound.so libudev.so libdecor-0.so libdbus-1.so; do
+            if ! strings "$PROGRAM" | grep -q "^$lib"; then
+              echo "::error::SDL was built without the backend for $lib"
+              missing=1
+            fi
+          done
+          exit $missing
 
       - name: Start the packaged game without data
         shell: bash
