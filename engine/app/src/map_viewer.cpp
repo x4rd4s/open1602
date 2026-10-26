@@ -192,7 +192,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     std::vector<assets::ModPackage> packages;
     {
         std::vector<std::string> problems;
-        packages = assets::load_mod_packages(data_folder() / "mods", problems);
+        packages = assets::load_mod_packages(data_folder() / "mods", problems, remembered.disabled_mods);
         for (const std::string& p : problems) {
             std::fprintf(stderr, "mods: %s\n", p.c_str());
         }
@@ -2443,6 +2443,79 @@ void MapViewer::use_game_packages() {
     }
 }
 
+ModsModel MapViewer::mods_model() const {
+    using State = ModsModel::Entry::State;
+    const std::filesystem::path mods = data_folder() / "mods";
+    const std::vector<std::string>& off = m_app_settings.disabled_mods;
+    ModsModel model;
+    for (assets::ModPackage& p : assets::mod_packages(mods)) {
+        std::vector<std::string> ignored;  // load_mod_packages wrote them into the log
+        if (const auto bytes = core::read_file(p.folder / assets::kManifestFile)) {
+            (void)assets::read_manifest(
+                p, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), ignored);
+        }
+        ModsModel::Entry e;
+        e.id = p.id;
+        e.folder = p.folder;
+        e.name = core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
+        e.version = core::utf8_to_cp1252(p.version);
+        e.description = core::utf8_to_cp1252(p.description);
+        const bool loaded = std::any_of(m_packages.begin(), m_packages.end(),
+                                        [&](const assets::ModPackage& m) { return m.id == p.id; });
+        e.state = std::find(off.begin(), off.end(), p.id) != off.end() ? State::Off
+                  : loaded                                             ? State::On
+                                                                       : State::Broken;
+        model.entries.push_back(std::move(e));
+    }
+    for (const assets::ModPackage& p : m_cached_packages) {
+        if (std::any_of(m_packages.begin(), m_packages.end(),
+                        [&](const assets::ModPackage& m) { return m.content() == p.content(); })) {
+            continue;  // the same files are among this computer's own
+        }
+        ModsModel::Entry e;
+        e.id = p.id;
+        e.folder = p.folder;
+        e.name = core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
+        e.version = core::utf8_to_cp1252(p.version);
+        e.description = core::utf8_to_cp1252(p.description);
+        e.state = State::Received;
+        std::error_code ec;
+        e.adoptable = !std::filesystem::exists(mods / core::path_from_utf8(p.id), ec);
+        model.entries.push_back(std::move(e));
+    }
+    return model;
+}
+
+void MapViewer::reload_mods() {
+    std::vector<std::string> problems;
+    m_packages = assets::load_mod_packages(data_folder() / "mods", problems, m_app_settings.disabled_mods);
+    for (const std::string& p : problems) {
+        std::fprintf(stderr, "mods: %s\n", p.c_str());
+    }
+    ModRules rules = load_mod_rules(m_packages, m_buildings);
+    m_factions = std::move(rules.factions);
+    m_balance = rules.balance;
+}
+
+std::string MapViewer::adopt_mod(const std::filesystem::path& folder) {
+    const auto cached = std::find_if(m_cached_packages.begin(), m_cached_packages.end(),
+                                     [&](const assets::ModPackage& p) { return p.folder == folder; });
+    if (cached == m_cached_packages.end()) {
+        return {};
+    }
+    const std::string name = core::utf8_to_cp1252(cached->name.empty() ? cached->id : cached->name);
+    const auto adopted = assets::adopt_package(data_folder() / "mods", *cached);
+    if (!adopted) {
+        std::fprintf(stderr, "mods: %s\n", adopted.error().message.c_str());
+        return ui::tr("mods.adopt_failed", {name, ui::error_text(adopted.error(), "mods")});
+    }
+    std::fprintf(stderr, "mods: %s added to the mods folder\n", cached->id.c_str());
+    std::erase(m_app_settings.disabled_mods, cached->id);
+    save_settings();
+    reload_mods();
+    return ui::tr("mods.adopted", {name});
+}
+
 std::vector<assets::ModPackage> MapViewer::known_packages() const {
     std::vector<assets::ModPackage> known = m_packages;
     known.insert(known.end(), m_cached_packages.begin(), m_cached_packages.end());
@@ -2708,6 +2781,26 @@ void MapViewer::apply_menu() {
             case MenuEvent::Kind::ContinueLast:
                 started = load_game(slot_file(save_folder(), kLastGameSlot));
                 break;
+            case MenuEvent::Kind::Mods:
+                menu->set_mods(mods_model());
+                continue;
+            case MenuEvent::Kind::ToggleMod: {
+                std::vector<std::string>& off = m_app_settings.disabled_mods;
+                if (std::erase(off, e.name) == 0) {
+                    off.push_back(e.name);
+                }
+                save_settings();
+                reload_mods();
+                menu->set_mods(mods_model());
+                continue;
+            }
+            case MenuEvent::Kind::AdoptMod: {
+                std::string notice = adopt_mod(e.path);
+                ModsModel model = mods_model();
+                model.notice = std::move(notice);
+                menu->set_mods(std::move(model));
+                continue;
+            }
             case MenuEvent::Kind::NameEntered:
                 // "Unter welcher Flagge wollt Ihr segeln?" and four more, one at random (Speech8
                 // 107..115). The original speaks on entering the screen; Open1602 once the name is in.

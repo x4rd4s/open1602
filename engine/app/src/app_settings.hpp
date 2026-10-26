@@ -44,6 +44,9 @@ struct AppSettings {
     /// Multiplayer hosts joined by address, the latest first ("name[:port]"); at most kMaxHosts.
     std::vector<std::string> remembered_hosts;
     static constexpr std::size_t kMaxHosts = 8;
+    /// Packages of the mods folder turned off in the menu "Mods" (their ids, UTF-8): new games do
+    /// not use them (docs/modding/packages.md).
+    std::vector<std::string> disabled_mods;
     /// The last settings chosen in the start dialog of the endless game.
     EndlessSetup endless;
     /// The last rules chosen for a scenario (its world is given, only the rules count).

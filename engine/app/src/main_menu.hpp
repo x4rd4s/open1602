@@ -14,11 +14,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "app_settings.hpp"
 #include "endless_setup.hpp"
 #include "game_settings_menu.hpp"
+#include "mods_menu.hpp"
 
 #include "o1602/assets/gad.hpp"
 #include "o1602/assets/game_directory.hpp"
@@ -58,7 +60,10 @@ struct MenuEvent {
         LoadSlot,      ///< savegame `slot`
         ContinueLast,  ///< lastgame
         NameEntered,   ///< the name is confirmed (Enter): "Wählt Euer Banner" and the like
-        Multiplayer    ///< the multiplayer menu (Open1602's own, multiplayer_menu.hpp)
+        Multiplayer,   ///< the multiplayer menu (Open1602's own, multiplayer_menu.hpp)
+        Mods,          ///< the screen "Mods" opened: its model is due (set_mods)
+        ToggleMod,     ///< turn the package `name` (its id, UTF-8) in the folder `path` on or off
+        AdoptMod,      ///< copy the received package `name` in the folder `path` into the mods folder
     };
     Kind kind = Kind::Quit;
     std::uint8_t level = 0;
@@ -76,7 +81,7 @@ struct MenuEvent {
 
 class MainMenu {
 public:
-    enum class Screen : std::uint8_t { Base, Host, Mission, Colour, Settings };
+    enum class Screen : std::uint8_t { Base, Host, Mission, Colour, Settings, Mods };
 
     MainMenu(const assets::GameDirectory& game, const assets::TextTable* texts);
 
@@ -101,7 +106,14 @@ public:
     void set_scenario_setup(const EndlessSetup& setup) { m_scenario = setup; }
     [[nodiscard]] const EndlessSetup& scenario_setup() const noexcept { return m_scenario; }
     /// Colours of Open1602's own screens (the start dialog).
-    void set_form_style(const ui::FormStyle& style) { m_settings.set_style(style); }
+    void set_form_style(const ui::FormStyle& style) {
+        m_settings.set_style(style);
+        m_mods.set_style(style);
+        m_base_form.set_style(style);
+    }
+    /// What the screen "Mods" shows.
+    void set_mods(ModsModel model) { m_mods_model = std::move(model); }
+    [[nodiscard]] const ModsModel& mods() const noexcept { return m_mods_model; }
     /// Why the game the start dialog asked for did not start, shown in the dialog. False if the
     /// dialog is not open (the message is then only in the log).
     bool show_start_error(std::string text) {
@@ -141,6 +153,8 @@ private:
     [[nodiscard]] ui::Panel* panel();
     [[nodiscard]] std::string text(std::string_view section, std::size_t line) const;
     void refresh_host();
+    /// The button "Mods" beside the original's on the main menu's screen.
+    void layout_base_form();
     void refresh_mission();
     void refresh_colour();
     void load_scenarios();
@@ -173,6 +187,10 @@ private:
     assets::CampaignProgress m_progress;
     std::string m_name;
     GameSettingsMenu m_settings;
+    ModsMenu m_mods;
+    ModsModel m_mods_model;
+    /// Open1602's own button "Mods" on the main menu's screen.
+    ui::Form m_base_form;
     EndlessSetup m_endless;
     EndlessSetup m_scenario;
     /// The banners in the hall of the colour screen (FARBWAHL.GAD), which show a further colour.

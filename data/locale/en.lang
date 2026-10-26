@@ -710,3 +710,20 @@ list.order.idle = Idle first
 list.order.damaged = Damaged first
 list.order.help.ships = Click: order the ships by name, idle or damaged first, or as the original
 list.order.help.cities = Click: order the cities by name or as the original
+
+# The screen "Mods" of the main menu (mods_menu.cpp)
+menu.mods = Mods
+mods.title = Mods
+mods.hint = New games use the mods turned on here; a savegame keeps its own. Mods received from a host serve only the games that need them.
+mods.col_name = Mod
+mods.col_version = Version
+mods.col_state = State
+mods.state_on = On
+mods.state_off = Off
+mods.state_broken = Not loaded (see the log)
+mods.state_received = Received from a host
+mods.none = There are no mods yet. A mod is a folder in the folder "mods" of Open1602's user data folder.
+mods.adopt = Add to my mods
+mods.back = Back
+mods.adopted = {1} is in your mods folder now and turned on.
+mods.adopt_failed = {1} could not be copied: {2}

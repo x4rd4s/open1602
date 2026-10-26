@@ -30,6 +30,7 @@ add_library(o1602_menus
     ../src/main_menu.cpp
     ../src/map_gestures.cpp
     ../src/message_table.cpp
+    ../src/mods_menu.cpp
     ../src/multiplayer_menu.cpp
     ../src/multiplayer_texts.cpp
     ../src/name_edit.cpp

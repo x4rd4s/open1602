@@ -228,9 +228,14 @@ std::uint64_t package_hash(const std::filesystem::path& folder) {
     return h;
 }
 
-std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods, std::vector<std::string>& warnings) {
+std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods, std::vector<std::string>& warnings,
+                                          std::span<const std::string> disabled) {
     std::vector<ModPackage> packages;
     for (ModPackage& package : mod_packages(mods)) {
+        if (std::find(disabled.begin(), disabled.end(), package.id) != disabled.end()) {
+            warnings.push_back(package.id + ": turned off; the package is not loaded");
+            continue;
+        }
         if (package.id.size() > kMaxPackageIdLength) {
             warnings.push_back(package.id + ": a package's name has at most " + std::to_string(kMaxPackageIdLength) +
                                " bytes; the package is not loaded");

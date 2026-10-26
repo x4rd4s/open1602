@@ -87,9 +87,11 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
 /// its hash. A package comes after the ones it depends on and the ones it wants to come after;
 /// otherwise in the order of the bytes of their ids. A package whose manifest cannot be read, whose
 /// dependency is missing or too old, or that is part of a circle of dependencies is left out, and
-/// a warning says why (as are the packages that depend on it).
+/// a warning says why (as are the packages that depend on it). So is a package whose id is in
+/// `disabled` (turned off in the menu of mods), and with it those that depend on it.
 [[nodiscard]] std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods,
-                                                        std::vector<std::string>& warnings);
+                                                        std::vector<std::string>& warnings,
+                                                        std::span<const std::string> disabled = {});
 /// The same for packages whose manifests were read already (and whose hashes are set): the order,
 /// without the packages that cannot be loaded.
 [[nodiscard]] std::vector<ModPackage> order_packages(std::vector<ModPackage> packages,
@@ -137,7 +139,7 @@ inline constexpr std::size_t kMaxPackagePathLength = 255;
 
 /// The folder of a received package in the cache: <cache>/<id>-<hash as 16 hex digits>.
 [[nodiscard]] std::filesystem::path cached_package_folder(const std::filesystem::path& cache,
-                                                         const ContentPackage& package);
+                                                          const ContentPackage& package);
 /// Writes the files of `package` into the cache (cached_package_folder) and reads it back as a
 /// package: refused, and nothing is left behind, when a path is not safe_package_path, the id is
 /// no package id, or the files written do not have the package's hash.

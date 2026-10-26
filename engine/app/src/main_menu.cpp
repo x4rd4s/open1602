@@ -24,6 +24,9 @@ constexpr std::int32_t kMulti = 30003;
 constexpr std::int32_t kCredits = 30004;
 constexpr std::int32_t kIntro = 30005;
 constexpr std::int32_t kQuit = 30006;
+// Open1602's own button on BASE.GAD's screen, below the original's.
+constexpr std::int32_t kModsButton = 1;
+constexpr ui::Rect kModsButtonRect{24, 714, 160, 38};
 // HOST.GAD
 constexpr std::int32_t kNewGame = 31002;
 constexpr std::int32_t kLoadGame = 31003;
@@ -278,6 +281,8 @@ void MainMenu::set_scale(double scale) {
         }
     }
     m_settings.set_scale(scale);
+    m_mods.set_scale(scale);
+    m_base_form.set_scale(scale);
 }
 
 ui::Panel* MainMenu::panel() {
@@ -291,6 +296,8 @@ ui::Panel* MainMenu::panel() {
             break;
         case Screen::Settings:  // drawn by its form; the screen before it stands behind it
             p = m_settings.scope() == SetupScope::Scenario ? &m_mission : &m_colour;
+            break;
+        case Screen::Mods:  // drawn by its form
             break;
         case Screen::Colour:
             p = &m_colour;
@@ -639,8 +646,21 @@ std::vector<ui::DrawItem> MainMenu::draw(const std::array<const ui::Font*, ui::k
         refresh_colour();
     } else if (m_screen == Screen::Settings) {
         return m_settings.draw(fonts);
+    } else if (m_screen == Screen::Mods) {
+        return m_mods.draw(m_mods_model, fonts);
     }
-    return p->draw(fonts);
+    std::vector<ui::DrawItem> out = p->draw(fonts);
+    if (m_screen == Screen::Base) {
+        layout_base_form();
+        const std::vector<ui::DrawItem> own = m_base_form.draw(fonts);
+        out.insert(out.end(), own.begin(), own.end());
+    }
+    return out;
+}
+
+void MainMenu::layout_base_form() {
+    m_base_form.clear();
+    m_base_form.button(kModsButton, kModsButtonRect, ui::tr("menu.mods"));
 }
 
 std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down, ui::MouseButton button) {
@@ -673,6 +693,32 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                 break;
         }
         return out;
+    }
+    if (m_screen == Screen::Mods) {
+        if (const auto e = m_mods.mouse(m_mods_model, x, y, down, button)) {
+            const ModsModel::Entry* entry =
+                e->index < m_mods_model.entries.size() ? &m_mods_model.entries[e->index] : nullptr;
+            if (e->kind == ModsMenu::Event::Kind::Close) {
+                m_screen = Screen::Base;
+            } else if (entry != nullptr) {
+                MenuEvent ev{e->kind == ModsMenu::Event::Kind::Toggle ? MenuEvent::Kind::ToggleMod
+                                                                      : MenuEvent::Kind::AdoptMod};
+                ev.name = entry->id;
+                ev.path = entry->folder;
+                out.push_back(std::move(ev));
+            }
+        }
+        return out;
+    }
+    if (m_screen == Screen::Base && button == ui::MouseButton::Left) {
+        layout_base_form();
+        if (m_base_form.mouse(x, y, down) == kModsButton) {
+            m_mods.open();
+            m_mods_model.notice.clear();
+            m_screen = Screen::Mods;
+            out.push_back(MenuEvent{MenuEvent::Kind::Mods});
+            return out;
+        }
     }
     ui::Panel* p = panel();
     if (p == nullptr || button != ui::MouseButton::Left) {
@@ -789,7 +835,8 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                 }
                 break;
             case Screen::Settings:
-                break;  // the form's, above
+            case Screen::Mods:
+                break;  // the forms', above
         }
     }
     return out;
@@ -808,6 +855,9 @@ bool MainMenu::back() {
             break;
         case Screen::Colour:
             m_screen = Screen::Mission;
+            break;
+        case Screen::Mods:
+            m_screen = Screen::Base;
             break;
         case Screen::Settings:
             if (m_settings.back()) {

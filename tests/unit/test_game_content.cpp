@@ -224,6 +224,12 @@ TEST_CASE("game content: the installed packages with manifests, hashes and load 
     CHECK(packages[2].version.empty());
     CHECK(packages[0].hash != 0);
     CHECK(packages[0].hash == assets::package_hash(mods.root / "base"));
+
+    // Turned off: left out, and so is what depends on it.
+    const std::vector<std::string> off{"base"};
+    warnings.clear();
+    CHECK(ids(assets::load_mod_packages(mods.root, warnings, off)) == "plain");
+    CHECK(warnings.size() == 3);
 }
 
 TEST_CASE("game content: a game takes the packages it names, in its order, and no others") {

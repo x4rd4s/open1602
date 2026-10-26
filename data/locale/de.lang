@@ -649,3 +649,20 @@ list.order.idle = Untätige zuerst
 list.order.damaged = Schäden zuerst
 list.order.help.ships = Klick: Schiffe nach Name, untätige oder beschädigte zuerst, oder wie im Original ordnen
 list.order.help.cities = Klick: Städte nach Name oder wie im Original ordnen
+
+# Der Bildschirm „Mods“ des Hauptmenüs (mods_menu.cpp)
+menu.mods = Mods
+mods.title = Mods
+mods.hint = Neue Spiele nutzen die hier eingeschalteten Mods, ein Spielstand behält seine eigenen. Von einem Gastgeber empfangene Mods gelten nur für Spiele, die sie brauchen.
+mods.col_name = Mod
+mods.col_version = Version
+mods.col_state = Zustand
+mods.state_on = An
+mods.state_off = Aus
+mods.state_broken = Nicht geladen (siehe Protokoll)
+mods.state_received = Vom Gastgeber empfangen
+mods.none = Es gibt noch keine Mods. Ein Mod ist ein Ordner im Ordner „mods“ im Benutzerordner von Open1602.
+mods.adopt = In Mods übernehmen
+mods.back = Zurück
+mods.adopted = {1} liegt jetzt in Eurem Mods-Ordner und ist eingeschaltet.
+mods.adopt_failed = {1} konnte nicht kopiert werden: {2}

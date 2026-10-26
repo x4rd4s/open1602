@@ -279,3 +279,52 @@ TEST_CASE("main menu: without its layouts the menu is not usable") {
     MainMenu menu(*g.dir, &g.texts);
     CHECK(!menu.usable());
 }
+
+TEST_CASE("main menu: the screen \"Mods\" turns packages on and off and takes in received ones") {
+    Game g("o1602-test-menu-mods", {});
+    MainMenu menu(*g.dir, &g.texts);
+    REQUIRE(menu.usable());
+    const auto press = [&](std::int32_t x, std::int32_t y) {
+        auto events = menu.mouse(x, y, true);
+        for (MenuEvent& e : menu.mouse(x, y, false)) {
+            events.push_back(std::move(e));
+        }
+        return events;
+    };
+    // Open1602's own button below the original's.
+    auto opened = press(104, 733);
+    REQUIRE(opened.size() == 1);
+    CHECK(opened[0].kind == MenuEvent::Kind::Mods);
+    CHECK(menu.screen() == MainMenu::Screen::Mods);
+
+    app::ModsModel model;
+    app::ModsModel::Entry own;
+    own.id = "leuchtturm";
+    own.folder = "mods/leuchtturm";
+    own.name = "Leuchtturm";
+    own.version = "1.2";
+    app::ModsModel::Entry received = own;
+    received.id = "wetter";
+    received.folder = "mods-cache/wetter-0123456789abcdef";
+    received.name = "Wetter";
+    received.state = app::ModsModel::Entry::State::Received;
+    received.adoptable = true;
+    model.entries = {own, received};
+    menu.set_mods(model);
+    CHECK(shows(menu, "Leuchtturm"));
+    CHECK(shows(menu, app::ModsMenu::state_text(app::ModsModel::Entry::State::Received)));
+
+    auto toggled = press(84, 203);  // the check box of the first row
+    REQUIRE(toggled.size() == 1);
+    CHECK(toggled[0].kind == MenuEvent::Kind::ToggleMod);
+    CHECK(toggled[0].name == "leuchtturm");
+
+    CHECK(press(300, 237).empty());  // chooses the received package
+    auto adopted = press(200, 686);
+    REQUIRE(adopted.size() == 1);
+    CHECK(adopted[0].kind == MenuEvent::Kind::AdoptMod);
+    CHECK(adopted[0].path == received.folder);
+
+    CHECK(menu.back());
+    CHECK(menu.screen() == MainMenu::Screen::Base);
+}

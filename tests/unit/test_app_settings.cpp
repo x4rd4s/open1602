@@ -24,6 +24,16 @@ TEST_CASE("app settings: names are written as UTF-8 and read back") {
     CHECK(back.remembered_hosts[0] == "example.org:2601");
 }
 
+TEST_CASE("app settings: the mods turned off, each once") {
+    app::AppSettings s;
+    s.disabled_mods = {"leuchtturm", "wetter"};
+    const app::AppSettings back = app::parse_settings(app::write_settings(s) + "disabled_mod = wetter\n", {});
+    REQUIRE(back.disabled_mods.size() == 2);
+    CHECK(back.disabled_mods[0] == "leuchtturm");
+    CHECK(back.disabled_mods[1] == "wetter");
+    CHECK(app::write_settings(app::AppSettings{}).find("disabled_mod") == std::string::npos);
+}
+
 TEST_CASE("app settings: a byte order mark and files of older versions") {
     // Saved by an editor with a byte order mark: the first key still counts.
     const app::AppSettings bom =

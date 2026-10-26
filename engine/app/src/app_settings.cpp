@@ -139,6 +139,11 @@ AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
             if (!value.empty() && s.remembered_hosts.size() < AppSettings::kMaxHosts) {
                 s.remembered_hosts.push_back(from_file(value));
             }
+        } else if (key == "disabled_mod") {
+            if (!value.empty() &&
+                std::find(s.disabled_mods.begin(), s.disabled_mods.end(), value) == s.disabled_mods.end()) {
+                s.disabled_mods.emplace_back(value);
+            }
         } else if (key == "mission_window") {
             s.mission_window = flag(value, s.mission_window);
         } else if (key == "tutorial_chapter") {
@@ -194,6 +199,12 @@ std::string write_settings(const AppSettings& s) {
         if (const std::string text = to_file(host); !text.empty()) {
             out += "remembered_host = " + text + "\n";
         }
+    }
+    if (!s.disabled_mods.empty()) {
+        out += "# Packages of the mods folder turned off in the menu \"Mods\"\n";
+    }
+    for (const std::string& id : s.disabled_mods) {
+        out += "disabled_mod = " + id + "\n";
     }
     out += write_display(s.display);
     out += "# The last settings of the start dialog of the endless game\n";

@@ -21,6 +21,7 @@
 #include "game_state.hpp"
 #include "hud.hpp"
 #include "map_input.hpp"
+#include "mods_menu.hpp"
 #include "multiplayer_menu.hpp"
 #include "names.hpp"
 #include "stock_notes.hpp"
@@ -245,6 +246,13 @@ private:
     /// The packages this computer has, its own and those received, as a host sends them to
     /// computers that lack them.
     [[nodiscard]] std::vector<net::SharedPackage> shared_packages() const;
+    /// The screen "Mods": the packages of the mods folder with their state, then those received.
+    [[nodiscard]] ModsModel mods_model() const;
+    /// Loads the mods folder's packages anew after one was turned on or off or added: what new
+    /// games get from them (a running game keeps what it has).
+    void reload_mods();
+    /// Copies the received package in `folder` into the mods folder; what the screen "Mods" says.
+    std::string adopt_mod(const std::filesystem::path& folder);
     /// The packages a game may use here: those in `mods`, then those received from hosts.
     [[nodiscard]] std::vector<assets::ModPackage> known_packages() const;
     /// Drops the session, its beacon and the hosted game; the menus stay as they are.
