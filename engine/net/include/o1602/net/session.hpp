@@ -27,6 +27,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <future>
 #include <memory>
@@ -121,6 +122,17 @@ struct SessionConfig {
     /// back into its host's game, with its token, before it takes the host for gone and moves on to
     /// the successor (MS-2). Needs ClientSession::reconnect_with().
     std::uint32_t reconnect_ms = 10'000;
+    /// (Host) The bytes of packages it sends at most to a computer that lacks them and asks for them
+    /// (HostSession::share_packages); a computer that lacks more is refused as without sharing.
+    std::uint64_t max_share_bytes = 256U << 20;
+};
+
+/// A package of the game a host may send to computers that lack it: what the game names, and the
+/// folder its files are read from when one asks.
+struct SharedPackage {
+    assets::ContentPackage package;
+    std::filesystem::path folder;
+    std::uint64_t bytes = 0;  ///< of its files together (assets::package_size)
 };
 
 enum class EndReason : std::uint8_t {
@@ -152,6 +164,7 @@ struct SessionEvent {
         Dropped,       ///< `count` commands of this computer's player were not carried out (too many at once)
         Reconnecting,  ///< (computer) the connection to the host broke; it tries to get back in
         PauseRefused,  ///< (computer) only the host pauses and resumes this game (Lobby::host_pauses_only)
+        PackageKept,   ///< (computer) a package the host sent was kept (packages[0])
     };
     Kind kind = Kind::Joined;
     Seat seat = sim::kNoPlayer;
@@ -159,8 +172,11 @@ struct SessionEvent {
     std::uint64_t frame = 0;
     EndReason reason = EndReason::None;
     RefuseReason refused = RefuseReason::Version;
-    /// (Ended, refused for Packages) The packages of the game this computer lacks.
+    /// (Ended, refused for Packages) The packages of the game this computer lacks; (PackageKept)
+    /// the package kept.
     std::vector<assets::ContentPackage> packages;
+    /// (Ended, refused for Packages) Their bytes, when the host sends them (Refused::share_bytes).
+    std::uint64_t share_bytes = 0;
     std::string text;
     std::uint32_t count = 0;
     /// (Chat) To everyone, or privately to the players in `to`; on the computer that said it, the
@@ -285,6 +301,10 @@ public:
     void set_packages(std::vector<assets::ContentPackage> packages) { m_packages = std::move(packages); }
     /// The content packages a computer needs to join.
     [[nodiscard]] std::span<const assets::ContentPackage> packages() const noexcept;
+    /// The packages this computer has that it sends to a computer that lacks them, when that asks
+    /// for them (Hello::fetch_packages) and they are within SessionConfig::max_share_bytes. Without,
+    /// such a computer is refused (RefuseReason::Packages).
+    void share_packages(std::vector<SharedPackage> packages) { m_shared = std::move(packages); }
     /// Title, description and the program's setup of the game to come; the slots stay.
     void set_lobby_info(std::string title, std::string game, std::vector<std::uint8_t> setup);
     /// Who plays slot `seat`: Open, Computer or Closed. A computer that had it watches from then
@@ -382,7 +402,12 @@ private:
     void update_lead(std::uint32_t real_ms);
     void watch_stalls(std::uint32_t real_ms, bool stalled);
     /// Ends the computer's connection, telling it why if `tell` (with `packages` for Packages).
-    void drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages = {});
+    void drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages = {},
+              std::uint64_t share_bytes = 0);
+    /// The bytes of `missing` if this host sends them all (share_packages), else 0.
+    [[nodiscard]] std::uint64_t share_bytes(std::span<const assets::ContentPackage> missing) const;
+    /// Sends the computer the files of `missing` (PackageFiles); false if one could not be read.
+    bool send_packages(Peer& peer, std::span<const assets::ContentPackage> missing);
     void refresh_roster();
     void init_lobby();
     /// The token of a slot (made when it is first needed).
@@ -416,6 +441,7 @@ private:
     std::string m_name;
     std::uint64_t m_content;
     std::vector<assets::ContentPackage> m_packages;  ///< before the game runs (set_packages)
+    std::vector<SharedPackage> m_shared;             ///< share_packages()
     std::vector<std::unique_ptr<Peer>> m_peers;
     std::deque<Frame> m_log;  ///< frames m_log_start to m_closed - 1
     std::uint64_t m_log_start = 0;
@@ -484,6 +510,10 @@ public:
     using Loader = std::function<sim::Simulation*(std::span<const std::uint8_t> save)>;
     /// A connection to the successor (nullptr if none can be made now).
     using Connect = std::function<std::unique_ptr<Transport>()>;
+    /// Keeps a package the host sent (its files, in package_hash order): false if it cannot, which
+    /// ends the session (LoadFailed).
+    using KeepPackage =
+        std::function<bool(const assets::ContentPackage& package, std::span<const assets::PackageFile> files)>;
 
     ClientSession(std::unique_ptr<Transport> transport, Hello hello, Loader load, SessionConfig config = {});
     /// Host migration: follows `old`, whose host left, to the successor: the same name and slot (its
@@ -506,6 +536,9 @@ public:
     /// SessionConfig::reconnect_ms before it moves on to the successor. Without, it only moves on
     /// when the host said it leaves.
     void reconnect_with(Connect connect) { m_reconnect = std::move(connect); }
+    /// Where the packages go that the host sends when the Hello asks for them (Hello::fetch_packages),
+    /// before the game that uses them is loaded. Without, a computer that gets one ends the session.
+    void keep_packages_with(KeepPackage keep) { m_keep_package = std::move(keep); }
 
     /// Taken in by the host (in the lobby or the game).
     [[nodiscard]] bool welcomed() const noexcept { return m_welcomed; }
@@ -531,6 +564,7 @@ private:
     void receive(std::span<const std::uint8_t> bytes);
     void load(Snapshot& m);
     void turn(Turn& m);
+    void package_files(PackageFiles& m);
     void run(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick);
     void report(std::uint32_t real_ms);
     /// Sends what the host would admit now of m_outgoing.
@@ -554,6 +588,9 @@ private:
     std::deque<sim::Command> m_outgoing;
     std::vector<std::uint8_t> m_part;  ///< the pieces so far of a message that comes in Parts
     std::uint32_t m_part_total = 0;    ///< its size
+    KeepPackage m_keep_package;
+    /// The files so far of a package that comes in several PackageFiles messages.
+    std::optional<PackageFiles> m_package;
     /// Pacing what goes to the host as it would admit it (MS-17): commands and work in the frames
     /// run since the last sending, so that the host does not have to drop any.
     std::uint32_t m_send_commands = 0;

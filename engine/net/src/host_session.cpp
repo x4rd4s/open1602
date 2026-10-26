@@ -476,13 +476,17 @@ void HostSession::hello(Peer& peer, const Hello& m) {
         drop(peer, RefuseReason::Content);
         return;
     }
-    if (auto missing = assets::missing_packages(packages(), m.packages); !missing.empty()) {
-        drop(peer, RefuseReason::Packages, std::move(missing));
-        return;
-    }
     if (m.password != m_config.password) {
         drop(peer, RefuseReason::Password);
         return;
+    }
+    if (auto missing = assets::missing_packages(packages(), m.packages); !missing.empty()) {
+        // Sent only to a computer with the password, and only once its person agreed to them.
+        const std::uint64_t bytes = share_bytes(missing);
+        if (!m.fetch_packages || bytes == 0 || !send_packages(peer, missing)) {
+            drop(peer, RefuseReason::Packages, std::move(missing), bytes);
+            return;
+        }
     }
     Seat seat = seat_of_token(m);
     if (seat != sim::kNoPlayer) {
@@ -943,7 +947,53 @@ std::span<const assets::ContentPackage> HostSession::packages() const noexcept {
     return m_packages;
 }
 
-void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages) {
+std::uint64_t HostSession::share_bytes(std::span<const assets::ContentPackage> missing) const {
+    std::uint64_t total = 0;
+    for (const assets::ContentPackage& p : missing) {
+        const auto shared = std::find_if(m_shared.begin(), m_shared.end(),
+                                         [&](const SharedPackage& s) { return s.package == p; });
+        if (shared == m_shared.end()) {
+            return 0;
+        }
+        total += shared->bytes;
+    }
+    // Packages without files count 1 byte: 0 says the host does not send them.
+    return total <= m_config.max_share_bytes ? std::max<std::uint64_t>(total, 1) : 0;
+}
+
+bool HostSession::send_packages(Peer& peer, std::span<const assets::ContentPackage> missing) {
+    for (const assets::ContentPackage& p : missing) {
+        const auto shared = std::find_if(m_shared.begin(), m_shared.end(),
+                                         [&](const SharedPackage& s) { return s.package == p; });
+        auto files = assets::read_package_files(shared->folder);
+        if (!files || assets::package_hash(shared->folder) != p.hash) {
+            return false;  // changed since the game started
+        }
+        // The files in messages of at most kMaxPackageFilesBytes, in their order.
+        std::vector<PackageFiles> messages(1, PackageFiles{p, 0, 1, {}});
+        std::size_t bytes = 0;
+        for (assets::PackageFile& f : *files) {
+            if (f.bytes.size() > kMaxPackageFilesBytes) {
+                return false;
+            }
+            if ((bytes + f.bytes.size() > kMaxPackageFilesBytes || messages.back().files.size() == kMaxPackageFiles) &&
+                !messages.back().files.empty()) {
+                messages.push_back(PackageFiles{p, static_cast<std::uint32_t>(messages.size()), 1, {}});
+                bytes = 0;
+            }
+            bytes += f.bytes.size();
+            messages.back().files.push_back(std::move(f));
+        }
+        for (PackageFiles& message : messages) {
+            message.count = static_cast<std::uint32_t>(messages.size());
+            send(peer.link, message);
+        }
+    }
+    return true;
+}
+
+void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages,
+                       std::uint64_t share_bytes) {
     if (peer.gone) {
         return;
     }
@@ -951,7 +1001,7 @@ void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell, std::vector
     peer.game_due = false;
     peer.packing = false;
     if (tell) {
-        send(peer.link, Refused{*tell, std::move(packages)});
+        send(peer.link, Refused{*tell, std::move(packages), share_bytes});
     }
     m_transport->disconnect(peer.link);
     if (peer.welcomed) {

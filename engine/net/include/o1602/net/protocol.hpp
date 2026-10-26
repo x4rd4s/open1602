@@ -26,7 +26,7 @@ namespace o1602::net {
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
-inline constexpr std::uint16_t kProtocolVersion = 14;
+inline constexpr std::uint16_t kProtocolVersion = 15;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -59,6 +59,12 @@ inline constexpr std::size_t kMaxAddressLength = 64;
 inline constexpr std::uint32_t kMaxLobbyBanners = 1024;
 /// Content packages a Hello names or a Refused lists (ADR 0007 section 7).
 inline constexpr std::uint32_t kMaxPackages = 1024;
+/// The bytes of a package's files in one PackageFiles message: a package travels in as many as it
+/// needs, and a single file larger than this not at all.
+inline constexpr std::uint32_t kMaxPackageFilesBytes = 16U << 20;
+static_assert(kMaxPackageFilesBytes + (64U << 10) <= kMaxMessageBytes);
+/// Files of a package in one PackageFiles message.
+inline constexpr std::uint32_t kMaxPackageFiles = 4096;
 
 /// Which player of the world a computer plays: kNoPlayer watches only.
 using Seat = sim::PlayerId;
@@ -81,6 +87,9 @@ struct Hello {
     /// The content packages installed on the computer, each with its version and hash: it joins
     /// only with every package the game uses; those it has beyond them it does not load for the game.
     std::vector<assets::ContentPackage> packages;
+    /// The person agreed to download the packages it lacks (Refused::share_bytes): the host sends
+    /// them (PackageFiles) before it takes the computer in.
+    bool fetch_packages = false;
 };
 
 /// Commands of the computer's player, in the order given; the host puts them into the next frame
@@ -131,6 +140,9 @@ struct Refused {
     RefuseReason reason = RefuseReason::Version;
     /// (Packages) The packages of the game the computer lacks, as the host has them.
     std::vector<assets::ContentPackage> packages;
+    /// (Packages) The bytes of these packages, when the host sends them to a computer that asks for
+    /// them (Hello::fetch_packages); 0 when it does not.
+    std::uint64_t share_bytes = 0;
 };
 
 /// The whole game as the host has it before frame `frame`: at the start, for a computer that
@@ -312,8 +324,18 @@ struct HostLeaving {
     std::string successor_address;
 };
 
+/// (Host) Files of a package of the game the computer asked for (Hello::fetch_packages): the
+/// `index`th of `count` messages of the package, together its files in package_hash order. The
+/// computer keeps the package only when the files have its hash (assets::store_package).
+struct PackageFiles {
+    assets::ContentPackage package;
+    std::uint32_t index = 0;
+    std::uint32_t count = 1;
+    std::vector<assets::PackageFile> files;
+};
+
 using Message = std::variant<Hello, CommandBatch, Progress, Welcome, Refused, Snapshot, Turn, Roster, Desync, Lobby,
-                             TakeSeat, SetReady, Chat, Standby, SetBanner, Dropped, HostLeaving, Part>;
+                             TakeSeat, SetReady, Chat, Standby, SetBanner, Dropped, HostLeaving, Part, PackageFiles>;
 
 [[nodiscard]] std::vector<std::uint8_t> encode(const Message& message);
 /// What goes over the transport for an encoded message: the message itself, or the encoded Parts of

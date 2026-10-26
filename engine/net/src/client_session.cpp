@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <algorithm>
+#include <iterator>
 #include <utility>
 
 #include "o1602/net/session.hpp"
@@ -213,7 +214,11 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
         end(EndReason::ProtocolError);  // another message between the pieces of one
         return;
     }
-    if (const auto* welcome = std::get_if<Welcome>(&*message)) {
+    if (auto* files = std::get_if<PackageFiles>(&*message)) {
+        package_files(*files);
+    } else if (m_package) {
+        end(EndReason::ProtocolError);  // another message between the files of a package
+    } else if (const auto* welcome = std::get_if<Welcome>(&*message)) {
         // Again in the lobby when this computer moves to another slot.
         if ((m_welcomed && m_lobby.started) || welcome->protocol != kProtocolVersion) {
             end(EndReason::ProtocolError);
@@ -238,6 +243,7 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
         e.reason = EndReason::Refused;
         e.refused = refused->reason;
         e.packages = refused->packages;
+        e.share_bytes = refused->share_bytes;
         m_ended = true;
         m_end_reason = refused->reason == RefuseReason::Desync ? EndReason::Desync : EndReason::Refused;
         e.reason = m_end_reason;
@@ -284,6 +290,39 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
     } else {
         end(EndReason::ProtocolError);  // a message only computers send
     }
+}
+
+void ClientSession::package_files(PackageFiles& m) {
+    if (!m_hello.fetch_packages || !m_keep_package || m_welcomed) {
+        end(EndReason::ProtocolError);  // only before it is taken in, when it asked for them
+        return;
+    }
+    if (!m_package) {
+        if (m.index != 0) {
+            end(EndReason::ProtocolError);
+            return;
+        }
+        m_package = std::move(m);
+    } else if (m.package != m_package->package || m.count != m_package->count || m.index != m_package->index + 1) {
+        end(EndReason::ProtocolError);
+        return;
+    } else {
+        m_package->index = m.index;
+        std::move(m.files.begin(), m.files.end(), std::back_inserter(m_package->files));
+    }
+    if (m_package->index + 1 < m_package->count) {
+        return;
+    }
+    const PackageFiles whole = std::move(*m_package);
+    m_package.reset();
+    if (!m_keep_package(whole.package, whole.files)) {
+        end(EndReason::LoadFailed);
+        return;
+    }
+    SessionEvent e;
+    e.kind = SessionEvent::Kind::PackageKept;
+    e.packages.push_back(whole.package);
+    event(std::move(e));
 }
 
 void ClientSession::load(Snapshot& m) {
