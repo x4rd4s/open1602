@@ -1,0 +1,306 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Builds the game for players on Linux, Windows and macOS and publishes it as a GitHub release.
+# The packages hold only Open1602 itself: the original Anno 1602 data is never part of them, the
+# player points the game at their own installation.
+#
+# - A pushed tag vX.Y.Z, or a manual run with a tag, builds the packages and publishes the release
+#   (the manual run creates the tag on the commit it was started on).
+# - A manual run without a tag, and a pull request that changes this file, only build the packages
+#   and keep them as workflow artifacts.
+#
+# SDL 3 is linked statically, and on Windows the C++ runtime too, so that every package runs on its
+# own: Linux needs only the system's C library and zlib, Windows and macOS nothing besides the system.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml', '.github/workflows/start-game.sh']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, for example v0.1.0 (must match the version in CMakeLists.txt); empty only builds the packages'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark the release as a pre-release'
+        type: boolean
+        default: false
+
+# Actions are pinned to commit SHAs (the tag in the comment), as in ci.yml.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  SDL_VERSION: 3.2.24
+  ZLIB_VERSION: 1.3.1
+  # Oldest macOS the package starts on; the package holds arm64 and x86_64 code.
+  MACOSX_DEPLOYMENT_TARGET: '11.0'
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      name: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # A release's tag must match the project's version, so that the program and the release
+      # agree. A build without a tag is named after its commit.
+      - name: Determine the version
+        id: version
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          project=$(sed -nE '/^project\(Open1602/,/\)/s/^ *VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="$INPUT_TAG"
+          fi
+          if [[ -n "$tag" ]]; then
+            if [[ "$tag" != "v$project" ]]; then
+              echo "::error::tag $tag does not match the version $project in CMakeLists.txt (expected v$project)"
+              exit 1
+            fi
+            name="$project"
+          else
+            name="$project-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Packages are named Open1602-$name-<platform>${tag:+, published as $tag}"
+
+  package:
+    name: Package (${{ matrix.name }})
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built on Ubuntu 24.04: the package needs glibc 2.39 (Ubuntu 24.04, Debian 13, Fedora 40
+          # and newer, Arch).
+          - { name: Linux,   os: ubuntu-24.04, platform: linux-x64 }
+          - { name: Windows, os: windows-2025, platform: windows-x64 }
+          - { name: macOS,   os: macos-14,     platform: macos-universal }
+    env:
+      PACKAGE: Open1602-${{ needs.version.outputs.name }}-${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libx11-dev libxext-dev
+          libxrandr-dev libxcursor-dev libxi-dev libxss-dev libwayland-dev libxkbcommon-dev wayland-protocols
+          libegl1-mesa-dev libgl1-mesa-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
+        with:
+          arch: x64
+
+      # The same flags for SDL, zlib and the game: on Windows one C++ runtime (the static one), on
+      # macOS both architectures and the same oldest macOS, on Linux position-independent code for
+      # the game's PIE and libstdc++ linked in (the package then runs beside an older libstdc++).
+      - name: Set the build flags
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows) flags='-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW' ;;
+            macOS)   flags='-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' ;;
+            Linux)   flags='-DCMAKE_POSITION_INDEPENDENT_CODE=ON' ;;
+          esac
+          echo "DEP_FLAGS=$flags" >> "$GITHUB_ENV"
+
+      - name: Cache SDL3 (static)
+        id: sdl-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ runner.temp }}/sdl3
+          key: sdl3-static-${{ env.SDL_VERSION }}-${{ matrix.platform }}-${{ env.MACOSX_DEPLOYMENT_TARGET }}
+
+      - name: Build SDL3 (static)
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "release-$SDL_VERSION" https://github.com/libsdl-org/SDL sdl-src
+          cmake -S sdl-src -B sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+                -DSDL_SHARED=OFF -DSDL_STATIC=ON $DEP_FLAGS -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/sdl3"
+          cmake --build sdl-build
+          cmake --install sdl-build
+          cp sdl-src/LICENSE.txt "$RUNNER_TEMP/sdl3/SDL3-LICENSE.txt"
+
+      - name: Cache zlib (Windows, static runtime)
+        if: runner.os == 'Windows'
+        id: zlib-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ runner.temp }}/zlib
+          key: zlib-mt-${{ env.ZLIB_VERSION }}-${{ matrix.platform }}
+
+      - name: Build zlib (Windows, static runtime)
+        if: runner.os == 'Windows' && steps.zlib-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "v$ZLIB_VERSION" https://github.com/madler/zlib zlib-src
+          cmake -S zlib-src -B zlib-build -G Ninja -DCMAKE_BUILD_TYPE=Release $DEP_FLAGS \
+                -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/zlib"
+          cmake --build zlib-build
+          cmake --install zlib-build
+          cp zlib-src/LICENSE "$RUNNER_TEMP/zlib/zlib-LICENSE.txt"
+
+      # The release preset without the tests: they run in ci.yml on every change to main.
+      - name: Configure
+        shell: bash
+        run: |
+          extra=()
+          if [[ "$RUNNER_OS" == Windows ]]; then extra+=(-DZLIB_USE_STATIC_LIBS=ON); fi
+          if [[ "$RUNNER_OS" == Linux ]]; then extra+=("-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc"); fi
+          cmake --preset release -DO1602_BUILD_TESTS=OFF -DO1602_BUILD_TOOLS=OFF $DEP_FLAGS "${extra[@]}" \
+                -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/sdl3;$RUNNER_TEMP/zlib"
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Install into the package folder
+        run: cmake --install build/release --prefix stage
+
+      # Each platform gets the layout its players expect: on Windows one folder with the program,
+      # on macOS the app bundle, on Linux the usual bin/ and share/ (which can also be copied to
+      # ~/.local). The licences of SDL and, on Windows, zlib go beside Open1602's.
+      - name: Arrange the package
+        shell: bash
+        run: |
+          mkdir -p "$PACKAGE"
+          case "$RUNNER_OS" in
+            Linux)
+              cp -R stage/. "$PACKAGE/"
+              licenses="$PACKAGE/share/doc/open1602/licenses"
+              program="$PACKAGE/bin/open1602" ;;
+            Windows)
+              cp stage/bin/open1602.exe "$PACKAGE/"
+              cp stage/share/doc/open1602/LICENSE "$PACKAGE/LICENSE.txt"
+              cp -R stage/share/doc/open1602/licenses "$PACKAGE/licenses"
+              licenses="$PACKAGE/licenses"
+              cp "$RUNNER_TEMP/zlib/zlib-LICENSE.txt" "$licenses/zlib.txt"
+              program="$PACKAGE/open1602.exe" ;;
+            macOS)
+              cp -R stage/Open1602.app "$PACKAGE/"
+              cp stage/share/doc/open1602/LICENSE "$PACKAGE/LICENSE.txt"
+              cp -R stage/share/doc/open1602/licenses "$PACKAGE/licenses"
+              licenses="$PACKAGE/licenses"
+              # Not signed with a developer certificate: an ad-hoc signature over the whole bundle
+              # lets arm64 Macs start it once the player has allowed it (right click > Open).
+              codesign --force --deep --sign - "$PACKAGE/Open1602.app"
+              program="$PACKAGE/Open1602.app/Contents/MacOS/Open1602" ;;
+          esac
+          cp "$RUNNER_TEMP/sdl3/SDL3-LICENSE.txt" "$licenses/SDL3.txt"
+          echo "PROGRAM=$program" >> "$GITHUB_ENV"
+          find "$PACKAGE" -type f | sort
+
+      # Nothing the player would have to install: no SDL3, no C++ runtime, no Homebrew library; on
+      # macOS both architectures.
+      - name: Check the program's dependencies
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux)   deps=$(ldd "$PROGRAM"); unwanted='SDL3|libstdc\+\+' ;;
+            Windows) deps=$(dumpbin //nologo //dependents "$PROGRAM"); unwanted='SDL3|MSVCP|VCRUNTIME' ;;
+            macOS)   deps=$(otool -L "$PROGRAM"); unwanted='SDL3|/opt/homebrew|/usr/local'
+                     archs=$(lipo -archs "$PROGRAM")
+                     echo "architectures: $archs"
+                     if [[ "$archs" != *arm64* || "$archs" != *x86_64* ]]; then
+                       echo "::error::$PROGRAM is not universal ($archs)"
+                       exit 1
+                     fi ;;
+          esac
+          echo "$deps"
+          if grep -iE "$unwanted" <<< "$deps"; then
+            echo "::error::$PROGRAM depends on a library the package does not bring along"
+            exit 1
+          fi
+
+      - name: Start the packaged game without data
+        shell: bash
+        timeout-minutes: 5
+        env:
+          O1602_STATIC_SDL: 1
+        run: .github/workflows/start-game.sh "$PROGRAM"
+
+      - name: Pack
+        shell: bash
+        run: |
+          mkdir -p dist
+          case "$RUNNER_OS" in
+            Linux)   tar -czf "dist/$PACKAGE.tar.gz" "$PACKAGE" ;;
+            Windows) 7z a -tzip "dist/$PACKAGE.zip" "$PACKAGE" > /dev/null ;;
+            macOS)   ditto -c -k --keepParent "$PACKAGE" "dist/$PACKAGE.zip" ;;  # keeps the bundle's signature
+          esac
+          ls -l dist
+
+      - name: Upload the package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: ${{ env.PACKAGE }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [version, package]
+    if: needs.version.outputs.tag != '' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download the packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum Open1602-* | tee SHA256SUMS.txt
+
+      # gh creates the tag on this commit when it does not exist yet (manual run).
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease && '--prerelease' || '' }}
+        run: |
+          cat > notes.md <<EOF
+          Open1602 ${TAG#v}, built from ${GITHUB_SHA::7}.
+
+          **Open1602 needs the data of an installed Anno 1602** (for example the GOG edition); the
+          packages hold only the engine. On its first start it looks for the installation and, when
+          it finds none, asks for its folder.
+
+          | Platform | Package | Start |
+          |---|---|---|
+          | Windows 10/11 (64-bit) | \`Open1602-${TAG#v}-windows-x64.zip\` | unpack, start \`open1602.exe\` |
+          | macOS 11 or newer (Apple silicon and Intel) | \`Open1602-${TAG#v}-macos-universal.zip\` | unpack, right click \`Open1602.app\` > Open (the app is not notarised) |
+          | Linux x86-64 (glibc 2.39+: Ubuntu 24.04, Debian 13, Fedora 40, Arch) | \`Open1602-${TAG#v}-linux-x64.tar.gz\` | unpack, start \`bin/open1602\` |
+
+          SHA-256 checksums are in \`SHA256SUMS.txt\`.
+          EOF
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Open1602 ${TAG#v}" \
+             --notes-file notes.md $PRERELEASE

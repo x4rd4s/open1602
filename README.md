@@ -11,6 +11,15 @@ stable multiplayer and room for new features, quality-of-life improvements and m
 > interface and the modding foundations are still missing. What is done, open and unclear:
 > [docs/status.md](docs/status.md).
 
+## Download
+
+Ready-built packages for Windows (64-bit), macOS (11 or newer, Apple silicon and Intel) and Linux
+(x86-64, glibc 2.39 or newer) are on the [releases page](https://github.com/x4rd4s/open1602/releases).
+They hold only the engine; the original game data comes from your own installation (below). The macOS
+app is not notarised: start it the first time with a right click on `Open1602.app` > Open. The packages
+are built by [.github/workflows/release.yml](.github/workflows/release.yml), which publishes a release
+for every pushed tag `vX.Y.Z` that matches the version in `CMakeLists.txt`.
+
 ## Original game data
 
 Open1602 contains **no** game files. You need your own copy of *Anno 1602*, for example the GOG

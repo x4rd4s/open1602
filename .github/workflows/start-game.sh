@@ -11,7 +11,8 @@
 #    sanitizers.
 set -u
 game="$1"
-if [[ "${RUNNER_OS:-}" == "Windows" && ! -f "$(dirname "$game")/SDL3.dll" ]]; then
+# The release packages link SDL3 statically (O1602_STATIC_SDL=1) and bring no SDL3.dll.
+if [[ "${RUNNER_OS:-}" == "Windows" && -z "${O1602_STATIC_SDL:-}" && ! -f "$(dirname "$game")/SDL3.dll" ]]; then
     echo "SDL3.dll is missing next to $game" >&2
     exit 1
 fi
