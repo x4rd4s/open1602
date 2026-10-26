@@ -950,8 +950,8 @@ std::span<const assets::ContentPackage> HostSession::packages() const noexcept {
 std::uint64_t HostSession::share_bytes(std::span<const assets::ContentPackage> missing) const {
     std::uint64_t total = 0;
     for (const assets::ContentPackage& p : missing) {
-        const auto shared = std::find_if(m_shared.begin(), m_shared.end(),
-                                         [&](const SharedPackage& s) { return s.package == p; });
+        const auto shared =
+            std::find_if(m_shared.begin(), m_shared.end(), [&](const SharedPackage& s) { return s.package == p; });
         if (shared == m_shared.end()) {
             return 0;
         }
@@ -963,8 +963,8 @@ std::uint64_t HostSession::share_bytes(std::span<const assets::ContentPackage> m
 
 bool HostSession::send_packages(Peer& peer, std::span<const assets::ContentPackage> missing) {
     for (const assets::ContentPackage& p : missing) {
-        const auto shared = std::find_if(m_shared.begin(), m_shared.end(),
-                                         [&](const SharedPackage& s) { return s.package == p; });
+        const auto shared =
+            std::find_if(m_shared.begin(), m_shared.end(), [&](const SharedPackage& s) { return s.package == p; });
         auto files = assets::read_package_files(shared->folder);
         if (!files || assets::package_hash(shared->folder) != p.hash) {
             return false;  // changed since the game started

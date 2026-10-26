@@ -970,9 +970,8 @@ TEST_CASE("net: the host sends the packages a computer lacks once it asks for th
     stingy.game.world->set_packages({lighthouse});
     stingy.session->share_packages({{lighthouse, folder, size}});
     Computer late(small, "Late", 0, kContent, {}, {}, {}, true);
-    late.session->keep_packages_with([](const assets::ContentPackage&, std::span<const assets::PackageFile>) {
-        return true;
-    });
+    late.session->keep_packages_with(
+        [](const assets::ContentPackage&, std::span<const assets::PackageFile>) { return true; });
     run_for(small, stingy, {&late}, 1000);
     REQUIRE(!late.events.empty());
     CHECK(late.events.back().refused == net::RefuseReason::Packages);
