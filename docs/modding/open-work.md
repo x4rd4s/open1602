@@ -1,7 +1,7 @@
 # Modding: what is done and what is still open
 
 This page compares the requirements of [ADR 0007](../architecture/0007-extensibility-and-modding.md)
-with what the engine does today (state of 2026-10-24, after PR #159). It is the list to work from
+with what the engine does today (state of 2026-10-26, after PR #224). It is the list to work from
 for milestone M8 ([plan](../00-plan.md#6-milestones)). The table of fixed limits at the end of
 ADR 0007 tracks the same items from the code's side.
 
@@ -9,8 +9,15 @@ ADR 0007 tracks the same items from the code's side.
 
 A mod is a folder `mods/<package>/`. The folder's name is the package's id, and the packages are
 read in the order of their names (UTF-8 bytes, the same on every system, `assets::mod_packages`).
-Every computer of a multiplayer game compares a fingerprint of the original data and the packages
-(`assets::content_fingerprint`) before anyone joins.
+
+**Multiplayer.** Before anyone joins, the computers of a multiplayer game compare a fingerprint of
+the original data the simulation computes with, `haeuser.cod` and `figuren.cod`
+(`assets::content_fingerprint`). The packages are not part of it. The two mod files that change the
+game travel with it instead: factions and balance are saved in the game (sections `FACT` and
+`BALA`), so every computer plays the host's, whatever it has installed. The two others stay each
+computer's own: its messages, which are presentation only, and its build menu, which can only list
+buildings of `haeuser.cod` and so issues the same commands. A computer with packages the host does
+not have can therefore join today, but nobody is told when the packages differ.
 
 | File | Changes | Guide |
 |---|---|---|
@@ -36,8 +43,19 @@ code review of October 2026 ([PR #109](https://github.com/x4rd4s/open1602/pull/1
 
 A manifest per package with id, version, dependencies and load order. Today the folder's name is
 the id and the order is alphabetical; a package cannot say that it needs another one or must load
-after it. The versions belong into the fingerprint, the savegame and the lobby (section 7), so that
-a game names the packages it needs. Packages as archives (not only folders) come with it.
+after it. Packages as archives (not only folders) come with it.
+
+With the manifest a game names the packages it uses (section 7): a new game takes the packages
+installed on the computer that starts it, in their load order, each with id, version and a hash of
+its files, and keeps that list in the savegame. The list, not the mods folder, is what counts:
+
+- The fingerprint covers the original data and exactly the packages of the list.
+- A computer joins only with every package of the list at the same version and hash; the host
+  names what is missing or different.
+- Packages a computer has in addition are not loaded for that game. So a player with more mods
+  installed can still join, and plays with what the game needs.
+- Loading a savegame loads the packages of its list, and only those, and says which ones are
+  missing.
 
 ### 2. Content registry with string ids (section 2)
 
@@ -102,10 +120,16 @@ Stage 2, islands of their own shapes from height and moisture maps with the rule
 shape, frequencies) as data, is postponed. Climates and templates are already in one registry
 (MD-7, PR #142), which stage 2 builds on.
 
-## Suggested order
+## Order of work
+
+Agreed on 2026-10-26:
 
 1. Manifest (item 1), because ids, versions and load order are what every later item refers to.
-2. Content registry and content object (items 2 and 3).
-3. Graphics and sound import (item 4) and the AI from data (item 5), which can run side by side.
-4. Lua (item 6), then scenarios, campaigns and factions of a package's own (items 7 and 8).
-5. Island generator stage 2 (item 9) does not depend on the others and can come at any point.
+2. Content registry and content object (items 2 and 3), in three steps: single fields of the
+   original's buildings and figures changed by a package, then buildings of a package's own with
+   savegames storing ids, then goods, resident classes and unlock levels as data.
+3. Graphics and sound import (item 4), right after a package can add buildings, which need it to
+   be seen.
+4. Lua (item 6), then scenarios and campaigns (item 7) and factions of a package's own (item 8).
+5. Computer players from data (item 5), later by the owner's decision of 2026-10-25.
+6. Island generator stage 2 (item 9), last, as the [plan](../00-plan.md#7-order-of-work) says.

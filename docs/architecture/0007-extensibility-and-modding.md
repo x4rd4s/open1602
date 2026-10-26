@@ -131,8 +131,10 @@ a clear message.
 
 ### 7. Multiplayer and savegames
 
-- The list of content packages with versions and checksums is part of the savegame and the lobby.
-  All participants need the same content, otherwise the match is not started.
+- A game names the content packages it uses, with versions and checksums; the list is part of the
+  savegame and the lobby. Every participant needs these packages, otherwise they cannot join.
+  Packages a participant has installed in addition are not loaded for that game, so more mods on
+  one computer never keep it out of a game (amended 2026-10-26).
 - Savegames store ids (strings), not runtime indices. That way they stay valid
   when a package adds entries.
 
