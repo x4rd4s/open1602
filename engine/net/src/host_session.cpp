@@ -5,6 +5,7 @@
 #include <random>
 #include <utility>
 
+#include "o1602/assets/game_content.hpp"
 #include "o1602/net/session.hpp"
 #include "o1602/sim/command_io.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -475,6 +476,10 @@ void HostSession::hello(Peer& peer, const Hello& m) {
         drop(peer, RefuseReason::Content);
         return;
     }
+    if (auto missing = assets::missing_packages(packages(), m.packages); !missing.empty()) {
+        drop(peer, RefuseReason::Packages, std::move(missing));
+        return;
+    }
     if (m.password != m_config.password) {
         drop(peer, RefuseReason::Password);
         return;
@@ -931,7 +936,14 @@ void HostSession::update_lead(std::uint32_t real_ms) {
     }
 }
 
-void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell) {
+std::span<const assets::ContentPackage> HostSession::packages() const noexcept {
+    if (m_simulation != nullptr && m_simulation->world().packages()) {
+        return *m_simulation->world().packages();
+    }
+    return m_packages;
+}
+
+void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages) {
     if (peer.gone) {
         return;
     }
@@ -939,7 +951,7 @@ void HostSession::drop(Peer& peer, std::optional<RefuseReason> tell) {
     peer.game_due = false;
     peer.packing = false;
     if (tell) {
-        send(peer.link, Refused{*tell});
+        send(peer.link, Refused{*tell, std::move(packages)});
     }
     m_transport->disconnect(peer.link);
     if (peer.welcomed) {

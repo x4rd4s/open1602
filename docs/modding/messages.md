@@ -22,7 +22,7 @@ of content), OGG sounds, and a manifest with version, dependencies and load orde
 The user data folder is `~/.local/share/Open1602` on Linux, `~/Library/Application Support/Open1602`
 on macOS and `%APPDATA%\Open1602` on Windows. The folder's name is the package's id: lower-case
 letters, digits, `_` and `-` (`lighthouse_mod`). `anno1602` is the original's package and cannot be
-used. Packages are read in the order of their names; a later one can change what an earlier one
+used. Packages are read in their [load order](packages.md#load-order); a later one can change what an earlier one
 defined. Until content packages have a manifest (M8), the folder's name is all there is.
 
 Problems are written to the log (standard error) with the file and the line, for example
@@ -113,8 +113,9 @@ at their numbers, then the packages'. At runtime a message is its index (`app::M
 string ids are only used when loading and by the scripts that will post messages
 (`MapViewer::announce(id, args)`). The status bar (`Hud`) takes icon and text from the table, the
 voices and videos (`GameSound`, `audio::Voices`) its `audio::MessagePlayback`. Messages are
-presentation only: they never change the game, so in a multiplayer game each computer may show its
-own mods' messages.
+presentation only: they never change the game. A game shows the messages of the packages it uses
+([packages.md](packages.md#which-packages-a-game-uses)), on every computer of a multiplayer game the
+same.
 
 The data file format is read by `core::parse_data_file` (`engine/core/include/o1602/core/data_file.hpp`),
 meant for every data file of content packages.

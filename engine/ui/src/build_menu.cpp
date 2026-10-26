@@ -315,11 +315,10 @@ core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_vie
     return core::Ok{};
 }
 
-BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu, const std::filesystem::path& mods,
+BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu, std::span<const assets::ModPackage> packages,
                                          const assets::BuildingTable& buildings, std::vector<std::string>& warnings) {
     BuildMenuDefinition out = menu;
-    // By name, the same order on every system, as the packages' messages.
-    for (const assets::ModPackage& package : assets::mod_packages(mods)) {
+    for (const assets::ModPackage& package : packages) {
         const auto bytes = core::read_file(package.folder / kBuildMenuFile);
         if (!bytes) {
             continue;  // a package that leaves the menu as it is

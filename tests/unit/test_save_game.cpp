@@ -230,6 +230,34 @@ TEST_CASE("save game: the fingerprint of the running game sees every tile, and o
     CHECK(other.state_hash() == built);
 }
 
+TEST_CASE("save game: the content packages a game uses come back in their order (PACK)") {
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    auto without = sim::write_game(world, buildings);
+    REQUIRE(without.ok());
+    auto older = sim::read_game(*without, buildings);
+    REQUIRE(older.ok());
+    CHECK(!older->packages().has_value());  // plays with the packages installed
+
+    world.set_packages({});
+    auto none = sim::write_game(world, buildings);
+    REQUIRE(none.ok());
+    auto loaded_none = sim::read_game(*none, buildings);
+    REQUIRE(loaded_none.ok());
+    REQUIRE(loaded_none->packages().has_value());
+    CHECK(loaded_none->packages()->empty());
+
+    const std::vector<assets::ContentPackage> packages{{"zeta", "1.2", 0x1234'5678'9ABC'DEF0ULL},
+                                                       {"\xc3\xa4rger", "", 7}};
+    world.set_packages(packages);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded->packages().has_value());
+    CHECK(*loaded->packages() == packages);
+}
+
 TEST_CASE("save game: fight counters beyond 65 535 come back whole, smaller ones keep SCOR 1 (LC-9)") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings);

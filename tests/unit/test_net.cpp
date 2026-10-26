@@ -125,9 +125,11 @@ struct Computer {
     std::vector<net::SessionEvent> events;
 
     Computer(net::LoopbackNetwork& network, std::string name, std::uint64_t token = 0, std::uint64_t content = kContent,
-             net::SessionConfig config = {}, std::string password = {}) {
+             net::SessionConfig config = {}, std::string password = {},
+             std::vector<assets::ContentPackage> packages = {}) {
         net::Hello hello;
         hello.content = content;
+        hello.packages = std::move(packages);
         hello.name = std::move(name);
         hello.token = token;
         hello.password = std::move(password);
@@ -261,13 +263,21 @@ std::string random_name(sim::Random& r) {
 
 TEST_CASE("net: every message goes to bytes and back") {
     std::vector<net::Message> all;
-    all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "geheim"});
-    all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "", true});
+    all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "geheim", false, {}});
+    all.emplace_back(net::Hello{net::kProtocolVersion, 77, "Merlin", 2, 1234, "", true, {}});
+    all.emplace_back(net::Hello{net::kProtocolVersion,
+                                77,
+                                "Merlin",
+                                2,
+                                0,
+                                "",
+                                false,
+                                {{"lighthouse", "1.2", 0xFEDC}, {"\xc3\xa4rger", "", 1}}});
     all.emplace_back(net::CommandBatch{{sim::PlayerRename{1, "Zweiter"}, sim::GameSpeedOrder{1, {}, 4}}});
     all.emplace_back(net::Progress{3, 1000, net::FrameHash{900, 0xABCDEF}});
     all.emplace_back(net::Progress{1, 5, std::nullopt});
     all.emplace_back(net::Welcome{net::kProtocolVersion, 2, 99});
-    all.emplace_back(net::Refused{net::RefuseReason::Content});
+    all.emplace_back(net::Refused{net::RefuseReason::Content, {}});
     all.emplace_back(net::Snapshot{2, 400, 4, true, {1, 2, 3, 4, 5}});
     net::Turn turn;
     turn.first = 10;
@@ -299,7 +309,8 @@ TEST_CASE("net: every message goes to bytes and back") {
     all.emplace_back(net::SetReady{true});
     all.emplace_back(net::Chat{1, "Anna", "Hallo!", true, {}, {}});
     all.emplace_back(net::Chat{1, "Anna", "Nur fuer dich", false, {0, 2}, {3}});
-    all.emplace_back(net::Refused{net::RefuseReason::Kicked});
+    all.emplace_back(net::Refused{net::RefuseReason::Kicked, {}});
+    all.emplace_back(net::Refused{net::RefuseReason::Packages, {{"lighthouse", "1.2", 0xFEDC}}});
     all.emplace_back(net::Standby{{net::SeatToken{1, 0xABCDEF, 0x1234567890ULL}, net::SeatToken{3, 5, 7}}, {3}});
     all.emplace_back(net::SetBanner{0x0809});
     for (const net::Message& m : all) {
@@ -552,7 +563,7 @@ TEST_CASE("net: nobody gives orders for another player") {
     std::vector<net::TransportEvent> ev;
     network.advance(50);
     raw->poll(ev);
-    raw->send(0, net::encode(net::Hello{net::kProtocolVersion, kContent, "Mallory", sim::kNoPlayer, 0, ""}));
+    raw->send(0, net::encode(net::Hello{net::kProtocolVersion, kContent, "Mallory", sim::kNoPlayer, 0, "", false, {}}));
     for (int i = 0; i < 20; ++i) {
         step(network, host, {&a});
     }
@@ -882,6 +893,43 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
     lonely.update(50);
     CHECK(lonely.session->ended());
     CHECK(lonely.session->end_reason() == net::EndReason::ConnectFailed);
+}
+
+TEST_CASE("net: a computer needs the game's packages, and may have more") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    const assets::ContentPackage lighthouse{"lighthouse", "1.2", 0x1111};
+    const assets::ContentPackage weather{"weather", "", 0x2222};
+    host.game.world->set_packages({lighthouse, weather});
+    REQUIRE(host.session->packages().size() == 2);
+
+    Computer none(network, "Nobody");
+    Computer other(network, "Other", 0, kContent, {}, {}, {lighthouse, {"weather", "", 0x3333}});
+    Computer more(network, "More", 0, kContent, {}, {}, {{"extra", "9", 4}, weather, lighthouse});
+    run_for(network, host, {&none, &other, &more}, 1000);
+    CHECK(none.session->end_reason() == net::EndReason::Refused);
+    REQUIRE(!none.events.empty());
+    CHECK(none.events.back().refused == net::RefuseReason::Packages);
+    CHECK(none.events.back().packages == std::vector<assets::ContentPackage>({lighthouse, weather}));
+    REQUIRE(!other.events.empty());
+    CHECK(other.events.back().refused == net::RefuseReason::Packages);
+    CHECK(other.events.back().packages == std::vector<assets::ContentPackage>({weather}));  // as the host has it
+    REQUIRE(more.session->playing());
+    REQUIRE(more.game.world != nullptr);
+    REQUIRE(more.game.world->packages().has_value());
+    CHECK(*more.game.world->packages() == std::vector<assets::ContentPackage>({lighthouse, weather}));
+}
+
+TEST_CASE("net: in the lobby the host asks for the packages it was given") {
+    net::LoopbackNetwork network(5, 0);
+    net::Lobby lobby;
+    lobby.seats = {net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 0},
+                   net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 1}};
+    net::HostSession session(network.listen(), lobby, 0, "Gastgeber", kContent);
+    CHECK(session.packages().empty());
+    session.set_packages({{"lighthouse", "1", 5}});
+    REQUIRE(session.packages().size() == 1);
+    CHECK(session.packages()[0].id == "lighthouse");
 }
 
 TEST_CASE("net: the host waits for a slow computer, then goes on without a frozen one") {

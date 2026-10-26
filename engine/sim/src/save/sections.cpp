@@ -84,14 +84,17 @@ constexpr std::uint32_t kFactions = tag("FACT");
 constexpr std::uint32_t kBalance = tag("BALA");
 /// The changed values of buildings (Balance::buildings), only written when there are any.
 constexpr std::uint32_t kBuildingValues = tag("BLDV");
+/// The content packages the game uses (World::packages(), ADR 0007 section 7), only written when the
+/// world names them.
+constexpr std::uint32_t kPackages = tag("PACK");
 
 /// Every section this version reads; others are of a later version.
 constexpr std::array kKnownSections = {
-    kRules,           kWorld,       kIslands,   kTiles,     kPlayers,  kCities,    kProductions,   kHouses,
-    kGrowth,          kCosts,       kShips,     kSoldiers,  kAnimals,  kDisasters, kVolcanoes,     kSimulation,
-    kFleet,           kEpochs,      kArmy,      kDiplomacy, kExplored, kMap,       kWorld2,        kMeta,
-    kMissions,        kPlayerState, kCityState, kOrigin,    kQueues,   kStances,   kScores,        kMaterialClocks,
-    kPopulationMarks, kTutorial,    kGiveUps,   kFactions,  kLedgers,  kBalance,   kBuildingValues};
+    kRules,           kWorld,       kIslands,   kTiles,     kPlayers,  kCities,    kProductions,    kHouses,
+    kGrowth,          kCosts,       kShips,     kSoldiers,  kAnimals,  kDisasters, kVolcanoes,      kSimulation,
+    kFleet,           kEpochs,      kArmy,      kDiplomacy, kExplored, kMap,       kWorld2,         kMeta,
+    kMissions,        kPlayerState, kCityState, kOrigin,    kQueues,   kStances,   kScores,         kMaterialClocks,
+    kPopulationMarks, kTutorial,    kGiveUps,   kFactions,  kLedgers,  kBalance,   kBuildingValues, kPackages};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -274,6 +277,20 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
                 o.u32(v.value);
             });
         });
+    }
+    if (world.packages()) {
+        // Optional: the packages decide only what this computer loads beside the game, never what
+        // the simulation computes with (factions and balance are sections of their own).
+        section(
+            out, kPackages,
+            [&](Writer& o) {
+                o.list(*world.packages(), 16, [&](const assets::ContentPackage& p) {
+                    o.string(p.id);
+                    o.string(p.version);
+                    o.u64(p.hash);
+                });
+            },
+            Need::Optional);
     }
     const std::uint16_t player_state_at = player_state_version(world);
     section(
@@ -469,6 +486,20 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.fail();
                 }
                 d.building_values = std::move(values);
+                break;
+            }
+            case kPackages: {
+                std::vector<assets::ContentPackage> packages;
+                in.list(packages, 16, [&](assets::ContentPackage& p) {
+                    in.string(p.id);
+                    in.string(p.version);
+                    in.u64(p.hash);
+                    if (p.id.empty() || p.id.size() > assets::kMaxPackageIdLength ||
+                        p.version.size() > assets::kMaxPackageVersionLength) {
+                        in.fail();
+                    }
+                });
+                d.packages = std::move(packages);
                 break;
             }
             case kPlayerState:

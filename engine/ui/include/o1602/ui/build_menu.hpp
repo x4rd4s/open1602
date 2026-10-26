@@ -12,12 +12,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/gad.hpp"
+#include "o1602/assets/game_content.hpp"
 #include "o1602/core/result.hpp"
 
 namespace o1602::ui {
@@ -78,10 +80,10 @@ inline constexpr std::size_t kMaxRowIcons = 4;
 /// file and the line; a file that cannot be read is an error and changes nothing.
 core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_view package, std::string_view utf8,
                                       const assets::BuildingTable& buildings, std::vector<std::string>& warnings);
-/// Every package in `mods` that has a build_menu.toml (<mods>/<package>/build_menu.toml), in the
-/// order of their names, applied to a copy of `menu`.
+/// The build_menu.toml of every package that has one (<package folder>/build_menu.toml), in the
+/// order given (their load order), applied to a copy of `menu`.
 [[nodiscard]] BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu,
-                                                       const std::filesystem::path& mods,
+                                                       std::span<const assets::ModPackage> packages,
                                                        const assets::BuildingTable& buildings,
                                                        std::vector<std::string>& warnings);
 

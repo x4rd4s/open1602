@@ -85,6 +85,8 @@ const char* describe(RefuseReason reason) noexcept {
             return "sent away by the host";
         case RefuseReason::Taken:
             return "the slot is played from another computer";
+        case RefuseReason::Packages:
+            return "content packages of the game are missing or differ";
     }
     return "";
 }

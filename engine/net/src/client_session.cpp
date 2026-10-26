@@ -237,6 +237,7 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
         e.kind = SessionEvent::Kind::Ended;
         e.reason = EndReason::Refused;
         e.refused = refused->reason;
+        e.packages = refused->packages;
         m_ended = true;
         m_end_reason = refused->reason == RefuseReason::Desync ? EndReason::Desync : EndReason::Refused;
         e.reason = m_end_reason;

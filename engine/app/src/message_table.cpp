@@ -311,9 +311,8 @@ core::Status MessageTable::load_package(std::string_view package, std::string_vi
     return core::Ok{};
 }
 
-void MessageTable::load_mods(const std::filesystem::path& mods, std::vector<std::string>& warnings) {
-    // By name, the same order on every system (a manifest's load order comes with M8).
-    for (const assets::ModPackage& package : assets::mod_packages(mods)) {
+void MessageTable::load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings) {
+    for (const assets::ModPackage& package : packages) {
         const auto bytes = core::read_file(package.folder / kFileName);
         if (!bytes) {
             continue;  // a package without messages

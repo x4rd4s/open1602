@@ -175,7 +175,7 @@ std::string mp_text(net::EndReason reason) {
     return {};
 }
 
-std::string mp_text(net::RefuseReason reason) {
+std::string mp_text(net::RefuseReason reason, std::span<const assets::ContentPackage> packages) {
     switch (reason) {
         case net::RefuseReason::Version:
             return ui::tr("net.refused.version");
@@ -195,6 +195,13 @@ std::string mp_text(net::RefuseReason reason) {
             return ui::tr("net.refused.kicked");
         case net::RefuseReason::Taken:
             return ui::tr("net.refused.taken");
+        case net::RefuseReason::Packages: {
+            std::string names;
+            for (const assets::ContentPackage& p : packages) {
+                names += (names.empty() ? "" : ", ") + assets::package_label(p);
+            }
+            return ui::tr("net.refused.packages", {names});
+        }
     }
     return {};
 }

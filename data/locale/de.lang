@@ -23,6 +23,7 @@ notice.save_failed = Speichern fehlgeschlagen: {1}
 notice.load_failed = Laden fehlgeschlagen: {1}
 # {1}: how many problems
 notice.load_problems = Mit {1} Problem(en) geladen: Teile des Spiels ließen sich nicht verwenden. Einzelheiten stehen im Protokoll.
+notice.packages = Dieses Spiel nutzt Mods, die hier fehlen oder anders sind: {1}. Einzelheiten stehen im Protokoll.
 notice.screenshot_failed = Bildschirmfoto fehlgeschlagen: {1}
 
 # Menus and savegames
@@ -239,6 +240,7 @@ net.refused.invalid = Dieser Rechner hat Unverständliches geschickt.
 net.refused.password = Falsches Kennwort.
 net.refused.kicked = Der Gastgeber hat Euch entfernt.
 net.refused.taken = Euer Platz wird noch von einem anderen Rechner aus gespielt.
+net.refused.packages = Das Spiel braucht Mods, die dieser Rechner nicht oder in einer anderen Fassung hat: {1}.
 
 # The four players of the original by their colours, when Text.cod has no [PLAYCOL]
 player.colour.red = Roter Spieler

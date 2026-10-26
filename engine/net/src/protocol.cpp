@@ -25,6 +25,15 @@ void put_commands(core::ByteWriter& out, const std::vector<sim::Command>& comman
     }
 }
 
+void put_packages(core::ByteWriter& out, const std::vector<assets::ContentPackage>& packages) {
+    out.u32(static_cast<std::uint32_t>(packages.size()));
+    for (const assets::ContentPackage& p : packages) {
+        out.string(p.id);
+        out.string(p.version);
+        out.u64(p.hash);
+    }
+}
+
 void put(core::ByteWriter& out, const Hello& m) {
     out.u16(m.protocol);
     out.u64(m.content);
@@ -33,6 +42,7 @@ void put(core::ByteWriter& out, const Hello& m) {
     out.u64(m.token);
     out.string(m.password);
     out.boolean(m.returning);
+    put_packages(out, m.packages);
 }
 
 void put(core::ByteWriter& out, const CommandBatch& m) {
@@ -57,6 +67,7 @@ void put(core::ByteWriter& out, const Welcome& m) {
 
 void put(core::ByteWriter& out, const Refused& m) {
     out.u8(static_cast<std::uint8_t>(m.reason));
+    put_packages(out, m.packages);
 }
 
 void put(core::ByteWriter& out, const Snapshot& m) {
@@ -179,6 +190,20 @@ void put(core::ByteWriter& out, const Standby& m) {
     }
 }
 
+std::vector<assets::ContentPackage> get_packages(In& in) {
+    const std::uint32_t n = in.count(kMaxPackages);
+    std::vector<assets::ContentPackage> out;
+    out.reserve(n);
+    for (std::uint32_t i = 0; i < n && in.ok(); ++i) {
+        assets::ContentPackage p;
+        p.id = in.text(assets::kMaxPackageIdLength);
+        p.version = in.text(assets::kMaxPackageVersionLength);
+        p.hash = in.u64();
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
 Hello get_hello(In& in) {
     Hello m;
     m.protocol = in.u16();
@@ -188,6 +213,7 @@ Hello get_hello(In& in) {
     m.token = in.u64();
     m.password = in.text(kMaxPasswordLength);
     m.returning = in.boolean();
+    m.packages = get_packages(in);
     return m;
 }
 
@@ -215,10 +241,11 @@ Welcome get_welcome(In& in) {
 Refused get_refused(In& in) {
     Refused m;
     const std::uint8_t reason = in.u8();
-    if (reason > static_cast<std::uint8_t>(RefuseReason::Taken)) {
+    if (reason > static_cast<std::uint8_t>(RefuseReason::Packages)) {
         in.fail();
     }
     m.reason = static_cast<RefuseReason>(reason);
+    m.packages = get_packages(in);
     return m;
 }
 

@@ -32,6 +32,7 @@ notice.save_failed = Saving failed: {1}
 notice.load_failed = Loading failed: {1}
 # {1}: how many problems
 notice.load_problems = Loaded with {1} problem(s): parts of the game could not be used. The log has the details.
+notice.packages = This game uses mods that are missing here or differ: {1}. The log has the details.
 notice.screenshot_failed = Screenshot failed: {1}
 
 # Menus and savegames
@@ -261,6 +262,7 @@ net.refused.invalid = This computer sent what makes no sense.
 net.refused.password = Wrong password.
 net.refused.kicked = The host sent you away.
 net.refused.taken = Your slot is still being played from another computer.
+net.refused.packages = The game needs mods this computer does not have, or has in another version: {1}.
 
 # Players five to twelve of a new world, named after their colours
 player.colour.red = Red player

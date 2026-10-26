@@ -74,6 +74,8 @@ struct Decoded {
     };
     std::optional<FactionPart> factions;
     std::optional<Balance> balance;
+    /// The content packages the game uses (PACK).
+    std::optional<std::vector<assets::ContentPackage>> packages;
     /// The changed values of buildings (BLDV).
     std::optional<std::vector<BuildingValue>> building_values;
     /// Missions and the end of the game (MISN).

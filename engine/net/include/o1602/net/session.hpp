@@ -159,6 +159,8 @@ struct SessionEvent {
     std::uint64_t frame = 0;
     EndReason reason = EndReason::None;
     RefuseReason refused = RefuseReason::Version;
+    /// (Ended, refused for Packages) The packages of the game this computer lacks.
+    std::vector<assets::ContentPackage> packages;
     std::string text;
     std::uint32_t count = 0;
     /// (Chat) To everyone, or privately to the players in `to`; on the computer that said it, the
@@ -277,6 +279,12 @@ public:
 
     /// The game has started (start(), or the session began with a running game).
     [[nodiscard]] bool started() const noexcept { return m_simulation != nullptr; }
+    /// The content packages the game to come uses (ADR 0007 section 7): a computer that lacks one of
+    /// them, or has it with other files, is refused (RefuseReason::Packages). Once the game runs,
+    /// those its world names count.
+    void set_packages(std::vector<assets::ContentPackage> packages) { m_packages = std::move(packages); }
+    /// The content packages a computer needs to join.
+    [[nodiscard]] std::span<const assets::ContentPackage> packages() const noexcept;
     /// Title, description and the program's setup of the game to come; the slots stay.
     void set_lobby_info(std::string title, std::string game, std::vector<std::uint8_t> setup);
     /// Who plays slot `seat`: Open, Computer or Closed. A computer that had it watches from then
@@ -373,7 +381,8 @@ private:
     void forget_frames();
     void update_lead(std::uint32_t real_ms);
     void watch_stalls(std::uint32_t real_ms, bool stalled);
-    void drop(Peer& peer, std::optional<RefuseReason> tell);
+    /// Ends the computer's connection, telling it why if `tell` (with `packages` for Packages).
+    void drop(Peer& peer, std::optional<RefuseReason> tell, std::vector<assets::ContentPackage> packages = {});
     void refresh_roster();
     void init_lobby();
     /// The token of a slot (made when it is first needed).
@@ -406,6 +415,7 @@ private:
     const assets::BuildingTable* m_buildings;
     std::string m_name;
     std::uint64_t m_content;
+    std::vector<assets::ContentPackage> m_packages;  ///< before the game runs (set_packages)
     std::vector<std::unique_ptr<Peer>> m_peers;
     std::deque<Frame> m_log;  ///< frames m_log_start to m_closed - 1
     std::uint64_t m_log_start = 0;

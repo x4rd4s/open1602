@@ -14,12 +14,14 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "o1602/assets/game_content.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/core/data_file.hpp"
 
@@ -84,9 +86,9 @@ public:
     /// a file that cannot be read at all is an error and changes nothing.
     core::Status load_package(std::string_view package, std::string_view utf8, const std::filesystem::path& folder,
                               std::vector<std::string>& warnings);
-    /// Every package in `mods` that has a messages.toml (<mods>/<package>/messages.toml), in the
-    /// order of their names; a package's id is its folder's name.
-    void load_mods(const std::filesystem::path& mods, std::vector<std::string>& warnings);
+    /// The messages.toml of every package that has one (<package folder>/messages.toml), in the
+    /// order given (their load order, assets::load_mod_packages).
+    void load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings);
 
 private:
     /// Applies the fields of `table` to `m`.

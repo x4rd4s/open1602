@@ -30,6 +30,7 @@
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/core/file.hpp"
@@ -175,6 +176,13 @@ private:
     /// A game that loaded with `warnings` (parts skipped, other game data) or without its running
     /// state: a note in the status line, the details are in the log.
     void report_load_problems(std::size_t warnings);
+    /// What the mods give a game that does not bring its own (a new game, one from a file of the
+    /// original): their factions and balance, and the installed packages as the game's.
+    void give_mod_content(sim::World& world) const;
+    /// Loads what the game's packages give beside the game, its messages and build menu, from the
+    /// packages it names (all installed for a game that names none); packages installed in addition
+    /// are not used (ADR 0007 section 7). A missing or different package is noted in the status line.
+    void use_game_packages();
     /// What the main menu asked for this frame.
     void apply_menu();
     /// The end screen of a decided game, when it is due (EventPresenter::end_screen_due). Called
@@ -341,6 +349,8 @@ private:
     /// The factions a new game starts with: the base game's as the mods change them
     /// (docs/modding/factions.md). A savegame of Open1602 keeps its own.
     std::vector<sim::Faction> m_factions = sim::base_factions();
+    /// The content packages installed in <data folder>/mods, in their load order (docs/modding/packages.md).
+    std::vector<assets::ModPackage> m_packages;
     sim::Balance m_balance;  ///< the numbers a new game starts with, as the mods change them (docs/modding/balance.md)
     /// Flags, smoke and icons: buildings do not move, so they are collected once at load.
     std::vector<render::BuildingFigure> m_building_figures;

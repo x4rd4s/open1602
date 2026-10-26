@@ -1,7 +1,8 @@
 # Implementation status
 
-Status: 2026-10-25 (latest steps: tests for the side panel's windows, faster computer players and
-sea map, videos read on a thread of their own, the programs built into `bin/`). This page is the overview
+Status: 2026-10-26 (latest steps: packages with a manifest and the packages of each game, tests for
+the side panel's windows, faster computer players and sea map, videos read on a thread of their own,
+the programs built into `bin/`). This page is the overview
 and the single place for the status of the project. The details are in the linked documents, each in
 its "Open" section. It is updated with every completed step.
 
@@ -40,8 +41,9 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
   their attitude done) · M6 🟡 (lockstep, desync detection with resync,
   reconnecting, lobby, LAN search, Open1602's own multiplayer menu, 4 to 12 players, host migration; open: see
   Multiplayer in 1.2) · M7 🟡 (freely assignable keys, mouse-wheel zoom, pixel scaling, screenshot,
-  bug fixes, any window size and full screen, free zoom and the interface's size done; open: editor) · M8 ⬜ (banners with
-  tinted flags and the mods' own messages already in place).
+  bug fixes, any window size and full screen, free zoom and the interface's size done; open: editor) · M8 🟡 (banners with
+  tinted flags, the mods' own messages, build menu, factions and balance as data, and packages with a
+  manifest, load order and the packages of each game done; open: see 2.2).
 - **Savegames**: since 2026-10-18 Open1602 saves in its own format `.o1602`
   ([o1602-save.md](formats/o1602-save.md), [ADR 0009](architecture/0009-own-save-format.md)): without
   the limits of the original (7 players, 150 ships, 400 soldiers, 350 towers), with a checksum, compressed,
@@ -148,6 +150,7 @@ are listed in 2.1.
 | **Balance as data** (MD-9): the free trader's amounts and restocking, a castle's training step and landing range, how fires and plagues spread are values with the original's defaults that `mods/<package>/balance.toml` changes for new games; a game keeps them (section `BALA`) | [balance.md](modding/balance.md) |
 | **Mods' own messages**: `mods/<package>/messages.toml` adds messages of the status bar and changes the original's, with text per language and placeholders, icon, own WAV sound or an original voice, an original video; `--message ID` shows one at the start | [messages.md](modding/messages.md) |
 | **Build menu as data**: `mods/<package>/build_menu.toml` adds a package's buildings with icon and name, moves the original's to another category or row and takes them out; the ids are checked against `haeuser.cod`, rows and icons per row are bounded | [build-menu.md](modding/build-menu.md) |
+| **Packages with a manifest** (2026-10-26): `mods/<package>/mod.toml` gives name, version, dependencies and load order; a game keeps the packages it uses with version and hash in its savegame (section `PACK`) and loads only those; a multiplayer game lets in only computers with its packages and names the missing ones (protocol 14), packages installed in addition stay unloaded | [packages.md](modding/packages.md) |
 | **Renaming ships and cities** (2026-10-23): a click on the name in the ship window (also the military mode's) or on the city's name in the warehouse window starts typing it (16 characters, as the original); Enter or a click elsewhere keeps it, Escape takes it back; the new name is a command, so every computer of a multiplayer game has it at the same tick, the savegame keeps it, and every window, list and message reads it from the one place it is kept | [ui.md](re/ui.md#name-input) |
 | **Savegame lists** show what the section `META` says: the time played in the main menu's list, player, time and map size in the status bar over a slot of the settings | [o1602-save.md](formats/o1602-save.md) |
 | **Goods balance „Warenbilanz“** (F2, or the line under „Punkte“ in the player status): per good what the player's cities, all or one island's, produced, imported, used and exported per minute over the last 1, 5, 15 or 60 game minutes, the balance and how long the stock lasts; drawn on a parchment in the original's style; a good's page with every flow, what each kind of building made, how many of them work or wait for raw material, the inhabitants' supply and a chart of the last hour or twelve hours. Tabs for the production buildings (utilisation, waiting for raw material, costs), the population (classes, satisfaction, taxes, supply, history), the trade at the Kontor (tons, gold, average prices, free trader and other players) and the finances (now, average and history). At the Kontor's stock the trend of every good in green or red (a setting of „Anzeige“); a click on it opens its page. An early warning in the voice of „Es fehlt an …“ before a good the inhabitants use runs out. Only one's own cities, also in multiplayer; saved in `GLDG` | [ADR 0012](architecture/0012-goods-statistics.md) |
@@ -159,7 +162,7 @@ are listed in 2.1.
 |---|---|---|
 | Flag menu with free RGB colour as in Anno 1503 | Interface | [ADR 0007](architecture/0007-extensibility-and-modding.md) |
 | Factions of a package's own (with slots in the game and a behaviour of their own) | Lua (M8) | [factions.md](modding/factions.md) |
-| Content packs with manifest and identifiers, free goods list, PNG and OGG import (also icons, sounds and videos of the mods' messages) | M8 | ADR 0007, [open-work.md](modding/open-work.md) |
+| Content registry with identifiers, packages as archives, free goods list, PNG and OGG import (also icons, sounds and videos of the mods' messages) | M8 | ADR 0007, [open-work.md](modding/open-work.md) |
 | Scripts post the mods' messages (`MapViewer::announce`) | Lua (M8) | [messages.md](modding/messages.md) |
 | Lua scripts, custom scenarios and campaigns | M8, scenarios | ADR 0007 |
 | Computer players use a package's new production chains: a format with which mods describe new chains, stages and cheats to the AI (MD-4; the AI's tables are in one header since #198, `engine/sim/src/ai/ai_tables.hpp`). Until then the computers build no buildings of a new chain; a building that makes a known ware from a known raw material they already find by ware and raw material | to be added later (owner's decision 2026-10-25) | [build-menu.md](modding/build-menu.md) |
@@ -179,7 +182,7 @@ are recorded in the ADRs and in [bugs.md](re/bugs.md).
 
 | Point | Status |
 |---|---|
-| Tests | 875 test cases on 2026-10-25 (counted with `grep -c '^TEST_CASE'`; ctest runs them as the tests `unit` and `data`): 800 in the 85 files of `tests/unit/`, which need no original data, and 75 in the 12 files of `tests/data/`, which skip without `ANNO1602_DIR` (one of them needs no data). Sea and land routes, world generator, new games, AI (founding, diplomacy, determinism), multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) and the recorded bytes of every savegame section have their own. The SDL layer (`engine/platform`, `render_sdl`) has its own executable `o1602_sdl_tests` (37 cases), built with the game and run headless in the game's CI jobs (dummy drivers, software renderer). Without their own unit tests: the parts of the game executable outside `o1602::menus` (`engine/app`); `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). A CI job measures the line and branch coverage of `engine/` by the tests without data (gcovr report as an artifact). How to run them: [tests/README.md](../tests/README.md) |
+| Tests | 930 test cases on 2026-10-26 (counted with `grep -c '^TEST_CASE'`; ctest runs them as the tests `unit` and `data`): 853 in the 87 files of `tests/unit/`, which need no original data, and 77 in the 13 files of `tests/data/`, which skip without `ANNO1602_DIR` (one of them needs no data). Sea and land routes, world generator, new games, AI (founding, diplomacy, determinism), multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) and the recorded bytes of every savegame section have their own. The SDL layer (`engine/platform`, `render_sdl`) has its own executable `o1602_sdl_tests` (37 cases), built with the game and run headless in the game's CI jobs (dummy drivers, software renderer). Without their own unit tests: the parts of the game executable outside `o1602::menus` (`engine/app`); `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). A CI job measures the line and branch coverage of `engine/` by the tests without data (gcovr report as an artifact). How to run them: [tests/README.md](../tests/README.md) |
 | Builds | presets `debug`, `release`, `asan`, `tsan`, `ci`, `coverage` and `vcpkg` (`release` and `vcpkg` build the game, the others with `-DO1602_BUILD_GAME=ON`; `release` and `vcpkg` put the game and `o1602-tool` into `bin/`, the others into `build/<preset>/bin/`, on macOS the game as `Open1602.app`), locally under Linux without warnings; CI for Linux (GCC, Clang, ASan, TSan, coverage), Windows (MSVC 2026, Visual Studio 2026), macOS 14 and the game with SDL3 on all three. Windows and macOS have never run locally |
 | Player commands | complete for the simulation (since 2026-10-18 also the town window and ship window); the selection windows trigger them; white flag, scuttling, patrol, command chains and group commands with offset have been added |
 | Symbol table `re/symbols/` | 613 functions and 50 globals on 2026-10-25 (private, in `open1602-re`; evidence refers to the document). The code cites about 250 more addresses that only its comments explain; `re/scripts/check_symbol_refs.py` lists them |

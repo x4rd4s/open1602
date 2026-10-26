@@ -6,9 +6,11 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
+#include "o1602/assets/game_content.hpp"
 #include "o1602/net/protocol.hpp"
 #include "o1602/net/session.hpp"
 
@@ -128,6 +130,7 @@ enum class MpText : std::uint16_t {
 [[nodiscard]] std::string mp_text(MpText id, std::string_view value);
 /// Why a session ended or a computer was refused, for the player.
 [[nodiscard]] std::string mp_text(net::EndReason reason);
-[[nodiscard]] std::string mp_text(net::RefuseReason reason);
+/// `packages` (RefuseReason::Packages): the packages of the game this computer lacks.
+[[nodiscard]] std::string mp_text(net::RefuseReason reason, std::span<const assets::ContentPackage> packages = {});
 
 }  // namespace o1602::app

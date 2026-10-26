@@ -86,7 +86,12 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    game data the simulation depends on (`haeuser.cod`, `figuren.cod`), and the game's password if it
    has one. The names for new cities and ships (`Text.cod` of the installation that began the game)
    are part of the simulation's saved state, so they reach every computer with the game and
-   installations in different languages can play together.
+   installations in different languages can play together. `Hello` also names the content packages
+   installed on the computer, each with version and hash; the host lets it in only with every
+   package the game uses (`World::packages()`, before the start those given with
+   `HostSession::set_packages`) and otherwise refuses it with `RefuseReason::Packages`, naming what
+   is missing (protocol version 14). Packages the computer has in addition are not loaded for the
+   game ([packages.md](../modding/packages.md)).
 10. **Transport.** Messages travel reliably and in order over ENet 1.3.18 (`third_party/enet`, MIT,
     shipped unchanged so that the build needs no network). The sessions only know the interface
     `net::Transport`; the tests have an in-memory network with latency, jitter and cuts, and a relay

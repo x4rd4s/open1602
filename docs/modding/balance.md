@@ -75,7 +75,7 @@ same buildings go before the setting's.
 ```
 
 The user data folder and the package's name are as for [messages](messages.md#where-a-mods-messages-are).
-Packages are read in the order of their names; a later one can change what an earlier one set. The
+Packages are read in their [load order](packages.md#load-order); a later one can change what an earlier one set. The
 changes apply to the games started afterwards: new games and scenarios or savegames of the original.
 Problems are written to the log (standard error) with the file and the line.
 

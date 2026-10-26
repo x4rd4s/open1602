@@ -26,7 +26,7 @@ namespace o1602::net {
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
-inline constexpr std::uint16_t kProtocolVersion = 13;
+inline constexpr std::uint16_t kProtocolVersion = 14;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -57,6 +57,8 @@ static_assert(kMaxLobbySeats == sim::kMaxPlayerCount && kMaxLobbySeats >= sim::k
 inline constexpr std::uint32_t kMaxSetupBytes = 64U << 10;
 inline constexpr std::size_t kMaxAddressLength = 64;
 inline constexpr std::uint32_t kMaxLobbyBanners = 1024;
+/// Content packages a Hello names or a Refused lists (ADR 0007 section 7).
+inline constexpr std::uint32_t kMaxPackages = 1024;
 
 /// Which player of the world a computer plays: kNoPlayer watches only.
 using Seat = sim::PlayerId;
@@ -76,6 +78,9 @@ struct Hello {
     /// Comes after its host left, to the computer that carries the game on (host migration): back
     /// into its slot with `token`, else it watches.
     bool returning = false;
+    /// The content packages installed on the computer, each with its version and hash: it joins
+    /// only with every package the game uses; those it has beyond them it does not load for the game.
+    std::vector<assets::ContentPackage> packages;
 };
 
 /// Commands of the computer's player, in the order given; the host puts them into the next frame
@@ -119,10 +124,13 @@ enum class RefuseReason : std::uint8_t {
     Password,  ///< a wrong password
     Kicked,    ///< the host sent it away
     Taken,     ///< the slot of the token is played from another computer that is still there
+    Packages,  ///< content packages of the game are missing on the computer or differ (Refused::packages)
 };
 
 struct Refused {
     RefuseReason reason = RefuseReason::Version;
+    /// (Packages) The packages of the game the computer lacks, as the host has them.
+    std::vector<assets::ContentPackage> packages;
 };
 
 /// The whole game as the host has it before frame `frame`: at the start, for a computer that

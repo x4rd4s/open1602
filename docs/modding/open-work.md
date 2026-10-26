@@ -7,17 +7,17 @@ ADR 0007 tracks the same items from the code's side.
 
 ## What a mod can do today
 
-A mod is a folder `mods/<package>/`. The folder's name is the package's id, and the packages are
-read in the order of their names (UTF-8 bytes, the same on every system, `assets::mod_packages`).
+A mod is a folder `mods/<package>/`. The folder's name is the package's id. Its manifest
+`mod.toml` gives a name, a version, the packages it depends on and the ones it loads after; the
+packages are read in that order, otherwise in the order of their ids' bytes, the same on every
+system ([packages.md](packages.md)).
 
 **Multiplayer.** Before anyone joins, the computers of a multiplayer game compare a fingerprint of
 the original data the simulation computes with, `haeuser.cod` and `figuren.cod`
-(`assets::content_fingerprint`). The packages are not part of it. The two mod files that change the
-game travel with it instead: factions and balance are saved in the game (sections `FACT` and
-`BALA`), so every computer plays the host's, whatever it has installed. The two others stay each
-computer's own: its messages, which are presentation only, and its build menu, which can only list
-buildings of `haeuser.cod` and so issues the same commands. A computer with packages the host does
-not have can therefore join today, but nobody is told when the packages differ.
+(`assets::content_fingerprint`), and the packages the game uses, one by one with version and hash
+([packages.md](packages.md#which-packages-a-game-uses)). A computer that lacks one of them is told
+which; packages it has in addition are not loaded for the game. Factions and balance travel with
+the game besides (sections `FACT` and `BALA`), so every computer plays the host's.
 
 | File | Changes | Guide |
 |---|---|---|
@@ -25,6 +25,7 @@ not have can therefore join today, but nobody is told when the packages differ.
 | `build_menu.toml` | the build menu: a package's buildings with icon and name, the original's moved or taken out | [build-menu.md](build-menu.md) |
 | `factions.toml` | how pirate nests, trader ships and the trader's reach grow with the players | [factions.md](factions.md) |
 | `balance.toml` | trader amounts and restocking, castle training and landing range, fire and plague spread | [balance.md](balance.md) |
+| `mod.toml` | the package's name, version, dependencies and load order | [packages.md](packages.md) |
 
 Without a mod file the engine already has banners with tinted flags for any number of players
 ([flags.md](flags.md)), up to 12 players, worlds and islands beyond the original's sizes
@@ -39,23 +40,12 @@ later does not change a running game.
 Each item names the ADR 0007 section it comes from and, where there is one, the finding of the
 code review of October 2026 ([PR #109](https://github.com/x4rd4s/open1602/pull/109)).
 
-### 1. Package manifest (ADR 0007 section 2)
+### 1. Package manifest (ADR 0007 section 2) – done
 
-A manifest per package with id, version, dependencies and load order. Today the folder's name is
-the id and the order is alphabetical; a package cannot say that it needs another one or must load
-after it. Packages as archives (not only folders) come with it.
-
-With the manifest a game names the packages it uses (section 7): a new game takes the packages
-installed on the computer that starts it, in their load order, each with id, version and a hash of
-its files, and keeps that list in the savegame. The list, not the mods folder, is what counts:
-
-- The fingerprint covers the original data and exactly the packages of the list.
-- A computer joins only with every package of the list at the same version and hash; the host
-  names what is missing or different.
-- Packages a computer has in addition are not loaded for that game. So a player with more mods
-  installed can still join, and plays with what the game needs.
-- Loading a savegame loads the packages of its list, and only those, and says which ones are
-  missing.
+Done on 2026-10-26 ([packages.md](packages.md)): the manifest `mod.toml` with name, version,
+description, dependencies and load order; the hash of a package's files; the packages a game uses
+in its savegame (section `PACK`); multiplayer games let in only computers with the game's packages
+and load no others for it. Still open: packages as archives, not only folders.
 
 ### 2. Content registry with string ids (section 2)
 

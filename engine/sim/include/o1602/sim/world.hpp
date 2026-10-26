@@ -14,6 +14,7 @@
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
+#include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/scenario.hpp"
@@ -468,6 +469,13 @@ public:
     /// package changed them before the game started.
     [[nodiscard]] const Balance& balance() const noexcept { return m_balance; }
     void set_balance(const Balance& balance) noexcept { m_balance = balance; }
+    /// The content packages this game uses, in their load order (ADR 0007 section 7): those
+    /// installed when it started, kept in the savegame (section PACK). Nothing for a game from a
+    /// savegame of a version before them, which plays with the packages installed now.
+    [[nodiscard]] const std::optional<std::vector<assets::ContentPackage>>& packages() const noexcept {
+        return m_packages;
+    }
+    void set_packages(std::vector<assets::ContentPackage> packages) { m_packages = std::move(packages); }
     /// The faction a player belongs to; the settlers' for a faction the world does not have.
     [[nodiscard]] const Faction& faction(const Player& player) const noexcept {
         return player.faction < m_factions.size() ? m_factions[player.faction] : m_factions[faction::kSettlers];
@@ -678,6 +686,7 @@ private:
     std::vector<Player> m_players;
     std::vector<Faction> m_factions = base_factions();
     Balance m_balance;
+    std::optional<std::vector<assets::ContentPackage>> m_packages;
     std::vector<Ship> m_ships;
     std::uint32_t m_next_ship_id = 1;
     IdIndex m_ship_index;

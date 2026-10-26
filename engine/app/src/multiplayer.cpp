@@ -231,7 +231,7 @@ void MapViewer::apply_session_events() {
             case net::SessionEvent::Kind::Ended:
                 std::fprintf(stderr, "multiplayer: %s\n",
                              e.reason == net::EndReason::Refused ? net::describe(e.refused) : net::describe(e.reason));
-                ended = e.reason == net::EndReason::Refused ? mp_text(e.refused) : mp_text(e.reason);
+                ended = e.reason == net::EndReason::Refused ? mp_text(e.refused, e.packages) : mp_text(e.reason);
                 host_left = e.reason == net::EndReason::HostLeft;
                 break;
             case net::SessionEvent::Kind::LobbyChanged:
@@ -623,6 +623,8 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     const std::string name = m_hud ? m_hud->multiplayer()->name() : m_app_settings.player_name;
     m_session = std::make_unique<net::HostSession>(std::move(transport).value(), std::move(lobby), seat, name,
                                                    content_fingerprint(), config);
+    // A computer needs the packages of the game to join: a savegame's own, else those installed here.
+    host_session()->set_packages(world && world->packages() ? *world->packages() : assets::content_of(m_packages));
     m_command_sink.set_session(m_session.get());
     m_hosted = setup;
     m_hosted_world = std::move(world);
@@ -688,8 +690,7 @@ core::Status MapViewer::start_hosted_game() {
         if (!made) {
             return made.error();
         }
-        made->set_factions(m_factions);
-        made->set_balance(m_balance);
+        give_mod_content(*made);
         for (const auto& w : warnings) {
             std::fprintf(stderr, "warning: %s\n", w.c_str());
         }
@@ -789,6 +790,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
 
     net::Hello hello;
     hello.content = content_fingerprint();
+    hello.packages = assets::content_of(m_packages);  // the host asks for those of its game
     // The name typed in the menu; joining from the command line, the one given there.
     std::string name = m_hud && m_hud->multiplayer() != nullptr ? m_hud->multiplayer()->name() : std::string{};
     if (name.empty()) {

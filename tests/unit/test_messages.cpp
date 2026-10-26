@@ -2,6 +2,7 @@
 // The data files of content packages (core/data_file.hpp) and the messages a mod defines with them
 // (app/message_table.hpp, docs/modding/messages.md).
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -11,6 +12,7 @@
 #include "../test_framework.hpp"
 #include "message_table.hpp"
 
+#include "o1602/assets/game_content.hpp"
 #include "o1602/core/data_file.hpp"
 #include "o1602/core/file.hpp"
 
@@ -284,7 +286,7 @@ TEST_CASE("messages: what is wrong in a field is passed over with a warning that
     CHECK(!t.load_package("anno1602", "", pkg.path, warnings).ok());
 }
 
-TEST_CASE("messages: the mods folder, package by package in the order of their names") {
+TEST_CASE("messages: the packages' messages, package by package in their load order") {
     TempPackage b("b_second");
     TempPackage a("a_first");
     a.write("messages.toml", "[hello]\ntext = \"from a\"\n");
@@ -292,12 +294,22 @@ TEST_CASE("messages: the mods folder, package by package in the order of their n
     std::filesystem::create_directories(a.path.parent_path() / "no_messages");
     app::MessageTable t;
     std::vector<std::string> warnings;
-    t.load_mods(a.path.parent_path(), warnings);
+    t.load_mods(assets::mod_packages(a.path.parent_path()), warnings);
     CHECK(warnings.empty());
     CHECK(t.size() == 0x72);
     CHECK(t.text(*t.find("a_first:hello"), "en") == "changed by b");
     CHECK(t.text(*t.find("b_second:hello"), "en") == "from b");
-    // No folder at all: nothing to load, nothing to say.
-    t.load_mods(a.path.parent_path() / "missing", warnings);
+    // In the other load order b's change comes before a's message: it changes nothing.
+    std::vector<assets::ModPackage> reversed = assets::mod_packages(a.path.parent_path());
+    std::reverse(reversed.begin(), reversed.end());
+    app::MessageTable other;
+    other.load_mods(reversed, warnings);
+    REQUIRE(other.find("a_first:hello").has_value());
+    CHECK(other.text(*other.find("a_first:hello"), "en") == "from a");
+    // No packages at all: nothing to load, nothing to say.
+    warnings.clear();
+    app::MessageTable none;
+    none.load_mods({}, warnings);
     CHECK(warnings.empty());
+    CHECK(none.size() == app::MessageTable().size());
 }
