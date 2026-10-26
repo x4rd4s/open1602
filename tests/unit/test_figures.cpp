@@ -214,6 +214,48 @@ TEST_CASE("figures: land figure with shadow, position and depth") {
     CHECK(!render::land_figure_sprites(deer, world, render::WorldView{render::Zoom::Large, 0}, layers, f));
 }
 
+TEST_CASE("figures: a display figure's shadow follows its picture and height (kind 0x1E)") {
+    const auto figures = make_deer();
+    const auto terrain = test::make_sheet({{4, 2}});
+    const auto tiere = test::make_sheet(std::vector<std::pair<std::uint32_t, std::uint32_t>>(200, {10, 12}));
+    const auto schatten = test::make_sheet(std::vector<std::pair<std::uint32_t, std::uint32_t>>(80, {14, 6}));
+    const auto palette = test::make_palette();
+    const assets::SpriteSheet* sheets[] = {&terrain, &tiere, &schatten};
+    auto atlas = render::SpriteAtlas::build(sheets, palette, 512);
+    REQUIRE(atlas.ok());
+    render::WorldLayers layers;
+    layers.figures = &figures;
+    layers.atlas = &*atlas;
+    layers.sheet_base[static_cast<std::size_t>(assets::FigureSheet::Tiere)] = atlas->sheet_base(1);
+    layers.sheet_base[static_cast<std::size_t>(assets::FigureSheet::Schatten)] = atlas->sheet_base(2);
+
+    // Like a juggler: standing at height 0.6 on the market, the shadow at the same height.
+    render::EffectFigure e;
+    e.x = 10.5;
+    e.y = 20.5;
+    e.z = 0.6;
+    e.ground = 0.6;
+    e.figure = 89;
+    e.anim = 0;
+    e.frame = 3;
+    e.direction = 2;
+    e.sheet = assets::FigureSheet::Tiere;
+    sim::World world;
+    render::FigureSprites f;
+    REQUIRE(render::effect_figure_sprites(e, world, render::WorldView{render::Zoom::Large, 0}, layers, 0, f));
+    REQUIRE(f.count == 2);
+    // The shadow figure's ANIM 0 with the body's frame and direction (0x0044F8F0), centred on the
+    // point lifted by trunc(0.6 * 32) = 19 and the one row of Open1602 (0x0045092D).
+    const render::DrawCommand& shadow = f.parts[0];
+    CHECK(shadow.mode == render::DrawCommand::Mode::Shadow);
+    CHECK(shadow.sprite == atlas->sheet_base(2) + 8 + 3 + 2 * 8);
+    CHECK(shadow.x == 10880 - 7);
+    CHECK(shadow.y == 496 - 20 - 3 + 6);
+    const render::DrawCommand& body = f.parts[1];
+    CHECK(body.sprite == atlas->sheet_base(1) + 4 + 3 + 2 * 8);
+    CHECK(body.y == 505 + 3 - 20);  // bottom at Y + Posoffs[0], lifted by the same 20 pixels
+}
+
 TEST_CASE("figures: half-size sheets for zoom levels without graphics") {
     // 4 x 2 image: left 2x2 block fully opaque red 100/200, right block with one opaque pixel.
     std::vector<std::uint8_t> src(4 * 2 * 4, 0);

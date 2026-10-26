@@ -954,13 +954,23 @@ bool effect_figure_sprites(const EffectFigure& figure, const sim::World& world, 
     }
     const WorldView view = fit_view(view_in, world);
     const double tw = tile_width(view.zoom);
+    const assets::FigureAnim* a = fig->anim(figure.anim);
+    std::uint32_t frame = 0;
+    if (figure.frame) {
+        frame = *figure.frame;
+    } else if (a != nullptr && a->count > 0) {
+        const std::uint64_t speed = a->speed_ms > 0 ? a->speed_ms : 1;
+        frame = static_cast<std::uint32_t>(((time_ms + figure.phase) / speed) % a->count);
+    }
     constexpr double kShadowHeight = 5.0;
     const assets::FigureType* shadow = fig->shadow != 0 ? layers.figures->get(fig->shadow) : nullptr;
     const auto shadow_base = layers.sheet_base[static_cast<std::size_t>(assets::FigureSheet::Schatten)];
     if (shadow != nullptr && shadow_base && figure.z - figure.ground < kShadowHeight) {
         DrawCommand& c = out.parts[out.count];
         c = DrawCommand{};
-        c.sprite = *shadow_base + assets::figure_sprite(*shadow, 0, 0, 0, view.rotation);
+        // The shadow figure's picture of the body's ANIM, frame and direction (0x0044F8F0, called
+        // with the shadow figure for kinds 0x1E and 0x21).
+        c.sprite = *shadow_base + assets::figure_sprite(*shadow, figure.anim, frame, figure.direction, view.rotation);
         const AtlasRect& r = layers.atlas->rect(c.sprite);
         if (!r.empty()) {
             double sx = 0.0;
@@ -976,14 +986,6 @@ bool effect_figure_sprites(const EffectFigure& figure, const sim::World& world, 
     }
     DrawCommand& c = out.parts[out.count];
     c = DrawCommand{};
-    const assets::FigureAnim* a = fig->anim(figure.anim);
-    std::uint32_t frame = 0;
-    if (figure.frame) {
-        frame = *figure.frame;
-    } else if (a != nullptr && a->count > 0) {
-        const std::uint64_t speed = a->speed_ms > 0 ? a->speed_ms : 1;
-        frame = static_cast<std::uint32_t>(((time_ms + figure.phase) / speed) % a->count);
-    }
     c.sprite = *base + assets::figure_sprite(*fig, figure.anim, frame, figure.direction, view.rotation);
     const AtlasRect& r = layers.atlas->rect(c.sprite);
     if (r.empty()) {

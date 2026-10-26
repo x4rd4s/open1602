@@ -404,6 +404,9 @@ void Ambient::frame(const sim::World& world, const assets::BuildingTable& buildi
             EffectFigure e;
             building_attach_point(island, *b, x, y, cell.rotation, *fig, e.x, e.y);
             e.z = fig->fahnoffs[2];
+            // The shadow lies under his feet, not on the ground below the market: kind 0x1E centres
+            // it on the lifted point like the body (0x0045092D), without the ground height of lava.
+            e.ground = e.z;
             e.figure = kFigureJuggler;
             e.anim = j.anim.anim;
             e.frame = j.anim.frame;

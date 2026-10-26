@@ -348,6 +348,7 @@ TEST_CASE("ambient: a juggler on the market of a city with more than 59 citizens
     CHECK(j.x == 100 + 20 + 2.0 + 2.1);  // centre of the 4 x 3 market and Fahnoffs 2.1
     CHECK(j.y == 100 + 2 + 1.5);
     CHECK(j.z == 0.6);
+    CHECK(j.ground == 0.6);  // the shadow under his feet, at his height (0x0045092D)
     CHECK(j.direction == 2);
 }
 
