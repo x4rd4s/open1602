@@ -6,8 +6,9 @@ how a package describes itself, in which order packages are loaded and which pac
 
 **Status:** Done are the manifest `mod.toml` with name, version, description, dependencies and
 load order, the hash of a package's files, the list of packages every game keeps in its savegame,
-and multiplayer games that let in only computers with the game's packages. Still open, with
-milestone M8: packages as archives and adding content of a package's own
+multiplayer games that let in only computers with the game's packages, a host that sends its
+packages to a computer that lacks them and agrees, and the main menu's screen "Mods". Still open,
+with milestone M8: packages as archives and adding content of a package's own
 ([open-work.md](open-work.md)).
 
 ## The folder
@@ -58,6 +59,7 @@ is that of the ids' bytes (`Alpha` before `beta` before `zeta`), the same on eve
 
 A package is not loaded, with a line in the log, when
 
+- it is turned off in the screen "Mods" (below),
 - a package it depends on is not installed, has no version or an older one than it needs,
 - a package it depends on is not loaded itself,
 - its dependencies and `after` entries go round in a circle.
@@ -76,7 +78,41 @@ not the `mods` folder, decides:
 - **Multiplayer:** a computer joins only with every package of the game, with the same files. The
   host refuses one that lacks a package or has another version of it, and names the packages in
   its message. Packages a computer has in addition are not loaded for the game, so more mods never
-  keep a player out.
+  keep a player out. The host can send the missing packages, see below.
 
 The hash covers every file of the package's folder and its subfolders, by its path, size and
 bytes. Two copies of a package compare equal only when all their files do.
+
+## Packages a host sends
+
+A computer that lacks packages of a multiplayer game can get them from the host. The host offers
+them when it has every missing package with the game's files and they come to at most 256 MiB
+together (`SessionConfig::max_share_bytes`); only a computer that gave the right password learns
+of them. The player is asked first, with the names and the size: "This game needs mods this
+computer does not have: lighthouse 1.2 (2.4 MB). Download them from the host?" Without a yes,
+nothing is sent and the game is not joined.
+
+With a yes, the computer joins again and asks for the packages (`Hello::fetch_packages`). The host
+sends their files (`PackageFiles`, at most 16 MiB of files a message, so a single file of a
+package may not be larger), then takes the computer in as usual. The computer writes each package
+into `<user data folder>/mods-cache/<id>-<hash>/` and keeps it only when its files have the hash
+the game names; a path that would leave that folder refuses the whole package. Packages received
+once are there for the next game that needs them.
+
+Received packages are used only by the games that name them, never by a new game of the player's
+own: the `mods` folder stays as the player left it. A computer that hosts the game on after its
+host left (host migration) sends the received packages on like its own.
+
+## The screen "Mods"
+
+The main menu's button "Mods" lists the packages of the `mods` folder with name, version and
+whether new games use them, and below them the packages received from hosts.
+
+- **On and off:** the box before a package turns it on or off for new games. A package turned off
+  is not loaded, nor are those that depend on it; `settings.cfg` keeps the ids
+  (`disabled_mod = lighthouse`). A savegame keeps the packages it was started with.
+- **Received packages** have no box: the games that need them use them. "Add to my mods" copies
+  one into the `mods` folder, where it is a package of the player's own from then on, turned on.
+  This is refused while the `mods` folder has a package of that id.
+- A package that cannot be loaded (a broken manifest, a missing dependency) says so; the log says
+  why.

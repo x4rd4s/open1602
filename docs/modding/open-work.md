@@ -16,7 +16,8 @@ system ([packages.md](packages.md)).
 the original data the simulation computes with, `haeuser.cod` and `figuren.cod`
 (`assets::content_fingerprint`), and the packages the game uses, one by one with version and hash
 ([packages.md](packages.md#which-packages-a-game-uses)). A computer that lacks one of them is told
-which; packages it has in addition are not loaded for the game. Factions and balance travel with
+which, and the host offers to send them ([packages.md](packages.md#packages-a-host-sends));
+packages it has in addition are not loaded for the game. Factions and balance travel with
 the game besides (sections `FACT` and `BALA`), so every computer plays the host's.
 
 | File | Changes | Guide |
@@ -45,7 +46,9 @@ code review of October 2026 ([PR #109](https://github.com/x4rd4s/open1602/pull/1
 Done on 2026-10-26 ([packages.md](packages.md)): the manifest `mod.toml` with name, version,
 description, dependencies and load order; the hash of a package's files; the packages a game uses
 in its savegame (section `PACK`); multiplayer games let in only computers with the game's packages
-and load no others for it. Still open: packages as archives, not only folders.
+and load no others for it. Also done: a host sends missing packages to a computer whose player
+agrees (kept in `mods-cache`), and the main menu's screen "Mods" turns packages on and off and adds
+received ones to the `mods` folder. Still open: packages as archives, not only folders.
 
 ### 2. Content registry with string ids (section 2)
 
