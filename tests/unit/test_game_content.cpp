@@ -245,3 +245,65 @@ TEST_CASE("game content: a game takes the packages it names, in its order, and n
     CHECK(assets::package_label(missing[1]) == "gone 4");
     CHECK(assets::package_label({"c", "", 3}) == "c");
 }
+
+TEST_CASE("game content: only paths inside a package are written") {
+    CHECK(assets::safe_package_path("mod.toml"));
+    CHECK(assets::safe_package_path("gfx/towers/tower.png"));
+    CHECK(!assets::safe_package_path(""));
+    CHECK(!assets::safe_package_path("/etc/passwd"));
+    CHECK(!assets::safe_package_path("gfx/../../x"));
+    CHECK(!assets::safe_package_path("./x"));
+    CHECK(!assets::safe_package_path("gfx//x"));
+    CHECK(!assets::safe_package_path("gfx/"));
+    CHECK(!assets::safe_package_path("gfx\\x"));
+    CHECK(!assets::safe_package_path("C:x"));
+    CHECK(!assets::safe_package_path("a\nb"));
+    CHECK(!assets::safe_package_path(std::string(assets::kMaxPackagePathLength + 1, 'a')));
+}
+
+TEST_CASE("game content: a received package is kept in the cache only with the package's hash") {
+    Folder source("o1602_store_source");
+    Folder cache("o1602_store_cache");
+    std::filesystem::create_directories(source.root / "gfx");
+    source.write("mod.toml", "name = \"Beacon\"\nversion = \"1.2\"\n");
+    source.write("gfx/tower.txt", "tower");
+    const auto files = assets::read_package_files(source.root);
+    REQUIRE(files.ok());
+    REQUIRE(files->size() == 2);
+    CHECK((*files)[0].path == "gfx/tower.txt");
+    CHECK(assets::package_size(source.root) == files->at(0).bytes.size() + files->at(1).bytes.size());
+    const assets::ContentPackage beacon{"beacon", "1.2", assets::package_hash(source.root)};
+
+    const auto stored = assets::store_package(cache.root, beacon, *files);
+    REQUIRE(stored.ok());
+    CHECK(stored->folder == assets::cached_package_folder(cache.root, beacon));
+    CHECK(stored->name == "Beacon");
+    CHECK(stored->content() == beacon);
+
+    assets::ContentPackage other = beacon;
+    other.hash ^= 1;
+    CHECK(!assets::store_package(cache.root, other, *files).ok());
+    CHECK(!std::filesystem::exists(assets::cached_package_folder(cache.root, other)));
+    std::vector<assets::PackageFile> outside = *files;
+    outside[0].path = "../escape.txt";
+    CHECK(!assets::store_package(cache.root, beacon, outside).ok());
+    CHECK(!std::filesystem::exists(cache.root / "escape.txt"));
+    CHECK(!assets::store_package(cache.root, {"..", "", beacon.hash}, *files).ok());
+
+    std::vector<std::string> warnings;
+    auto cached = assets::cached_packages(cache.root, warnings);
+    REQUIRE(cached.size() == 1);
+    CHECK(warnings.empty());
+    CHECK(cached[0].content() == beacon);
+
+    Folder mods("o1602_adopt_mods");
+    const auto adopted = assets::adopt_package(mods.root, cached[0]);
+    REQUIRE(adopted.ok());
+    CHECK(*adopted == mods.root / "beacon");
+    CHECK(assets::package_hash(*adopted) == beacon.hash);
+    CHECK(!assets::adopt_package(mods.root, cached[0]).ok());  // there already
+
+    std::ofstream(stored->folder / "gfx" / "tower.txt") << "changed";
+    CHECK(assets::cached_packages(cache.root, warnings).empty());
+    CHECK(warnings.size() == 1);
+}

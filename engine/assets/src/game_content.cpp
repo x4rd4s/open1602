@@ -57,6 +57,43 @@ std::optional<std::string> key_after(std::string_view key, std::string_view pref
     return std::string(key.substr(prefix.size()));
 }
 
+/// The regular files of a package's folder and its subfolders: their paths relative to it (UTF-8,
+/// '/' between folders) and on disk, ordered by the bytes of the relative paths.
+std::vector<std::pair<std::string, std::filesystem::path>> files_of(const std::filesystem::path& folder) {
+    std::vector<std::pair<std::string, std::filesystem::path>> files;
+    std::error_code ec;
+    for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
+         !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file(ec)) {
+            const std::u8string relative = it->path().lexically_relative(folder).generic_u8string();
+            files.emplace_back(std::string(relative.begin(), relative.end()), it->path());
+        }
+    }
+    std::sort(files.begin(), files.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    return files;
+}
+
+/// Whether `id` can be a package's id and so the start of a folder's name.
+bool valid_package_id(std::string_view id) noexcept {
+    if (id.empty() || id.size() > kMaxPackageIdLength || id == "." || id == "..") {
+        return false;
+    }
+    return std::none_of(id.begin(), id.end(), [](char c) {
+        const auto u = static_cast<unsigned char>(c);
+        return u < 0x20 || u == 0x7F || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' ||
+               c == '<' || c == '>' || c == '|';
+    });
+}
+
+std::string hex16(std::uint64_t value) {
+    static constexpr char kDigits[] = "0123456789abcdef";
+    std::string out(16, '0');
+    for (std::size_t i = 0; i < 16; ++i) {
+        out[15 - i] = kDigits[(value >> (4 * i)) & 0xFU];
+    }
+    return out;
+}
+
 }  // namespace
 
 std::uint64_t content_fingerprint(const GameDirectory& game) {
@@ -177,16 +214,7 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
 }
 
 std::uint64_t package_hash(const std::filesystem::path& folder) {
-    std::vector<std::pair<std::string, std::filesystem::path>> files;
-    std::error_code ec;
-    for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
-         !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
-        if (it->is_regular_file(ec)) {
-            const std::u8string relative = it->path().lexically_relative(folder).generic_u8string();
-            files.emplace_back(std::string(relative.begin(), relative.end()), it->path());
-        }
-    }
-    std::sort(files.begin(), files.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    const auto files = files_of(folder);
     std::uint64_t h = hash_number(files.size(), 0);
     for (const auto& [relative, path] : files) {
         h = hash_text(relative, h);
@@ -329,8 +357,11 @@ std::vector<ModPackage> packages_for(std::span<const ModPackage> installed, std:
                                      std::vector<std::string>& warnings) {
     std::vector<ModPackage> out;
     for (const ContentPackage& w : wanted) {
-        const auto p =
-            std::find_if(installed.begin(), installed.end(), [&](const ModPackage& m) { return m.id == w.id; });
+        auto p = std::find_if(installed.begin(), installed.end(),
+                              [&](const ModPackage& m) { return m.id == w.id && m.hash == w.hash; });
+        if (p == installed.end()) {
+            p = std::find_if(installed.begin(), installed.end(), [&](const ModPackage& m) { return m.id == w.id; });
+        }
         if (p == installed.end()) {
             warnings.push_back("the game uses the package " + package_label(w) + ", which is not installed");
             continue;
@@ -358,6 +389,155 @@ std::vector<ContentPackage> missing_packages(std::span<const ContentPackage> nee
 
 std::string package_label(const ContentPackage& package) {
     return package.version.empty() ? package.id : package.id + " " + package.version;
+}
+
+bool safe_package_path(std::string_view path) noexcept {
+    if (path.empty() || path.size() > kMaxPackagePathLength) {
+        return false;
+    }
+    std::size_t start = 0;
+    while (start <= path.size()) {
+        const std::size_t end = std::min(path.find('/', start), path.size());
+        const std::string_view part = path.substr(start, end - start);
+        if (part.empty() || part == "." || part == "..") {
+            return false;
+        }
+        start = end + 1;
+    }
+    return std::none_of(path.begin(), path.end(), [](char c) {
+        const auto u = static_cast<unsigned char>(c);
+        return u < 0x20 || u == 0x7F || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' ||
+               c == '>' || c == '|';
+    });
+}
+
+core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder) {
+    std::vector<PackageFile> out;
+    for (const auto& [relative, path] : files_of(folder)) {
+        auto bytes = core::read_file(path);
+        if (!bytes) {
+            return bytes.error();
+        }
+        out.push_back(PackageFile{relative, std::move(bytes).value()});
+    }
+    return out;
+}
+
+std::uint64_t package_size(const std::filesystem::path& folder) {
+    std::uint64_t total = 0;
+    for (const auto& file : files_of(folder)) {
+        std::error_code ec;
+        const std::uintmax_t size = std::filesystem::file_size(file.second, ec);
+        total += ec ? 0 : static_cast<std::uint64_t>(size);
+    }
+    return total;
+}
+
+std::filesystem::path cached_package_folder(const std::filesystem::path& cache, const ContentPackage& package) {
+    const std::string name = package.id + "-" + hex16(package.hash);
+    return cache / core::path_from_utf8(name);
+}
+
+core::Result<ModPackage> store_package(const std::filesystem::path& cache, const ContentPackage& package,
+                                       std::span<const PackageFile> files) {
+    if (!valid_package_id(package.id)) {
+        return core::make_error(core::ErrorCode::InvalidFormat, "a package id that cannot name a folder");
+    }
+    for (const PackageFile& f : files) {
+        if (!safe_package_path(f.path)) {
+            return core::make_error(core::ErrorCode::InvalidFormat, package.id + ": a file outside the package");
+        }
+    }
+    const std::filesystem::path folder = cached_package_folder(cache, package);
+    std::filesystem::path incoming = folder;
+    incoming += ".incoming";
+    std::error_code ec;
+    std::filesystem::remove_all(incoming, ec);
+    const auto fail = [&](std::string message) {
+        std::error_code ignored;
+        std::filesystem::remove_all(incoming, ignored);
+        return core::make_error(core::ErrorCode::InvalidFormat, package.id + ": " + std::move(message));
+    };
+    for (const PackageFile& f : files) {
+        const std::filesystem::path path = incoming / core::path_from_utf8(f.path);
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (const auto written = core::write_file(path, f.bytes); !written) {
+            return fail(written.error().message);
+        }
+    }
+    std::filesystem::create_directories(incoming, ec);  // a package without files
+    if (package_hash(incoming) != package.hash) {
+        return fail("the files received do not have the package's hash");
+    }
+    std::filesystem::remove_all(folder, ec);
+    std::filesystem::rename(incoming, folder, ec);
+    if (ec) {
+        return fail("cannot be kept: " + ec.message());
+    }
+    ModPackage out;
+    out.id = package.id;
+    out.folder = folder;
+    out.name = package.id;
+    if (const auto bytes = core::read_file(folder / kManifestFile)) {
+        std::vector<std::string> ignored;
+        (void)read_manifest(out, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()),
+                            ignored);
+    }
+    out.hash = package.hash;
+    return out;
+}
+
+std::vector<ModPackage> cached_packages(const std::filesystem::path& cache, std::vector<std::string>& warnings) {
+    std::vector<ModPackage> out;
+    for (ModPackage& folder : mod_packages(cache)) {
+        const std::size_t dash = folder.id.rfind('-');
+        if (dash == std::string::npos || folder.id.size() - dash != 17 || folder.id.ends_with(".incoming")) {
+            continue;  // not a received package, or one that never arrived whole
+        }
+        ModPackage package;
+        package.id = folder.id.substr(0, dash);
+        package.folder = folder.folder;
+        package.name = package.id;
+        package.hash = package_hash(folder.folder);
+        if (hex16(package.hash) != folder.id.substr(dash + 1)) {
+            warnings.push_back(core::path_to_utf8(folder.folder) + ": its files changed since it was received");
+            continue;
+        }
+        if (const auto bytes = core::read_file(folder.folder / kManifestFile)) {
+            const auto read = read_manifest(
+                package, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), warnings);
+            if (!read) {
+                warnings.push_back(read.error().message);
+            }
+        }
+        out.push_back(std::move(package));
+    }
+    return out;
+}
+
+core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods, const ModPackage& cached) {
+    if (!valid_package_id(cached.id)) {
+        return core::make_error(core::ErrorCode::InvalidFormat, "a package id that cannot name a folder");
+    }
+    const std::filesystem::path target = mods / core::path_from_utf8(cached.id);
+    std::error_code ec;
+    if (std::filesystem::exists(target, ec)) {
+        return core::make_error(core::ErrorCode::Unsupported, cached.id + ": the mods folder has this package already");
+    }
+    std::filesystem::path incoming = target;
+    incoming += ".incoming";
+    std::filesystem::remove_all(incoming, ec);
+    std::filesystem::create_directories(incoming.parent_path(), ec);
+    std::filesystem::copy(cached.folder, incoming, std::filesystem::copy_options::recursive, ec);
+    if (!ec) {
+        std::filesystem::rename(incoming, target, ec);
+    }
+    if (ec) {
+        std::error_code ignored;
+        std::filesystem::remove_all(incoming, ignored);
+        return core::make_error(core::ErrorCode::IoError, cached.id + ": cannot be copied: " + ec.message());
+    }
+    return target;
 }
 
 }  // namespace o1602::assets

@@ -98,9 +98,10 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
 /// What a game names (ContentPackage) of the packages it was started with.
 [[nodiscard]] std::vector<ContentPackage> content_of(std::span<const ModPackage> packages);
 
-/// The packages of `wanted` (a game's) among `installed`, in the game's order. A package that is
-/// not installed is left out, one installed with other files is taken (this computer's), each with
-/// a warning. The installed packages the game does not name are not taken.
+/// The packages of `wanted` (a game's) among `installed`, in the game's order: the one with the
+/// same id and hash, else one with the same id. A package that is not installed is left out, one
+/// installed only with other files is taken (this computer's), each with a warning. The installed
+/// packages the game does not name are not taken.
 [[nodiscard]] std::vector<ModPackage> packages_for(std::span<const ModPackage> installed,
                                                    std::span<const ContentPackage> wanted,
                                                    std::vector<std::string>& warnings);
@@ -112,5 +113,43 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
 
 /// "lighthouse 1.2" (or "lighthouse" without a version), for messages.
 [[nodiscard]] std::string package_label(const ContentPackage& package);
+
+// --- Packages a multiplayer host sends to a computer that lacks them ---
+
+/// A file of a package: its path relative to the package's folder ('/' between folders) and bytes.
+struct PackageFile {
+    std::string path;  ///< UTF-8
+    std::vector<std::uint8_t> bytes;
+    friend bool operator==(const PackageFile&, const PackageFile&) = default;
+};
+/// Upper limit of a path of a package file, in bytes.
+inline constexpr std::size_t kMaxPackagePathLength = 255;
+
+/// Whether `path` may name a file of a package written into a folder: relative, folders separated by
+/// '/', no empty part, no "." or "..", no '\', ':' or control characters, at most
+/// kMaxPackagePathLength bytes. A path from another computer is written only when it is.
+[[nodiscard]] bool safe_package_path(std::string_view path) noexcept;
+
+/// The bytes of every file of a package's folder (as package_hash counts them, in its order).
+[[nodiscard]] core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder);
+/// The bytes of every file of a package's folder together.
+[[nodiscard]] std::uint64_t package_size(const std::filesystem::path& folder);
+
+/// The folder of a received package in the cache: <cache>/<id>-<hash as 16 hex digits>.
+[[nodiscard]] std::filesystem::path cached_package_folder(const std::filesystem::path& cache,
+                                                         const ContentPackage& package);
+/// Writes the files of `package` into the cache (cached_package_folder) and reads it back as a
+/// package: refused, and nothing is left behind, when a path is not safe_package_path, the id is
+/// no package id, or the files written do not have the package's hash.
+[[nodiscard]] core::Result<ModPackage> store_package(const std::filesystem::path& cache, const ContentPackage& package,
+                                                     std::span<const PackageFile> files);
+/// The packages in the cache, each with its manifest and hash; a folder whose files no longer have
+/// the hash its name gives is passed over with a warning. Ordered by id and hash.
+[[nodiscard]] std::vector<ModPackage> cached_packages(const std::filesystem::path& cache,
+                                                      std::vector<std::string>& warnings);
+/// Copies a received package from the cache into `mods`, as <mods>/<id>, where it is a package of
+/// this computer's own from then on: refused when `mods` has a package with that id already.
+[[nodiscard]] core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods,
+                                                                const ModPackage& cached);
 
 }  // namespace o1602::assets
