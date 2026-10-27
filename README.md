@@ -18,7 +18,8 @@ Ready-built packages for Windows (64-bit), macOS (11 or newer, Apple silicon and
 They hold only the engine; the original game data comes from your own installation (below). The macOS
 app is not notarised: start it the first time with a right click on `Open1602.app` > Open. The packages
 are built by [.github/workflows/release.yml](.github/workflows/release.yml), which publishes a release
-for every pushed tag `vX.Y.Z` that matches the version in `CMakeLists.txt`.
+for every pushed tag `vX.Y.Z` that matches the version in `CMakeLists.txt`. Its notes start with what changed,
+written by hand in [docs/releases/](docs/releases) as `vX.Y.Z.md`.
 
 ## Original game data
 

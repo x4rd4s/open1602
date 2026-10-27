@@ -288,6 +288,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Only for the release notes of this version (docs/releases/vX.Y.Z.md).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: docs/releases
+
       - name: Download the packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
@@ -306,12 +311,24 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           PRERELEASE: ${{ inputs.prerelease && '--prerelease' || '' }}
         run: |
-          cat > notes.md <<EOF
+          # What changed, written by hand in docs/releases/<tag>.md; GitHub appends the list of
+          # merged pull requests since the previous release (--generate-notes).
+          changes="docs/releases/$TAG.md"
+          if [[ -f "$changes" ]]; then
+            cp "$changes" notes.md
+            echo >> notes.md
+          else
+            echo "::warning::$changes is missing: the release notes only list the pull requests"
+            : > notes.md
+          fi
+          cat >> notes.md <<EOF
+          ## Download
+
           Open1602 ${TAG#v}, built from ${GITHUB_SHA::7}.
 
-          **Open1602 needs the data of an installed Anno 1602** (for example the GOG edition); the
-          packages hold only the engine. On its first start it looks for the installation and, when
-          it finds none, asks for its folder.
+          **Open1602 needs the data of an installed Anno 1602** (the GOG edition, the Königsedition or
+          the History Edition); the packages hold only the engine. On its first start it looks for
+          the installation and, when it finds none, asks for its folder.
 
           | Platform | Package | Start |
           |---|---|---|
@@ -322,4 +339,4 @@ jobs:
           SHA-256 checksums are in \`SHA256SUMS.txt\`.
           EOF
           gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Open1602 ${TAG#v}" \
-             --notes-file notes.md $PRERELEASE
+             --notes-file notes.md --generate-notes $PRERELEASE

@@ -65,4 +65,5 @@ if(UNIX AND NOT APPLE)
 endif()
 # The licences of the libraries built into the program (MIT asks for its notice to go along).
 install(FILES ${PROJECT_SOURCE_DIR}/third_party/enet/LICENSE DESTINATION share/doc/open1602/licenses RENAME enet.txt)
+install(FILES ${PROJECT_SOURCE_DIR}/third_party/lua/LICENSE DESTINATION share/doc/open1602/licenses RENAME lua.txt)
 install(FILES ${PROJECT_SOURCE_DIR}/LICENSE DESTINATION share/doc/open1602)
