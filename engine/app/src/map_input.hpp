@@ -142,6 +142,9 @@ public:
     void selection_changed(bool box);
     /// Orders to the simulation; those that cannot be taken back wait for an answer (ADR 0010).
     void submit_orders(std::vector<sim::Command> orders, bool sound = true);
+    /// The field of the farm (plantation, forester) at the island tile on the open ground it
+    /// reaches, as far as the money goes; nothing for another building.
+    void plant_fields_at(std::uint16_t island, std::int32_t x, std::int32_t y);
     /// The answer to the question before the waiting orders.
     void answer(bool yes);
     /// A building (or the demolish tool) was taken from the menu: the selected ships and units
