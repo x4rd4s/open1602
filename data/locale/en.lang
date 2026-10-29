@@ -69,6 +69,10 @@ keys.heading.building = While building
 keys.heading.groups = Groups and selection
 keys.heading.units = Ships and units selected
 keys.heading.view = Display
+# Clicks with a modifier in windows (F1, units and ships)
+keys.click = click
+keys.click.castle_all = Castle, send-out arrow: all trained units
+keys.click.cannons = Cannons in a ship's hold: mount as many as fit
 # Replaces the digit of a group key ("Ctrl+1" becomes "Ctrl+1 .. 0")
 keys.group_digits = 1 .. 0
 keys.modifier.ctrl = Ctrl+
@@ -307,6 +311,8 @@ city.default = City {2} on island {1}
 ship.default = Ship {1}
 # A hold of cannons in an own ship's window ({1}: the goods, as "10t Cannons")
 ship.cannon_hold = {1} (click: mount one, Shift+click: as many as fit)
+# The castle's send-out arrow ({1}: its help line from the game's texts)
+castle.release = {1} (Shift+click: all trained units, lined up around the spot)
 player.colour.orange = Orange player
 player.colour.purple = Purple player
 player.colour.teal = Teal player

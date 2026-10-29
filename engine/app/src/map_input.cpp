@@ -285,7 +285,9 @@ void MapInput::show_key_help() {
         }
         entries.push_back(KeyHelpEntry{b.action, std::move(key)});
     }
-    m_hud->show_help(key_help_pages(entries, [](KeyAction a) { return action_label(a); }));
+    auto pages = key_help_pages(entries, [](KeyAction a) { return action_label(a); });
+    add_click_lines(pages);
+    m_hud->show_help(std::move(pages));
 }
 
 ui::KeyContext MapInput::key_context() const {

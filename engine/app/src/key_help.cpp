@@ -24,6 +24,11 @@ constexpr std::array<std::array<const char*, 2>, kKeyHelpPages> kSectionHeadings
     {"keys.heading.view", nullptr},
 }};
 
+/// The page and section of the clicks of add_click_lines(): ships and units selected.
+constexpr KeyHelpPlace kClickPlace{3, 1};
+/// What each click does (keys.click.<name>), all with Shift.
+constexpr std::array<const char*, 2> kShiftClicks = {"keys.click.castle_all", "keys.click.cannons"};
+
 }  // namespace
 
 KeyHelpPlace key_help_place(KeyAction action) noexcept {
@@ -145,6 +150,21 @@ std::array<KeyHelpPage, kKeyHelpPages> key_help_pages(const std::vector<KeyHelpE
         }
     }
     return pages;
+}
+
+void add_click_lines(std::array<KeyHelpPage, kKeyHelpPages>& pages) {
+    KeyHelpPage& page = pages[kClickPlace.page];
+    const std::string heading = ui::tr(kSectionHeadings[kClickPlace.page][kClickPlace.section]);
+    auto section = std::find_if(page.sections.begin(), page.sections.end(),
+                                [&](const KeyHelpSection& s) { return s.heading == heading; });
+    if (section == page.sections.end()) {
+        page.sections.push_back(KeyHelpSection{heading, {}});
+        section = page.sections.end() - 1;
+    }
+    const std::string keys = ui::tr("keys.modifier.shift") + ui::tr("keys.click");
+    for (const char* text : kShiftClicks) {
+        section->lines.push_back(KeyHelpLine{keys, ui::tr(text)});
+    }
 }
 
 namespace {

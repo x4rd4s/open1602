@@ -1417,6 +1417,7 @@ public:
                 break;
             case 40004:
                 m_picking = true;  // the unit's destination: the next click on the map
+                m_all = c.shift;   // Open1602: with Shift every trained unit goes
                 break;
             default:
                 break;
@@ -1432,7 +1433,7 @@ public:
         o.island = s.island;
         o.x = s.x;
         o.y = s.y;
-        o.op = sim::CastleOrder::Op::Release;
+        o.op = m_all || c.shift ? sim::CastleOrder::Op::ReleaseAll : sim::CastleOrder::Op::Release;
         o.slot = static_cast<std::uint8_t>(std::max(m_slot, 0));
         o.spot = sim::Target::spot(2 * x + 1, 2 * y + 1);
         out.emplace_back(o);
@@ -1450,7 +1451,7 @@ public:
             case 40003:
                 return line(85);
             case 40004:
-                return line(84);
+                return ui::tr("castle.release", {help_line(c, 84)});
             case 40006:
                 return line(83);
             case 40009:
@@ -1510,6 +1511,7 @@ private:
     std::int32_t m_slot = 0;
     std::int32_t m_unit = 0;
     bool m_picking = false;
+    bool m_all = false;  ///< the pick sends every trained unit (Shift on the send-out arrow)
 };
 
 // ---- A foreign Kontor --------------------------------------------------------------------------

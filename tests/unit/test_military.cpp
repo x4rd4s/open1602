@@ -476,6 +476,50 @@ TEST_CASE("military: a castle trains units with weapons and sends them out") {
     CHECK(castle.slots.empty());
 }
 
+TEST_CASE("military: Shift on the send-out arrow sends every trained unit, lined up around the spot") {
+    Field f;
+    f.build(kCastle, 20, 5, 0);
+    f.world.add_cost_building(sim::CostBuilding{sim::CostBuilding::Kind::Castle, 0, 20, 5, true});
+    sim::CastleSlot trained;
+    trained.figure = kSword;
+    trained.training = false;
+    trained.armed = true;
+    trained.progress = 320;
+    trained.health = 640;
+    sim::CastleSlot learning = trained;
+    learning.training = true;
+    learning.progress = 100;
+    f.world.cost_buildings().back().slots = {trained, learning, trained};
+    f.start();
+    using Op = sim::CastleOrder::Op;
+    const sim::CostBuilding& castle = f.world.cost_buildings().back();
+    REQUIRE(f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::ReleaseAll, 0, 0, sim::Target::spot(40, 40)}));
+    // The unit in training stays; the others leave as one group, a tile apart, centred on the spot.
+    REQUIRE(castle.slots.size() == 1);
+    CHECK(castle.slots[0].training);
+    REQUIRE(f.world.soldiers().size() == 2);
+    CHECK(f.world.soldiers()[0].target == sim::Target::spot(39, 40));
+    CHECK(f.world.soldiers()[1].target == sim::Target::spot(41, 40));
+    CHECK(f.military->army_size(0) == 3);
+    // Nothing trained: nothing to send.
+    CHECK(!f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::ReleaseAll, 0, 0, sim::Target::spot(40, 40)}));
+    CHECK(f.world.soldiers().size() == 2);
+    // A full fortress: three rows of three at most, every place its own.
+    f.world.cost_buildings().back().slots.assign(8, trained);
+    REQUIRE(f.military->castle(sim::CastleOrder{0, 0, 20, 5, Op::ReleaseAll, 0, 0, sim::Target::spot(40, 40)}));
+    REQUIRE(f.world.soldiers().size() == 10);
+    std::set<std::pair<std::uint32_t, std::uint32_t>> places;
+    for (std::size_t i = 2; i < 10; ++i) {
+        const sim::Target& t = f.world.soldiers()[i].target;
+        CHECK(t.x >= 38);
+        CHECK(t.x <= 42);
+        CHECK(t.y >= 38);
+        CHECK(t.y <= 42);
+        places.emplace(t.x, t.y);
+    }
+    CHECK(places.size() == 8);
+}
+
 TEST_CASE("military: the unit limit is a rule, 250 by default (L-008)") {
     Field f;
     f.build(kCastle, 20, 5, 0);
