@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Windows of Open1602's own that have no layout in the original's files (the multiplayer menu):
-// framed panels, labels, buttons, text fields, check boxes and list rows in the original's fonts
+// framed panels, labels, buttons, text fields, check boxes, sliders and list rows in the original's fonts
 // and the colours of Open1602's other windows (gold frame, dark ground). The owner lays the form
 // out anew whenever its state changes (design units of the 1024 x 768 screen, like the layouts);
 // the form draws it and answers the mouse. Pure logic, like ui::Panel.
@@ -83,6 +83,10 @@ public:
     void check(Id id, Rect r, std::string text, bool on, bool enabled = true);
     /// A row of a list: clickable, highlighted when `selected`; labels go on top of it.
     void row(Id id, Rect r, bool selected);
+    /// A slider with its knob at `position` (0: left end, 1: right end). Pressed on it, the knob
+    /// follows the mouse while the button is held; letting go, wherever, clicks it, and
+    /// slid_to() tells where the knob was let go.
+    void slider(Id id, Rect r, double position, bool enabled = true);
 
     /// The field that takes the keys, if any.
     [[nodiscard]] std::optional<Id> focus() const noexcept { return m_focus; }
@@ -92,6 +96,12 @@ public:
     /// released on it with the same button), if any. The right button clicks cycle buttons only;
     /// a button pressed while another is held is not seen.
     std::optional<Id> mouse(std::int32_t x, std::int32_t y, bool down, MouseButton button = MouseButton::Left);
+    /// Where the knob of slider `id` is dragged now, if it is held (to show its value meanwhile).
+    [[nodiscard]] std::optional<double> sliding(Id id) const noexcept {
+        return m_pressed == id && m_pressed_with == MouseButton::Left ? std::optional<double>(m_slide) : std::nullopt;
+    }
+    /// Where the slider of the last click mouse() returned was let go (0..1).
+    [[nodiscard]] double slid_to() const noexcept { return m_slide; }
     /// The button of the last click mouse() returned.
     [[nodiscard]] MouseButton clicked_with() const noexcept { return m_clicked_with; }
     /// The widget under the mouse at the last call.
@@ -105,7 +115,7 @@ public:
 
     /// The widgets' boxes and texts as laid out, for tests and the owner.
     struct Widget {
-        enum class Kind : std::uint8_t { Panel, Swatch, Label, Entry, Paragraph, Button, Field, Check, Row };
+        enum class Kind : std::uint8_t { Panel, Swatch, Label, Entry, Paragraph, Button, Field, Check, Row, Slider };
         Kind kind = Kind::Label;
         Id id = 0;
         Rect rect;
@@ -116,6 +126,7 @@ public:
         Tone value_tone = Tone::Normal;  ///< entry
         std::uint8_t colour = 0;
         std::int32_t line = 0;  ///< paragraph: line height
+        double position = 0.0;  ///< slider: where the knob is (0..1)
         bool enabled = true;
         bool on = false;      ///< selected, checked, secret
         bool cycles = false;  ///< button: the right button chooses the previous value
@@ -125,6 +136,10 @@ public:
 private:
     [[nodiscard]] std::optional<Id> hit(std::int32_t x, std::int32_t y, MouseButton button) const;
     [[nodiscard]] std::int32_t colour_of(Tone tone) const noexcept;
+    /// The slider held now, if a slider is pressed.
+    [[nodiscard]] const Widget* held_slider() const noexcept;
+    /// The knob's position for the mouse at x pixels over `slider`.
+    [[nodiscard]] double slider_position(const Widget& slider, std::int32_t x) const noexcept;
 
     FormStyle m_style;
     double m_scale = 1.0;
@@ -135,6 +150,7 @@ private:
     std::optional<Id> m_hovered;
     std::optional<Id> m_focus;
     bool m_released = false;
+    double m_slide = 0.0;  ///< the held slider's knob, then where it was let go
 };
 
 }  // namespace o1602::ui

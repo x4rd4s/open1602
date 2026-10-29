@@ -31,6 +31,9 @@ struct DisplaySettings {
     /// where the mouse cannot leave the window: in full screen (which then keeps the mouse) or
     /// with grab_mouse.
     bool edge_scroll = true;
+    /// How fast edge scrolling is, in percent of the arrow keys' speed (kEdgeSpeedMin to
+    /// kEdgeSpeedMax in steps of kEdgeSpeedStep).
+    std::int32_t edge_speed = 100;
     /// The mouse stays in the window (also in a window, not only in full screen) while it has the
     /// focus; switching to another program lets it go.
     bool grab_mouse = false;
@@ -51,6 +54,11 @@ struct DisplaySettings {
 
     friend bool operator==(const DisplaySettings&, const DisplaySettings&) = default;
 };
+
+/// Edge scrolling's speeds offered, in percent of the arrow keys' speed.
+inline constexpr std::int32_t kEdgeSpeedMin = 25;
+inline constexpr std::int32_t kEdgeSpeedMax = 300;
+inline constexpr std::int32_t kEdgeSpeedStep = 25;
 
 /// The interface sizes offered, in percent (0: automatic).
 inline constexpr std::array<std::int32_t, 9> kUiScales = {0, 75, 100, 125, 150, 175, 200, 250, 300};
@@ -88,6 +96,11 @@ inline constexpr std::array<WindowSize, 10> kWindowSizes = {{{1024, 768},
 [[nodiscard]] std::int32_t next_ui_scale(std::int32_t current) noexcept;
 /// The setting before `current` in kUiScales (before the first the last).
 [[nodiscard]] std::int32_t previous_ui_scale(std::int32_t current) noexcept;
+
+/// Edge scrolling's speed for a slider at `position` (0..1): the nearest step.
+[[nodiscard]] std::int32_t edge_speed_at(double position) noexcept;
+/// Where the slider of edge scrolling's `speed` stands (0..1).
+[[nodiscard]] double edge_speed_position(std::int32_t speed) noexcept;
 
 /// A "display.*" line of settings.cfg (`key` without the prefix); false if the key is unknown.
 bool read_display_line(DisplaySettings& s, std::string_view key, std::string_view value);

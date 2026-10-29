@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "display_menu.hpp"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 
@@ -19,14 +20,15 @@ constexpr Id kItem = 1;  // + Item
 constexpr Id kClose = 20;
 
 constexpr std::int32_t kRowY = 64;
-constexpr std::int32_t kRowH = 38;
+constexpr std::int32_t kRowH = 36;
+constexpr std::int32_t kPercentW = 72;  ///< the value beside a slider
 constexpr std::int32_t kLabelW = 260;
 constexpr std::int32_t kValueW = 232;
 
 constexpr std::array<std::string_view, DisplayMenu::kItems> kLabels = {
-    "display.mode",         "display.size",       "display.ui_scale",     "display.zoom",
-    "display.zoom_drawing", "display.vsync",      "display.edge_scroll",  "display.grab_mouse",
-    "display.goods_trend",  "display.rival_wars", "display.plant_fields", "display.graphics"};
+    "display.mode",       "display.size",         "display.ui_scale",   "display.zoom",       "display.zoom_drawing",
+    "display.vsync",      "display.edge_scroll",  "display.edge_speed", "display.grab_mouse", "display.goods_trend",
+    "display.rival_wars", "display.plant_fields", "display.graphics"};
 
 std::string on_off(bool on) {
     return ui::tr(on ? "display.on" : "display.off");
@@ -58,6 +60,8 @@ std::string DisplayMenu::value_text(const DisplayModel& model, Item item) {
             return on_off(s.vsync);
         case Item::EdgeScroll:
             return on_off(s.edge_scroll);
+        case Item::EdgeSpeed:
+            return ui::tr("display.percent", {std::to_string(s.edge_speed)});
         case Item::GrabMouse:
             return on_off(s.grab_mouse);
         case Item::GoodsTrend:
@@ -107,6 +111,16 @@ bool DisplayMenu::choose(DisplayModel& model, Item item, bool forward) {
         case Item::EdgeScroll:
             s.edge_scroll = !s.edge_scroll;
             return true;
+        case Item::EdgeSpeed: {
+            if (!s.edge_scroll) {
+                return false;
+            }
+            const std::int32_t next =
+                std::clamp(s.edge_speed + (forward ? kEdgeSpeedStep : -kEdgeSpeedStep), kEdgeSpeedMin, kEdgeSpeedMax);
+            const bool changed = next != s.edge_speed;
+            s.edge_speed = next;
+            return changed;
+        }
         case Item::GrabMouse:
             s.grab_mouse = !s.grab_mouse;
             return true;
@@ -142,6 +156,13 @@ DisplayMenu::Result DisplayMenu::mouse(std::int32_t x, std::int32_t y, bool down
     if (*id == kClose) {
         return Result::Close;
     }
+    if (*id == kItem + static_cast<Id>(Item::EdgeSpeed)) {
+        // The slider, let go: the nearest step.
+        const std::int32_t speed = edge_speed_at(m_form.slid_to());
+        const bool changed = speed != model.settings.edge_speed;
+        model.settings.edge_speed = speed;
+        return changed ? Result::Changed : Result::None;
+    }
     if (*id >= kItem && *id < kItem + static_cast<Id>(kItems)) {
         const bool forward = m_form.clicked_with() == ui::MouseButton::Left;
         return choose(model, static_cast<Item>(*id - kItem), forward) ? Result::Changed : Result::None;
@@ -158,10 +179,24 @@ void DisplayMenu::layout(const DisplayModel& model) {
         const auto item = static_cast<Item>(i);
         const std::int32_t y = kRowY + static_cast<std::int32_t>(i) * kRowH;
         const bool used = !(item == Item::WindowSize && model.settings.fullscreen) &&
-                          !(item == Item::ZoomDrawing && !model.settings.free_zoom);
+                          !(item == Item::ZoomDrawing && !model.settings.free_zoom) &&
+                          !(item == Item::EdgeSpeed && !model.settings.edge_scroll);
         f.label(Rect{24, y, kLabelW, kRowH - 4}, ui::tr(kLabels[i]), Align::Left, used ? Tone::Normal : Tone::Dim);
-        f.cycle_button(kItem + static_cast<Id>(i), Rect{kWidth - 24 - kValueW, y, kValueW, kRowH - 6},
-                       value_text(model, item), used);
+        const Id id = kItem + static_cast<Id>(i);
+        const Rect value{kWidth - 24 - kValueW, y, kValueW, kRowH - 6};
+        if (item == Item::EdgeSpeed) {
+            // A slider, with its value beside it; while it is dragged the value it would take.
+            DisplayModel shown = model;
+            if (const auto at = f.sliding(id)) {
+                shown.settings.edge_speed = edge_speed_at(*at);
+            }
+            f.slider(id, Rect{value.x, value.y, value.w - kPercentW, value.h},
+                     edge_speed_position(model.settings.edge_speed), used);
+            f.label(Rect{value.x + value.w - kPercentW, value.y, kPercentW, value.h}, value_text(shown, item),
+                    Align::Right, used ? Tone::Normal : Tone::Dim);
+            continue;
+        }
+        f.cycle_button(id, value, value_text(model, item), used);
     }
     const std::int32_t below = kRowY + static_cast<std::int32_t>(kItems) * kRowH + 4;
     f.paragraph(Rect{24, below, kWidth - 48, kHeight - below - 60}, ui::tr("display.hint"), Tone::Dim);

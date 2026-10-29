@@ -99,6 +99,20 @@ double ui_scale_for(std::int32_t ui_scale, std::int32_t width, std::int32_t heig
     return std::min(fit, ui_scale / 100.0 * desktop);
 }
 
+std::int32_t edge_speed_at(double position) noexcept {
+    if (!std::isfinite(position)) {
+        return 100;
+    }
+    constexpr double kSteps = (kEdgeSpeedMax - kEdgeSpeedMin) / kEdgeSpeedStep;
+    const auto step = static_cast<std::int32_t>(std::lround(std::clamp(position, 0.0, 1.0) * kSteps));
+    return kEdgeSpeedMin + step * kEdgeSpeedStep;
+}
+
+double edge_speed_position(std::int32_t speed) noexcept {
+    const std::int32_t s = std::clamp(speed, kEdgeSpeedMin, kEdgeSpeedMax);
+    return static_cast<double>(s - kEdgeSpeedMin) / (kEdgeSpeedMax - kEdgeSpeedMin);
+}
+
 std::int32_t next_ui_scale(std::int32_t current) noexcept {
     const auto it = std::ranges::find(kUiScales, current);
     if (it == kUiScales.end() || std::next(it) == kUiScales.end()) {
@@ -154,6 +168,14 @@ bool read_display_line(DisplaySettings& s, std::string_view key, std::string_vie
     if (key == "edge_scroll") {
         return read_flag(value, s.edge_scroll);
     }
+    if (key == "edge_speed") {
+        std::int32_t n = 0;
+        if (!read_number(value, kEdgeSpeedMin, kEdgeSpeedMax, n)) {
+            return false;
+        }
+        s.edge_speed = edge_speed_at(edge_speed_position(n));  // on a step
+        return true;
+    }
     if (key == "grab_mouse") {
         return read_flag(value, s.grab_mouse);
     }
@@ -189,6 +211,8 @@ std::string write_display(const DisplaySettings& s) {
     out += std::string("display.vsync = ") + on_off(s.vsync) + "\n";
     out += "# The map scrolls with the mouse at the screen's edge (full screen, or with grab_mouse)\n";
     out += std::string("display.edge_scroll = ") + on_off(s.edge_scroll) + "\n";
+    out += "# Its speed in percent of the arrow keys' (25 to 300)\n";
+    out += "display.edge_speed = " + std::to_string(s.edge_speed) + "\n";
     out += "# The mouse cannot leave the window while it has the focus\n";
     out += std::string("display.grab_mouse = ") + on_off(s.grab_mouse) + "\n";
     out += "# Under each good of a Kontor's stock how much more comes in or goes out per minute\n";

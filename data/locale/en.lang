@@ -623,6 +623,7 @@ display.zoom_smooth = sharp and smooth
 display.zoom_pixels = plain pixels
 display.vsync = V-Sync
 display.edge_scroll = Scroll at the screen's edge
+display.edge_speed = Speed at the edge
 display.grab_mouse = Keep the mouse in the window
 display.goods_trend = Goods trend at the Kontor
 display.rival_wars = Wars between others

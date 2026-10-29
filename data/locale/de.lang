@@ -593,6 +593,7 @@ display.zoom_smooth = scharf und weich
 display.zoom_pixels = einfache Pixel
 display.vsync = V-Sync
 display.edge_scroll = Am Bildschirmrand scrollen
+display.edge_speed = Tempo am Rand
 display.grab_mouse = Maus im Fenster halten
 display.goods_trend = Warentrend im Kontor
 display.rival_wars = Kriege anderer Spieler
