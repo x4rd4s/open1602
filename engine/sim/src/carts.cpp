@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <vector>
 
+#include "o1602/sim/logistics.hpp"
 #include "o1602/sim/ships.hpp"
 
 namespace o1602::sim {
@@ -131,7 +132,16 @@ std::uint32_t Fleet::request_cart(const CartRequest& r) {
     if ((r.x == sx && r.y == sy) || island_of(*m_world, r.x, r.y) != r.island) {
         return 0;  // a click on the Kontor itself sends nothing out; only to a tile of its island
     }
-    Ship cart = make_ship(next_ship_name(), sx, sy, figure::kTradeCart, r.player, 4);
+    // It sets off from the middle of the Kontor (origin + half its footprint), as in the original.
+    std::uint32_t cx = sx;
+    std::uint32_t cy = sy;
+    if (const auto b = building_at(
+            *m_world, *m_buildings, r.island,
+            {static_cast<std::int32_t>(*city->warehouse_x), static_cast<std::int32_t>(*city->warehouse_y)})) {
+        cx = isl.x + static_cast<std::uint32_t>(b->origin.x) + b->width / 2;
+        cy = isl.y + static_cast<std::uint32_t>(b->origin.y) + b->height / 2;
+    }
+    Ship cart = make_ship(next_ship_name(), cx, cy, figure::kTradeCart, r.player, 4);
     cart.cargo.resize(type->ship.cargo_slots != 0 ? type->ship.cargo_slots : 3U);
     cart.health = type->ship.max_health;
     cart.previous = Target::city_of(r.island, r.city);
