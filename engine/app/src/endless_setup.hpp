@@ -73,7 +73,7 @@ enum class SetupItem : std::uint8_t {
     Resources,
     // Opponents
     ComputerPlayers,
-    ClassicAi,  ///< also on the page "Original settings", as the bug it brings back
+    ClassicAi,  ///< a bug of the original too (OriginalBugs::classic_ai); the page's presets switch it
     ShipPurchases,
     Pirates,
     PirateNests,
@@ -92,7 +92,7 @@ enum class SetupItem : std::uint8_t {
     WinAll,
     WinComputers,
     // Bugs of the original brought back (a page of their own, "Original settings"; sim::OriginalBugs),
-    // in the page's order: disasters, construction, ships and trade; the opponents' ClassicAi is above
+    // in the page's order: disasters, construction, ships and trade
     BugFireRisk,
     BugGallows,
     BugRobberVictims,
@@ -110,14 +110,17 @@ enum class SetupItem : std::uint8_t {
 [[nodiscard]] constexpr bool victory_item(SetupItem item) noexcept {
     return item >= SetupItem::WinInhabitants && item <= SetupItem::WinComputers;
 }
-/// Whether an item is a bug of the original (the page "Original settings"); the computer players
-/// are one too, shown on the first page as well.
+/// Whether an item is on the page "Original settings". The computer players (ClassicAi) are a bug of
+/// the original too, but have their row with the opponents; the page's presets switch them as well.
 [[nodiscard]] constexpr bool bug_item(SetupItem item) noexcept {
-    return (item >= SetupItem::BugFireRisk && item < SetupItem::Count) || item == SetupItem::ClassicAi;
+    return item >= SetupItem::BugFireRisk && item < SetupItem::Count;
 }
 /// The bug an item of the page "Original settings" switches, or nullptr.
 [[nodiscard]] bool sim::OriginalBugs::*bug_of(SetupItem item) noexcept;
-/// The bugs of the original in a few words: Open1602's fixes, or how many are as in the original.
+/// The bugs of the page "Original settings": `bugs` without the computer players, which have their
+/// row with the opponents.
+[[nodiscard]] sim::OriginalBugs page_bugs(sim::OriginalBugs bugs) noexcept;
+/// The bugs of the page in a few words: Open1602's fixes, or how many are as in the original.
 [[nodiscard]] std::string bugs_summary(const sim::OriginalBugs& bugs);
 /// Whether what is played offers victory conditions: endless games (a saved one to look at).
 [[nodiscard]] bool victory_offered(SetupScope scope) noexcept;

@@ -406,16 +406,21 @@ TEST_CASE("game setup: the dialog of a scenario shows the rules only") {
     CHECK(!find_text(menu, ui::tr("setup.group.world")).has_value());
     CHECK(!find_text(menu, ui::tr("setup.map")).has_value());
     CHECK(!find_text(menu, ui::tr("setup.resources")).has_value());
-    // The computer players are with the opponents and on the page of the original's bugs: one setting.
+    // The computer players are with the opponents, not on the page of the original's bugs, whose
+    // presets switch them all the same.
     CHECK(find_text(menu, app::setup_label(SetupItem::ClassicAi)).has_value());
     (void)click(menu, ui::tr("setup.bug.classic_ai.fixed"));
     CHECK(menu.setup().rules.bugs.classic_ai);
-    (void)click(menu, ui::tr("setup.bugs.open", {ui::tr("setup.bugs.one")}));
-    (void)click(menu, ui::tr("setup.bug.classic_ai.original"));
+    (void)click(menu, ui::tr("setup.bugs.open", {ui::tr("setup.bugs.none")}));  // not counted there
+    REQUIRE(menu.bugs_page());
+    CHECK(!find_text(menu, app::setup_label(SetupItem::ClassicAi)).has_value());
+    (void)click(menu, ui::tr("setup.bugs.all_fixed"));
     CHECK(!menu.setup().rules.bugs.classic_ai);
-    (void)click(menu, ui::tr("setup.bug.classic_ai.fixed"));
+    (void)click(menu, ui::tr("setup.bugs.all_original"));
     CHECK(menu.setup().rules.bugs.classic_ai);
     (void)click(menu, ui::tr("setup.back"));
+    CHECK(find_text(menu, ui::tr("setup.bug.classic_ai.original")).has_value());
+    (void)click(menu, ui::tr("setup.defaults"));
     (void)click(menu, ui::tr("setup.original"));
     CHECK(menu.setup().rules == sim::Rules::original());
     CHECK(click(menu, ui::tr("setup.start")) == app::GameSettingsMenu::Result::Start);

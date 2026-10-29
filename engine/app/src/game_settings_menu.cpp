@@ -56,8 +56,7 @@ struct Group {
 constexpr std::int32_t kLeft = 40;
 constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 
-// Economy, limits and disasters on the left, the world and the opponents on the right. The
-// opponents' computer players (ClassicAi) are on the page of the original's bugs too: one setting.
+// Economy, limits and disasters on the left, the world and the opponents on the right.
 constexpr Group kGroups[] = {
     {"setup.group.economy", SetupItem::Refund, SetupItem::BreadChain, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
@@ -75,12 +74,12 @@ constexpr Group kVictoryGroups[] = {
     {"setup.group.end", SetupItem::WinTimeLimit, SetupItem::WinComputers, kRight},
 };
 
-// The bugs of the original a game can bring back, by what they touch.
+// The bugs of the original a game can bring back, by what they touch; the computer players
+// (ClassicAi) have their row with the opponents on the first page, the page's presets switch them too.
 constexpr Group kBugGroups[] = {
     {"setup.group.disasters", SetupItem::BugFireRisk, SetupItem::BugRobberFlight, kLeft},
     {"setup.group.construction", SetupItem::BugGoldsheep, SetupItem::BugInfertileFields, kLeft},
     {"setup.group.ships", SetupItem::BugRemoteTrade, SetupItem::BugSmallYardWarships, kRight},
-    {"setup.group.opponents", SetupItem::ClassicAi, SetupItem::ClassicAi, kRight},
 };
 
 std::string_view title_key(SetupScope scope) {
@@ -270,7 +269,7 @@ void GameSettingsMenu::layout() {
             f.button(kVictory, value, ui::tr("setup.victory.open", {victory_summary(m_setup.rules.victory)}));
             top += kRowH;
         }
-        const Rect value = row(kLeft, top, ui::tr("setup.bugs"), m_setup.rules.bugs.count() != 0);
+        const Rect value = row(kLeft, top, ui::tr("setup.bugs"), page_bugs(m_setup.rules.bugs).count() != 0);
         f.button(kBugs, value, ui::tr("setup.bugs.open", {bugs_summary(m_setup.rules.bugs)}));
     }
     // The hint below the lower column; three lines of it fit above the buttons.
@@ -293,9 +292,9 @@ void GameSettingsMenu::layout() {
                  !m_setup.rules.victory.active());
     } else if (bugs) {
         f.button(kBugsOriginal, Rect{260, kBottomY, 240, 44}, ui::tr("setup.bugs.all_original"), true,
-                 m_setup.rules.bugs == sim::OriginalBugs::all());
+                 page_bugs(m_setup.rules.bugs) == page_bugs(sim::OriginalBugs::all()));
         f.button(kBugsFixed, Rect{520, kBottomY, 240, 44}, ui::tr("setup.bugs.all_fixed"), true,
-                 m_setup.rules.bugs == sim::OriginalBugs{});
+                 page_bugs(m_setup.rules.bugs) == sim::OriginalBugs{});
     } else {
         f.button(kOriginal, Rect{260, kBottomY, 240, 44}, ui::tr("setup.original"), true,
                  same_setup(m_setup, keep_decided(EndlessSetup::original(m_scope)), m_scope));
