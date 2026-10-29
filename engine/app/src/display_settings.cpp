@@ -157,6 +157,9 @@ bool read_display_line(DisplaySettings& s, std::string_view key, std::string_vie
     if (key == "rival_wars") {
         return read_flag(value, s.rival_wars);
     }
+    if (key == "plant_fields") {
+        return read_flag(value, s.plant_fields);
+    }
     if (key == "graphics") {
         if (value == "classic" || value == "modern") {
             s.classic_graphics = value == "classic";
@@ -182,6 +185,8 @@ std::string write_display(const DisplaySettings& s) {
     out += std::string("display.goods_trend = ") + on_off(s.goods_trend) + "\n";
     out += "# Tell when two other players go to war or make peace\n";
     out += std::string("display.rival_wars = ") + on_off(s.rival_wars) + "\n";
+    out += "# A new farm plants its fields on the open ground around it at once\n";
+    out += std::string("display.plant_fields = ") + on_off(s.plant_fields) + "\n";
     out += "# classic: shadows and smoke as the original draws them (every second pixel); modern: blended\n";
     out += std::string("display.graphics = ") + (s.classic_graphics ? "classic" : "modern") + "\n";
     return out;

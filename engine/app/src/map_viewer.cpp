@@ -1168,11 +1168,12 @@ void MapViewer::apply_construction() {
                                                                    static_cast<std::uint16_t>(e.y))) {
                 m_production_phases.forget(*index);
             }
-            // A farm the local player placed plants its fields at once, as key F would.
-            const sim::IslandMap& map = m_state->world.islands()[e.island].map;
-            if (e.type != nullptr &&
-                (e.type->prod_kind == sim::prod::kFarm || e.type->prod_kind == sim::prod::kPasture) &&
-                map.top(static_cast<std::uint32_t>(e.x), static_cast<std::uint32_t>(e.y)).owner == m_local_player) {
+            // With the setting on, a farm the local player placed plants its fields at once, as
+            // key F would (clearing the forest for a crop or pasture). It is an ordinary order of
+            // the local player (a farm of another player gives none), so every computer in a
+            // multiplayer game sees the same.
+            if (m_app_settings.display.plant_fields && e.type != nullptr &&
+                (e.type->prod_kind == sim::prod::kFarm || e.type->prod_kind == sim::prod::kPasture)) {
                 m_input->plant_fields_at(e.island, e.x, e.y);
             }
         }

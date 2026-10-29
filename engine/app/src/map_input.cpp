@@ -1029,10 +1029,11 @@ void MapInput::plant_fields() {
 
 void MapInput::plant_fields_at(std::uint16_t island, std::int32_t x, std::int32_t y) {
     const sim::World& w = world();
-    if (island >= w.islands().size()) {
+    if (island >= w.islands().size() || !w.islands()[island].map.contains(x, y)) {
         return;
     }
-    const sim::SubTile t = w.islands()[island].map.sub_tile(m_buildings, x, y);
+    const sim::SubTile t =
+        w.islands()[island].map.sub_tile(m_buildings, static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
     if (t.building == nullptr || t.building->raw_ware == 0) {
         return;
     }

@@ -624,6 +624,7 @@ display.zoom_pixels = plain pixels
 display.vsync = V-Sync
 display.goods_trend = Goods trend at the Kontor
 display.rival_wars = Wars between others
+display.plant_fields = Plant fields automatically
 display.graphics = Graphics
 display.graphics_classic = as in the original
 display.graphics_modern = modern
