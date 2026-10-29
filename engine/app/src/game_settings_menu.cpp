@@ -35,11 +35,11 @@ constexpr Rect kHeading{40, 28, 760, 40};
 constexpr std::int32_t kBottomY = 690;
 constexpr std::int32_t kHintY = 592;  ///< the hint's top when the groups end above it
 
-// The endless game's left column (four groups) and right column (two long ones) end where the
-// hint still has two lines above the buttons.
+// The endless game's left column (four groups) and right column (two long ones, sixteen rows) end
+// where the hint still has two lines above the buttons.
 constexpr std::int32_t kTop = 76;
 constexpr std::int32_t kGap = 6;
-constexpr std::int32_t kRowH = 30;     // room for three lines of hint or error below the endless game's items (FB-32)
+constexpr std::int32_t kRowH = 28;     // room for two lines of hint or error below the endless game's items (FB-32)
 constexpr std::int32_t kGroupW = 464;  ///< a column: its frame
 constexpr std::int32_t kRowW = kGroupW - 28;  ///< a row in it: label, a gap of 4 and value
 constexpr std::int32_t kTextPadding = 8;      ///< ui::Form's text from the edges of its box
@@ -56,7 +56,8 @@ struct Group {
 constexpr std::int32_t kLeft = 40;
 constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 
-// Economy, limits and disasters on the left, the world and the opponents on the right.
+// Economy, limits and disasters on the left, the world and the opponents on the right. The
+// opponents' computer players (ClassicAi) are on the page of the original's bugs too: one setting.
 constexpr Group kGroups[] = {
     {"setup.group.economy", SetupItem::Refund, SetupItem::BreadChain, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},

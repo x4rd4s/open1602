@@ -73,6 +73,7 @@ enum class SetupItem : std::uint8_t {
     Resources,
     // Opponents
     ComputerPlayers,
+    ClassicAi,  ///< also on the page "Original settings", as the bug it brings back
     ShipPurchases,
     Pirates,
     PirateNests,
@@ -91,7 +92,7 @@ enum class SetupItem : std::uint8_t {
     WinAll,
     WinComputers,
     // Bugs of the original brought back (a page of their own, "Original settings"; sim::OriginalBugs),
-    // in the page's order: disasters, construction, ships and trade, opponents
+    // in the page's order: disasters, construction, ships and trade; the opponents' ClassicAi is above
     BugFireRisk,
     BugGallows,
     BugRobberVictims,
@@ -102,7 +103,6 @@ enum class SetupItem : std::uint8_t {
     BugRemoteTrade,
     BugRemoteRepair,
     BugSmallYardWarships,
-    ClassicAi,
     Count,
 };
 
@@ -110,9 +110,10 @@ enum class SetupItem : std::uint8_t {
 [[nodiscard]] constexpr bool victory_item(SetupItem item) noexcept {
     return item >= SetupItem::WinInhabitants && item <= SetupItem::WinComputers;
 }
-/// Whether an item is a bug of the original (the page "Original settings").
+/// Whether an item is a bug of the original (the page "Original settings"); the computer players
+/// are one too, shown on the first page as well.
 [[nodiscard]] constexpr bool bug_item(SetupItem item) noexcept {
-    return item >= SetupItem::BugFireRisk && item < SetupItem::Count;
+    return (item >= SetupItem::BugFireRisk && item < SetupItem::Count) || item == SetupItem::ClassicAi;
 }
 /// The bug an item of the page "Original settings" switches, or nullptr.
 [[nodiscard]] bool sim::OriginalBugs::*bug_of(SetupItem item) noexcept;

@@ -875,6 +875,7 @@ std::string setup_label(SetupItem item) {
         "setup.starts",
         "setup.resources",
         "setup.computers",
+        "setup.bug.classic_ai",
         "setup.ship_purchases",
         "setup.pirates",
         "setup.pirate_nests",
@@ -901,7 +902,6 @@ std::string setup_label(SetupItem item) {
         "setup.bug.remote_trade",
         "setup.bug.remote_repair",
         "setup.bug.small_yard_warships",
-        "setup.bug.classic_ai",
     };
     static_assert(kKeys.size() == kSetupItems);
     const auto i = static_cast<std::size_t>(item);
