@@ -211,6 +211,21 @@ void Window::usable_area(std::int32_t& width, std::int32_t& height) const {
     }
 }
 
+void Window::set_mouse_grab(bool on) {
+    if (on == m_mouse_grab) {
+        return;
+    }
+    m_mouse_grab = on;
+    if (!SDL_SetWindowMouseGrab(m_window, on)) {
+        std::fprintf(stderr, "mouse grab: %s\n", SDL_GetError());
+    }
+}
+
+bool Window::mouse_confined() const {
+    constexpr SDL_WindowFlags kFocus = SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_MOUSE_FOCUS;
+    return SDL_GetWindowMouseGrab(m_window) && (SDL_GetWindowFlags(m_window) & kFocus) == kFocus;
+}
+
 bool Window::maximized() const {
     return (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED) != 0;
 }

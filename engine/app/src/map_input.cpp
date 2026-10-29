@@ -25,6 +25,8 @@ namespace o1602::app {
 namespace {
 
 constexpr double kScrollSpeed = 900.0;  // pixels per second
+/// How close to the screen's edge the mouse scrolls the map, in window coordinates.
+constexpr double kEdgeMargin = 2.0;
 /// How far a unit's pictures may reach from its position, in tile widths (ships with sails and
 /// soldiers on high ground stay well inside). Units further from a picked rectangle are skipped.
 constexpr double kPickMarginTiles = 4.0;
@@ -390,6 +392,26 @@ void MapInput::scroll_with_keys(std::uint32_t delta_ms) {
     if (dx != 0.0 || dy != 0.0) {
         const double distance = kScrollSpeed * (fast ? 3.0 : 1.0) * delta_ms / 1000.0;
         m_camera.scroll(dx * distance, dy * distance);
+    }
+}
+
+bool MapInput::edge_scroll_paused() const noexcept {
+    return m_hud != nullptr && (m_hud->modal() || m_hud->typing() || m_hud->menu_active());
+}
+
+void MapInput::scroll_at_edges(std::uint32_t delta_ms) {
+    if (edge_scroll_paused() || m_drag.dragging() || !m_window.mouse_confined()) {
+        return;
+    }
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    m_window.output_size(w, h);
+    const double margin = std::max(1.0, std::round(kEdgeMargin * static_cast<double>(m_window.pixel_density())));
+    const EdgeScroll e = edge_scroll_at(m_mouse_x, m_mouse_y, w, h, margin);
+    if (e.dx != 0 || e.dy != 0) {
+        const bool fast = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
+        const double distance = kScrollSpeed * (fast ? 3.0 : 1.0) * delta_ms / 1000.0;
+        m_camera.scroll(e.dx * distance, e.dy * distance);
     }
 }
 

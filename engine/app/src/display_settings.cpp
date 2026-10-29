@@ -151,6 +151,12 @@ bool read_display_line(DisplaySettings& s, std::string_view key, std::string_vie
     if (key == "vsync") {
         return read_flag(value, s.vsync);
     }
+    if (key == "edge_scroll") {
+        return read_flag(value, s.edge_scroll);
+    }
+    if (key == "grab_mouse") {
+        return read_flag(value, s.grab_mouse);
+    }
     if (key == "goods_trend") {
         return read_flag(value, s.goods_trend);
     }
@@ -181,6 +187,10 @@ std::string write_display(const DisplaySettings& s) {
     out += std::string("display.free_zoom = ") + on_off(s.free_zoom) + "\n";
     out += std::string("display.smooth_zoom = ") + on_off(s.smooth_zoom) + "\n";
     out += std::string("display.vsync = ") + on_off(s.vsync) + "\n";
+    out += "# The map scrolls with the mouse at the screen's edge (full screen, or with grab_mouse)\n";
+    out += std::string("display.edge_scroll = ") + on_off(s.edge_scroll) + "\n";
+    out += "# The mouse cannot leave the window while it has the focus\n";
+    out += std::string("display.grab_mouse = ") + on_off(s.grab_mouse) + "\n";
     out += "# Under each good of a Kontor's stock how much more comes in or goes out per minute\n";
     out += std::string("display.goods_trend = ") + on_off(s.goods_trend) + "\n";
     out += "# Tell when two other players go to war or make peace\n";

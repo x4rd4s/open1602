@@ -27,6 +27,13 @@ struct DisplaySettings {
     /// off: straight with uneven pixels (cheapest).
     bool smooth_zoom = true;
     bool vsync = true;  ///< frames wait for the screen
+    /// The map scrolls while the mouse rests at the edge of the screen, as in the original. Only
+    /// where the mouse cannot leave the window: in full screen (which then keeps the mouse) or
+    /// with grab_mouse.
+    bool edge_scroll = true;
+    /// The mouse stays in the window (also in a window, not only in full screen) while it has the
+    /// focus; switching to another program lets it go.
+    bool grab_mouse = false;
     /// The goods trend at the Kontor: under each good of its stock what comes in more than goes
     /// out per minute, green, or the other way round, red (docs/architecture/0012-goods-statistics.md).
     bool goods_trend = true;

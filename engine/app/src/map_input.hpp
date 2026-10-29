@@ -130,6 +130,13 @@ public:
     void release_left() noexcept { m_left_down = false; }
     /// Every frame: the map scrolls while its keys are held.
     void scroll_with_keys(std::uint32_t delta_ms);
+    /// Every frame with edge scrolling on: the map scrolls while the mouse rests at the screen's
+    /// edge, where it cannot leave the window (Window::mouse_confined), and no window or menu
+    /// takes the mouse.
+    void scroll_at_edges(std::uint32_t delta_ms);
+    /// A menu, a question or a window over the map takes the mouse, or a name is typed: no edge
+    /// scrolling now.
+    [[nodiscard]] bool edge_scroll_paused() const noexcept;
     /// Every frame, in the menu as in the game: the platform's text input runs exactly while a
     /// name is typed.
     void sync_text_input();

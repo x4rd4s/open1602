@@ -817,6 +817,7 @@ int MapViewer::run() {
         // A video that starts now plays in the minimap's window only while one is on screen.
         const bool video = m_video->frame(now, m_hud && !m_hud->menu_active());
         update_cursor(video && m_video->full_screen());
+        follow_mouse_grab(video && m_video->full_screen());
         if (video && m_video->full_screen()) {
             // The game stands still while a video fills the screen (the original's main loop
             // 0x00408293); the time does not reach the simulation afterwards. Not in a multiplayer
@@ -1019,6 +1020,9 @@ void MapViewer::animate_zoom(std::uint32_t delta_ms) {
 void MapViewer::update(std::uint32_t delta_ms) {
     animate_zoom(delta_ms);
     m_input->scroll_with_keys(delta_ms);
+    if (m_app_settings.display.edge_scroll) {
+        m_input->scroll_at_edges(delta_ms);
+    }
     // The pause of the video ended another way (F3, another player): the video goes too.
     m_video->follow_pause(m_state->simulation.paused());
     m_input->follow_selection();
@@ -2000,6 +2004,17 @@ void MapViewer::apply_display(const DisplaySettings& display) {
         m_hud->options_model().fullscreen = display.fullscreen;
     }
     save_settings();
+}
+
+void MapViewer::follow_mouse_grab(bool video_full_screen) {
+    // Full screen keeps the mouse for edge scrolling (as the original's did), so that it does not
+    // slip onto a second screen, but lets it go while edge scrolling pauses (a menu or a window is
+    // open, a video plays), so that the mouse can reach another screen then. In a window only if
+    // the player asks for it, then always.
+    const DisplaySettings& display = m_app_settings.display;
+    const bool scrolling = display.edge_scroll && m_window->fullscreen() && !video_full_screen &&
+                           !(m_input && m_input->edge_scroll_paused());
+    m_window->set_mouse_grab(display.grab_mouse || scrolling);
 }
 
 void MapViewer::lay_out() {

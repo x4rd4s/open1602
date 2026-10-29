@@ -22,6 +22,8 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     s.display.free_zoom = false;
     s.display.smooth_zoom = false;
     s.display.vsync = false;
+    s.display.edge_scroll = false;
+    s.display.grab_mouse = true;
     s.display.goods_trend = false;
     s.display.rival_wars = false;
     s.display.plant_fields = true;
@@ -39,6 +41,8 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     CHECK(none.display.free_zoom);
     CHECK(none.display.smooth_zoom);
     CHECK(none.display.vsync);
+    CHECK(none.display.edge_scroll);  // as in the original
+    CHECK(!none.display.grab_mouse);
     CHECK(none.display.goods_trend);
     CHECK(none.display.rival_wars);
     CHECK(!none.display.plant_fields);      // the original plants no fields by itself
@@ -127,6 +131,12 @@ TEST_CASE("display menu: each row chooses its next value") {
     CHECK(!app::DisplayMenu::choose_next(model, Item::ZoomDrawing));  // the original's levels: whole scales
     CHECK(app::DisplayMenu::choose_next(model, Item::Vsync));
     CHECK(!model.settings.vsync);
+    CHECK(app::DisplayMenu::value_text(model, Item::EdgeScroll) == "on");
+    CHECK(app::DisplayMenu::choose_next(model, Item::EdgeScroll));
+    CHECK(!model.settings.edge_scroll);
+    CHECK(app::DisplayMenu::value_text(model, Item::GrabMouse) == "off");
+    CHECK(app::DisplayMenu::choose_previous(model, Item::GrabMouse));
+    CHECK(model.settings.grab_mouse);
     CHECK(app::DisplayMenu::value_text(model, Item::GoodsTrend) == "on");
     CHECK(app::DisplayMenu::choose_next(model, Item::GoodsTrend));
     CHECK(!model.settings.goods_trend);
@@ -159,7 +169,7 @@ TEST_CASE("display menu: a click on a row changes it, the button closes the wind
     CHECK(model.settings.fullscreen);
     CHECK(app::DisplayMenu::choose_next(model, Item::Mode));  // back to the window
     // A right click on the window's size takes the previous one.
-    const std::int32_t size_y = 64 + 40 + 15;
+    const std::int32_t size_y = 64 + 38 + 15;
     CHECK(menu.mouse(x, size_y, true, model, ui::MouseButton::Right) == app::DisplayMenu::Result::None);
     CHECK(menu.mouse(x, size_y, false, model, ui::MouseButton::Right) == app::DisplayMenu::Result::Changed);
     CHECK(model.window == (app::WindowSize{1280, 720}));
