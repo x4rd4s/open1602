@@ -311,12 +311,12 @@ void Military::castle_second(CostBuilding& c) {
 }
 
 std::optional<Target> Military::warrior_target(std::uint16_t island, TilePos origin, std::uint32_t width,
-                                               std::uint32_t height, PlayerId owner) {
+                                               std::uint32_t height, std::uint8_t city) {
     // 0x00467820, called by 0x0047EB30 with a reach of 7: from the hut's origin, with the hut's
     // footprint opened as the start area, a search over the 15 x 15 square around it (no circle)
     // walks on roads, open ground, ruins, squares, bridges, beach ruins, piers and the middle of
     // gates (the Land class, all at the Wegspeed of speed type 3). The goals are the roads and
-    // bridges of the natives' owner, never the start; the first goal reached is the target. No
+    // bridges of the village's city, never the start; the first goal reached is the target. No
     // random number is drawn; without such a tile the warrior stays in the hut. The original runs
     // its wavefront in rounds of 64 cost units, Open1602 the exact search of PathFinder on the same
     // costs (pathfinding.hpp).
@@ -337,7 +337,7 @@ std::optional<Target> Military::warrior_target(std::uint16_t island, TilePos ori
             }
             const MapCell& c = isl.map.top(static_cast<std::uint32_t>(p.x), static_cast<std::uint32_t>(p.y));
             const assets::BuildingType* t = c.empty() ? nullptr : m_buildings->by_sprite(c.sprite);
-            if (t != nullptr && c.owner == owner &&
+            if (t != nullptr && c.city == city &&
                 (t->kind == building_kind::kRoad || t->kind == building_kind::kBridge)) {
                 m_finder.set(p, PathFinder::Cell::Goal);
             }
@@ -386,10 +386,8 @@ void Military::natives_tick() {
             continue;
         }
         std::uint32_t& out = counts[std::size_t{found.owner} * islands + found.island];
+        // Only the village's first hut (in the order of the castle table) sends and recruits.
         for (CostBuilding& hut : m_world->cost_buildings()) {
-            if (out >= wanted) {
-                break;
-            }
             if (hut.kind != CostBuilding::Kind::Castle || hut.island != found.island ||
                 m_world->islands()[hut.island].map.top(hut.x, hut.y).city != found.index) {
                 continue;
@@ -398,40 +396,51 @@ void Military::natives_tick() {
             if (!b) {
                 continue;
             }
-            // From the last place: a trained warrior goes out, a new one starts training in its place.
-            // The map does not change in this loop, so the hut's target is searched once.
+            const assets::FigureType* recruit = m_figures->get(b->type->worker_figure);
+            const CastleSlot fresh{b->type->worker_figure, true, true,
+                                   recruit != nullptr ? recruit->combat.max_health : 0U, 0};
+            // From the last place backwards: a trained warrior goes out, and every place looked at
+            // recruits a new one, into the place left or a free one (op 0x10), so that the huts of
+            // a new game, which start empty, fill up. The map does not change in this loop, so the
+            // hut's target is searched once.
+            const std::size_t places = std::max<std::size_t>(b->type->max_wares, hut.slots.size());
             std::optional<std::optional<Target>> target;
-            for (std::size_t k = hut.slots.size(); k-- > 0 && out < wanted;) {
-                if (hut.slots[k].figure == 0 || hut.slots[k].training) {
+            for (std::size_t k = places; k-- > 0 && out < wanted;) {
+                bool sent = false;
+                if (k < hut.slots.size() && hut.slots[k].figure != 0 && !hut.slots[k].training) {
+                    const auto cell = exit_cell(hut.island, hut.x, hut.y);
+                    if (cell) {
+                        if (!target) {
+                            target = warrior_target(hut.island, b->origin, b->width, b->height, found.index);
+                        }
+                        if (*target) {
+                            const Target spot = **target;
+                            const CastleSlot slot = hut.slots[k];
+                            Soldier s;
+                            s.place_cell(cell->first, cell->second);
+                            s.figure = slot.figure;
+                            s.owner = found.owner;
+                            s.island = hut.island;
+                            s.health = slot.health;
+                            s.anim = 1;
+                            s.home = spot;
+                            s.target = spot;
+                            m_world->add_soldier(s);
+                            ++out;
+                            sent = true;
+                        }
+                    }
+                }
+                if (fresh.figure == 0) {
                     continue;
                 }
-                const auto cell = exit_cell(hut.island, hut.x, hut.y);
-                if (!cell) {
-                    break;
+                if (sent) {
+                    hut.slots[k] = fresh;
+                } else if (hut.slots.size() < b->type->max_wares) {
+                    hut.slots.push_back(fresh);
                 }
-                if (!target) {
-                    target = warrior_target(hut.island, b->origin, b->width, b->height, found.owner);
-                }
-                if (!*target) {
-                    continue;  // no owned road or bridge in reach: this place sends nobody
-                }
-                const Target spot = **target;
-                const CastleSlot slot = hut.slots[k];
-                Soldier s;
-                s.place_cell(cell->first, cell->second);
-                s.figure = slot.figure;
-                s.owner = found.owner;
-                s.island = hut.island;
-                s.health = slot.health;
-                s.anim = 1;
-                s.home = spot;
-                s.target = spot;
-                m_world->add_soldier(s);
-                ++out;
-                const assets::FigureType* type = m_figures->get(b->type->worker_figure);
-                hut.slots[k] = CastleSlot{b->type->worker_figure, true, true,
-                                          type != nullptr ? type->combat.max_health : slot.health, 0};
             }
+            break;
         }
     }
 }
