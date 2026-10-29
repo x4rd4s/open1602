@@ -406,7 +406,7 @@ void MapInput::scroll_at_edges(std::uint32_t delta_ms) {
     std::int32_t w = 0;
     std::int32_t h = 0;
     m_window.output_size(w, h);
-    const double margin = std::max(1.0, std::round(kEdgeMargin * m_window.pixel_density()));
+    const double margin = std::max(1.0, std::round(kEdgeMargin * static_cast<double>(m_window.pixel_density())));
     const EdgeScroll e = edge_scroll_at(m_mouse_x, m_mouse_y, w, h, margin);
     if (e.dx != 0 || e.dy != 0) {
         const bool fast = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
