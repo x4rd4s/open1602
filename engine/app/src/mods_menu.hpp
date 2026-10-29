@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "o1602/ui/form.hpp"
+#include "o1602/ui/list_scroll.hpp"
 
 namespace o1602::app {
 
@@ -73,6 +74,10 @@ public:
                                                  const std::array<const ui::Font*, ui::kFontSlots>& fonts);
     std::optional<Event> mouse(const ModsModel& model, std::int32_t x, std::int32_t y, bool down,
                                ui::MouseButton button = ui::MouseButton::Left);
+    /// The mouse wheel (`notches` up positive): the list a row per notch.
+    void wheel(const ModsModel& model, std::int32_t notches) noexcept {
+        m_first = ui::wheel_scroll(m_first, model.entries.size(), kRows, notches);
+    }
     /// The text of an entry's state ("an", "aus", ...).
     [[nodiscard]] static std::string state_text(ModsModel::Entry::State state);
 

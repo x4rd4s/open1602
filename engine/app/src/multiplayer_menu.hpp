@@ -193,6 +193,9 @@ public:
     /// The right button only reaches the start dialog's settings.
     std::vector<MultiplayerEvent> mouse(const MultiplayerModel& model, std::int32_t x, std::int32_t y, bool down,
                                         ui::MouseButton button = ui::MouseButton::Left);
+    /// The mouse wheel (`notches` up positive): the games found, or the scenarios or savegames of
+    /// a game being created, a row per notch. False on a screen without a list.
+    bool wheel(const MultiplayerModel& model, std::int32_t notches);
     /// Escape: one screen back. Close on the search screen, Leave in a session; nothing when the
     /// menu went back by itself (from creating a game to the search).
     std::optional<MultiplayerEvent> back();

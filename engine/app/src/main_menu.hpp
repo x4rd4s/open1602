@@ -150,6 +150,10 @@ public:
     /// The right button only reaches the start dialog's settings.
     std::vector<MenuEvent> mouse(std::int32_t x, std::int32_t y, bool down,
                                  ui::MouseButton button = ui::MouseButton::Left);
+    /// The mouse wheel (`notches` up positive): the scenarios or savegames a row per notch, a
+    /// mission's briefing a line per notch, the mods a row per notch (Open1602; the original has
+    /// only the arrows). False on a screen without a list.
+    bool wheel(std::int32_t notches);
     /// Escape (0x00409D70): one screen back; false in the main menu.
     bool back();
     /// Where the credits play: the picture frame of the main menu, design units.

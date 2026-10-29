@@ -233,6 +233,33 @@ TEST_CASE("multiplayer menu: creating a game: endless, scenario, settings") {
     CHECK(events[0].setup.file_name == "Die Insel");
 }
 
+TEST_CASE("multiplayer menu: the mouse wheel scrolls the scenarios of a game being created a row per notch") {
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.name = "Bernd";
+    for (int i = 0; i < 20; ++i) {
+        app::MenuScenario scenario;
+        scenario.name = "Karte " + std::to_string(i);
+        scenario.files = {{0xFF, "Szenes/Karte.szs"}};
+        model.scenarios.push_back(scenario);
+    }
+    menu.open();
+    CHECK(menu.wheel(model, -1));  // the search list: nothing found, nothing to scroll, no zoom
+    CHECK(click(menu, model, "Create game").empty());
+    CHECK(!menu.wheel(model, -1));  // the endless game has no list
+    CHECK(click(menu, model, "Scenario").empty());
+    CHECK(find_text(menu, model, "Karte 0").has_value());
+    CHECK(menu.wheel(model, -2));  // down two rows
+    CHECK(!find_text(menu, model, "Karte 1").has_value());
+    CHECK(find_text(menu, model, "Karte 2").has_value());
+    CHECK(menu.wheel(model, -50));  // not past the end: the last eleven rows
+    CHECK(find_text(menu, model, "Karte 19").has_value());
+    CHECK(find_text(menu, model, "Karte 9").has_value());
+    CHECK(!find_text(menu, model, "Karte 8").has_value());
+    CHECK(menu.wheel(model, 50));  // up, not before the first
+    CHECK(find_text(menu, model, "Karte 0").has_value());
+}
+
 TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
     net::LoopbackNetwork network;
     net::Lobby lobby;

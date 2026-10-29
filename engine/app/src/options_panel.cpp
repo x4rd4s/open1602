@@ -5,6 +5,7 @@
 #include <array>
 #include <utility>
 
+#include "o1602/ui/list_scroll.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -570,8 +571,7 @@ std::vector<OptionsEvent> OptionsPanel::mouse(std::int32_t x, std::int32_t y, bo
 
 bool OptionsPanel::wheel(std::int32_t notches, const OptionsModel& model) {
     const auto scroll = [notches](std::size_t& first, std::size_t count, std::size_t rows) {
-        const auto last = static_cast<std::int64_t>(count > rows ? count - rows : 0);
-        first = static_cast<std::size_t>(std::clamp<std::int64_t>(static_cast<std::int64_t>(first) - notches, 0, last));
+        first = ui::wheel_scroll(first, count, rows, notches);
     };
     switch (m_page) {
         case Page::Disk:
