@@ -15,6 +15,8 @@ constexpr std::int32_t kPadding = 8;    ///< text from the left or right edge of
 constexpr std::int32_t kBox = 18;       ///< the box of a check box
 constexpr double kFallbackText = 18;    ///< text height without a font
 constexpr std::int32_t kEntryGap = 12;  ///< between an entry's label and its value
+constexpr std::int32_t kKnob = 14;      ///< a slider's knob, wide
+constexpr std::int32_t kTrack = 6;      ///< a slider's track, high
 
 /// Width and height of text in design units.
 double text_width(const Font* font, std::string_view s) {
@@ -147,6 +149,34 @@ void Form::row(Id id, Rect r, bool selected) {
     m_widgets.push_back(std::move(w));
 }
 
+void Form::slider(Id id, Rect r, double position, bool enabled) {
+    Widget w = make(Widget::Kind::Slider, id, r);
+    w.position = std::isfinite(position) ? std::clamp(position, 0.0, 1.0) : 0.0;
+    w.enabled = enabled;
+    m_widgets.push_back(std::move(w));
+}
+
+const Form::Widget* Form::held_slider() const noexcept {
+    if (!m_pressed || *m_pressed < 0 || m_pressed_with != MouseButton::Left) {
+        return nullptr;
+    }
+    for (const Widget& w : m_widgets) {
+        if (w.id == *m_pressed && w.kind == Widget::Kind::Slider) {
+            return &w;
+        }
+    }
+    return nullptr;
+}
+
+double Form::slider_position(const Widget& slider, std::int32_t x) const noexcept {
+    // The knob's middle follows the mouse, from half a knob in from either end.
+    const double room = slider.rect.w - kKnob;
+    if (room <= 0.0) {
+        return 0.0;
+    }
+    return std::clamp((x / m_scale - slider.rect.x - kKnob / 2.0) / room, 0.0, 1.0);
+}
+
 std::optional<Form::Id> Form::hit(std::int32_t x, std::int32_t y, MouseButton button) const {
     // In design units; the last widget laid out is on top. The right button passes through the
     // widgets it does not click.
@@ -175,7 +205,18 @@ std::optional<Form::Id> Form::mouse(std::int32_t x, std::int32_t y, bool down, M
             m_pressed = under ? under : std::optional<Id>(-1);  // -1: pressed on nothing
             m_pressed_with = button;
         }
+        if (const Widget* s = held_slider()) {
+            m_slide = slider_position(*s, x);
+        }
         return std::nullopt;
+    }
+    if (const Widget* s = held_slider()) {
+        // A slider is let go wherever the mouse is: the knob stays where it was dragged.
+        m_slide = slider_position(*s, x);
+        m_pressed.reset();
+        m_released = true;
+        m_clicked_with = button;
+        return s->id;
     }
     const std::optional<Id> pressed = std::exchange(m_pressed, std::nullopt);
     m_released = pressed.has_value();
@@ -255,6 +296,7 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& font
         out.push_back(d);
     };
     const bool held = m_pressed && *m_pressed >= 0;
+    const Widget* sliding = held_slider();
     for (const Widget& w : m_widgets) {
         const bool hover = w.id >= 0 && m_hovered == w.id && w.enabled;
         switch (w.kind) {
@@ -325,6 +367,18 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& font
                     fill(w.rect, w.on ? m_style.selected : m_style.hover, true);
                 }
                 break;
+            case Widget::Kind::Slider: {
+                // A thin track across the box and the knob on it; held, the knob is where the
+                // mouse drags it.
+                const double position = sliding == &w ? m_slide : w.position;
+                framed(Rect{w.rect.x, w.rect.y + (w.rect.h - kTrack) / 2, w.rect.w, kTrack}, m_style.field);
+                const auto knob_x = w.rect.x + static_cast<std::int32_t>(std::lround(position * (w.rect.w - kKnob)));
+                fill(Rect{knob_x, w.rect.y, kKnob, w.rect.h}, m_style.frame);
+                if (!w.enabled) {
+                    raster(w.rect);
+                }
+                break;
+            }
         }
     }
     return out;

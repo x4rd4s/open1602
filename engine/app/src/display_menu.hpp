@@ -35,16 +35,17 @@ public:
         ZoomDrawing,
         Vsync,
         EdgeScroll,
+        EdgeSpeed,
         GrabMouse,
         GoodsTrend,
         RivalWars,
         PlantFields,
         Graphics
     };
-    static constexpr std::size_t kItems = 12;
+    static constexpr std::size_t kItems = 13;
     /// The window's size in design units (it is centred over the map).
     static constexpr std::int32_t kWidth = 560;
-    static constexpr std::int32_t kHeight = 710;
+    static constexpr std::int32_t kHeight = 720;
 
     explicit DisplayMenu(ui::FormStyle style = {}) : m_form(style) {}
 

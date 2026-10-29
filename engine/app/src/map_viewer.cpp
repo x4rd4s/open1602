@@ -1021,7 +1021,7 @@ void MapViewer::update(std::uint32_t delta_ms) {
     animate_zoom(delta_ms);
     m_input->scroll_with_keys(delta_ms);
     if (m_app_settings.display.edge_scroll) {
-        m_input->scroll_at_edges(delta_ms);
+        m_input->scroll_at_edges(delta_ms, m_app_settings.display.edge_speed);
     }
     // The pause of the video ended another way (F3, another player): the video goes too.
     m_video->follow_pause(m_state->simulation.paused());

@@ -23,6 +23,7 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     s.display.smooth_zoom = false;
     s.display.vsync = false;
     s.display.edge_scroll = false;
+    s.display.edge_speed = 175;
     s.display.grab_mouse = true;
     s.display.goods_trend = false;
     s.display.rival_wars = false;
@@ -42,6 +43,7 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     CHECK(none.display.smooth_zoom);
     CHECK(none.display.vsync);
     CHECK(none.display.edge_scroll);  // as in the original
+    CHECK(none.display.edge_speed == 100);
     CHECK(!none.display.grab_mouse);
     CHECK(none.display.goods_trend);
     CHECK(none.display.rival_wars);
@@ -131,9 +133,16 @@ TEST_CASE("display menu: each row chooses its next value") {
     CHECK(!app::DisplayMenu::choose_next(model, Item::ZoomDrawing));  // the original's levels: whole scales
     CHECK(app::DisplayMenu::choose_next(model, Item::Vsync));
     CHECK(!model.settings.vsync);
+    CHECK(app::DisplayMenu::value_text(model, Item::EdgeSpeed) == "100 %");
+    CHECK(app::DisplayMenu::choose_next(model, Item::EdgeSpeed));
+    CHECK(model.settings.edge_speed == 125);
+    CHECK(app::DisplayMenu::choose_previous(model, Item::EdgeSpeed));
+    CHECK(app::DisplayMenu::choose_previous(model, Item::EdgeSpeed));
+    CHECK(model.settings.edge_speed == 75);
     CHECK(app::DisplayMenu::value_text(model, Item::EdgeScroll) == "on");
     CHECK(app::DisplayMenu::choose_next(model, Item::EdgeScroll));
     CHECK(!model.settings.edge_scroll);
+    CHECK(!app::DisplayMenu::choose_next(model, Item::EdgeSpeed));  // no edge scrolling: no speed
     CHECK(app::DisplayMenu::value_text(model, Item::GrabMouse) == "off");
     CHECK(app::DisplayMenu::choose_previous(model, Item::GrabMouse));
     CHECK(model.settings.grab_mouse);
@@ -169,7 +178,7 @@ TEST_CASE("display menu: a click on a row changes it, the button closes the wind
     CHECK(model.settings.fullscreen);
     CHECK(app::DisplayMenu::choose_next(model, Item::Mode));  // back to the window
     // A right click on the window's size takes the previous one.
-    const std::int32_t size_y = 64 + 38 + 15;
+    const std::int32_t size_y = 64 + 36 + 15;
     CHECK(menu.mouse(x, size_y, true, model, ui::MouseButton::Right) == app::DisplayMenu::Result::None);
     CHECK(menu.mouse(x, size_y, false, model, ui::MouseButton::Right) == app::DisplayMenu::Result::Changed);
     CHECK(model.window == (app::WindowSize{1280, 720}));
@@ -181,4 +190,49 @@ TEST_CASE("display menu: a click on a row changes it, the button closes the wind
     const std::int32_t cy = app::DisplayMenu::kHeight - 34;
     CHECK(menu.mouse(cx, cy, true, model) == app::DisplayMenu::Result::None);
     CHECK(menu.mouse(cx, cy, false, model) == app::DisplayMenu::Result::Close);
+}
+
+TEST_CASE("display settings: edge scrolling's speed in steps of 25 %") {
+    CHECK(app::edge_speed_at(0.0) == app::kEdgeSpeedMin);
+    CHECK(app::edge_speed_at(1.0) == app::kEdgeSpeedMax);
+    CHECK(app::edge_speed_at(-3.0) == app::kEdgeSpeedMin);
+    CHECK(app::edge_speed_at(7.0) == app::kEdgeSpeedMax);
+    for (std::int32_t s = app::kEdgeSpeedMin; s <= app::kEdgeSpeedMax; s += app::kEdgeSpeedStep) {
+        CHECK(app::edge_speed_at(app::edge_speed_position(s)) == s);
+    }
+    app::DisplaySettings d;
+    CHECK(app::read_display_line(d, "edge_speed", "110"));  // the nearest step
+    CHECK(d.edge_speed == 100);
+    CHECK(app::read_display_line(d, "edge_speed", "1000"));  // kept within limits
+    CHECK(d.edge_speed == app::kEdgeSpeedMax);
+    CHECK(!app::read_display_line(d, "edge_speed", "fast"));
+    CHECK(d.edge_speed == app::kEdgeSpeedMax);
+}
+
+TEST_CASE("display menu: the slider of edge scrolling's speed follows the mouse") {
+    ui::set_language(ui::kFallbackLanguage);
+    using Item = app::DisplayMenu::Item;
+    app::DisplayMenu menu;
+    menu.set_scale(1.0);
+    app::DisplayModel model;
+    model.window = {1280, 800};
+    model.sizes = app::window_sizes_for(0, 0);
+    (void)menu.draw(model, {});
+    // The slider's row; it runs from the value column's left edge.
+    const std::int32_t y = 64 + static_cast<std::int32_t>(Item::EdgeSpeed) * 36 + 15;
+    const std::int32_t left = app::DisplayMenu::kWidth - 24 - 232;
+    CHECK(menu.mouse(left + 2, y, true, model) == app::DisplayMenu::Result::None);
+    CHECK(menu.mouse(left + 400, y, true, model) == app::DisplayMenu::Result::None);  // dragged past the end
+    CHECK(model.settings.edge_speed == 100);                                          // only on letting go
+    CHECK(menu.mouse(left + 400, y + 80, false, model) == app::DisplayMenu::Result::Changed);
+    CHECK(model.settings.edge_speed == app::kEdgeSpeedMax);
+    CHECK(menu.mouse(left, y, true, model) == app::DisplayMenu::Result::None);
+    CHECK(menu.mouse(left, y, false, model) == app::DisplayMenu::Result::Changed);
+    CHECK(model.settings.edge_speed == app::kEdgeSpeedMin);
+    // Off without edge scrolling.
+    model.settings.edge_scroll = false;
+    (void)menu.draw(model, {});
+    CHECK(menu.mouse(left + 100, y, true, model) == app::DisplayMenu::Result::None);
+    CHECK(menu.mouse(left + 100, y, false, model) == app::DisplayMenu::Result::None);
+    CHECK(model.settings.edge_speed == app::kEdgeSpeedMin);
 }

@@ -399,7 +399,7 @@ bool MapInput::edge_scroll_paused() const noexcept {
     return m_hud != nullptr && (m_hud->modal() || m_hud->typing() || m_hud->menu_active());
 }
 
-void MapInput::scroll_at_edges(std::uint32_t delta_ms) {
+void MapInput::scroll_at_edges(std::uint32_t delta_ms, std::int32_t speed_percent) {
     if (edge_scroll_paused() || m_drag.dragging() || !m_window.mouse_confined()) {
         return;
     }
@@ -410,7 +410,7 @@ void MapInput::scroll_at_edges(std::uint32_t delta_ms) {
     const EdgeScroll e = edge_scroll_at(m_mouse_x, m_mouse_y, w, h, margin);
     if (e.dx != 0 || e.dy != 0) {
         const bool fast = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
-        const double distance = kScrollSpeed * (fast ? 3.0 : 1.0) * delta_ms / 1000.0;
+        const double distance = kScrollSpeed * speed_percent / 100.0 * (fast ? 3.0 : 1.0) * delta_ms / 1000.0;
         m_camera.scroll(e.dx * distance, e.dy * distance);
     }
 }
