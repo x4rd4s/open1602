@@ -539,7 +539,19 @@ bool Hud::picking() {
 }
 
 bool Hud::panel_wheel(std::int32_t x, std::int32_t y, std::int32_t notches) {
-    if (!m_menu_active && m_options_model.mission_window && m_tutor && m_regions.tutor.contains(x, y)) {
+    if (m_menu_active) {
+        // The menus' lists scroll a row per notch (Open1602); the map behind them never zooms. A
+        // window over the menu takes the wheel as it takes the clicks.
+        if (!m_help && !m_question && !m_end_active && !m_display_open) {
+            if (multiplayer_open()) {
+                (void)m_multiplayer->wheel(m_multiplayer_model, notches);
+            } else if (m_menu) {
+                (void)m_menu->wheel(notches);
+            }
+        }
+        return true;
+    }
+    if (m_options_model.mission_window && m_tutor && m_regions.tutor.contains(x, y)) {
         // The mission's text scrolls a line per notch, as its arrows (Open1602); the tutorial's
         // pages do not, and the map does not zoom under the window either.
         if (!m_tutorial) {
@@ -547,7 +559,7 @@ bool Hud::panel_wheel(std::int32_t x, std::int32_t y, std::int32_t notches) {
         }
         return true;
     }
-    if (m_menu_active || !m_regions.side_panel.contains(x, y)) {
+    if (!m_regions.side_panel.contains(x, y)) {
         return false;
     }
     if (m_mode == kModeOptions) {

@@ -13,6 +13,7 @@
 
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/ui/list_scroll.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -919,6 +920,28 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
         }
     }
     return out;
+}
+
+bool MainMenu::wheel(std::int32_t notches) {
+    switch (m_screen) {
+        case Screen::Host: {
+            const std::size_t count = m_mode == ListMode::Load ? m_slots.size() : m_scenarios.size();
+            m_first = ui::wheel_scroll(m_first, count, kRows, notches);
+            return true;
+        }
+        case Screen::Mission:
+            // As its arrows: a line per notch, up to where the end of the text shows.
+            m_briefing_line = std::clamp(m_briefing_line - notches, 0, std::max(0, m_briefing_last));
+            return true;
+        case Screen::Mods:
+            m_mods.wheel(m_mods_model, notches);
+            return true;
+        case Screen::Base:
+        case Screen::Settings:
+        case Screen::Colour:
+            break;
+    }
+    return false;
 }
 
 bool MainMenu::back() {

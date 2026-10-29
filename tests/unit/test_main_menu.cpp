@@ -337,6 +337,42 @@ TEST_CASE("main menu: a long list scrolls by fourteen rows") {
     CHECK(shows(menu, "KarteA"));
 }
 
+TEST_CASE("main menu: the mouse wheel scrolls the scenarios and the savegames a row per notch") {
+    std::vector<std::string> files;
+    for (char c = 'A'; c <= 'T'; ++c) {
+        files.push_back(std::string("Karte") + c + ".szs");
+    }
+    Game g("o1602-test-menu-wheel", files);
+    MainMenu menu(*g.dir, &g.texts);
+    CHECK(!menu.wheel(-1));  // the main menu has no list
+    click(menu, base_layout(), 30002);
+    REQUIRE(menu.screen() == MainMenu::Screen::Host);
+    CHECK(shows(menu, "KarteA"));
+    CHECK(menu.wheel(-2));  // the heading and KarteA leave the top
+    CHECK(!shows(menu, "KarteA"));
+    CHECK(shows(menu, "KarteB"));
+    CHECK(!shows(menu, "KarteP"));
+    CHECK(menu.wheel(-1));
+    CHECK(shows(menu, "KarteP"));
+    CHECK(menu.wheel(-50));  // not past the end: 21 entries, the last 14 rows
+    CHECK(shows(menu, "KarteT"));
+    CHECK(shows(menu, "KarteG"));
+    CHECK(!shows(menu, "KarteF"));
+    CHECK(menu.wheel(50));  // up, not before the first
+    CHECK(shows(menu, "KarteA"));
+
+    app::SaveSlots slots;
+    for (std::size_t i = 0; i < 20; ++i) {
+        slots.set(i, "Spiel " + std::to_string(i), 1);
+    }
+    menu.set_slots(slots);
+    click(menu, host_layout(), 31003);  // "Spiel laden"
+    CHECK(shows(menu, "Spiel 0"));
+    CHECK(menu.wheel(-3));
+    CHECK(!shows(menu, "Spiel 2"));
+    CHECK(shows(menu, "Spiel 3"));
+}
+
 TEST_CASE("main menu: the savegames to load, and the last game to continue") {
     Game g("o1602-test-menu-load", {});
     MainMenu menu(*g.dir, &g.texts);

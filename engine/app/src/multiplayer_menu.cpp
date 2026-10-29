@@ -5,6 +5,7 @@
 #include <charconv>
 #include <random>
 
+#include "o1602/ui/list_scroll.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -261,6 +262,28 @@ std::vector<ui::DrawItem> MultiplayerMenu::draw(const MultiplayerModel& model,
     }
     layout(model);
     return m_form.draw(fonts);
+}
+
+bool MultiplayerMenu::wheel(const MultiplayerModel& model, std::int32_t notches) {
+    switch (m_screen) {
+        case Screen::Browse:
+            m_browse_first = ui::wheel_scroll(m_browse_first, browse_rows(model).size(), kBrowseRows, notches);
+            return true;
+        case Screen::Create:
+            if (m_setup.kind == HostSetup::Kind::Endless) {
+                return false;
+            }
+            m_list_first = ui::wheel_scroll(
+                m_list_first,
+                m_setup.kind == HostSetup::Kind::Scenario ? model.scenarios.size() : model.savegames.size(), kListRows,
+                notches);
+            return true;
+        case Screen::Lobby:
+        case Screen::Connecting:
+        case Screen::Settings:
+            break;
+    }
+    return false;
 }
 
 std::vector<MultiplayerEvent> MultiplayerMenu::mouse(const MultiplayerModel& model, std::int32_t x, std::int32_t y,
