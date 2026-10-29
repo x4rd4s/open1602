@@ -2,6 +2,7 @@
 // Soldiers, towers and building damage (docs/re/military.md).
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <memory>
 #include <set>
@@ -662,7 +663,7 @@ TEST_CASE("military: a village without huts is gone, its land free, and it curse
     CHECK(!sim::native_village_gone(f.world, f.buildings, 0, 1));
     f.world.diplomacy().set_blamed(2, 0);  // player 0 destroyed the chief's house
     f.start();
-    for (const std::uint16_t x : {14, 16, 18}) {
+    for (const std::uint16_t x : std::array<std::uint16_t, 3>{14, 16, 18}) {
         REQUIRE(f.world.city(0, 1) != nullptr);
         f.military->damage_building(0, x, 9, 32 * 3, true, 0, &f.construction);
         f.run(50);
