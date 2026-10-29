@@ -97,10 +97,10 @@ rules" bring all of them back.
 
 The start dialog has a group "More" below the disasters whose second row ("Original settings",
 German „Originaleinstellungen“) opens a page of its own, built as the victory conditions' page: the
-bugs in the four groups of the table, each a button with "fixed" or the original's way, and the
+bugs in the groups of the table, each a button with "fixed" or the original's way, and the
 buttons "All as the original" and "All fixed". The computer players ("Improved" or "As the original")
-are also in the group "Opponents" of the first page, as before that page existed; both buttons
-change the same setting. It is offered for every kind of game, scenarios
+are the exception: their row is in the group "Opponents" of the first page, not on this page, but
+its two buttons switch them with the others, and its summary counts only the page's bugs. It is offered for every kind of game, scenarios
 included, and shown for a savegame. settings.cfg keeps them as `<prefix>bug.<name> = fixed|original`
 with the names of the table (the computer players also as the older `<prefix>ai = classic|open1602`),
 the lobby passes them on with the other lines, the savegame as the `RULE` keys of the table, written

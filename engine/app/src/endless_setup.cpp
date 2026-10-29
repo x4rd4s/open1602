@@ -708,8 +708,13 @@ std::string victory_summary(const sim::VictoryConditions& v) {
     return ui::tr(n == 1 ? "setup.victory.one" : "setup.victory.many", {std::to_string(n)});
 }
 
+sim::OriginalBugs page_bugs(sim::OriginalBugs bugs) noexcept {
+    bugs.classic_ai = false;
+    return bugs;
+}
+
 std::string bugs_summary(const sim::OriginalBugs& bugs) {
-    const std::uint32_t n = bugs.count();
+    const std::uint32_t n = page_bugs(bugs).count();
     if (n == 0) {
         return ui::tr("setup.bugs.none");
     }

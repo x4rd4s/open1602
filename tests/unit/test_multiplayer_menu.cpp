@@ -575,9 +575,7 @@ TEST_CASE("multiplayer menu: the host chooses the settings of the game") {
     CHECK(!menu.typing());
     CHECK(find_text(menu, model, ui::tr("setup.title.multiplayer")).has_value());
     (void)click(menu, model, ui::tr("setup.defaults"));
-    (void)click(menu, model, ui::tr("setup.bugs.open", {ui::tr("setup.bugs.none")}));
     (void)click(menu, model, ui::tr("setup.bug.classic_ai.fixed"));
-    (void)click(menu, model, ui::tr("setup.back"));
     CHECK(click(menu, model, "Apply").empty());
     CHECK(menu.screen() == MultiplayerMenu::Screen::Create);
     // Escape out of the dialog keeps what was there.
