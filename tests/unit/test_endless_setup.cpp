@@ -406,8 +406,13 @@ TEST_CASE("game setup: the dialog of a scenario shows the rules only") {
     CHECK(!find_text(menu, ui::tr("setup.group.world")).has_value());
     CHECK(!find_text(menu, ui::tr("setup.map")).has_value());
     CHECK(!find_text(menu, ui::tr("setup.resources")).has_value());
-    // The computer players are on the page of the original's bugs.
-    (void)click(menu, ui::tr("setup.bugs.open", {ui::tr("setup.bugs.none")}));
+    // The computer players are with the opponents and on the page of the original's bugs: one setting.
+    CHECK(find_text(menu, app::setup_label(SetupItem::ClassicAi)).has_value());
+    (void)click(menu, ui::tr("setup.bug.classic_ai.fixed"));
+    CHECK(menu.setup().rules.bugs.classic_ai);
+    (void)click(menu, ui::tr("setup.bugs.open", {ui::tr("setup.bugs.one")}));
+    (void)click(menu, ui::tr("setup.bug.classic_ai.original"));
+    CHECK(!menu.setup().rules.bugs.classic_ai);
     (void)click(menu, ui::tr("setup.bug.classic_ai.fixed"));
     CHECK(menu.setup().rules.bugs.classic_ai);
     (void)click(menu, ui::tr("setup.back"));
@@ -515,7 +520,7 @@ TEST_CASE("game setup: every group of the dialog ends above its hint") {
         }
         REQUIRE(hint_y != INT32_MAX);
         CHECK(rows_y > 0);
-        CHECK(rows_y + 27 <= hint_y);  // a row is 30 high, the hint's line 22: texts sit in their middles
+        CHECK(rows_y + 27 <= hint_y);  // a row is 28 high, the hint's line 22: texts sit in their middles
         if (scope != app::SetupScope::Scenario) {
             CHECK(find_text(menu, ui::tr("setup.gold_islands")).has_value());
         }
