@@ -955,19 +955,24 @@ TEST_CASE("construction: the key \"plant all farm fields\" plants the farm's ope
     island.found();
     REQUIRE(island.build({{kPlantation, 9, 12, 0, 0}}).placed == 1);
     REQUIRE(island.build({{kField, 11, 14, 0, 0}}).placed == 1);  // a field it has already
+    REQUIRE(island.build({{kRoad, 12, 11, 0, 0}}).placed == 1);
     island.world.island(0).map.set_sprite(8, 11, static_cast<std::uint16_t>(island.buildings.by_id(kTree)->gfx));
     const auto order = sim::plant_fields_order(island.world, island.buildings, 0, 0, {9, 12}, kField);
     REQUIRE(order);
     REQUIRE(!order->items.empty());
     CHECK(order->player == 0);
+    bool over_tree = false;
     for (const sim::BuildItem& item : order->items) {
         CHECK(item.building == kField);
-        // Not on the plantation, the field, the tree or the Kontor (x 5..6, y 10..12).
+        // Not on the plantation, the field, the road or the Kontor (x 5..6, y 10..12).
         CHECK(!(item.x >= 9 && item.x <= 10 && item.y >= 12 && item.y <= 13));
         CHECK(!(item.x == 11 && item.y == 14));
-        CHECK(!(item.x == 8 && item.y == 11));
+        CHECK(!(item.x == 12 && item.y == 11));
         CHECK(!(item.x >= 5 && item.x <= 6 && item.y >= 10 && item.y <= 12));
+        over_tree |= item.x == 8 && item.y == 11;
     }
+    // The forest is cleared for the crop.
+    CHECK(over_tree);
     // The nearest first: a tile next to the plantation.
     const sim::BuildItem& first = order->items.front();
     CHECK(first.x >= 8);
@@ -983,4 +988,23 @@ TEST_CASE("construction: the key \"plant all farm fields\" plants the farm's ope
     CHECK(!sim::plant_fields_order(island.world, island.buildings, 0, 0, {5, 10}, kField));
     CHECK(!sim::plant_fields_order(island.world, island.buildings, 1, 0, {9, 12}, kField));
     CHECK(!sim::plant_fields_order(island.world, island.buildings, 0, 0, {9, 12}, 20211));
+    // With money for all of it the tree gives way to a field and the road stays.
+    island.world.player(0)->money = 100000;
+    sim::BuildOrder all = *order;
+    CHECK(sim::execute_build(island.world, island.buildings, all, island.names, nullptr).placed > 2);
+    CHECK(island.at(8, 11)->id == kField);
+    CHECK(island.at(12, 11)->kind == assets::kind::kRoad);
+}
+
+TEST_CASE("construction: \"plant all farm fields\" at a forester leaves the standing forest") {
+    Island island;
+    island.found();
+    REQUIRE(island.build({{kForester, 9, 12, 0, 0}}).placed == 1);
+    island.world.island(0).map.set_sprite(8, 11, static_cast<std::uint16_t>(island.buildings.by_id(kTree)->gfx));
+    const auto order = sim::plant_fields_order(island.world, island.buildings, 0, 0, {9, 12}, kSapling);
+    REQUIRE(order);
+    REQUIRE(!order->items.empty());
+    for (const sim::BuildItem& item : order->items) {
+        CHECK(!(item.x == 8 && item.y == 11));
+    }
 }

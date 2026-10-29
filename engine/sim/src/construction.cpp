@@ -2345,6 +2345,7 @@ std::optional<BuildOrder> plant_fields_order(const World& world, const assets::B
     }
     const Catchment area = catchment_of(*farm, cell.rotation, origin);
     const std::vector<std::uint8_t>& half = circle_table(area.radius);
+    const bool clears_forest = farm->raw_ware != ware::kTree;
     struct Spot {
         std::int32_t d = 0;
         std::int32_t x = 0;
@@ -2361,10 +2362,12 @@ std::optional<BuildOrder> plant_fields_order(const World& world, const assets::B
                 !map.contains(x, y)) {
                 continue;
             }
-            // Open ground only: trees, meadows and the fields of other farms stay as they are.
+            // Open ground, and forest cleared for a crop or pasture; a woodcutter keeps the trees
+            // that stand. Roads, meadows, the fields of other farms and buildings stay as they are.
             const MapCell& c = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
             const assets::BuildingType* b = c.empty() ? nullptr : buildings.by_sprite(c.sprite);
-            if (b == nullptr || b->kind != kind::kGround) {
+            const bool forest = b != nullptr && b->kind == kind::kForest && crop_ware(buildings, *b) == ware::kTree;
+            if (b == nullptr || (b->kind != kind::kGround && (!forest || !clears_forest))) {
                 continue;
             }
             spots.push_back(Spot{dx * dx + dy * dy, x, y});

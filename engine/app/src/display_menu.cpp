@@ -24,8 +24,8 @@ constexpr std::int32_t kLabelW = 260;
 constexpr std::int32_t kValueW = 232;
 
 constexpr std::array<std::string_view, DisplayMenu::kItems> kLabels = {
-    "display.mode",  "display.size",        "display.ui_scale",  "display.zoom",       "display.zoom_drawing",
-    "display.vsync", "display.goods_trend", "display.fertility", "display.rival_wars", "display.graphics"};
+    "display.mode",  "display.size",        "display.ui_scale",   "display.zoom",    "display.zoom_drawing",
+    "display.vsync", "display.goods_trend", "display.rival_wars", "display.graphics"};
 
 std::string on_off(bool on) {
     return ui::tr(on ? "display.on" : "display.off");
@@ -57,8 +57,6 @@ std::string DisplayMenu::value_text(const DisplayModel& model, Item item) {
             return on_off(s.vsync);
         case Item::GoodsTrend:
             return on_off(s.goods_trend);
-        case Item::Fertility:
-            return on_off(s.fertility);
         case Item::RivalWars:
             return on_off(s.rival_wars);
         case Item::Graphics:
@@ -101,9 +99,6 @@ bool DisplayMenu::choose(DisplayModel& model, Item item, bool forward) {
             return true;
         case Item::GoodsTrend:
             s.goods_trend = !s.goods_trend;
-            return true;
-        case Item::Fertility:
-            s.fertility = !s.fertility;
             return true;
         case Item::RivalWars:
             s.rival_wars = !s.rival_wars;

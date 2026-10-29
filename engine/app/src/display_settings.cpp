@@ -154,9 +154,6 @@ bool read_display_line(DisplaySettings& s, std::string_view key, std::string_vie
     if (key == "goods_trend") {
         return read_flag(value, s.goods_trend);
     }
-    if (key == "fertility") {
-        return read_flag(value, s.fertility);
-    }
     if (key == "rival_wars") {
         return read_flag(value, s.rival_wars);
     }
@@ -183,8 +180,6 @@ std::string write_display(const DisplaySettings& s) {
     out += std::string("display.vsync = ") + on_off(s.vsync) + "\n";
     out += "# Under each good of a Kontor's stock how much more comes in or goes out per minute\n";
     out += std::string("display.goods_trend = ") + on_off(s.goods_trend) + "\n";
-    out += "# While building a field, green where its crop bears and red where not\n";
-    out += std::string("display.fertility = ") + on_off(s.fertility) + "\n";
     out += "# Tell when two other players go to war or make peace\n";
     out += std::string("display.rival_wars = ") + on_off(s.rival_wars) + "\n";
     out += "# classic: shadows and smoke as the original draws them (every second pixel); modern: blended\n";

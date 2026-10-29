@@ -494,7 +494,7 @@ private:
     bool m_show_fps = false;                 ///< the frame rate in the map's corner (Ctrl+F)
     bool m_show_coordinates = false;         ///< the tile under the mouse in the map's corner (Ctrl+K)
     bool m_show_unit_arms = false;           ///< coats of arms over the own land units (M)
-    bool m_show_fertility = false;           ///< the fertility view for the selected farm's crop (Ctrl+B)
+    bool m_show_fertility = false;           ///< fertility view (Ctrl+B): the build tool's or selected farm's crop
     double m_fps = 0.0;                      ///< frames a second, measured for the title
     bool m_quit_pending = false;             ///< "Ende" waits for the answer to its question
     AppSettings m_app_settings;              ///< settings.cfg in the user's data folder

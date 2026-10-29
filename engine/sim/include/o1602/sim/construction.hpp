@@ -234,9 +234,12 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
 /// The order of the key "Plant all farm fields" (Open1602, after the History Edition's text 757,
 /// which has no key and whose code is not known): the building at `origin` is a farm, plantation,
 /// pasture or woodcutter of `player`, and `field` is the field it harvests; the order puts that
-/// field on every tile of open ground in its catchment, the nearest first. Building it places what
-/// fits and what the player can pay. Nothing if the building is not the player's or no farm. Trees
-/// take one of their variants per tile, drawn from `seed` and the tile, as the build tool's do.
+/// field on every tile of open ground in its catchment, the nearest first. A crop or pasture also
+/// goes on the forest there (building over it clears the trees); a woodcutter's trees only go on
+/// open ground, so the forest it fells stays. Roads and buildings are never touched. Building it
+/// places what fits and what the player can pay. Nothing if the building is not the player's or no
+/// farm. Trees take one of their variants per tile, drawn from `seed` and the tile, as the build
+/// tool's do.
 [[nodiscard]] std::optional<BuildOrder> plant_fields_order(const World& world, const assets::BuildingTable& buildings,
                                                            PlayerId player, std::uint16_t island, TilePos origin,
                                                            std::uint32_t field, std::uint32_t seed = 0);
