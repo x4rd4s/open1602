@@ -97,8 +97,10 @@ public:
     [[nodiscard]] std::vector<Notice> city_events(const sim::World& world, sim::PlayerId local,
                                                   const std::vector<sim::CityEvent>& events);
     /// Discoveries and exploring of the local player's ships, in the log (their voices come from
-    /// GameSound::ships).
-    void ship_events(const sim::World& world, sim::PlayerId local, const std::vector<sim::ShipEvent>& events) const;
+    /// GameSound::ships). Open1602 also tells, in the status bar only, when another player bought
+    /// one of the local player's ships.
+    [[nodiscard]] std::vector<Notice> ship_events(const sim::World& world, sim::PlayerId local,
+                                                  const std::vector<sim::ShipEvent>& events) const;
     /// Fires and plagues in the player's cities (MELDUNG 2, 1).
     [[nodiscard]] std::vector<Notice> disaster_events(const sim::World& world, sim::PlayerId local,
                                                       const std::vector<sim::DisasterEvent>& events) const;

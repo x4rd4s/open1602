@@ -445,3 +445,28 @@ TEST_CASE("event presenter: a treasure is announced at its tile, to the builder 
     CHECK((a->tile == std::make_pair(104.0, 53.0)));
     CHECK(g.presenter.construction_events(g.world, kRival, {found}).empty());
 }
+
+TEST_CASE("event presenter: the seller of a ship is told who bought it") {
+    Game g;
+    sim::Ship ship = sim::make_ship("Aurora", 120, 60, 21, kRival);
+    g.world.add_ship(ship);
+    const std::uint32_t id = g.world.ships().back().id;
+    sim::ShipEvent sold;
+    sold.kind = sim::ShipEvent::Kind::Sold;
+    sold.ship = id;
+    sold.player = kMe;   // the seller
+    sold.city = kRival;  // the buyer
+    sold.money = 2500;
+    const auto told = g.presenter.ship_events(g.world, kMe, {sold});
+    REQUIRE(told.size() == 1);
+    const app::Announcement* a = announcement(told[0]);
+    CHECK(a->message == 0x0A);
+    CHECK(!a->voice);
+    CHECK(a->about == std::optional<sim::PlayerId>(kRival));
+    REQUIRE(a->tile.has_value());
+    CHECK(static_cast<int>(a->tile->first) == 120);  // where the ship is
+    CHECK(static_cast<int>(a->tile->second) == 60);
+    CHECK(a->text == "Blue player has bought your ship Aurora for 2500 gold");
+    // The buyer and everyone else hear nothing of it.
+    CHECK(g.presenter.ship_events(g.world, kRival, {sold}).empty());
+}
