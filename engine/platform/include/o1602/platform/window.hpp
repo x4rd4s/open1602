@@ -92,7 +92,8 @@ public:
     /// Whether the window is maximised (its size then is not the one to remember).
     [[nodiscard]] bool maximized() const;
     /// Keeps the mouse inside the window while it has the focus (SDL lets it go when another
-    /// program gets the focus and takes it again when the window gets it back).
+    /// program gets the focus and takes it again when the window gets it back). Cheap to call
+    /// every frame: SDL is only asked when the wish changes.
     void set_mouse_grab(bool on);
     /// The mouse is kept inside the window now and is over it: it cannot leave it.
     [[nodiscard]] bool mouse_confined() const;
@@ -114,6 +115,7 @@ private:
     SDL_Window* m_window = nullptr;
     SDL_Renderer* m_renderer = nullptr;
     bool m_vsync = true;
+    bool m_mouse_grab = false;
     std::uint64_t m_last_present_ns = 0;
 };
 

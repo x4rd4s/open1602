@@ -212,6 +212,10 @@ void Window::usable_area(std::int32_t& width, std::int32_t& height) const {
 }
 
 void Window::set_mouse_grab(bool on) {
+    if (on == m_mouse_grab) {
+        return;
+    }
+    m_mouse_grab = on;
     if (!SDL_SetWindowMouseGrab(m_window, on)) {
         std::fprintf(stderr, "mouse grab: %s\n", SDL_GetError());
     }

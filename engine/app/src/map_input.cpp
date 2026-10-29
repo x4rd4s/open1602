@@ -395,11 +395,12 @@ void MapInput::scroll_with_keys(std::uint32_t delta_ms) {
     }
 }
 
+bool MapInput::edge_scroll_paused() const noexcept {
+    return m_hud != nullptr && (m_hud->modal() || m_hud->typing() || m_hud->menu_active());
+}
+
 void MapInput::scroll_at_edges(std::uint32_t delta_ms) {
-    if (m_hud && (m_hud->modal() || m_hud->typing() || m_hud->menu_active())) {
-        return;
-    }
-    if (m_drag.dragging() || !m_window.mouse_confined()) {
+    if (edge_scroll_paused() || m_drag.dragging() || !m_window.mouse_confined()) {
         return;
     }
     std::int32_t w = 0;

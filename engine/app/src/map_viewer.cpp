@@ -444,7 +444,6 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         return window.error();
     }
     viewer->m_window = std::move(window).value();
-    viewer->follow_mouse_grab();
     viewer->m_map_canvas = std::make_unique<render::SdlMapCanvas>(viewer->m_window->sdl_renderer());
     viewer->m_software_renderer = viewer->m_window->renderer_name() == "software";
     viewer->load_cursors();
@@ -818,6 +817,7 @@ int MapViewer::run() {
         // A video that starts now plays in the minimap's window only while one is on screen.
         const bool video = m_video->frame(now, m_hud && !m_hud->menu_active());
         update_cursor(video && m_video->full_screen());
+        follow_mouse_grab(video && m_video->full_screen());
         if (video && m_video->full_screen()) {
             // The game stands still while a video fills the screen (the original's main loop
             // 0x00408293); the time does not reach the simulation afterwards. Not in a multiplayer
@@ -945,10 +945,6 @@ void MapViewer::handle_event(const SDL_Event& original) {
         }
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             follow_display_scale();
-            break;
-        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-            follow_mouse_grab();
             break;
         default:
             m_input->handle_event(event);
@@ -1983,7 +1979,6 @@ void MapViewer::apply_display(const DisplaySettings& display) {
     if (display.vsync != before.vsync) {
         m_window->set_vsync(display.vsync);
     }
-    follow_mouse_grab();
     if (m_hud) {
         m_hud->set_goods_trend(display.goods_trend);
     }
@@ -2011,11 +2006,15 @@ void MapViewer::apply_display(const DisplaySettings& display) {
     save_settings();
 }
 
-void MapViewer::follow_mouse_grab() {
+void MapViewer::follow_mouse_grab(bool video_full_screen) {
     // Full screen keeps the mouse for edge scrolling (as the original's did), so that it does not
-    // slip onto a second screen; in a window only if the player asks for it.
+    // slip onto a second screen, but lets it go while edge scrolling pauses (a menu or a window is
+    // open, a video plays), so that the mouse can reach another screen then. In a window only if
+    // the player asks for it, then always.
     const DisplaySettings& display = m_app_settings.display;
-    m_window->set_mouse_grab(display.grab_mouse || (display.edge_scroll && m_window->fullscreen()));
+    const bool scrolling = display.edge_scroll && m_window->fullscreen() && !video_full_screen &&
+                           !(m_input && m_input->edge_scroll_paused());
+    m_window->set_mouse_grab(display.grab_mouse || scrolling);
 }
 
 void MapViewer::lay_out() {

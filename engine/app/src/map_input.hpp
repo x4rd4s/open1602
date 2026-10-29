@@ -134,6 +134,9 @@ public:
     /// edge, where it cannot leave the window (Window::mouse_confined), and no window or menu
     /// takes the mouse.
     void scroll_at_edges(std::uint32_t delta_ms);
+    /// A menu, a question or a window over the map takes the mouse, or a name is typed: no edge
+    /// scrolling now.
+    [[nodiscard]] bool edge_scroll_paused() const noexcept;
     /// Every frame, in the menu as in the game: the platform's text input runs exactly while a
     /// name is typed.
     void sync_text_input();
