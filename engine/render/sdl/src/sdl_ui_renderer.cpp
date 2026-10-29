@@ -85,18 +85,22 @@ SdlUiRenderer::SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory
             }
         }
     }
-    for (std::int32_t f = 0; f < static_cast<std::int32_t>(m_fonts.size()); ++f) {
-        auto font = ui::Font::load(game, ui::font_file(f, size));
-        if (!font && f == ui::kOwnFontSlot) {
-            // The History Edition lacks ZEI14V: the small font, as at the other sizes.
-            font = ui::Font::load(game, ui::font_file(1, size));
-        }
-        if (font) {
-            font->set_design_scale(ui::art_scale(size));
-            if (data_fixes) {
-                (void)font->fix_accents();
+    // The fonts of every size: text takes the size its scale shows unshrunk (ui::text_art_size()).
+    for (std::size_t z = 0; z < m_fonts.size(); ++z) {
+        const auto font_size = static_cast<ui::ArtSize>(z);
+        for (std::int32_t f = 0; f < static_cast<std::int32_t>(ui::kFontSlots); ++f) {
+            auto font = ui::Font::load(game, ui::font_file(f, font_size));
+            if (!font && f == ui::kOwnFontSlot) {
+                // The History Edition lacks ZEI14V: the small font, as at the other sizes.
+                font = ui::Font::load(game, ui::font_file(1, font_size));
             }
-            m_fonts[static_cast<std::size_t>(f)] = std::move(font).value();
+            if (font) {
+                font->set_design_scale(ui::art_scale(font_size));
+                if (data_fixes) {
+                    (void)font->fix_accents();
+                }
+                m_fonts[z][static_cast<std::size_t>(f)] = std::move(font).value();
+            }
         }
     }
     for (std::size_t c = 0; c < m_colours.size(); ++c) {
@@ -168,10 +172,22 @@ void SdlUiRenderer::release_textures() {
     m_checker = Texture{};
 }
 
-std::array<const ui::Font*, ui::kFontSlots> SdlUiRenderer::fonts() const noexcept {
+const ui::Font* SdlUiRenderer::font(std::int32_t slot, ui::ArtSize size) const noexcept {
+    if (slot < 0 || slot >= static_cast<std::int32_t>(ui::kFontSlots)) {
+        return nullptr;
+    }
+    const auto i = static_cast<std::size_t>(slot);
+    const auto& own = m_fonts[static_cast<std::size_t>(size)][i];
+    // A size whose font is missing (the History Edition has only the large ones): the large font.
+    const auto& large = m_fonts[static_cast<std::size_t>(ui::ArtSize::Large)][i];
+    return own ? &*own : large ? &*large : nullptr;
+}
+
+std::array<const ui::Font*, ui::kFontSlots> SdlUiRenderer::fonts(double scale) const noexcept {
+    const ui::ArtSize size = ui::text_art_size(scale);
     std::array<const ui::Font*, ui::kFontSlots> f{};
     for (std::size_t i = 0; i < f.size(); ++i) {
-        f[i] = m_fonts[i] ? &*m_fonts[i] : nullptr;
+        f[i] = font(static_cast<std::int32_t>(i), size);
     }
     return f;
 }
@@ -360,16 +376,15 @@ void SdlUiRenderer::forget_package_icons() {
     }
 }
 
-SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t font, std::int32_t colour) {
-    if (const Texture* cached = m_texts.find(s, font, colour)) {
+SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t slot, ui::ArtSize size,
+                                           std::int32_t colour) {
+    // One cache for all sizes: the slot and the size in one number.
+    const std::int32_t key = slot + static_cast<std::int32_t>(ui::kFontSlots) * static_cast<std::int32_t>(size);
+    if (const Texture* cached = m_texts.find(s, key, colour)) {
         return *cached;
     }
     Texture t;
-    const ui::Font* f =
-        font >= 0 && font < static_cast<std::int32_t>(ui::kFontSlots) && m_fonts[static_cast<std::size_t>(font)]
-            ? &*m_fonts[static_cast<std::size_t>(font)]
-            : nullptr;
-    if (f != nullptr) {
+    if (const ui::Font* f = font(slot, size)) {
         assets::IndexedImage canvas;
         canvas.width = f->width(s) + 2;            // glyphs may overhang the last advance
         canvas.height = f->height() + f->above();  // the accents above the cell (D-012)
@@ -380,8 +395,13 @@ SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t fo
         f->draw(canvas, s, 0, static_cast<std::int32_t>(canvas.height), recolour);
         t = make(canvas.to_rgba(m_palette), static_cast<std::int32_t>(canvas.width),
                  static_cast<std::int32_t>(canvas.height));
+        if (t.texture != nullptr && f->design_scale() > ui::art_scale(size)) {
+            // A larger font standing in for a missing one is shrunk: blended, so that no stroke
+            // of a glyph drops out.
+            SDL_SetTextureScaleMode(t.texture, SDL_SCALEMODE_LINEAR);
+        }
     }
-    m_texts.insert(s, font, colour, t, [](const Texture& old) { SDL_DestroyTexture(old.texture); });
+    m_texts.insert(s, key, colour, t, [](const Texture& old) { SDL_DestroyTexture(old.texture); });
     return t;
 }
 
@@ -582,12 +602,22 @@ void SdlUiRenderer::draw(const std::vector<ui::DrawItem>& items, std::int32_t ox
                 break;
             }
             case ui::DrawItem::Kind::Text: {
-                const Texture t = text(d.text, d.block, d.colour);
-                const double w = t.w * stretch;
+                // In the fonts of the size that are not shrunk at this scale (ui::text_art_size()).
+                const ui::ArtSize size = ui::text_art_size(scale);
+                const ui::Font* f = font(d.block, size);
+                const Texture t = text(d.text, d.block, size, d.colour);
+                if (f == nullptr || t.texture == nullptr) {
+                    break;
+                }
+                const double by = scale / f->design_scale();
+                const double w = t.w * by;
                 const double x = d.align == ui::Align::Centre  ? d.x - std::trunc(w / 2)
                                  : d.align == ui::Align::Right ? d.x - w
                                                                : d.x;
-                blit(t, x, d.y - t.h * stretch, false);
+                SDL_SetTextureAlphaMod(t.texture, 255);
+                const SDL_FRect dst{static_cast<float>(ox + x), static_cast<float>(oy + d.y - t.h * by),
+                                    static_cast<float>(std::round(w)), static_cast<float>(std::round(t.h * by))};
+                SDL_RenderTexture(m_renderer, t.texture, nullptr, &dst);
                 break;
             }
             case ui::DrawItem::Kind::Fill: {

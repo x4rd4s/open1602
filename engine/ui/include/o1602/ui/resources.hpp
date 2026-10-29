@@ -24,6 +24,16 @@ enum class ArtSize : std::uint8_t { Small, Medium, Large };  ///< 640, 800, 1024
 [[nodiscard]] constexpr double art_scale(ArtSize size) noexcept {
     return size == ArtSize::Small ? 0.625 : size == ArtSize::Medium ? 0.78125 : 1.0;
 }
+/// The art size whose fonts text drawn at `scale` (screen pixels per pixel of the 1024 x 768
+/// design) takes: the largest that is not shrunk there, so that no glyph loses rows or columns
+/// (as in the original, a 800 or 640 pixels wide screen shows that screen's fonts at their size).
+/// Below the small art's scale the small fonts.
+[[nodiscard]] constexpr ArtSize text_art_size(double scale) noexcept {
+    constexpr double kSlack = 1e-6;  // 600 / 768 is 0.78125 too, but a scale may come from a division
+    return scale + kSlack >= art_scale(ArtSize::Large)    ? ArtSize::Large
+           : scale + kSlack >= art_scale(ArtSize::Medium) ? ArtSize::Medium
+                                                          : ArtSize::Small;
+}
 
 /// Sprite sheet of a Blocknr: 0 TOOLS, 1 START, 2 SYMBOL (one size), 3 BAUHAUS, 4 BAUSHIP; empty for others.
 [[nodiscard]] constexpr std::string_view sheet_file(std::int32_t block, ArtSize size) noexcept {

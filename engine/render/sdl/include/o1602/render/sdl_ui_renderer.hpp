@@ -31,8 +31,9 @@ namespace o1602::render {
 
 class SdlUiRenderer {
 public:
-    /// Loads the interface's sheets and fonts of one art size from the game directory (missing ones
-    /// draw nothing); `data_fixes`: with the accents of the fonts' capitals in place (D-012).
+    /// Loads the interface's sheets of one art size and the fonts of all three from the game
+    /// directory (missing sheets draw nothing, a missing font is the large one); `data_fixes`: with
+    /// the accents of the fonts' capitals in place (D-012).
     SdlUiRenderer(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets::Palette& palette,
                   ui::ArtSize size, bool data_fixes = true);
     ~SdlUiRenderer();
@@ -40,8 +41,9 @@ public:
     SdlUiRenderer& operator=(const SdlUiRenderer&) = delete;
 
     [[nodiscard]] ui::ArtSize art_size() const noexcept { return m_size; }
-    /// The three font slots, for panels that wrap text.
-    [[nodiscard]] std::array<const ui::Font*, ui::kFontSlots> fonts() const noexcept;
+    /// The font slots that text drawn at `scale` (draw()) takes, for panels that measure or wrap
+    /// it: those of ui::text_art_size(scale).
+    [[nodiscard]] std::array<const ui::Font*, ui::kFontSlots> fonts(double scale) const noexcept;
     /// Size of a sprite of a sheet at the art's own scale, nothing if there is none. A sprite number
     /// of a package's icon (ui::package_icons()) is that icon in any sheet.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> sprite_size(std::int32_t block,
@@ -89,7 +91,9 @@ private:
                                                    const ui::ColourTint& tint) const;
     /// The picture of a package's icon at the art's scale, or its shape in `colour` (mask, raster).
     Texture package_icon(const assets::PackageIcon& icon, int mode, std::int32_t colour);
-    Texture text(const std::string& s, std::int32_t font, std::int32_t colour);
+    /// The font of a slot and size: the large one where that size has none, nullptr for none.
+    [[nodiscard]] const ui::Font* font(std::int32_t slot, ui::ArtSize size) const noexcept;
+    Texture text(const std::string& s, std::int32_t slot, ui::ArtSize size, std::int32_t colour);
     Texture make(const std::vector<std::uint8_t>& rgba, std::int32_t w, std::int32_t h);
     [[nodiscard]] double art_scale() const noexcept;
 
@@ -97,7 +101,8 @@ private:
     assets::Palette m_palette;
     ui::ArtSize m_size;
     std::array<std::optional<assets::SpriteSheet>, 5> m_sheets;
-    std::array<std::optional<ui::Font>, ui::kFontSlots> m_fonts;
+    /// Per art size (ui::ArtSize) the font slots.
+    std::array<std::array<std::optional<ui::Font>, ui::kFontSlots>, 3> m_fonts;
     std::array<ui::Recolour, ui::kTextColours> m_colours{};
     /// Block, gfx, mode, colour, tint (0: none, else 0x01RRGGBB), its stride, variants, pattern, base (a byte each),
     /// shape.

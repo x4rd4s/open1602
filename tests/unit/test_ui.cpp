@@ -148,6 +148,14 @@ TEST_CASE("ui: regions of the screen and the original's rounding") {
     CHECK(ui::art_size(1280) == ui::ArtSize::Large);
     CHECK(ui::sheet_file(0, ui::ArtSize::Medium) == "TOOLGFX/TOOLS8.BSH");
     CHECK(ui::font_file(2, ui::ArtSize::Small) == "TOOLGFX/ZEI20V.ZEI");
+    // Text takes the largest fonts that are not shrunk at its scale.
+    CHECK(ui::text_art_size(2.0) == ui::ArtSize::Large);
+    CHECK(ui::text_art_size(1.0) == ui::ArtSize::Large);
+    CHECK(ui::text_art_size(0.99) == ui::ArtSize::Medium);
+    CHECK(ui::text_art_size(600.0 / 768.0) == ui::ArtSize::Medium);
+    CHECK(ui::text_art_size(0.7) == ui::ArtSize::Small);
+    CHECK(ui::text_art_size(480.0 / 768.0) == ui::ArtSize::Small);
+    CHECK(ui::text_art_size(0.5) == ui::ArtSize::Small);
 }
 
 TEST_CASE("ui: a panel draws by state and answers the mouse") {

@@ -96,11 +96,14 @@ TEST_CASE("sdl ui renderer: loads the sheets and fonts that exist, and knows the
     CHECK(!s.ui.sprite_size(0, 2).has_value());
     CHECK(!s.ui.sprite_size(1, 0).has_value());  // no START.BSH in the folder
     CHECK(!s.ui.sprite_size(7, 0).has_value());
-    const auto fonts = s.ui.fonts();
+    const auto fonts = s.ui.fonts(1.0);
     REQUIRE(fonts[0] != nullptr);
     CHECK(fonts[0]->height() == 6);
     CHECK(fonts[1] == nullptr);
     CHECK(fonts[2] == nullptr);
+    // No fonts of the smaller sizes in the folder: those scales take the large ones.
+    CHECK(s.ui.fonts(0.78125)[0] == fonts[0]);
+    CHECK(s.ui.fonts(0.625)[0] == fonts[0]);
 }
 
 TEST_CASE("sdl ui renderer: a sprite is drawn at the region's offset, stretched from the art's scale") {
@@ -174,6 +177,39 @@ TEST_CASE("sdl ui renderer: text in the font's colour, its cell's bottom at y, a
     s.ui.draw({text}, 0, 0, 1.0);
     s.canvas.read();
     CHECK(s.canvas.at(36, 17) == kBackground);
+}
+
+TEST_CASE("sdl ui renderer: below the large scale text takes the smaller fonts at their own size") {
+    GameFolder folder;
+    folder.write("TOOLGFX/ZEI16V.ZEI",
+                 test::sheet_bytes(std::vector<std::pair<std::uint32_t, std::uint32_t>>(96, {3, 5})));
+    const assets::Palette palette = test::make_palette();
+    test::Canvas canvas{64, 48};
+    render::SdlUiRenderer ui{canvas.renderer(), folder.game(), palette, ui::ArtSize::Large};
+    const assets::Rgba body = palette[ui::text_recolour(palette, 3)[1]];
+
+    const auto medium = ui.fonts(0.78125);  // 800 x 600
+    REQUIRE(medium[0] != nullptr);
+    CHECK(medium[0]->height() == 5);
+    CHECK(medium[0]->design_scale() == 0.78125);
+    CHECK(ui.fonts(0.9)[0] == medium[0]);
+    CHECK(ui.fonts(1.0)[0]->height() == 6);
+    CHECK(ui.fonts(0.625)[0]->height() == 6);  // no small font: the large one
+
+    // At 800 x 600 the medium font, pixel for pixel: two glyphs of 3 x 5.
+    canvas.clear(kBackground);
+    auto text = item(ui::DrawItem::Kind::Text, 10, 20);
+    text.text = "AB";
+    text.colour = 3;
+    ui.draw({text}, 0, 0, 0.78125);
+    canvas.read();
+    CHECK(box(canvas, 10, 15, 16, 20, body));
+
+    // At the large scale the large font as before.
+    canvas.clear(kBackground);
+    ui.draw({text}, 0, 0, 1.0);
+    canvas.read();
+    CHECK(box(canvas, 10, 14, 18, 20, body));
 }
 
 TEST_CASE("sdl ui renderer: filled rectangles, solid or half transparent, and the checkerboard") {
