@@ -265,6 +265,7 @@ constexpr BugEntry kBugEntries[] = {
     {SetupItem::BugRemoteTrade, &sim::OriginalBugs::remote_trade, "remote_trade"},
     {SetupItem::BugRemoteRepair, &sim::OriginalBugs::remote_repair, "remote_repair"},
     {SetupItem::BugSmallYardWarships, &sim::OriginalBugs::small_yard_warships, "small_yard_warships"},
+    {SetupItem::BugNativeLand, &sim::OriginalBugs::native_land, "native_land"},
     {SetupItem::ClassicAi, &sim::OriginalBugs::classic_ai, "classic_ai"},
 };
 static_assert(std::size(kBugEntries) == std::size(sim::OriginalBugs::kAll), "every bug has its item");
@@ -357,6 +358,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::BugRemoteTrade:
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
+        case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
             return 2;
         case SetupItem::WinInhabitants:
@@ -464,6 +466,7 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::BugRemoteTrade:
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
+        case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
             return r.bugs.*bug_of(item) ? 1 : 0;
         case SetupItem::ComputerPlayers:
@@ -597,6 +600,7 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::BugRemoteTrade:
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
+        case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
             r.bugs.*bug_of(item) = choice == 1;
             break;
@@ -812,6 +816,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::BugRemoteTrade:
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
+        case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
             return true;
         default:
@@ -907,6 +912,7 @@ std::string setup_label(SetupItem item) {
         "setup.bug.remote_trade",
         "setup.bug.remote_repair",
         "setup.bug.small_yard_warships",
+        "setup.bug.native_land",
     };
     static_assert(kKeys.size() == kSetupItems);
     const auto i = static_cast<std::size_t>(item);
@@ -991,6 +997,7 @@ std::string setup_value(SetupItem item, std::size_t choice) {
         case SetupItem::BugRemoteTrade:
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
+        case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
             return ui::tr(std::string(bug_key(item)) + (choice == 1 ? ".original" : ".fixed"));
         case SetupItem::ComputerPlayers: {

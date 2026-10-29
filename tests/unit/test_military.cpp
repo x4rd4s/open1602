@@ -678,6 +678,31 @@ TEST_CASE("military: a village without huts is gone, its land free, and it curse
                       [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
 }
 
+TEST_CASE("military: as in the original, the ruins of a village without huts keep its land") {
+    Field f(false, true);
+    sim::OriginalBugs bugs;
+    bugs.native_land = true;
+    f.world.set_original_bugs(bugs);
+    f.build(kKontorRuin, 20, 5, 2, 1);
+    f.world.city(0, 1)->warehouse_x = 20;
+    f.world.city(0, 1)->warehouse_y = 5;
+    for (const std::int32_t x : {14, 16, 18}) {
+        f.build(kVillageHut, x, 9, 2, 1);
+    }
+    f.world.island(0).map.set_city(24, 12, 1, 2);
+    f.start();
+    for (const std::uint16_t x : std::array<std::uint16_t, 3>{14, 16, 18}) {
+        f.military->damage_building(0, x, 9, 32 * 3, true, 0, &f.construction);
+        f.run(50);
+    }
+    CHECK(f.count(sim::MilitaryEvent::Kind::BuildingDestroyed) == 3);
+    CHECK(sim::native_village_gone(f.world, f.buildings, 0, 1));
+    CHECK(f.world.city(0, 1) != nullptr);
+    CHECK(f.world.islands()[0].map.top(24, 12).city == 1);
+    CHECK(std::none_of(f.construction.begin(), f.construction.end(),
+                       [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
+}
+
 TEST_CASE("military: a group keeps its shape; queued orders follow one after another") {
     Field f;
     f.start();

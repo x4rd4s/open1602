@@ -192,6 +192,10 @@ struct OriginalBugs {
     bool small_yard_warships = false;
 
     // Opponents
+    /// A native village that lost its chief's house, market and huts keeps its land: the ruins hold
+    /// it as a destroyed Kontor does, and nobody can build there (fixed: the village is gone and its
+    /// land is free).
+    bool native_land = false;
     /// S-097 to S-099, the original's computer players (docs/re/ai.md): while a settlement ship
     /// sails no city develops, a city whose colony search failed waits for it for ever, an
     /// unreachable site is searched afresh (and found again), the fisher looks in two directions
@@ -205,7 +209,7 @@ struct OriginalBugs {
         &OriginalBugs::fire_risk,           &OriginalBugs::gallows,      &OriginalBugs::robber_victims,
         &OriginalBugs::robber_flight,       &OriginalBugs::goldsheep,    &OriginalBugs::building_radius,
         &OriginalBugs::infertile_fields,    &OriginalBugs::remote_trade, &OriginalBugs::remote_repair,
-        &OriginalBugs::small_yard_warships, &OriginalBugs::classic_ai,
+        &OriginalBugs::small_yard_warships, &OriginalBugs::native_land,  &OriginalBugs::classic_ai,
     };
 
     /// How many of them are as in the original.
