@@ -224,7 +224,7 @@ void fit_connection(World& world, const assets::BuildingTable& buildings, std::u
 /// Destroys the building with origin `origin` to ruins without an order of its owner (a fire,
 /// 0x00463F40): like demolishing, the territory is checked again afterwards. A native village
 /// left without its chief's house, market and huts (native_village_gone) is dissolved, and its
-/// land becomes free.
+/// land becomes free (not with OriginalBugs::native_land).
 bool destroy_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island, TilePos origin,
                       std::vector<ConstructionEvent>* events);
 

@@ -48,6 +48,7 @@ enum RuleKey : std::uint16_t {
     kBugSmallYardWarships = 40,
     kRevealNone = 41,       // 1: Reveal::None, under its own key so older versions read the original's way
     kNoShipPurchases = 42,  // 1: the computers buy no ships (Rules::computers_buy_ships off)
+    kBugNativeLand = 43,
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -75,6 +76,7 @@ constexpr std::pair<RuleKey, bool OriginalBugs::*> kBugKeys[] = {
     {kBugRemoteTrade, &OriginalBugs::remote_trade},
     {kBugRemoteRepair, &OriginalBugs::remote_repair},
     {kBugSmallYardWarships, &OriginalBugs::small_yard_warships},
+    {kBugNativeLand, &OriginalBugs::native_land},
 };
 static_assert(std::size(kBugKeys) + 1 == std::size(OriginalBugs::kAll), "every bug but classic_ai has a key");
 
@@ -297,6 +299,7 @@ Rules read_rules(Reader& in) {
             case kBugRemoteTrade:
             case kBugRemoteRepair:
             case kBugSmallYardWarships:
+            case kBugNativeLand:
                 for (const auto& [k, bug] : kBugKeys) {
                     if (k == key) {
                         r.bugs.*bug = v != 0;

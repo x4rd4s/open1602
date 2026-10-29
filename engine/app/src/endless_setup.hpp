@@ -92,7 +92,7 @@ enum class SetupItem : std::uint8_t {
     WinAll,
     WinComputers,
     // Bugs of the original brought back (a page of their own, "Original settings"; sim::OriginalBugs),
-    // in the page's order: disasters, construction, ships and trade
+    // in the page's order: disasters, construction, ships and trade, opponents
     BugFireRisk,
     BugGallows,
     BugRobberVictims,
@@ -103,6 +103,7 @@ enum class SetupItem : std::uint8_t {
     BugRemoteTrade,
     BugRemoteRepair,
     BugSmallYardWarships,
+    BugNativeLand,
     Count,
 };
 
