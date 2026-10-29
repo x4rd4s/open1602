@@ -1546,6 +1546,9 @@ bool Engine::mine_path(AiPlayer& p, std::uint8_t w, std::vector<BuildItem>& road
     const IslandMap& map = m_world.islands()[p.island].map;
     const auto width = static_cast<std::int32_t>(map.width());
     const auto height = static_cast<std::int32_t>(map.height());
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
     std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
     std::vector<std::int32_t> dist(prev.size(), 0);
     std::vector<std::int32_t> queue;
