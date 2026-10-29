@@ -65,6 +65,17 @@ private:
     double m_distance = 0.0;  ///< mouse travel while the button is held
 };
 
+/// Which way the map scrolls with the mouse at (x, y) on a screen of `width` x `height` pixels:
+/// -1, 0 or 1 on each axis, towards the edges the mouse is within `margin` pixels of (both in a
+/// corner).
+struct EdgeScroll {
+    int dx = 0;
+    int dy = 0;
+    friend bool operator==(const EdgeScroll&, const EdgeScroll&) = default;
+};
+[[nodiscard]] EdgeScroll edge_scroll_at(double x, double y, std::int32_t width, std::int32_t height,
+                                        double margin) noexcept;
+
 /// A group key pressed twice within kTwiceMs goes to the group.
 class GroupKey {
 public:

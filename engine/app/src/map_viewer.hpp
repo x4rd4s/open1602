@@ -344,6 +344,9 @@ private:
     /// Applies how the game is shown (the window "Anzeige", F11): full screen, the window's size,
     /// the interface's size, the zoom and vertical sync. Saved with the other settings.
     void apply_display(const DisplaySettings& display);
+    /// Keeps the mouse in the window (DisplaySettings::grab_mouse, or full screen with edge
+    /// scrolling) or lets it go; after a change of the settings or of full screen.
+    void follow_mouse_grab();
     /// What the window "Anzeige" shows: the settings and the window's size now.
     [[nodiscard]] DisplayModel display_model() const;
     /// The window's size went to the settings: remembered for the next start.

@@ -19,13 +19,14 @@ constexpr Id kItem = 1;  // + Item
 constexpr Id kClose = 20;
 
 constexpr std::int32_t kRowY = 64;
-constexpr std::int32_t kRowH = 40;
+constexpr std::int32_t kRowH = 38;
 constexpr std::int32_t kLabelW = 260;
 constexpr std::int32_t kValueW = 232;
 
 constexpr std::array<std::string_view, DisplayMenu::kItems> kLabels = {
-    "display.mode",  "display.size",        "display.ui_scale",   "display.zoom",         "display.zoom_drawing",
-    "display.vsync", "display.goods_trend", "display.rival_wars", "display.plant_fields", "display.graphics"};
+    "display.mode",         "display.size",       "display.ui_scale",     "display.zoom",
+    "display.zoom_drawing", "display.vsync",      "display.edge_scroll",  "display.grab_mouse",
+    "display.goods_trend",  "display.rival_wars", "display.plant_fields", "display.graphics"};
 
 std::string on_off(bool on) {
     return ui::tr(on ? "display.on" : "display.off");
@@ -55,6 +56,10 @@ std::string DisplayMenu::value_text(const DisplayModel& model, Item item) {
             return ui::tr(s.smooth_zoom ? "display.zoom_smooth" : "display.zoom_pixels");
         case Item::Vsync:
             return on_off(s.vsync);
+        case Item::EdgeScroll:
+            return on_off(s.edge_scroll);
+        case Item::GrabMouse:
+            return on_off(s.grab_mouse);
         case Item::GoodsTrend:
             return on_off(s.goods_trend);
         case Item::RivalWars:
@@ -98,6 +103,12 @@ bool DisplayMenu::choose(DisplayModel& model, Item item, bool forward) {
             return true;
         case Item::Vsync:
             s.vsync = !s.vsync;
+            return true;
+        case Item::EdgeScroll:
+            s.edge_scroll = !s.edge_scroll;
+            return true;
+        case Item::GrabMouse:
+            s.grab_mouse = !s.grab_mouse;
             return true;
         case Item::GoodsTrend:
             s.goods_trend = !s.goods_trend;

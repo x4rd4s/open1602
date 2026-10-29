@@ -77,3 +77,21 @@ TEST_CASE("map gestures: the next city after the one the key went to last (Histo
     CHECK(app::next_in_cycle(cities, std::size_t{6}) == std::optional<std::size_t>(0));  // round again
     CHECK(app::next_in_cycle(cities, std::size_t{5}) == std::optional<std::size_t>(0));  // a city lost since
 }
+
+TEST_CASE("map gestures: the mouse at the screen's edge scrolls towards it") {
+    using app::EdgeScroll;
+    // 1920 x 1080 pixels, 2 pixels from each edge.
+    CHECK(app::edge_scroll_at(960.0, 540.0, 1920, 1080, 2.0) == (EdgeScroll{0, 0}));
+    CHECK(app::edge_scroll_at(0.0, 540.0, 1920, 1080, 2.0) == (EdgeScroll{-1, 0}));
+    CHECK(app::edge_scroll_at(1.5, 540.0, 1920, 1080, 2.0) == (EdgeScroll{-1, 0}));
+    CHECK(app::edge_scroll_at(2.0, 540.0, 1920, 1080, 2.0) == (EdgeScroll{0, 0}));
+    CHECK(app::edge_scroll_at(1919.0, 540.0, 1920, 1080, 2.0) == (EdgeScroll{1, 0}));
+    CHECK(app::edge_scroll_at(1917.0, 540.0, 1920, 1080, 2.0) == (EdgeScroll{0, 0}));
+    CHECK(app::edge_scroll_at(960.0, 0.0, 1920, 1080, 2.0) == (EdgeScroll{0, -1}));
+    CHECK(app::edge_scroll_at(960.0, 1079.0, 1920, 1080, 2.0) == (EdgeScroll{0, 1}));
+    // A corner scrolls both ways.
+    CHECK(app::edge_scroll_at(0.0, 1079.0, 1920, 1080, 2.0) == (EdgeScroll{-1, 1}));
+    CHECK(app::edge_scroll_at(1919.5, 0.0, 1920, 1080, 2.0) == (EdgeScroll{1, -1}));
+    // No screen yet: nothing.
+    CHECK(app::edge_scroll_at(0.0, 0.0, 0, 0, 2.0) == (EdgeScroll{0, 0}));
+}

@@ -22,6 +22,22 @@ bool MapDrag::move(double dx, double dy) {
     return m_dragging;
 }
 
+EdgeScroll edge_scroll_at(double x, double y, std::int32_t width, std::int32_t height, double margin) noexcept {
+    EdgeScroll e;
+    if (width <= 0 || height <= 0) {
+        return e;
+    }
+    const auto axis = [margin](double at, std::int32_t size) {
+        if (at < margin) {
+            return -1;
+        }
+        return at >= static_cast<double>(size) - margin ? 1 : 0;
+    };
+    e.dx = axis(x, width);
+    e.dy = axis(y, height);
+    return e;
+}
+
 bool GroupKey::press(std::size_t group, std::uint64_t now_ms) {
     const bool twice = m_last == group && now_ms - m_last_ms < kTwiceMs;
     m_last = group;

@@ -444,6 +444,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         return window.error();
     }
     viewer->m_window = std::move(window).value();
+    viewer->follow_mouse_grab();
     viewer->m_map_canvas = std::make_unique<render::SdlMapCanvas>(viewer->m_window->sdl_renderer());
     viewer->m_software_renderer = viewer->m_window->renderer_name() == "software";
     viewer->load_cursors();
@@ -945,6 +946,10 @@ void MapViewer::handle_event(const SDL_Event& original) {
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             follow_display_scale();
             break;
+        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+        case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+            follow_mouse_grab();
+            break;
         default:
             m_input->handle_event(event);
             break;
@@ -1019,6 +1024,9 @@ void MapViewer::animate_zoom(std::uint32_t delta_ms) {
 void MapViewer::update(std::uint32_t delta_ms) {
     animate_zoom(delta_ms);
     m_input->scroll_with_keys(delta_ms);
+    if (m_app_settings.display.edge_scroll) {
+        m_input->scroll_at_edges(delta_ms);
+    }
     // The pause of the video ended another way (F3, another player): the video goes too.
     m_video->follow_pause(m_state->simulation.paused());
     m_input->follow_selection();
@@ -1975,6 +1983,7 @@ void MapViewer::apply_display(const DisplaySettings& display) {
     if (display.vsync != before.vsync) {
         m_window->set_vsync(display.vsync);
     }
+    follow_mouse_grab();
     if (m_hud) {
         m_hud->set_goods_trend(display.goods_trend);
     }
@@ -2000,6 +2009,13 @@ void MapViewer::apply_display(const DisplaySettings& display) {
         m_hud->options_model().fullscreen = display.fullscreen;
     }
     save_settings();
+}
+
+void MapViewer::follow_mouse_grab() {
+    // Full screen keeps the mouse for edge scrolling (as the original's did), so that it does not
+    // slip onto a second screen; in a window only if the player asks for it.
+    const DisplaySettings& display = m_app_settings.display;
+    m_window->set_mouse_grab(display.grab_mouse || (display.edge_scroll && m_window->fullscreen()));
 }
 
 void MapViewer::lay_out() {

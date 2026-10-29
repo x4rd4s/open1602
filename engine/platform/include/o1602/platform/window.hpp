@@ -91,6 +91,11 @@ public:
     void usable_area(std::int32_t& width, std::int32_t& height) const;
     /// Whether the window is maximised (its size then is not the one to remember).
     [[nodiscard]] bool maximized() const;
+    /// Keeps the mouse inside the window while it has the focus (SDL lets it go when another
+    /// program gets the focus and takes it again when the window gets it back).
+    void set_mouse_grab(bool on);
+    /// The mouse is kept inside the window now and is over it: it cannot leave it.
+    [[nodiscard]] bool mouse_confined() const;
     /// Frames wait for the screen (vertical sync); kept when the renderer is made again.
     void set_vsync(bool on);
     /// Shows the frame drawn. With vertical sync on, a frame that comes back much sooner than the
