@@ -162,6 +162,11 @@ struct ConstructionEvent {
 [[nodiscard]] bool city_defenceless(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                                     std::uint8_t city);
 
+/// Whether the native village `city` is gone (Open1602): defenceless (city_defenceless) and no
+/// hut of it standing; the ruins left over do not count.
+[[nodiscard]] bool native_village_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                                       std::uint8_t city);
+
 /// Builds what plan_build() accepts and pays for it. New cities take the next name of
 /// `city_names` (round robin, World::city_name_index()).
 BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, const BuildOrder& order,
@@ -217,7 +222,9 @@ void fit_connection(World& world, const assets::BuildingTable& buildings, std::u
                     std::int32_t y);
 
 /// Destroys the building with origin `origin` to ruins without an order of its owner (a fire,
-/// 0x00463F40): like demolishing, the territory is checked again afterwards.
+/// 0x00463F40): like demolishing, the territory is checked again afterwards. A native village
+/// left without its chief's house, market and huts (native_village_gone) is dissolved, and its
+/// land becomes free.
 bool destroy_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island, TilePos origin,
                       std::vector<ConstructionEvent>* events);
 

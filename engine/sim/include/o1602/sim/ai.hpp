@@ -49,6 +49,9 @@ public:
     /// a young colony (fewer than 10 inhabitants) on that island, its home city elsewhere, remembers
     /// it against him (diplomacy event 5).
     void city_founded(std::uint16_t island, std::uint8_t city);
+    /// Land on `island` became free (a city dissolved, a native village gone): the computers'
+    /// cities there search their sites anew (Open1602; not with Rules::bugs.classic_ai).
+    void land_freed(std::uint16_t island);
     /// `asker` is about to found a city on `island` (0x004294C0 with island order 0x4C): the first
     /// computer with a city there answers if it is at peace with him and the island is not a large
     /// one (DiplomacyNotice::Kind::FoundingProtest, FoundingRefused, FoundingTolerated).

@@ -2,6 +2,7 @@
 // Soldiers, towers and building damage (docs/re/military.md).
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <memory>
 #include <set>
@@ -36,6 +37,8 @@ constexpr std::uint32_t kKontor = 20108;
 constexpr std::uint32_t kKontorDestroyed = 20109;
 constexpr std::uint32_t kNativeHut = 20110;
 constexpr std::uint32_t kTree = 20111;
+constexpr std::uint32_t kKontorRuin = 20109;
+constexpr std::uint32_t kVillageHut = 20112;
 constexpr std::uint16_t kSword = 1;
 constexpr std::uint16_t kMusket = 9;
 
@@ -44,7 +47,15 @@ constexpr const char* kTreeRecord =
     "  @Nummer: 9\n  Id: 20111\n  Kind: 10\n  Gfx: 60\n  Size: 1, 1\n  Maxenergy: 3\n  NoShotFlg: 1\n"
     "  Ruinenr: 255\n";
 
-assets::BuildingTable make_buildings(bool tree = false) {
+/// A hut of the natives (PIRATWOHN) and its ruin for the tables that ask for a village (the golden
+/// hashes stay).
+constexpr const char* kVillageRecord =
+    "  @Nummer: 10\n  Id: 20112\n  Kind: 14\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 3\n  NoShotFlg: 1\n"
+    "  Ruinenr: 0\n"
+    "  Objekt: HAUS_PRODTYP\n    Kind: 31\n  EndObj\n"
+    "  @Nummer: 11\n  Id: 22601\n  Kind: 12\n  Gfx: 74\n  Size: 1, 1\n";  // its ruin
+
+assets::BuildingTable make_buildings(bool tree = false, bool village = false) {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     const std::string text =
         std::string(
@@ -69,7 +80,7 @@ assets::BuildingTable make_buildings(bool tree = false) {
             "  Ruinenr: 255\n"
             "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n    Nativflg: 1\n  EndObj\n"  // natives' main hut
             ) +
-        (tree ? kTreeRecord : "") + "EndObj\n";
+        (tree ? kTreeRecord : "") + (village ? kVillageRecord : "") + "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -109,7 +120,7 @@ struct Field {
     std::vector<sim::MilitaryEvent> events;
     std::vector<sim::ConstructionEvent> construction;
 
-    explicit Field(bool tree = false) : buildings(make_buildings(tree)) {
+    explicit Field(bool tree = false, bool village = false) : buildings(make_buildings(tree, village)) {
         std::vector<sim::Player> players(3);
         players[0].role = sim::PlayerRole::Human;
         players[0].money = 10000;
@@ -636,6 +647,35 @@ TEST_CASE("military: natives curse who destroyed their village") {
                                     [](const auto& e) { return e.kind == sim::MilitaryEvent::Kind::NativesCurse; });
     CHECK(curse->player == 0);
     CHECK(curse->pirates == f.world.islands()[0].drought.curse_pending);
+}
+
+TEST_CASE("military: a village without huts is gone, its land free, and it curses once") {
+    Field f(false, true);
+    // The ruin of the chief's house holds the land, as a destroyed Kontor does; three huts.
+    f.build(kKontorRuin, 20, 5, 2, 1);
+    f.world.city(0, 1)->warehouse_x = 20;
+    f.world.city(0, 1)->warehouse_y = 5;
+    for (const std::int32_t x : {14, 16, 18}) {
+        f.build(kVillageHut, x, 9, 2, 1);
+    }
+    f.world.island(0).map.set_city(24, 12, 1, 2);
+    CHECK(sim::city_defenceless(f.world, f.buildings, 0, 1));
+    CHECK(!sim::native_village_gone(f.world, f.buildings, 0, 1));
+    f.world.diplomacy().set_blamed(2, 0);  // player 0 destroyed the chief's house
+    f.start();
+    for (const std::uint16_t x : std::array<std::uint16_t, 3>{14, 16, 18}) {
+        REQUIRE(f.world.city(0, 1) != nullptr);
+        f.military->damage_building(0, x, 9, 32 * 3, true, 0, &f.construction);
+        f.run(50);
+    }
+    CHECK(f.count(sim::MilitaryEvent::Kind::BuildingDestroyed) == 3);
+    // Fewer than three huts cursed the destroyer; the last hut dissolved the village, no second curse.
+    CHECK(f.count(sim::MilitaryEvent::Kind::NativesCurse) == 1);
+    CHECK(f.world.city(0, 1) == nullptr);
+    CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+    CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
+    CHECK(std::any_of(f.construction.begin(), f.construction.end(),
+                      [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
 }
 
 TEST_CASE("military: a group keeps its shape; queued orders follow one after another") {

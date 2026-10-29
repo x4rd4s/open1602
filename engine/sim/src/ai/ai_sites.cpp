@@ -7,6 +7,7 @@
 // once the road list is exhausted.
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <span>
 #include <vector>
 
@@ -882,6 +883,137 @@ bool Engine::search_market(AiPlayer& p) {
     }
 }
 
+namespace {
+
+/// A distance in tiles without a square root: the longer leg and half the shorter.
+std::int32_t tile_distance(std::int32_t dx, std::int32_t dy) {
+    const std::int32_t ax = std::abs(dx);
+    const std::int32_t ay = std::abs(dy);
+    return std::max(ax, ay) + std::min(ax, ay) / 2;
+}
+
+/// Tiles a claim market must come nearer to its target than the city's nearest market or Kontor.
+constexpr std::int32_t kClaimStep = 3;
+
+}  // namespace
+
+DepositAccess Engine::deposit_access(const AiPlayer& p, const assets::IslandHeader::Deposit& d, std::int32_t& free_x,
+                                     std::int32_t& free_y) {
+    // The mountain's rock tiles carry the deposit's origin; a mine stands on a slope next to them.
+    const City* c = m_world.city(p.island, p.city);
+    const std::int32_t kx = c != nullptr && c->warehouse_x ? *c->warehouse_x : d.x;
+    const std::int32_t ky = c != nullptr && c->warehouse_y ? *c->warehouse_y : d.y;
+    constexpr std::int32_t kMountain = 24;  // larger than any mountain
+    bool free = false;
+    std::int32_t best = 0;
+    for (std::int32_t y = d.y; y < d.y + kMountain; ++y) {
+        for (std::int32_t x = d.x; x < d.x + kMountain; ++x) {
+            const Tile rock = tile(p.island, x, y);
+            if (!rock.valid() || rock.kind != kind::kRock || rock.ox != d.x || rock.oy != d.y) {
+                continue;
+            }
+            for (const auto& [dx, dy] : {std::pair{1, 0}, std::pair{-1, 0}, std::pair{0, 1}, std::pair{0, -1}}) {
+                const Tile slope = tile(p.island, x + dx, y + dy);
+                if (!slope.valid() || slope.kind != kind::kSlope) {
+                    continue;
+                }
+                if (slope.city == p.city) {
+                    return DepositAccess::Own;
+                }
+                if (slope.city != MapCell::kNoCity) {
+                    continue;
+                }
+                const std::int32_t dist = tile_distance(x + dx - kx, y + dy - ky);
+                if (!free || dist < best) {
+                    free = true;
+                    best = dist;
+                    free_x = x + dx;
+                    free_y = y + dy;
+                }
+            }
+        }
+    }
+    return free ? DepositAccess::Free : DepositAccess::Closed;
+}
+
+std::int32_t Engine::market_distance(const AiPlayer& p, std::int32_t x, std::int32_t y) {
+    // From the middle of the city's nearest market or Kontor to (x, y).
+    const IslandMap& map = m_world.islands()[p.island].map;
+    std::int32_t best = 1 << 15;
+    for (std::uint32_t ty = 0; ty < map.height(); ++ty) {
+        for (std::uint32_t tx = 0; tx < map.width(); ++tx) {
+            if (map.top(tx, ty).city != p.city) {
+                continue;
+            }
+            const Tile t = tile(p.island, static_cast<std::int32_t>(tx), static_cast<std::int32_t>(ty));
+            if (!t.origin || !market_or_kontor(t) || t.type->destroyed) {
+                continue;
+            }
+            const std::int32_t mx = static_cast<std::int32_t>(tx) + static_cast<std::int32_t>(t.type->size_x) / 2;
+            const std::int32_t my = static_cast<std::int32_t>(ty) + static_cast<std::int32_t>(t.type->size_y) / 2;
+            best = std::min(best, tile_distance(mx - x, my - y));
+        }
+    }
+    return best;
+}
+
+bool Engine::search_claim(AiPlayer& p) {
+    // Open1602 (task kClaimLand): along the road runs like search_market, the market site whose
+    // reach takes in the target tile; failing that, the one nearest to it that comes at least
+    // kClaimStep tiles nearer than the city's markets so far (`extra`), a step on the way there.
+    const assets::BuildingType* b = by_id(p.search.building);
+    Search& s = p.search;
+    if (b == nullptr || s.target_x < 0) {
+        return true;
+    }
+    const std::vector<std::uint8_t>& circle = circle_table(b->radius);
+    const auto radius = static_cast<std::int32_t>(b->radius);
+    for (std::int32_t visited = 1;; ++visited) {
+        if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
+            return true;
+        }
+        const Segment& g = p.segments[static_cast<std::size_t>(s.segment)];
+        bool any = false;
+        for (const std::int32_t side : {0, 1, -1, -2}) {
+            Site c = gen_sized(g, s.x, s.y, side, 4, 3, s.remaining);
+            if (c.x0 > c.x1 || !can_place(p, *b, c.x0, c.y0, c.w(), c.h())) {
+                continue;
+            }
+            any = true;
+            const std::int32_t dx = std::max({c.x0 - s.target_x, 0, s.target_x - c.x1});
+            const std::int32_t dy = std::max({c.y0 - s.target_y, 0, s.target_y - c.y1});
+            const bool reaches = dy <= radius && dx <= circle[static_cast<std::size_t>(dy)];
+            const std::int32_t dist = tile_distance((c.x0 + c.x1) / 2 - s.target_x, (c.y0 + c.y1) / 2 - s.target_y);
+            if (!reaches && dist + kClaimStep > s.extra) {
+                continue;
+            }
+            bool road = false;
+            rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 1,
+                  [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t) {
+                      road = road || t.kind == kind::kRoad || t.kind == kind::kBridge;
+                  });
+            if (!road) {
+                continue;
+            }
+            const std::int32_t score = (reaches ? 1 << 14 : 0) + std::max(1, 4096 - 16 * dist);
+            if (score > s.best) {
+                s.best = score;
+                s.best_x0 = c.x0;
+                s.best_y0 = c.y0;
+                s.best_x1 = c.x1;
+                s.best_y1 = c.y1;
+                s.rotation = c.w() == static_cast<std::int32_t>(b->size_x) ? 0 : 1;
+            }
+        }
+        if (!advance_cursor(p, 0)) {
+            return true;
+        }
+        if (any || visited >= kSearchPositions) {
+            return false;
+        }
+    }
+}
+
 bool Engine::farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                        std::int32_t y1) {
     // Room for the fields the maintenance sweep wants to see later (14, grain 7): the original
@@ -1403,6 +1535,77 @@ bool Engine::search_shipyard(AiPlayer& p) {
             return false;
         }
     }
+}
+
+bool Engine::mine_path(AiPlayer& p, std::uint8_t w, std::vector<BuildItem>& road) {
+    // Open1602: when no straight road reaches a slope (search_mine, search_mine_wide), the
+    // shortest way over the city's open ground from any of its roads to a slope with the deposit's
+    // rock behind it, up to kMinePath tiles; the road along it goes to `road`, the slope and the
+    // mine's building to the search as search_mine would leave them.
+    constexpr std::int32_t kMinePath = 24;
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto width = static_cast<std::int32_t>(map.width());
+    const auto height = static_cast<std::int32_t>(map.height());
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+    std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
+    std::vector<std::int32_t> dist(prev.size(), 0);
+    std::vector<std::int32_t> queue;
+    for (std::int32_t y = 0; y < height; ++y) {
+        for (std::int32_t x = 0; x < width; ++x) {
+            const Tile t = tile(p.island, x, y);
+            if (t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                prev[static_cast<std::size_t>(y * width + x)] = -1;
+                queue.push_back(y * width + x);
+            }
+        }
+    }
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::int32_t i = queue[head];
+        if (dist[static_cast<std::size_t>(i)] >= kMinePath) {
+            continue;
+        }
+        const std::int32_t x = i % width;
+        const std::int32_t y = i / width;
+        for (std::uint8_t dir = 0; dir < 4; ++dir) {
+            const std::int32_t nx = x + kStep[dir][0];
+            const std::int32_t ny = y + kStep[dir][1];
+            const Tile t = tile(p.island, nx, ny);
+            if (!t.valid() || t.city != p.city) {
+                continue;
+            }
+            std::int32_t ox = 0;
+            std::int32_t oy = 0;
+            if (t.kind == kind::kSlope) {
+                if (mountain_walk(p, nx, ny, dir, w, &ox, &oy, 1, true, false) != 0) {
+                    continue;
+                }
+                // Found: bind the deposit as search_mine does, and lay the road back to the roads.
+                mountain_walk(p, nx, ny, dir, w, &ox, &oy, 1, true, true);
+                for (std::int32_t k = i; prev[static_cast<std::size_t>(k)] != -1;
+                     k = prev[static_cast<std::size_t>(k)]) {
+                    road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
+                }
+                std::reverse(road.begin(), road.end());
+                Search& s = p.search;
+                s.best = 1;
+                s.best_x1 = ox;
+                s.best_y1 = oy;
+                s.rotation = dir;
+                s.extra = 0;
+                return true;
+            }
+            const auto n = static_cast<std::size_t>(ny * width + nx);
+            if (prev[n] != -2 || !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
+                continue;
+            }
+            prev[n] = i;
+            dist[n] = dist[static_cast<std::size_t>(i)] + 1;
+            queue.push_back(ny * width + nx);
+        }
+    }
+    return false;
 }
 
 bool Engine::search_mine(AiPlayer& p, std::uint8_t w) {

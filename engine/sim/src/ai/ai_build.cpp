@@ -549,6 +549,28 @@ void Engine::task_market(AiPlayer& p) {
     }
 }
 
+void Engine::task_claim_land(AiPlayer& p) {
+    if (!search_claim(p)) {
+        return;
+    }
+    pop(p);
+    refund(p);
+    const Search s = p.search;
+    if (s.best > 0 && build(p, {BuildItem{id::kMarket, s.best_x0, s.best_y0, static_cast<std::uint8_t>(s.rotation), 0}},
+                            false) != 0) {
+        slot_built(p, kSlotMarket);
+        log(p, "claim market at %d,%d towards %d,%d", s.best_x0, s.best_y0, s.target_x, s.target_y);
+        return;
+    }
+    // No site on the way: the deposit is given up until land changes (land_freed) or the hourly
+    // new start, rather than searched again at once.
+    log(p, "no market site towards %d,%d", s.target_x, s.target_y);
+    if (CityPlan* r = current_plan(p)) {
+        r->slots[s.slot].attempts = 2;
+        r->slots[s.slot].fail_level = 2;
+    }
+}
+
 void Engine::task_mine(AiPlayer& p) {
     const assets::BuildingType* b = by_id(p.search.building);
     if (b == nullptr) {
@@ -564,13 +586,17 @@ void Engine::task_mine(AiPlayer& p) {
     const Search s = p.search;
     log(p, "mine search ware %u: best %d at %d,%d segments %zu", b->ware, s.best, s.best_x1, s.best_y1,
         p.segments.size());
-    if (s.best < 1) {
+    std::vector<BuildItem> path;
+    if (s.best < 1 && (classic() || !mine_path(p, b->ware, path))) {
         slot_fail(p, s.slot);
         return;
     }
-    const auto& d = kStep[static_cast<std::uint32_t>(s.rotation) & 3U];
-    // The road from the road to the slope first.
-    if (s.extra > 0) {
+    if (!path.empty()) {
+        log(p, "mine road of %zu tiles to %d,%d", path.size(), p.search.best_x1, p.search.best_y1);
+        build(p, std::move(path), false);
+    } else if (s.extra > 0) {
+        // The road from the road to the slope first.
+        const auto& d = kStep[static_cast<std::uint32_t>(s.rotation) & 3U];
         road_line(p, s.best_x0 + d[0], s.best_y0 + d[1], s.extra, static_cast<std::uint8_t>(s.rotation), true);
     }
     // The mine on the slope (1 x 2, facing the rock).
@@ -578,8 +604,8 @@ void Engine::task_mine(AiPlayer& p) {
     if (mine == nullptr) {
         return;
     }
-    const std::int32_t hx = s.best_x1;
-    const std::int32_t hy = s.best_y1;
+    const std::int32_t hx = p.search.best_x1;
+    const std::int32_t hy = p.search.best_y1;
     std::size_t placed = 0;
     for (const auto& o : std::array<std::array<std::int32_t, 3>, 6>{
              {{0, 0, 0}, {-1, 0, 1}, {0, -1, 0}, {0, 0, 1}, {0, -1, 1}, {-1, 0, 0}}}) {

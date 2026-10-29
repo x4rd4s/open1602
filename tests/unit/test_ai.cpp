@@ -474,8 +474,8 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     run(s, 90'000);
     const std::uint64_t hash = s.state_hash();
     // Names left empty without Text.cod (MD-10); SIMU in parts (DS-3); tiles by blocks (TB-26); a ship
-    // whose goods do not fit at home is free again.
-    constexpr std::uint64_t kExpected = 0x8b4db8f3cc3ac662ULL;
+    // whose goods do not fit at home is free again; the computers' state version 4 (a search's target).
+    constexpr std::uint64_t kExpected = 0x54d8f8262ae85d2eULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -590,7 +590,7 @@ TEST_CASE("ai: a state of version 1 loads and goes on as the same state") {
     sim::ai::Saver saver(old, 1);
     saver(state);
     const std::vector<std::uint8_t> v1 = old.take();
-    CHECK(v1.size() > now.size());
+    CHECK(v1 != now);
     core::ByteReader in(v1);
     sim::ComputerPlayers computers(s);
     REQUIRE(computers.load(in, 1));
@@ -621,9 +621,10 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     core::ByteReader in(v2);
     sim::ComputerPlayers computers(s);
     REQUIRE(computers.load(in, 2));
-    // Saved again as version 3: one byte more per computer, and no request.
+    // Saved again as the newest version: one byte more per computer, and no request (version 3),
+    // and the search's target (version 4).
     const std::vector<std::uint8_t> again = saved(computers);
-    CHECK(again.size() == v2.size() + state.players.size());
+    CHECK(again.size() == v2.size() + state.players.size() * (1 + 2 * sizeof(std::int32_t)));
     core::ByteReader back(again);
     sim::StateIn reader(back);
     sim::ai::State loaded;
@@ -632,6 +633,59 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     REQUIRE(reader.ok());
     for (const sim::ai::AiPlayer& p : loaded.players) {
         CHECK(!p.yard_wanted);
+    }
+}
+
+TEST_CASE("ai: land freed on its island lets a computer's city search its sites anew, not the original's") {
+    for (const bool classic : {false, true}) {
+        Game g;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s);
+        // Every search of the city given up.
+        sim::ai::State state;
+        {
+            const std::vector<std::uint8_t> now = saved(s.computers());
+            core::ByteReader in(now);
+            sim::StateIn reader(in);
+            sim::ai::Loader loader(reader);
+            loader(state);
+            REQUIRE(reader.ok());
+        }
+        std::optional<std::uint16_t> island;
+        for (sim::ai::AiPlayer& p : state.players) {
+            for (sim::ai::CityPlan& r : p.plans) {
+                island = r.island;
+                r.flags |= sim::ai::city_flag::kMarket;
+                for (sim::ai::SlotState& slot : r.slots) {
+                    slot.attempts = 2;
+                    slot.fail_level = 2;
+                }
+            }
+        }
+        REQUIRE(island.has_value());
+        core::ByteWriter out;
+        sim::ai::Saver saver(out);
+        saver(state);
+        const std::vector<std::uint8_t> bytes = out.take();
+        core::ByteReader in(bytes);
+        sim::ComputerPlayers computers(s);
+        REQUIRE(computers.load(in, sim::ComputerPlayers::state_version()));
+        const auto given_up = [&](bool expected) {
+            for (const auto& v : computers.view()) {
+                for (const auto& c : v.plans) {
+                    CHECK(((c.flags & sim::ai::city_flag::kMarket) != 0) == expected);
+                    for (const auto& slot : c.slots) {
+                        CHECK((slot[1] == 2 && slot[2] == 2) == expected);
+                    }
+                }
+            }
+        };
+        computers.land_freed(static_cast<std::uint16_t>(*island + 1));  // another island
+        given_up(true);
+        computers.land_freed(*island);
+        given_up(classic);  // the original waits for its hourly new start
     }
 }
 

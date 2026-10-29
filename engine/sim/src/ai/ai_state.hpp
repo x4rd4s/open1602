@@ -18,9 +18,10 @@
 namespace o1602::sim::ai {
 
 /// Version of the saved state of the computer players. 2 dropped what nothing read (GB-5): the
-/// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). Every
-/// version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 3;
+/// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
+/// target of a search (Search::target_x/target_y, task kClaimLand). Every version from
+/// kFirstStateVersion on loads.
+inline constexpr std::uint32_t kStateVersion = 4;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the original's dispatcher (AI_RunTask 0x00429AA0). The numbers are kept so the
@@ -84,6 +85,8 @@ enum Task : std::uint8_t {
     kBrunnen = 0x3A,
     kShipyardUpgrade = 0x3B,
     kDenkmal = 0x3C,
+    /// Open1602: a market that brings a deposit the city wants into its land (Engine::claim_land).
+    kClaimLand = 0x3D,
 };
 
 /// Building slots of a city record (R+0x34 + 6k): what the city has of each kind of building.
@@ -249,6 +252,9 @@ struct Search {
     std::int32_t rotation = 0;  ///< +0x1D6C
     std::int32_t stub_x = -1;   ///< +0x1D70/+0x1D74: road tile to connect a farm, -1 none
     std::int32_t stub_y = -1;
+    /// Open1602, task kClaimLand: the tile the new market should bring into the city's land, -1 none.
+    std::int32_t target_x = -1;
+    std::int32_t target_y = -1;
 };
 
 /// Money and building material taken from a city while a building is planned (C+0x1D34..+0x1D44).
