@@ -24,6 +24,7 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     s.display.vsync = false;
     s.display.goods_trend = false;
     s.display.rival_wars = false;
+    s.display.plant_fields = true;
     s.display.classic_graphics = true;
     const std::string text = app::write_settings(s);
     CHECK(text.find("display.window = 1600x900\n") != std::string::npos);
@@ -40,6 +41,7 @@ TEST_CASE("display settings: written to settings.cfg and read back") {
     CHECK(none.display.vsync);
     CHECK(none.display.goods_trend);
     CHECK(none.display.rival_wars);
+    CHECK(!none.display.plant_fields);      // the original plants no fields by itself
     CHECK(!none.display.classic_graphics);  // Open1602's look
 }
 
@@ -131,6 +133,9 @@ TEST_CASE("display menu: each row chooses its next value") {
     CHECK(app::DisplayMenu::choose_next(model, Item::RivalWars));
     CHECK(!model.settings.rival_wars);
     CHECK(app::DisplayMenu::value_text(model, Item::RivalWars) == "off");
+    CHECK(app::DisplayMenu::value_text(model, Item::PlantFields) == "off");
+    CHECK(app::DisplayMenu::choose_next(model, Item::PlantFields));
+    CHECK(model.settings.plant_fields);
     CHECK(app::DisplayMenu::value_text(model, Item::Graphics) == "modern");
     CHECK(app::DisplayMenu::choose_next(model, Item::Graphics));
     CHECK(model.settings.classic_graphics);

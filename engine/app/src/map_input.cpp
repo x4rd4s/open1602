@@ -1021,15 +1021,19 @@ void MapInput::select_building_at_mouse(const Selection& before) {
 void MapInput::plant_fields() {
     // The selected farm's field (the one its window picks in the build menu, 0x004331B0) on all
     // open ground in its catchment; with nothing selected or another building nothing happens.
-    if (!m_hud || m_hud->selection().kind != Selection::Kind::Building) {
-        return;
+    if (m_hud && m_hud->selection().kind == Selection::Kind::Building) {
+        const Selection& sel = m_hud->selection();
+        plant_fields_at(sel.island, sel.x, sel.y);
     }
-    const Selection& sel = m_hud->selection();
+}
+
+void MapInput::plant_fields_at(std::uint16_t island, std::int32_t x, std::int32_t y) {
     const sim::World& w = world();
-    if (sel.island >= w.islands().size()) {
+    if (island >= w.islands().size() || !w.islands()[island].map.contains(x, y)) {
         return;
     }
-    const sim::SubTile t = w.islands()[sel.island].map.sub_tile(m_buildings, sel.x, sel.y);
+    const sim::SubTile t =
+        w.islands()[island].map.sub_tile(m_buildings, static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
     if (t.building == nullptr || t.building->raw_ware == 0) {
         return;
     }
@@ -1040,7 +1044,7 @@ void MapInput::plant_fields() {
             ui::build_menu().category_of(field.id) == nullptr) {
             continue;
         }
-        if (auto order = sim::plant_fields_order(w, m_buildings, local(), sel.island, {sel.x, sel.y}, field.id,
+        if (auto order = sim::plant_fields_order(w, m_buildings, local(), island, {x, y}, field.id,
                                                  static_cast<std::uint32_t>(w.time_ms()));
             order && !order->items.empty()) {
             submit({std::move(*order)}, false, false);

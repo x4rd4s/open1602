@@ -594,6 +594,7 @@ display.zoom_pixels = einfache Pixel
 display.vsync = V-Sync
 display.goods_trend = Warentrend im Kontor
 display.rival_wars = Kriege anderer Spieler
+display.plant_fields = Felder automatisch bepflanzen
 display.graphics = Grafik
 display.graphics_classic = wie im Original
 display.graphics_modern = modern

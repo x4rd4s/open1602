@@ -33,6 +33,9 @@ struct DisplaySettings {
     /// The status bar tells when two other players go to war or make peace (the original tells
     /// only the player concerned).
     bool rival_wars = true;
+    /// A farm, plantation, pasture or forester the player builds plants its fields on the open
+    /// ground of its catchment at once, as key F does (the original plants none by itself).
+    bool plant_fields = false;
     /// The original's graphics instead of Open1602's: shadows and chimney smoke dithered (every
     /// second pixel) instead of blended (render::Dither), and no dotted border around other players'
     /// land while building. One switch for everything where the two differ in look, not in what is
