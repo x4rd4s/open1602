@@ -1561,7 +1561,7 @@ void MapViewer::apply_production_events() {
     show_notices(m_events.city_events(m_state->world, m_local_player, m_state->simulation.take_city_events()));
     const std::vector<sim::ShipEvent> ship_events = m_state->simulation.take_ship_events();
     m_sound->ships(m_state->world, m_figures, ship_events, m_local_player, m_state->world.time_ms());
-    m_events.ship_events(m_state->world, m_local_player, ship_events);
+    show_notices(m_events.ship_events(m_state->world, m_local_player, ship_events));
     m_combat.ships(m_state->world, m_figures, ship_events);
     show_notices(m_events.disaster_events(m_state->world, m_local_player, m_state->simulation.take_disaster_events()));
     show_notices(m_events.island_events(m_state->world, m_local_player, m_state->simulation.take_island_events()));

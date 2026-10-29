@@ -1641,9 +1641,15 @@ void MapInput::submit(std::vector<sim::Command> orders, bool sound, bool ask) {
     for (sim::Command& c : orders) {
         m_commands.submit(std::move(c));
     }
-    // One acknowledgement of the first unit (0x0044D540).
+    // One acknowledgement of the first unit, as in the original: ships and soldiers answer, a market cart
+    // does not.
     if (sound && !m_units.empty()) {
-        if (const auto pos = ui::unit_position(world(), m_units.units().front())) {
+        const ui::UnitRef first = m_units.units().front();
+        const sim::Ship* cart = first.kind == ui::UnitRef::Kind::Ship ? world().ship(first.id) : nullptr;
+        if (cart != nullptr && cart->cart()) {
+            return;
+        }
+        if (const auto pos = ui::unit_position(world(), first)) {
             m_sound.order(m_units.kind() == ui::UnitRef::Kind::Ship, attack, pos->first, pos->second);
         }
     }

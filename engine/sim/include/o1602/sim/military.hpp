@@ -166,14 +166,15 @@ public:
         return r;
     }
 
-    /// The natives' city tick (every 10 s, 0x0047EB30): warriors come out of their huts, three
-    /// every 30 s, seven every 10 s for ten minutes after their village was attacked. Each goes to
-    /// the first road or bridge of the natives' owner that a search within 7 tiles of the hut
-    /// reaches (warrior_target()); a hut without one sends nobody.
+    /// The natives' city tick (every 10 s): warriors come out of the village's first
+    /// hut, three every 30 s, seven every 10 s for ten minutes after their village was attacked.
+    /// Each goes to the first road or bridge of the village that a search within 7 tiles of the
+    /// hut reaches (warrior_target()); a hut without one sends nobody. Every place of the hut looked
+    /// at recruits a new warrior, so empty huts fill up.
     void natives_tick();
     /// Target of a warrior leaving `hut` (0x00467820): a half-tile spot, nothing without a goal.
     [[nodiscard]] std::optional<Target> warrior_target(std::uint16_t island, TilePos origin, std::uint32_t width,
-                                                       std::uint32_t height, PlayerId owner);
+                                                       std::uint32_t height, std::uint8_t city);
 
     /// A tower building was built or a city's territory changed: towers come and go with it.
     void update_towers(std::uint16_t island);

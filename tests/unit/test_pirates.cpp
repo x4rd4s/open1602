@@ -522,7 +522,7 @@ struct Road {
     std::int32_t y;
     sim::PlayerId owner;
 };
-void add_village(World& w, std::initializer_list<Road> roads) {
+void add_village(World& w, std::initializer_list<Road> roads, bool trained = true) {
     sim::IslandMap& map = w.world.island(0).map;
     REQUIRE(map.place(*w.buildings.by_id(20104), 5, 4, 0, 0, 3, 0).ok());
     for (const Road& r : roads) {
@@ -534,7 +534,8 @@ void add_village(World& w, std::initializer_list<Road> roads) {
         }
     }
     for (const Road& r : roads) {
-        map.set_city(static_cast<std::uint32_t>(r.x), static_cast<std::uint32_t>(r.y), 0, r.owner);
+        // Another player's road belongs to another city.
+        map.set_city(static_cast<std::uint32_t>(r.x), static_cast<std::uint32_t>(r.y), r.owner == 3 ? 0 : 1, r.owner);
     }
     sim::City village;
     village.island = 0;
@@ -545,7 +546,7 @@ void add_village(World& w, std::initializer_list<Road> roads) {
     village.ensure_ware(24);
     w.world.add_city(village);
     sim::CostBuilding hut{sim::CostBuilding::Kind::Castle, 0, 5, 4, true};
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 8 && trained; ++i) {
         hut.slots.push_back(sim::CastleSlot{33, false, true, 18 * 32, 320});
     }
     w.world.add_cost_building(hut);
@@ -620,6 +621,35 @@ TEST_CASE("natives: without a road of theirs within 7 tiles no warrior comes out
     // Every place keeps its trained warrior.
     for (const sim::CastleSlot& slot : w.world.cost_buildings().back().slots) {
         CHECK(!slot.training);
+    }
+}
+
+TEST_CASE("natives: the empty huts of a new game recruit warriors, who then come out") {
+    // The village templates bring their huts without warriors; every place the tick looks at
+    // recruits one, as in the original, and the trained ones go out later.
+    World w(false);
+    add_village(w, {{8, 5, 3}}, false);
+    w.military->natives_tick();
+    w.military->natives_tick();
+    CHECK(w.world.cost_buildings().back().slots.empty());  // every 30 s only
+    w.military->natives_tick();
+    const std::vector<sim::CastleSlot>& slots = w.world.cost_buildings().back().slots;
+    REQUIRE(slots.size() == 8);
+    for (const sim::CastleSlot& slot : slots) {
+        CHECK(slot.figure == 33);
+        CHECK(slot.training);
+    }
+    CHECK(w.world.soldiers().empty());
+    // Trained in the hut, three of them go out.
+    int ticks = 0;
+    for (; ticks < 300 && w.world.soldiers().size() < 3; ++ticks) {
+        w.run(10'000);
+        w.military->natives_tick();
+    }
+    CHECK(ticks > 3);  // not before they are trained
+    CHECK(w.world.soldiers().size() == 3);
+    for (const sim::Soldier& s : w.world.soldiers()) {
+        CHECK(s.owner == 3);
     }
 }
 

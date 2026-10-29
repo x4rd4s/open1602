@@ -704,7 +704,7 @@ private:
         bool found = false;                     ///< land within 4 tiles on an island without an own city
         std::optional<sim::CostBuilding> yard;  ///< an own shipyard in reach
         sim::ExploreState explore = sim::ExploreState::NotAllowed;
-        bool pirates = false;                                        ///< at the pirates' Kontor
+        bool pirates = false;                                        ///< at the pirates' Kontor (and trade)
         std::optional<std::pair<std::uint16_t, std::uint8_t>> city;  ///< the Kontor's city
     };
 
@@ -756,7 +756,10 @@ private:
             } else if (city.owner == ship.owner) {
                 k.own_kontor = true;
             } else if (owner != nullptr && w.behaviour(*owner) == sim::FactionBehaviour::Pirates) {
+                // Dealing with the pirates, and with a trade treaty (players start with one) trading
+                // at their Kontor as at any other (both buttons, as in the original).
                 k.pirates = true;
+                k.foreign_kontor = w.diplomacy().may_trade(ship.owner, city.owner);
             } else if (w.diplomacy().may_trade(ship.owner, city.owner)) {  // natives too: by treaty
                 k.foreign_kontor = true;
             }

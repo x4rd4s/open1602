@@ -18,6 +18,8 @@ namespace {
 constexpr std::uint16_t kMessageMissionAccomplished = 0x54;
 /// „Ein vergrabener Schatz wurde entdeckt!“ (MELDUNG 0x2E).
 constexpr std::uint16_t kMessageTreasure = 0x2E;
+/// „Ein Schiff steht zum Verkauf“ (MELDUNG 0x0A): its icon tells of a sold ship too.
+constexpr std::uint16_t kMessageShipForSale = 0x0A;
 
 /// A message, with where it happened and the player it is about.
 Announcement announce(std::uint16_t message, std::optional<std::pair<double, double>> tile = std::nullopt,
@@ -226,10 +228,31 @@ std::vector<Notice> EventPresenter::city_events(const sim::World& world, sim::Pl
     return out;
 }
 
-void EventPresenter::ship_events(const sim::World& world, sim::PlayerId local,
-                                 const std::vector<sim::ShipEvent>& events) const {
+std::vector<Notice> EventPresenter::ship_events(const sim::World& world, sim::PlayerId local,
+                                                const std::vector<sim::ShipEvent>& events) const {
     // MELDUNG 0x2A-0x30.
+    std::vector<Notice> out;
     for (const sim::ShipEvent& e : events) {
+        if (e.kind == sim::ShipEvent::Kind::Sold && e.player == local && local != sim::kNoPlayer) {
+            // Open1602: the seller is told who bought the ship, without voice, under the icon of
+            // the offer in the buyer's colour (the original tells nobody).
+            const sim::Ship* ship = world.ship(e.ship);
+            const sim::Player* buyer = world.player(e.city);
+            if (ship == nullptr || buyer == nullptr) {
+                continue;
+            }
+            Announcement a = announce(kMessageShipForSale,
+                                      std::make_pair(ship->pos_x / static_cast<double>(sim::kPosUnit),
+                                                     ship->pos_y / static_cast<double>(sim::kPosUnit)),
+                                      e.city);
+            a.text = ui::tr("message.ship_bought", {player_name(*buyer), ship_name(*ship),
+                                                    std::to_string(std::max<std::int64_t>(e.money, 0))});
+            a.voice = false;
+            out.emplace_back(std::move(a));
+            std::fprintf(stderr, "%s bought the ship %s for %lld\n", m_label(*buyer, e.city).c_str(),
+                         ship_name(*ship).c_str(), static_cast<long long>(e.money));
+            continue;
+        }
         if (e.player != local || e.island >= world.islands().size()) {
             continue;
         }
@@ -257,6 +280,7 @@ void EventPresenter::ship_events(const sim::World& world, sim::PlayerId local,
                 break;
         }
     }
+    return out;
 }
 
 std::vector<Notice> EventPresenter::disaster_events(const sim::World& world, sim::PlayerId local,

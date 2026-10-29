@@ -422,7 +422,10 @@ public:
                 // 0x0043CE00: with a cart on the island the view jumps to it and selects it, else
                 // the next click on the map sends one out from the Kontor (0x004894E0 with 4).
                 if (const sim::Ship* cart = sim::trade_cart_of(c.world(), c.local, city->island)) {
-                    m_request = Request{Request::Kind::SelectShip, cart->id};
+                    Request r{Request::Kind::SelectShip, cart->id};
+                    r.x = cart->x;
+                    r.y = cart->y;
+                    m_request = r;
                 } else {
                     m_cart_pick = true;
                 }

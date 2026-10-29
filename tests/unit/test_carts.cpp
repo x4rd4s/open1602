@@ -154,8 +154,8 @@ TEST_CASE("carts: a city's owner gets one cart per island at the Kontor, for not
     const sim::Ship* cart = land.world.ship(id);
     REQUIRE(cart != nullptr);
     CHECK(cart->cart());
-    CHECK(cart->x == 10);
-    CHECK(cart->y == 14);
+    CHECK(cart->x == 11);  // the middle of the 2 x 2 Kontor at (10, 14)
+    CHECK(cart->y == 15);
     CHECK(cart->owner == 0);
     CHECK(sim::usable_holds(*cart, land.figures) == 3);
     CHECK(cart->health == 14 * 32);
@@ -172,14 +172,32 @@ TEST_CASE("carts: a city's owner gets one cart per island at the Kontor, for not
     CHECK(fleet.request_cart(sim::CartRequest{1, 0, 1, 25, 18}) != 0);
 }
 
+TEST_CASE("carts: a new cart leaves the Kontor from its middle even where houses close one side") {
+    // The Kontor at island (0, 4) on the west coast; houses on its east and south side leave only
+    // the way north, which the middle tile (1, 5) reaches through the Kontor itself.
+    Land land;
+    sim::IslandMap& map = land.world.island(0).map;
+    for (const auto& [x, y] : {std::pair{2, 4}, std::pair{2, 5}, std::pair{2, 6}, std::pair{0, 6}, std::pair{1, 6}}) {
+        REQUIRE(map.place(*land.buildings.by_id(kHouse), x, y, 0, 0, 0, 0).ok());
+    }
+    sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+    const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 15, 11});
+    REQUIRE(id != 0);
+    const auto events = run(fleet, land.world, 1500);
+    CHECK(count(events, sim::ShipEvent::Kind::GaveUp) == 0);
+    const sim::Ship* cart = land.world.ship(id);
+    CHECK(cart->y < 14);  // out of the Kontor (island rows 4 and 5) to the north within 1.5 s
+    CHECK(cart->target == sim::Target::position(15, 11));
+}
+
 TEST_CASE("carts: a cart drives over land to the clicked tile, faster on roads") {
     Land land;
     sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
     const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 18, 15});
     REQUIRE(id != 0);
-    // Round the Kontor and eight tiles of open ground (Wegspeed 64, 6.25 s * 64 / 300 = 1.3 s a
-    // tile straight): about 12.6 s.
-    auto events = run(fleet, land.world, 9000);
+    // From the Kontor's middle one tile at the cost of a building (40) and six tiles of open
+    // ground (Wegspeed 64, 6.25 s * 64 / 300 = 1.3 s a tile straight): about 8.8 s.
+    auto events = run(fleet, land.world, 8000);
     CHECK(count(events, sim::ShipEvent::Kind::Arrived) == 0);
     events = run(fleet, land.world, 8000);
     CHECK(count(events, sim::ShipEvent::Kind::Arrived) == 1);

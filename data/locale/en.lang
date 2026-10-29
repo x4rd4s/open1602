@@ -791,6 +791,7 @@ message.won.purple = The purple player has fulfilled their task!
 message.won.brown = The brown player has fulfilled their task!
 message.rival_war = War: {1} against {2}
 message.rival_peace = Peace: {1} and {2}
+message.ship_bought = {1} has bought your ship {2} for {3} gold
 
 # The game's folder, asked for at the start when none is found (in the system's dialogs, which may
 # lack letters beyond Latin-1: no typographic quotes or ellipsis)

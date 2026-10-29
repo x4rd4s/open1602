@@ -732,6 +732,7 @@ message.won.purple = Der violette Spieler konnte seinen Auftrag erfüllen!
 message.won.brown = Der braune Spieler konnte seinen Auftrag erfüllen!
 message.rival_war = Krieg: {1} gegen {2}
 message.rival_peace = Frieden: {1} und {2}
+message.ship_bought = {1} hat Euer Schiff {2} für {3} Taler gekauft
 
 # The game's folder, asked for at the start when none is found (in the system's dialogs, which may
 # lack letters beyond Latin-1: no typographic quotes or ellipsis)

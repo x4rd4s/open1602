@@ -461,8 +461,8 @@ void Engine::task_settle_site(AiPlayer& p) {
 
 void Engine::free_colony_cargo(AiPlayer& p, Ship& ship, bool computer) {
     // 0x00416A80: the AI's founding goods come from nowhere (the original sends them as raw cargo
-    // messages). Computers: wood and tools up to 50 t, food up to 15 t, bricks 20 t if neither
-    // food nor bricks are aboard. Pirates: food 15 t and bricks up to 20 t.
+    // messages). Wood and tools up to 50 t; computers food up to 15 t and bricks 20 t if neither
+    // food nor bricks are aboard, pirates food 15 t and bricks up to 20 t.
     (void)p;
     const auto& m = m_buildings.materials();
     const std::uint8_t food = m_buildings.food_ware();
@@ -492,10 +492,10 @@ void Engine::free_colony_cargo(AiPlayer& p, Ship& ship, bool computer) {
             }
         }
     };
+    const bool food_or_bricks = ship.load(food) != 0 || ship.load(m.bricks) != 0;
+    top_up(m.wood, 50 * kTon);
+    top_up(m.tools, 50 * kTon);
     if (computer) {
-        const bool food_or_bricks = ship.load(food) != 0 || ship.load(m.bricks) != 0;
-        top_up(m.wood, 50 * kTon);
-        top_up(m.tools, 50 * kTon);
         top_up(food, 15 * kTon);
         if (!food_or_bricks) {
             top_up(m.bricks, 20 * kTon);

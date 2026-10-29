@@ -895,6 +895,8 @@ TEST_CASE("selection panels: the trade cart button asks where a cart goes, then 
     REQUIRE(jump.has_value());
     CHECK(jump->kind == SelectionPanel::Request::Kind::SelectShip);
     CHECK(jump->ship == id);
+    CHECK(jump->x == 9.0);  // where the cart is, not the map's corner
+    CHECK(jump->y == 7.0);
 
     // The cart's window (TRADER.GAD): standing next to the own Kontor, the exchange opens the
     // ship's transfer page; the route button switches the route like the ship's.
@@ -1285,4 +1287,49 @@ TEST_CASE("selection panels: the ship window gives the orders of a ship at sea a
     CHECK(buy->op == sim::ShipCommand::Op::Buy);
     CHECK(buy->ship == bargain.ship);
     CHECK(buy->player == kLocal);
+}
+
+TEST_CASE("selection panels: at the pirates' Kontor a ship trades and deals with the pirates") {
+    Game g("o1602-test-selection-pirates");
+    Town t;
+    std::vector<sim::Player> players = t.world.players();
+    sim::make_neutral(players[kOther], sim::faction::kPirates);
+    t.world.set_players(players);
+    add_city(t.world, 4, kOther, "Nest");
+    t.world.city(0, 4)->warehouse_x = 6;
+    t.world.city(0, 4)->warehouse_y = 5;
+    t.world.add_ship(sim::make_ship("Pioneer", 11, 12, 0, kLocal));  // below the Kontor at world (10, 9)
+    sim::Simulation simulation(t.world, t.buildings, t.figures);
+    SelectionPanels panels(*g.dir);
+    const PanelContext c{simulation, t.buildings, t.figures, &g.texts, kLocal};
+    Selection s;
+    s.kind = Selection::Kind::Ship;
+    s.ship = t.world.ships().back().id;
+    s.serial = 1;
+    SelectionPanel* p = panels.panel_for(s, c);
+    REQUIRE(p != nullptr);
+    p->refresh(s, c);
+    const ui::Panel* root = &p->panel();
+    std::vector<sim::Command> out;
+    // With the trade treaty players start with, the trade page opens and stays open.
+    t.world.diplomacy().relation(kLocal, kOther).trade = sim::Treaty::Signed;
+    t.world.diplomacy().relation(kOther, kLocal).trade = sim::Treaty::Signed;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 38005}, s, c, out);
+    p->refresh(s, c);
+    CHECK(&p->panel() != root);
+    CHECK(p->back());
+    CHECK(&p->panel() == root);
+    // The pirates' own page too.
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 38019}, s, c, out);
+    p->refresh(s, c);
+    const ui::Panel* pirates = &p->panel();
+    CHECK(pirates != root);
+    CHECK(p->back());
+    // Without a treaty, no trade.
+    t.world.diplomacy().relation(kLocal, kOther).trade = sim::Treaty::None;
+    t.world.diplomacy().relation(kOther, kLocal).trade = sim::Treaty::None;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 38005}, s, c, out);
+    p->refresh(s, c);
+    CHECK(&p->panel() == root);
+    CHECK(out.empty());
 }
