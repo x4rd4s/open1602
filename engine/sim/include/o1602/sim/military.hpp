@@ -166,7 +166,7 @@ public:
         return r;
     }
 
-    /// The natives' city tick (every 10 s, 0x0047EB30): warriors come out of the village's first
+    /// The natives' city tick (every 10 s): warriors come out of the village's first
     /// hut, three every 30 s, seven every 10 s for ten minutes after their village was attacked.
     /// Each goes to the first road or bridge of the village that a search within 7 tiles of the
     /// hut reaches (warrior_target()); a hut without one sends nobody. Every place of the hut looked

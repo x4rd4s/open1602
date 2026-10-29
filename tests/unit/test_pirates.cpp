@@ -626,7 +626,7 @@ TEST_CASE("natives: without a road of theirs within 7 tiles no warrior comes out
 
 TEST_CASE("natives: the empty huts of a new game recruit warriors, who then come out") {
     // The village templates bring their huts without warriors; every place the tick looks at
-    // recruits one (op 0x10), as in the original, and the trained ones go out later.
+    // recruits one, as in the original, and the trained ones go out later.
     World w(false);
     add_village(w, {{8, 5, 3}}, false);
     w.military->natives_tick();

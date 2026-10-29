@@ -400,7 +400,7 @@ void Military::natives_tick() {
             const CastleSlot fresh{b->type->worker_figure, true, true,
                                    recruit != nullptr ? recruit->combat.max_health : 0U, 0};
             // From the last place backwards: a trained warrior goes out, and every place looked at
-            // recruits a new one, into the place left or a free one (op 0x10), so that the huts of
+            // recruits a new one, into the place left or a free one, so that the huts of
             // a new game, which start empty, fill up. The map does not change in this loop, so the
             // hut's target is searched once.
             const std::size_t places = std::max<std::size_t>(b->type->max_wares, hut.slots.size());
