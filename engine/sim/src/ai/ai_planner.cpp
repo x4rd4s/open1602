@@ -1394,18 +1394,26 @@ bool Engine::need_iron_mine(AiPlayer& p, std::uint32_t n) {
         return false;
     }
     bool usable = false;
+    std::int32_t free_x = -1;
+    std::int32_t free_y = -1;
     for (const auto& d : island_of(c->island).header.deposits) {
         if (d.ware == ware::kOre && d.amount > 0 &&
             (d.kind == 1 || d.amount >= 120 * kTon || player(p).unlocked(infra::kLevel3F))) {
-            usable = true;
+            usable = usable || reachable_deposit(p, d, free_x, free_y);
         }
     }
-    if (!usable) {
+    if (!usable && free_x < 0) {
         s.attempts = 2;
         return false;
     }
     const assets::BuildingType* b = by_id(id::kOreMine);
-    if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b)) {
+    if (b == nullptr || !unlocked(p, *b)) {
+        return false;
+    }
+    if (!usable) {
+        return claim_land(p, kSlotIronMine, free_x, free_y);
+    }
+    if (!affordable(p, *c, *b)) {
         return false;
     }
     if (plan_building(p, kIronMine, *b, kSlotIronMine, false, true)) {
@@ -1426,20 +1434,76 @@ bool Engine::need_gold_mine(AiPlayer& p) {
         return false;
     }
     bool usable = false;
+    std::int32_t free_x = -1;
+    std::int32_t free_y = -1;
     for (const auto& d : island_of(c->island).header.deposits) {
-        usable = usable || (d.ware == ware::kGold && d.amount > 0);
+        if (d.ware == ware::kGold && d.amount > 0) {
+            usable = usable || reachable_deposit(p, d, free_x, free_y);
+        }
     }
-    if (!usable) {
+    if (!usable && free_x < 0) {
         s.attempts = 2;
         return false;
     }
     const assets::BuildingType* b = by_id(id::kGoldMine);
-    if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b)) {
+    if (b == nullptr || !unlocked(p, *b)) {
+        return false;
+    }
+    if (!usable) {
+        return claim_land(p, kSlotGoldMine, free_x, free_y);
+    }
+    if (!affordable(p, *c, *b)) {
         return false;
     }
     if (plan_building(p, kGoldMine, *b, kSlotGoldMine, false, true)) {
         reserve(p, *b);
     }
+    return true;
+}
+
+bool Engine::reachable_deposit(AiPlayer& p, const assets::IslandHeader::Deposit& d, std::int32_t& free_x,
+                               std::int32_t& free_y) {
+    // The original's mine search binds any deposit of the island to the mountain it finds (S-093),
+    // so for it every deposit counts. Open1602's stays where it lies: one in another city's land
+    // is not searched for, one on free land is claimed first (claim_land).
+    if (classic()) {
+        return true;
+    }
+    std::int32_t x = -1;
+    std::int32_t y = -1;
+    switch (deposit_access(p, d, x, y)) {
+        case DepositAccess::Own:
+            return true;
+        case DepositAccess::Free:
+            if (free_x < 0) {
+                free_x = x;
+                free_y = y;
+            }
+            return false;
+        case DepositAccess::Closed:
+            return false;
+    }
+    return false;
+}
+
+bool Engine::claim_land(AiPlayer& p, std::uint8_t slot, std::int32_t x, std::int32_t y) {
+    // Open1602: a market that brings the free slope (x, y) into the city's land, or comes nearer
+    // to it (task kClaimLand). A failed search counts against the mine's slot, so a deposit that
+    // cannot be reached is given up like a mine without a site.
+    City* c = current_city(p);
+    const assets::BuildingType* b = by_id(id::kMarket);
+    if (c == nullptr || b == nullptr || !affordable(p, *c, *b)) {
+        return false;
+    }
+    if (!push(p, kClaimLand, false)) {
+        return false;
+    }
+    start_search(p, *b, slot, true);
+    p.search.target_x = x;
+    p.search.target_y = y;
+    p.search.extra = market_distance(p, x, y);
+    reserve(p, *b);
+    log(p, "claim land towards %d,%d for slot %u (nearest market %d)", x, y, slot, p.search.extra);
     return true;
 }
 

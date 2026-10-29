@@ -188,6 +188,10 @@ void io(A& a, Search& s) {
     a(s.rotation);
     a(s.stub_x);
     a(s.stub_y);
+    if (a.version() >= 4) {
+        a(s.target_x);
+        a(s.target_y);
+    }
 }
 
 template <class A>

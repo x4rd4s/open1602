@@ -123,7 +123,7 @@ bool Engine::accepts(const State& state) const {
         }
         for (std::size_t i = 0; i < p.stack.size(); ++i) {
             const std::uint8_t task = p.stack[i];
-            if (task < kSettleArea || task > kDenkmal ||
+            if (task < kSettleArea || task > kClaimLand ||
                 std::find(p.stack.begin(), p.stack.begin() + static_cast<std::ptrdiff_t>(i), task) !=
                     p.stack.begin() + static_cast<std::ptrdiff_t>(i)) {
                 return false;
@@ -131,7 +131,8 @@ bool Engine::accepts(const State& state) const {
         }
         const Search& s = p.search;
         if (s.segment < 0 || s.slot >= kSlots || s.remaining < -kMaxSpan || s.remaining > kMaxSpan ||
-            s.extra < -kMaxSpan || s.extra > kMaxSpan) {
+            s.extra < -kMaxSpan || s.extra > kMaxSpan || s.target_x < -1 || s.target_x > kMaxSpan || s.target_y < -1 ||
+            s.target_y > kMaxSpan) {
             return false;
         }
     }
@@ -308,6 +309,9 @@ void Engine::run_task(AiPlayer& p) {
             break;
         case kTowers:
             task_towers(p);
+            break;
+        case kClaimLand:
+            task_claim_land(p);
             break;
         case kPirateHouses:
             if (p.pirates) {
@@ -573,6 +577,32 @@ void Engine::city_founded(std::uint16_t island, std::uint8_t index) {
     }
 }
 
+void Engine::land_freed(std::uint16_t island) {
+    // Open1602: the original learns of new land only at its hourly new start or after a long new
+    // road; until then a site search that failed six times stays given up. The cities on the
+    // island forget their failures, so a deposit or field that lay on the lost city's land is
+    // looked for at their next turn.
+    if (classic()) {
+        return;
+    }
+    for (AiPlayer& p : m_state.players) {
+        if (p.pirates) {
+            continue;
+        }
+        for (CityPlan& r : p.plans) {
+            if (r.island != island) {
+                continue;
+            }
+            for (SlotState& s : r.slots) {
+                s.attempts = 0;
+                s.fail_level = 0;
+            }
+            r.flags &= ~city_flag::kMarket;
+            log(p, "land freed on island %u: city %u searches its sites anew", island, r.city);
+        }
+    }
+}
+
 void Engine::founding_query(PlayerId asker, std::uint16_t island) {
     // 0x004294C0 with order 0x4C: the computer of the first city on the island (0x00429470: its city
     // slots in order, player kind 0x0C) answers, at peace with the asker and on any but a large
@@ -730,6 +760,10 @@ bool ComputerPlayers::directs(std::uint32_t ship) const {
 
 void ComputerPlayers::city_founded(std::uint16_t island, std::uint8_t city) {
     m_engine->city_founded(island, city);
+}
+
+void ComputerPlayers::land_freed(std::uint16_t island) {
+    m_engine->land_freed(island);
 }
 
 void ComputerPlayers::founding_query(PlayerId asker, std::uint16_t island) {

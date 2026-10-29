@@ -141,6 +141,14 @@ enum class RingFilter : std::uint8_t {
     Any,       ///< everything (0x00410C90)
 };
 
+/// How a city reaches a deposit of its island (Open1602, Engine::deposit_access): a mine needs a
+/// slope at the deposit's mountain in the city's land.
+enum class DepositAccess : std::uint8_t {
+    Own,     ///< a slope at the mountain is the city's
+    Free,    ///< none is, but one lies on free land: a market can bring it in
+    Closed,  ///< every slope there belongs to another city
+};
+
 /// A Need of the stage handlers (0x0041FE60..0x00422610): what to build and when.
 enum class NeedType : std::uint8_t { A, B, C, D };
 
@@ -337,6 +345,11 @@ private:
     bool need_castle(AiPlayer& p);
     bool need_iron_mine(AiPlayer& p, std::uint32_t n);
     bool need_gold_mine(AiPlayer& p);
+    /// Whether the current city can mine deposit `d` from its land; one it could claim first
+    /// leaves its free slope in `free_x`, `free_y` unless an earlier one did.
+    bool reachable_deposit(AiPlayer& p, const assets::IslandHeader::Deposit& d, std::int32_t& free_x,
+                           std::int32_t& free_y);
+    bool claim_land(AiPlayer& p, std::uint8_t slot, std::int32_t x, std::int32_t y);
     bool need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov);
     bool processing(AiPlayer& p);
     bool iron_tools(AiPlayer& p);
@@ -369,6 +382,11 @@ private:
     bool search_grain(AiPlayer& p);
     bool search_hunter(AiPlayer& p);
     bool search_market(AiPlayer& p);
+    bool search_claim(AiPlayer& p);
+    bool mine_path(AiPlayer& p, std::uint8_t ware, std::vector<BuildItem>& road);
+    [[nodiscard]] DepositAccess deposit_access(const AiPlayer& p, const assets::IslandHeader::Deposit& d,
+                                               std::int32_t& free_x, std::int32_t& free_y);
+    [[nodiscard]] std::int32_t market_distance(const AiPlayer& p, std::int32_t x, std::int32_t y);
     bool search_public(AiPlayer& p);
     bool search_military(AiPlayer& p);
     bool search_denkmal(AiPlayer& p);
@@ -461,6 +479,7 @@ private:
 public:
     [[nodiscard]] bool directs(std::uint32_t ship) const;
     void city_founded(std::uint16_t island, std::uint8_t city);
+    void land_freed(std::uint16_t island);
     void founding_query(PlayerId asker, std::uint16_t island);
 
 private:
@@ -472,6 +491,7 @@ private:
     void task_public(AiPlayer& p, std::uint8_t task);
     void task_market(AiPlayer& p);
     void task_mine(AiPlayer& p);
+    void task_claim_land(AiPlayer& p);
     void task_fisher(AiPlayer& p);
     void task_shipyard(AiPlayer& p);
     void task_shipyard_upgrade(AiPlayer& p);

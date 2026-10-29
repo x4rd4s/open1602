@@ -2319,9 +2319,40 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
     if (!b || b->origin.x != origin.x || b->origin.y != origin.y) {
         return false;
     }
+    const MapCell& cell =
+        world.islands()[island].map.top(static_cast<std::uint32_t>(origin.x), static_cast<std::uint32_t>(origin.y));
+    const bool natives = b->city != MapCell::kNoCity && world.acts_as(cell.owner, FactionBehaviour::Natives);
     Builder builder(world, buildings, island, events);
     builder.destroy(*b);
+    if (natives && native_village_gone(world, buildings, island, b->city)) {
+        // Open1602: a village without its chief's house, market and huts is gone, and its land is
+        // free for anybody's market; otherwise the ruin of the chief's house would hold it like a
+        // destroyed Kontor.
+        builder.dissolve_city(b->city);
+    }
     builder.finish();
+    return true;
+}
+
+bool native_village_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                         std::uint8_t city) {
+    if (island >= world.islands().size() || world.city(island, city) == nullptr ||
+        !city_defenceless(world, buildings, island, city)) {
+        return false;
+    }
+    const IslandMap& map = world.islands()[island].map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const MapCell& c = map.top(x, y);
+            if (c.empty() || c.city != city) {
+                continue;
+            }
+            const assets::BuildingType* t = buildings.by_sprite(c.sprite);
+            if (t != nullptr && t->prod_kind == prod::kPirateHouse && !t->destroyed) {
+                return false;  // a hut still stands
+            }
+        }
+    }
     return true;
 }
 

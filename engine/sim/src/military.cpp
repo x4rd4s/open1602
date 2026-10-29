@@ -506,11 +506,14 @@ void Military::damage_building(std::uint16_t island, std::uint16_t x, std::uint1
     const Player* owner = m_world->player(victim);
     const bool natives =
         owner != nullptr && m_world->behaviour(*owner) == FactionBehaviour::Natives && city != MapCell::kNoCity;
+    // A village cursed before it is gone curses only once (the dissolved city takes its flag along).
+    const City* village = natives ? m_world->city(island, city) : nullptr;
+    const bool cursed_before = village != nullptr && village->cursed;
     if (destroy_building(*m_world, *m_buildings, island, {ox, oy}, construction)) {
         m_events.push_back(MilitaryEvent{MilitaryEvent::Kind::BuildingDestroyed, {}, what, attacker, victim});
         m_combat->island_changed(island);
         update_towers(island);
-        if (natives) {
+        if (natives && !cursed_before) {
             curse(island, city, m_world->city(island, city) == nullptr);
         }
     }

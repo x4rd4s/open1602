@@ -783,9 +783,12 @@ void Simulation::handle(const std::vector<ConstructionEvent>& events, std::size_
                 m_world->reveal_islands(m_rules.reveal, e.island);
                 storage = true;
                 break;
+            case ConstructionEvent::Kind::CityDissolved:
+                m_ai.land_freed(e.island);
+                storage = true;
+                break;
             case ConstructionEvent::Kind::StorageChanged:
             case ConstructionEvent::Kind::CityTaken:
-            case ConstructionEvent::Kind::CityDissolved:
                 storage = true;
                 break;
             case ConstructionEvent::Kind::Placed:
