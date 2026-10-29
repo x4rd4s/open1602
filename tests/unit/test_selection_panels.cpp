@@ -895,6 +895,8 @@ TEST_CASE("selection panels: the trade cart button asks where a cart goes, then 
     REQUIRE(jump.has_value());
     CHECK(jump->kind == SelectionPanel::Request::Kind::SelectShip);
     CHECK(jump->ship == id);
+    CHECK(jump->x == 9.0);  // where the cart is, not the map's corner
+    CHECK(jump->y == 7.0);
 
     // The cart's window (TRADER.GAD): standing next to the own Kontor, the exchange opens the
     // ship's transfer page; the route button switches the route like the ship's.
