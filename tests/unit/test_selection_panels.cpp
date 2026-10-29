@@ -740,6 +740,25 @@ TEST_CASE("selection panels: the castle window recruits, shows the training and 
     CHECK(release->op == sim::CastleOrder::Op::Release);
     CHECK(release->slot == 1);
     CHECK(release->spot == sim::Target::spot(7, 9));
+
+    // With Shift on the arrow (or at the pick) every trained unit goes (Open1602); the help says so.
+    out.clear();
+    PanelContext shifted = c;
+    shifted.shift = true;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 40004}, castle, shifted, out);
+    p->picked(3, 4, castle, c, out);
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 40004}, castle, c, out);
+    p->picked(3, 4, castle, shifted, out);
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 40004}, castle, c, out);
+    p->picked(3, 4, castle, c, out);
+    REQUIRE(out.size() == 3);
+    CHECK(std::get<sim::CastleOrder>(out[0]).op == sim::CastleOrder::Op::ReleaseAll);
+    CHECK(std::get<sim::CastleOrder>(out[0]).spot == sim::Target::spot(7, 9));
+    CHECK(std::get<sim::CastleOrder>(out[1]).op == sim::CastleOrder::Op::ReleaseAll);
+    CHECK(std::get<sim::CastleOrder>(out[2]).op == sim::CastleOrder::Op::Release);
+    const auto arrow = p->help(40004, castle, c);
+    REQUIRE(arrow);
+    CHECK(arrow->find("Shift+click") != std::string::npos);
 }
 
 TEST_CASE("selection panels: the own Kontor shows the city, edits its trade list and opens the stock") {

@@ -56,6 +56,10 @@ struct KeyHelpEntry {
 [[nodiscard]] std::array<KeyHelpPage, kKeyHelpPages> key_help_pages(
     const std::vector<KeyHelpEntry>& entries, const std::function<std::string(ui::KeyAction)>& label);
 
+/// Adds the clicks with a modifier that windows know and no key binding names (Shift on the castle's
+/// send-out arrow, on cannons in a ship's hold) to the units of the units and ships page.
+void add_click_lines(std::array<KeyHelpPage, kKeyHelpPages>& pages);
+
 /// The rows line `line` of section `section` takes: its text wrapped to the width of its column.
 /// Without one every line takes one row.
 using KeyHelpHeight = std::function<std::size_t(std::size_t section, std::size_t line)>;

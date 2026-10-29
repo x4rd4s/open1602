@@ -144,20 +144,46 @@ bool Military::castle(const CastleOrder& o) {
             if (!cell) {
                 return false;
             }
-            const CastleSlot slot = c->slots[o.slot];
-            Soldier s;
-            s.place_cell(cell->first, cell->second);
-            s.figure = slot.figure;
-            s.owner = owner;
-            s.island = o.island;
-            s.health = slot.health;
-            s.anim = 1;
-            s.home = Target::building(o.island, o.x, o.y);
-            if (!o.spot.empty() && target_valid(o.spot)) {
-                s.target = o.spot;
+            release(*c, o.slot, *cell, owner, o.spot);
+            return true;
+        }
+        case CastleOrder::Op::ReleaseAll: {
+            // Open1602: all trained units at once, in a block around the spot. The block is fixed
+            // here, not taken from the formations of the figure data, which may differ between the
+            // computers of a multiplayer game.
+            const auto cell = exit_cell(o.island, o.x, o.y);
+            if (!cell) {
+                return false;
             }
-            m_world->add_soldier(s);
-            c->slots.erase(c->slots.begin() + o.slot);
+            SoldierOrder group;
+            group.player = owner;
+            group.target = o.spot;
+            for (std::size_t i = 0; i < c->slots.size();) {
+                if (c->slots[i].training) {
+                    ++i;
+                } else {
+                    group.soldiers.push_back(release(*c, i, *cell, owner, o.spot));  // the place goes
+                }
+            }
+            if (group.soldiers.empty()) {
+                return false;
+            }
+            if (o.spot.kind == Target::Kind::Spot && group.soldiers.size() > 1) {
+                // Rows of `columns` units a tile apart (offsets in 1/8 tile), centred on the spot.
+                const auto n = static_cast<std::int32_t>(group.soldiers.size());
+                std::int32_t columns = 1;
+                while (columns * columns < n) {
+                    ++columns;
+                }
+                const std::int32_t rows = (n + columns - 1) / columns;
+                for (std::int32_t i = 0; i < n; ++i) {
+                    group.offsets.emplace_back(static_cast<std::int16_t>(8 * (i % columns) - 4 * (columns - 1)),
+                                               static_cast<std::int16_t>(8 * (i / columns) - 4 * (rows - 1)));
+                }
+            }
+            if (!o.spot.empty() && target_valid(o.spot)) {
+                order(group);
+            }
             return true;
         }
         case CastleOrder::Op::Cancel: {
@@ -182,6 +208,25 @@ bool Military::castle(const CastleOrder& o) {
         }
     }
     return false;
+}
+
+std::uint32_t Military::release(CostBuilding& c, std::size_t slot, std::pair<std::int32_t, std::int32_t> cell,
+                                PlayerId owner, const Target& spot) {
+    const CastleSlot unit = c.slots[slot];
+    Soldier s;
+    s.place_cell(cell.first, cell.second);
+    s.figure = unit.figure;
+    s.owner = owner;
+    s.island = c.island;
+    s.health = unit.health;
+    s.anim = 1;
+    s.home = Target::building(c.island, c.x, c.y);
+    if (!spot.empty() && target_valid(spot)) {
+        s.target = spot;
+    }
+    m_world->add_soldier(s);
+    c.slots.erase(c.slots.begin() + static_cast<std::ptrdiff_t>(slot));
+    return m_world->soldiers().back().id;
 }
 
 void Military::castles_tick() {

@@ -15,6 +15,8 @@ constexpr std::uint32_t kMaxOwedMs = kTickMs * sim::Simulation::kMaxTicksPerAdva
 /// command_work() of one item of a build order and one unit of a soldier order, in tiles.
 constexpr std::uint64_t kBuildItemWork = 16;
 constexpr std::uint64_t kSoldierWork = 4;
+/// The most units a castle holds (its places in the castle window).
+constexpr std::uint64_t kCastleUnits = 9;
 
 }  // namespace
 
@@ -41,6 +43,10 @@ std::uint64_t command_work(const sim::World& world, const sim::Command& command)
     }
     if (const auto* soldiers = std::get_if<sim::SoldierOrder>(&command)) {
         return 1 + soldiers->soldiers.size() * kSoldierWork;
+    }
+    if (const auto* castle = std::get_if<sim::CastleOrder>(&command);
+        castle != nullptr && castle->op == sim::CastleOrder::Op::ReleaseAll) {
+        return 1 + kCastleUnits * kSoldierWork;  // every unit of a full castle sent as a group
     }
     return 1;
 }

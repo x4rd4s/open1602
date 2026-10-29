@@ -203,7 +203,7 @@ void io(A& a, T& t)
     a(t.island);
     a(t.x);
     a(t.y);
-    a.enumeration(t.op, CastleOrder::Op::Cancel);
+    a.enumeration(t.op, CastleOrder::Op::ReleaseAll);
     a(t.figure);
     a(t.slot);
     a(t.spot);

@@ -74,6 +74,9 @@ struct CastleOrder {
         Recruit,  ///< train a unit of `figure` (SOLDAT1, KAVALERIE1, MUSKETIER1, KANONIER1)
         Release,  ///< send the trained unit of `slot` out, walking to `spot`
         Cancel,   ///< give up the unit of `slot`; paid weapons come back as far as it is healthy
+        /// Open1602: every trained unit leaves at once and the group lines up in a block around
+        /// `spot` (the units in training stay)
+        ReleaseAll,
     };
     PlayerId player = kNoPlayer;
     std::uint16_t island = 0;
@@ -253,6 +256,9 @@ private:
     [[nodiscard]] CostBuilding* castle_at(std::uint16_t island, std::uint16_t x, std::uint16_t y);
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> exit_cell(std::uint16_t island, std::uint16_t x,
                                                                                  std::uint16_t y) const;
+    /// The unit of `slot` (trained) out of castle `c` at `cell`, walking to `spot`; its id.
+    std::uint32_t release(CostBuilding& c, std::size_t slot, std::pair<std::int32_t, std::int32_t> cell, PlayerId owner,
+                          const Target& spot);
     bool board(Soldier& s, Ship& ship);
 
     // Towers (towers.cpp)

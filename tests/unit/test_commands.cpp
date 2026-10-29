@@ -136,6 +136,10 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     const auto mounted = std::get<sim::ShipCommand>(*sim::decode_command(sim::encode_command(mount)));
     CHECK(mounted.op == sim::ShipCommand::Op::MountCannon);
     CHECK(mounted.count == sim::ShipCommand::kAllCannons);
+    const sim::CastleOrder all_out{1, 2, 3, 4, sim::CastleOrder::Op::ReleaseAll, 0, 0, sim::Target::spot(9, 8)};
+    const auto sent = std::get<sim::CastleOrder>(*sim::decode_command(sim::encode_command(all_out)));
+    CHECK(sent.op == sim::CastleOrder::Op::ReleaseAll);
+    CHECK(sent.spot == sim::Target::spot(9, 8));
     const auto gates = std::get<sim::GateOrder>(*sim::decode_command(sim::encode_command(all[all.size() - 2])));
     CHECK(gates.player == 1);
     CHECK(gates.closed);
