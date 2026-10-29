@@ -232,6 +232,11 @@ bool Fleet::plan_cart(Ship& ship) {
     m_cart_paths.begin(map, *m_buildings, area, WalkClass::Land, type != nullptr ? type->speed_type : 2U, false);
     const auto ox = static_cast<std::int32_t>(isl.x);
     const auto oy = static_cast<std::int32_t>(isl.y);
+    // The building it stands in (the Kontor it set off from) is open to it, so that it can leave
+    // it from the middle.
+    if (const auto b = building_at(*m_world, *m_buildings, *island, {ship.x - ox, ship.y - oy})) {
+        m_cart_paths.open_footprint(b->origin, b->width, b->height);
+    }
     const auto goal_near = [&](std::int32_t x, std::int32_t y, std::int32_t reach) {
         for (std::int32_t dy = -reach; dy <= reach; ++dy) {
             for (std::int32_t dx = -reach; dx <= reach; ++dx) {
