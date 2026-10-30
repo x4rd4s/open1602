@@ -240,8 +240,8 @@ struct Lobby {
     std::vector<sim::BannerId> banners;
     /// The computer plays the slots of persons who left the running game (SessionConfig).
     bool computer_takes_over = true;
-    /// Only the host pauses and resumes the game; the others' pauses are refused (MS-20).
-    bool host_pauses_only = false;
+    /// Only the host pauses, resumes and sets the speed; the others are refused (MS-20).
+    bool host_controls_speed = false;
     /// Spectators may write in the chat, to everyone (they read the lines to everyone in any case).
     bool spectators_chat = true;
     friend bool operator==(const Lobby&, const Lobby&) = default;

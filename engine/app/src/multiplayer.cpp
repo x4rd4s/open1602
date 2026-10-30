@@ -261,8 +261,8 @@ void MapViewer::apply_session_events() {
             case net::SessionEvent::Kind::Reconnecting:
                 session_line(MpText::Reconnecting);
                 break;
-            case net::SessionEvent::Kind::PauseRefused:
-                session_line(MpText::PauseRefused);
+            case net::SessionEvent::Kind::SpeedRefused:
+                session_line(MpText::SpeedRefused);
                 break;
             case net::SessionEvent::Kind::PackageKept:
                 session_line(MpText::PackageKept, core::utf8_to_cp1252(assets::package_label(e.packages.at(0))));
@@ -643,7 +643,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     config.spectators = setup.spectators;
     config.spectators_chat = setup.spectators_chat;
     config.computer_takes_over = setup.computer_takes_over;
-    config.host_pauses_only = setup.host_pauses_only;
+    config.host_controls_speed = setup.host_controls_speed;
     auto transport = net::enet_listen(setup.port);
     if (!transport) {
         return transport.error();

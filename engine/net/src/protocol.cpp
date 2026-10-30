@@ -133,7 +133,7 @@ void put(core::ByteWriter& out, const Lobby& m) {
         out.u16(b);
     }
     out.boolean(m.computer_takes_over);
-    out.boolean(m.host_pauses_only);
+    out.boolean(m.host_controls_speed);
     out.boolean(m.spectators_chat);
 }
 
@@ -370,7 +370,7 @@ Lobby get_lobby(In& in) {
         m.banners.push_back(in.u16());
     }
     m.computer_takes_over = in.boolean();
-    m.host_pauses_only = in.boolean();
+    m.host_controls_speed = in.boolean();
     m.spectators_chat = in.boolean();
     return m;
 }
