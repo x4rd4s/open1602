@@ -108,19 +108,49 @@ const Ship* trade_cart_of(const World& world, PlayerId player, std::uint16_t isl
     return nullptr;
 }
 
+std::vector<const Ship*> trade_carts_of(const World& world, PlayerId player, std::uint16_t island) {
+    std::vector<const Ship*> carts;
+    for (const Ship& s : world.ships()) {
+        if (s.cart() && s.owner == player && !s.sinking && island_of(world, s.x, s.y) == island) {
+            carts.push_back(&s);
+        }
+    }
+    return carts;
+}
+
+std::uint32_t cart_places(const World& world, const assets::BuildingTable& buildings, PlayerId player,
+                          std::uint16_t island) {
+    if (island >= world.islands().size()) {
+        return 0;
+    }
+    const IslandMap& map = world.islands()[island].map;
+    std::uint32_t n = 0;
+    for (const Production& p : world.productions()) {
+        if (p.used && p.island == island && map.contains(p.x, p.y) && map.top(p.x, p.y).owner == player &&
+            trades_there(building_on(map, buildings, p.x, p.y))) {
+            ++n;
+        }
+    }
+    return n;
+}
+
 const Ship* Fleet::cart_of(PlayerId player, std::uint16_t island) const {
     return trade_cart_of(*m_world, player, island);
 }
 
 std::uint32_t Fleet::request_cart(const CartRequest& r) {
-    // 0x00440AC0 and CreateCart 0x00449300: at the city's Kontor, for its owner, one per island.
+    // At the city's Kontor or market, for its owner, one per island (Open1602: Rules::more_carts).
     City* city = m_world->city(r.island, r.city);
     const Player* player = m_world->player(r.player);
     if (city == nullptr || player == nullptr || !player->active() ||
         (player->role != PlayerRole::Human && player->role != PlayerRole::Computer) || city->owner != r.player ||
-        !city->warehouse_x || !city->warehouse_y || r.island >= m_world->islands().size() ||
-        cart_of(r.player, r.island) != nullptr) {
+        !city->warehouse_x || !city->warehouse_y || r.island >= m_world->islands().size()) {
         return 0;
+    }
+    if (cart_of(r.player, r.island) != nullptr && (!r.another || !m_rules->more_carts ||
+                                                   trade_carts_of(*m_world, r.player, r.island).size() >=
+                                                       cart_places(*m_world, *m_buildings, r.player, r.island))) {
+        return 0;  // one per island, or in Open1602 one for each Kontor and market there
     }
     const assets::FigureType* type = m_figures->get(figure::kTradeCart);
     if (type == nullptr) {
@@ -132,12 +162,20 @@ std::uint32_t Fleet::request_cart(const CartRequest& r) {
     if ((r.x == sx && r.y == sy) || island_of(*m_world, r.x, r.y) != r.island) {
         return 0;  // a click on the Kontor itself sends nothing out; only to a tile of its island
     }
-    // It sets off from the middle of the Kontor (origin + half its footprint), as in the original.
+    // It sets off from the middle (origin + half its footprint) of the Kontor, or of the city's
+    // market whose window asked for it, as in the original.
+    TilePos from{static_cast<std::int32_t>(*city->warehouse_x), static_cast<std::int32_t>(*city->warehouse_y)};
+    if (island_of(*m_world, r.from_x, r.from_y) == r.island) {
+        const TilePos at{static_cast<std::int32_t>(r.from_x) - static_cast<std::int32_t>(isl.x),
+                         static_cast<std::int32_t>(r.from_y) - static_cast<std::int32_t>(isl.y)};
+        if (const auto m = building_at(*m_world, *m_buildings, r.island, at);
+            m && m->type->prod_kind == prod::kMarket && m->city == r.city) {
+            from = m->origin;
+        }
+    }
     std::uint32_t cx = sx;
     std::uint32_t cy = sy;
-    if (const auto b = building_at(
-            *m_world, *m_buildings, r.island,
-            {static_cast<std::int32_t>(*city->warehouse_x), static_cast<std::int32_t>(*city->warehouse_y)})) {
+    if (const auto b = building_at(*m_world, *m_buildings, r.island, from)) {
         cx = isl.x + static_cast<std::uint32_t>(b->origin.x) + b->width / 2;
         cy = isl.y + static_cast<std::uint32_t>(b->origin.y) + b->height / 2;
     }

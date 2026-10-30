@@ -127,10 +127,11 @@ information fit in and the controls follow today's real-time strategy games (202
 | R | edit trade route (ship selected) |
 | Delete | disband unit / sink ship (with confirmation) |
 | Shift + click on the castle's send-out arrow | all trained units leave and line up in a block around the spot clicked next; units in training stay |
+| Shift + click on a city window's trade cart button | another trade cart, up to one per Kontor and market of the player on the island (setting „Trade carts per island“); without Shift the button jumps from cart to cart, the nearest first |
 
 Attack-move, hold position, jumping to idle units and sending a castle's units out all at once do not
 exist in the original. The clicks with Shift in windows (send all units out, mount as many cannons as
-fit) are listed with the unit keys in the F1 overview and in the windows' help lines.
+fit, another trade cart) are listed with the unit keys in the F1 overview and in the windows' help lines.
 
 No unit key is also a general key (2026-10-18: attack moved from A to F, stop from
 S to H, and in exchange hold position on G, formation on C, spread out on Shift+C), so W A S D always

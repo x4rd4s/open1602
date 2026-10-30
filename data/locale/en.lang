@@ -73,6 +73,7 @@ keys.heading.view = Display
 keys.click = click
 keys.click.castle_all = Castle, send-out arrow: all trained units
 keys.click.cannons = Cannons in a ship's hold: mount as many as fit
+keys.click.trade_cart = City window, trade cart button: another trade cart (one per Kontor and market)
 # Replaces the digit of a group key ("Ctrl+1" becomes "Ctrl+1 .. 0")
 keys.group_digits = 1 .. 0
 keys.modifier.ctrl = Ctrl+
@@ -312,6 +313,8 @@ ship.default = Ship {1}
 # A hold of cannons in an own ship's window ({1}: the goods, as "10t Cannons")
 ship.cannon_hold = {1} (click: mount one, Shift+click: as many as fit)
 # The castle's send-out arrow ({1}: its help line from the game's texts)
+# The city window's trade cart button while another cart is allowed ({1}: its help line from the game's texts)
+city.cart_more = {1} (Shift+click: another trade cart)
 castle.release = {1} (Shift+click: all trained units, lined up around the spot)
 player.colour.orange = Orange player
 player.colour.purple = Purple player
@@ -424,6 +427,9 @@ setup.ore_veins.endless = Endless
 setup.bread = Bread production
 setup.bread.original = As the original
 setup.bread.revised = Revised
+setup.trade_carts = Trade carts per island
+setup.trade_carts.one = One, as the original
+setup.trade_carts.more = One per Kontor and market
 setup.ships = Ships per player
 setup.units = Units per player
 setup.unlimited = Unlimited

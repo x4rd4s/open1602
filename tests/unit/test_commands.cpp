@@ -82,7 +82,7 @@ std::vector<sim::Command> every_kind() {
     all.emplace_back(sim::PlayerRename{1, "Merlin"});
     all.emplace_back(sim::PlayerControl{1, true});
     all.emplace_back(sim::GateOrder{1, true});
-    all.emplace_back(sim::CartRequest{1, 2, 3, 40, 50});
+    all.emplace_back(sim::CartRequest{1, 2, 3, 40, 50, 41, 52});
     return all;
 }
 
@@ -151,6 +151,8 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     CHECK(cart.city == 3);
     CHECK(cart.x == 40);
     CHECK(cart.y == 50);
+    CHECK(cart.from_x == 41);
+    CHECK(cart.from_y == 52);
 
     // With the tick, as the network carries them, one after another.
     core::ByteWriter out;

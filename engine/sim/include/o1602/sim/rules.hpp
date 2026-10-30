@@ -287,6 +287,11 @@ struct Rules {
     /// nor yard). Off with the original's settings.
     bool computers_buy_ships = true;
 
+    /// Open1602: a player gets more than one trade cart on an island (Shift on the city window's
+    /// cart button), one for each of its Kontors and markets there; the original allows one per
+    /// player and island. Off with the original's settings.
+    bool more_carts = true;
+
     /// Which towns are discovered from the start (players, natives, pirates) or only by ship.
     Reveal reveal = Reveal::Original;
 
@@ -318,6 +323,7 @@ struct Rules {
         r.computer_players = Computers::Game;
         r.revised_bread = false;
         r.computers_buy_ships = false;
+        r.more_carts = false;
         r.reveal = Reveal::Original;
         r.bugs = OriginalBugs::all();
         return r;

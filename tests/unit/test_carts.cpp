@@ -172,6 +172,78 @@ TEST_CASE("carts: a city's owner gets one cart per island at the Kontor, for not
     CHECK(fleet.request_cart(sim::CartRequest{1, 0, 1, 25, 18}) != 0);
 }
 
+TEST_CASE("carts: asked for in a market's window, the cart comes out of that market") {
+    // The market at island (12, 4), world (22, 14): its middle is world (23, 15).
+    Land land;
+    sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+    const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 25, 18, 22, 14});
+    REQUIRE(id != 0);
+    const sim::Ship* cart = land.world.ship(id);
+    CHECK(cart->x == 23);
+    CHECK(cart->y == 15);
+    CHECK(cart->target == sim::Target::position(25, 18));
+    run(fleet, land.world, 1500);
+    CHECK(land.world.ship(id)->y > 15);  // on its way out
+}
+
+TEST_CASE("carts: a market of another city or a tile without a market sends the cart out of the Kontor") {
+    for (const auto& [fx, fy] : {std::pair{37, 14}, std::pair{15, 15}}) {
+        Land land;
+        sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+        const auto from_x = static_cast<std::uint16_t>(fx);
+        const auto from_y = static_cast<std::uint16_t>(fy);
+        const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 20, 18, from_x, from_y});
+        REQUIRE(id != 0);
+        CHECK(land.world.ship(id)->x == 11);  // the middle of the Kontor at (10, 14)
+        CHECK(land.world.ship(id)->y == 15);
+    }
+}
+
+TEST_CASE("carts: with Shift a player gets another cart, one per Kontor and market on the island (Open1602)") {
+    for (const bool more : {true, false}) {
+        Land land;
+        land.rules.more_carts = more;
+        // Player 0's Kontor and market, player 1's Kontor.
+        for (const auto& [x, y] : {std::pair{0, 4}, std::pair{12, 4}, std::pair{27, 4}}) {
+            sim::Production p;
+            p.x = static_cast<std::uint16_t>(x);
+            p.y = static_cast<std::uint16_t>(y);
+            land.world.productions().push_back(p);
+        }
+        CHECK(sim::cart_places(land.world, land.buildings, 0, 0) == 2);
+        CHECK(sim::cart_places(land.world, land.buildings, 1, 0) == 1);
+        sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+        CHECK(fleet.request_cart(sim::CartRequest{0, 0, 0, 20, 18}) != 0);
+        sim::CartRequest another{0, 0, 0, 21, 18, 22, 14};
+        CHECK(fleet.request_cart(sim::CartRequest{0, 0, 0, 21, 18}) == 0);  // without Shift: one
+        another.another = true;
+        CHECK((fleet.request_cart(another) != 0) == more);
+        CHECK(sim::trade_carts_of(land.world, 0, 0).size() == (more ? 2U : 1U));
+        CHECK(fleet.request_cart(another) == 0);  // no third: a Kontor and a market
+        sim::CartRequest east{1, 0, 1, 25, 18};
+        CHECK(fleet.request_cart(east) != 0);
+        east.another = true;
+        CHECK(fleet.request_cart(east) == 0);  // a Kontor only
+    }
+}
+
+TEST_CASE("carts: the rule for more carts is kept in the savegame, off only under its own key") {
+    const assets::BuildingTable buildings = make_buildings();
+    for (const bool more : {false, true}) {
+        sim::World world(60, 40);
+        sim::Rules rules;
+        rules.more_carts = more;
+        world.set_saved_rules(rules);
+        auto bytes = sim::write_game(world, buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, buildings);
+        REQUIRE(loaded.ok());
+        REQUIRE(loaded->saved_rules().has_value());
+        CHECK(loaded->saved_rules()->more_carts == more);
+    }
+    CHECK(!sim::Rules::original().more_carts);
+}
+
 TEST_CASE("carts: a new cart leaves the Kontor from its middle even where houses close one side") {
     // The Kontor at island (0, 4) on the west coast; houses on its east and south side leave only
     // the way north, which the middle tile (1, 5) reaches through the Kontor itself.

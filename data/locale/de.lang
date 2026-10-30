@@ -58,6 +58,7 @@ keys.heading.view = Anzeige
 # Clicks with a modifier in windows (F1, units and ships)
 keys.click = Klick
 keys.click.castle_all = Burg, Aussenden-Pfeil: alle fertigen Einheiten
+keys.click.trade_cart = Stadtfenster, Händlerknopf: ein weiterer fahrender Händler (einer je Kontor und Markt)
 keys.click.cannons = Kanonen im Laderaum: so viele montieren wie Platz haben
 keys.modifier.ctrl = Strg+
 keys.modifier.shift = Umschalt+
@@ -291,6 +292,8 @@ ship.default = Schiff {1}
 # A hold of cannons in an own ship's window ({1}: the goods, as "10t Cannons")
 ship.cannon_hold = {1} (Klick: eine Kanone montieren, Umschalt+Klick: so viele wie Platz haben)
 # The castle's send-out arrow ({1}: its help line from the game's texts)
+# The city window's trade cart button while another cart is allowed ({1}: its help line from the game's texts)
+city.cart_more = {1} (Umschalt+Klick: ein weiterer fahrender Händler)
 castle.release = {1} (Umschalt+Klick: alle fertigen Einheiten, aufgestellt um den Zielpunkt)
 
 # Players five to twelve of a new world, named after their colours
@@ -398,6 +401,9 @@ setup.ore_veins.endless = Unendlich
 setup.bread = Brotproduktion
 setup.bread.original = Wie im Original
 setup.bread.revised = Überarbeitet
+setup.trade_carts = Fahrende Händler je Insel
+setup.trade_carts.one = Einer, wie im Original
+setup.trade_carts.more = Einer je Kontor und Markt
 setup.ships = Schiffe je Spieler
 setup.units = Einheiten je Spieler
 setup.unlimited = Unbegrenzt

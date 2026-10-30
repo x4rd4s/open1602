@@ -882,6 +882,8 @@ TEST_CASE("selection panels: the trade cart button asks where a cart goes, then 
     CHECK(request->city == 3);
     CHECK(request->x == 12);
     CHECK(request->y == 7);
+    CHECK(request->from_x == t.world.islands()[0].x + 4);  // out of the building of this window
+    CHECK(request->from_y == t.world.islands()[0].y + 0);
     out.clear();
     // With a cart on the island it selects the cart and looks at it.
     sim::Ship cart = sim::make_ship("Altair", 9, 7, sim::figure::kTradeCart, kLocal);
@@ -897,6 +899,40 @@ TEST_CASE("selection panels: the trade cart button asks where a cart goes, then 
     CHECK(jump->ship == id);
     CHECK(jump->x == 9.0);  // where the cart is, not the map's corner
     CHECK(jump->y == 7.0);
+
+    // Open1602: with Shift another cart while the player has more Kontors and markets than carts
+    // there (two places here: the Kontor counted twice).
+    for (int i = 0; i < 2; ++i) {
+        sim::Production place;
+        place.x = 4;
+        t.world.productions().push_back(place);
+    }
+    PanelContext shift = c;
+    shift.shift = true;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 43026}, kontor, shift, out);
+    CHECK(p->picking());
+    p->picked(14, 7, kontor, shift, out);
+    REQUIRE(out.size() == 1);
+    CHECK(std::get<sim::CartRequest>(out[0]).another);
+    out.clear();
+    // With two carts each click jumps to the next, the nearest to the Kontor first.
+    sim::Ship second = sim::make_ship("Beteigeuze", 6, 5, sim::figure::kTradeCart, kLocal);
+    second.cargo.resize(3);
+    t.world.add_ship(second);
+    const std::uint32_t near = t.world.ships().back().id;
+    std::vector<std::uint32_t> jumps;
+    for (int i = 0; i < 3; ++i) {
+        p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 43026}, kontor, c, out);
+        const auto to = p->take_request();
+        REQUIRE(to.has_value());
+        jumps.push_back(to->ship);
+    }
+    CHECK((jumps == std::vector<std::uint32_t>{near, id, near}));
+    // No third place: Shift jumps too.
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 43026}, kontor, shift, out);
+    CHECK(!p->picking());
+    CHECK(p->take_request().has_value());
+    CHECK(out.empty());
 
     // The cart's window (TRADER.GAD): standing next to the own Kontor, the exchange opens the
     // ship's transfer page; the route button switches the route like the ship's.

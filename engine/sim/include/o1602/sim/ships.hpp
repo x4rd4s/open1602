@@ -82,8 +82,15 @@ inline constexpr std::uint8_t kCartStops = 4;
 [[nodiscard]] std::vector<std::size_t> cities_near_cart(const World& world, const assets::BuildingTable& buildings,
                                                         std::int32_t wx, std::int32_t wy);
 
-/// The trade cart of `player` on `island` (one per player and island), nullptr if it has none.
+/// The first trade cart of `player` on `island` (one per player and island as in the original; more
+/// with Rules::more_carts), nullptr if it has none.
 [[nodiscard]] const Ship* trade_cart_of(const World& world, PlayerId player, std::uint16_t island);
+/// All trade carts of `player` on `island`, in the order of the world's ships.
+[[nodiscard]] std::vector<const Ship*> trade_carts_of(const World& world, PlayerId player, std::uint16_t island);
+/// Open1602 (Rules::more_carts): how many trade carts `player` may have on `island`, one for each of
+/// its Kontors and markets there.
+[[nodiscard]] std::uint32_t cart_places(const World& world, const assets::BuildingTable& buildings, PlayerId player,
+                                        std::uint16_t island);
 
 /// Whether a world tile lies within reach of a building (0x004670D0): the integer circle of radius
 /// 5 around its centre. Ships trade with a Kontor, are repaired by a shipyard from there.
@@ -227,15 +234,22 @@ struct ShipCommand {
     std::uint8_t count = 1;  ///< MountCannon: cannons at most, kAllCannons = as many as fit
 };
 
-/// "Fahrenden Händler anfordern" (city panel button 43026, 0x00449300): a city's owner without a
-/// trade cart on its island gets one at the city's Kontor, which drives to the world tile `x`, `y`
-/// at once. It costs nothing; one per player and island.
+/// "Fahrenden Händler anfordern" (city panel button 43026): a city's owner without a trade cart on
+/// its island gets one, which comes out of the city's Kontor, or of the market whose window asked
+/// for it, and drives to the world tile `x`, `y` at once, as in the original. It costs nothing; one
+/// per player and island.
 struct CartRequest {
     PlayerId player = kNoPlayer;
     std::uint16_t island = 0;
     std::uint8_t city = 0;
     std::uint16_t x = 0;  ///< world tile
     std::uint16_t y = 0;
+    /// World tile of the city's market it comes out of; 0, 0 or anything else: the Kontor.
+    std::uint16_t from_x = 0;
+    std::uint16_t from_y = 0;
+    /// Open1602 (Rules::more_carts): another cart where the player has one on the island already, up
+    /// to one for each of its Kontors and markets there.
+    bool another = false;
 };
 
 /// Whether and why a ship can explore an island now (the button of the ship panel).
@@ -340,6 +354,7 @@ public:
     bool explore(const ExploreOrder& order);
     /// A new trade cart (carts.cpp); its id, or 0 when the request is refused.
     std::uint32_t request_cart(const CartRequest& request);
+
     /// The trade cart of `player` on `island`, if it has one.
     [[nodiscard]] const Ship* cart_of(PlayerId player, std::uint16_t island) const;
     /// Cannons, cargo overboard, name, sale (ship_orders.cpp).

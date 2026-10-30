@@ -419,15 +419,23 @@ public:
             } else if (e.id == city_ids::kStock) {
                 m_page = Page::Stock;
             } else if (e.id == city_ids::kTrader) {
-                // 0x0043CE00: with a cart on the island the view jumps to it and selects it, else
-                // the next click on the map sends one out from the Kontor (0x004894E0 with 4).
-                if (const sim::Ship* cart = sim::trade_cart_of(c.world(), c.local, city->island)) {
+                // With a cart on the island the view jumps to it and selects it, else the next
+                // click on the map sends one out of this Kontor or market. Open1602: Shift asks for
+                // another while the player has fewer than its Kontors and markets there
+                // (Rules::more_carts), and with several carts each click jumps to the next one,
+                // nearest to this building first.
+                const auto carts = sim::trade_carts_of(c.world(), c.local, city->island);
+                const bool another = c.shift && !carts.empty() && c.simulation.rules().more_carts &&
+                                     carts.size() < sim::cart_places(c.world(), c.buildings, c.local, city->island);
+                if (carts.empty() || another) {
+                    m_cart_pick = true;
+                    m_cart_another = another;
+                } else {
+                    const sim::Ship* cart = next_cart(carts, s, c);
                     Request r{Request::Kind::SelectShip, cart->id};
                     r.x = cart->x;
                     r.y = cart->y;
                     m_request = r;
-                } else {
-                    m_cart_pick = true;
                 }
             } else if (e.id == city_ids::kMaterialLock) {
                 sim::CityOrder o;
@@ -563,8 +571,15 @@ public:
                 case city_ids::kMaterialLock:
                     return line(154 + (city->material_lock ? 1 : 0));
                 case city_ids::kTrader:
-                    // "Fahrenden Händler anfordern" / "Zum fahrenden Händler springen".
-                    return line(sim::trade_cart_of(c.world(), c.local, city->island) != nullptr ? 157 : 156);
+                    // "Fahrenden Händler anfordern" / "Zum fahrenden Händler springen"; Open1602 names
+                    // the Shift click while another cart is allowed (Rules::more_carts).
+                    if (const auto carts = sim::trade_carts_of(c.world(), c.local, city->island); carts.empty()) {
+                        return line(156);
+                    } else if (c.simulation.rules().more_carts &&
+                               carts.size() < sim::cart_places(c.world(), c.buildings, c.local, city->island)) {
+                        return ui::tr("city.cart_more", {help_line(c, 157)});
+                    }
+                    return line(157);
                 default:
                     return std::nullopt;
             }
@@ -620,14 +635,46 @@ public:
                 std::vector<sim::Command>& out) override {
         m_cart_pick = false;
         if (const sim::City* city = city_at(s, c)) {
-            out.emplace_back(sim::CartRequest{c.local, city->island, city->index, static_cast<std::uint16_t>(x),
-                                              static_cast<std::uint16_t>(y)});
+            // Out of the building whose window asked: the Kontor, or a market of the city.
+            sim::CartRequest r{c.local, city->island, city->index, static_cast<std::uint16_t>(x),
+                               static_cast<std::uint16_t>(y)};
+            r.another = std::exchange(m_cart_another, false);
+            if (s.kind == Selection::Kind::Building && s.island < c.world().islands().size()) {
+                const sim::WorldIsland& isl = c.world().islands()[s.island];
+                r.from_x = static_cast<std::uint16_t>(isl.x + s.x);
+                r.from_y = static_cast<std::uint16_t>(isl.y + s.y);
+            }
+            out.emplace_back(r);
         }
     }
     bool back() override { return std::exchange(m_cart_pick, false); }
 
 private:
     enum class Page : std::uint8_t { City, Kontor, Stock };
+
+    /// The cart a click on the cart button jumps to: the one nearest to the selected building on
+    /// the first click, the next nearest on each further click of the same selection, round.
+    const sim::Ship* next_cart(std::vector<const sim::Ship*> carts, const Selection& s, const PanelContext& c) {
+        if (s.serial != m_cart_serial || carts.size() != m_cart_count) {
+            m_cart_serial = s.serial;
+            m_cart_count = carts.size();
+            m_cart_next = 0;
+        }
+        std::int64_t bx = 0;
+        std::int64_t by = 0;
+        if (s.island < c.world().islands().size()) {
+            bx = c.world().islands()[s.island].x + s.x;
+            by = c.world().islands()[s.island].y + s.y;
+        }
+        const auto distance = [&](const sim::Ship* ship) {
+            const std::int64_t dx = std::int64_t{ship->x} - bx;
+            const std::int64_t dy = std::int64_t{ship->y} - by;
+            return dx * dx + dy * dy;
+        };
+        std::stable_sort(carts.begin(), carts.end(),
+                         [&](const sim::Ship* a, const sim::Ship* b) { return distance(a) < distance(b); });
+        return carts[m_cart_next++ % carts.size()];
+    }
 
     [[nodiscard]] sim::TradeSetting::Mode mode() const noexcept {
         return m_sell ? sim::TradeSetting::Mode::Sell : sim::TradeSetting::Mode::Buy;
@@ -765,6 +812,10 @@ private:
     /// The picture of the trade cart button while the city has one, after "anfordern"'s.
     static constexpr std::int32_t kCartIconJump = 2;
     bool m_cart_pick = false;
+    bool m_cart_another = false;  ///< the cart being picked for is another one (Shift)
+    std::uint32_t m_cart_serial = 0;
+    std::size_t m_cart_count = 0;  ///< the carts on the island at the last jump
+    std::size_t m_cart_next = 0;   ///< how often the cart button jumped since
     Page m_page = Page::City;
     bool m_sell = true;
     bool m_picker = false;
