@@ -52,7 +52,7 @@ information fit in and the controls follow today's real-time strategy games (202
 | N | jump to the next own city (History Edition) |
 | F3 | pause |
 | Pause | pause with the original's pause video (U-018) |
-| Num+ / Num− | game speed |
+| + / − (QWERTY: = / −), Num+ / Num− | game speed |
 | F5 / F9 | quicksave / quickload |
 | F10, Escape (when there is nothing to cancel) | game menu |
 | F12, Print Screen | screenshot |
