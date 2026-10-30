@@ -882,6 +882,8 @@ TEST_CASE("selection panels: the trade cart button asks where a cart goes, then 
     CHECK(request->city == 3);
     CHECK(request->x == 12);
     CHECK(request->y == 7);
+    CHECK(request->from_x == t.world.islands()[0].x + 4);  // out of the building of this window
+    CHECK(request->from_y == t.world.islands()[0].y + 0);
     out.clear();
     // With a cart on the island it selects the cart and looks at it.
     sim::Ship cart = sim::make_ship("Altair", 9, 7, sim::figure::kTradeCart, kLocal);

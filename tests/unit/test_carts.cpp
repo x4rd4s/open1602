@@ -172,6 +172,33 @@ TEST_CASE("carts: a city's owner gets one cart per island at the Kontor, for not
     CHECK(fleet.request_cart(sim::CartRequest{1, 0, 1, 25, 18}) != 0);
 }
 
+TEST_CASE("carts: asked for in a market's window, the cart comes out of that market") {
+    // The market at island (12, 4), world (22, 14): its middle is world (23, 15).
+    Land land;
+    sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+    const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 25, 18, 22, 14});
+    REQUIRE(id != 0);
+    const sim::Ship* cart = land.world.ship(id);
+    CHECK(cart->x == 23);
+    CHECK(cart->y == 15);
+    CHECK(cart->target == sim::Target::position(25, 18));
+    run(fleet, land.world, 1500);
+    CHECK(land.world.ship(id)->y > 15);  // on its way out
+}
+
+TEST_CASE("carts: a market of another city or a tile without a market sends the cart out of the Kontor") {
+    for (const auto& [fx, fy] : {std::pair{37, 14}, std::pair{15, 15}}) {
+        Land land;
+        sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+        const auto from_x = static_cast<std::uint16_t>(fx);
+        const auto from_y = static_cast<std::uint16_t>(fy);
+        const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 20, 18, from_x, from_y});
+        REQUIRE(id != 0);
+        CHECK(land.world.ship(id)->x == 11);  // the middle of the Kontor at (10, 14)
+        CHECK(land.world.ship(id)->y == 15);
+    }
+}
+
 TEST_CASE("carts: a new cart leaves the Kontor from its middle even where houses close one side") {
     // The Kontor at island (0, 4) on the west coast; houses on its east and south side leave only
     // the way north, which the middle tile (1, 5) reaches through the Kontor itself.

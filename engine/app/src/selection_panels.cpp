@@ -419,8 +419,8 @@ public:
             } else if (e.id == city_ids::kStock) {
                 m_page = Page::Stock;
             } else if (e.id == city_ids::kTrader) {
-                // 0x0043CE00: with a cart on the island the view jumps to it and selects it, else
-                // the next click on the map sends one out from the Kontor (0x004894E0 with 4).
+                // With a cart on the island the view jumps to it and selects it, else the next
+                // click on the map sends one out of this Kontor or market.
                 if (const sim::Ship* cart = sim::trade_cart_of(c.world(), c.local, city->island)) {
                     Request r{Request::Kind::SelectShip, cart->id};
                     r.x = cart->x;
@@ -620,8 +620,15 @@ public:
                 std::vector<sim::Command>& out) override {
         m_cart_pick = false;
         if (const sim::City* city = city_at(s, c)) {
-            out.emplace_back(sim::CartRequest{c.local, city->island, city->index, static_cast<std::uint16_t>(x),
-                                              static_cast<std::uint16_t>(y)});
+            // Out of the building whose window asked: the Kontor, or a market of the city.
+            sim::CartRequest r{c.local, city->island, city->index, static_cast<std::uint16_t>(x),
+                               static_cast<std::uint16_t>(y)};
+            if (s.kind == Selection::Kind::Building && s.island < c.world().islands().size()) {
+                const sim::WorldIsland& isl = c.world().islands()[s.island];
+                r.from_x = static_cast<std::uint16_t>(isl.x + s.x);
+                r.from_y = static_cast<std::uint16_t>(isl.y + s.y);
+            }
+            out.emplace_back(r);
         }
     }
     bool back() override { return std::exchange(m_cart_pick, false); }

@@ -132,12 +132,20 @@ std::uint32_t Fleet::request_cart(const CartRequest& r) {
     if ((r.x == sx && r.y == sy) || island_of(*m_world, r.x, r.y) != r.island) {
         return 0;  // a click on the Kontor itself sends nothing out; only to a tile of its island
     }
-    // It sets off from the middle of the Kontor (origin + half its footprint), as in the original.
+    // It sets off from the middle (origin + half its footprint) of the Kontor, or of the city's
+    // market whose window asked for it, as in the original.
+    TilePos from{static_cast<std::int32_t>(*city->warehouse_x), static_cast<std::int32_t>(*city->warehouse_y)};
+    if (island_of(*m_world, r.from_x, r.from_y) == r.island) {
+        const TilePos at{static_cast<std::int32_t>(r.from_x) - static_cast<std::int32_t>(isl.x),
+                         static_cast<std::int32_t>(r.from_y) - static_cast<std::int32_t>(isl.y)};
+        if (const auto m = building_at(*m_world, *m_buildings, r.island, at);
+            m && m->type->prod_kind == prod::kMarket && m->city == r.city) {
+            from = m->origin;
+        }
+    }
     std::uint32_t cx = sx;
     std::uint32_t cy = sy;
-    if (const auto b = building_at(
-            *m_world, *m_buildings, r.island,
-            {static_cast<std::int32_t>(*city->warehouse_x), static_cast<std::int32_t>(*city->warehouse_y)})) {
+    if (const auto b = building_at(*m_world, *m_buildings, r.island, from)) {
         cx = isl.x + static_cast<std::uint32_t>(b->origin.x) + b->width / 2;
         cy = isl.y + static_cast<std::uint32_t>(b->origin.y) + b->height / 2;
     }

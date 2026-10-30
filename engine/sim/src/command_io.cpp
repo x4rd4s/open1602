@@ -302,6 +302,8 @@ void io(A& a, T& t)
     a(t.city);
     a(t.x);
     a(t.y);
+    a(t.from_x);
+    a(t.from_y);
 }
 
 class Writer {
