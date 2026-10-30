@@ -176,17 +176,17 @@ TEST_CASE("endless setup: the values reach the rules and the world") {
     app::read_setup(read, app::write_setup(s));
     CHECK(read.rules.computer_players == sim::Computers::Off);
     CHECK(app::setup_item_offered(app::SetupScope::Scenario, SetupItem::ComputerPlayers));
-    // Bread production: as in the original by default, the revised chain on choice.
-    CHECK(!s.rules.revised_bread);
-    CHECK(value_of(s, SetupItem::BreadChain) == ui::tr("setup.bread.original"));
-    app::choose(s, SetupItem::BreadChain, 1);
+    // Bread production: the revised chain by default, the original's on choice.
     CHECK(s.rules.revised_bread);
     CHECK(value_of(s, SetupItem::BreadChain) == ui::tr("setup.bread.revised"));
-    CHECK(app::write_setup(s).find("endless.bread = revised\n") != std::string::npos);
+    app::choose(s, SetupItem::BreadChain, 0);
+    CHECK(!s.rules.revised_bread);
+    CHECK(value_of(s, SetupItem::BreadChain) == ui::tr("setup.bread.original"));
+    CHECK(app::write_setup(s).find("endless.bread = original\n") != std::string::npos);
     app::read_setup(read, app::write_setup(s));
-    CHECK(read.rules.revised_bread);
-    CHECK(app::read_setup_line(read, "bread", "original"));
     CHECK(!read.rules.revised_bread);
+    CHECK(app::read_setup_line(read, "bread", "revised"));
+    CHECK(read.rules.revised_bread);
 
     // The world's items count only for a world of its own.
     CHECK(!app::setup_item_used(s, SetupItem::Players));

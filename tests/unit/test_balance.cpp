@@ -269,11 +269,11 @@ TEST_CASE("balance: a game's building table has its values, the next game the or
 }
 
 TEST_CASE("balance: the revised bread chain goes under the packages' values") {
-    CHECK(sim::rule_building_values(sim::Rules{}).empty());
+    // Open1602 plays the revised chain by default, the original's settings the original's.
+    CHECK(sim::rule_building_values(sim::Rules::original()).empty());
     CHECK(!sim::Rules::original().revised_bread);
-    CHECK(!sim::Rules::open1602().revised_bread);
-    sim::Rules rules;
-    rules.revised_bread = true;
+    CHECK(sim::Rules::open1602().revised_bread);
+    const sim::Rules rules = sim::Rules::open1602();
     const std::vector<sim::BuildingValue> bread = sim::rule_building_values(rules);
     REQUIRE(bread.size() == 3);
     CHECK((bread[0] == sim::BuildingValue{20503, sim::BuildingField::Produce, 2}));  // bakery
@@ -306,6 +306,17 @@ TEST_CASE("balance: a game keeps its building values and the rule in the savegam
     CHECK(loaded->balance() == balance);
     REQUIRE(loaded->saved_rules().has_value());
     CHECK(loaded->saved_rules()->revised_bread);
+
+    // The original's chain writes no key, and a game without the key (also one of the versions
+    // before the revised chain became the default) plays the original's chain.
+    rules.revised_bread = false;
+    world.set_saved_rules(rules);
+    auto without_key = sim::write_game(world, buildings);
+    REQUIRE(without_key.ok());
+    auto loaded_without_key = sim::read_game(*without_key, buildings);
+    REQUIRE(loaded_without_key.ok());
+    REQUIRE(loaded_without_key->saved_rules().has_value());
+    CHECK(!loaded_without_key->saved_rules()->revised_bread);
 
     // Only the building values: BALA stays out, BLDV alone brings them back.
     CHECK(sim::original_numbers(loaded->balance()));

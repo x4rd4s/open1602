@@ -185,7 +185,8 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.computer_players != Computers::Game) {
         values.emplace_back(kComputerPlayers, static_cast<std::uint32_t>(r.computer_players));
     }
-    // The revised bread chain only when it is on: off is the original, so older games keep their bytes.
+    // The revised bread chain only when it is on: the games of the versions before it, which have no
+    // key, played the original's chain (read_rules).
     if (r.revised_bread) {
         values.emplace_back(kRevisedBread, 1U);
     }
@@ -233,6 +234,8 @@ void write_rules(Writer& out, const Rules& r) {
 
 Rules read_rules(Reader& in) {
     Rules r;
+    // Without its key a game plays the original's bread chain, as the versions before the key did.
+    r.revised_bread = false;
     const std::uint32_t n = in.in().count(6);
     for (std::uint32_t i = 0; i < n; ++i) {
         const std::uint16_t key = in.in().u16();

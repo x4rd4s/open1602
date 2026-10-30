@@ -279,8 +279,8 @@ struct Rules {
     /// at 15 gold a minute instead of 5. The original's chain gives 1.5 t of bread a minute from 20
     /// fields where two cattle farms and a butcher give 2.4 t of meat; revised it gives 6.3 t at
     /// the same running cost per ton as meat. Its values go under those of the mods' balance.toml.
-    /// Off by default, as the original.
-    bool revised_bread = false;
+    /// On by default; the original's settings keep the original's chain.
+    bool revised_bread = true;
 
     /// Open1602: computer players buy ships other players offer for sale when they are short of
     /// ships (the History Edition's do; the original's buy one only while they have neither ship

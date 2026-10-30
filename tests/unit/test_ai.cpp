@@ -474,8 +474,9 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     run(s, 90'000);
     const std::uint64_t hash = s.state_hash();
     // Names left empty without Text.cod (MD-10); SIMU in parts (DS-3); tiles by blocks (TB-26); a ship
-    // whose goods do not fit at home is free again; the computers' state version 4 (a search's target).
-    constexpr std::uint64_t kExpected = 0x54d8f8262ae85d2eULL;
+    // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
+    // the revised bread chain by default.
+    constexpr std::uint64_t kExpected = 0x2e2f860e06bad5adULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }

@@ -49,7 +49,8 @@ makes 2 t of grain per ripe field, the bakery 2 t of bread from 2 t of flour for
 instead of 5. Three farms with 21 fields, two mills and a bakery then make about 6.3 t of bread a
 minute instead of 1.5 t, for the same 6.3 gold per ton as two cattle farms and a butcher; meat and
 fish stay as they are (`tests/data/test_food_chains.cpp` measures it). A package's values for the
-same buildings go before the setting's.
+same buildings go before the setting's. The setting is on by default; the original's settings
+switch it off.
 
 ## Where a mod's changes are
 
