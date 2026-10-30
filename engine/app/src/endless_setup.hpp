@@ -53,6 +53,7 @@ enum class SetupItem : std::uint8_t {
     TraderReach,
     OreVeins,
     BreadChain,
+    TradeCarts,  ///< Rules::more_carts
     // Limits
     Ships,
     Units,

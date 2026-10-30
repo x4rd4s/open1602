@@ -108,19 +108,49 @@ const Ship* trade_cart_of(const World& world, PlayerId player, std::uint16_t isl
     return nullptr;
 }
 
+std::vector<const Ship*> trade_carts_of(const World& world, PlayerId player, std::uint16_t island) {
+    std::vector<const Ship*> carts;
+    for (const Ship& s : world.ships()) {
+        if (s.cart() && s.owner == player && !s.sinking && island_of(world, s.x, s.y) == island) {
+            carts.push_back(&s);
+        }
+    }
+    return carts;
+}
+
+std::uint32_t cart_places(const World& world, const assets::BuildingTable& buildings, PlayerId player,
+                          std::uint16_t island) {
+    if (island >= world.islands().size()) {
+        return 0;
+    }
+    const IslandMap& map = world.islands()[island].map;
+    std::uint32_t n = 0;
+    for (const Production& p : world.productions()) {
+        if (p.used && p.island == island && map.contains(p.x, p.y) && map.top(p.x, p.y).owner == player &&
+            trades_there(building_on(map, buildings, p.x, p.y))) {
+            ++n;
+        }
+    }
+    return n;
+}
+
 const Ship* Fleet::cart_of(PlayerId player, std::uint16_t island) const {
     return trade_cart_of(*m_world, player, island);
 }
 
 std::uint32_t Fleet::request_cart(const CartRequest& r) {
-    // 0x00440AC0 and CreateCart 0x00449300: at the city's Kontor, for its owner, one per island.
+    // At the city's Kontor or market, for its owner, one per island (Open1602: Rules::more_carts).
     City* city = m_world->city(r.island, r.city);
     const Player* player = m_world->player(r.player);
     if (city == nullptr || player == nullptr || !player->active() ||
         (player->role != PlayerRole::Human && player->role != PlayerRole::Computer) || city->owner != r.player ||
-        !city->warehouse_x || !city->warehouse_y || r.island >= m_world->islands().size() ||
-        cart_of(r.player, r.island) != nullptr) {
+        !city->warehouse_x || !city->warehouse_y || r.island >= m_world->islands().size()) {
         return 0;
+    }
+    if (cart_of(r.player, r.island) != nullptr && (!r.another || !m_rules->more_carts ||
+                                                   trade_carts_of(*m_world, r.player, r.island).size() >=
+                                                       cart_places(*m_world, *m_buildings, r.player, r.island))) {
+        return 0;  // one per island, or in Open1602 one for each Kontor and market there
     }
     const assets::FigureType* type = m_figures->get(figure::kTradeCart);
     if (type == nullptr) {

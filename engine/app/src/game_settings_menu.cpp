@@ -18,7 +18,6 @@ using Tone = ui::Form::Tone;
 using ui::Align;
 using ui::Rect;
 
-constexpr Id kItem = 1;  // + SetupItem
 constexpr Id kOriginal = 50;
 constexpr Id kDefaults = 51;
 constexpr Id kBack = 52;
@@ -28,6 +27,7 @@ constexpr Id kVictoryOff = 55;    // all of them off
 constexpr Id kBugs = 56;          // the page of the original's bugs
 constexpr Id kBugsOriginal = 57;  // all of them as in the original
 constexpr Id kBugsFixed = 58;     // all of them fixed
+constexpr Id kItem = 100;         // + SetupItem
 
 // The frame and the bottom row, as the multiplayer menu's.
 constexpr Rect kScreen{16, 16, 992, 736};
@@ -58,7 +58,7 @@ constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 
 // Economy, limits and disasters on the left, the world and the opponents on the right.
 constexpr Group kGroups[] = {
-    {"setup.group.economy", SetupItem::Refund, SetupItem::BreadChain, kLeft},
+    {"setup.group.economy", SetupItem::Refund, SetupItem::TradeCarts, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
     {"setup.group.disasters", SetupItem::Droughts, SetupItem::Volcanoes, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},

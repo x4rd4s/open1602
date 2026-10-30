@@ -187,6 +187,16 @@ TEST_CASE("endless setup: the values reach the rules and the world") {
     CHECK(!read.rules.revised_bread);
     CHECK(app::read_setup_line(read, "bread", "revised"));
     CHECK(read.rules.revised_bread);
+    // Trade carts per island: one per Kontor and market by default, one as in the original on choice.
+    CHECK(s.rules.more_carts);
+    CHECK(value_of(s, SetupItem::TradeCarts) == ui::tr("setup.trade_carts.more"));
+    app::choose(s, SetupItem::TradeCarts, 0);
+    CHECK(!s.rules.more_carts);
+    CHECK(app::write_setup(s).find("endless.trade_carts = one\n") != std::string::npos);
+    app::read_setup(read, app::write_setup(s));
+    CHECK(!read.rules.more_carts);
+    CHECK(app::setup_item_offered(app::SetupScope::Scenario, SetupItem::TradeCarts));
+    CHECK(!EndlessSetup::original().rules.more_carts);
 
     // The world's items count only for a world of its own.
     CHECK(!app::setup_item_used(s, SetupItem::Players));

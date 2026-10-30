@@ -199,6 +199,51 @@ TEST_CASE("carts: a market of another city or a tile without a market sends the 
     }
 }
 
+TEST_CASE("carts: with Shift a player gets another cart, one per Kontor and market on the island (Open1602)") {
+    for (const bool more : {true, false}) {
+        Land land;
+        land.rules.more_carts = more;
+        // Player 0's Kontor and market, player 1's Kontor.
+        for (const auto& [x, y] : {std::pair{0, 4}, std::pair{12, 4}, std::pair{27, 4}}) {
+            sim::Production p;
+            p.x = static_cast<std::uint16_t>(x);
+            p.y = static_cast<std::uint16_t>(y);
+            land.world.productions().push_back(p);
+        }
+        CHECK(sim::cart_places(land.world, land.buildings, 0, 0) == 2);
+        CHECK(sim::cart_places(land.world, land.buildings, 1, 0) == 1);
+        sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+        CHECK(fleet.request_cart(sim::CartRequest{0, 0, 0, 20, 18}) != 0);
+        sim::CartRequest another{0, 0, 0, 21, 18, 22, 14};
+        CHECK(fleet.request_cart(sim::CartRequest{0, 0, 0, 21, 18}) == 0);  // without Shift: one
+        another.another = true;
+        CHECK((fleet.request_cart(another) != 0) == more);
+        CHECK(sim::trade_carts_of(land.world, 0, 0).size() == (more ? 2U : 1U));
+        CHECK(fleet.request_cart(another) == 0);  // no third: a Kontor and a market
+        sim::CartRequest east{1, 0, 1, 25, 18};
+        CHECK(fleet.request_cart(east) != 0);
+        east.another = true;
+        CHECK(fleet.request_cart(east) == 0);  // a Kontor only
+    }
+}
+
+TEST_CASE("carts: the rule for more carts is kept in the savegame, off only under its own key") {
+    const assets::BuildingTable buildings = make_buildings();
+    for (const bool more : {false, true}) {
+        sim::World world(60, 40);
+        sim::Rules rules;
+        rules.more_carts = more;
+        world.set_saved_rules(rules);
+        auto bytes = sim::write_game(world, buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, buildings);
+        REQUIRE(loaded.ok());
+        REQUIRE(loaded->saved_rules().has_value());
+        CHECK(loaded->saved_rules()->more_carts == more);
+    }
+    CHECK(!sim::Rules::original().more_carts);
+}
+
 TEST_CASE("carts: a new cart leaves the Kontor from its middle even where houses close one side") {
     // The Kontor at island (0, 4) on the west coast; houses on its east and south side leave only
     // the way north, which the middle tile (1, 5) reaches through the Kontor itself.
