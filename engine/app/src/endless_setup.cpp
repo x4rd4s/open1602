@@ -470,8 +470,10 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::BugRemoteRepair:
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
-        case SetupItem::ClassicAi:
-            return r.bugs.*bug_of(item) ? 1 : 0;
+        case SetupItem::ClassicAi: {
+            const auto bug = bug_of(item);
+            return bug != nullptr && r.bugs.*bug ? 1 : 0;
+        }
         case SetupItem::ComputerPlayers:
             return std::min<std::size_t>(static_cast<std::size_t>(r.computer_players), kComputerNames.size() - 1);
         case SetupItem::Pirates:
@@ -608,7 +610,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::ClassicAi:
-            r.bugs.*bug_of(item) = choice == 1;
+            if (const auto bug = bug_of(item); bug != nullptr) {
+                r.bugs.*bug = choice == 1;
+            }
             break;
         case SetupItem::ComputerPlayers:
             r.computer_players = static_cast<sim::Computers>(choice);
