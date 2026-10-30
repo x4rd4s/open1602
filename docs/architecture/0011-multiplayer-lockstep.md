@@ -47,10 +47,12 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    a computer from touching the new game.
 7. **Senders.** Every command names its player; the host takes from a computer only commands for its
    own slot (review point 6), none from spectators, and only commands every computer can read back
-   (`sim::command_size`; the host's own too). Only the host sets the game speed and hands slots to the
-   computer (`PlayerControl`); every player may pause, go on and rename himself, at most four times a
-   second. A message that makes no sense, a message to the host larger than 1 MiB and a connection
-   without `Hello` after 3 s disconnect the computer.
+   (`sim::command_size`; the host's own too). Only the host hands slots to the computer
+   (`PlayerControl`); every player may pause, go on, set the game speed and rename himself, at most
+   four times a second. With the setting „Only the host sets speed“ (`host_controls_speed`,
+   MS-20) the host takes no pause, resume or speed orders from the others. A message that makes no
+   sense, a message to the host larger than 1 MiB and a connection without `Hello` after 3 s
+   disconnect the computer.
    **Admission by work.** A frame holds at most 1024 commands and 64 KiB of them, 64 places kept for
    the host's own (`PlayerControl`, names), which are never dropped. Each player has an equal share of
    the rest (at most 256) and of the frame's work, `kFrameWork` units of about one map tile looked at
@@ -225,7 +227,8 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 ## Consequences
 
 - Videos, menus and windows do not pause the game in multiplayer (M-018); only pause commands do, for
-  everyone. The automatic return to speed 1 at a fire or an attack works only on the host.
+  everyone. The automatic return to speed 1 at a fire or an attack works only on the host; the players change
+  the speed by hand, unless only the host may.
 - Loading savegames and starting new games is blocked during a session.
 - The fingerprint costs writing the game but for the tiles in memory on every computer about every
   5 s of real time, and hashing the blocks of tiles that changed (point 5). The host writes games for joining computers a few at once and then at most one a second; it packs

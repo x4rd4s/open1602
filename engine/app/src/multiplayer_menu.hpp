@@ -51,10 +51,10 @@ struct HostSetup {
     bool lan = true;  ///< answer searches on the local network
     bool join_running = true;
     bool spectators = true;
-    bool spectators_chat = true;      ///< spectators may write in the chat (they always read it)
-    bool computer_takes_over = true;  ///< the computer plays on for a person who left
-    bool host_pauses_only = false;    ///< only the host pauses and resumes (MS-20)
-    bool dedicated = false;           ///< the host plays no slot
+    bool spectators_chat = true;       ///< spectators may write in the chat (they always read it)
+    bool computer_takes_over = true;   ///< the computer plays on for a person who left
+    bool host_controls_speed = false;  ///< only the host pauses, resumes and sets the speed (MS-20)
+    bool dedicated = false;            ///< the host plays no slot
     std::uint16_t port = net::kDefaultPort;
     /// The game's settings (ADR 0008): rules, and for an endless game its world; a scenario uses
     /// the rules only, a savegame keeps its own.

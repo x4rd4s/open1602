@@ -97,9 +97,10 @@ struct SessionConfig {
     /// it again. Without: the slot gives no orders until its player is back.
     bool computer_takes_over = true;
     std::uint32_t take_over_ms = 60'000;
-    /// (Host, also after a host migration) Only the host's player pauses and resumes the game; the
-    /// others' pauses are not carried out (MS-20: one player could keep the game paused).
-    bool host_pauses_only = false;
+    /// (Host, also after a host migration) Only the host's player pauses, resumes and sets the
+    /// speed of the game; the others' speed orders are not carried out (MS-20: one player could
+    /// keep the game paused). Without it, every player may do all three.
+    bool host_controls_speed = false;
     /// (Host, also after a host migration) How long, in real time, a game for a computer that
     /// joins or resyncs may pack on a worker while the game goes on before the host waits for it
     /// (TB-26). 0 waits at once, as a test that steps time faster than it passes needs; the game
@@ -163,7 +164,8 @@ struct SessionEvent {
         Chat,          ///< `seat` (`name`) said `text`, to everyone or privately (`everyone`, `to`, `missed`)
         Dropped,       ///< `count` commands of this computer's player were not carried out (too many at once)
         Reconnecting,  ///< (computer) the connection to the host broke; it tries to get back in
-        PauseRefused,  ///< (computer) only the host pauses and resumes this game (Lobby::host_pauses_only)
+        SpeedRefused,  ///< (computer) only the host pauses, resumes and sets the speed of this game
+                       ///< (Lobby::host_controls_speed)
         PackageKept,   ///< (computer) a package the host sent was kept (packages[0])
     };
     Kind kind = Kind::Joined;
@@ -204,8 +206,8 @@ public:
     /// to the players in `to` (only players say something privately, to other players). A
     /// spectator's line goes out only if the game lets spectators write (Lobby::spectators_chat).
     virtual void say(std::string text, std::vector<Seat> to = {}) = 0;
-    /// This computer's player may pause and resume the game (the host always may).
-    [[nodiscard]] virtual bool may_pause() const noexcept { return true; }
+    /// This computer's player may pause, resume and set the speed of the game (the host always may).
+    [[nodiscard]] virtual bool may_change_speed() const noexcept { return true; }
 
     /// The player this computer plays, kNoPlayer while it only watches or is not in yet.
     [[nodiscard]] Seat local_seat() const noexcept { return m_seat; }
@@ -524,7 +526,7 @@ public:
     void submit(sim::Command command) override;
     void update(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick = {}) override;
     void say(std::string text, std::vector<Seat> to = {}) override;
-    [[nodiscard]] bool may_pause() const noexcept override { return !m_lobby.host_pauses_only; }
+    [[nodiscard]] bool may_change_speed() const noexcept override { return !m_lobby.host_controls_speed; }
     /// In the lobby: asks for an open slot, or kNoPlayer to watch.
     void take_seat(Seat seat);
     /// In the lobby: ready to start, or not.

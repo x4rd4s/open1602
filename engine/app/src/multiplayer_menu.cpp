@@ -51,7 +51,7 @@ constexpr Id kListDown = 52;
 constexpr Id kFewerPlayers = 53;
 constexpr Id kMorePlayers = 54;
 constexpr Id kTakeOver = 55;
-constexpr Id kHostPauses = 56;
+constexpr Id kHostSpeed = 56;
 constexpr Id kSpectatorChat = 57;
 constexpr Id kListRow = 200;  ///< + row
 constexpr std::size_t kListRows = 11;
@@ -549,7 +549,7 @@ void MultiplayerMenu::layout_create(const MultiplayerModel& model) {
             m_setup.spectators);
     f.check(kTakeOver, Rect{668, 398, 304, 30}, tr(MpText::ComputerTakesOver), m_setup.computer_takes_over);
     f.check(kDedicated, Rect{668, 430, 304, 30}, tr(MpText::HostOnly), m_setup.dedicated);
-    f.check(kHostPauses, Rect{668, 462, 304, 30}, tr(MpText::HostPausesOnly), m_setup.host_pauses_only);
+    f.check(kHostSpeed, Rect{668, 462, 304, 30}, tr(MpText::HostControlsSpeed), m_setup.host_controls_speed);
     if (m_setup.kind != HostSetup::Kind::Savegame) {
         // A savegame keeps the settings it was started with; the lobby shows them.
         settings_button(502, m_setup.game_settings(), true);
@@ -693,7 +693,7 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     setting(240, MpText::AllowSpectators, lobby.spectators);
     setting(272, MpText::AllowSpectatorChat, lobby.spectators && lobby.spectators_chat);
     setting(304, MpText::ComputerTakesOver, lobby.computer_takes_over);
-    setting(336, MpText::HostPausesOnly, lobby.host_pauses_only);
+    setting(336, MpText::HostControlsSpeed, lobby.host_controls_speed);
     // The host's settings: the host changes them until the game starts, the others look at them.
     std::int32_t y_free = 386;
     if (const auto settings = read_lobby_setup(lobby.setup)) {
@@ -884,8 +884,8 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
                 m_setup.spectators_chat = !m_setup.spectators_chat;
             } else if (id == kTakeOver) {
                 m_setup.computer_takes_over = !m_setup.computer_takes_over;
-            } else if (id == kHostPauses) {
-                m_setup.host_pauses_only = !m_setup.host_pauses_only;
+            } else if (id == kHostSpeed) {
+                m_setup.host_controls_speed = !m_setup.host_controls_speed;
             } else if (id == kDedicated) {
                 m_setup.dedicated = !m_setup.dedicated;
             } else if (id == kSettings && m_setup.kind != Kind::Savegame) {

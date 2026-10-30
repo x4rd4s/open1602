@@ -163,7 +163,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& cl
     m_config.join_running = client.m_lobby.join_running;
     m_config.spectators = client.m_lobby.spectators;
     m_config.computer_takes_over = client.m_lobby.computer_takes_over;
-    m_config.host_pauses_only = client.m_lobby.host_pauses_only;
+    m_config.host_controls_speed = client.m_lobby.host_controls_speed;
     m_config.spectators_chat = client.m_lobby.spectators_chat;
     m_seat = client.m_seat;
     // The game goes on from this computer's frame. The frames the old host closed beyond it are
@@ -223,7 +223,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& cl
 void HostSession::init_lobby() {
     m_lobby.join_running = m_config.join_running;
     m_lobby.computer_takes_over = m_config.computer_takes_over;
-    m_lobby.host_pauses_only = m_config.host_pauses_only;
+    m_lobby.host_controls_speed = m_config.host_controls_speed;
     m_lobby.spectators = m_config.spectators;
     m_lobby.spectators_chat = m_config.spectators_chat;
     m_lobby.password = !m_config.password.empty();
@@ -582,15 +582,13 @@ void HostSession::commands(Peer& peer, CommandBatch& m) {
         return;  // spectators give no orders, and nobody without a game
     }
     for (sim::Command& c : m.commands) {
-        // Only the host hands slots to the computer and sets the speed (ADR 0011); everyone may
-        // pause and resume and name himself, a few times a second.
+        // Only the host hands slots to the computer (ADR 0011); everyone may pause, resume, set the
+        // speed and name himself, a few times a second, unless only the host controls the speed.
         if (std::holds_alternative<sim::PlayerControl>(c)) {
             continue;
         }
-        if (const auto* speed = std::get_if<sim::GameSpeedOrder>(&c)) {
-            if (speed->op == sim::GameSpeedOrder::Op::SetSpeed || m_config.host_pauses_only) {
-                continue;  // with host_pauses_only, pausing and resuming too (MS-20)
-            }
+        if (std::holds_alternative<sim::GameSpeedOrder>(c) && m_config.host_controls_speed) {
+            continue;  // MS-20
         }
         if (std::holds_alternative<sim::GameSpeedOrder>(c) || std::holds_alternative<sim::PlayerRename>(c)) {
             if (peer.game_orders >= kMaxGameOrdersPerSecond) {

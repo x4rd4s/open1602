@@ -98,11 +98,10 @@ void ClientSession::submit(sim::Command command) {
         event(std::move(e));
         return;
     }
-    if (const auto* speed = std::get_if<sim::GameSpeedOrder>(&command);
-        speed != nullptr && speed->op != sim::GameSpeedOrder::Op::SetSpeed && !may_pause()) {
+    if (std::holds_alternative<sim::GameSpeedOrder>(command) && !may_change_speed()) {
         // The host would not carry it out (MS-20); the player is told why nothing happens.
         SessionEvent e;
-        e.kind = SessionEvent::Kind::PauseRefused;
+        e.kind = SessionEvent::Kind::SpeedRefused;
         e.seat = m_seat;
         event(std::move(e));
         return;

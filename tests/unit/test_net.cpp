@@ -306,7 +306,7 @@ TEST_CASE("net: every message goes to bytes and back") {
     lobby.setup = {9, 8, 7};
     lobby.banners = {0, 1, 2, 3, 7, 8, 0x1234};
     lobby.computer_takes_over = false;
-    lobby.host_pauses_only = true;
+    lobby.host_controls_speed = true;
     lobby.spectators_chat = false;
     all.emplace_back(lobby);
     all.emplace_back(net::TakeSeat{3});
@@ -725,23 +725,23 @@ TEST_CASE("net: without the setting, the slot of someone who left gives no order
     CHECK(a.game.world->players()[2].role == sim::PlayerRole::Human);
 }
 
-TEST_CASE("net: with the setting, only the host pauses and resumes the game (MS-20)") {
+TEST_CASE("net: with the setting, only the host pauses, resumes and sets the speed (MS-20)") {
     net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
-    config.host_pauses_only = true;
+    config.host_controls_speed = true;
     Host host(network, config);
     Computer a(network, "Anna");
     run_for(network, host, {&a}, 2000);
     REQUIRE(a.session->playing());
-    CHECK(a.session->lobby().host_pauses_only);
-    CHECK(!a.session->may_pause());
-    CHECK(host.session->may_pause());
+    CHECK(a.session->lobby().host_controls_speed);
+    CHECK(!a.session->may_change_speed());
+    CHECK(host.session->may_change_speed());
     const net::Seat anna = a.session->local_seat();
     a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::Pause, 1});
     run_for(network, host, {&a}, 1000);
     CHECK(!host.game.simulation->paused());
     CHECK(!a.game.simulation->paused());
-    CHECK(a.count(net::SessionEvent::Kind::PauseRefused) == 1);
+    CHECK(a.count(net::SessionEvent::Kind::SpeedRefused) == 1);
     // The host pauses; the other cannot resume.
     host.session->submit(sim::GameSpeedOrder{host.session->local_seat(), sim::GameSpeedOrder::Op::Pause, 1});
     run_for(network, host, {&a}, 1000);
@@ -750,7 +750,44 @@ TEST_CASE("net: with the setting, only the host pauses and resumes the game (MS-
     a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::Resume, 1});
     run_for(network, host, {&a}, 1000);
     CHECK(host.game.simulation->paused());
-    CHECK(a.count(net::SessionEvent::Kind::PauseRefused) == 2);
+    CHECK(a.count(net::SessionEvent::Kind::SpeedRefused) == 2);
+    // Nor can the other change the speed.
+    host.session->submit(sim::GameSpeedOrder{host.session->local_seat(), sim::GameSpeedOrder::Op::Resume, 1});
+    run_for(network, host, {&a}, 1000);
+    REQUIRE(!host.game.simulation->paused());
+    a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::SetSpeed, 2});
+    run_for(network, host, {&a}, 1000);
+    CHECK(host.game.simulation->speed() == 1);
+    CHECK(a.game.simulation->speed() == 1);
+    CHECK(a.count(net::SessionEvent::Kind::SpeedRefused) == 3);
+    host.session->submit(sim::GameSpeedOrder{host.session->local_seat(), sim::GameSpeedOrder::Op::SetSpeed, 2});
+    run_for(network, host, {&a}, 1000);
+    CHECK(host.game.simulation->speed() == 2);
+    CHECK(a.game.simulation->speed() == 2);
+}
+
+TEST_CASE("net: without the setting, every player pauses, resumes and sets the speed") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    Computer a(network, "Anna");
+    run_for(network, host, {&a}, 2000);
+    REQUIRE(a.session->playing());
+    CHECK(!a.session->lobby().host_controls_speed);
+    CHECK(a.session->may_change_speed());
+    const net::Seat anna = a.session->local_seat();
+    a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::SetSpeed, 2});
+    run_for(network, host, {&a}, 1000);
+    CHECK(host.game.simulation->speed() == 2);
+    CHECK(a.game.simulation->speed() == 2);
+    a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::Pause, 2});
+    run_for(network, host, {&a}, 1000);
+    CHECK(host.game.simulation->paused());
+    CHECK(a.game.simulation->paused());
+    a.session->submit(sim::GameSpeedOrder{anna, sim::GameSpeedOrder::Op::Resume, 2});
+    run_for(network, host, {&a}, 1000);
+    CHECK(!host.game.simulation->paused());
+    CHECK(a.game.simulation->speed() == 2);
+    CHECK(a.count(net::SessionEvent::Kind::SpeedRefused) == 0);
 }
 
 TEST_CASE("net: a slot's token is good only for the one it was given to") {
@@ -1267,11 +1304,13 @@ TEST_CASE("net: a lobby: slots, password, chat and ready, then the game starts o
     CHECK(anna.session->lobby().started);
     CHECK(anna.game.world->player(3)->name == "Bernd");
     CHECK(host_game->world->player(1)->name == "Anna");
-    // Only the host sets the speed; a player may pause and go on, for everyone.
-    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 8});
+    // Only the host hands a slot to the computer; a player may set the speed, pause and go on,
+    // for everyone.
+    anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 2});
     anna.session->submit(sim::PlayerControl{1, true});
     tick(2000);
-    CHECK(host_game->simulation->speed() == 1);
+    CHECK(host_game->simulation->speed() == 2);
+    CHECK(anna.game.simulation->speed() == 2);
     CHECK(host_game->world->player(1)->role == sim::PlayerRole::Human);
     anna.session->submit(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::Pause, 1});
     tick(2000);

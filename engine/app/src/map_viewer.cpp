@@ -504,9 +504,10 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_sound->set_listener([self = viewer.get()](MessageId message, std::uint16_t flags,
                                                         std::optional<std::pair<double, double>> tile,
                                                         std::optional<sim::PlayerId> about, std::string_view text) {
-        if ((flags & audio::kMessageNormalSpeed) != 0 && self->m_state->simulation.speed() > 1) {
-            // Fires, plagues and attacks: back to normal speed (0x004893F0), as a command like any
-            // other change of the speed.
+        if ((flags & audio::kMessageNormalSpeed) != 0 && self->m_state->simulation.speed() > 1 &&
+            (!self->m_session || self->host_session() != nullptr)) {
+            // Fires, plagues and attacks: back to normal speed as in the original, as a command like
+            // any other change of the speed; in a multiplayer game only on the host's computer.
             self->m_command_sink.submit(
                 sim::GameSpeedOrder{self->m_local_player, sim::GameSpeedOrder::Op::SetSpeed, 1});
         }
@@ -1771,8 +1772,9 @@ void MapViewer::notify(std::string text, std::string_view log) {
 }
 
 void MapViewer::toggle_pause_video() {
-    if (m_session && !m_session->may_pause()) {
-        // Only the host pauses (MS-20): the order goes in to tell the player, the video stays off.
+    if (m_session && !m_session->may_change_speed()) {
+        // Only the host controls the speed (MS-20): the order goes in to tell the player, the video
+        // stays off.
         m_command_sink.submit(
             sim::GameSpeedOrder{m_local_player, sim::GameSpeedOrder::Op::Pause, m_state->simulation.speed()});
         return;
