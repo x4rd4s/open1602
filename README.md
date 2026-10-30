@@ -51,8 +51,26 @@ and ends. To set the variable:
 | cmd | `set ANNO1602_DIR=C:\GOG Games\Anno 1602` |
 
 To keep it set, add the line to `~/.bashrc` / `~/.zshrc`, use `set -Ux` once in fish, or `setx ANNO1602_DIR "..."`
-on Windows. Quotes around the path are ignored, so `set ANNO1602_DIR="C:\GOG Games\Anno 1602"` works too. On Linux and macOS the GOG installer can be unpacked without Windows:
-`innoextract setup_anno_1602*.exe` (or install it through Heroic or Wine).
+on Windows. Quotes around the path are ignored, so `set ANNO1602_DIR="C:\GOG Games\Anno 1602"` works too.
+
+### GOG installer without Windows (macOS, Linux)
+
+GOG ships the game as a Windows installer (`setup_anno_1602_*.exe`, sometimes with `.bin` files next to
+it). Open1602 does not need it to run: [innoextract](https://constexpr.org/innoextract/) unpacks it
+without Windows, Wine, a virtual machine or CrossOver. On macOS with [Homebrew](https://brew.sh):
+
+```sh
+brew install innoextract unar     # Linux: the distribution's innoextract and unar packages
+mkdir -p /tmp/anno1602 ~/"GOG Games"
+innoextract --gog -d /tmp/anno1602 ~/Downloads/setup_anno_1602_*.exe
+mv /tmp/anno1602/app ~/"GOG Games/Anno 1602"
+```
+
+Keep any `.bin` files in the same folder as the `.exe`; `--gog` unpacks them too (that part needs
+`unar`). The game files end up in the `app` folder of the output; the folder to use is the one that
+holds `haeuser.cod` and `gfx/`. In `~/GOG Games/Anno 1602` Open1602 finds it on its own; anywhere else,
+pick that folder in the dialog or set `ANNO1602_DIR`. The game folder can also simply be copied from an
+existing installation on Windows or Linux (GOG, Heroic or Wine).
 
 ## Building
 
