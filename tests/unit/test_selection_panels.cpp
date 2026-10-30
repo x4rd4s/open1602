@@ -635,9 +635,16 @@ TEST_CASE("selection panels: the shipyard window orders a ship of the types a sm
     const ui::Panel* yard_page = &p->panel();
     p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 39016}, yard, c, out);
     CHECK(&p->panel() != yard_page);
+    const auto laid_out = p->panel().layout().find(60003)->pos;
     p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 60004}, yard, c, out);
     p->refresh(yard, c);
     CHECK(p->panel().selected(60003));
+    // The small types moved to the middle: the click area with the picture.
+    const auto moved = p->panel().position(60003);
+    REQUIRE(moved.has_value());
+    CHECK((*moved)[0] == laid_out[0] + 40);
+    CHECK((*moved)[1] == laid_out[1]);
+    CHECK(p->panel().layout().find(60003)->offset[0] == 0);
     CHECK(!p->panel().selected(60004));
     p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 60005}, yard, c, out);
     p->refresh(yard, c);

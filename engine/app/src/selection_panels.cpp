@@ -76,6 +76,16 @@ const assets::BuildingType* building_at(const Selection& s, const PanelContext& 
     return top.empty() ? nullptr : c.buildings.by_sprite(top.sprite);
 }
 
+/// Tells the buildings apart for a PendingSwitch.
+constexpr std::uint64_t switch_key(const Selection& s) noexcept {
+    return (std::uint64_t{s.island} << 32U) | (std::uint64_t{s.x} << 16U) | s.y;
+}
+
+/// Tells the cities apart for a PendingSwitch.
+constexpr std::uint64_t city_key(const sim::City& city) noexcept {
+    return (std::uint64_t{city.island} << 8U) | city.index;
+}
+
 /// The name of a building as the build menu calls it (Haus_GetMenuName 0x0042D230).
 std::string building_name(const assets::BuildingType& b, const PanelContext& c) {
     if (const ui::BuildCategory* cat = ui::build_menu().category_of(b.id)) {
@@ -151,8 +161,8 @@ public:
         m_panel.set_text(m_ids.util_value, ui::format_text(c.text("GAME", kGamePercent), {utilisation(*p, *b, c)}));
         m_panel.set_text(m_ids.cost_label, c.text("GAME", kGameRunningCost));
         m_panel.set_text(m_ids.cost_value, std::to_string(p->enabled ? b->running_cost : b->idle_cost));
-        m_panel.set_selected(m_ids.stop, !p->enabled);
-        m_panel.set_selected(m_ids.pickup, p->no_pickup());
+        m_panel.set_selected(m_ids.stop, m_stop.shown(switch_key(s), !p->enabled, c.now_ms));
+        m_panel.set_selected(m_ids.pickup, m_pickup.shown(switch_key(s), p->no_pickup(), c.now_ms));
 
         const std::string tons = c.text("GAME", kGameTons);
         const auto show = [&](const auto& group, bool on) {
@@ -201,12 +211,16 @@ public:
         sw.x = s.x;
         sw.y = s.y;
         if (id == m_ids.stop) {
+            const bool off = m_stop.next(switch_key(s), !p->enabled, c.now_ms);
+            m_stop.clicked(switch_key(s), off, c.now_ms);
             sw.op = sim::ProductionSwitch::Op::Enable;
-            sw.on = !p->enabled;
+            sw.on = !off;
             out.emplace_back(sw);
         } else if (id == m_ids.pickup) {
+            const bool banned = m_pickup.next(switch_key(s), p->no_pickup(), c.now_ms);
+            m_pickup.clicked(switch_key(s), banned, c.now_ms);
             sw.op = sim::ProductionSwitch::Op::Pickup;
-            sw.on = p->no_pickup();
+            sw.on = !banned;
             out.emplace_back(sw);
         }
     }
@@ -251,6 +265,8 @@ public:
 private:
     ProductionIds m_ids;
     std::int32_t m_gfx_ware;
+    PendingSwitch m_stop;
+    PendingSwitch m_pickup;
 };
 
 // ---- Public buildings ----------------------------------------------------------------------------
@@ -443,7 +459,8 @@ public:
                 o.island = city->island;
                 o.city = city->index;
                 o.op = sim::CityOrder::Op::MaterialLock;
-                o.on = !city->material_lock;
+                o.on = m_material_lock.next(city_key(*city), city->material_lock, c.now_ms);
+                m_material_lock.clicked(city_key(*city), o.on, c.now_ms);
                 out.emplace_back(o);
             }
             return;
@@ -729,7 +746,8 @@ private:
             m_stadt.set_text(label + 1, std::to_string(rows[i].second));
         }
         m_stadt.set_graphic(city_ids::kBalanceIcon, m_balance_icon + (balance < 0 ? 1 : 0), 0);
-        m_stadt.set_selected(city_ids::kMaterialLock, city.material_lock);
+        m_stadt.set_selected(city_ids::kMaterialLock,
+                             m_material_lock.shown(city_key(city), city.material_lock, c.now_ms));
         // The trade cart: requested or jumped to (two pictures, 0x00448B70 finds the cart).
         const bool cart = sim::trade_cart_of(c.world(), c.local, city.island) != nullptr;
         m_stadt.set_graphic(city_ids::kTrader, m_cart_icon + (cart ? kCartIconJump : 0), 0);
@@ -821,6 +839,7 @@ private:
     bool m_picker = false;
     std::int32_t m_slot = 0;
     SelectionPages m_pages;
+    PendingSwitch m_material_lock;
 };
 
 // ---- Houses --------------------------------------------------------------------------------------
@@ -1162,7 +1181,7 @@ public:
         m_gfx_ware = m_werft.layout().constant("GFXWARE").value_or(192);
         for (std::int32_t k = 0; k < 4; ++k) {
             if (const assets::Gadget* g = m_bauship.layout().find(kType + k)) {
-                m_type_x[static_cast<std::size_t>(k)] = g->offset[0];
+                m_type_pos[static_cast<std::size_t>(k)] = g->pos;
             }
         }
     }
@@ -1190,12 +1209,14 @@ public:
         };
         if (m_choose) {
             m_bauship.set_text(60002, city != nullptr ? city_name(*city) : std::string());
-            // A small yard (three tiles wide) builds the small types only, moved to the middle.
+            // A small yard (three tiles wide) builds the small types only, moved to the middle:
+            // picture and click area together (moving only the picture left the click area behind).
             const bool small = b->size_x == 3;
             for (std::int32_t k = 0; k < 4; ++k) {
                 const bool big = k == 1 || k == 3;
+                const std::array<std::int32_t, 2>& at = m_type_pos[static_cast<std::size_t>(k)];
                 m_bauship.set_visible(kType + k, !(small && big));
-                m_bauship.set_offset(kType + k, m_type_x[static_cast<std::size_t>(k)] + (small && !big ? 40 : 0), 0);
+                m_bauship.set_position(kType + k, at[0] + (small && !big ? 40 : 0), at[1]);
             }
             // The original keeps a large type chosen at a large yard; its order then builds it in the
             // small one too (S-005, brought back by OriginalBugs::small_yard_warships).
@@ -1231,7 +1252,7 @@ public:
         }
         m_werft.set_visible(39016, !(order));
         m_werft.set_visible(39017, order);
-        m_werft.set_selected(39018, !yard->enabled);
+        m_werft.set_selected(39018, m_stop.shown(switch_key(s), !yard->enabled, c.now_ms));
         if (order) {
             const assets::FigureType* f = c.figures.get(sim::figure::ship_figure(yard->order));
             const std::uint32_t need = f != nullptr ? std::max<std::uint32_t>(f->ship.build_amount, 1) : 1;
@@ -1279,11 +1300,14 @@ public:
                 o.op = sim::ShipyardOrder::Op::Cancel;
                 out.emplace_back(o);
                 break;
-            case 39018:
+            case 39018: {
+                const bool off = m_stop.next(switch_key(s), !yard->enabled, c.now_ms);
+                m_stop.clicked(switch_key(s), off, c.now_ms);
                 o.op = sim::ShipyardOrder::Op::Enable;
-                o.on = !yard->enabled;
+                o.on = !off;
                 out.emplace_back(o);
                 break;
+            }
             default:
                 break;
         }
@@ -1355,7 +1379,8 @@ private:
     ui::Panel m_werft;
     ui::Panel m_bauship;
     std::int32_t m_gfx_ware = 192;
-    std::array<std::int32_t, 4> m_type_x{};
+    std::array<std::array<std::int32_t, 2>, 4> m_type_pos{};
+    PendingSwitch m_stop;
     bool m_choose = false;
     std::uint8_t m_type = 0;
     SelectionPages m_pages;

@@ -102,4 +102,43 @@ private:
     bool m_seen = false;
 };
 
+/// A switch of a window whose state lives in the game (a production building switched off, the
+/// building material kept from the people). A click sends an order that the game carries out a
+/// tick or, in a multiplayer game, a round trip later; until then the button would show the old
+/// state again and flicker. The switch shows the state clicked for until the game has it, the
+/// window shows another object, or the order did not go through within kTimeoutMs.
+class PendingSwitch {
+public:
+    static constexpr std::uint64_t kTimeoutMs = 3000;
+
+    /// The player clicked the switch of `object` (any key that tells the window's objects apart)
+    /// to `on` at `now_ms`.
+    constexpr void clicked(std::uint64_t object, bool on, std::uint64_t now_ms) noexcept {
+        m_object = object;
+        m_on = on;
+        m_since_ms = now_ms;
+        m_waiting = true;
+    }
+
+    /// What the switch of `object` shows while the game has `actual`.
+    [[nodiscard]] constexpr bool shown(std::uint64_t object, bool actual, std::uint64_t now_ms) noexcept {
+        if (m_waiting &&
+            (object != m_object || actual == m_on || now_ms < m_since_ms || now_ms - m_since_ms >= kTimeoutMs)) {
+            m_waiting = false;
+        }
+        return m_waiting ? m_on : actual;
+    }
+
+    /// The state the next click asks for: the opposite of what the switch shows.
+    [[nodiscard]] constexpr bool next(std::uint64_t object, bool actual, std::uint64_t now_ms) noexcept {
+        return !shown(object, actual, now_ms);
+    }
+
+private:
+    std::uint64_t m_object = 0;
+    std::uint64_t m_since_ms = 0;
+    bool m_on = false;
+    bool m_waiting = false;
+};
+
 }  // namespace o1602::app

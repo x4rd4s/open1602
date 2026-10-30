@@ -13,6 +13,7 @@
 #include "banner_graphic.hpp"
 #include "panel_common.hpp"
 
+#include "o1602/sim/construction.hpp"
 #include "o1602/sim/diplomacy.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/ui/localization.hpp"
@@ -752,7 +753,12 @@ private:
             k.city = std::make_pair(city.island, city.index);
             const sim::Player* owner = w.player(city.owner);
             if (!sim::kontor_open(w, c.buildings, city)) {
-                // A destroyed Kontor of the natives, pirates or a defeated player: no buttons.
+                // A destroyed Kontor of the natives, pirates or a defeated player: no buttons. That of
+                // a defenceless city of another human or computer player can be built over with a
+                // Kontor of one's own, which takes the city over: the ship offers the Kontor.
+                k.found = city.owner != ship.owner && owner != nullptr &&
+                          (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer) &&
+                          sim::city_defenceless(w, c.buildings, city.island, city.index);
             } else if (city.owner == ship.owner) {
                 k.own_kontor = true;
             } else if (owner != nullptr && w.behaviour(*owner) == sim::FactionBehaviour::Pirates) {

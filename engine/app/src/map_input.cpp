@@ -960,6 +960,17 @@ void MapInput::follow_selection() {
     // Units that died, sank or changed hands leave the selection.
     if (m_units.prune(world())) {
         selection_changed(false);
+        if (m_units.empty()) {
+            leave_military_mode();
+        }
+    }
+}
+
+void MapInput::leave_military_mode() {
+    // Open1602: the units or ships deselected (or all of them fallen or sunk), the military mode
+    // gives way to the player status; selecting units again goes back to it (selection_changed).
+    if (m_hud && m_hud->mode() == Hud::kModeMilitary) {
+        set_mode(Hud::kModeInfo);
     }
 }
 
@@ -1401,6 +1412,7 @@ void MapInput::map_left_up(double x, double y, std::uint16_t mod, int clicks) {
     if (!m_units.empty()) {
         m_units.clear();
         selection_changed(false);
+        leave_military_mode();
     }
     select_building_at_mouse(before);
 }
@@ -1574,6 +1586,7 @@ void MapInput::cancel_action() {
     if (!m_units.empty()) {
         m_units.clear();
         selection_changed(false);
+        leave_military_mode();
         return;
     }
     if (m_hud && m_hud->selection().kind != Selection::Kind::None) {

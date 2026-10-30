@@ -108,3 +108,26 @@ TEST_CASE("selection: a building or unit selected from the settings shows in the
     CHECK(app::mode_after_selecting(m::kMilitary, true) == m::kMilitary);
     CHECK(app::mode_after_selecting(m::kBuild, true) == m::kBuild);
 }
+
+TEST_CASE("selection: a switch shows the state clicked for until the game has it") {
+    app::PendingSwitch lock;
+    CHECK(!lock.shown(7, false, 1000));
+    // Clicked on: shown on while the order is on its way, the game still saying off.
+    CHECK(lock.next(7, false, 1000));
+    lock.clicked(7, true, 1000);
+    CHECK(lock.shown(7, false, 1010));
+    CHECK(lock.shown(7, false, 1500));
+    // The game has it: the game's state from now on, also when it changes again by itself.
+    CHECK(lock.shown(7, true, 1600));
+    CHECK(!lock.shown(7, false, 1700));
+    // Clicked off: shown off at once.
+    lock.clicked(7, false, 2000);
+    CHECK(!lock.shown(7, true, 2010));
+    // Another object shows its own state.
+    CHECK(lock.shown(8, true, 2020));
+    CHECK(lock.shown(7, true, 2030));
+    // An order that never went through: the game's state again after the timeout.
+    lock.clicked(7, true, 3000);
+    CHECK(lock.shown(7, false, 3000 + app::PendingSwitch::kTimeoutMs - 1));
+    CHECK(!lock.shown(7, false, 3000 + app::PendingSwitch::kTimeoutMs));
+}

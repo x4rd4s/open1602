@@ -418,6 +418,15 @@ TEST_CASE("world renderer: a catchment circle lights the land, its border is das
     CHECK(lighting.dimmed(10, 16, &own));     // outside the circle
     CHECK(!render::TileLighting::territory(0).dimmed(10, 16, &own));
     CHECK(!render::TileLighting::territory(0).outline(area).dimmed(10, 16, &own));  // only the border
+    {
+        // A fisher's hut: the water inside its circle stays lit as well, not the land of others.
+        render::TileLighting fisher = render::TileLighting::circle(0, area);
+        fisher.water();
+        CHECK(!fisher.dimmed(10, 21, nullptr));
+        CHECK(fisher.dimmed(10, 16, nullptr));  // water outside the circle
+        CHECK(fisher.dimmed(10, 20, &other));
+        CHECK(!fisher.dimmed(10, 20, &own));
+    }
 
     for (std::uint8_t rotation = 0; rotation < 4; ++rotation) {
         render::WorldView view;

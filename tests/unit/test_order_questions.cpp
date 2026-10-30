@@ -132,6 +132,13 @@ TEST_CASE("order questions: an attack asks only when it means war") {
 
     g.set_peace(sim::Treaty::None);
     CHECK(!attack(sim::Target::other_ship(g.other_ship)).has_value());  // at war already
+    // An offer of peace after the declaration of war, either way: still war, no question.
+    g.world.diplomacy().relation(kMe, kOther).peace = sim::Treaty::Received;
+    g.world.diplomacy().relation(kOther, kMe).peace = sim::Treaty::Offered;
+    CHECK(!attack(sim::Target::other_ship(g.other_ship)).has_value());
+    g.world.diplomacy().relation(kMe, kOther).peace = sim::Treaty::Offered;
+    g.world.diplomacy().relation(kOther, kMe).peace = sim::Treaty::Received;
+    CHECK(!attack(sim::Target::soldier(g.other_soldier)).has_value());
 }
 
 TEST_CASE("order questions: a ship attacks a Kontor it may not trade at, and sails to a trade partner's") {

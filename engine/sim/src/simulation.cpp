@@ -63,6 +63,7 @@ Simulation::Simulation(World& world, const assets::BuildingTable& buildings, con
         m_rules = *world.saved_rules();  // the settings the game was started with
     }
     world.set_original_bugs(m_rules.bugs);
+    world.set_fertile_fields(m_rules.fertile_fields);
 }
 
 Simulation::Simulation(World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
