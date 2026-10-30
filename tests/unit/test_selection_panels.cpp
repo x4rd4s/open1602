@@ -1333,3 +1333,41 @@ TEST_CASE("selection panels: at the pirates' Kontor a ship trades and deals with
     CHECK(&p->panel() == root);
     CHECK(out.empty());
 }
+
+TEST_CASE("selection panels: the city list shows a pirates' nest once its island is discovered") {
+    Game g("o1602-test-selection-citylist-pirates");
+    Town t;
+    std::vector<sim::Player> players = t.world.players();
+    sim::make_neutral(players[kOther], sim::faction::kPirates);
+    t.world.set_players(players);
+    add_city(t.world, 4, kOther, "Nest");
+    t.world.city(0, 4)->warehouse_x = 6;
+    t.world.city(0, 4)->warehouse_y = 5;
+    sim::Simulation simulation(t.world, t.buildings, t.figures);
+    SelectionPanels panels(*g.dir);
+    const PanelContext c{simulation, t.buildings, t.figures, &g.texts, kLocal};
+    Selection list;
+    list.kind = Selection::Kind::CityList;
+    SelectionPanel* p = panels.panel_for(list, c);
+    REQUIRE(p != nullptr);
+    const auto listed = [&] {
+        p->opened();
+        p->refresh(list, c);
+        const auto shown = texts(*p);
+        return std::find(shown.begin(), shown.end(), "Nest") != shown.end();
+    };
+    CHECK(!listed());  // not found yet
+    t.world.island(0).discover(kLocal);
+    CHECK(listed());
+    // A click on it goes to the nest's Kontor.
+    std::vector<sim::Command> out;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 63031}, list, c, out);
+    const auto request = p->take_request();
+    REQUIRE(request.has_value());
+    CHECK(request->x == 4 + 6);
+    CHECK(request->y == 4 + 5);
+    // Another player who discovered it does not make it known to the local one.
+    t.world.island(0).discovered.assign(t.world.players().size(), false);
+    t.world.island(0).discover(kOther);
+    CHECK(!listed());
+}
