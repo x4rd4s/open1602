@@ -753,12 +753,7 @@ private:
             k.city = std::make_pair(city.island, city.index);
             const sim::Player* owner = w.player(city.owner);
             if (!sim::kontor_open(w, c.buildings, city)) {
-                // A destroyed Kontor of the natives, pirates or a defeated player: no buttons. That of
-                // a defenceless city of another human or computer player can be built over with a
-                // Kontor of one's own, which takes the city over: the ship offers the Kontor.
-                k.found = city.owner != ship.owner && owner != nullptr &&
-                          (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer) &&
-                          sim::city_defenceless(w, c.buildings, city.island, city.index);
+                // A destroyed Kontor of the natives, pirates or a defeated player: no buttons.
             } else if (city.owner == ship.owner) {
                 k.own_kontor = true;
             } else if (owner != nullptr && w.behaviour(*owner) == sim::FactionBehaviour::Pirates) {
@@ -769,6 +764,15 @@ private:
             } else if (w.diplomacy().may_trade(ship.owner, city.owner)) {  // natives too: by treaty
                 k.foreign_kontor = true;
             }
+            // The destroyed Kontor of a defenceless city of another human or computer player can be
+            // built over with a Kontor of one's own, which takes the city over: the ship offers it.
+            const auto kontor =
+                city.warehouse_x && city.warehouse_y
+                    ? sim::building_at(w, c.buildings, city.island, {*city.warehouse_x, *city.warehouse_y})
+                    : std::nullopt;
+            k.found = kontor && kontor->type->destroyed && city.owner != ship.owner && owner != nullptr &&
+                      (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer) &&
+                      sim::city_defenceless(w, c.buildings, city.island, city.index);
         } else if (const auto site = sim::kontor_site_near(w, c.buildings, ship.x, ship.y)) {
             // Land within 4 tiles of a ship in an island's rectangle where the player has no city
             // yet (0x00448EF0).

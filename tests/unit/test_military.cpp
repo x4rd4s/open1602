@@ -756,6 +756,25 @@ TEST_CASE("military: a computer gives up a city without Kontor, market, tower an
             CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
         }
     }
+    // Razed before (a savegame): given up with the cities' next check.
+    {
+        Field r;
+        r.build(kKontorDestroyed, 20, 5, 1);
+        r.world.city(0, 0)->warehouse_x = 20;
+        r.world.city(0, 0)->warehouse_y = 5;
+        std::vector<sim::ConstructionEvent> events;
+        CHECK(sim::give_up_razed_cities(r.world, r.buildings, &events) == 1);
+        CHECK(r.world.city(0, 0) == nullptr);
+        CHECK(std::any_of(events.begin(), events.end(),
+                          [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
+        // Not a city whose Kontor stands, nor one of a human player.
+        Field k;
+        k.build(kKontor, 20, 5, 1);
+        k.world.city(0, 0)->warehouse_x = 20;
+        k.world.city(0, 0)->warehouse_y = 5;
+        k.build(kKontorDestroyed, 10, 5, 0, 1);
+        CHECK(sim::give_up_razed_cities(k.world, k.buildings, nullptr) == 0);
+    }
     // A human player's city stays.
     Field h;
     h.build(kKontorDestroyed, 20, 5, 0);

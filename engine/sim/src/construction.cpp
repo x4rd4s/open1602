@@ -2365,6 +2365,36 @@ bool computer_city_gone(const World& world, const assets::BuildingTable& buildin
     return true;
 }
 
+std::size_t give_up_razed_cities(World& world, const assets::BuildingTable& buildings,
+                                 std::vector<ConstructionEvent>* events) {
+    if (world.original_bugs().native_land) {
+        return 0;
+    }
+    std::vector<std::pair<std::uint16_t, std::uint8_t>> gone;
+    for (const City& c : world.cities()) {
+        // Cheap first: only a city whose Kontor lies in ruins is given up.
+        if (!c.warehouse_x || !c.warehouse_y) {
+            continue;
+        }
+        const auto kontor = building_at(world, buildings, c.island, {*c.warehouse_x, *c.warehouse_y});
+        if (!kontor || !kontor->type->destroyed) {
+            continue;
+        }
+        const Player* owner = world.player(c.owner);
+        if (owner != nullptr && owner->role == PlayerRole::Computer &&
+            world.acts_as(c.owner, FactionBehaviour::Settlers) &&
+            computer_city_gone(world, buildings, c.island, c.index)) {
+            gone.emplace_back(c.island, c.index);
+        }
+    }
+    for (const auto& [island, city] : gone) {
+        Builder builder(world, buildings, island, events);
+        builder.dissolve_city(city);
+        builder.finish();
+    }
+    return gone.size();
+}
+
 bool native_village_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                          std::uint8_t city) {
     if (island >= world.islands().size() || world.city(island, city) == nullptr ||
