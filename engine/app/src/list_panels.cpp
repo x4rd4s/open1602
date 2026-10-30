@@ -4,8 +4,8 @@
 // CityList_Refresh 0x00434200; docs/re/ui.md): opened from the player status or with L and
 // Shift+L, 13 rows a page; a click on a name goes there (a ship is also selected). Open1602 (FB-6):
 // the mouse wheel scrolls row by row, a click on the heading orders the list (ships by name, idle
-// first or damaged first; cities by name), and the list is gathered a few times a second rather
-// than every frame.
+// first or damaged first; cities by name), the city list also shows the pirates' nests the player
+// has discovered, and the list is gathered a few times a second rather than every frame.
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -223,14 +223,23 @@ private:
             sort_rows();
             return;
         }
-        // Cities of humans and computers: the player's own and those of trade partners.
+        // Cities of humans and computers: the player's own and those of trade partners. Open1602
+        // adds the pirates' nests the player has discovered, while their Kontor stands (the
+        // original lists no pirates).
         for (const sim::City& city : w.cities()) {
             const sim::Player* owner = w.player(city.owner);
-            if (owner == nullptr || city.island >= w.islands().size() ||
-                (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+            if (owner == nullptr || city.island >= w.islands().size()) {
                 continue;
             }
-            if (city.owner != c.local && (c.local == sim::kNoPlayer || !w.diplomacy().may_trade(c.local, city.owner))) {
+            if (w.behaviour(*owner) == sim::FactionBehaviour::Pirates) {
+                if (c.local == sim::kNoPlayer || !w.islands()[city.island].discovered_by(c.local) ||
+                    !sim::kontor_open(w, c.buildings, city)) {
+                    continue;
+                }
+            } else if (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer) {
+                continue;
+            } else if (city.owner != c.local &&
+                       (c.local == sim::kNoPlayer || !w.diplomacy().may_trade(c.local, city.owner))) {
                 continue;
             }
             const sim::WorldIsland& island = w.islands()[city.island];
