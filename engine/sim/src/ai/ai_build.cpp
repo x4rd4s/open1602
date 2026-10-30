@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <optional>
+#include <utility>
+#include <vector>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -143,7 +145,7 @@ std::int32_t Engine::road_line(AiPlayer& p, std::int32_t x, std::int32_t y, std:
         if (!t.valid() || (t.city != p.city)) {
             break;
         }
-        if (t.kind == kind::kRoad || t.kind == kind::kBridge) {
+        if (way(t)) {
             if (!items.empty()) {
                 break;
             }
@@ -169,8 +171,7 @@ std::int32_t Engine::road_line(AiPlayer& p, std::int32_t x, std::int32_t y, std:
         bool next_to_road = false;
         for (const auto& n : kStep) {
             const Tile o = tile(p.island, cx + n[0], cy + n[1]);
-            next_to_road =
-                next_to_road || (o.valid() && o.city == p.city && (o.kind == kind::kRoad || o.kind == kind::kBridge));
+            next_to_road = next_to_road || (o.valid() && o.city == p.city && way(o));
         }
         if (next_to_road) {
             items.push_back(BuildItem{dirt->id, cx, cy, 0, 0});
@@ -229,6 +230,148 @@ void Engine::plaza_ring(AiPlayer& p) {
         }
     }
     build(p, std::move(items), false);
+}
+
+std::int32_t Engine::opened_land(const AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir, std::int32_t n,
+                                 std::vector<std::pair<std::int32_t, std::int32_t>>& seen) const {
+    const auto free_land = [&](std::int32_t fx, std::int32_t fy) {
+        const Tile t = tile(p.island, fx, fy);
+        if (!t.valid() || t.city != p.city ||
+            (t.kind != kind::kForest && t.kind != kind::kGround && t.kind != kind::kRuin)) {
+            return false;
+        }
+        for (const auto& s : kStep) {
+            if (way(tile(p.island, fx + s[0], fy + s[1]))) {
+                return false;  // a road reaches it already
+            }
+        }
+        return true;
+    };
+    const auto& d = kStep[dir & 3U];
+    const auto& side = kStep[(dir + 1U) & 3U];
+    std::int32_t used = 0;
+    for (std::int32_t i = 0; i < n; ++i) {
+        const std::int32_t rx = x + d[0] * i;
+        const std::int32_t ry = y + d[1] * i;
+        if (free_land(rx, ry)) {
+            ++used;  // land the run itself takes
+        }
+        for (const std::int32_t k : {-2, -1, 1, 2}) {
+            const std::int32_t fx = rx + side[0] * k;
+            const std::int32_t fy = ry + side[1] * k;
+            if (free_land(fx, fy) && std::find(seen.begin(), seen.end(), std::pair{fx, fy}) == seen.end()) {
+                seen.emplace_back(fx, fy);
+            }
+        }
+    }
+    return used;
+}
+
+std::int32_t Engine::road_gain(const AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir, std::int32_t right,
+                               std::int32_t left, std::int32_t back) const {
+    // The three roads of road_three: the free land they open beside them less the land they take.
+    std::vector<std::pair<std::int32_t, std::int32_t>> seen;
+    std::int32_t used = opened_land(p, x, y, static_cast<std::uint8_t>((dir + 2U) & 3U), back, seen);
+    for (const std::uint8_t arm :
+         {static_cast<std::uint8_t>((dir + 1U) & 3U), static_cast<std::uint8_t>((dir + 3U) & 3U)}) {
+        const std::int32_t n = arm == ((dir + 1U) & 3U) ? right : left;
+        used += opened_land(p, x + kStep[arm][0], y + kStep[arm][1], arm, n - 1, seen);
+    }
+    return static_cast<std::int32_t>(seen.size()) - used;
+}
+
+std::int32_t Engine::coast_run(AiPlayer& p, std::int32_t land_gain) {
+    // Open1602 (not with the original's computers): the beach is no land for buildings, so a row of
+    // piers along it, from the end of a road, opens the land beside it without taking any of that
+    // land for a road. It is laid where it opens more free land than the best next road would
+    // (`land_gain`, see road_gain) and at least kMinFrontage tiles: on a narrow strip of land along
+    // the coast, where a road would take half of the land it opens.
+    constexpr std::int32_t kMinPiers = 3;
+    constexpr std::int32_t kMaxPiers = 10;
+    constexpr std::int32_t kMinFrontage = 6;
+    const assets::BuildingType* pier = by_id(id::kPier);
+    const City* c = current_city(p);
+    if (classic() || p.pirates || pier == nullptr || !unlocked(p, *pier) || c == nullptr) {
+        return 0;
+    }
+    if (market_count(*c) < 2) {
+        return 0;  // the centre first: Kontor, market and the roads around them
+    }
+    const auto pier_ground = [&](const Tile& t) {
+        return t.valid() && t.city == p.city &&
+               (t.kind == kind::kBeach || (t.kind >= kind::kBeachOuter && t.kind <= kind::kBeachVariant) ||
+                t.kind == kind::kBeachRuin);
+    };
+    std::int32_t best = std::max(kMinFrontage - 1, land_gain);
+    std::int32_t best_x = 0;
+    std::int32_t best_y = 0;
+    std::int32_t best_n = 0;
+    std::uint8_t best_dir = 0;
+    std::vector<std::pair<std::int32_t, std::int32_t>> seen;
+    for (const Segment& g : p.segments) {
+        for (const auto& [ex, ey] : {std::pair{g.x0, g.y0}, std::pair{g.x1, g.y1}}) {
+            for (std::uint8_t to = 0; to < 4; ++to) {
+                const std::int32_t bx = ex + kStep[to][0];
+                const std::int32_t by = ey + kStep[to][1];
+                if (!pier_ground(tile(p.island, bx, by))) {
+                    continue;
+                }
+                // Straight on from the road, or along the beach to either side.
+                for (const std::uint8_t dir :
+                     {to, static_cast<std::uint8_t>((to + 1U) & 3U), static_cast<std::uint8_t>((to + 3U) & 3U)}) {
+                    const auto& d = kStep[dir];
+                    std::int32_t n = 0;
+                    while (n < kMaxPiers && pier_ground(tile(p.island, bx + d[0] * n, by + d[1] * n))) {
+                        ++n;
+                    }
+                    if (n < kMinPiers) {
+                        continue;
+                    }
+                    seen.clear();
+                    opened_land(p, bx, by, dir, n, seen);
+                    const auto frontage = static_cast<std::int32_t>(seen.size());
+                    if (frontage > best) {
+                        best = frontage;
+                        best_x = bx;
+                        best_y = by;
+                        best_n = n;
+                        best_dir = dir;
+                    }
+                }
+            }
+        }
+    }
+    if (best_n == 0) {
+        return 0;
+    }
+    std::vector<BuildItem> items;
+    const auto& d = kStep[best_dir];
+    for (std::int32_t i = 0; i < best_n; ++i) {
+        const std::int32_t x = best_x + d[0] * i;
+        const std::int32_t y = best_y + d[1] * i;
+        // Turned to the sea as the Kontor's piers are (0 east, 1 south, 2 west, 3 north).
+        auto rotation = static_cast<std::uint8_t>((best_dir + 1U) & 3U);
+        for (std::uint8_t r = 0; r < 4; ++r) {
+            const Tile w = tile(p.island, x + kStep[r][0], y + kStep[r][1]);
+            if (w.valid() && (w.kind == kind::kSea || w.kind == kind::kSurf || w.kind == kind::kSurfCorner)) {
+                rotation = r;
+                break;
+            }
+        }
+        items.push_back(BuildItem{pier->id, x, y, rotation, 0});
+    }
+    const auto placed = static_cast<std::int32_t>(build(p, std::move(items), false));
+    if (placed >= kMinPiers) {
+        // New sites along it, as after a long road (road_three).
+        if (CityPlan* r = current_plan(p)) {
+            for (SlotState& st : r->slots) {
+                st.attempts = 0;
+            }
+            r->flags &= ~city_flag::kMarket;
+        }
+        push(p, kLayout, true);
+    }
+    return placed;
 }
 
 bool in_wood_reach(const std::vector<WoodReach>& reaches, std::int32_t x, std::int32_t y) {
@@ -947,7 +1090,7 @@ void Engine::task_roads(AiPlayer& p) {
     if (c == nullptr || !c->warehouse_x || !c->warehouse_y) {
         return;
     }
-    if (p.segments.empty()) {
+    if (!any_road(p)) {
         const std::int32_t kx = *c->warehouse_x;
         const std::int32_t ky = *c->warehouse_y;
         const std::uint8_t rot =
@@ -973,7 +1116,7 @@ void Engine::task_roads(AiPlayer& p) {
     std::int32_t b_right = 0;
     for (std::size_t i = 0; i < p.segments.size(); ++i) {
         const Segment& g = p.segments[i];
-        if (!g.open) {
+        if (!g.open || pier_run(p, g)) {
             continue;
         }
         const std::uint8_t out = static_cast<std::uint8_t>((g.dir + 2U) & 3U);
@@ -1000,6 +1143,12 @@ void Engine::task_roads(AiPlayer& p) {
             b_right = right;
         }
     }
+    const std::int32_t land_gain = best > 0 ? road_gain(p, bx, by, p.segments[best_index].dir, std::min(b_right, 7),
+                                                        std::min(b_left, 7), std::min(b_back, 7))
+                                            : 0;
+    if (coast_run(p, land_gain) > 0) {
+        return;
+    }
     if (best <= 0) {
         for (Segment& g : p.segments) {
             g.open = false;
@@ -1014,10 +1163,18 @@ void Engine::task_roads(AiPlayer& p) {
     }
 }
 
+bool Engine::pier_run(const AiPlayer& p, const Segment& g) const {
+    return tile(p.island, g.x0, g.y0).kind == kind::kPier && tile(p.island, g.x1, g.y1).kind == kind::kPier;
+}
+
+bool Engine::any_road(const AiPlayer& p) const {
+    return std::any_of(p.segments.begin(), p.segments.end(), [&](const Segment& g) { return !pier_run(p, g); });
+}
+
 void Engine::task_layout(AiPlayer& p) {
     pop(p);
     build_segments(p);
-    if (p.segments.empty()) {
+    if (!any_road(p)) {
         push(p, kRoads, false);
     }
 }
@@ -1246,8 +1403,7 @@ void Engine::sweep(AiPlayer& p) {
             bool joined = false;
             for (const auto& n : kStep) {
                 const Tile o = tile(p.island, x + n[0], y + n[1]);
-                joined = joined || (o.valid() && (o.kind == kind::kRoad || o.kind == kind::kBridge ||
-                                                  o.kind == kind::kGate || o.prod == prod::kKontor));
+                joined = joined || (o.valid() && (way(o) || o.kind == kind::kGate || o.prod == prod::kKontor));
             }
             if (!joined) {
                 demolish_tile(p, x, y);  // an isolated piece of road
@@ -1281,7 +1437,7 @@ void Engine::sweep(AiPlayer& p) {
                       if (o.ware == t.raw) {
                           ++fields;
                       }
-                      if (d == 0 && (o.kind == kind::kRoad || o.kind == kind::kBridge)) {
+                      if (d == 0 && way(o)) {
                           road = true;
                       }
                   });

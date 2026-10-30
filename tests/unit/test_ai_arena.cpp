@@ -44,6 +44,7 @@ constexpr std::uint32_t kChapel = 20803;
 constexpr std::uint32_t kRoadDirt = 20411;
 constexpr std::uint32_t kWebstube = 20507;
 constexpr std::uint32_t kYard = 22115;
+constexpr std::uint32_t kPier = 21073;
 constexpr std::uint16_t kShipFigure = 21;
 
 constexpr sim::PlayerId kFirst = 0;
@@ -51,8 +52,9 @@ constexpr sim::PlayerId kSecond = 1;
 constexpr sim::PlayerId kTrader = 2;
 constexpr sim::PlayerId kNatives = 3;
 
-/// With `yard`, a weaving hut and the small shipyard too, so that a computer wants a yard.
-assets::BuildingTable make_buildings(bool yard = false) {
+/// With `yard`, a weaving hut and the small shipyard too, so that a computer wants a yard. With
+/// `pier`, the pier too.
+assets::BuildingTable make_buildings(bool yard = false, bool pier = false) {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"BGRUPPE", 5}, {"BGRUPPE_WARE", 6}};
     const std::string yard_records =
         "  @Nummer: +1\n  Id: 20507\n  Kind: 14\n  Gfx: 90\n  Size: 2, 2\n  Wegspeed: 120, 120, 120, 100\n"
@@ -62,6 +64,9 @@ assets::BuildingTable make_buildings(bool yard = false) {
         "  @Nummer: +1\n  Id: 22115\n  Kind: 36\n  Gfx: 100\n  Size: 2, 3\n  Wegspeed: 120, 120, 120, 100\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 14\n    Rohstoff: 23\n    Rohmenge: 2\n    Kosten: 30, 12\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 200\n  EndObj\n";
+    const std::string pier_record =
+        "  @Nummer: +1\n  Id: 21073\n  Kind: 30\n  Gfx: 110\n  Size: 1, 1\n  Wegspeed: 100, 100, 100, 100\n"
+        "  Objekt: HAUS_BAUKOST\n    Money: 10\n  EndObj\n";
     const auto doc = assets::cod::parse(
         "Nahrung: 1.3\n"
         "Objekt: BGRUPPE\n"
@@ -135,7 +140,7 @@ assets::BuildingTable make_buildings(bool yard = false) {
         "Maxlager: 4\n"
         "    Interval: 20\n    Figurnr: 86\n    Radius: 6\n    Kosten: 5, 2\n    Arbeiter: 2\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Holz: 2\n    Money: 100\n  EndObj\n" +
-            (yard ? yard_records : std::string()) + "EndObj\n",
+            (yard ? yard_records : std::string()) + (pier ? pier_record : std::string()) + "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -172,14 +177,18 @@ assets::FigureTable make_figures() {
 /// 47..49). Players 0 and 1 are computers, each with a ship east of its island; 2 the trader, 3 the
 /// natives. With `yard`, the buildings of make_buildings(true) and on each island a lake (columns
 /// 38..40, rows 18..32) behind the coast, closer to the city's roads than the sea, with a beach on
-/// its east shore (column 41).
+/// its east shore (column 41). With `with_piers`, the pier too; with `with_strip`, south of row 20
+/// only a strip of land three tiles wide (columns 43..45) along the beach, sea west of it.
 struct Arena {
     bool yard = false;
     assets::BuildingTable buildings;
     assets::FigureTable figures = make_figures();
     sim::World world{150, 80};
 
-    explicit Arena(bool with_yard = false) : yard(with_yard), buildings(make_buildings(with_yard)) {
+    bool strip = false;
+
+    explicit Arena(bool with_yard = false, bool with_piers = false, bool with_strip = false)
+        : yard(with_yard), buildings(make_buildings(with_yard, with_piers)), strip(with_strip) {
         add_island(10, 15);
         add_island(90, 15);
         std::vector<sim::Player> players(4);
@@ -200,7 +209,9 @@ struct Arena {
             for (std::int32_t x = 0; x < 50; ++x) {
                 std::uint32_t id = kGround;
                 const bool lake_row = yard && y >= 18 && y <= 32;
-                if (lake_row && x >= 38 && x <= 40) {
+                if (strip && y >= 20 && x < 43) {
+                    id = kSea;
+                } else if (lake_row && x >= 38 && x <= 40) {
                     id = kSea;
                 } else if (lake_row && x == 41) {
                     id = kBeach;
@@ -474,4 +485,26 @@ TEST_CASE("ai arena: a computer without ships or yard buys the cheapest ship on 
     CHECK(bought);
     CHECK(a.world.ship(dear_id)->owner == kSecond);
     CHECK(a.world.player(kSecond)->money == money + 500);
+}
+
+TEST_CASE("ai arena: a computer opens the land between its road and the beach with piers, not the original's") {
+    // With the narrow strip the computer's main road runs along column 43, which leaves two tiles
+    // of land to the beach: too narrow for another road beside it, wide enough for houses beside a
+    // row of piers on the beach.
+    const auto play = [](bool piers, bool classic) {
+        Arena a(false, piers, true);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 5 * 60'000);
+        return std::pair{a.built(kFirst)[kPier], a.houses(kFirst)};
+    };
+    const auto [piers, houses] = play(true, false);
+    const auto [no_piers, roads_only] = play(false, false);
+    const auto [classic_piers, classic_houses] = play(true, true);
+    CHECK(no_piers == 0);
+    CHECK(piers > 3);  // the Kontor's three and a row along the beach
+    CHECK(houses > roads_only);
+    CHECK(classic_piers == 3);  // the Kontor's only
+    CHECK(classic_houses > 0);
 }

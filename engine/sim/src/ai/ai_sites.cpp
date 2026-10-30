@@ -175,10 +175,10 @@ void Engine::build_segments(AiPlayer& p) {
     // Road piece of the current city: 0 straight, 1 curve, 2 T, 3 cross; -1 no road.
     const auto piece = [&](std::int32_t x, std::int32_t y) -> std::int32_t {
         const Tile t = tile(island, x, y);
-        if (!t.valid() || t.city != p.city || (t.kind != kind::kRoad && t.kind != kind::kBridge)) {
+        if (!t.valid() || t.city != p.city || !way(t)) {
             return -1;
         }
-        if (t.kind == kind::kBridge || t.type->kreuz_base <= 0) {
+        if (t.kind == kind::kBridge || t.kind == kind::kPier || t.type->kreuz_base <= 0) {
             return 0;
         }
         const auto v = static_cast<std::int32_t>(t.type->record) - t.type->kreuz_base;
@@ -483,7 +483,7 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
             Acc acc;
             rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 9,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (d == 0 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                      if (d == 0 && way(t)) {
                           acc.road = true;
                       }
                       if (coast(t.kind) && d < 8) {
@@ -550,7 +550,7 @@ bool Engine::search_stonemason(AiPlayer& p) {
             Acc acc;
             rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 13,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (d == 0 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                      if (d == 0 && way(t)) {
                           acc.road = true;
                       }
                       if (t.origin && market_or_kontor(t) && d < 13) {
@@ -614,7 +614,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                 }
                 rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 13,
                       [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                          if (d <= 1 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                          if (d <= 1 && way(t)) {
                               acc.road = true;
                           }
                           if (woodcutter) {
@@ -717,7 +717,7 @@ bool Engine::search_grain(AiPlayer& p) {
             Acc acc;
             rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 13,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (d <= 1 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                      if (d <= 1 && way(t)) {
                           acc.road = true;
                       }
                       if (t.prod == prod::kShipyard && d <= 3) {
@@ -788,7 +788,7 @@ bool Engine::search_hunter(AiPlayer& p) {
                           min_dx = std::min(min_dx, dx);
                       }
                   }
-                  if (d == 0 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                  if (d == 0 && way(t)) {
                       acc.road = true;
                   }
                   if (market_or_kontor(t) && d < 12) {
@@ -841,7 +841,7 @@ bool Engine::search_market(AiPlayer& p) {
             std::int32_t free = 0;
             rings(p, RingFilter::Any, c.x0, c.y0, c.x1, c.y1, kRings,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (d == 0 && (t.kind == kind::kRoad || t.kind == kind::kBridge) && t.city == p.city) {
+                      if (d == 0 && way(t) && t.city == p.city) {
                           acc.road = true;
                       }
                       if (t.city == MapCell::kNoCity &&
@@ -989,9 +989,7 @@ bool Engine::search_claim(AiPlayer& p) {
             }
             bool road = false;
             rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 1,
-                  [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t) {
-                      road = road || t.kind == kind::kRoad || t.kind == kind::kBridge;
-                  });
+                  [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t) { road = road || way(t); });
             if (!road) {
                 continue;
             }
@@ -1132,7 +1130,7 @@ bool Engine::search_military(AiPlayer& p) {
             acc.score = 1000;
             rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 9,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (d == 0 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                      if (d == 0 && way(t)) {
                           acc.road = true;
                       }
                       if (coast(t.kind) && d < 4) {
@@ -1357,6 +1355,12 @@ std::int32_t Engine::mountain_walk(AiPlayer& p, std::int32_t x, std::int32_t y, 
     return -1;
 }
 
+bool Engine::way(const Tile& t) const {
+    // What the market carts drive on and the sites are laid along: roads and bridges, and in
+    // Open1602 the piers along the coast too (not with the original's computers).
+    return t.kind == kind::kRoad || t.kind == kind::kBridge || (t.kind == kind::kPier && !classic());
+}
+
 std::int32_t Engine::free_run(std::uint16_t island, std::uint8_t own, std::int32_t x, std::int32_t y,
                               std::uint8_t dir) const {
     // 0x0040FE80: straight tiles of the city or of nobody that a road can take (single river
@@ -1555,7 +1559,7 @@ bool Engine::mine_path(AiPlayer& p, std::uint8_t w, std::vector<BuildItem>& road
     for (std::int32_t y = 0; y < height; ++y) {
         for (std::int32_t x = 0; x < width; ++x) {
             const Tile t = tile(p.island, x, y);
-            if (t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+            if (t.city == p.city && way(t)) {
                 prev[static_cast<std::size_t>(y * width + x)] = -1;
                 queue.push_back(y * width + x);
             }
@@ -1668,7 +1672,7 @@ bool Engine::search_mine_wide(AiPlayer& p, std::uint8_t w) {
     for (std::int32_t y = s.phase; y < end; ++y) {
         for (std::int32_t x = 0; x < static_cast<std::int32_t>(map.width()); ++x) {
             const Tile t = tile(p.island, x, y);
-            if (t.city != p.city || (t.kind != kind::kRoad && t.kind != kind::kBridge)) {
+            if (t.city != p.city || !way(t)) {
                 continue;
             }
             for (std::uint8_t dir = 0; dir < 4; ++dir) {

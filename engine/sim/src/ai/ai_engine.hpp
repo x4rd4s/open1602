@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "ai_state.hpp"
@@ -402,6 +403,9 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
+    /// A tile the city's market carts drive on and its sites lie along: road, bridge, and in
+    /// Open1602 a pier.
+    [[nodiscard]] bool way(const Tile& t) const;
     bool farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                    std::int32_t y1);
     [[nodiscard]] std::uint16_t house_services(std::uint16_t island, std::int32_t x, std::int32_t y) const;
@@ -513,6 +517,21 @@ private:
     std::int32_t road_three(AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir, std::int32_t right,
                             std::int32_t left, std::int32_t back, bool force);
     void plaza_ring(AiPlayer& p);
+    /// Open1602: a row of piers along the beach from the end of a road, where it opens more free
+    /// land beside it than the next road would gain (task 6); the tiles placed.
+    std::int32_t coast_run(AiPlayer& p, std::int32_t land_gain);
+    /// Open1602: the free land within two tiles beside a run of `n` tiles from (x, y) towards `dir`
+    /// that no road reaches yet, added to `seen` once each; returns the free land the run takes.
+    std::int32_t opened_land(const AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir, std::int32_t n,
+                             std::vector<std::pair<std::int32_t, std::int32_t>>& seen) const;
+    /// Open1602: what road_three's roads from (x, y) would gain: the free land they open less the
+    /// land they take, to weigh against a coast run.
+    [[nodiscard]] std::int32_t road_gain(const AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir,
+                                         std::int32_t right, std::int32_t left, std::int32_t back) const;
+    /// A run of piers only (both ends a pier), such as the Kontor's: no road a new road starts from.
+    [[nodiscard]] bool pier_run(const AiPlayer& p, const Segment& g) const;
+    /// Some run of the city is a road, not piers only.
+    [[nodiscard]] bool any_road(const AiPlayer& p) const;
     /// The city's own woodcutters whose reach may cover a tile within `n` rings of the rectangle.
     [[nodiscard]] std::vector<WoodReach> woodcutters_near(AiPlayer& p, std::int32_t x0, std::int32_t y0,
                                                           std::int32_t x1, std::int32_t y1, std::int32_t n);
