@@ -66,13 +66,14 @@ void write(const std::filesystem::path& file, const std::string& text) {
 /// MKSHIP (50002..50040), SKSOLDAT (65002..65030), MKSOLDAT (52002..52040), VERTRAG (56001..56070),
 /// TRIBUT (64001..64030), INFRA (62002..62021), HANDEL (53002..53100) and the ship window's (SHIP,
 /// TRANSFER, TRADE, ROUTE, PIRAT, PIRATORD, TRADER) layouts and the GAME and
-/// DIVERS texts the windows show.
+/// DIVERS texts the windows show. With `route_row`, ROUTE.GAD has the gadgets of all four stops
+/// and MUSIK.GAD its list arrows: the route editor gets Open1602's row below the stops.
 struct Game {
     std::filesystem::path root;
     std::optional<assets::GameDirectory> dir;
     assets::TextTable texts;
 
-    explicit Game(const std::string& name) {
+    explicit Game(const std::string& name, bool route_row = false) {
         root = test::temp_path(name);
         std::filesystem::remove_all(root);
         for (const char* file : {"haeuser.cod", "figuren.cod", "toolgfx/stadtfld.col", "gfx/stadtfld.bsh"}) {
@@ -169,7 +170,10 @@ struct Game {
         range("SHIP.GAD", 38001, 38111);
         range("TRANSFER.GAD", 45002, 45160);
         range("TRADE.GAD", 33002, 33060);
-        range("ROUTE.GAD", 58001, 58100);
+        range("ROUTE.GAD", 58001, route_row ? 58260 : 58100);
+        if (route_row) {
+            range("MUSIK.GAD", 49002, 49012);
+        }
         range("PIRAT.GAD", 54002, 54010);
         range("PIRATORD.GAD", 55002, 55045);
         range("TRADER.GAD", 59001, 59094);
@@ -1280,15 +1284,25 @@ TEST_CASE("selection panels: the ship window gives the orders of a ship at sea a
     CHECK(op(3) == sim::ShipCommand::Op::Scuttle);
     out.clear();
 
-    // The route editor is a page of its own; Escape comes back.
+    // The route editor is a page of its own; Escape and a right click come back.
     const ui::Panel* root = &p->panel();
-    CHECK(!p->wheel(-1));  // the ship's page has no list
+    CHECK(!p->wheel(-1));     // the ship's page has no list
+    CHECK(!p->steps_back());  // a right click there goes out to the player status
     p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 38021}, pioneer, c, out);
     CHECK(&p->panel() != root);
     p->refresh(pioneer, c);
     CHECK(!p->wheel(-1));  // four stops without Open1602's row (ROUTE.GAD lacks the stops' arrows here)
+    CHECK(p->steps_back());
+    // Choosing a stop on the map ends first, the editor stays.
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 58041}, pioneer, c, out);  // the first stop's symbol
+    REQUIRE(p->picking());
+    CHECK(p->back());
+    CHECK(!p->picking());
+    CHECK(&p->panel() != root);
+    CHECK(p->steps_back());
     CHECK(p->back());
     CHECK(&p->panel() == root);
+    CHECK(!p->steps_back());
     CHECK(!p->back());
     CHECK(out.empty());
 
@@ -1323,6 +1337,53 @@ TEST_CASE("selection panels: the ship window gives the orders of a ship at sea a
     CHECK(buy->op == sim::ShipCommand::Op::Buy);
     CHECK(buy->ship == bargain.ship);
     CHECK(buy->player == kLocal);
+}
+
+TEST_CASE("selection panels: the route editor's ship button and a right click lead back to the ship") {
+    Game g("o1602-test-selection-route-back", true);
+    Town t;
+    t.world.add_ship(sim::make_ship("Pioneer", 30, 30, 0, kLocal));
+    sim::Simulation simulation(t.world, t.buildings, t.figures);
+    SelectionPanels panels(*g.dir);
+    const PanelContext c{simulation, t.buildings, t.figures, &g.texts, kLocal};
+    Selection s;
+    s.kind = Selection::Kind::Ship;
+    s.ship = t.world.ships().back().id;
+    s.serial = 1;
+    SelectionPanel* p = panels.panel_for(s, c);
+    REQUIRE(p != nullptr);
+    p->refresh(s, c);
+    const ui::Panel* root = &p->panel();
+    std::vector<sim::Command> out;
+    const auto click = [&](std::int32_t id) {
+        p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, id}, s, c, out);
+        p->refresh(s, c);
+    };
+    constexpr std::int32_t kRouteEditor = 38021;
+    constexpr std::int32_t kShipButton = 58304;
+    click(kRouteEditor);
+    REQUIRE(&p->panel() != root);
+    REQUIRE(p->panel().layout().find(kShipButton) != nullptr);
+    CHECK(p->help(kShipButton, s, c).has_value());
+    // The button: straight back to the ship's page, also while choosing a stop.
+    click(58041);  // the first stop's symbol: choosing its city on the map
+    REQUIRE(p->picking());
+    click(kShipButton);
+    CHECK(&p->panel() == root);
+    CHECK(!p->picking());
+    CHECK(!p->steps_back());
+    // A right click: one step at a time, the choice of a stop first.
+    click(kRouteEditor);
+    click(58041);
+    REQUIRE(p->picking());
+    REQUIRE(p->steps_back());
+    CHECK(p->back());
+    CHECK(!p->picking());
+    CHECK(&p->panel() != root);
+    REQUIRE(p->steps_back());
+    CHECK(p->back());
+    CHECK(&p->panel() == root);
+    CHECK(out.empty());
 }
 
 TEST_CASE("selection panels: at the pirates' Kontor a ship trades and deals with the pirates") {

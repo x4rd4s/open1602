@@ -352,6 +352,7 @@ route.current_stop = {1} (the ship sails here now)
 route.stop_wares = Show all {1} wares of this stop
 route.show_stop = Show stop {1}
 route.back = Back to the route
+route.back_to_ship = Back to the ship, where the route is started (also right click)
 route.no_hold = No hold free on this ship: the ware stays in the route for larger ships
 
 # Window title
