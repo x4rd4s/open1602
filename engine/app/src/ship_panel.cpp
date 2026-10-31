@@ -314,12 +314,13 @@ public:
             return;
         }
         if (copy) {
-            if (const sim::Ship* from = route_source_near(*ship, c, x, y)) {
+            // The selected ship's stops go to the ship clicked on: copy here, paste there.
+            if (const sim::Ship* to = route_target_near(*ship, c, x, y)) {
                 sim::RouteEdit o;
                 o.player = c.local;
-                o.ship = ship->id;
+                o.ship = to->id;
                 o.op = sim::RouteEdit::Op::CopyFrom;
-                o.target = sim::Target::other_ship(from->id);
+                o.target = sim::Target::other_ship(ship->id);
                 out.emplace_back(o);
             }
             return;
@@ -1531,21 +1532,26 @@ private:
         return m_route_row && !m_is_cart ? sim::TradeRoute::kStops / kStopsShown : 1;  // a cart has four stops
     }
     /// Another own ship with a route of cities by the tile clicked (ships stand out of their tile).
-    [[nodiscard]] static const sim::Ship* route_source_near(const sim::Ship& ship, const PanelContext& c,
+    /// Whether the route has a city to copy (patrol points and ships to meet are not copied).
+    [[nodiscard]] static bool has_city_stop(const sim::Ship& ship) {
+        return std::ranges::any_of(ship.route.stops,
+                                   [](const sim::RouteStop& st) { return st.target.kind == sim::Target::Kind::City; });
+    }
+
+    /// The own ship (or cart, for a cart) nearest to the clicked tile that takes the copied route.
+    [[nodiscard]] static const sim::Ship* route_target_near(const sim::Ship& ship, const PanelContext& c,
                                                             std::uint32_t x, std::uint32_t y) {
         constexpr std::int32_t kReach = 2;
         const sim::Ship* best = nullptr;
         std::int32_t best_distance = kReach + 1;
         for (const sim::Ship& other : c.world().ships()) {
-            if (other.id == ship.id || other.owner != ship.owner || other.sinking) {
+            if (other.id == ship.id || other.owner != ship.owner || other.sinking || other.cart() != ship.cart()) {
                 continue;
             }
-            const bool cities = std::ranges::any_of(
-                other.route.stops, [](const sim::RouteStop& st) { return st.target.kind == sim::Target::Kind::City; });
             const std::int32_t d =
                 std::max(std::abs(static_cast<std::int32_t>(other.x) - static_cast<std::int32_t>(x)),
                          std::abs(static_cast<std::int32_t>(other.y) - static_cast<std::int32_t>(y)));
-            if (cities && d < best_distance) {
+            if (d < best_distance) {
                 best = &other;
                 best_distance = d;
             }
@@ -1643,6 +1649,7 @@ private:
         if (m_route_row) {
             if (m_stop_page) {
                 m_route.set_text(kRouteCopy, ui::tr("route.back"));
+                m_route.set_disabled(kRouteCopy, false);
                 m_route.set_disabled(kRouteUp, !neighbour_stop(ship, c, *m_stop_page, -1));
                 m_route.set_disabled(kRouteDown, !neighbour_stop(ship, c, *m_stop_page, 1));
                 m_route.set_selected(kRouteCopy, false);
@@ -1650,6 +1657,11 @@ private:
                 m_route.set_text(kRouteCopy, ui::tr("route.copy"));
                 m_route.set_disabled(kRouteUp, m_route_page == 0);
                 m_route.set_disabled(kRouteDown, m_route_page + 1 >= route_pages());
+                const bool can_copy = has_city_stop(ship);
+                if (!can_copy) {
+                    m_pick_copy = false;
+                }
+                m_route.set_disabled(kRouteCopy, !can_copy);
                 m_route.set_selected(kRouteCopy, m_pick_copy);
             }
         }
@@ -1688,8 +1700,8 @@ private:
                         m_pick_stop.reset();
                         return;
                     }
-                    // Waits for a click on another own ship on the map, whose stops this one takes.
-                    m_pick_copy = !m_pick_copy;
+                    // Waits for a click on another own ship on the map, which takes this ship's stops.
+                    m_pick_copy = !m_pick_copy && has_city_stop(ship);
                     m_pick_stop.reset();
                     return;
                 default:
@@ -2031,7 +2043,7 @@ private:
     std::int32_t m_gfx_arrow = 605;
     std::int32_t m_gfx_pirate_arms = 548;
     std::optional<std::uint8_t> m_pick_stop;  ///< the stop whose city a click on the map chooses
-    bool m_pick_copy = false;                 ///< a click on the map chooses the ship to copy from
+    bool m_pick_copy = false;                 ///< a click on the map chooses the ship that takes the route
     bool m_route_row = false;                 ///< the editor has Open1602's row (copy, pages)
     std::size_t m_route_page = 0;             ///< stops 1-4 or 5-8 in the editor
     std::optional<std::uint8_t> m_stop_page;  ///< the stop whose page of wares the editor shows

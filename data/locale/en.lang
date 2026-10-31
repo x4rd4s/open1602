@@ -348,7 +348,7 @@ diplomacy.no_wars = {1} is at peace with everyone
 # Trade route editor: the row below the stops (copy a route, show the stops {1} as 1-4 or 5-8),
 # and the help line of the stop the ship sails to now ({1}: the original's help line)
 route.copy = Copy route
-route.copy_help = Take the stops of another of your ships: click on it on the map
+route.copy_help = Give these stops to another of your ships: click on it on the map
 route.show_stops = Show the stops {1}
 route.current_stop = {1} (the ship sails here now)
 route.stop_wares = Show all {1} wares of this stop
