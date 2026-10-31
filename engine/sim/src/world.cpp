@@ -585,6 +585,9 @@ PlayerId take_single_player(World& world, std::uint64_t owner) {
     }
     for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
         Player* p = world.player(static_cast<PlayerId>(i));
+        if (p == nullptr) {
+            continue;
+        }
         if (i == own) {
             p->owner = owner != 0 ? owner : p->owner;
         } else if (p->role == PlayerRole::Human) {
