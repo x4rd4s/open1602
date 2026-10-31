@@ -723,6 +723,30 @@ TEST_CASE("ui: cutting text to a width finds the same cut as trying one byte aft
     }
 }
 
+TEST_CASE("ui: wrap_lines keeps every character of what players write") {
+    using Lines = std::vector<std::string>;
+    // Without a font every byte is 9 units wide: 45 units hold five bytes.
+    CHECK((ui::wrap_lines(nullptr, "", 45) == Lines{""}));
+    CHECK((ui::wrap_lines(nullptr, "ab cd", 45) == Lines{"ab cd"}));
+    CHECK((ui::wrap_lines(nullptr, "ab cd ef", 45) == Lines{"ab cd", "ef"}));
+    // A word wider than a line is cut where the line is full.
+    CHECK((ui::wrap_lines(nullptr, "abcdefghijkl", 45) == Lines{"abcde", "fghij", "kl"}));
+    // It starts on the line before, after what is there already.
+    CHECK((ui::wrap_lines(nullptr, "ab abcdefgh", 45) == Lines{"ab ab", "cdefg", "h"}));
+    CHECK((ui::wrap_lines(nullptr, "abcd abcdefgh", 45) == Lines{"abcd", "abcde", "fgh"}));
+    // Hyphens and "--" stay as written; no room at all still gives a character a line.
+    CHECK((ui::wrap_lines(nullptr, "a--b -x", 45) == Lines{"a--b", "-x"}));
+    CHECK((ui::wrap_lines(nullptr, "abc", 0) == Lines{"a", "b", "c"}));
+    // Every word is still there, in order.
+    const std::string text = "Wer baut die erste Kirche auf der grossen Insel im Norden, bevor der Winter kommt?";
+    std::string joined;
+    for (const std::string& line : ui::wrap_lines(nullptr, text, 120)) {
+        CHECK(line.size() * 9 <= 120);
+        joined += (joined.empty() ? "" : " ") + line;
+    }
+    CHECK(joined == text);
+}
+
 TEST_CASE("ui: key bindings: a key by its place works on every layout, by meaning where it is printed") {
     // SDL numbers: scancode 26 is the key at W on a US keyboard; on AZERTY it prints Z.
     constexpr std::int32_t kScanW = 26;

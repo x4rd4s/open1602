@@ -708,6 +708,80 @@ TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their 
     CHECK(text("Bernd joined")->ink == -1);
 }
 
+TEST_CASE("multiplayer menu: a long line in the lobby's chat is wrapped, not cut") {
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.seats = app::endless_seats(4);
+    lobby.banners = app::player_banners();
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+
+    MultiplayerMenu menu(ui::FormStyle{});
+    menu.set_banners(menu_banners(), 1);
+    app::MultiplayerModel model;
+    model.name = "Anna";
+    model.session = &host;
+    model.hosting = true;
+    const auto say = [&](std::string name, std::string text) {
+        app::ChatLine line;
+        line.name = std::move(name);
+        line.text = std::move(text);
+        line.seat = line.name.empty() ? sim::kNoPlayer : 0;
+        app::add_chat_line(&model.chat, std::move(line), false);
+    };
+    for (int n = 0; n < 20; ++n) {
+        say({}, "Line " + std::to_string(n));
+    }
+    // Without a font every byte is 9 units wide: a row of the chat holds 65 bytes.
+    const std::string first = "Wer baut die erste Kirche auf der grossen Insel im Norden, ehe";
+    const std::string second = "der Winter kommt und die Schiffe der Piraten wieder auslaufen?";
+    say("Anna", first.substr(4) + " " + second);
+    menu.show_lobby();
+
+    const auto texts = [&] {
+        std::vector<std::string> out;
+        for (const ui::DrawItem& d : menu.draw(model, kNoFonts)) {
+            if (d.kind == ui::DrawItem::Kind::Text) {
+                out.push_back(d.text);
+            }
+        }
+        return out;
+    };
+    const auto shows = [&](const std::string& t) {
+        const std::vector<std::string> all = texts();
+        return std::find(all.begin(), all.end(), t) != all.end();
+    };
+    // The name in its colour on the first row, the rest of the line on the next; nothing is cut.
+    CHECK(shows("Anna"));
+    CHECK(shows(": " + first.substr(4)));
+    CHECK(shows(second));
+    for (const std::string& t : texts()) {
+        CHECK(
+            !(t.ends_with("...") && (t.find("Kirche") != std::string::npos || t.find("Winter") != std::string::npos)));
+    }
+    // The newest two rows are the long line's; four slots leave room for eleven rows.
+    CHECK(shows("Line 19"));
+    CHECK(shows("Line 11"));
+    CHECK(!shows("Line 10"));
+
+    // The wheel goes back by rows: one notch shows the long line's first row at the bottom.
+    CHECK(menu.wheel(model, 1));
+    CHECK(shows("Line 10"));
+    CHECK(shows(": " + first.substr(4)));
+    CHECK(!shows(second));
+    // A new long line does not move what is being read.
+    say("Anna", first + " " + second);
+    CHECK(shows("Line 10"));
+    CHECK(!shows(second));
+    // Back to the newest rows.
+    CHECK(menu.wheel(model, -50));
+    CHECK(shows(": " + first.substr(4)));
+    CHECK(shows(second));
+    CHECK(!shows("Line 10"));
+    CHECK(!shows("Line 9"));
+}
+
 TEST_CASE("multiplayer menu: the host's settings travel in the lobby") {
     app::EndlessSetup settings = app::EndlessSetup::defaults(app::SetupScope::MultiplayerEndless);
     app::choose(settings, app::SetupItem::ClassicAi, 1);

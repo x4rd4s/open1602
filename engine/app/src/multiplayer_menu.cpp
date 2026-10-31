@@ -76,6 +76,7 @@ constexpr Id kReady = 62;
 constexpr Id kStart = 63;
 constexpr Id kWatch = 64;
 constexpr std::size_t kChatLines = 12;
+constexpr Rect kChatBox{48, 0, 604, 28};  ///< a row of the lobby's chat (x and width)
 // Connecting
 constexpr Id kCancel = 70;
 // The game's settings, on the create screen and in the lobby
@@ -262,6 +263,7 @@ std::vector<ui::DrawItem> MultiplayerMenu::draw(const MultiplayerModel& model,
     if (m_screen == Screen::Settings) {
         return m_settings.draw(fonts);
     }
+    m_chat_font = m_form.font(fonts);  // the chat is wrapped with it
     layout(model);
     return m_form.draw(fonts);
 }
@@ -281,11 +283,11 @@ bool MultiplayerMenu::wheel(const MultiplayerModel& model, std::int32_t notches)
                 notches);
             return true;
         case Screen::Lobby: {
-            // The chat, back to older lines and forward again (not while the colours are offered).
+            // The chat, back to older rows and forward again (not while the colours are offered).
             if (m_banner_seat || m_chat_rows == 0) {
                 return true;
             }
-            const std::size_t count = model.chat.size();
+            const std::size_t count = chat_rows(model).size();
             const std::size_t last = count > m_chat_rows ? count - m_chat_rows : 0;
             const std::size_t first = last - std::min(m_chat_back, last);
             m_chat_back = last - ui::wheel_scroll(first, count, m_chat_rows, notches);
@@ -389,6 +391,29 @@ void MultiplayerMenu::open_settings(const EndlessSetup& setup, SetupScope scope,
 void MultiplayerMenu::settings_button(std::int32_t y, const EndlessSetup& setup, bool can_change) {
     m_form.label(Rect{684, y, 292, 30}, ui::tr("setup.summary", {rules_summary(setup.rules)}), Align::Left, Tone::Dim);
     m_form.button(kSettings, Rect{688, y + 34, 284, 38}, ui::tr(can_change ? "setup.change" : "setup.view"));
+}
+
+const std::vector<MultiplayerMenu::ChatRow>& MultiplayerMenu::chat_rows(const MultiplayerModel& model) {
+    // Lines without a serial cannot be told apart: wrapped anew each time.
+    const auto made_of = model.chat.empty()
+                             ? decltype(m_chat_wrapped_for){0, 0, 0, m_chat_font}
+                             : decltype(m_chat_wrapped_for){model.chat.front().serial, model.chat.back().serial,
+                                                            model.chat.size(), m_chat_font};
+    if (made_of == m_chat_wrapped_for && std::get<1>(made_of) != 0) {
+        return m_chat_wrapped;
+    }
+    m_chat_wrapped_for = made_of;
+    m_chat_wrapped.clear();
+    // As wide as a label in the chat's box has room for, so that no row is cut.
+    const double width = kChatBox.w - 2.0 * ui::kTextPadding;
+    for (std::size_t i = 0; i < model.chat.size(); ++i) {
+        const ChatLine& line = model.chat[i];
+        bool first = true;
+        for (std::string& text : ui::wrap_lines(m_chat_font, chat_prefix(line) + line.text, width)) {
+            m_chat_wrapped.push_back(ChatRow{i, line.serial, std::move(text), std::exchange(first, false)});
+        }
+    }
+    return m_chat_wrapped;
 }
 
 std::string chat_prefix(const ChatLine& line) {
@@ -677,31 +702,35 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     const auto chat_lines = static_cast<std::size_t>(std::max(0, (622 - 8 - (chat_top + 8)) / 28));
     m_chat_rows = m_banner_seat ? 0 : std::min(kChatLines, chat_lines);
     // Scrolled back (mouse wheel), the view holds still while new lines come in.
+    const std::vector<ChatRow>& wrapped = chat_rows(model);
     const std::uint64_t newest = model.chat.empty() ? 0 : model.chat.back().serial;
     if (newest < m_chat_newest) {
         m_chat_back = 0;  // the chat was cleared
     } else if (m_chat_back > 0) {
-        m_chat_back += static_cast<std::size_t>(newest - m_chat_newest);
+        for (auto r = wrapped.rbegin(); r != wrapped.rend() && r->serial > m_chat_newest; ++r) {
+            ++m_chat_back;  // a row of a new line
+        }
     }
     m_chat_newest = newest;
-    const std::size_t lines = std::min(model.chat.size(), m_chat_rows);
-    m_chat_back = std::min(m_chat_back, model.chat.size() - lines);
+    const std::size_t visible = std::min(wrapped.size(), m_chat_rows);
+    m_chat_back = std::min(m_chat_back, wrapped.size() - visible);
     if (m_banner_seat) {
         layout_banner_choice(model, chat_top + 8);
     }
-    for (std::size_t i = 0; i < lines; ++i) {
-        const ChatLine& line = model.chat[model.chat.size() - m_chat_back - lines + i];
+    for (std::size_t i = 0; i < visible; ++i) {
+        const ChatRow& row = wrapped[wrapped.size() - m_chat_back - visible + i];
+        const ChatLine& line = model.chat[row.line];
         const std::int32_t y = chat_top + 8 + static_cast<std::int32_t>(i) * 28;
-        const Rect box{48, y, 604, 28};
+        const Rect box{kChatBox.x, y, kChatBox.w, 28};
         const Tone tone = line.whisper ? Tone::Heading : Tone::Normal;
         if (line.name.empty()) {
-            f.label(box, line.text, Align::Left, Tone::Dim);
-        } else if (line.seat < lobby.seats.size()) {
+            f.label(box, row.text, Align::Left, Tone::Dim);
+        } else if (row.first && line.seat < lobby.seats.size() && row.text.starts_with(line.name)) {
             // A player's name in the colour they chose; a spectator's in the line's.
             f.speech(box, line.name, banner_text_colour(lobby.seats[line.seat].banner),
-                     chat_prefix(line).substr(line.name.size()) + line.text, tone);
+                     row.text.substr(line.name.size()), tone);
         } else {
-            f.label(box, chat_prefix(line) + line.text, Align::Left, tone);
+            f.label(box, row.text, Align::Left, tone);
         }
     }
     f.field(kChat, Rect{52, 622, 596, 36}, m_chat);

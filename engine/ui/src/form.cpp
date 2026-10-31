@@ -10,8 +10,8 @@ namespace o1602::ui {
 
 namespace {
 
-constexpr std::int32_t kBorder = 2;     ///< frame width, design units
-constexpr std::int32_t kPadding = 8;    ///< text from the left or right edge of its box
+constexpr std::int32_t kBorder = 2;  ///< frame width, design units
+constexpr std::int32_t kPadding = kTextPadding;
 constexpr std::int32_t kBox = 18;       ///< the box of a check box
 constexpr double kFallbackText = 18;    ///< text height without a font
 constexpr std::int32_t kEntryGap = 12;  ///< between an entry's label and its value
@@ -33,6 +33,70 @@ Form::Widget make(Form::Widget::Kind kind, Form::Id id, Rect r, std::string text
 }
 
 }  // namespace
+
+std::vector<std::string> wrap_lines(const Font* font, std::string_view text, double width) {
+    std::vector<std::string> lines;
+    std::string line;
+    bool open = false;  // a line is begun (it may still be empty)
+    std::size_t start = 0;
+    for (;;) {
+        const std::size_t end = std::min(text.find(' ', start), text.size());
+        std::string_view word = text.substr(start, end - start);
+        for (;;) {
+            if (!open) {
+                // The word begins the line; wider than a whole line, it is cut where the line is
+                // full (at least one character).
+                if (word.empty() || text_width(font, word) <= width) {
+                    line.assign(word);
+                    open = true;
+                    break;
+                }
+                std::size_t n = 1;
+                while (n < word.size() && text_width(font, word.substr(0, n + 1)) <= width) {
+                    ++n;
+                }
+                lines.emplace_back(word.substr(0, n));
+                word.remove_prefix(n);
+                if (word.empty()) {
+                    break;  // the word's last piece filled a line
+                }
+                continue;
+            }
+            std::string candidate = line;
+            candidate += ' ';
+            candidate += word;
+            if (text_width(font, candidate) <= width) {
+                line = std::move(candidate);
+                break;
+            }
+            if (text_width(font, word) > width) {
+                // A word wider than any line starts right here, as much of it as still fits.
+                std::size_t n = 0;
+                while (n < word.size() && text_width(font, line + ' ' + std::string(word.substr(0, n + 1))) <= width) {
+                    ++n;
+                }
+                if (n > 0) {
+                    line += ' ';
+                    line += word.substr(0, n);
+                    word.remove_prefix(n);
+                }
+            }
+            lines.push_back(std::exchange(line, {}));
+            open = false;
+            if (word.empty()) {
+                break;
+            }
+        }
+        if (end >= text.size()) {
+            break;
+        }
+        start = end + 1;
+    }
+    if (open) {
+        lines.push_back(std::move(line));
+    }
+    return lines;
+}
 
 std::string fit_text(const Font* font, std::string s, double width, bool keep_end) {
     if (text_width(font, s) <= width) {
@@ -249,10 +313,14 @@ std::int32_t Form::colour_of(Tone tone) const noexcept {
     return m_style.text;
 }
 
+const Font* Form::font(const std::array<const Font*, kFontSlots>& fonts) const noexcept {
+    return m_style.font >= 0 && m_style.font < static_cast<std::int32_t>(kFontSlots)
+               ? fonts[static_cast<std::size_t>(m_style.font)]
+               : nullptr;
+}
+
 std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& fonts) const {
-    const Font* font = m_style.font >= 0 && m_style.font < static_cast<std::int32_t>(kFontSlots)
-                           ? fonts[static_cast<std::size_t>(m_style.font)]
-                           : nullptr;
+    const Font* font = this->font(fonts);
     const double s = m_scale;
     const auto px = [s](std::int32_t v) { return to_pixels(v, s); };
     std::vector<DrawItem> out;

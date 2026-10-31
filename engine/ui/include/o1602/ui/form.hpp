@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "o1602/ui/font.hpp"
@@ -35,10 +36,18 @@ struct FormStyle {
     bool translucent = false;
 };
 
+/// Text in a form's box starts this far (design units) from its left or right edge.
+inline constexpr std::int32_t kTextPadding = 8;
+
 /// The text cut to `width` design units: its end replaced by "..." (or, with `keep_end`, for a
 /// field being typed in, its start left out, so that the caret stays in sight). Without a font
 /// every byte is 9 units wide.
 [[nodiscard]] std::string fit_text(const Font* font, std::string text, double width, bool keep_end);
+/// The text broken into lines of at most `width` design units, at its spaces; a word wider than a
+/// line is cut where the line is full. Unlike wrap_text() the text stays as it is (nothing is read
+/// as a hyphen or a line break), as it is meant for what players write. Without a font every byte is
+/// 9 units wide. Empty text is one empty line.
+[[nodiscard]] std::vector<std::string> wrap_lines(const Font* font, std::string_view text, double width);
 /// Where the bottom of the cell of text goes, design units, so that its ink sits in the middle of
 /// the line from `y`, `height` high (the digits' ink, Font::ink_drop()).
 [[nodiscard]] std::int32_t text_bottom(const Font* font, std::int32_t y, std::int32_t height);
@@ -56,6 +65,8 @@ public:
     void set_style(const FormStyle& style) { m_style = style; }
     void set_scale(double scale) noexcept { m_scale = scale; }
     [[nodiscard]] double scale() const noexcept { return m_scale; }
+    /// The font of all text out of `fonts` (FormStyle::font), if there is one.
+    [[nodiscard]] const Font* font(const std::array<const Font*, kFontSlots>& fonts) const noexcept;
 
     /// Takes all widgets away for a new layout; the pressed and the focused widget stay by Id.
     void clear() { m_widgets.clear(); }
