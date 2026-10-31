@@ -393,6 +393,7 @@ bool Fleet::plunder(Ship& pirate, Ship& victim) {
         }
         d.add_event(p, victim.owner, DiplomacyEventType::Surrendered, m_world->time_ms());
     }
+    victim.plundered = true;  // once per surrender: the pirates leave the ship alone now
     if (!any) {
         const Player* owner = m_world->player(victim.owner);
         if (owner != nullptr && owner->role != PlayerRole::Human) {

@@ -154,7 +154,7 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
         return kClosedGates;
     }
     if (id == kFleet) {
-        return kWideDiscovered;
+        return kPlunderedFlag;
     }
     if (id == kMap) {
         return kCompactMap;

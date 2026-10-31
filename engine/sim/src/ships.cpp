@@ -646,6 +646,7 @@ void Fleet::hit(std::uint32_t id, std::uint32_t damage, PlayerId attacker, bool 
         m_world->behaviour(*owner) != FactionBehaviour::Pirates) {
         // A computer's, the trader's or the natives' ship surrenders at once (0x00445930).
         ship->held = true;
+        ship->plundered = false;
         ship->motion.path.clear();
         ship->motion.path_index = 0;
         m_events.push_back(ShipEvent{ShipEvent::Kind::WhiteFlag, ship->id, ship->owner});

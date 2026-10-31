@@ -157,7 +157,11 @@ struct Ship {
     /// Open1602 (ADR 0010): attack move and hold position, as for land units.
     bool attack_move = false;
     bool hold = false;
-    bool held = false;               ///< white flag: no decisions of its own
+    /// White flag: no decisions of its own.
+    bool held = false;
+    /// The pirates have dealt with this surrender (plundered the ship, or found nothing worth
+    /// taking): they leave it alone while the flag stays up. Only meaningful while `held`.
+    bool plundered = false;
     bool sinking = false;            ///< hit fatally: turns, sinks and is removed
     std::uint64_t next_shot_ms = 0;  ///< game time of the next shot allowed (reload)
     bool repairing = false;          ///< ordered to a shipyard for repair

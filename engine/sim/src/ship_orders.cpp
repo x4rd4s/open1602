@@ -180,6 +180,7 @@ bool Fleet::command(const ShipCommand& c) {
                 if (!ship->held) {
                     order(ShipOrder{c.player, ship->id, Target{}});
                     ship->held = true;
+                    ship->plundered = false;
                     m_events.push_back(ShipEvent{ShipEvent::Kind::WhiteFlag, ship->id, ship->owner});
                 }
             } else {

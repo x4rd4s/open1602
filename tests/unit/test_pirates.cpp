@@ -864,3 +864,90 @@ TEST_CASE("natives: warriors roam around the place they went to, on road and gro
     }
     CHECK(seen.size() > 20);
 }
+
+namespace {
+
+/// A pirate at war with the human player 0 near the human's empty ship, which raises the white flag.
+struct Surrender {
+    World w{false};  // no nest: the surrender does not please the pirates, war comes back at once
+    std::uint32_t pirate = 0;
+    std::uint32_t victim = 0;
+
+    Surrender() {
+        w.start();
+        w.world.diplomacy().set_peace(w.world, 2, 0, sim::Treaty::None, 0);
+        sim::Ship p = sim::make_ship("Pirat", 40, 25, 31, 2, 2);
+        p.cargo.resize(5);
+        p.cannons = 6;
+        w.world.add_ship(p);
+        pirate = w.world.ships().back().id;
+        sim::Ship mine = sim::make_ship("Bote", 46, 25, 21, 0, 0);
+        mine.cargo.resize(4);
+        mine.health = 50 * 32;
+        w.world.add_ship(mine);
+        victim = w.world.ships().back().id;
+        sim::ShipCommand flag;
+        flag.player = 0;
+        flag.ship = victim;
+        flag.op = sim::ShipCommand::Op::WhiteFlag;
+        REQUIRE(w.fleet->command(flag));
+    }
+
+    /// Runs with the pirates' look at war and peace every 5 s, as the game does.
+    void run(std::uint32_t ms) {
+        for (std::uint32_t t = 0; t < ms; t += 5'000) {
+            w.run(5'000);
+            sim::pirates_reconsider(w.world);
+        }
+    }
+};
+
+}  // namespace
+
+TEST_CASE("pirates: a surrender is plundered once, then the pirate sails on, also at war again") {
+    // Bug report: after the white flag the pirates came to the empty ship and stayed there. Without
+    // a nest (or after enough damage) they are at war again within seconds and took the same ship
+    // as their next prey over and over.
+    Surrender s;
+    s.run(30'000);
+    CHECK(s.w.count(sim::ShipEvent::Kind::Plundered) == 1);
+    CHECK(s.w.world.diplomacy().hostile(2, 0));  // at war again: nothing pleased them
+    const sim::Ship* m = s.w.world.ship(s.victim);
+    REQUIRE(m != nullptr);
+    CHECK(m->held);
+    CHECK(m->plundered);
+    s.run(170'000);
+    CHECK(s.w.count(sim::ShipEvent::Kind::Plundered) == 1);
+    CHECK(s.w.count(sim::ShipEvent::Kind::Attacked) == 0);
+    const sim::Ship* p = s.w.world.ship(s.pirate);
+    REQUIRE(p != nullptr);
+    CHECK(!(p->target == sim::Target::other_ship(s.victim)));
+    // Under way to somewhere else, not lying at the ship.
+    CHECK(!p->target.empty());
+
+    // Sailing on strikes the flag: the ship is prey again, and a new surrender is plundered anew.
+    sim::ShipCommand down;
+    down.player = 0;
+    down.ship = s.victim;
+    down.op = sim::ShipCommand::Op::WhiteFlag;
+    down.on = false;
+    REQUIRE(s.w.fleet->command(down));
+    sim::ShipCommand up = down;
+    up.on = true;
+    REQUIRE(s.w.fleet->command(up));
+    CHECK(!s.w.world.ship(s.victim)->plundered);
+}
+
+TEST_CASE("pirates: the mark of a plundered surrender stays with the savegame") {
+    Surrender s;
+    s.run(30'000);
+    REQUIRE(s.w.world.ship(s.victim)->plundered);
+    auto bytes = sim::write_game(s.w.world, s.w.buildings, nullptr, sim::SaveOptions{false});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, s.w.buildings, nullptr, &s.w.figures);
+    REQUIRE(loaded.ok());
+    const sim::Ship* m = loaded->ship(s.victim);
+    REQUIRE(m != nullptr);
+    CHECK(m->held);
+    CHECK(m->plundered);
+}

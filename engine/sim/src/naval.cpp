@@ -80,6 +80,13 @@ bool Fleet::naval_combat(Ship& ship) {
             if (ship.route.active && c.unit.kind == Target::Kind::Building) {
                 continue;  // ships on a route leave towers alone
             }
+            if (pirate && c.unit.kind == Target::Kind::Ship) {
+                // A surrender is plundered once; afterwards the pirates leave the ship under the
+                // white flag alone and sail on, even when they are at war with its owner again.
+                if (const Ship* s = m_world->ship(c.unit.ship); s != nullptr && s->held && s->plundered) {
+                    continue;
+                }
+            }
             if (c.near && bearing_to(ship, c.unit)) {
                 fight = c.unit;
                 break;
@@ -106,8 +113,10 @@ bool Fleet::naval_combat(Ship& ship) {
     // A pirate meeting a ship with the white flag plunders it instead of shooting (0x00455840).
     if (pirate && fight.kind == Target::Kind::Ship) {
         if (Ship* victim = m_world->ship(fight.ship); victim != nullptr && victim->held) {
-            plunder(ship, *victim);
-            return false;
+            if (!victim->plundered) {
+                plunder(ship, *victim);
+            }
+            return false;  // never a shot at a ship under the white flag
         }
     }
     const auto bearing = bearing_to(ship, fight);

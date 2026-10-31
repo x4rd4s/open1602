@@ -285,6 +285,9 @@ inline constexpr std::uint16_t kCompactMap = 2;
 inline constexpr std::uint16_t kWideIslands = 3;
 inline constexpr std::uint16_t kWideEpochs = 2;
 inline constexpr std::uint16_t kWideDiscovered = 4;
+/// FLEE version 5: every ship also says whether the pirates have dealt with its surrender
+/// (Ship::plundered). The writer takes it only when a ship under the white flag has it.
+inline constexpr std::uint16_t kPlunderedFlag = 5;
 
 /// An island coordinate of ISLE and VOLC: 8 bit up to version 1, 16 bit from kWideCoordinates.
 template <class A, class T>
@@ -379,8 +382,9 @@ void write_ships(Writer& out, const World& w);
 [[nodiscard]] std::vector<Ship> read_ships(Reader& in);
 void write_fleet(Writer& out, const World& w, std::uint16_t version);
 [[nodiscard]] Decoded::FleetPart read_fleet(Reader& in, std::uint16_t version);
-/// The version of FLEE: kRouteWares if a stop has a ware beyond the original's three, kLongRoutes
-/// if a route has a stop beyond the original's four, 1 otherwise.
+/// The version of FLEE: kPlunderedFlag if a ship under the white flag has been plundered,
+/// kWideDiscovered if an island number needs 16 bits, kRouteWares if a stop has a ware beyond the
+/// original's three, kLongRoutes if a route has a stop beyond the original's four, 1 otherwise.
 [[nodiscard]] std::uint16_t fleet_version(const World& w);
 
 // army.cpp: SOLD (files older than ARMY, read only), ARMY.

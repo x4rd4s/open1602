@@ -61,6 +61,14 @@ void io_ship(A& a, S& s, std::uint16_t version) {
     io_target(a, s.order);
     io_target(a, s.previous);
     a.boolean(s.held);
+    if (version >= kPlunderedFlag) {
+        if constexpr (A::kReading) {
+            a.boolean(s.plundered);
+            s.plundered = s.plundered && s.held;
+        } else {
+            a.boolean(s.held && s.plundered);  // only meaningful under the flag
+        }
+    }
     a.boolean(s.repairing);
     a.boolean(s.for_sale);
     a.u16(s.sale_factor);
@@ -182,6 +190,10 @@ std::vector<Ship> read_ships(Reader& in) {
 }
 
 std::uint16_t fleet_version(const World& w) {
+    // Version 5 has all of version 4 and the pirates' mark on a surrendered ship.
+    if (std::ranges::any_of(w.ships(), [](const Ship& s) { return s.held && s.plundered; })) {
+        return kPlunderedFlag;
+    }
     // Version 4 has the routes of version 3 and wide island numbers.
     if (std::ranges::any_of(w.islands(), [](const WorldIsland& i) { return i.header.number > 0xFF; })) {
         return kWideDiscovered;
