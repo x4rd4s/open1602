@@ -2609,7 +2609,8 @@ core::Status MapViewer::save_game(const std::filesystem::path& path) {
         m_state->world.set_unit_groups(m_local_player, m_input->saved_groups());
     }
     auto bytes = ending == ".gam" ? sim::write_savegame(m_state->world, m_buildings, &m_state->simulation)
-                                  : sim::write_game(m_state->world, m_buildings, &m_state->simulation);
+                                  : sim::write_game(m_state->world, m_buildings, &m_state->simulation,
+                                                    sim::SaveOptions{.compress = true, .fast = true});
     if (!bytes) {
         return bytes.error();
     }
