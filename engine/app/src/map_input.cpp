@@ -1026,6 +1026,20 @@ std::optional<render::TilePos> MapInput::tile_at(double sx, double sy) const {
         sx, sy, [&](render::TilePos t) { return render::tile_elevation(w, m_buildings, local(), t.x, t.y, zoom); });
 }
 
+std::optional<render::TilePos> MapInput::tile_at_mouse() const {
+    if (m_hud && m_hud->modal()) {
+        return std::nullopt;
+    }
+    return tile_at(m_mouse_x, m_mouse_y);
+}
+
+std::optional<ui::UnitRef> MapInput::unit_at_mouse() const {
+    if (m_hud && m_hud->modal()) {
+        return std::nullopt;
+    }
+    return unit_at(m_mouse_x, m_mouse_y);
+}
+
 std::optional<BuildTool::Spot> MapInput::spot_at_mouse() const {
     const auto tile = tile_at_mouse();
     if (!tile) {

@@ -770,8 +770,10 @@ ui::Rect Hud::layout(std::int32_t width, std::int32_t height, double ui_scale) {
 bool Hud::covers(std::int32_t x, std::int32_t y) const noexcept {
     // The mission's window takes the clicks inside it (0x0042D1C0); the menu and the window
     // "Anzeige" all of them.
-    return m_menu_active || m_display_open || m_goods_open || (chat_open() && chat_rect().contains(x, y)) ||
-           m_regions.side_panel.contains(x, y) || m_regions.status_bar.contains(x, y) ||
+    // A question takes all of them: nothing behind it answers the mouse.
+    return m_menu_active || m_question.has_value() || m_display_open || m_goods_open ||
+           (chat_open() && chat_rect().contains(x, y)) || m_regions.side_panel.contains(x, y) ||
+           m_regions.status_bar.contains(x, y) ||
            (m_options_model.mission_window && m_tutor && m_regions.tutor.contains(x, y));
 }
 
@@ -883,16 +885,15 @@ ui::Rect Hud::layout_question() {
         const auto row = static_cast<std::int32_t>(i % static_cast<std::size_t>(rows));
         const std::int32_t x = left + column * (cell + 2 * kQuestionGap);
         const std::int32_t y = top + row * (kQuestionButtonH + kQuestionGap);
+        // Enter takes the first option: it is highlighted. The banner's colour is a field at the
+        // left end of the button, so that a click on it chooses the option too.
+        f.button(kQuestionOption + static_cast<ui::Form::Id>(i), ui::Rect{x, y, cell, kQuestionButtonH},
+                 m_choices[i].text, true, i == 0);
         if (const auto& banner = m_choices[i].banner) {
             const std::uint8_t colour =
                 *banner < m_banner_palette.size() ? m_banner_palette[*banner] : m_other_banner_palette;
-            f.panel(ui::Rect{x, y + 6, kQuestionSwatch, kQuestionButtonH - 12});
-            f.swatch(ui::Rect{x + 2, y + 8, kQuestionSwatch - 4, kQuestionButtonH - 16}, colour);
+            f.swatch(ui::Rect{x + kQuestionGap + 2, y + 10, kQuestionSwatch, kQuestionButtonH - 20}, colour);
         }
-        // Enter takes the first option: it is highlighted.
-        f.button(kQuestionOption + static_cast<ui::Form::Id>(i),
-                 ui::Rect{x + kQuestionSwatch + kQuestionGap, y, kQuestionButtonW, kQuestionButtonH}, m_choices[i].text,
-                 true, i == 0);
     }
     const auto w = static_cast<std::int32_t>(width * s);
     const auto h = static_cast<std::int32_t>(height * s);
