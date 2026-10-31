@@ -126,7 +126,10 @@ core::Result<core::Bytes> pack_game(const core::Bytes& sections, const SaveOptio
     std::uint16_t flags = 0;
     core::Bytes stored;
     if (options.compress && core::has_zlib()) {
-        auto packed = core::zlib_deflate(sections);
+        // SaveOptions::fast: a world of 4000 x 3346 with giants saves in 0.5 s instead of 2.2 s,
+        // 59 MB instead of 38 MB.
+        constexpr std::size_t kLarge = std::size_t{64} << 20;
+        auto packed = core::zlib_deflate(sections, options.fast && sections.size() > kLarge ? 1 : 6);
         if (!packed) {
             return packed.error();
         }

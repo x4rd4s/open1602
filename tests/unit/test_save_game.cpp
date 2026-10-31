@@ -432,6 +432,12 @@ TEST_CASE("save game: unpacking follows the data, not what the header promises")
     CHECK(!core::zlib_inflate(cut, data.size()).ok());
     // A 2 GiB promise from a few bytes is refused before anything is allocated.
     CHECK(!core::zlib_inflate(std::span(packed->data(), 33), std::size_t{1} << 31).ok());
+    // The fastest level (large games) is read the same way.
+    auto fast = core::zlib_deflate(data, 1);
+    REQUIRE(fast.ok());
+    auto fast_back = core::zlib_inflate(*fast, data.size());
+    REQUIRE(fast_back.ok());
+    CHECK(*fast_back == data);
     auto empty = core::zlib_deflate({});
     REQUIRE(empty.ok());
     auto none = core::zlib_inflate(*empty, 0);

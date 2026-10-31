@@ -31,6 +31,10 @@ inline constexpr std::string_view kSaveExtension = ".o1602";
 struct SaveOptions {
     /// Compress the sections with zlib (if the build has zlib; otherwise they are stored as they are).
     bool compress = true;
+    /// Pack a large game (sections over 64 MiB, a world of thousands of tiles a side) at zlib's
+    /// fastest level: about four times as fast, the file about half as large again. For saving to
+    /// disk while the game waits; a game sent over the network keeps the smaller file.
+    bool fast = false;
 };
 
 /// What the section META of a savegame says (docs/formats/o1602-save.md), for a list of savegames.

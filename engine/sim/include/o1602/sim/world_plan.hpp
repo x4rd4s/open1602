@@ -77,7 +77,9 @@ struct WorldSettings {
         [[nodiscard]] std::uint16_t fill() const;
     };
     static constexpr std::uint32_t kMinSide = 200;
-    static constexpr std::uint32_t kMaxSide = 2000;
+    /// Room for islands of shapes::kMaxSide among the start areas (fit_landscape); a world loads up
+    /// to kMaxWorldSide.
+    static constexpr std::uint32_t kMaxSide = 4000;
     static constexpr std::uint8_t kMaxGoldIslands = 250;  ///< one per island at most
 
     std::uint32_t width = 500;  ///< tiles; the original map is 500 x 350
