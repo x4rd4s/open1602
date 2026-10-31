@@ -10,8 +10,10 @@
 // gold within reach.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
@@ -99,6 +101,60 @@ struct WorldSettings {
     Landscape landscape;
     std::uint64_t seed = 0;
 };
+
+/// The names of the landscape's choices, as setup files and the command line write them, in the
+/// order of the enums.
+namespace landscape_names {
+inline constexpr std::array<std::string_view, 3> kSpread = {"even", "mixed", "giants"};
+inline constexpr std::array<std::string_view, 3> kGap = {"narrow", "normal", "wide"};
+inline constexpr std::array<std::string_view, 3> kCoast = {"smooth", "natural", "rugged"};
+inline constexpr std::array<std::string_view, 3> kOutline = {"round", "long", "branched"};
+inline constexpr std::array<std::string_view, 3> kShare = {"little", "normal", "much"};
+/// The keys of set_landscape().
+inline constexpr std::array<std::string_view, 9> kKeys = {"land",  "min",     "max",    "spread",   "gap",
+                                                          "coast", "outline", "forest", "mountains"};
+}  // namespace landscape_names
+
+/// A kind of world of islands of their own shape, by name: as they come (the Landscape's
+/// defaults), many small ones, a few large bodies of land, a few giants among small ones, and
+/// islands all of about one size.
+struct LandscapePreset {
+    std::string_view name;
+    WorldSettings::Landscape landscape;
+};
+[[nodiscard]] constexpr WorldSettings::Landscape make_landscape(
+    std::uint8_t land, std::uint16_t min_side, std::uint16_t max_side, WorldSettings::Landscape::Spread spread,
+    WorldSettings::Landscape::Gap gap, shapes::Roughness coast, WorldSettings::Landscape::Outline outline) {
+    WorldSettings::Landscape l;
+    l.land = land;
+    l.min_side = min_side;
+    l.max_side = max_side;
+    l.spread = spread;
+    l.gap = gap;
+    l.coast = coast;
+    l.outline = outline;
+    return l;
+}
+namespace detail {
+using L = WorldSettings::Landscape;
+}  // namespace detail
+inline constexpr std::array<LandscapePreset, 5> kLandscapePresets = {{
+    {"varied", detail::L{}},
+    {"archipelago", make_landscape(20, 16, 60, detail::L::Spread::Even, detail::L::Gap::Narrow,
+                                   shapes::Roughness::Rugged, detail::L::Outline::Round)},
+    {"continents", make_landscape(35, 150, 400, detail::L::Spread::Even, detail::L::Gap::Normal,
+                                  shapes::Roughness::Natural, detail::L::Outline::Round)},
+    {"giants", make_landscape(30, 25, 500, detail::L::Spread::FewGiants, detail::L::Gap::Wide,
+                              shapes::Roughness::Natural, detail::L::Outline::Round)},
+    {"even", make_landscape(20, 50, 60, detail::L::Spread::Even, detail::L::Gap::Normal, shapes::Roughness::Smooth,
+                            detail::L::Outline::Round)},
+}};
+
+/// Sets one setting of `landscape` from text: `key` one of landscape_names::kKeys, `value` a
+/// number (land: percent, min and max: tiles) or a name of landscape_names. When the smallest
+/// island would be larger than the largest, the other side follows. False, and nothing changed,
+/// for an unknown key or a value out of range.
+bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, std::string_view value);
 
 /// Settings for a world of `players` with as much sea and land per player as the original's
 /// 500 x 350 for four (multiplayer games of more than four, o1602-tool bench): both sides grow with

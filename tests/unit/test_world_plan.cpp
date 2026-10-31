@@ -494,3 +494,41 @@ TEST_CASE("world plan: the map grows for islands far larger than the original's"
     }
     CHECK(largest > 255);
 }
+
+TEST_CASE("world plan: the landscape's settings by name, as setup files and the command line give them") {
+    using L = sim::WorldSettings::Landscape;
+    L l;
+    CHECK(sim::set_landscape(l, "land", "45"));
+    CHECK(l.land == 45);
+    CHECK(!sim::set_landscape(l, "land", "4"));
+    CHECK(!sim::set_landscape(l, "land", "20%"));
+    CHECK(l.land == 45);
+    CHECK(sim::set_landscape(l, "max", "40"));
+    CHECK(l.max_side == 40);
+    CHECK(l.min_side == 30);
+    CHECK(sim::set_landscape(l, "min", "200"));  // the largest follows
+    CHECK(l.min_side == 200);
+    CHECK(l.max_side == 200);
+    CHECK(!sim::set_landscape(l, "max", "1001"));
+    CHECK(sim::set_landscape(l, "spread", "giants"));
+    CHECK(l.spread == L::Spread::FewGiants);
+    CHECK(sim::set_landscape(l, "gap", "wide"));
+    CHECK(l.gap == L::Gap::Wide);
+    CHECK(sim::set_landscape(l, "coast", "rugged"));
+    CHECK(l.coast == sim::shapes::Roughness::Rugged);
+    CHECK(sim::set_landscape(l, "outline", "branched"));
+    CHECK(l.outline == L::Outline::Branched);
+    CHECK(sim::set_landscape(l, "forest", "little"));
+    CHECK(l.forest == sim::shapes::Share::Little);
+    CHECK(sim::set_landscape(l, "mountains", "much"));
+    CHECK(l.mountains == sim::shapes::Share::Much);
+    CHECK(!sim::set_landscape(l, "mountains", "many"));
+    CHECK(!sim::set_landscape(l, "rivers", "many"));
+    // Every preset has a name of its own and is a landscape the settings can give.
+    for (const sim::LandscapePreset& p : sim::kLandscapePresets) {
+        CHECK(std::ranges::count(sim::kLandscapePresets, p.name, &sim::LandscapePreset::name) == 1);
+        CHECK(p.landscape.min_side <= p.landscape.max_side);
+        CHECK(p.landscape.land >= L::kMinLand);
+        CHECK(p.landscape.land <= L::kMaxLand);
+    }
+}

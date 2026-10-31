@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -1088,6 +1089,60 @@ std::uint16_t WorldSettings::Landscape::fill() const {
     const int l = std::clamp<int>(land, kMinLand, kMaxLand);
     const int compact = 560 + 9 * std::max(0, l - 25);
     return static_cast<std::uint16_t>(outline == Outline::Branched ? compact - 120 : compact);
+}
+
+bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, std::string_view value) {
+    using L = WorldSettings::Landscape;
+    namespace names = landscape_names;
+    const auto choice = [value](const std::array<std::string_view, 3>& list) -> std::optional<std::uint8_t> {
+        for (std::size_t i = 0; i < list.size(); ++i) {
+            if (list[i] == value) {
+                return static_cast<std::uint8_t>(i);
+            }
+        }
+        return std::nullopt;
+    };
+    std::uint32_t n = 0;
+    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), n);
+    const bool number = error == std::errc{} && end == value.data() + value.size() && !value.empty();
+    if (key == "land") {
+        if (!number || n < L::kMinLand || n > L::kMaxLand) {
+            return false;
+        }
+        landscape.land = static_cast<std::uint8_t>(n);
+    } else if (key == "min" || key == "max") {
+        if (!number || n < shapes::kMinSide || n > shapes::kMaxSide) {
+            return false;
+        }
+        const bool min = key == "min";
+        (min ? landscape.min_side : landscape.max_side) = static_cast<std::uint16_t>(n);
+        if (landscape.min_side > landscape.max_side) {
+            (min ? landscape.max_side : landscape.min_side) = static_cast<std::uint16_t>(n);
+        }
+    } else {
+        const std::array<std::string_view, 3>* list = key == "spread"                         ? &names::kSpread
+                                                      : key == "gap"                          ? &names::kGap
+                                                      : key == "coast"                        ? &names::kCoast
+                                                      : key == "outline"                      ? &names::kOutline
+                                                      : key == "forest" || key == "mountains" ? &names::kShare
+                                                                                              : nullptr;
+        const auto i = list != nullptr ? choice(*list) : std::nullopt;
+        if (!i) {
+            return false;
+        }
+        if (key == "spread") {
+            landscape.spread = static_cast<L::Spread>(*i);
+        } else if (key == "gap") {
+            landscape.gap = static_cast<L::Gap>(*i);
+        } else if (key == "coast") {
+            landscape.coast = static_cast<shapes::Roughness>(*i);
+        } else if (key == "outline") {
+            landscape.outline = static_cast<L::Outline>(*i);
+        } else {
+            (key == "forest" ? landscape.forest : landscape.mountains) = static_cast<shapes::Share>(*i);
+        }
+    }
+    return true;
 }
 
 std::vector<TemplateInfo> island_templates(const assets::GameDirectory& game, const assets::BuildingTable& buildings) {

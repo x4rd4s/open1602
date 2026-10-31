@@ -48,14 +48,20 @@ int usage() {
         "  o1602-tool bsh-info   <file.bsh|.zei>\n"
         "  o1602-tool bsh-export <file.bsh|.zei> <outdir> [--palette FILE] [--sheet] [--first N] [--count N]\n"
         "  o1602-tool islands    <file.scp|.szs|.szm|.gam>\n"
+        "  o1602-tool template-stats [--count N]           (the island templates' tiles, rivers and rocks;\n"
+        "                                                   N maps of templates with rivers, needs ANNO1602_DIR)\n"
         "  o1602-tool savegames                               (names from Game.dat, needs ANNO1602_DIR)\n"
         "  o1602-tool export    <in.gam|in.o1602> <out.gam> [--via-own]  (needs ANNO1602_DIR)\n"
         "  o1602-tool new-world <out.gam> [--level 0-3] [--seed N] [--world WxH] [--players N]\n"
         "                       [--island-count C] [--villages C] [--volcano-islands C] [--island-sizes S]\n"
         "                       [--gold-islands N] [--together] [--island-shapes templates|mixed|own]\n"
+        "                       [--island-preset P] [--island-land PERCENT] [--island-min N] [--island-max N]\n"
+        "                       [--island-spread S] [--island-gap G] [--island-coast C] [--island-outline O]\n"
+        "                       [--island-forest F] [--island-mountains M]\n"
         "                       (an own world as a new game; C none|few|normal|many, S small|mixed|large,\n"
         "                        N islands with gold, default by the level; shapes: the original's templates,\n"
-        "                        islands of their own shape or both; written as a savegame)\n"
+        "                        islands of their own shape or both; the landscape of islands of their own\n"
+        "                        shape as in open1602 --help; written as a savegame)\n"
         "  o1602-tool bench     [<file.gam|.o1602>] [--players N] [--world WxH] [--seed N] [--level 0-3]\n"
         "                       [--minutes M] [--period M] [--repeat N] [--wall] [--out file.o1602]\n"
         "                       (runs a game headless, every player a computer; tick times per period and step,\n"
@@ -156,6 +162,9 @@ int main(int argc, char** argv) {
     }
     if (command == "bench") {
         return cmd_bench(args);
+    }
+    if (command == "template-stats") {
+        return cmd_template_stats(args);
     }
     if (command == "export") {
         return cmd_export(args);

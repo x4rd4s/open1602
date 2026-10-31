@@ -730,3 +730,42 @@ TEST_CASE("script: game.set_mission changes no mission at the top level") {
     CHECK(has_error(scripts->take_notes(), "eager:1: game.set_mission: only while the game runs"));
     CHECK(game.world.missions().empty());
 }
+
+TEST_CASE("script: scripts list land units and send them as their owners would") {
+    Game game;
+    game.world.diplomacy().resize(2);
+    sim::Soldier own = sim::make_soldier(10, 12, 1, 0, 0);
+    own.health = 20 * 32;
+    game.world.add_soldier(own);
+    game.world.add_soldier(sim::make_soldier(14, 12, 9, 1));
+    const std::uint32_t mine = game.world.soldiers()[0].id;
+    const std::uint32_t theirs = game.world.soldiers()[1].id;
+    auto scripts = game.run(
+        one("army",
+            "function on_start()\n"
+            "  local u = game.units(0)[1]\n"
+            "  print(#game.units(), #game.units(1), u.player, u.figure, u.x, u.y, u.island, u.health)\n"
+            "  local other = game.units(1)[1]\n"
+            "  print(other.island, game.move_unit(999, 5, 5))\n"
+            "  print(game.move_unit(u.id, 20, 21, true), game.move_unit(u.id, 64, 1))\n"
+            "  print(game.attack_unit(other.id, u.id), game.attack_unit(u.id, u.id), game.attack_unit(u.id, 999))\n"
+            "  game.move_unit(u.id, 1)\n"
+            "end\n"));
+    game.ticks(1);
+    const auto notes = scripts->take_notes();
+    REQUIRE(notes.size() == 5);
+    CHECK(notes[0].text == "2\t1\t0\t1\t10\t12\t0\t20");
+    CHECK(notes[1].text == "nil\tfalse");
+    CHECK(notes[2].text == "true\tfalse");
+    CHECK(notes[3].text == "true\tfalse\tfalse");
+    CHECK(has_error(notes, "army:8: game.move_unit: the unit's id, a world tile x, y"));
+    const sim::Soldier* walker = game.world.soldier(mine);
+    REQUIRE(walker != nullptr);
+    CHECK(walker->target == sim::Target::tile_spot(20, 21));
+    CHECK(walker->attack_move);
+    // The attack is the owner's: player 1 is at war with player 0 now.
+    const sim::Soldier* attacker = game.world.soldier(theirs);
+    REQUIRE(attacker != nullptr);
+    CHECK(attacker->target == sim::Target::soldier(mine));
+    CHECK(game.world.diplomacy().hostile(0, 1));
+}
