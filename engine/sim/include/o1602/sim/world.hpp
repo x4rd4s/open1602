@@ -671,8 +671,8 @@ public:
     /// from its rules; they are not saved, the rules are.
     [[nodiscard]] const OriginalBugs& original_bugs() const noexcept { return m_original_bugs; }
     void set_original_bugs(const OriginalBugs& bugs) noexcept { m_original_bugs = bugs; }
-    /// Whether every field bears where its crop grows at all (Rules::fertile_fields), set like the
-    /// bugs above.
+    /// Whether poor ground takes nothing from a field (Rules::fertile_fields), set like the bugs
+    /// above.
     [[nodiscard]] bool fertile_fields() const noexcept { return m_fertile_fields; }
     void set_fertile_fields(bool on) noexcept { m_fertile_fields = on; }
 

@@ -296,11 +296,12 @@ struct Rules {
     /// Which towns are discovered from the start (players, natives, pirates) or only by ship.
     Reveal reveal = Reveal::Original;
 
-    /// Open1602: every field bears where its crop grows on the island at all. In the original only
-    /// some tiles of an island carry a crop, more the more fertile the island is for it (all of them
-    /// only on a fully fertile one); with this setting every tile carries as on a fully fertile
-    /// island. An island that does not grow the crop still does not, and droughts still wither.
-    /// Off by default and with the original's settings.
+    /// Open1602: poor ground takes nothing from a field. In the original the ground under a tile
+    /// weighs the island's fertility for a crop, so that single tiles stay barren even where the
+    /// island grows the crop fully; with this setting every tile has the island's fertility. An
+    /// island that grows a crop only partly still carries it on as many tiles as before, one that
+    /// does not grow it still does not, and droughts still wither. Off by default and with the
+    /// original's settings.
     bool fertile_fields = false;
 
     /// Bugs of the original brought back; none by default, also in savegames of the original.

@@ -561,39 +561,34 @@ TEST_CASE("construction: fields grow where the island is fertile, forest becomes
     CHECK(original.world.players()[0].money < before);
 }
 
-TEST_CASE("construction: with every field fertile a crop bears on every tile where it grows at all") {
-    // Tobacco in the north without its bit grows half: pattern 2, 16 of 32 tiles carry.
-    const auto refused = [](bool all, std::uint32_t fertility) {
-        Island island(fertility, 0);
-        island.world.set_fertile_fields(all);
-        island.found();
+TEST_CASE("construction: with barren patches fertile every tile has the island's fertility") {
+    // Poor ground, Randwachs 70 of 100: as in the original, it takes a share of the island's
+    // fertility, so a crop the island grows fully still leaves tiles barren.
+    const std::uint8_t tobacco = sim::ware::kTobaccoField;
+    const auto barren = [&](bool even, std::uint32_t fertility, std::uint8_t climate, std::uint8_t drought) {
+        Island island(fertility, climate);
+        island.buildings.by_id(kGround)->edge_growth = 70 * 128 / 100;
+        island.world.set_fertile_fields(even);
         std::size_t n = 0;
-        for (std::int32_t x = 7; x <= 12; ++x) {
-            n += island.build({{kField, x, 13, 0, 0}}).items[0].refusal == sim::BuildRefusal::Infertile ? 1U : 0U;
+        for (std::int32_t y = 10; y < 18; ++y) {
+            for (std::int32_t x = 6; x < 18; ++x) {
+                n += sim::tile_fertile_at(island.world, island.buildings, 0, tobacco, x, y, drought) ? 0U : 1U;
+            }
         }
         return n;
     };
-    CHECK(refused(false, 0x0U) > 0);
-    CHECK(refused(true, 0x0U) == 0);
+    const std::uint32_t full = 1U << (tobacco - sim::ware::kCornField);
+    CHECK(barren(false, full, 0, 0) > 0);
+    CHECK(barren(true, full, 0, 0) == 0);
+    // Tobacco in the north without its bit grows half: about half the tiles stay barren with the
+    // setting too.
+    const std::size_t half = barren(true, 0x0U, 0, 0);
+    CHECK(half > 96 / 4);
+    CHECK(half < 96 * 3 / 4);
     // An island that does not grow the crop still does not (but for the original's two tiles in 32).
-    Island south(0x0U, 1);
-    south.world.set_fertile_fields(true);
-    south.found();
-    std::size_t barren = 0;
-    for (std::int32_t x = 7; x <= 12; ++x) {
-        barren += south.build({{kField, x, 13, 0, 0}}).items[0].refusal == sim::BuildRefusal::Infertile ? 1U : 0U;
-    }
-    CHECK(barren == 4);
+    CHECK(barren(true, 0x0U, 1, 0) >= 96 * 28 / 32);
     // Droughts still take their share.
-    Island dry(0x0U, 0);
-    dry.world.set_fertile_fields(true);
-    dry.found();
-    dry.world.island(0).drought.strength = 0x60;
-    std::size_t withered = 0;
-    for (std::int32_t x = 7; x <= 12; ++x) {
-        withered += sim::tile_fertile(dry.world, dry.buildings, 0, sim::ware::kTobaccoField, x, 13) ? 0U : 1U;
-    }
-    CHECK(withered > 0);
+    CHECK(barren(true, full, 0, 0x60) > 0);
 }
 
 TEST_CASE("construction: the rule for fertile fields is kept in the savegame") {

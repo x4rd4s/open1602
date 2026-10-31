@@ -50,7 +50,7 @@ enum RuleKey : std::uint16_t {
     kNoShipPurchases = 42,  // 1: the computers buy no ships (Rules::computers_buy_ships off)
     kBugNativeLand = 43,
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
-    kFertileFields = 45,  // 1: every field bears where its crop grows (Rules::fertile_fields)
+    kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
