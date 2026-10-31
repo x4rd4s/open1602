@@ -47,6 +47,7 @@ version = "1.2.0"                # one to four numbers with dots
 description = "A lighthouse for every coast."
 depends.harbour = "1.0"          # needs the package harbour, version 1.0 or later
 depends.coast = ""               # needs the package coast, any version
+depends.sea = ">=2.1, <3"        # needs the package sea from 2.1 on, but not 3 or later
 after.weather = true             # loads after weather if that is installed, without needing it
 ```
 
@@ -55,12 +56,29 @@ after.weather = true             # loads after weather if that is installed, wit
 | `name` | the package's name for people |
 | `version` | `"1"`, `"1.2"`, `"0.10.3"`: compared number by number, `1.10` comes after `1.9`, `1.2` equals `1.2.0` |
 | `description` | a sentence about the package |
-| `depends.<id>` | another package this one needs, with the lowest version it works with (`""`: any) |
+| `depends.<id>` | another package this one needs, with the versions it works with (below; `""`: any) |
 | `after.<id>` | another package whose changes this one builds on, when it is there |
 
 A package without a manifest is loaded as before: no version, no dependencies. What is wrong in a
 field is passed over with a warning in the log that names the file and the line; a file that is no
 data file at all keeps the package out.
+
+## Versions a package needs
+
+`depends.<id>` names the versions of the other package this one works with: comparisons with a
+version, separated by commas, all of which must hold.
+
+| Requirement | Versions it takes |
+|---|---|
+| `""` | any, also a package without a version |
+| `"1.2"` or `">=1.2"` | 1.2 and later |
+| `">1.2"` | after 1.2 (1.2.1, 1.3, 2 ...) |
+| `"<2"` | before 2 (1.9.9, but not 2.0) |
+| `"<=2.0.1"` | up to 2.0.1 |
+| `"=1.2.3"` | exactly 1.2.3 (also 1.2.3.0) |
+| `">=1.2, <2"` | from 1.2 on, before 2: a package that will not work with the next major version |
+
+Versions compare number by number as above. A package without a version meets only `""`.
 
 ## Load order
 
@@ -71,8 +89,8 @@ is that of the ids' bytes (`Alpha` before `beta` before `zeta`), the same on eve
 A package is not loaded, with a line in the log, when
 
 - it is turned off in the screen "Mods" (below),
-- a package it depends on is not installed, has no version or an older one than it needs,
-- a package it depends on is not loaded itself,
+- a package it depends on is not installed, or not in a version it takes (or has no version),
+- a package it depends on is turned off, or not loaded itself,
 - its dependencies and `after` entries go round in a circle.
 
 ## Which packages a game uses
@@ -119,11 +137,17 @@ host left (host migration) sends the received packages on like its own.
 The main menu's button "Mods" lists the packages of the `mods` folder with name, version and
 whether new games use them, and below them the packages received from hosts.
 
-- **On and off:** the box before a package turns it on or off for new games. A package turned off
-  is not loaded, nor are those that depend on it; `settings.cfg` keeps the ids
-  (`disabled_mod = lighthouse`). A savegame keeps the packages it was started with.
+- **On and off:** the box before a package turns it on or off for new games; `settings.cfg` keeps
+  the ids of those turned off (`disabled_mod = lighthouse`). A savegame keeps the packages it was
+  started with.
+- **Turning on** a package also turns on the installed packages it needs, and those they need, as
+  long as their version is one it takes; the screen names them. The load order puts them before it.
+- **Turning off** a package names the packages that are not loaded without it. Their boxes stay as
+  they are: turned on again, the package brings them back.
 - **Received packages** have no box: the games that need them use them. "Add to my mods" copies
   one into the `mods` folder, where it is a package of the player's own from then on, turned on.
   This is refused while the `mods` folder has a package of that id.
-- A package that cannot be loaded (a broken manifest, a missing dependency) says so; the log says
-  why.
+- A package whose box is ticked but that cannot be loaded says why in its row ("Needs harbour", a
+  circle, a broken manifest); chosen, it says so in a sentence: "it needs harbour >=1.0, which is
+  not installed", "it needs harbour <2, but version 2.1 is installed", "... which is turned off",
+  "... which cannot be loaded itself". The log says the same.

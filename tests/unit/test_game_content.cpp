@@ -111,6 +111,26 @@ TEST_CASE("game content: versions of one to four numbers, compared number by num
     CHECK(assets::compare_versions("2.0.0.1", "2") > 0);
 }
 
+TEST_CASE("game content: version requirements with bounds, a bare version the lowest") {
+    for (const char* good : {"", "1.2", ">=1.2", ">1", "<2", "<=2.0.1", "=1.2.3", ">=1.2, <2", " >= 1.2 ,<2 "}) {
+        CHECK(assets::valid_version_requirement(good));
+    }
+    for (const char* bad : {",", "1.2,", ">=", "=>1", "<>1", "~1.2", "^1", "1.2 <2", ">=1.2,,<2", "*"}) {
+        CHECK(!assets::valid_version_requirement(bad));
+    }
+    CHECK(assets::version_meets("1.2", "1.2"));
+    CHECK(assets::version_meets("1.10", "1.9"));
+    CHECK(!assets::version_meets("1.1.9", "1.2"));
+    CHECK(assets::version_meets("1.9.9", ">=1.2, <2"));
+    CHECK(!assets::version_meets("2.0", ">=1.2, <2"));
+    CHECK(!assets::version_meets("1.2", ">1.2"));
+    CHECK(assets::version_meets("1.2.0", "=1.2"));
+    CHECK(assets::version_meets("2.0.1", "<=2.0.1"));
+    CHECK(assets::version_meets("", ""));
+    CHECK(assets::version_meets("3", ""));
+    CHECK(!assets::version_meets("", ">=1"));
+}
+
 TEST_CASE("game content: a manifest gives name, version, dependencies and load order") {
     assets::ModPackage p = package("lighthouse");
     std::vector<std::string> warnings;
@@ -120,6 +140,7 @@ version = "1.2.0"
 description = "Shines."
 depends.harbour = "1.0"
 depends.coast = ""
+depends.sea = ">=2, <3"
 after.weather = true
 after.never = false
 colour = "red"
@@ -129,15 +150,16 @@ colour = "red"
     CHECK(p.name == "Leuchtturm");
     CHECK(p.version == "1.2.0");
     CHECK(p.description == "Shines.");
-    REQUIRE(p.depends.size() == 2);
+    REQUIRE(p.depends.size() == 3);
     CHECK(p.depends[0].id == "harbour");
-    CHECK(p.depends[0].min_version == "1.0");
+    CHECK(p.depends[0].versions == "1.0");
     CHECK(p.depends[1].id == "coast");
-    CHECK(p.depends[1].min_version.empty());
+    CHECK(p.depends[1].versions.empty());
+    CHECK(p.depends[2].versions == ">=2, <3");
     REQUIRE(p.after.size() == 1);
     CHECK(p.after[0] == "weather");
     REQUIRE(warnings.size() == 1);
-    CHECK(warnings[0].find("lighthouse/mod.toml line 9: unknown field colour") == 0);
+    CHECK(warnings[0].find("lighthouse/mod.toml line 10: unknown field colour") == 0);
 }
 
 TEST_CASE("game content: what is wrong in a manifest is passed over, a broken one changes nothing") {
@@ -187,6 +209,69 @@ TEST_CASE("game content: a missing or too old dependency and a circle leave pack
     std::vector<std::string> warnings;
     CHECK(ids(assets::order_packages(list, warnings)) == "base versionless");
     CHECK(warnings.size() == 6);
+}
+
+TEST_CASE("game content: why a package is not loaded, for the menu of mods") {
+    using Kind = assets::PackageProblem::Kind;
+    std::vector<assets::ModPackage> list;
+    list.push_back(package("base", "2.1"));
+    list.push_back(package("too-new"));
+    list.back().depends.push_back({"base", "<2"});
+    list.push_back(package("fits"));
+    list.back().depends.push_back({"base", ">=2, <3"});
+    list.push_back(package("needs-gone"));
+    list.back().depends.push_back({"gone", ">=1"});
+    list.push_back(package("switched"));
+    list.push_back(package("needs-switched"));
+    list.back().depends.push_back({"switched", ""});
+    list.push_back(package("needs-needs-switched"));
+    list.back().depends.push_back({"needs-switched", ""});
+    list.push_back(package("needs-unreadable"));
+    list.back().depends.push_back({"unreadable", ""});
+    std::vector<assets::PackageProblem> problems{{"unreadable", Kind::Unreadable, {}, {}, {}}};
+    std::vector<std::string> warnings;
+    const std::vector<std::string> off{"switched"};
+    CHECK(ids(assets::order_packages(list, warnings, off, &problems)) == "base fits");
+    const auto of = [&](const std::string& id) {
+        for (const auto& p : problems) {
+            if (p.package == id) {
+                return p;
+            }
+        }
+        return assets::PackageProblem{};
+    };
+    CHECK(problems.size() == 7);
+    const assets::PackageProblem too_new{"too-new", Kind::WrongVersion, "base", "<2", "2.1"};
+    const assets::PackageProblem gone{"needs-gone", Kind::Missing, "gone", ">=1", {}};
+    const assets::PackageProblem switched{"needs-switched", Kind::DependencyOff, "switched", {}, {}};
+    CHECK(of("too-new") == too_new);
+    CHECK(of("needs-gone") == gone);
+    CHECK(of("switched").kind == Kind::TurnedOff);
+    CHECK(of("needs-switched") == switched);
+    CHECK(of("needs-needs-switched").kind == Kind::DependencyBroken);
+    CHECK(of("needs-unreadable").kind == Kind::DependencyBroken);
+    CHECK(warnings.size() == 6);
+    CHECK(warnings[0] == "switched: turned off; the package is not loaded");
+}
+
+TEST_CASE("game content: turning a package on turns on what it needs, turning it off names what needs it") {
+    std::vector<assets::ModPackage> list;
+    list.push_back(package("base", "2.1"));
+    list.push_back(package("harbour", "1.0"));
+    list.back().depends.push_back({"base", ">=2"});
+    list.push_back(package("lighthouse", "1.2"));
+    list.back().depends.push_back({"harbour", "1.0"});
+    list.back().depends.push_back({"old", "<1"});
+    list.push_back(package("old", "1.5"));  // a version lighthouse does not take: left as it is
+    list.push_back(package("unrelated"));
+    const std::vector<std::string> off{"base", "harbour", "old", "unrelated"};
+    const std::vector<std::string> with = assets::dependencies_to_turn_on(list, "lighthouse", off);
+    const std::vector<std::string> expected_with{"base", "harbour"};
+    CHECK(with == expected_with);
+    CHECK(assets::dependencies_to_turn_on(list, "unrelated", off).empty());
+    const std::vector<std::string> expected_needing{"harbour", "lighthouse"};
+    CHECK(assets::packages_needing(list, "base") == expected_needing);
+    CHECK(assets::packages_needing(list, "lighthouse").empty());
 }
 
 TEST_CASE("game content: a package's hash covers its files' paths and bytes, not when they were made") {

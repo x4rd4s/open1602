@@ -439,9 +439,20 @@ TEST_CASE("main menu: the screen \"Mods\" turns packages on and off and takes in
     received.name = "Wetter";
     received.state = app::ModsModel::Entry::State::Received;
     received.adoptable = true;
-    model.entries = {own, received};
+    app::ModsModel::Entry broken = own;
+    broken.id = "nebel";
+    broken.folder = "mods/nebel";
+    broken.name = "Nebel";
+    broken.state = app::ModsModel::Entry::State::Broken;
+    const assets::PackageProblem why{"nebel", assets::PackageProblem::Kind::Missing, "wetter", ">=2", {}};
+    broken.short_problem = app::ModsMenu::short_problem_text(why);
+    broken.problem = app::ModsMenu::problem_text(why);
+    model.entries = {own, received, broken};
     menu.set_mods(model);
     CHECK(shows(menu, "Leuchtturm"));
+    CHECK(shows(menu, broken.short_problem));
+    CHECK(broken.short_problem.find("wetter") != std::string::npos);
+    CHECK(broken.problem.find("wetter >=2") != std::string::npos);
     CHECK(shows(menu, app::ModsMenu::state_text(app::ModsModel::Entry::State::Received)));
 
     auto toggled = press(84, 203);  // the check box of the first row

@@ -2854,24 +2854,36 @@ ModsModel MapViewer::mods_model() const {
     using State = ModsModel::Entry::State;
     const std::filesystem::path mods = data_folder() / "mods";
     const std::vector<std::string>& off = m_app_settings.disabled_mods;
+    // What load_mod_packages finds, here for why each package is not loaded (the log has it too).
+    std::vector<std::string> ignored;
+    std::vector<assets::PackageProblem> problems;
+    const std::vector<assets::ModPackage> installed = assets::read_mod_packages(mods, ignored, &problems);
+    const std::vector<assets::ModPackage> loadable = assets::order_packages(installed, ignored, off, &problems);
     ModsModel model;
-    for (assets::ModPackage& p : assets::mod_packages(mods)) {
-        std::vector<std::string> ignored;  // load_mod_packages wrote them into the log
-        if (const auto bytes = core::read_file(p.folder / assets::kManifestFile)) {
-            (void)assets::read_manifest(
-                p, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), ignored);
-        }
+    for (const assets::ModPackage& folder : assets::mod_packages(mods)) {
+        const auto read = std::find_if(installed.begin(), installed.end(),
+                                       [&](const assets::ModPackage& m) { return m.id == folder.id; });
+        const assets::ModPackage& p = read != installed.end() ? *read : folder;
         ModsModel::Entry e;
         e.id = p.id;
         e.folder = p.folder;
         e.name = core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
         e.version = core::utf8_to_cp1252(p.version);
         e.description = core::utf8_to_cp1252(p.description);
-        const bool loaded = std::any_of(m_packages.begin(), m_packages.end(),
-                                        [&](const assets::ModPackage& m) { return m.id == p.id; });
-        e.state = std::find(off.begin(), off.end(), p.id) != off.end() ? State::Off
-                  : loaded                                             ? State::On
-                                                                       : State::Broken;
+        e.wanted = std::find(off.begin(), off.end(), p.id) == off.end();
+        const auto problem = std::find_if(problems.begin(), problems.end(),
+                                          [&](const assets::PackageProblem& m) { return m.package == p.id; });
+        if (std::any_of(loadable.begin(), loadable.end(), [&](const assets::ModPackage& m) { return m.id == p.id; })) {
+            e.state = State::On;
+        } else if (!e.wanted) {
+            e.state = State::Off;
+        } else {
+            e.state = State::Broken;
+            if (problem != problems.end()) {
+                e.short_problem = ModsMenu::short_problem_text(*problem);
+                e.problem = ModsMenu::problem_text(*problem);
+            }
+        }
         model.entries.push_back(std::move(e));
     }
     for (const assets::ModPackage& p : m_cached_packages) {
@@ -2931,6 +2943,47 @@ void MapViewer::reload_mods() {
     sim::apply_building_values(m_buildings, m_original_buildings, m_state->world.balance());
     sim::apply_resident_classes(m_buildings, m_original_buildings, m_state->world.resident_classes());
     sim::apply_infra_levels(m_buildings, m_original_buildings, m_state->world.infra_levels());
+}
+
+std::string MapViewer::toggle_mod(const std::string& id) {
+    std::vector<std::string>& off = m_app_settings.disabled_mods;
+    std::vector<std::string> ignored;
+    const std::vector<assets::ModPackage> installed = assets::read_mod_packages(data_folder() / "mods", ignored);
+    const auto names = [&](std::span<const std::string> ids) {
+        std::string list;
+        for (const std::string& other : ids) {
+            const auto p = std::find_if(installed.begin(), installed.end(),
+                                        [&](const assets::ModPackage& m) { return m.id == other; });
+            const std::string& name = p != installed.end() && !p->name.empty() ? p->name : other;
+            list += (list.empty() ? "" : ", ") + core::utf8_to_cp1252(name);
+        }
+        return list;
+    };
+    const std::string name = names(std::span<const std::string>(&id, 1));
+    std::string notice;
+    if (std::erase(off, id) > 0) {
+        // On, and with it what it needs: the load order puts them before it.
+        const std::vector<std::string> with = assets::dependencies_to_turn_on(installed, id, off);
+        for (const std::string& other : with) {
+            std::erase(off, other);
+        }
+        if (!with.empty()) {
+            std::fprintf(stderr, "mods: %s turned on with what it needs\n", id.c_str());
+            notice = ui::tr("mods.turned_on_with", {name, names(with)});
+        }
+    } else {
+        // Off; what needs it stays as the player set it, but is not loaded without it.
+        off.push_back(id);
+        std::vector<std::string> needing = assets::packages_needing(installed, id);
+        std::erase_if(needing,
+                      [&](const std::string& other) { return std::find(off.begin(), off.end(), other) != off.end(); });
+        if (!needing.empty()) {
+            notice = ui::tr("mods.turned_off_with", {name, names(needing)});
+        }
+    }
+    save_settings();
+    reload_mods();
+    return notice;
 }
 
 std::string MapViewer::adopt_mod(const std::filesystem::path& folder) {
@@ -3241,13 +3294,10 @@ void MapViewer::apply_menu() {
                 menu->set_mods(mods_model());
                 continue;
             case MenuEvent::Kind::ToggleMod: {
-                std::vector<std::string>& off = m_app_settings.disabled_mods;
-                if (std::erase(off, e.name) == 0) {
-                    off.push_back(e.name);
-                }
-                save_settings();
-                reload_mods();
-                menu->set_mods(mods_model());
+                std::string notice = toggle_mod(e.name);
+                ModsModel model = mods_model();
+                model.notice = std::move(notice);
+                menu->set_mods(std::move(model));
                 continue;
             }
             case MenuEvent::Kind::AdoptMod: {
