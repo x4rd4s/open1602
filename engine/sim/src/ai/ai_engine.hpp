@@ -507,6 +507,16 @@ private:
     /// False for a tile that is no building origin of the city (the survey has nothing there).
     bool survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t x, std::uint32_t y, SurveyFinds& finds);
     void sweep(AiPlayer& p);
+    /// Some human still in the game has no peace treaty with the computer.
+    [[nodiscard]] bool at_war_with_a_human(const AiPlayer& p) const;
+    /// The wall or gate the sweep puts on tile (x, y) of the current city, if any. At war: walls
+    /// on the border away from other cities and on the coast. At peace: walls on the border
+    /// towards other cities and on the coast, gates where a wall crosses a road. A road under a
+    /// new wall is demolished at once.
+    std::optional<BuildItem> wall_item(AiPlayer& p, const City& c, const Tile& t, std::int32_t x, std::int32_t y,
+                                       bool war);
+    /// A wall of the city with no coast within two tiles and no neighbour outside the city.
+    [[nodiscard]] bool inner_wall(AiPlayer& p, std::int32_t x, std::int32_t y);
     void kontor_restore(AiPlayer& p);
     std::size_t build(AiPlayer& p, std::vector<BuildItem> items, bool orient);
     std::int32_t road_line(AiPlayer& p, std::int32_t x, std::int32_t y, std::int32_t len, std::uint8_t dir, bool force);
