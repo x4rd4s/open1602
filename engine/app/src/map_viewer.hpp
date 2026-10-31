@@ -257,6 +257,8 @@ private:
     void open_multiplayer_menu();
     /// The multiplayer menu: its model, what it asked for, the search on the local network.
     void apply_multiplayer_menu();
+    /// How far the game from the host has come, into the multiplayer menu's model.
+    void join_to_model();
     void handle_multiplayer(const MultiplayerEvent& e);
     /// Answers searches for the hosted game, in the menu and in the game.
     void update_lan_beacon();
