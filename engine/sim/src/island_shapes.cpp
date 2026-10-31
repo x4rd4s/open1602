@@ -179,7 +179,9 @@ std::uint32_t pick(Random& random, const std::array<std::uint32_t, N>& ids) {
 /// (per mille) of the blocks. `strength`: the noise against the falloff, percent; `spread`: the
 /// lattice of the noise in parts of the shorter side (more parts, smaller features).
 LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t share, int strength, int spread) {
-    const int spacing = std::max(3, std::min(blocks_x, blocks_y) / spread);
+    // Bays and capes of at most about a big template's size, so that a giant is not one round body.
+    constexpr int kWidestLattice = 24;
+    const int spacing = std::clamp(std::min(blocks_x, blocks_y) / spread, 3, kWidestLattice);
     const Noise coarse(random, blocks_x, blocks_y, spacing);
     const Noise fine(random, blocks_x, blocks_y, std::max(2, spacing / 2));
     // Large islands: finer octaves down to a few blocks, each of half the weight, so that their
@@ -190,7 +192,8 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
     }
     // Half-block units, so that the centres of a block and of the island are whole numbers; the
     // ellipse reaches the blocks next to the edge.
-    const int rim_band = std::min(blocks_x, blocks_y) / 10;
+    const bool large = std::min(blocks_x, blocks_y) >= 30;  // 60 tiles and more
+    constexpr int kSteepFrom = 800;
     const int rx = std::max(1, blocks_x - 2);
     const int ry = std::max(1, blocks_y - 2);
     std::vector<int> scores;
@@ -213,11 +216,17 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
             }
             const int noise = sum / weight;
             int score = 1024 - falloff + (noise - 512) * strength / 100;
-            // Large islands: the land falls off within a tenth of the side of the edge, so that a
-            // full island never runs straight along its rectangle.
-            const int rim = std::min({bx - 1, by - 1, blocks_x - 2 - bx, blocks_y - 2 - by});
-            if (rim_band >= 3 && rim < rim_band) {
-                score -= (rim_band - rim) * 1024 / rim_band;
+            if (large) {
+                // Large islands: the land falls off steeply towards the ellipse, its radius
+                // wandering with the coarse noise, so that a full island neither fills its
+                // rectangle nor runs straight along it; the last two blocks stay sea.
+                const int wandering = falloff * (1024 + (coarse.at(bx, by) - 512) / 2) / 1024;
+                if (wandering > kSteepFrom) {
+                    score -= (wandering - kSteepFrom) * (wandering - kSteepFrom) / 128;
+                }
+                if (std::min({bx - 1, by - 1, blocks_x - 2 - bx, blocks_y - 2 - by}) < 2) {
+                    score -= 4096;
+                }
             }
             grid[static_cast<std::size_t>(by) * static_cast<std::size_t>(blocks_x) + static_cast<std::size_t>(bx)] =
                 score;
