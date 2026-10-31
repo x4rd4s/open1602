@@ -72,6 +72,9 @@ void io_player_state(A& a, P& p, std::uint16_t version) {
     if (version >= kClosedGates) {
         a.boolean(p.gates_closed);
     }
+    if (version >= kPlayerOwners) {
+        a.u64(p.owner);
+    }
 }
 
 template <class A, class S>
@@ -272,6 +275,9 @@ Decoded::FactionPart read_factions(Reader& in) {
 std::uint16_t player_state_version(const World& w) {
     const bool any = std::any_of(w.players().begin(), w.players().end(),
                                  [](const Player& p) { return p.scenario != ScenarioSwitches{}; });
+    if (std::any_of(w.players().begin(), w.players().end(), [](const Player& p) { return p.owner != 0; })) {
+        return kPlayerOwners;
+    }
     if (std::any_of(w.players().begin(), w.players().end(), [](const Player& p) { return p.gates_closed; })) {
         return kClosedGates;
     }
@@ -281,6 +287,9 @@ std::uint16_t player_state_version(const World& w) {
 namespace {
 
 std::size_t player_state_size(std::uint16_t version) {
+    if (version >= kPlayerOwners) {
+        return 42;
+    }
     if (version >= kClosedGates) {
         return 34;
     }

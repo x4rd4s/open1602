@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
+#include <random>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -95,6 +96,45 @@ std::string flags_text(const std::array<bool, audio::kMessageKinds>& a) {
 
 }  // namespace
 
+std::uint64_t new_player_id() {
+    std::random_device device;
+    std::uint64_t id = 0;
+    while (id == 0) {
+        id = (std::uint64_t{device()} << 32) ^ device();
+    }
+    return id;
+}
+
+std::string player_id_text(std::uint64_t id) {
+    static constexpr char kDigits[] = "0123456789abcdef";
+    std::string out(16, '0');
+    for (std::size_t i = 0; i < 16; ++i) {
+        out[15 - i] = kDigits[(id >> (4 * i)) & 0xF];
+    }
+    return out;
+}
+
+std::optional<std::uint64_t> parse_player_id(std::string_view text) {
+    if (text.empty() || text.size() > 16) {
+        return std::nullopt;
+    }
+    std::uint64_t id = 0;
+    for (const char c : text) {
+        std::uint64_t digit = 0;
+        if (c >= '0' && c <= '9') {
+            digit = static_cast<std::uint64_t>(c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            digit = static_cast<std::uint64_t>(c - 'a' + 10);
+        } else if (c >= 'A' && c <= 'F') {
+            digit = static_cast<std::uint64_t>(c - 'A' + 10);
+        } else {
+            return std::nullopt;
+        }
+        id = (id << 4) | digit;
+    }
+    return id != 0 ? std::optional<std::uint64_t>(id) : std::nullopt;
+}
+
 AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
     AppSettings s = defaults;
     bool songs_listed = false;
@@ -135,6 +175,8 @@ AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
             s.game_folder = std::string(value);
         } else if (key == "player_name") {
             s.player_name = from_file(value);
+        } else if (key == "player_id") {
+            s.player_id = parse_player_id(value).value_or(s.player_id);
         } else if (key == "remembered_host") {
             if (!value.empty() && s.remembered_hosts.size() < AppSettings::kMaxHosts) {
                 s.remembered_hosts.push_back(from_file(value));
@@ -194,6 +236,10 @@ std::string write_settings(const AppSettings& s) {
     out += std::string("data_fixes = ") + (s.data_fixes ? "on" : "off") + "\n";
     if (const std::string name = to_file(s.player_name); !name.empty()) {
         out += "player_name = " + name + "\n";
+    }
+    if (s.player_id != 0) {
+        out += "# Knows this player again in multiplayer games and their savegames (random, keep it)\n";
+        out += "player_id = " + player_id_text(s.player_id) + "\n";
     }
     for (const std::string& host : s.remembered_hosts) {
         if (const std::string text = to_file(host); !text.empty()) {

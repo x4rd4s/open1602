@@ -2,6 +2,7 @@
 #include "o1602/net/protocol.hpp"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 #include "wire.hpp"
@@ -40,6 +41,7 @@ void put(core::ByteWriter& out, const Hello& m) {
     out.string(m.name);
     out.u8(m.seat);
     out.u64(m.token);
+    out.u64(m.player);
     out.string(m.password);
     out.boolean(m.returning);
     put_packages(out, m.packages);
@@ -225,6 +227,7 @@ Hello get_hello(In& in) {
     m.name = in.text(kMaxNameLength);
     m.seat = in.u8();
     m.token = in.u64();
+    m.player = in.u64();
     m.password = in.text(kMaxPasswordLength);
     m.returning = in.boolean();
     m.packages = get_packages(in);
@@ -567,6 +570,23 @@ std::uint64_t token_verifier(std::uint64_t token, std::uint64_t salt) noexcept {
         v |= std::uint64_t{digest[k]} << (8 * k);
     }
     return v;
+}
+
+std::uint64_t player_verifier(std::uint64_t player) noexcept {
+    if (player == 0) {
+        return 0;
+    }
+    core::ByteWriter in;
+    for (const char c : std::string_view("open1602 player")) {
+        in.u8(static_cast<std::uint8_t>(c));
+    }
+    in.u64(player);
+    const auto digest = core::sha256(in.data());
+    std::uint64_t v = 0;
+    for (std::size_t k = 0; k < 8; ++k) {
+        v |= std::uint64_t{digest[k]} << (8 * k);
+    }
+    return v != 0 ? v : 1;  // 0 means "nobody"
 }
 
 }  // namespace o1602::net

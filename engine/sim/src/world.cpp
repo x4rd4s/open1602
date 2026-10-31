@@ -566,6 +566,34 @@ PlayerId first_human_player(const World& world) noexcept {
     return kNoPlayer;
 }
 
+PlayerId take_single_player(World& world, std::uint64_t owner) {
+    const auto& players = world.players();
+    PlayerId own = kNoPlayer;
+    if (owner != 0) {
+        for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
+            if (players[i].role == PlayerRole::Human && players[i].owner == owner) {
+                own = static_cast<PlayerId>(i);
+                break;
+            }
+        }
+    }
+    if (own == kNoPlayer) {
+        own = first_human_player(world);
+    }
+    if (own == kNoPlayer) {
+        return kNoPlayer;
+    }
+    for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
+        Player* p = world.player(static_cast<PlayerId>(i));
+        if (i == own) {
+            p->owner = owner != 0 ? owner : p->owner;
+        } else if (p->role == PlayerRole::Human) {
+            p->role = PlayerRole::Computer;  // keeps its owner: that person gets it back in a multiplayer game
+        }
+    }
+    return own;
+}
+
 namespace {
 
 /// Collects the warnings of a load, if the caller asked for them.

@@ -951,6 +951,30 @@ TEST_CASE("save format: every field read comes back where it was written") {
     }
 }
 
+TEST_CASE("save format: who played each player comes back (version 4 of PSTA)") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings, false);
+    const core::Bytes before = save(world, buildings);
+    world.player(1)->owner = 0x1234'5678'9ABC'DEF0ULL;
+    world.player(2)->gates_closed = true;
+    const core::Bytes bytes = save(world, buildings);
+    CHECK(bytes != before);
+    auto loaded = sim::read_game(bytes, buildings, nullptr);
+    REQUIRE(loaded.ok());
+    for (std::size_t p = 0; p < world.players().size(); ++p) {
+        CHECK(loaded->players()[p].owner == world.players()[p].owner);
+        CHECK(loaded->players()[p].gates_closed == (p == 2));
+    }
+    CHECK(save(*loaded, buildings) == bytes);
+
+    const core::Bytes chunk = sim::encode_extension(world, buildings, nullptr, {});
+    sim::World bare(400, 300);
+    add_islands(bare, buildings, false);
+    REQUIRE(sim::apply_extension(bare, buildings, chunk, {}).ok());
+    CHECK(bare.players()[1].owner == world.players()[1].owner);
+    CHECK(bare.players()[0].owner == 0);
+}
+
 TEST_CASE("save format: closed city gates come back (version 3 of PSTA)") {
     const auto buildings = make_buildings();
     for (const bool wide : {false, true}) {

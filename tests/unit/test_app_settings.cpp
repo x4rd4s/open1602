@@ -24,6 +24,29 @@ TEST_CASE("app settings: names are written as UTF-8 and read back") {
     CHECK(back.remembered_hosts[0] == "example.org:2601");
 }
 
+TEST_CASE("app settings: the player ID is kept as it was drawn") {
+    app::AppSettings s;
+    CHECK(app::write_settings(s).find("player_id") == std::string::npos);  // not drawn yet
+    s.player_id = 0x00C0FFEE12345678ULL;
+    const std::string text = app::write_settings(s);
+    CHECK(text.find("player_id = 00c0ffee12345678\n") != std::string::npos);
+    CHECK(app::parse_settings(text, {}).player_id == s.player_id);
+    // Upper case reads too; nonsense and 0 keep what there was.
+    CHECK(app::parse_settings("player_id = 00C0FFEE12345678\n", {}).player_id == s.player_id);
+    app::AppSettings kept;
+    kept.player_id = 7;
+    CHECK(app::parse_settings("player_id = xyz\n", kept).player_id == 7);
+    CHECK(app::parse_settings("player_id = 0\n", kept).player_id == 7);
+    CHECK(app::parse_settings("player_id = 1234567890abcdef0\n", kept).player_id == 7);  // 17 digits
+    // Drawn at random, never 0; set_setting_line adds it to a file without changing the rest.
+    const std::uint64_t a = app::new_player_id();
+    CHECK(a != 0);
+    CHECK(a != app::new_player_id());
+    const std::string file = app::set_setting_line("music = off\n", "player_id", app::player_id_text(a));
+    CHECK(file.starts_with("music = off\n"));
+    CHECK(app::parse_settings(file, {}).player_id == a);
+}
+
 TEST_CASE("app settings: the mods turned off, each once") {
     app::AppSettings s;
     s.disabled_mods = {"leuchtturm", "wetter"};

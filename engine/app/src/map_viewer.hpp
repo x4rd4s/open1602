@@ -169,6 +169,8 @@ private:
     /// How often the scenery shows itself, from the settings.
     [[nodiscard]] render::Ambient::Config ambient_config() const;
     void save_settings();
+    /// Writes a newly drawn player ID into settings.cfg, leaving the file's other lines as they are.
+    static void remember_player_id(std::uint64_t id);
     /// Replaces the running game by a savegame (Open1602's own or the original's) while the
     /// program runs (F9); the game goes on as it was if the file cannot be read. `rules`: the
     /// settings chosen for a scenario (a savegame of Open1602 keeps its own).

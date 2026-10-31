@@ -834,6 +834,12 @@ void fit_goodwill(World& world);
 /// The player at this computer until there is a lobby: the first human player, kNoPlayer if none.
 [[nodiscard]] PlayerId first_human_player(const World& world) noexcept;
 
+/// The player of a person who plays the game alone, `owner` being their Player::owner: the human
+/// player they played before (a multiplayer game saved or loaded alone), else the first human
+/// player. That player gets `owner` (unless 0); the computer plays the other human players, whose
+/// people are not there. kNoPlayer, and nothing changes, if the world has no human player.
+PlayerId take_single_player(World& world, std::uint64_t owner);
+
 /// Loads a scenario (.SZS/.SZM) or savegame (.GAM): all islands, each on its island template and
 /// placed on the world map, the players and the ships. Problems are collected in `warnings`; islands that cannot be
 /// placed are skipped. A scenario that makes its islands at the start (the endless games) gets

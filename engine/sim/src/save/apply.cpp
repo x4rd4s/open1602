@@ -279,6 +279,7 @@ core::Status apply_decoded(World& world, Decoded& d) {
             p.purchases = from.purchases;
             p.sales = from.sales;
             p.gates_closed = from.gates_closed;
+            p.owner = from.owner;
             if (d.player_switches) {
                 p.scenario = from.scenario;
             } else if (i < kept_switches.size()) {

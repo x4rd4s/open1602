@@ -80,6 +80,7 @@ struct HostSession::Peer {
     bool lagging = false;
     std::uint32_t stalls = 0;        ///< times the others stopped waiting for it
     std::uint64_t token = 0;         ///< to come back to its slot (0: it watches)
+    std::uint64_t owner = 0;         ///< player_verifier of its player ID (0: none)
     std::uint32_t chat_lines = 0;    ///< in the current second
     std::uint32_t game_orders = 0;   ///< pauses and renames in the current second
     std::uint32_t lobby_orders = 0;  ///< slot changes in the current second
@@ -116,6 +117,11 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& 
             m_computer_held.push_back(static_cast<Seat>(s));
         }
         m_lobby.seats.push_back(std::move(lobby_seat));
+    }
+    // The game keeps who plays the host's slot.
+    if (const std::uint64_t own = player_verifier(m_config.player);
+        own != 0 && seat < players.size() && players[seat].owner != own) {
+        insert(sim::PlayerControl{seat, false, own});
     }
     init_lobby();
 }
@@ -516,6 +522,18 @@ void HostSession::hello(Peer& peer, const Hello& m) {
         drop(peer, RefuseReason::Kicked);
         return;
     }
+    peer.owner = player_verifier(m.player);
+    // A person kicked in this session has no claim to their slot any more.
+    const std::uint64_t claim =
+        std::find(m_kicked.begin(), m_kicked.end(), peer.owner) != m_kicked.end() ? 0 : peer.owner;
+    if (seat == sim::kNoPlayer) {
+        // Back into the slot this person played (the game keeps who it was), also after a restart
+        // of the program or a change of host, and also when newcomers may no longer join.
+        seat = seat_of_owner(claim);
+        if (seat != sim::kNoPlayer) {
+            forget_token(seat);  // whoever had it in the meantime cannot come back with the old token
+        }
+    }
     if (seat == sim::kNoPlayer && m.returning && m_config.spectators) {
         // After the host changed, without its slot (it watched, or someone took the slot): it
         // watches, rather than taking a slot it did not have.
@@ -524,7 +542,7 @@ void HostSession::hello(Peer& peer, const Hello& m) {
             drop(peer, RefuseReason::Closed);
             return;
         }
-        seat = free_seat(m.seat);
+        seat = free_seat(m.seat, claim);
         if (seat == sim::kNoPlayer && !m_config.spectators) {
             drop(peer, RefuseReason::Full);
             return;
@@ -562,7 +580,7 @@ void HostSession::hello(Peer& peer, const Hello& m) {
         if (started()) {
             // The player takes the slot over from the computer, under the player's name, as
             // commands of that player like any other.
-            insert(sim::PlayerControl{seat, false});
+            insert(sim::PlayerControl{seat, false, peer.owner});
             insert(sim::PlayerRename{seat, peer.name});
         }
     }
@@ -1059,7 +1077,7 @@ bool HostSession::seat_taken(Seat seat) const {
                                          [seat](const auto& p) { return !p->gone && p->welcomed && p->seat == seat; });
 }
 
-Seat HostSession::free_seat(Seat wanted) const {
+Seat HostSession::free_seat(Seat wanted, std::uint64_t owner) const {
     const auto free = [&](std::size_t s) {
         if (s >= m_lobby.seats.size() || seat_taken(static_cast<Seat>(s))) {
             return false;
@@ -1079,9 +1097,49 @@ Seat HostSession::free_seat(Seat wanted) const {
     if (free(wanted)) {
         return wanted;
     }
+    // Slots nobody owns (or this person) first: another person's slot waits for its player.
+    for (std::size_t s = 0; s < m_lobby.seats.size(); ++s) {
+        const std::uint64_t o = owner_of(static_cast<Seat>(s));
+        if ((o == 0 || o == owner) && free(s)) {
+            return static_cast<Seat>(s);
+        }
+    }
     for (std::size_t s = 0; s < m_lobby.seats.size(); ++s) {
         if (free(s)) {
             return static_cast<Seat>(s);
+        }
+    }
+    return sim::kNoPlayer;
+}
+
+std::uint64_t HostSession::owner_of(Seat seat) const {
+    if (!started()) {
+        return seat < m_lobby.seats.size() ? m_lobby.seats[seat].owner : 0;
+    }
+    const auto& players = m_simulation->world().players();
+    return seat < players.size() ? players[seat].owner : 0;
+}
+
+Seat HostSession::seat_of_owner(std::uint64_t owner) const {
+    if (owner == 0) {
+        return sim::kNoPlayer;
+    }
+    for (std::size_t s = 0; s < m_lobby.seats.size(); ++s) {
+        const auto seat = static_cast<Seat>(s);
+        if (owner_of(seat) != owner || seat == m_seat || seat_taken(seat)) {
+            continue;
+        }
+        // Free as for anyone, except that a slot kept for its player (reserved) is this one's.
+        if (!started()) {
+            if (m_lobby.seats[s].kind == LobbySeat::Kind::Open) {
+                return seat;
+            }
+            continue;
+        }
+        const auto& players = m_simulation->world().players();
+        if (m_lobby.seats[s].kind == LobbySeat::Kind::Open && s < players.size() && players[s].active() &&
+            (players[s].role == sim::PlayerRole::Human || players[s].role == sim::PlayerRole::Computer)) {
+            return seat;
         }
     }
     return sim::kNoPlayer;
@@ -1450,6 +1508,7 @@ void HostSession::kick(Seat seat) {
                                      [&](const auto& p) { return !p->gone && p->welcomed && p->seat == seat; });
     if (seat != sim::kNoPlayer && holder != m_peers.end()) {
         ban((*holder)->address);
+        ban_owner((*holder)->owner);
         drop(**holder, RefuseReason::Kicked);
         forget_token(seat);  // and it cannot come back with it
     }
@@ -1465,6 +1524,7 @@ void HostSession::kick_member(std::size_t member, Seat seat, std::string_view na
         return;
     }
     ban(peer->address);
+    ban_owner(peer->owner);
     drop(*peer, RefuseReason::Kicked);
     if (seat != sim::kNoPlayer) {
         forget_token(seat);  // and it cannot come back with it
@@ -1474,6 +1534,12 @@ void HostSession::kick_member(std::size_t member, Seat seat, std::string_view na
 void HostSession::ban(const std::string& address) {
     if (!address.empty() && std::find(m_banned.begin(), m_banned.end(), address) == m_banned.end()) {
         m_banned.push_back(address);
+    }
+}
+
+void HostSession::ban_owner(std::uint64_t owner) {
+    if (owner != 0 && std::find(m_kicked.begin(), m_kicked.end(), owner) == m_kicked.end()) {
+        m_kicked.push_back(owner);
     }
 }
 
@@ -1505,7 +1571,13 @@ void HostSession::start(sim::Simulation& simulation, const assets::BuildingTable
         p->game_due = true;
         if (p->seat != sim::kNoPlayer) {
             insert(sim::PlayerRename{p->seat, p->name});
+            if (p->owner != 0) {
+                insert(sim::PlayerControl{p->seat, false, p->owner});  // the game keeps who plays it
+            }
         }
+    }
+    if (const std::uint64_t own = player_verifier(m_config.player); own != 0 && m_seat != sim::kNoPlayer) {
+        insert(sim::PlayerControl{m_seat, false, own});
     }
 }
 

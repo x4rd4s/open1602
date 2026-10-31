@@ -151,7 +151,7 @@ enum class Need : std::uint8_t { Required, Optional };
 /// The highest version of a section this version reads.
 constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     if (id == kPlayerState) {
-        return kClosedGates;
+        return kPlayerOwners;
     }
     if (id == kFleet) {
         return kWideDiscovered;

@@ -298,6 +298,13 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         remembered = parse_settings(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), {});
     }
     const bool data_fixes = remembered.data_fixes && !options.original_data;
+    // The player ID of this installation, drawn once: it goes into settings.cfg at once, as the
+    // only line that changes there.
+    std::uint64_t player_id = remembered.player_id;
+    if (player_id == 0) {
+        player_id = new_player_id();
+        remember_player_id(player_id);
+    }
     if (data_fixes) {
         std::vector<std::string_view> fixed = assets::fixes::fix_buildings(*buildings);
         for (const std::string_view id : assets::fixes::fix_figures(*figures)) {
@@ -371,6 +378,10 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     if (!world) {
         return world.error();
     }
+    if (!joining) {
+        // Alone until a session begins: the human player this person played before.
+        (void)sim::take_single_player(*world, net::player_verifier(player_id));
+    }
     for (const auto& w : warnings) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
@@ -417,6 +428,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_building_figures =
         render::collect_building_figures(viewer->m_state->world, viewer->m_buildings, viewer->m_figures);
     viewer->m_local_player = sim::first_human_player(viewer->m_state->world);
+    viewer->m_app_settings.player_id = player_id;  // settings.cfg says the same, unless it cannot be written
     if (auto texts = assets::TextTable::load(game)) {
         viewer->m_city_names = texts->section("STAEDTE");
         viewer->m_ship_names = texts->section("SHIPS");
@@ -2672,6 +2684,21 @@ void MapViewer::apply_language() {
     std::fprintf(stderr, "language: %s\n", ui::current_language().c_str());
 }
 
+void MapViewer::remember_player_id(std::uint64_t id) {
+    const std::filesystem::path path = data_folder() / "settings.cfg";
+    std::string text;
+    if (auto bytes = core::read_file(path)) {
+        text.assign(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+    }
+    text = set_setting_line(text, "player_id", player_id_text(id));
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
+    if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+        std::fprintf(stderr, "settings: %s\n", status.error().message.c_str());
+    }
+}
+
 void MapViewer::save_settings() {
     const std::string text = write_settings(m_app_settings);
     const std::filesystem::path path = data_folder() / "settings.cfg";
@@ -3160,6 +3187,11 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
         }
     };
     try {
+        if (!m_session) {
+            // Alone: the human player this person played before (also of a multiplayer game);
+            // the computer plays the other people's.
+            (void)sim::take_single_player(world, net::player_verifier(m_app_settings.player_id));
+        }
         next = make_state(std::move(world), rules != nullptr ? *rules : m_options.rules);
     } catch (const std::bad_alloc&) {
         keep_old();

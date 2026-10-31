@@ -727,6 +727,9 @@ bool Simulation::control_player(const PlayerControl& order) {
     }
     const bool to_person = p->role == PlayerRole::Computer && !order.computer;
     p->role = order.computer ? PlayerRole::Computer : PlayerRole::Human;
+    if (order.owner != 0) {
+        p->owner = order.owner;
+    }
     if (to_person) {
         // The person finds the ships standing where the computer left them, not sailing on to
         // where it sent them; trade routes keep running (they show in the ship's window).

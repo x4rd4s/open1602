@@ -263,6 +263,9 @@ inline constexpr std::uint16_t kScenarioSwitches = 2;
 /// Version 3 of PSTA: each player also has whether his gates are closed (Player::gates_closed). The
 /// writer takes it only when a player closed them.
 inline constexpr std::uint16_t kClosedGates = 3;
+/// Version 4 of PSTA: each player also has the person who played it last (Player::owner). The
+/// writer takes it only when a player has one.
+inline constexpr std::uint16_t kPlayerOwners = 4;
 /// FLEE version 2: every ship's route with TradeRoute::kStops stops, not the original's four.
 inline constexpr std::uint16_t kLongRoutes = 2;
 /// FLEE version 3: every stop with RouteStop::kEntries wares, not the original's three.
