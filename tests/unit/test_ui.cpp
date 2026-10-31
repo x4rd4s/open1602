@@ -731,7 +731,9 @@ TEST_CASE("ui: wrap_lines keeps every character of what players write") {
     CHECK((ui::wrap_lines(nullptr, "ab cd ef", 45) == Lines{"ab cd", "ef"}));
     // A word wider than a line is cut where the line is full.
     CHECK((ui::wrap_lines(nullptr, "abcdefghijkl", 45) == Lines{"abcde", "fghij", "kl"}));
-    CHECK((ui::wrap_lines(nullptr, "ab abcdefgh", 45) == Lines{"ab", "abcde", "fgh"}));
+    // It starts on the line before, after what is there already.
+    CHECK((ui::wrap_lines(nullptr, "ab abcdefgh", 45) == Lines{"ab ab", "cdefg", "h"}));
+    CHECK((ui::wrap_lines(nullptr, "abcd abcdefgh", 45) == Lines{"abcd", "abcde", "fgh"}));
     // Hyphens and "--" stay as written; no room at all still gives a character a line.
     CHECK((ui::wrap_lines(nullptr, "a--b -x", 45) == Lines{"a--b", "-x"}));
     CHECK((ui::wrap_lines(nullptr, "abc", 0) == Lines{"a", "b", "c"}));

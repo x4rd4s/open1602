@@ -69,8 +69,23 @@ std::vector<std::string> wrap_lines(const Font* font, std::string_view text, dou
                 line = std::move(candidate);
                 break;
             }
+            if (text_width(font, word) > width) {
+                // A word wider than any line starts right here, as much of it as still fits.
+                std::size_t n = 0;
+                while (n < word.size() && text_width(font, line + ' ' + std::string(word.substr(0, n + 1))) <= width) {
+                    ++n;
+                }
+                if (n > 0) {
+                    line += ' ';
+                    line += word.substr(0, n);
+                    word.remove_prefix(n);
+                }
+            }
             lines.push_back(std::exchange(line, {}));
             open = false;
+            if (word.empty()) {
+                break;
+            }
         }
         if (end >= text.size()) {
             break;
