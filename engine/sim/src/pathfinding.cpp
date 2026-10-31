@@ -104,6 +104,11 @@ Catchment catchment_of(const assets::BuildingType& building, std::uint8_t rotati
     return c;
 }
 
+bool catchment_covers_water(const assets::BuildingType& building) noexcept {
+    return building.prod_kind == prod::kFisher || building.prod_kind == prod::kTower ||
+           building.kind == building_kind::kTower || building.kind == building_kind::kTowerBeach;
+}
+
 bool walkable(const assets::BuildingType& building, const MapCell& cell, WalkClass walk) noexcept {
     using namespace building_kind;
     if (walk == WalkClass::Water) {

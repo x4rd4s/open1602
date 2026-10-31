@@ -625,8 +625,9 @@ void Engine::task_settle_land(AiPlayer& p) {
         return;
     }
     Player& pl = player(p);
-    if (pl.money < kCheats.founding_below) {
-        pl.money = money_plus(pl.money, std::int64_t{kCheats.founding_money});  // the original's founding money (cheat)
+    if (pl.money < cheats().founding_below) {
+        pl.money =
+            money_plus(pl.money, std::int64_t{cheats().founding_money});  // the original's founding money (cheat)
     }
     BuildOrder order;
     order.player = p.player;
@@ -668,7 +669,7 @@ void Engine::task_settle_land(AiPlayer& p) {
     r.land = free_land(island, c->index, &r.land_percent);
     unload_at(*c, *ship, false, false);
     add_goods(*c, m_buildings.materials().bricks,
-              kCheats.founding_bricks * kStockUnitsPerTon);  // free bricks after founding
+              cheats().founding_bricks * kStockUnitsPerTon);  // free bricks after founding
     s.failed = false;
     p.budget = 14;
     if (!p.home_valid) {
@@ -879,19 +880,19 @@ bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
     if (behind(p) && !threatened(p)) {
         // The colony subsidy (cheat): one ware per call into the current city.
         bool given = true;
-        if (c->stock(m.wood) < kCheats.wood_below * kStockUnitsPerTon) {
-            add_goods(*c, m.wood, kCheats.wood * kStockUnitsPerTon);
-        } else if (c->stock(m.tools) < kCheats.tools_below * kStockUnitsPerTon) {
-            add_goods(*c, m.tools, kCheats.tools * kStockUnitsPerTon);
+        if (c->stock(m.wood) < cheats().wood_below * kStockUnitsPerTon) {
+            add_goods(*c, m.wood, cheats().wood * kStockUnitsPerTon);
+        } else if (c->stock(m.tools) < cheats().tools_below * kStockUnitsPerTon) {
+            add_goods(*c, m.tools, cheats().tools * kStockUnitsPerTon);
         } else {
             std::uint32_t inhabited = 0;
             for (const City& o : m_world.cities()) {
                 inhabited += o.owner == p.player && population(o) > 0 ? 1U : 0U;
             }
-            if (inhabited < 2 && c->stock(food_ware) < kCheats.food_below * kStockUnitsPerTon) {
-                add_goods(*c, food_ware, kCheats.food * kStockUnitsPerTon);
-            } else if (inhabited >= 2 && c->stock(m.bricks) < kCheats.bricks_below * kStockUnitsPerTon) {
-                add_goods(*c, m.bricks, kCheats.bricks * kStockUnitsPerTon);
+            if (inhabited < 2 && c->stock(food_ware) < cheats().food_below * kStockUnitsPerTon) {
+                add_goods(*c, food_ware, cheats().food * kStockUnitsPerTon);
+            } else if (inhabited >= 2 && c->stock(m.bricks) < cheats().bricks_below * kStockUnitsPerTon) {
+                add_goods(*c, m.bricks, cheats().bricks * kStockUnitsPerTon);
             } else {
                 given = false;
             }

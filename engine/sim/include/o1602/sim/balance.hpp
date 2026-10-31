@@ -88,6 +88,27 @@ struct Balance {
     std::uint32_t castle_unload_range = 6;  ///< tiles from a ship where soldiers land (0x00448D90)
     std::uint32_t fire_spread = 19;         ///< chance of 128 per epoch that a fire spreads
     std::uint32_t plague_radius = 4;        ///< tiles a plague reaches to infect a neighbour
+    /// What the computer players get from nowhere, on every difficulty (the original's cheats,
+    /// docs/re/ai.md). Money below the first value of a pair gets the second; goods in tons.
+    std::uint32_t ai_steady_below = 3791;  ///< task 5's steady money (0x00428E30)
+    std::uint32_t ai_steady_money = 379;
+    std::uint32_t ai_founding_below = 500;  ///< a founding
+    std::uint32_t ai_founding_money = 799;
+    std::uint32_t ai_founding_bricks = 8;        ///< t of bricks into a new city
+    std::uint32_t ai_subsidy_poor_below = 4733;  ///< a computer that is behind (0x00428370)
+    std::uint32_t ai_subsidy_poor_money = 797;
+    std::uint32_t ai_subsidy_below = 9376;  ///< from the settlers on
+    std::uint32_t ai_subsidy_money = 1793;
+    std::uint32_t ai_subsidy_wood = 7;        ///< t of wood while the stock is below as much
+    std::uint32_t ai_subsidy_tools = 3;       ///< t of tools while the stock is below as much
+    std::uint32_t ai_colony_wood_below = 19;  ///< the colony subsidy, one good per call
+    std::uint32_t ai_colony_wood = 13;
+    std::uint32_t ai_colony_tools_below = 15;
+    std::uint32_t ai_colony_tools = 9;
+    std::uint32_t ai_colony_food_below = 19;
+    std::uint32_t ai_colony_food = 9;
+    std::uint32_t ai_colony_bricks_below = 19;
+    std::uint32_t ai_colony_bricks = 9;
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -103,10 +124,14 @@ struct BalanceField {
     std::uint32_t Balance::*value;
     std::uint32_t min;
     std::uint32_t max;
+    std::uint16_t version = 1;  ///< the version of the section BALA that holds it first
 };
 
+/// The version of the section BALA with the computers' values.
+inline constexpr std::uint16_t kBalanceWithComputers = 2;
+
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 7> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 26> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -114,7 +139,30 @@ inline constexpr std::array<BalanceField, 7> kBalanceFields = {{
     {"castle", "unload_range", &Balance::castle_unload_range, 1, 16},
     {"disasters", "fire_spread", &Balance::fire_spread, 0, 128},
     {"disasters", "plague_radius", &Balance::plague_radius, 0, 16},
+    {"computers", "steady_below", &Balance::ai_steady_below, 0, 1'000'000, kBalanceWithComputers},
+    {"computers", "steady_money", &Balance::ai_steady_money, 0, 100'000, kBalanceWithComputers},
+    {"computers", "founding_below", &Balance::ai_founding_below, 0, 1'000'000, kBalanceWithComputers},
+    {"computers", "founding_money", &Balance::ai_founding_money, 0, 100'000, kBalanceWithComputers},
+    {"computers", "founding_bricks", &Balance::ai_founding_bricks, 0, 100, kBalanceWithComputers},
+    {"computers", "subsidy_poor_below", &Balance::ai_subsidy_poor_below, 0, 1'000'000, kBalanceWithComputers},
+    {"computers", "subsidy_poor_money", &Balance::ai_subsidy_poor_money, 0, 100'000, kBalanceWithComputers},
+    {"computers", "subsidy_below", &Balance::ai_subsidy_below, 0, 1'000'000, kBalanceWithComputers},
+    {"computers", "subsidy_money", &Balance::ai_subsidy_money, 0, 100'000, kBalanceWithComputers},
+    {"computers", "subsidy_wood", &Balance::ai_subsidy_wood, 0, 100, kBalanceWithComputers},
+    {"computers", "subsidy_tools", &Balance::ai_subsidy_tools, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_wood_below", &Balance::ai_colony_wood_below, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_wood", &Balance::ai_colony_wood, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_tools_below", &Balance::ai_colony_tools_below, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_tools", &Balance::ai_colony_tools, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_food_below", &Balance::ai_colony_food_below, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_food", &Balance::ai_colony_food, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_bricks_below", &Balance::ai_colony_bricks_below, 0, 100, kBalanceWithComputers},
+    {"computers", "colony_bricks", &Balance::ai_colony_bricks, 0, 100, kBalanceWithComputers},
 }};
+
+/// The version of the section BALA that `balance` needs: 1 while the computers' values are the
+/// original's, so that an older Open1602 still reads it.
+[[nodiscard]] std::uint16_t balance_version(const Balance& balance) noexcept;
 
 /// A field of a building as balance.toml names it and its limits there.
 struct BuildingFieldInfo {

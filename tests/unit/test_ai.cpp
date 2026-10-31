@@ -21,6 +21,7 @@
 #include "o1602/core/byte_reader.hpp"
 #include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/ai.hpp"
+#include "o1602/sim/balance.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -1597,4 +1598,20 @@ TEST_CASE("ai: a computer builds the producer of a package's good its inhabitant
     REQUIRE(view[0].plans[0].slots.size() == sim::ai::kSlots + 1);
     CHECK(view[0].plans[0].slots[sim::ai::kSlots][0] == mills());
     CHECK(mills() >= 1);
+}
+
+TEST_CASE("ai: the computers' cheats come from the game's balance (balance.toml [computers])") {
+    // A poor computer gets money for its founding: the original's 799, or what the balance gives.
+    const auto money_after_founding = [](std::uint32_t founding_money) {
+        Game g(true, 300);
+        sim::Balance balance;
+        balance.ai_founding_money = founding_money;
+        g.world.set_balance(balance);
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+        return g.world.players()[kComputer].money;
+    };
+    const std::int32_t original = money_after_founding(799);
+    CHECK(money_after_founding(5799) == original + 5000);
+    CHECK(money_after_founding(0) == original - 799);
 }

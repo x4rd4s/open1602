@@ -174,6 +174,14 @@ bool valid(const Balance& balance) noexcept {
     return numbers && buildings && ordered && figures && figures_ordered;
 }
 
+std::uint16_t balance_version(const Balance& balance) noexcept {
+    const Balance original;
+    const bool computers = std::all_of(kBalanceFields.begin(), kBalanceFields.end(), [&](const BalanceField& f) {
+        return f.version < kBalanceWithComputers || balance.*f.value == original.*f.value;
+    });
+    return computers ? 1 : kBalanceWithComputers;
+}
+
 bool original_numbers(const Balance& balance) noexcept {
     const Balance original;
     return std::all_of(kBalanceFields.begin(), kBalanceFields.end(),

@@ -144,8 +144,11 @@ Part 1 done on 2026-10-31 ([computer-players.md](computer-players.md)): a good o
 class needs gets its producer from the building table, its raw material its own, down to a farm or
 a good of the original; a city wants as many as its inhabitants and the producers that use the good
 need, at most eight, after the list of its stage. They count in slots after the original's 55
-(savegame `AIST` version 5). Still open: the original's Needs, slots, stage orders, public buildings
-and cheat amounts as data.
+(savegame `AIST` version 5).
+
+Part 2 done on 2026-10-31 ([computer-players.md](computer-players.md#what-they-get-from-nowhere)):
+the cheat amounts are values of `balance.toml`'s table `[computers]` (savegame `BALA` version 2).
+Still open: the original's Needs, slots, stage orders and public buildings as data.
 
 ### 6. Lua scripts (section 6)
 

@@ -177,6 +177,9 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     if (id == kScripts) {
         return kScriptsWithCampaign;
     }
+    if (id == kBalance) {
+        return kBalanceWithComputers;
+    }
     return id == kIslands || id == kVolcanoes ? kWideCoordinates : 1;
 }
 
@@ -312,11 +315,17 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
     }
     if (!original_numbers(world.balance())) {
         // Required: a reader without it would compute another game.
-        section(out, kBalance, [&](Writer& o) {
-            for (const BalanceField& f : kBalanceFields) {
-                o.u32(world.balance().*f.value);
-            }
-        });
+        const std::uint16_t version = balance_version(world.balance());
+        section(
+            out, kBalance,
+            [&](Writer& o) {
+                for (const BalanceField& f : kBalanceFields) {
+                    if (f.version <= version) {
+                        o.u32(world.balance().*f.value);
+                    }
+                }
+            },
+            Need::Required, version);
     }
     if (!world.balance().buildings.empty()) {
         // Required as well: the buildings would produce and cost otherwise.
@@ -664,7 +673,9 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
             case kBalance: {
                 Balance b;
                 for (const BalanceField& f : kBalanceFields) {
-                    in.u32(b.*f.value);
+                    if (f.version <= version) {
+                        in.u32(b.*f.value);
+                    }
                 }
                 if (!valid(b)) {
                     in.fail();

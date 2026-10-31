@@ -20,9 +20,24 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `castle` | `unload_range` | 6 | 1–16 | tiles from a ship within which soldiers land |
 | `disasters` | `fire_spread` | 19 | 0–128 | chance of 128 per epoch that a fire spreads to a building nearby; 0 never |
 | `disasters` | `plague_radius` | 4 | 0–16 | tiles a plague reaches to infect a neighbouring house; 0 never |
+| `computers` | `steady_below`, `steady_money` | 3791, 379 | 0–1000000, 0–100000 | a computer with less money than the first gets the second at every refresh of its city (every 5.1 s) |
+| `computers` | `founding_below`, `founding_money` | 500, 799 | 0–1000000, 0–100000 | a computer that founds a city with less money than the first gets the second |
+| `computers` | `founding_bricks` | 8 | 0–100 | tons of bricks a computer's new city gets |
+| `computers` | `subsidy_poor_below`, `subsidy_poor_money` | 4733, 797 | 0–1000000, 0–100000 | a computer behind the others with less money than the first gets the second |
+| `computers` | `subsidy_below`, `subsidy_money` | 9376, 1793 | 0–1000000, 0–100000 | the same from the settlers on, when it has more than the poor one's limit |
+| `computers` | `subsidy_wood`, `subsidy_tools` | 7, 3 | 0–100 | tons of wood and tools a computer behind the others gets while its city has less |
+| `computers` | `colony_wood_below`, `colony_wood` | 19, 13 | 0–100 | a young city of a computer behind the others with less wood than the first (tons) gets the second |
+| `computers` | `colony_tools_below`, `colony_tools` | 15, 9 | 0–100 | the same with tools, when it has the wood |
+| `computers` | `colony_food_below`, `colony_food` | 19, 9 | 0–100 | the same with food, before the computer's second inhabited city |
+| `computers` | `colony_bricks_below`, `colony_bricks` | 19, 9 | 0–100 | the same with bricks, from its second inhabited city on |
+
+The `computers` values are the original's cheats: what the computer players get from nowhere, on
+every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of
+0 take a gift away.
 
 A game keeps the values it started with: they are saved with it (section `BALA` of
-[o1602-save.md](../formats/o1602-save.md), written only when they differ from the original's), so a
+[o1602-save.md](../formats/o1602-save.md), written only when they differ from the original's; version
+2 holds the `computers` values and is written only when one of them differs), so a
 mod installed or removed later does not change a running game, and every computer of a multiplayer
 game plays with the host's.
 
