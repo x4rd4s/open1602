@@ -17,6 +17,10 @@ namespace o1602::app {
 /// Call first in main(), before anything is written to stderr.
 void setup_diagnostics();
 
+/// Linux and macOS: SIGTERM, SIGINT or SIGHUP arrived (and was logged); the main loop ends the
+/// game as if the window was closed. Windows: always false (SDL reports those as SDL_EVENT_QUIT).
+[[nodiscard]] bool termination_requested();
+
 /// The last line of a log file: the program ended by itself. A log without it ended in a crash
 /// or was killed.
 void report_exit(int code);

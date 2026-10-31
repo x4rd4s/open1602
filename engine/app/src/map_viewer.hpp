@@ -117,7 +117,7 @@ private:
     void quick_save() override;
     void quick_load() override;
     void request_screenshot() override;
-    void quit() override { m_running = false; }
+    void quit() override;
     void toggle_owners() override { m_show_owners = !m_show_owners; }
     void toggle_fps() override { m_show_fps = !m_show_fps; }
     void toggle_coordinates() override { m_show_coordinates = !m_show_coordinates; }
