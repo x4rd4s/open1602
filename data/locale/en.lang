@@ -135,7 +135,6 @@ keys.action.rotate_building = Rotate building
 keys.action.rotate_building_back = Rotate building the other way
 keys.action.pick_building = Pick the building under the mouse
 keys.action.demolish_tool = Demolish
-keys.action.next_building = Next building
 keys.action.plant_fields = Plant all farm fields
 keys.action.toggle_gates = Open/close all city gates
 keys.action.group_store = Store group

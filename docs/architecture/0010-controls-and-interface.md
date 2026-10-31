@@ -71,7 +71,7 @@ information fit in and the controls follow today's real-time strategy games (202
 | O | options |
 | L / Shift+L | ship list / city list |
 | V | diplomacy (treaties; German „Verträge“) |
-| F2 | goods balance „Warenbilanz“ (Open1602, ADR 0012) |
+| F2, Tab | goods balance „Warenbilanz“ (Open1602, ADR 0012); with units selected Tab narrows the selection instead |
 
 **Building**
 
@@ -136,7 +136,9 @@ fit, another trade cart) are listed with the unit keys in the F1 overview and in
 No unit key is also a general key (2026-10-18: attack moved from A to F, stop from
 S to H, and in exchange hold position on G, formation on C, spread out on Shift+C), so W A S D always
 scroll. Only keys in contexts that never apply at the same time are bound twice: R and Delete (building:
-rotate, demolish; units: route, disband), C (building: pipette; units: formation) and Tab.
+rotate, demolish; units: route, disband), C (building: pipette; units: formation) and Tab (general: goods
+balance; units: the next type in the selection). Tab no longer steps through all buildings while
+building (2026-10-31): that list ignored what the player had unlocked yet.
 
 Keys that matter by their place are bound by scancode (2026-10-19, review point 25): W A S D, Q and E
 and the digits of the groups lie where they are on a US keyboard on every layout (AZERTY: Z Q S D, A

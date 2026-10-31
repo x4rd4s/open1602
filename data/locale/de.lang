@@ -110,7 +110,6 @@ keys.action.rotate_building = Gebäude drehen
 keys.action.rotate_building_back = Gebäude andersherum drehen
 keys.action.pick_building = Gebäude unter der Maus wählen
 keys.action.demolish_tool = Abreißen
-keys.action.next_building = Nächstes Gebäude
 keys.action.plant_fields = Alle Farmfelder bepflanzen
 keys.action.toggle_gates = Alle Stadttore öffnen/schließen
 keys.action.group_store = Gruppe festlegen

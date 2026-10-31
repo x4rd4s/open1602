@@ -120,7 +120,7 @@ int usage() {
         "  F5 / F9        quick save / quick load     F12, Print               screenshot\n"
         "  F1             these keys over the map     F11, Alt+Enter           window / full screen\n"
         "  Ctrl + / Ctrl - the map twice / half as large\n"
-        "  B K I O        build, military, info, options   F2  goods balance\n"
+        "  B K I O        build, military, info, options   F2, Tab  goods balance\n"
         "  Enter          chat (multiplayer)\n"
         "  left mouse     select (drag: rectangle, Shift: add, Ctrl/double: all alike on screen)\n"
         "  right mouse    order (also on the minimap; Shift: queued)\n"
@@ -128,7 +128,7 @@ int usage() {
         "  . / ,          next idle ship / unit\n"
         "  units:         F attack, H stop, G hold, P patrol, C formation, Shift+C scatter, Tab one kind,\n"
         "                 Y white flag, X explore, T trade, R route, Del disband/scuttle\n"
-        "  building:      R rotate, C pick the building under the mouse, Del demolish, Tab next\n"
+        "  building:      R rotate, C pick the building under the mouse, Del demolish\n"
         "  Esc            back, out of a tool, deselect   Ctrl+Q quit   Ctrl+O ownership view\n",
         stderr);
     return 2;
