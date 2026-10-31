@@ -36,8 +36,8 @@ jobs:
           - { name: Windows MSVC,  os: windows-2025, cc: cl,    cxx: cl,      preset: ci }
           # Debug off Linux: asserts and the debug checks of MSVC's STL run there too.
           - { name: Windows Debug, os: windows-2025, cc: cl,    cxx: cl,      preset: debug }
-          - { name: macOS Clang,   os: macos-14,     cc: clang, cxx: clang++, preset: ci }
-          - { name: macOS Debug,   os: macos-14,     cc: clang, cxx: clang++, preset: debug }
+          - { name: macOS Clang,   os: macos-15,     cc: clang, cxx: clang++, preset: ci }
+          - { name: macOS Debug,   os: macos-15,     cc: clang, cxx: clang++, preset: debug }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -95,7 +95,7 @@ jobs:
           - { name: Linux,      os: ubuntu-24.04, preset: ci }
           - { name: Linux ASan, os: ubuntu-24.04, preset: asan }  # the game's start under ASan/UBSan
           - { name: Windows,    os: windows-2025, preset: ci }
-          - { name: macOS,      os: macos-14,     preset: ci }
+          - { name: macOS,      os: macos-15,     preset: ci }
     env:
       SDL_VERSION: 3.2.24
     steps:
