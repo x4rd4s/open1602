@@ -417,32 +417,40 @@ std::vector<ModPackage> order_packages(std::vector<ModPackage> packages, std::ve
     const auto find = [&](std::string_view id) {
         return std::find_if(packages.begin(), packages.end(), [&](const ModPackage& p) { return p.id == id; });
     };
+    // What keeps a package from loading: the first of its dependencies that is not there as it
+    // needs it.
+    const auto unmet = [&](const ModPackage& p) -> std::optional<PackageProblem> {
+        using Kind = PackageProblem::Kind;
+        for (const PackageDependency& d : p.depends) {
+            PackageProblem problem{p.id, Kind::Missing, d.id, d.versions, {}};
+            const ModPackage* other = installed_as(d.id);
+            const PackageProblem* gone = problem_of(d.id);
+            if (other == nullptr) {
+                problem.kind = gone != nullptr ? Kind::DependencyBroken : Kind::Missing;  // unreadable
+            } else if (!version_meets(other->version, d.versions)) {
+                problem.kind = Kind::WrongVersion;
+                problem.found = other->version;
+            } else if (find(d.id) != packages.end()) {
+                continue;
+            } else {
+                problem.kind =
+                    gone != nullptr && gone->kind == Kind::TurnedOff ? Kind::DependencyOff : Kind::DependencyBroken;
+            }
+            if (problem.kind != Kind::Missing && problem.kind != Kind::WrongVersion) {
+                problem.versions.clear();
+            }
+            return problem;
+        }
+        return std::nullopt;
+    };
     // Out go the packages whose dependencies are not there as they need them, until none is left
     // out any more: one that goes may take others with it.
     for (bool changed = true; changed;) {
         changed = false;
-        for (auto p = packages.begin(); p != packages.end() && !changed; ++p) {
-            for (const PackageDependency& d : p->depends) {
-                using Kind = PackageProblem::Kind;
-                PackageProblem problem{p->id, Kind::Missing, d.id, d.versions, {}};
-                const ModPackage* other = installed_as(d.id);
-                const PackageProblem* gone = problem_of(d.id);
-                if (other == nullptr) {
-                    problem.kind = gone != nullptr ? Kind::DependencyBroken : Kind::Missing;  // unreadable
-                } else if (!version_meets(other->version, d.versions)) {
-                    problem.kind = Kind::WrongVersion;
-                    problem.found = other->version;
-                } else if (find(d.id) != packages.end()) {
-                    continue;
-                } else {
-                    problem.kind =
-                        gone != nullptr && gone->kind == Kind::TurnedOff ? Kind::DependencyOff : Kind::DependencyBroken;
-                }
-                if (problem.kind != Kind::Missing && problem.kind != Kind::WrongVersion) {
-                    problem.versions.clear();
-                }
-                leave_out(std::move(problem));
-                packages.erase(p);
+        for (std::size_t i = 0; i < packages.size(); ++i) {
+            if (std::optional<PackageProblem> problem = unmet(packages[i])) {
+                leave_out(std::move(*problem));
+                packages.erase(packages.begin() + static_cast<std::ptrdiff_t>(i));
                 changed = true;
                 break;
             }
