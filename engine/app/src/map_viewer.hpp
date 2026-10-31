@@ -175,6 +175,12 @@ private:
     /// program runs (F9); the game goes on as it was if the file cannot be read. `rules`: the
     /// settings chosen for a scenario (a savegame of Open1602 keeps its own).
     core::Status load_game(const std::filesystem::path& path, const sim::Rules* rules = nullptr);
+    /// A game loaded alone that does not know this person and has several human players: they
+    /// choose which one to play before it starts (ask_choice); the human players to choose from,
+    /// empty if the game needs no choice.
+    [[nodiscard]] std::vector<sim::PlayerId> player_choice(const sim::World& world) const;
+    /// The answer to that question: the game starts with the chosen player.
+    void finish_pending_load(std::size_t option);
     /// A savegame or scenario as a world, not started.
     /// `warnings`: how many the loader gave (they are written to the log).
     [[nodiscard]] core::Result<sim::World> read_world(const std::filesystem::path& path,
@@ -480,6 +486,16 @@ private:
         std::string refusal;  ///< the host's refusal, shown if the person says no
     };
     std::optional<FetchOffer> m_fetch_offer;
+    /// A game loaded alone that waits for the person to choose their player (player_choice).
+    struct PendingLoad {
+        sim::World world;
+        std::filesystem::path path;
+        std::optional<sim::Rules> rules;
+        std::size_t warnings = 0;
+        std::vector<sim::PlayerId> players;  ///< the options, in order
+        std::vector<Hud::ChoiceOption> options;
+    };
+    std::optional<PendingLoad> m_pending_load;
     std::string m_join_password;       ///< of the game joined last, for joining it again with its packages
     bool m_fetching_packages = false;  ///< the game joined last was asked for its packages
     bool m_migrating = false;          ///< following a successor, its game not here yet

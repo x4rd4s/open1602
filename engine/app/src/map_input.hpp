@@ -171,11 +171,12 @@ public:
     /// World tile the player sees under a screen point: its ground diamond drawn at its height, so
     /// the land (raised above the sea) is picked where it is drawn.
     [[nodiscard]] std::optional<render::TilePos> tile_at(double sx, double sy) const;
-    [[nodiscard]] std::optional<render::TilePos> tile_at_mouse() const { return tile_at(m_mouse_x, m_mouse_y); }
+    /// Map tile under the mouse; none while a window takes all of the mouse (a question).
+    [[nodiscard]] std::optional<render::TilePos> tile_at_mouse() const;
     /// Island tile under the mouse, nullopt over the sea.
     [[nodiscard]] std::optional<BuildTool::Spot> spot_at_mouse() const;
     /// The ship or land unit under the mouse, as a click would pick it.
-    [[nodiscard]] std::optional<ui::UnitRef> unit_at_mouse() const { return unit_at(m_mouse_x, m_mouse_y); }
+    [[nodiscard]] std::optional<ui::UnitRef> unit_at_mouse() const;
     [[nodiscard]] double mouse_x() const noexcept { return m_mouse_x; }
     [[nodiscard]] double mouse_y() const noexcept { return m_mouse_y; }
     [[nodiscard]] ui::UnitSelection& units() noexcept { return m_units; }

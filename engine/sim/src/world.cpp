@@ -595,10 +595,18 @@ PlayerId take_single_player(World& world, std::uint64_t owner) {
     if (own == kNoPlayer) {
         own = first_human_player(world);
     }
-    if (own == kNoPlayer) {
-        return kNoPlayer;
+    if (own != kNoPlayer) {
+        take_player(world, own, owner);
     }
-    for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
+    return own;
+}
+
+void take_player(World& world, PlayerId own, std::uint64_t owner) {
+    const Player* chosen = world.player(own);
+    if (chosen == nullptr || chosen->role != PlayerRole::Human) {
+        return;
+    }
+    for (std::size_t i = 0; i < world.players().size() && i < kNoPlayer; ++i) {
         Player* p = world.player(static_cast<PlayerId>(i));
         if (p == nullptr) {
             continue;
@@ -609,7 +617,17 @@ PlayerId take_single_player(World& world, std::uint64_t owner) {
             p->role = PlayerRole::Computer;  // keeps its owner: that person gets it back in a multiplayer game
         }
     }
-    return own;
+}
+
+std::vector<PlayerId> human_players(const World& world) {
+    std::vector<PlayerId> out;
+    const auto& players = world.players();
+    for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
+        if (players[i].role == PlayerRole::Human && players[i].active()) {
+            out.push_back(static_cast<PlayerId>(i));
+        }
+    }
+    return out;
 }
 
 namespace {

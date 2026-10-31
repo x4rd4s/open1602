@@ -842,6 +842,11 @@ void fit_goodwill(World& world);
 /// player. That player gets `owner` (unless 0); the computer plays the other human players, whose
 /// people are not there. kNoPlayer, and nothing changes, if the world has no human player.
 PlayerId take_single_player(World& world, std::uint64_t owner);
+/// As take_single_player, with the human player `own` chosen by the person (a game that does not
+/// know them yet). Nothing changes if `own` is not a human player.
+void take_player(World& world, PlayerId own, std::uint64_t owner);
+/// The human players that are still in the game: those a person may take in a game loaded alone.
+[[nodiscard]] std::vector<PlayerId> human_players(const World& world);
 
 /// Loads a scenario (.SZS/.SZM) or savegame (.GAM): all islands, each on its island template and
 /// placed on the world map, the players and the ships. Problems are collected in `warnings`; islands that cannot be

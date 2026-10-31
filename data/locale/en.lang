@@ -11,6 +11,9 @@ dialog.yes = Yes
 dialog.no = No
 dialog.quit_game = Quit the game?\nIt is saved as “lastgame”.
 dialog.quit_anno = Quit Anno 1602?
+# A game with several human players that was saved on another computer (or before Open1602 knew
+# its players): which one to play, chosen from a list
+dialog.choose_player = Which player do you want to play?\nThis game does not know you yet.
 # {1}: the cost in gold
 dialog.disband_unit = Disband the unit?\nThis costs {1} gold.
 # {1}: the other player's name

@@ -96,7 +96,10 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    the lobby knows each slot's owner (`LobbySeat::owner`, not sent): the host takes its own slot,
    and each person who comes in finds theirs; computer players a person played before are open
    for them. Loaded alone (no session), a game gives the person the human player they own, else
-   the first, and the computer plays the other human players (`sim::take_single_player`).
+   the first, and the computer plays the other human players (`sim::take_single_player`). A
+   savegame with several human players that knows none of them as this person's (saved before
+   player IDs, on another computer, or after a new ID) asks first which one to play, a button per
+   player with its name and colour (`Hud::ask_choice`); the game behind the question waits.
 9. **Same data.** When a computer joins, the host checks the protocol version (from the first three
    bytes of `Hello`, which never change, so that any other version is told so) and a fingerprint of the
    game data the simulation depends on (`haeuser.cod`, `figuren.cod`), and the game's password if it

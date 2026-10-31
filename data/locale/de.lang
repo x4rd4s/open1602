@@ -9,6 +9,7 @@ dialog.yes = Ja
 dialog.no = Nein
 dialog.quit_game = Spiel beenden?\nDer Stand wird als „lastgame“ gesichert.
 dialog.quit_anno = Anno 1602 beenden?
+dialog.choose_player = Welchen Spieler wollt Ihr spielen?\nDieser Spielstand kennt Euch noch nicht.
 dialog.disband_unit = Einheit auflösen?\nDas kostet {1} Taler.
 dialog.break_peace = Friedensvertrag mit {1} brechen?\nDas bedeutet Krieg.
 dialog.declare_war = Ein Angriff bedeutet Krieg mit {1}.\nKrieg erklären?
