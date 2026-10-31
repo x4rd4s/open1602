@@ -509,6 +509,8 @@ namespace {
 
 /// The palette colour of banner 0 in the tests; the others follow (none is a colour of the form).
 constexpr std::int32_t kFirstColour = 150;
+/// The palette colour of banner 0's names in the chat (made legible); the others follow.
+constexpr std::int32_t kFirstText = 200;
 
 /// The menu's banners as the game gives them (Hud): the original's seven and the further colours.
 std::vector<app::MenuBanner> menu_banners() {
@@ -516,7 +518,8 @@ std::vector<app::MenuBanner> menu_banners() {
     table.add_more_players();
     std::vector<app::MenuBanner> banners;
     for (std::size_t i = 0; i < table.size(); ++i) {
-        banners.push_back(app::MenuBanner{static_cast<std::uint8_t>(kFirstColour + i), table.banners()[i].id});
+        banners.push_back(app::MenuBanner{static_cast<std::uint8_t>(kFirstColour + i), table.banners()[i].id,
+                                          static_cast<std::uint8_t>(kFirstText + i)});
     }
     return banners;
 }
@@ -685,7 +688,7 @@ TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their 
     const ui::DrawItem* hallo = text(": Hallo");
     REQUIRE(anna != nullptr);
     REQUIRE(hallo != nullptr);
-    CHECK(anna->ink == kFirstColour + 0);
+    CHECK(anna->ink == kFirstText + 0);
     CHECK(anna->colour == style.text);
     CHECK(hallo->ink == -1);
     CHECK(hallo->colour == style.text);
@@ -696,7 +699,7 @@ TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their 
     const ui::DrawItem* psst = text(" (to you): Psst");
     REQUIRE(bernd != nullptr);
     REQUIRE(psst != nullptr);
-    CHECK(bernd->ink == kFirstColour + 2);
+    CHECK(bernd->ink == kFirstText + 2);
     CHECK(psst->colour == style.heading);
     // A spectator has no colour, a notice no name.
     REQUIRE(text("Zoe: Moin") != nullptr);

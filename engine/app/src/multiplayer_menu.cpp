@@ -698,7 +698,7 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
             f.label(box, line.text, Align::Left, Tone::Dim);
         } else if (line.seat < lobby.seats.size()) {
             // A player's name in the colour they chose; a spectator's in the line's.
-            f.speech(box, line.name, banner_colour(lobby.seats[line.seat].banner),
+            f.speech(box, line.name, banner_text_colour(lobby.seats[line.seat].banner),
                      chat_prefix(line).substr(line.name.size()) + line.text, tone);
         } else {
             f.label(box, chat_prefix(line) + line.text, Align::Left, tone);

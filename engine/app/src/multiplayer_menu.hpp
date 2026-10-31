@@ -145,6 +145,9 @@ struct MultiplayerEvent {
 struct MenuBanner {
     std::uint8_t colour = 0;
     std::string id;
+    /// The player's name in the chat: the banner's colour, lightened where it would be hard to
+    /// read on the menus' dark ground (a dark blue).
+    std::uint8_t text = 0;
 };
 
 /// The lobby slots of an endless game for `players` (clamped to HostSetup::kMinPlayers..
@@ -241,6 +244,9 @@ private:
     Screen m_screen = Screen::Browse;
     [[nodiscard]] std::uint8_t banner_colour(sim::BannerId banner) const noexcept {
         return banner < m_banners.size() ? m_banners[banner].colour : m_other_banner;
+    }
+    [[nodiscard]] std::uint8_t banner_text_colour(sim::BannerId banner) const noexcept {
+        return banner < m_banners.size() ? m_banners[banner].text : m_other_banner;
     }
     [[nodiscard]] std::string banner_label(sim::BannerId banner) const;
     /// Whether this computer may choose the banner of slot `seat` now: its own, or as the host one
