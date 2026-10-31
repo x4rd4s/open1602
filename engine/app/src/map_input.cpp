@@ -166,6 +166,11 @@ void MapInput::setup_keys() {
     general(chord(SDLK_N), KeyAction::NextCity);
     general(chord(SDLK_F3), KeyAction::Pause);
     general(chord(SDLK_PAUSE), KeyAction::PauseVideo);
+    // + and - of the main keys first (keyboards without a keypad; "=" is the + key of QWERTY), then
+    // the keypad's.
+    general(chord(SDLK_PLUS), KeyAction::SpeedUp);
+    general(chord(SDLK_EQUALS), KeyAction::SpeedUp);
+    general(chord(SDLK_MINUS), KeyAction::SpeedDown);
     general(chord(SDLK_KP_PLUS), KeyAction::SpeedUp);
     general(chord(SDLK_KP_MINUS), KeyAction::SpeedDown);
     general(chord(SDLK_F5), KeyAction::QuickSave);

@@ -114,7 +114,7 @@ int usage() {
         "  WASD, arrows   scroll (Shift: faster)      right/middle mouse drag  scroll\n"
         "  Q / E          rotate view                 wheel, PageUp/PageDn     zoom\n"
         "  Space          to the last message         Home                     to the selection\n"
-        "  F3 / Pause     pause / with the pause video Num+ / Num-              game speed\n"
+        "  F3 / Pause     pause / with the pause video + / -, Num+ / Num-      game speed\n"
         "  F5 / F9        quick save / quick load     F12, Print               screenshot\n"
         "  F1             these keys over the map     F11, Alt+Enter           window / full screen\n"
         "  Ctrl + / Ctrl - the map twice / half as large\n"
