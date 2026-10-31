@@ -17,6 +17,8 @@
 #include <string_view>
 #include <vector>
 
+#include "o1602/sim/computer_orders.hpp"
+
 namespace o1602::assets {
 class BuildingTable;
 class FigureTable;
@@ -113,6 +115,8 @@ struct Balance {
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
     std::vector<FigureValue> figures;
+    /// The computers' build orders a package changed (computers.toml), sorted by list, each once.
+    std::vector<ComputerOrder> computer_orders;
 
     friend bool operator==(const Balance&, const Balance&) = default;
 };

@@ -272,6 +272,10 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_figures_file(rules.balance, package.id, text, problems);
         }
+        if (const auto bytes = core::read_file(package.folder / sim::kComputersFile)) {
+            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+            sim::apply_computers_file(rules.balance.computer_orders, package.id, text, problems, rules.goods);
+        }
     }
     sim::drop_unknown_buildings(rules.balance, buildings, problems);
     sim::drop_unknown_figures(rules.balance, figures, problems);

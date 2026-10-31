@@ -90,6 +90,9 @@ constexpr std::uint32_t kBalance = tag("BALA");
 constexpr std::uint32_t kBuildingValues = tag("BLDV");
 /// The changed values of figures (Balance::figures), only written when there are any.
 constexpr std::uint32_t kFigureValues = tag("FIGV");
+/// The computers' build orders a package changed (Balance::computer_orders), only written when
+/// there are any. Required: the computers would build otherwise.
+constexpr std::uint32_t kComputerOrders = tag("AIOR");
 /// The content packages the game uses (World::packages(), ADR 0007 section 7), only written when the
 /// world names them.
 constexpr std::uint32_t kPackages = tag("PACK");
@@ -132,13 +135,15 @@ constexpr std::size_t kMaxScenarioIdLength = 2 * assets::kMaxPackageIdLength + 1
 
 /// Every section this version reads; others are of a later version.
 constexpr std::array kKnownSections = {
-    kRules,           kWorld,        kIslands,   kTiles,     kPlayers,  kCities,    kProductions,    kHouses,
-    kGrowth,          kCosts,        kShips,     kSoldiers,  kAnimals,  kDisasters, kVolcanoes,      kSimulation,
-    kFleet,           kEpochs,       kArmy,      kDiplomacy, kExplored, kMap,       kWorld2,         kMeta,
-    kMissions,        kPlayerState,  kCityState, kOrigin,    kQueues,   kStances,   kScores,         kMaterialClocks,
-    kPopulationMarks, kTutorial,     kGiveUps,   kFactions,  kLedgers,  kBalance,   kBuildingValues, kPackages,
-    kFigureValues,    kOwnBuildings, kGoods,     kClasses,   kLevels,   kUnlocked,  kGoodPictures,   kScripts,
-    kUnitGroups,      kScenario,     kCampaign};
+    kRules,       kWorld,          kIslands,         kTiles,         kPlayers,      kCities,
+    kProductions, kHouses,         kGrowth,          kCosts,         kShips,        kSoldiers,
+    kAnimals,     kDisasters,      kVolcanoes,       kSimulation,    kFleet,        kEpochs,
+    kArmy,        kDiplomacy,      kExplored,        kMap,           kWorld2,       kMeta,
+    kMissions,    kPlayerState,    kCityState,       kOrigin,        kQueues,       kStances,
+    kScores,      kMaterialClocks, kPopulationMarks, kTutorial,      kGiveUps,      kFactions,
+    kLedgers,     kBalance,        kBuildingValues,  kPackages,      kFigureValues, kOwnBuildings,
+    kGoods,       kClasses,        kLevels,          kUnlocked,      kGoodPictures, kScripts,
+    kUnitGroups,  kScenario,       kCampaign,        kComputerOrders};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -344,6 +349,20 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
                 o.u32(v.number);
                 o.u8(static_cast<std::uint8_t>(v.field));
                 o.u32(v.value);
+            });
+        });
+    }
+    if (!world.balance().computer_orders.empty()) {
+        section(out, kComputerOrders, [&](Writer& o) {
+            o.list(world.balance().computer_orders, 5, [&](const ComputerOrder& order) {
+                o.u8(static_cast<std::uint8_t>(order.list));
+                o.list(order.needs, 8, [&](const ComputerNeed& n) {
+                    o.u8(static_cast<std::uint8_t>(n.kind));
+                    o.u8(n.slot);
+                    o.u32(n.n);
+                    o.u8(static_cast<std::uint8_t>(n.flag));
+                    o.u8(static_cast<std::uint8_t>(n.when));
+                });
             });
         });
     }
@@ -722,6 +741,32 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.fail();
                 }
                 d.figure_values = std::move(values);
+                break;
+            }
+            case kComputerOrders: {
+                std::vector<ComputerOrder> orders;
+                in.list(orders, 5, [&](ComputerOrder& order) {
+                    std::uint8_t list = 0;
+                    in.u8(list);
+                    order.list = static_cast<ComputerList>(list);
+                    in.list(order.needs, 8, [&](ComputerNeed& n) {
+                        std::uint8_t kind = 0;
+                        std::uint8_t flag = 0;
+                        std::uint8_t when = 0;
+                        in.u8(kind);
+                        in.u8(n.slot);
+                        in.u32(n.n);
+                        in.u8(flag);
+                        in.u8(when);
+                        n.kind = static_cast<ComputerNeed::Kind>(kind);
+                        n.flag = static_cast<ComputerNeed::When>(flag);
+                        n.when = static_cast<ComputerNeed::When>(when);
+                    });
+                });
+                if (!valid(orders)) {
+                    in.fail();  // a list, an entry or a condition of a later version
+                }
+                d.computer_orders = std::move(orders);
                 break;
             }
             case kGoods: {

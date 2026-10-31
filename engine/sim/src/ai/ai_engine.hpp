@@ -22,6 +22,7 @@
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/ship.hpp"
@@ -56,34 +57,8 @@ struct SurveyFinds {
 };
 
 /// One entry of the build order of a city's stage (run_stage): something the city may need, tried
-/// in the order of the stage's table.
-struct StageNeed {
-    enum class Kind : std::uint8_t {
-        Building,      ///< need(slot, n)
-        Market,        ///< need_market(n)
-        Houses,        ///< need_houses(n)
-        Public,        ///< need_public(slot, n, flag)
-        Kontor,        ///< need_kontor(n): the Kontor's level
-        Castle,        ///< need_castle()
-        Monument,      ///< need_denkmal()
-        Shipyard,      ///< need_shipyard()
-        Processing,    ///< processing()
-        IronTools,     ///< iron_tools()
-        Weapons,       ///< weapons()
-        Luxury,        ///< luxury(n, flag)
-        ColonyLuxury,  ///< colony_luxury(): one luxury field per n tiles of land
-        Tower,         ///< need_tower(1, n)
-        RoadsIfMason,  ///< roads_if_mason()
-        Colony,        ///< want_colony(n): n is the mode
-    };
-    /// A condition on the gold the player had when the stage ran.
-    enum class When : std::uint8_t { Never, Always, Gold4000, Gold5000, Gold8000 };
-    Kind kind = Kind::Building;
-    std::uint8_t slot = 0;
-    std::uint32_t n = 0;
-    When flag = When::Never;   ///< Public: `cov`; Luxury: `exclusive`
-    When when = When::Always;  ///< the entry is tried only then
-};
+/// in the order of the stage's list (computer_orders.hpp).
+using StageNeed = ComputerNeed;
 
 /// Game ms between two steps of a computer player (the original's 50 ms main timer).
 inline constexpr std::int32_t kStepMs = 50;
@@ -343,6 +318,8 @@ private:
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);
+    /// An order's entry for the package's good `w`: `wanted` producers, if the computers build any.
+    bool package_order(AiPlayer& p, const City& c, const CityPlan& r, std::uint8_t w, std::uint32_t wanted);
     /// The money and goods the computers get from nowhere, from the game's balance.
     [[nodiscard]] Cheats cheats() const;
     /// The slot of the package's Need that makes `w`, if any.

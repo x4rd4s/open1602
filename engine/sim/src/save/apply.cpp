@@ -218,6 +218,7 @@ core::Status apply_decoded(World& world, Decoded& d) {
     Balance balance = d.balance.value_or(Balance{});  // written whenever it is not the original's
     balance.buildings = d.building_values.value_or(std::vector<BuildingValue>{});
     balance.figures = d.figure_values.value_or(std::vector<FigureValue>{});
+    balance.computer_orders = d.computer_orders.value_or(std::vector<ComputerOrder>{});
     world.set_balance(balance);
     if (d.script_states) {
         world.set_script_states(std::move(*d.script_states));

@@ -16,6 +16,7 @@ add_executable(o1602_tests
     unit/test_ships.cpp
     unit/test_diplomacy.cpp
     unit/test_balance.cpp
+    unit/test_computer_orders.cpp
     unit/test_factions.cpp
     unit/test_diplomacy_strip.cpp
     unit/test_military.cpp
