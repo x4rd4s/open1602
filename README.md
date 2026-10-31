@@ -157,8 +157,8 @@ run `cmake --preset vcpkg` again.
 
 The `vcpkg` preset builds the game and copies `SDL3.dll` next to it; `vcpkg.json` pins the versions
 with its `builtin-baseline`. Started by a double click, the game shows fatal errors in a message box
-and writes its other messages to `open1602.log` in the data folder; started from a console, it writes
-them there.
+and writes its other messages to `open1602.log` in the data folder (see [Running](#running)); started
+from a console, it writes them there.
 
 ## Running
 
@@ -202,6 +202,13 @@ folder, never in the installation:
 | Linux | `~/.local/share/Open1602/` |
 | macOS | `~/Library/Application Support/Open1602/` |
 | Windows | `%APPDATA%\Open1602\` |
+
+Started from a desktop launcher, the Finder or by a double click, the game writes its messages to
+`open1602.log` in the data folder; the log of the run before is kept as `open1602.previous.log`, so
+it survives starting the game again after a crash. A crash writes what happened (and on Linux and
+macOS a backtrace) as the log's last lines; a log that ends without the line `Open1602 ended, exit
+code …` belongs to a run that crashed or was killed. Started from a terminal, the messages appear
+there. Please attach the log to a bug report.
 
 A multiplayer host takes players on UDP port 16020 (or the one given with `--port`) and answers the
 local network's game search on UDP port 16021. A firewall on the host must let both in, otherwise

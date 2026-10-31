@@ -955,6 +955,9 @@ void MapViewer::handle_event(const SDL_Event& original) {
     }
     switch (event.type) {
         case SDL_EVENT_QUIT:
+            // The window's close button, Alt+F4, or the system ending the program (SIGTERM): in the
+            // log, so that such an end is not taken for a crash.
+            std::fprintf(stderr, "quit: the window was closed or the system ended the program\n");
             m_running = false;
             break;
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
