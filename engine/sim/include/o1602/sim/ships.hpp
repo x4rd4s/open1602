@@ -325,6 +325,9 @@ class Combat;
 /// the original's files keep its eight slots; the ones beyond the type's stay empty. Everything
 /// that puts goods or soldiers into a hold looks only at these.
 [[nodiscard]] std::size_t usable_holds(const Ship& ship, const assets::FigureTable& figures);
+/// The hold a goods exchange window selects when it opens, as in the original: the one with the most
+/// goods. An empty ship gets the first hold; of equally full holds the last one is taken.
+[[nodiscard]] std::size_t fullest_hold(const Ship& ship, const assets::FigureTable& figures);
 /// The wares a stop of the ship's route moves: one per hold, at least the original's three, at
 /// most RouteStop::kEntries. The ones beyond stay stored (a route copied from a larger ship).
 [[nodiscard]] std::size_t usable_route_entries(const Ship& ship, const assets::FigureTable& figures);

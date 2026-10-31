@@ -1061,13 +1061,8 @@ private:
                 if (k.city) {
                     m_city = k.city;
                     m_page = e.id == kTrade ? Page::Trade : Page::Transfer;
-                    // The fullest hold is chosen first (0x0044E390).
-                    m_hold = 0;
-                    for (std::size_t h = 0; h < ship.cargo.size(); ++h) {
-                        if (ship.cargo[h].amount >= ship.cargo[static_cast<std::size_t>(m_hold)].amount) {
-                            m_hold = static_cast<std::int32_t>(h);
-                        }
-                    }
+                    // The fullest hold is chosen first; an empty ship starts at the first one.
+                    m_hold = static_cast<std::int32_t>(sim::fullest_hold(ship, c.figures));
                     m_offer = 0;
                 }
                 break;
