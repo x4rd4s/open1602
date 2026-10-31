@@ -79,14 +79,6 @@ void BuildTool::set_mode(Mode mode) noexcept {
     m_drag_start.reset();
 }
 
-void BuildTool::cycle(int step) noexcept {
-    if (m_list.empty()) {
-        return;
-    }
-    const auto n = static_cast<std::int64_t>(m_list.size());
-    m_selected = static_cast<std::size_t>(((static_cast<std::int64_t>(m_selected) + step) % n + n) % n);
-}
-
 void BuildTool::rotate(int step) noexcept {
     m_rotation = static_cast<std::uint8_t>((m_rotation + step) & 3);
 }

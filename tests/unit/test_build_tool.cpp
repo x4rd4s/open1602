@@ -97,20 +97,18 @@ TEST_CASE("build tool: the list holds what the build menu offers, in its order")
     const assets::BuildingTable buildings = make_buildings();
     app::BuildTool tool(buildings);
     CHECK(tool.mode() == app::BuildTool::Mode::Off);
+    CHECK(tool.selected()->id == kStoneWall);
     std::vector<std::uint32_t> order;
-    for (int i = 0; i < 9; ++i) {
-        order.push_back(tool.selected()->id);
-        tool.cycle(1);
+    for (const assets::BuildingType* b : tool.buildings()) {
+        order.push_back(b->id);
     }
     // By menu icon; ground, tree variants and the house without an icon are left out.
     // The monument costs nothing but is in the menu (#7: picking it kept the building before).
     const std::vector<std::uint32_t> expected{kStoneWall, kField,    kTree, kRoad,    kKontor,
                                               kKontor2,   kDwelling, kPier, kMonument};
     CHECK(order == expected);
-    CHECK(tool.selected()->id == kStoneWall);  // wrapped around
-    tool.cycle(-1);
-    CHECK(tool.selected()->id == kMonument);
     CHECK(tool.select(kMonument));
+    CHECK(tool.selected()->id == kMonument);
     CHECK(tool.select(kRoad));
     CHECK(tool.selected()->id == kRoad);
     CHECK(!tool.select(kHouse));
@@ -228,7 +226,7 @@ TEST_CASE("build tool: a Kontor is paid from the nearest own ship, or the one ch
     REQUIRE(nearest->ship.has_value());
     CHECK(*nearest->ship == m.ship(0));  // the foreign ship is nearer still
     // The ship window's button: the first Kontor, paid by that ship.
-    tool.cycle(1);
+    REQUIRE(tool.select(kKontor2));  // another building first
     REQUIRE(tool.select_kontor(m.ship(1)));
     CHECK(tool.selected()->id == kKontor);
     const auto chosen = tool.build_order(m.world, 0, {0, 2, 2});

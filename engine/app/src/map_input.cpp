@@ -189,6 +189,7 @@ void MapInput::setup_keys() {
     general(chord(SDLK_L, false, true), KeyAction::CityList);
     general(chord(SDLK_V), KeyAction::Diplomacy);
     general(chord(SDLK_F2), KeyAction::GoodsStatistics);
+    general(chord(SDLK_TAB), KeyAction::GoodsStatistics);  // with units selected Tab narrows them
     general(chord(SDLK_RETURN), KeyAction::Chat);
     general(chord(SDLK_KP_ENTER), KeyAction::Chat);
     general(chord(SDLK_DELETE), KeyAction::DemolishTool);
@@ -228,8 +229,6 @@ void MapInput::setup_keys() {
     building(chord(SDLK_R, false, true), KeyAction::RotateBuildingBack);
     building(chord(SDLK_C), KeyAction::PickBuilding);
     building(chord(SDLK_DELETE), KeyAction::DemolishTool);
-    building(chord(SDLK_TAB), KeyAction::NextBuilding);
-    building(chord(SDLK_TAB, false, true), KeyAction::NextBuilding, 1);
     building(chord(SDLK_F), KeyAction::PlantFields);
     // Orders to the selected units
     // None of these means anything in general (no clash with W A S D).
@@ -600,9 +599,6 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             if (m_tool.active()) {
                 drop_units();
             }
-            break;
-        case KeyAction::NextBuilding:
-            m_tool.cycle(b.param != 0 ? -1 : 1);
             break;
         case KeyAction::PlantFields:
             plant_fields();

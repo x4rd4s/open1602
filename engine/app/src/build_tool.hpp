@@ -29,8 +29,8 @@ public:
     void set_mode(Mode mode) noexcept;
     [[nodiscard]] bool active() const noexcept { return m_mode != Mode::Off; }
 
-    /// Next or previous building of the list.
-    void cycle(int step) noexcept;
+    /// The buildings the tool can place, in the build menu's order.
+    [[nodiscard]] const std::vector<const assets::BuildingType*>& buildings() const noexcept { return m_list; }
     /// Turns the building by a quarter.
     void rotate(int step) noexcept;
     [[nodiscard]] std::uint8_t rotation() const noexcept { return m_rotation; }
