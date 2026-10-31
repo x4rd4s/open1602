@@ -595,6 +595,35 @@ TEST_CASE("ui: a form of Open1602's own: clicks, focus, cut texts and the scale"
     CHECK(texts[1] == "******");
 }
 
+TEST_CASE("ui: a form's chat line: the speaker's name in its ink, the rest behind it, cut as one") {
+    ui::Form form;
+    form.set_scale(2.0);
+    form.speech(ui::Rect{10, 10, 300, 30}, "Anna", 150, ": Hallo", ui::Form::Tone::Heading);
+    auto items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Anna");
+    CHECK(items[0].ink == 150);
+    CHECK(items[0].colour == ui::FormStyle{}.heading);
+    CHECK(items[1].text == ": Hallo");
+    CHECK(items[1].ink == -1);
+    CHECK(items[1].colour == ui::FormStyle{}.heading);
+    CHECK(items[1].x == items[0].x + 4 * 9 * 2);  // 9 units a byte without a font, at scale 2
+    // Too long: cut at the end, the name whole.
+    form.clear();
+    form.speech(ui::Rect{10, 10, 100, 30}, "Anna", 150, ": " + std::string(40, 'x'));
+    items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Anna");
+    CHECK(items[1].text.ends_with("..."));
+    // A box too narrow for the name: all of what is left in the name's ink.
+    form.clear();
+    form.speech(ui::Rect{10, 10, 60, 30}, "Annabella", 150, ": Hallo");
+    items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text.ends_with("..."));
+    CHECK(items[0].ink == 150);
+}
+
 TEST_CASE("ui: a form's cycle buttons take the right button, its other widgets only the left one") {
     using ui::MouseButton;
     ui::Form form;

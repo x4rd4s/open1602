@@ -46,6 +46,8 @@ inline constexpr std::int32_t kTextBrightRed = 15;
                                           std::uint8_t b) noexcept;
 /// The recolouring of text colour `index` (out of range: 0) for a palette.
 [[nodiscard]] Recolour text_recolour(const assets::Palette& palette, std::size_t index);
+/// The same with the letters in palette colour `body` (a player's banner colour), the shadow kept.
+[[nodiscard]] Recolour text_recolour(const assets::Palette& palette, std::size_t index, std::uint8_t body);
 
 class Font {
 public:

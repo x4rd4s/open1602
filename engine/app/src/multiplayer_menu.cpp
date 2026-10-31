@@ -692,11 +692,16 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     for (std::size_t i = 0; i < lines; ++i) {
         const ChatLine& line = model.chat[model.chat.size() - m_chat_back - lines + i];
         const std::int32_t y = chat_top + 8 + static_cast<std::int32_t>(i) * 28;
+        const Rect box{48, y, 604, 28};
+        const Tone tone = line.whisper ? Tone::Heading : Tone::Normal;
         if (line.name.empty()) {
-            f.label(Rect{48, y, 604, 28}, line.text, Align::Left, Tone::Dim);
+            f.label(box, line.text, Align::Left, Tone::Dim);
+        } else if (line.seat < lobby.seats.size()) {
+            // A player's name in the colour they chose; a spectator's in the line's.
+            f.speech(box, line.name, banner_colour(lobby.seats[line.seat].banner),
+                     chat_prefix(line).substr(line.name.size()) + line.text, tone);
         } else {
-            f.label(Rect{48, y, 604, 28}, chat_prefix(line) + line.text, Align::Left,
-                    line.whisper ? Tone::Heading : Tone::Normal);
+            f.label(box, chat_prefix(line) + line.text, Align::Left, tone);
         }
     }
     f.field(kChat, Rect{52, 622, 596, 36}, m_chat);

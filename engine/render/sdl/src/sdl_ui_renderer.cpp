@@ -377,10 +377,14 @@ void SdlUiRenderer::forget_package_icons() {
 }
 
 SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t slot, ui::ArtSize size,
-                                           std::int32_t colour) {
-    // One cache for all sizes: the slot and the size in one number.
+                                           std::int32_t colour, std::int32_t ink) {
+    // One cache for all sizes: the slot and the size in one number; likewise the text colour and
+    // the ink.
     const std::int32_t key = slot + static_cast<std::int32_t>(ui::kFontSlots) * static_cast<std::int32_t>(size);
-    if (const Texture* cached = m_texts.find(s, key, colour)) {
+    colour = std::clamp(colour, 0, static_cast<std::int32_t>(ui::kTextColours) - 1);
+    ink = std::clamp(ink, -1, 255);
+    const std::int32_t shade = colour + static_cast<std::int32_t>(ui::kTextColours) * (ink + 1);
+    if (const Texture* cached = m_texts.find(s, key, shade)) {
         return *cached;
     }
     Texture t;
@@ -390,8 +394,9 @@ SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t sl
         canvas.height = f->height() + f->above();  // the accents above the cell (D-012)
         canvas.indices.assign(std::size_t{canvas.width} * canvas.height, 0);
         canvas.opaque.assign(canvas.indices.size(), 0);
-        const ui::Recolour& recolour =
-            m_colours[static_cast<std::size_t>(std::clamp(colour, 0, static_cast<std::int32_t>(ui::kTextColours) - 1))];
+        const ui::Recolour recolour =
+            ink < 0 ? m_colours[static_cast<std::size_t>(colour)]
+                    : ui::text_recolour(m_palette, static_cast<std::size_t>(colour), static_cast<std::uint8_t>(ink));
         f->draw(canvas, s, 0, static_cast<std::int32_t>(canvas.height), recolour);
         t = make(canvas.to_rgba(m_palette), static_cast<std::int32_t>(canvas.width),
                  static_cast<std::int32_t>(canvas.height));
@@ -401,7 +406,7 @@ SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t sl
             SDL_SetTextureScaleMode(t.texture, SDL_SCALEMODE_LINEAR);
         }
     }
-    m_texts.insert(s, key, colour, t, [](const Texture& old) { SDL_DestroyTexture(old.texture); });
+    m_texts.insert(s, key, shade, t, [](const Texture& old) { SDL_DestroyTexture(old.texture); });
     return t;
 }
 
@@ -605,7 +610,7 @@ void SdlUiRenderer::draw(const std::vector<ui::DrawItem>& items, std::int32_t ox
                 // In the fonts of the size that are not shrunk at this scale (ui::text_art_size()).
                 const ui::ArtSize size = ui::text_art_size(scale);
                 const ui::Font* f = font(d.block, size);
-                const Texture t = text(d.text, d.block, size, d.colour);
+                const Texture t = text(d.text, d.block, size, d.colour, d.ink);
                 if (f == nullptr || t.texture == nullptr) {
                     break;
                 }

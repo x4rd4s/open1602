@@ -85,6 +85,12 @@ Recolour text_recolour(const assets::Palette& palette, std::size_t index) {
     return r;
 }
 
+Recolour text_recolour(const assets::Palette& palette, std::size_t index, std::uint8_t body) {
+    Recolour r = text_recolour(palette, index);
+    r[kBody] = body;
+    return r;
+}
+
 core::Result<Font> Font::load(const assets::GameDirectory& game, std::string_view file) {
     const auto path = game.resolve(file);
     if (!path) {
