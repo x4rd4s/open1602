@@ -965,7 +965,7 @@ void Simulation::production_step() {
         return;
     }
     const std::size_t first = m_production_events.size();
-    advance_production(*m_world, *m_buildings, m_production_events.sink());
+    advance_production(*m_world, *m_buildings, m_production_events.sink(), m_figures);
     for (std::size_t i = first; i < m_production_events.size(); ++i) {
         m_logistics.handle(m_production_events.events()[i]);
     }

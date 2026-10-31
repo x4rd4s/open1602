@@ -268,6 +268,9 @@ inline constexpr std::uint16_t kRouteWares = 3;
 /// SCOR version 2: the fight counters of the players are 32 bit, not 16 (LC-9). The writer takes it
 /// only when a counter needs it, so other games write the bytes of version 1 as before.
 inline constexpr std::uint16_t kWideScores = 2;
+/// GLDG version 2: the ledgers have the flow GoodsFlow::Withheld after the 16 of version 1. The
+/// writer takes it only when one booked it, so other games write the bytes of version 1 as before.
+inline constexpr std::uint16_t kLedgerWithheld = 2;
 /// SIMU version 2: the state of the running game in parts with their own versions (SIMC, LOGI,
 /// FLET, MILI, AIST; Simulation::save_state, DS-3). Version 1 held them in one block.
 inline constexpr std::uint16_t kSectionedSimulation = 2;
@@ -356,8 +359,10 @@ void write_population_marks(Writer& out, const World& w);
 [[nodiscard]] std::vector<Decoded::PopulationMark> read_population_marks(Reader& in);
 void write_give_up_counts(Writer& out, const World& w);
 [[nodiscard]] std::vector<Decoded::GiveUpCount> read_give_up_counts(Reader& in);
-void write_ledgers(Writer& out, const World& w);
-[[nodiscard]] std::vector<Decoded::CityLedger> read_ledgers(Reader& in);
+/// The version of GLDG: kLedgerWithheld if a ledger booked GoodsFlow::Withheld, else 1.
+[[nodiscard]] std::uint16_t ledgers_version(const World& w);
+void write_ledgers(Writer& out, const World& w, std::uint16_t version);
+[[nodiscard]] std::vector<Decoded::CityLedger> read_ledgers(Reader& in, std::uint16_t version);
 void write_productions(Writer& out, const World& w);
 [[nodiscard]] Decoded::ProductionPart read_productions(Reader& in);
 void write_houses(Writer& out, const World& w);

@@ -90,7 +90,7 @@ older readers, marked optional.
 | `MLCK` | per city (island, number) the game time the building material was locked or the people last complained about it |
 | `CPOP` | per city (island, number) the last population message |
 | `CGUP` | per city (island, number) the ships that gave up their way to its Kontor (city + 0x252); optional |
-| `GLDG` | per city (island, number) its goods statistics: minutes closed, per good the ledger (counts of the running minute and quarter, 60 minute and 48 quarter samples of 16 flows and the stock, warning given), then the history of the city window's figures if the city keeps one (human players only); optional ([ADR 0012](../architecture/0012-goods-statistics.md)) |
+| `GLDG` | per city (island, number) its goods statistics: minutes closed, per good the ledger (counts of the running minute and quarter, 60 minute and 48 quarter samples of 16 flows, or 17 in version 2, and the stock, warning given), then the history of the city window's figures if the city keeps one (human players only); optional ([ADR 0012](../architecture/0012-goods-statistics.md)) |
 | `SCOR` | the score's counters per player (soldiers killed and lost, ships sunk and lost), then per city the growth of the house looked at last and the game time since it grows |
 | `FLEE` | ships in full (position in 1/4096 tile, course, holds with price, trade route, destinations with the original's reference, the trader's goods), next ship number, discovered islands, trade settings and affection of the cities, shipyard fields (order, build points, wood, cloth, tick, repair, failed launches: a byte that was reserved and 0 before); `SHIP` remains for older readers |
 | `ARMY` | soldiers in full (position in 1/4096 tile, hit points, home, destination, planning, clocks, patrol, path), next soldier number, cannon towers, building damage, shots in flight, weapons and slots of the castles |
@@ -117,6 +117,7 @@ whose version 2 carries trade routes with eight stops and version 3 stops with e
 | `PSTA` | as in the table above | per player in addition the switches a scenario gives a computer (u32 bits, u16 rival and own inhabitants, u8 own and rival development; `PLAYER4` +0x1C..+0x25) |
 | `FLEE` | per ship the route's four stops of the original | per ship the route's eight stops (Open1602's route editor), the same record per stop |
 | `EPOC` | per island its number as u8 and the phase | the number as u16 |
+| `GLDG` | per good the ledger with 16 flows | the same with 17 flows: after the 16, what producers withheld because the warehouse was full (`GoodsFlow::Withheld`). The writer takes it only when a ledger booked any |
 
 `FLEE` version 3: the eight stops of version 2, each with eight wares instead of the original's
 three (one per hold of the ship, Open1602's page of a stop), the same record per ware.

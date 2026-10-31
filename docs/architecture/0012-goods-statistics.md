@@ -12,13 +12,15 @@ before a good the people need runs out.
 ## Decision
 
 1. **A ledger per city (`sim::GoodsLedger`, `City::ledger`).** Every movement of a good is booked
-   where it happens, in 1/32 t like the stock, as one of twelve flows (`sim::GoodsFlow`):
+   where it happens, in 1/32 t like the stock, as one of the flows of `sim::GoodsFlow`:
    - in: `Produced`, `Bought`, `ShippedIn`, `Returned`;
    - out: `Residents`, `Workshops`, `Military`, `Construction`, `Sold`, `ShippedOut`, `Lost`;
    - and `Demand`, which is not a movement: what the inhabitants asked for. Together with
      `Residents` it gives how well they were supplied;
    - and four that count gold, not goods: `SoldValue` and `BoughtValue`, what the Kontor earned
-     and paid for the good, and `TraderSoldValue` and `TraderBoughtValue`, the free trader's share.
+     and paid for the good, and `TraderSoldValue` and `TraderBoughtValue`, the free trader's share;
+   - and `Withheld`, not a movement either: what producers would have made while they stood still
+     only because there was no room (see 9).
 
    Production and the raw material of a cycle are booked at the building when the cycle ends
    (`production_cycle.cpp`), not when a carrier brings the goods to the warehouse. The statistics
@@ -103,6 +105,26 @@ before a good the people need runs out.
    for the cities of human players only, the city window's figures and the inhabitants of each
    class become a sample, kept like the goods by minute for an hour and by quarter for 12 hours.
    It is saved with the ledger in `GLDG` and is part of the state hash like it.
+
+9. **A full warehouse is no shortage.** A producer whose own store is full waits until a cart
+   takes its goods away, and the cart waits for room in the warehouse. With the warehouse full the
+   producers of a good stand still, the production booked drops to what the city uses, and the
+   balance hovers around zero or below, which reads as "not enough production". So for every wait
+   of a producer that stands still only for want of room (`sim::waits_for_room`: switched on, its
+   store full, raw material for a cycle, less than a cart's ton of room in the warehouse after what
+   other carts bring), the cycle books as `Withheld` what the building would have made in the wait
+   at full speed (`sim::full_speed_seconds`: the interval, for farms, hunters and fishers with the
+   walks of their worker, as the building window counts its productivity). The fractions of a unit
+   are carried along the building's statistics window, so nothing new is kept.
+   - The window counts it as production: the column "Erzeugt", the balance, how long the stock
+     lasts, the chart of the last minutes in the table and the production of a good's page include
+     it (`FlowTotals::production`, `FlowTotals::balance`). The page also says how many producers
+     wait for room.
+   - The stock, the flows in and out of a good's chart and the trend at the Kontor stay the real
+     movements (`FlowTotals::net`): the stock does not grow.
+   - A producer that waits for a cart while the warehouse has room counts as before: that is a
+     real bottleneck of the roads or carts.
+   - `GLDG` version 2 holds the 17th flow; the writer takes it only when a ledger booked any.
 
 ## Consequences
 
