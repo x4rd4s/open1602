@@ -176,7 +176,16 @@ Part 3 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): a sc
 takes money (`game.add_money`) and goods of a city (`game.add_goods`, read with `game.cities` and
 `game.goods`), lets a player win (`game.win`) and puts one out (`game.defeat`). These changes are
 no commands: the simulation makes them at the same point of the tick on every computer
-(`Simulation::script_money` and the others). Still open: more events and functions.
+(`Simulation::script_money` and the others).
+
+Part 4 done on 2026-10-31 ([scripts.md](scripts.md#the-script)), the owner's choice of what comes
+next: scripts hear what happens to cities (shortage, hunger, levels, population), in disasters,
+volcanoes and droughts, to ships (launched, traded, discovered, attacked, sunk, sold), in fights and in
+diplomacy (`on_city`, `on_disaster`, `on_volcano`, `on_drought`, `on_ship`, `on_military`,
+`on_diplomacy`); they read a city's inhabitants (`game.city`), the ships (`game.ships`) and the
+treaties (`game.relation`), and make peace and war and trade treaties (`game.set_peace`,
+`game.set_trade`). Still open: placing and removing buildings, moving ships and units, and goals
+of a mission changed by a script.
 
 ### 7. Scenarios and campaigns (section 6)
 

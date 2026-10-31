@@ -302,7 +302,8 @@ TEST_CASE("script: buildings, houses and the end of players reach the scripts") 
     sim::GameEvent over;
     over.player = 0;
     const sim::GameEvent game_events[] = {won, out, over};
-    scripts->after_tick(game.simulation, sim::TickEvents{construction, houses, game_events});
+    scripts->after_tick(game.simulation,
+                        sim::TickEvents{.construction = construction, .houses = houses, .game = game_events});
 
     std::vector<std::string> lines;
     for (const auto& note : scripts->take_notes()) {
@@ -482,4 +483,177 @@ TEST_CASE("script: a campaign part's script takes the table the part before left
     REQUIRE(loaded_states.size() == 1);
     CHECK(loaded_states[0].campaign == states[1].campaign);
     CHECK(loaded_states[0].campaign != carried);
+}
+
+TEST_CASE("script: cities, disasters, ships, fights and diplomacy reach the scripts") {
+    Game game;
+    sim::City city;
+    city.island = 3;
+    city.index = 1;
+    city.owner = 0;
+    city.inhabitants = {40, 2};
+    game.world.add_city(city);
+    auto scripts = game.run(one("chronicle",
+                                "local function show(e)\n"
+                                "  local keys = {}\n"
+                                "  for k in pairs(e) do keys[#keys + 1] = k end\n"
+                                "  table.sort(keys)\n"
+                                "  local parts = {}\n"
+                                "  for _, k in ipairs(keys) do parts[#parts + 1] = k .. '=' .. tostring(e[k]) end\n"
+                                "  return table.concat(parts, ' ')\n"
+                                "end\n"
+                                "function on_city(e) print('city', show(e)) end\n"
+                                "function on_disaster(e) print('disaster', show(e)) end\n"
+                                "function on_volcano(e) print('volcano', show(e)) end\n"
+                                "function on_drought(e) print('drought', show(e)) end\n"
+                                "function on_ship(e) print('ship', show(e)) end\n"
+                                "function on_military(e) print('military', show(e)) end\n"
+                                "function on_diplomacy(e) print('diplomacy', show(e)) end\n"));
+    sim::CityEvent shortage;
+    shortage.kind = sim::CityEvent::Kind::Shortage;
+    shortage.island = 3;
+    shortage.city = 1;
+    shortage.owner = 0;
+    shortage.ware = 22;  // tools
+    sim::CityEvent level = shortage;
+    level.kind = sim::CityEvent::Kind::Unlocked;
+    level.infra = 5;
+    sim::CityEvent locked = shortage;
+    locked.kind = sim::CityEvent::Kind::MaterialLocked;  // a message of the original only
+    const sim::CityEvent cities[] = {shortage, level, locked};
+    sim::DisasterEvent fire;
+    fire.island = 3;
+    fire.x = 10;
+    fire.y = 12;
+    fire.city = 1;
+    fire.owner = 0;
+    fire.spread = true;
+    const sim::DisasterEvent disasters[] = {fire};
+    sim::VolcanoEvent eruption;
+    eruption.island = 4;
+    eruption.x = 7;
+    eruption.y = 8;
+    const sim::VolcanoEvent volcanoes[] = {eruption};
+    sim::IslandEvent drought;
+    drought.island = 2;
+    sim::IslandEvent withered = drought;
+    withered.kind = sim::IslandEvent::Kind::Withered;
+    const sim::IslandEvent islands[] = {drought, withered};
+    sim::ShipEvent sunk;
+    sunk.kind = sim::ShipEvent::Kind::Sunk;
+    sunk.ship = 17;
+    sunk.player = 1;
+    sunk.city = 0;  // the attacker
+    sim::ShipEvent traded;
+    traded.kind = sim::ShipEvent::Kind::Traded;
+    traded.ship = 18;
+    traded.player = 0;
+    traded.island = 3;
+    traded.city = 1;
+    traded.ware = 22;
+    traded.amount = 5;
+    traded.money = 120;
+    sim::ShipEvent arrived = traded;
+    arrived.kind = sim::ShipEvent::Kind::Arrived;  // too common to be worth a call
+    const sim::ShipEvent ships[] = {sunk, traded, arrived};
+    sim::MilitaryEvent destroyed;
+    destroyed.kind = sim::MilitaryEvent::Kind::BuildingDestroyed;
+    destroyed.target = sim::Target::building(3, 10, 12);
+    destroyed.player = 1;
+    destroyed.owner = 0;
+    sim::MilitaryEvent shot = destroyed;
+    shot.kind = sim::MilitaryEvent::Kind::Shot;
+    const sim::MilitaryEvent military[] = {destroyed, shot};
+    sim::DiplomacyNotice offer;
+    offer.kind = sim::DiplomacyNotice::Kind::PeaceOffered;
+    offer.from = 1;
+    offer.to = 0;
+    const sim::DiplomacyNotice diplomacy[] = {offer};
+    sim::TickEvents events;
+    events.cities = cities;
+    events.disasters = disasters;
+    events.volcanoes = volcanoes;
+    events.islands = islands;
+    events.ships = ships;
+    events.military = military;
+    events.diplomacy = diplomacy;
+    scripts->after_tick(game.simulation, events);
+
+    std::vector<std::string> lines;
+    for (const auto& note : scripts->take_notes()) {
+        CHECK(!note.error);
+        lines.push_back(note.text);
+    }
+    REQUIRE(lines.size() == 9);
+    CHECK(lines[0] == "city\tcity=1 good=anno1602:tools inhabitants=42 island=3 kind=shortage player=0");
+    CHECK(lines[1] == "city\tcity=1 inhabitants=42 island=3 kind=level level=5 player=0");
+    CHECK(lines[2] == "disaster\tcity=1 disaster=fire island=3 kind=started player=0 spread=true x=10 y=12");
+    CHECK(lines[3] == "volcano\tisland=4 kind=erupted x=7 y=8");
+    CHECK(lines[4] == "drought\tisland=2 kind=started");
+    CHECK(lines[5] == "ship\tkind=sunk other=0 player=1 ship=17");
+    CHECK(lines[6] == "ship\tamount=5 city=1 good=anno1602:tools island=3 kind=traded money=120 player=0 ship=18");
+    CHECK(lines[7] == "military\tisland=3 kind=building_destroyed owner=0 player=1 x=10 y=12");
+    CHECK(lines[8] == "diplomacy\tfrom=1 kind=peace_offered to=0");
+}
+
+TEST_CASE("script: scripts read cities, ships and treaties and make peace and war") {
+    Game game;
+    sim::City city;
+    city.island = 3;
+    city.index = 1;
+    city.owner = 0;
+    city.name = "Port Royal";
+    city.inhabitants = {40, 2};
+    game.world.add_city(city);
+    sim::Ship ship;
+    ship.id = 5;
+    ship.name = "Seeadler";
+    ship.owner = 1;
+    ship.figure = 21;
+    ship.x = 30;
+    ship.y = 31;
+    game.world.add_ship(ship);
+    game.world.diplomacy().resize(2);
+    auto scripts =
+        game.run(one("treaties",
+                     "function on_start()\n"
+                     "  local c = game.city(3, 1)\n"
+                     "  print(c.name, c.player, c.inhabitants, #c.classes, c.classes[2], game.city(3, 2))\n"
+                     "  local s = game.ships(1)[1]\n"
+                     "  print(#game.ships(), #game.ships(0), s.id, s.name, s.player, s.x, s.y)\n"
+                     "  local r = game.relation(0, 1)\n"
+                     "  print(r.peace, r.trade, r.hostile, game.relation(0, 0), game.relation(0, 9))\n"
+                     "  print(game.set_peace(0, 1, false), game.set_peace(0, 1, false), game.set_trade(1, 0, true))\n"
+                     "  r = game.relation(1, 0)\n"
+                     "  print(r.peace, r.trade, r.hostile, game.set_peace(0, 0, true))\n"
+                     "  game.set_peace(0, 1)\n"
+                     "end\n"));
+    game.ticks(1);
+    const auto notes = scripts->take_notes();
+    REQUIRE(notes.size() == 6);
+    CHECK(notes[0].text == "Port Royal\t0\t42\t2\t2\tnil");
+    CHECK(notes[1].text == "1\t0\t5\tSeeadler\t1\t30\t31");
+    CHECK(notes[2].text == "signed\tnone\tfalse\tnil\tnil");
+    CHECK(notes[3].text == "true\tfalse\ttrue");
+    CHECK(notes[4].text == "none\tsigned\ttrue\tfalse");
+    CHECK(has_error(notes, "treaties:11: game.set_peace: two players' numbers and true or false are needed"));
+    CHECK(game.world.diplomacy().hostile(0, 1));
+    CHECK(game.world.diplomacy().may_trade(0, 1));
+}
+
+TEST_CASE("script: a treaty offered in the game reaches the scripts in the same tick") {
+    Game game;
+    game.world.diplomacy().resize(2);
+    (void)game.world.diplomacy().set_peace(game.world, 0, 1, sim::Treaty::None, 0);
+    (void)game.world.diplomacy().take_notices();
+    auto scripts = game.run(one("watch", "function on_diplomacy(e) print(e.kind, e.from, e.to) end\n"));
+    sim::DiplomacyOrder offer;
+    offer.player = 0;
+    offer.partner = 1;
+    offer.value = sim::Treaty::Offered;
+    game.simulation.schedule(game.simulation.next_tick(), offer);
+    game.ticks(1);
+    const auto notes = scripts->take_notes();
+    REQUIRE(!notes.empty());
+    CHECK(notes[0].text.starts_with("peace_offered\t0\t1"));
 }

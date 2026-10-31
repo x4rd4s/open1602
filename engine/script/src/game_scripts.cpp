@@ -7,6 +7,7 @@
 #include <optional>
 #include <span>
 
+#include "o1602/assets/original_names.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/core/hash.hpp"
 #include "o1602/core/text.hpp"
@@ -136,6 +137,69 @@ Value city_table(const sim::City& city) {
         {"city", std::int64_t{city.index}},
         {"name", core::cp1252_to_utf8(city.name)},
         {"player", city.owner != sim::kNoPlayer ? Value{std::int64_t{city.owner}} : Value{}},
+    });
+}
+
+/// The id of a trade good as scripts name it: "anno1602:<name>" for the original's, "<package>:<name>"
+/// for a package's.
+std::string good_id(const sim::World& world, std::uint8_t ware) {
+    if (const assets::OwnGood* own = world.goods().own(ware)) {
+        return own->id;
+    }
+    for (const assets::OriginalName& name : assets::original_ware_names()) {
+        if (ware >= name.first && ware < name.first + name.count) {
+            return "anno1602:" + std::string(name.name);
+        }
+    }
+    return "anno1602:" + std::to_string(ware);
+}
+
+Value player_or_nil(sim::PlayerId p) {
+    return p == sim::kNoPlayer ? Value{} : Value{std::int64_t{p}};
+}
+
+const char* treaty_name(sim::Treaty treaty) {
+    switch (treaty) {
+        case sim::Treaty::None:
+            return "none";
+        case sim::Treaty::Offered:
+            return "offered";
+        case sim::Treaty::Received:
+            return "received";
+        case sim::Treaty::Signed:
+            return "signed";
+    }
+    return "none";
+}
+
+Value ship_table(const sim::Ship& ship) {
+    return make_table({
+        {"id", std::int64_t{ship.id}},
+        {"name", core::cp1252_to_utf8(ship.name)},
+        {"player", player_or_nil(ship.owner)},
+        {"figure", std::int64_t{ship.figure}},
+        {"x", std::int64_t{ship.x}},
+        {"y", std::int64_t{ship.y}},
+        {"cannons", std::int64_t{ship.cannons}},
+        {"trader", ship.trader},
+    });
+}
+
+/// A city as game.city() gives it: the fields of city_table and its inhabitants, in all and per class.
+Value city_details(const sim::City& city) {
+    std::vector<Value> classes;
+    std::int64_t sum = 0;
+    for (const std::uint32_t n : city.inhabitants) {
+        classes.emplace_back(std::int64_t{n});
+        sum += n;
+    }
+    return make_table({
+        {"island", std::int64_t{city.island}},
+        {"city", std::int64_t{city.index}},
+        {"name", core::cp1252_to_utf8(city.name)},
+        {"player", player_or_nil(city.owner)},
+        {"inhabitants", sum},
+        {"classes", make_table({}, std::move(classes))},
     });
 }
 
@@ -279,6 +343,68 @@ void GameScripts::add_api(Package& package) {
         const sim::City* city = find_city(*m_world, *island, *index);
         return city != nullptr ? Value{whole_tons(city->stock(*ware))} : Value{};
     });
+    add("city", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto island = integer(args, 0);
+        const auto index = integer(args, 1);
+        if (!island || !index) {
+            return script_error("game.city: the island and the city must be numbers");
+        }
+        const sim::City* city = find_city(*m_world, *island, *index);
+        return city != nullptr ? city_details(*city) : Value{};
+    });
+    add("ships", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto player = integer(args, 0);
+        if (!args.empty() && !std::holds_alternative<std::monostate>(args[0]) && !player) {
+            return script_error("game.ships: the player must be a number");
+        }
+        std::vector<Value> ships;
+        for (const sim::Ship& ship : m_world->ships()) {
+            if (!ship.sinking && (!player || ship.owner == *player)) {
+                ships.push_back(ship_table(ship));
+            }
+        }
+        return make_table({}, std::move(ships));
+    });
+    add("relation", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto a = integer(args, 0);
+        const auto b = integer(args, 1);
+        const auto players = static_cast<std::int64_t>(m_world->players().size());
+        if (!a || !b) {
+            return script_error("game.relation: the two players must be numbers");
+        }
+        if (*a < 0 || *a >= players || *b < 0 || *b >= players || *a == *b) {
+            return Value{};
+        }
+        const sim::Diplomacy& diplomacy = m_world->diplomacy();
+        const auto pa = static_cast<sim::PlayerId>(*a);
+        const auto pb = static_cast<sim::PlayerId>(*b);
+        const sim::Relation& relation = diplomacy.relation(pa, pb);
+        return make_table({
+            {"peace", std::string(treaty_name(relation.peace))},
+            {"trade", std::string(treaty_name(relation.trade))},
+            {"hostile", diplomacy.hostile(pa, pb)},
+        });
+    });
+    const auto treaty = [this](std::string_view name, bool peace) {
+        return [this, name, peace](std::span<const Value> args) -> core::Result<Value> {
+            const auto a = integer(args, 0);
+            const auto b = integer(args, 1);
+            const auto* on = args.size() > 2 ? std::get_if<bool>(&args[2]) : nullptr;
+            if (m_simulation == nullptr) {
+                return script_error("game." + std::string(name) + ": only while the game runs, not at the top level");
+            }
+            if (!a || !b || on == nullptr) {
+                return script_error("game." + std::string(name) +
+                                    ": two players' numbers and true or false are needed");
+            }
+            const auto players = static_cast<std::int64_t>(m_world->players().size());
+            return Value{*a >= 0 && *a < players && *b >= 0 && *b < players &&
+                         m_simulation->script_treaty(static_cast<sim::PlayerId>(*a), static_cast<sim::PlayerId>(*b),
+                                                     peace, *on)};
+        };
+    };
+    add("set_peace", treaty("set_peace", true));
+    add("set_trade", treaty("set_trade", false));
     add("add_money", [this](std::span<const Value> args) -> core::Result<Value> {
         const auto player = integer(args, 0);
         const auto amount = integer(args, 1);
@@ -417,9 +543,6 @@ void GameScripts::dispatch(Package& package, const sim::TickEvents& events) {
         call(package, "on_house_changed", args);
     }
     for (const sim::GameEvent& e : events.game) {
-        const auto player_or_nil = [](sim::PlayerId p) {
-            return p == sim::kNoPlayer ? Value{} : Value{std::int64_t{p}};
-        };
         if (e.kind == sim::GameEvent::Kind::MissionAccomplished) {
             const Value args[] = {player_or_nil(e.player)};
             call(package, "on_player_won", args);
@@ -431,9 +554,201 @@ void GameScripts::dispatch(Package& package, const sim::TickEvents& events) {
             call(package, "on_game_over", args);
         }
     }
+    dispatch_more(package, events);
     if (m_world->time_ms() % 1000 == 0) {
         const Value args[] = {Value{static_cast<std::int64_t>(m_world->time_ms() / 1000)}};
         call(package, "on_second", args);
+    }
+}
+
+void GameScripts::dispatch_more(Package& package, const sim::TickEvents& events) {
+    const sim::World& world = *m_world;
+    const auto good = [&](std::uint8_t ware) { return ware != 0 ? Value{good_id(world, ware)} : Value{}; };
+    for (const sim::CityEvent& e : events.cities) {
+        using K = sim::CityEvent::Kind;
+        const char* kind = nullptr;
+        switch (e.kind) {
+            case K::Shortage:
+                kind = "shortage";
+                break;
+            case K::Hunger:
+                kind = "hunger";
+                break;
+            case K::Unlocked:
+                kind = "level";
+                break;
+            case K::Monument:
+                kind = "monument";
+                break;
+            case K::Population:
+                kind = "population";
+                break;
+            case K::RunningLow:
+                kind = "running_low";
+                break;
+            case K::MaterialLocked:
+                break;
+        }
+        if (kind == nullptr) {
+            continue;
+        }
+        const sim::City* city = world.city(e.island, e.city);
+        std::int64_t inhabitants = 0;
+        if (city != nullptr) {
+            for (const std::uint32_t n : city->inhabitants) {
+                inhabitants += n;
+            }
+        }
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"island", std::int64_t{e.island}},
+            {"city", std::int64_t{e.city}},
+            {"player", player_or_nil(e.owner)},
+            {"good", e.kind == K::Shortage || e.kind == K::RunningLow ? good(e.ware) : Value{}},
+            {"level", e.kind == K::Unlocked ? Value{std::int64_t{e.infra}} : Value{}},
+            {"minutes", e.kind == K::RunningLow ? Value{std::int64_t{e.minutes}} : Value{}},
+            {"inhabitants", inhabitants},
+        })};
+        call(package, "on_city", args);
+    }
+    for (const sim::DisasterEvent& e : events.disasters) {
+        const char* kind = e.kind == sim::DisasterEvent::Kind::Started ? "started"
+                           : e.kind == sim::DisasterEvent::Kind::Ended ? "ended"
+                                                                       : "burned_down";
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"disaster", std::string(e.disaster == sim::Disaster::Kind::Fire ? "fire" : "plague")},
+            {"island", std::int64_t{e.island}},
+            {"x", std::int64_t{e.x}},
+            {"y", std::int64_t{e.y}},
+            {"city", e.city != sim::MapCell::kNoCity ? Value{std::int64_t{e.city}} : Value{}},
+            {"player", player_or_nil(e.owner)},
+            {"spread", e.spread},
+        })};
+        call(package, "on_disaster", args);
+    }
+    for (const sim::VolcanoEvent& e : events.volcanoes) {
+        const char* kind = e.kind == sim::VolcanoEvent::Kind::Erupted ? "erupted"
+                           : e.kind == sim::VolcanoEvent::Kind::Ended ? "ended"
+                           : e.kind == sim::VolcanoEvent::Kind::Fire  ? "fire"
+                                                                      : "destroyed";
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"island", std::int64_t{e.island}},
+            {"x", std::int64_t{e.x}},
+            {"y", std::int64_t{e.y}},
+        })};
+        call(package, "on_volcano", args);
+    }
+    for (const sim::IslandEvent& e : events.islands) {
+        if (e.kind != sim::IslandEvent::Kind::DroughtStarted && e.kind != sim::IslandEvent::Kind::DroughtOver) {
+            continue;
+        }
+        const Value args[] = {make_table({
+            {"kind", std::string(e.kind == sim::IslandEvent::Kind::DroughtStarted ? "started" : "over")},
+            {"island", std::int64_t{e.island}},
+        })};
+        call(package, "on_drought", args);
+    }
+    for (const sim::ShipEvent& e : events.ships) {
+        using K = sim::ShipEvent::Kind;
+        const char* kind = nullptr;
+        // `city` holds the other player of an attack, a sinking and a sale.
+        bool other = false;
+        switch (e.kind) {
+            case K::ShipLaunched:
+                kind = "launched";
+                break;
+            case K::Traded:
+                kind = "traded";
+                break;
+            case K::IslandDiscovered:
+                kind = "island_discovered";
+                break;
+            case K::Attacked:
+                kind = "attacked";
+                other = true;
+                break;
+            case K::Sunk:
+                kind = "sunk";
+                other = true;
+                break;
+            case K::Sold:
+                kind = "sold";
+                other = true;
+                break;
+            case K::PirateAppeared:
+                kind = "pirate_appeared";
+                break;
+            case K::TraderArrived:
+                kind = "trader_arrived";
+                break;
+            case K::DepositFound:
+                kind = "deposit_found";
+                break;
+            default:
+                break;
+        }
+        if (kind == nullptr) {
+            continue;
+        }
+        const bool traded = e.kind == K::Traded;
+        const bool place = e.kind == K::IslandDiscovered || e.kind == K::DepositFound || traded;
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"ship", e.ship != 0 ? Value{std::int64_t{e.ship}} : Value{}},
+            {"player", player_or_nil(e.player)},
+            {"other", other ? player_or_nil(e.city) : Value{}},
+            {"island", place ? Value{std::int64_t{e.island}} : Value{}},
+            {"city", traded ? Value{std::int64_t{e.city}} : Value{}},
+            {"x", e.kind == K::DepositFound ? Value{std::int64_t{e.x}} : Value{}},
+            {"y", e.kind == K::DepositFound ? Value{std::int64_t{e.y}} : Value{}},
+            {"good", traded || e.kind == K::DepositFound ? good(e.ware) : Value{}},
+            {"amount", traded ? Value{e.amount} : Value{}},
+            {"money", traded || e.kind == K::Sold ? Value{e.money} : Value{}},
+        })};
+        call(package, "on_ship", args);
+    }
+    for (const sim::MilitaryEvent& e : events.military) {
+        using K = sim::MilitaryEvent::Kind;
+        const char* kind = e.kind == K::SoldierKilled       ? "soldier_killed"
+                           : e.kind == K::BuildingDestroyed ? "building_destroyed"
+                           : e.kind == K::WarDeclared       ? "war_declared"
+                           : e.kind == K::UnitTrained       ? "unit_trained"
+                           : e.kind == K::TroopsLanded      ? "troops_landed"
+                                                            : nullptr;
+        if (kind == nullptr) {
+            continue;
+        }
+        const bool building = e.target.kind == sim::Target::Kind::Building;
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"player", player_or_nil(e.player)},
+            {"owner", player_or_nil(e.owner)},
+            {"island", building ? Value{std::int64_t{e.target.island}} : Value{}},
+            {"x", building ? Value{std::int64_t{e.target.x}} : Value{}},
+            {"y", building ? Value{std::int64_t{e.target.y}} : Value{}},
+        })};
+        call(package, "on_military", args);
+    }
+    for (const sim::DiplomacyNotice& e : events.diplomacy) {
+        using K = sim::DiplomacyNotice::Kind;
+        const char* kind = e.kind == K::PeaceBroken    ? "peace_broken"
+                           : e.kind == K::PeaceOffered ? "peace_offered"
+                           : e.kind == K::PeaceSigned  ? "peace_signed"
+                           : e.kind == K::TradeEnded   ? "trade_ended"
+                           : e.kind == K::TradeOffered ? "trade_offered"
+                           : e.kind == K::TradeSigned  ? "trade_signed"
+                                                       : nullptr;
+        if (kind == nullptr) {
+            continue;
+        }
+        const Value args[] = {make_table({
+            {"kind", std::string(kind)},
+            {"from", player_or_nil(e.from)},
+            {"to", player_or_nil(e.to)},
+        })};
+        call(package, "on_diplomacy", args);
     }
 }
 

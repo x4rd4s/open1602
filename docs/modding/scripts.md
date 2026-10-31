@@ -8,7 +8,8 @@ the game's commands ([ADR 0007](../architecture/0007-extensibility-and-modding.m
 `script.lua`, which the game runs in a sandbox at the end of every tick with what happened in it, a
 script reads the players and posts the package's messages, and its table `state` is saved with the
 game. Since 2026-10-31 a script also gives and takes money and goods and decides who wins and who
-is out. Still open: more events.
+is out, hears what happens to cities, in disasters, to ships, in fights and in diplomacy, reads
+cities, ships and treaties and makes peace and war.
 
 ## The script
 
@@ -32,6 +33,45 @@ script defines when something happens:
 | `on_player_won(player)` | a player accomplished the mission |
 | `on_player_defeated(player, by)` | a player is out; `by` is who defeated them (nil: nobody) |
 | `on_game_over(player)` | the game ended with `player`'s mission |
+| `on_city(e)` | something happened in a city: `e.kind` (below), `e.island`, `e.city`, `e.player` (its owner, nil without one), `e.inhabitants` (now) |
+| `on_disaster(e)` | a fire or the plague: `e.kind` (`"started"`, `"ended"`, `"burned_down"`), `e.disaster` (`"fire"`, `"plague"`), `e.island`, `e.x`, `e.y` (the building), `e.city`, `e.player` (the owner), `e.spread` (caught from a neighbour) |
+| `on_volcano(e)` | `e.kind` (`"erupted"`, `"ended"`, `"fire"`: lava set a building on fire, `"destroyed"`: lava destroyed it), `e.island`, `e.x`, `e.y` (the crater or the building) |
+| `on_drought(e)` | `e.kind` (`"started"`, `"over"`), `e.island` |
+| `on_ship(e)` | something happened to a ship: `e.kind` (below), `e.ship` (its id, as `game.ships` has it), `e.player` (its owner) |
+| `on_military(e)` | `e.kind` (below), `e.player` (who acted), `e.owner` (whom it happened to) |
+| `on_diplomacy(e)` | a treaty changed or was offered: `e.kind` (`"peace_offered"`, `"peace_signed"`, `"peace_broken"`, `"trade_offered"`, `"trade_signed"`, `"trade_ended"`), `e.from` (who acted), `e.to` |
+
+The kinds of `on_city`:
+
+| `e.kind` | What | More |
+|---|---|---|
+| `"shortage"` | the supply of a good fell twice in a row | `e.good` |
+| `"running_low"` | a good lasts only a few more minutes at the current balance | `e.good`, `e.minutes` |
+| `"hunger"` | the people are hungry | |
+| `"level"` | the city reached an unlock level for its owner | `e.level` (its number, as in `levels.toml`) |
+| `"monument"` | the owner may build one more monument | |
+| `"population"` | the city passed a mark of inhabitants (100 ... 9000) | |
+
+The kinds of `on_ship`:
+
+| `e.kind` | What | More |
+|---|---|---|
+| `"launched"` | a shipyard finished the ship | |
+| `"traded"` | goods changed hands at a Kontor | `e.island`, `e.city`, `e.good`, `e.amount`, `e.money` |
+| `"island_discovered"` | `e.player` sees an island for the first time | `e.island` |
+| `"deposit_found"` | exploring found ore or gold | `e.island`, `e.x`, `e.y`, `e.good` |
+| `"attacked"` | the ship was attacked | `e.other` (the attacker) |
+| `"sunk"` | the ship sank | `e.other` (the attacker) |
+| `"sold"` | the ship went to another player | `e.other` (the buyer), `e.money` |
+| `"pirate_appeared"` | a new pirate ship at the edge of the map | |
+| `"trader_arrived"` | the free trader appeared | |
+
+The kinds of `on_military`: `"soldier_killed"`, `"building_destroyed"` (with `e.island`, `e.x`,
+`e.y` of the building), `"war_declared"` (`e.player` on `e.owner`), `"unit_trained"` (a castle
+finished a unit, with the castle's `e.island`, `e.x`, `e.y`) and `"troops_landed"`.
+
+Goods are named as everywhere in scripts: `"anno1602:tools"` for the original's, `"<package>:<name>"`
+for a package's. A field without a value is nil.
 
 The game calls them inside the tick, on every computer of a multiplayer game alike, so a script
 needs nothing of its own to stay in step with the others.
@@ -69,6 +109,9 @@ ware number.
 |---|---|
 | `game.cities(player)` | the cities of `player` (nil: all), a list of tables: `island`, `city` (its number on the island), `name`, `player` (nil without an owner) |
 | `game.goods(island, city, good)` | the whole tons of `good` in the city's warehouses; nil for no such city |
+| `game.city(island, city)` | the city as `game.cities` gives it, and `inhabitants` (in all) and `classes` (a list of its inhabitants per class, the first class first); nil for no such city |
+| `game.ships(player)` | the ships of `player` (nil: all), a list of tables: `id`, `name`, `player` (nil without an owner), `figure` (its number in `figuren.cod`), `x`, `y` (the world tile it is on), `cannons`, `trader` (the free trader's) |
+| `game.relation(a, b)` | the treaties between players `a` and `b`: `peace` and `trade`, each `"signed"`, `"none"` (war, or no trade treaty), `"offered"` (by `a`) or `"received"` (from `b`), and `hostile` (their units fight); nil for no such players or the same player twice |
 
 ## What a script changes
 
@@ -78,11 +121,13 @@ ware number.
 | `game.add_goods(island, city, good, tons)` | puts whole tons of `good` into the city's warehouses, as many as fit, or takes them (negative), as many as are there and not promised to a carrier; returns the tons that changed (negative: taken) |
 | `game.win(player)` | `player` accomplished their task and the game is over for everybody, as when the victory conditions are met; true if so, false when the game is over already or the player is no human or computer still playing |
 | `game.defeat(player)` | `player` is out of the game, nobody counts as having defeated them; true if so, false when the game is over or the player is not playing |
+| `game.set_peace(a, b, on)` | peace between `a` and `b` (`on` true) or war (false), both ways at once and without asking either; true if it changed |
+| `game.set_trade(a, b, on)` | the trade treaty between `a` and `b` signed or ended the same way; true if it changed |
 
 They work only while the game runs, in the `on_...` functions, not at the top level of the script.
 Every computer of a multiplayer game makes the same changes at the same moment, so they need no
 command over the network, and a replay makes them again. What a script changes reaches no script as
-an event (`game.win` calls no `on_player_won`): the script knows what it did, and so does no script
+an event (`game.win` calls no `on_player_won`, `game.set_peace` no `on_diplomacy`): the script knows what it did, and so does no script
 end up calling itself for ever.
 
 ```lua

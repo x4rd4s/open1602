@@ -93,6 +93,8 @@ public:
 
 private:
     void dispatch(Package& package, const sim::TickEvents& events);
+    /// The events of cities, disasters, ships, fights and diplomacy.
+    void dispatch_more(Package& package, const sim::TickEvents& events);
     /// Calls `function` if the script defines it; failures count towards kMaxScriptErrors.
     void call(Package& package, std::string_view function, std::span<const Value> args = {});
     void fail(Package& package, const std::string& message);
