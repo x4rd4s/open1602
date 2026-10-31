@@ -8,6 +8,8 @@
 #include <utility>
 
 #include "o1602/assets/original_names.hpp"
+#include "o1602/core/byte_reader.hpp"
+#include "o1602/core/byte_writer.hpp"
 #include "o1602/core/data_file.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/core/text.hpp"
@@ -236,24 +238,35 @@ void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPacka
     }
 }
 
+namespace {
+
+/// The text of the file `name` of `package`, nothing if it has none or it cannot be read (with a
+/// warning).
+std::optional<std::string> package_text(const ModPackage& package, std::string_view name,
+                                        std::vector<std::string>& warnings) {
+    const std::filesystem::path path = package.folder / std::filesystem::path(name);
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) {
+        return std::nullopt;
+    }
+    const auto bytes = core::read_file(path);
+    if (!bytes) {
+        warnings.push_back(package.id + "/" + std::string(name) + ": " + bytes.error().message);
+        return std::nullopt;
+    }
+    const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+    return std::string(core::skip_utf8_bom(text));
+}
+
+}  // namespace
+
 std::vector<PackageScenario> load_package_scenarios(std::span<const ModPackage> packages,
                                                     std::vector<std::string>& warnings) {
     std::vector<PackageScenario> scenarios;
     for (const ModPackage& p : packages) {
-        const std::filesystem::path path = p.folder / std::filesystem::path(kScenariosFile);
-        std::error_code ec;
-        if (!std::filesystem::is_regular_file(path, ec)) {
-            continue;
+        if (const auto text = package_text(p, kScenariosFile, warnings)) {
+            read_scenarios_file(scenarios, p, *text, warnings);
         }
-        const auto bytes = core::read_file(path);
-        if (!bytes) {
-            warnings.push_back(p.id + "/" + std::string(kScenariosFile) + ": " + bytes.error().message);
-            continue;
-        }
-        read_scenarios_file(
-            scenarios, p,
-            core::skip_utf8_bom(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size())),
-            warnings);
     }
     return scenarios;
 }
@@ -262,6 +275,160 @@ const PackageScenario* find_scenario(std::span<const PackageScenario> scenarios,
     const auto it =
         std::find_if(scenarios.begin(), scenarios.end(), [&](const PackageScenario& s) { return s.id == id; });
     return it != scenarios.end() ? &*it : nullptr;
+}
+
+std::string PackageCampaign::name(std::string_view language) const {
+    return name_in(names, language, id);
+}
+
+std::string PackageCampaign::briefing(std::string_view language) const {
+    return name_in(briefings, language, {});
+}
+
+void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPackage& package,
+                         std::span<const PackageScenario> scenarios, std::string_view utf8,
+                         std::vector<std::string>& warnings) {
+    const std::string where = package.id + "/" + std::string(kCampaignsFile);
+    auto tables = core::parse_data_file(utf8);
+    if (!tables) {
+        warnings.push_back(where + " " + tables.error().message);
+        return;
+    }
+    for (const core::DataTable& t : *tables) {
+        const std::string at = line_of(where, t.line);
+        if (!is_name(t.name)) {
+            warnings.push_back(at + "[" + t.name +
+                               "]: a campaign's name holds only lower case letters, digits and '_'");
+            continue;
+        }
+        PackageCampaign c;
+        c.id = package.id + ":" + t.name;
+        c.package = package.id;
+        std::vector<std::string> parts(kMaxCampaignParts);
+        bool ok = true;
+        const auto refuse = [&](const core::DataEntry& e, const std::string& what) {
+            warnings.push_back(line_of(where, e.value.line) + "'" + e.key + "' " + what);
+            ok = false;
+        };
+        for (const core::DataEntry& e : t.entries) {
+            const std::string* text = e.value.string();
+            if (e.key == "stars") {
+                if (const auto n = number(e.value, 0, kMaxStars)) {
+                    c.stars = static_cast<std::uint8_t>(*n);
+                } else {
+                    refuse(e, "is a number from 0 to " + std::to_string(kMaxStars));
+                }
+            } else if (e.key == "carry.money") {
+                if (e.value.boolean() == nullptr) {
+                    refuse(e, "is true or false");
+                } else {
+                    c.carry_money = *e.value.boolean();
+                }
+            } else if (e.key.starts_with("part.")) {
+                const std::string_view digits = std::string_view(e.key).substr(5);
+                const std::size_t n = digits.size() == 1 && digits[0] >= '1' && digits[0] <= '9'
+                                          ? static_cast<std::size_t>(digits[0] - '0')
+                                          : 0;
+                std::string scenario = package.id;
+                scenario += ':';
+                scenario += text != nullptr ? *text : std::string();
+                if (n == 0 || n > kMaxCampaignParts) {
+                    refuse(e, "is no part: parts are numbered 1 to " + std::to_string(kMaxCampaignParts));
+                } else if (text == nullptr || find_scenario(scenarios, scenario) == nullptr) {
+                    refuse(e, "names no scenario of the package (scenarios.toml)");
+                } else {
+                    parts[n - 1] = std::move(scenario);
+                }
+            } else if (const std::string_view language = name_key_language(e.key); !language.empty()) {
+                if (text == nullptr || text->empty()) {
+                    refuse(e, "is a text");
+                } else {
+                    c.names.emplace_back(language, core::utf8_to_cp1252(*text));
+                }
+            } else if (const std::string_view b = text_key_language(e.key, "briefing"); !b.empty()) {
+                if (text == nullptr) {
+                    refuse(e, "is a text");
+                } else {
+                    c.briefings.emplace_back(b, core::utf8_to_cp1252(*text));
+                }
+            } else {
+                refuse(e, "is no field of a campaign and is passed over");
+            }
+        }
+        while (!parts.empty() && parts.back().empty()) {
+            parts.pop_back();
+        }
+        if (!ok) {
+            warnings.push_back(at + c.id + " is passed over");
+            continue;
+        }
+        if (parts.empty()) {
+            warnings.push_back(at + c.id + " has no parts ('part.1'); the campaign is passed over");
+            continue;
+        }
+        if (std::find(parts.begin(), parts.end(), std::string()) != parts.end()) {
+            warnings.push_back(at + c.id +
+                               " misses a part between its first and its last; the campaign is passed over");
+            continue;
+        }
+        c.parts = std::move(parts);
+        campaigns.push_back(std::move(c));
+    }
+}
+
+std::vector<PackageCampaign> load_package_campaigns(std::span<const ModPackage> packages,
+                                                    std::span<const PackageScenario> scenarios,
+                                                    std::vector<std::string>& warnings) {
+    std::vector<PackageCampaign> campaigns;
+    for (const ModPackage& p : packages) {
+        if (const auto text = package_text(p, kCampaignsFile, warnings)) {
+            read_campaigns_file(campaigns, p, scenarios, *text, warnings);
+        }
+    }
+    return campaigns;
+}
+
+const PackageCampaign* find_campaign(std::span<const PackageCampaign> campaigns, std::string_view id) {
+    const auto it =
+        std::find_if(campaigns.begin(), campaigns.end(), [&](const PackageCampaign& c) { return c.id == id; });
+    return it != campaigns.end() ? &*it : nullptr;
+}
+
+namespace {
+constexpr std::uint32_t kCarryMagic = 0x43363130;  ///< "016C" as u32 little endian
+constexpr std::uint8_t kCarryVersion = 1;
+}  // namespace
+
+std::filesystem::path campaign_carry_file(std::string_view campaign, std::size_t part) {
+    std::string name(campaign);
+    std::replace(name.begin(), name.end(), ':', '_');
+    name += '.';
+    name += std::to_string(part + 1);
+    name += ".carry";
+    return core::path_from_utf8(name);
+}
+
+std::vector<std::uint8_t> write_campaign_carry(const CampaignCarry& carry) {
+    core::ByteWriter out;
+    out.u32(kCarryMagic);
+    out.u8(kCarryVersion);
+    out.i64(carry.money);
+    out.bytes(carry.table);
+    return out.take();
+}
+
+std::optional<CampaignCarry> read_campaign_carry(std::span<const std::uint8_t> bytes) {
+    core::ByteReader in(bytes);
+    const auto magic = in.u32();
+    const auto version = in.u8();
+    const auto money = in.u64();
+    if (magic != kCarryMagic || version != kCarryVersion || !money) {
+        return std::nullopt;
+    }
+    CampaignCarry carry;
+    carry.money = static_cast<std::int64_t>(*money);
+    carry.table.assign(bytes.begin() + static_cast<std::ptrdiff_t>(in.offset()), bytes.end());
+    return carry;
 }
 
 }  // namespace o1602::assets

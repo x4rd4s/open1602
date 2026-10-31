@@ -17,7 +17,8 @@ is out. Still open: more events.
 ```
 
 A package has at most one script, a UTF-8 text file. A scenario of a package may bring one more,
-which runs only in that scenario, after the package's ([scenarios.md](scenarios.md)). When a game starts or is loaded, the game runs
+which runs only in that scenario, after the package's ([scenarios.md](scenarios.md)); in a part of
+a campaign its table `campaign` goes on to the next part ([scenarios.md](scenarios.md#campaigns)). When a game starts or is loaded, the game runs
 the top level of each package's script, in the packages' load order, each in a sandbox of its own:
 what one package's script defines, another's does not see. Then the game calls the functions the
 script defines when something happens:

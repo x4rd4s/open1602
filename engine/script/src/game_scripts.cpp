@@ -19,8 +19,9 @@ struct GameScripts::Package {
     std::string name;  ///< what its state is saved under and its notes name (PackageScript::name)
     Sandbox sandbox;
     sim::Random random;
-    bool started = false;  ///< on_start ran, or the savegame kept a state
-    bool stopped = false;  ///< failed at its top level or too often
+    bool started = false;   ///< on_start ran, or the savegame kept a state
+    bool stopped = false;   ///< failed at its top level or too often
+    bool campaign = false;  ///< the script of a campaign's part: keeps the table `campaign`
     std::size_t errors = 0;
 
     Package(std::string package, std::string script_name, Limits limits)
@@ -183,7 +184,13 @@ GameScripts::GameScripts(std::vector<PackageScript> scripts, const sim::World& w
         auto package = std::make_unique<Package>(std::move(script.package), std::move(name), limits);
         Package& p = *package;
         m_packages.push_back(std::move(package));
+        const auto& part = world.campaign_part();
+        p.campaign = part && p.name == world.package_scenario();
         add_api(p);
+        if (p.campaign) {
+            (void)p.sandbox.add_value("game", "campaign", Value{part->campaign});
+            (void)p.sandbox.add_value("game", "part", Value{static_cast<std::int64_t>(part->part) + 1});
+        }
 
         const auto saved = std::find_if(world.script_states().begin(), world.script_states().end(),
                                         [&](const sim::ScriptState& s) { return s.package == p.name; });
@@ -197,6 +204,13 @@ GameScripts::GameScripts(std::vector<PackageScript> scripts, const sim::World& w
         }
         if (saved != world.script_states().end()) {
             if (const core::Status loaded = p.sandbox.load_table(kStateTable, saved->data); !loaded) {
+                fail(p, loaded.error().message);
+            }
+        }
+        if (p.campaign) {
+            // What the part before left, or what this part kept when it was saved.
+            const auto& carried = saved != world.script_states().end() ? saved->campaign : part->carried;
+            if (const core::Status loaded = p.sandbox.load_table(kCampaignTable, carried); !loaded) {
                 fail(p, loaded.error().message);
             }
         }
@@ -458,6 +472,13 @@ std::vector<sim::ScriptState> GameScripts::save_states() {
             // Not counted as a failure: saving also happens on one computer alone (a player saves),
             // and the scripts must go on the same everywhere.
             m_notes.push_back(ScriptNote{package->name, data.error().message, true});
+        }
+        if (package->campaign) {
+            if (auto data = package->sandbox.save_table(kCampaignTable)) {
+                state.campaign = std::move(data).value();
+            } else if (m_notes.size() < kMaxPendingMessages) {
+                m_notes.push_back(ScriptNote{package->name, data.error().message, true});
+            }
         }
         states.push_back(std::move(state));
     }

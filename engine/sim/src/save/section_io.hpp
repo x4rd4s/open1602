@@ -81,6 +81,7 @@ struct Decoded {
     /// The groups the players stored (UGRP).
     std::optional<std::vector<UnitGroups>> unit_groups;
     std::optional<std::string> package_scenario;
+    std::optional<World::CampaignPart> campaign_part;
     /// The goods the packages added (GOOD).
     std::optional<assets::Goods> goods;
     /// The icons of packages the goods show, by ware number (GPIC).

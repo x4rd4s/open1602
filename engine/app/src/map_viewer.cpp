@@ -2654,7 +2654,7 @@ void MapViewer::load_options() {
         menu->set_name(m_app_settings.player_name);
         menu->set_endless_setup(m_app_settings.endless);
         menu->set_scenario_setup(m_app_settings.scenario);
-        menu->set_package_scenarios(m_package_scenarios);
+        menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);
         menu->set_tutorial_chapter(m_app_settings.tutorial_chapter);
     }
 }
@@ -2812,12 +2812,14 @@ core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::
 void MapViewer::load_package_scenarios() {
     std::vector<std::string> problems;
     m_package_scenarios = assets::load_package_scenarios(m_packages, problems);
+    m_package_campaigns = assets::load_package_campaigns(m_packages, m_package_scenarios, problems);
     for (const std::string& p : problems) {
         std::fprintf(stderr, "mods: %s\n", p.c_str());
     }
 }
 
-core::Status MapViewer::start_package_scenario(const std::string& id, const sim::Rules* rules) {
+core::Status MapViewer::start_package_scenario(const std::string& id, const sim::Rules* rules,
+                                               const std::string& campaign, std::uint8_t part) {
     const assets::PackageScenario* scenario = assets::find_scenario(m_package_scenarios, id);
     if (scenario == nullptr) {
         return core::make_error(core::ErrorCode::NotFound, "no scenario " + id);
@@ -2833,6 +2835,33 @@ core::Status MapViewer::start_package_scenario(const std::string& id, const sim:
     std::vector<std::string> warnings;
     sim::apply_package_scenario(*world, *scenario, ui::current_language(), &warnings);
     world->set_package_scenario(scenario->id);
+    if (const assets::PackageCampaign* c = assets::find_campaign(m_package_campaigns, campaign)) {
+        sim::World::CampaignPart state{c->id, part, {}};
+        // What winning the part before left; nothing for the first part.
+        std::optional<assets::CampaignCarry> carry;
+        if (part > 0) {
+            const std::filesystem::path file =
+                data_folder() / "campaigns" / assets::campaign_carry_file(c->id, std::size_t{part} - 1);
+            if (auto bytes = core::read_file(file)) {
+                carry = assets::read_campaign_carry(*bytes);
+            }
+        }
+        if (carry) {
+            state.carried = std::move(carry->table);
+            if (c->carry_money) {
+                std::vector<sim::Player> players = world->players();
+                for (sim::Player& p : players) {
+                    if (p.role == sim::PlayerRole::Human) {
+                        p.money = static_cast<std::int32_t>(
+                            std::clamp<std::int64_t>(carry->money, std::numeric_limits<std::int32_t>::min(),
+                                                     std::numeric_limits<std::int32_t>::max()));
+                    }
+                }
+                world->set_players(std::move(players));
+            }
+        }
+        world->set_campaign_part(std::move(state));
+    }
     // A game saved as the map: its scripts start anew, as in any new game.
     world->set_script_states({});
     for (const std::string& w : warnings) {
@@ -2964,7 +2993,7 @@ void MapViewer::reload_mods() {
     load_package_scenarios();
     if (m_hud) {
         if (MainMenu* menu = m_hud->menu()) {
-            menu->set_package_scenarios(m_package_scenarios);
+            menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);
         }
     }
     // The packages' own buildings go into tables without any (the game's and the next game's), so
@@ -3329,7 +3358,8 @@ void MapViewer::apply_menu() {
                 }
                 started = e.package_scenario.empty()
                               ? load_game(e.path, e.setup ? &e.setup->rules : nullptr)
-                              : start_package_scenario(e.package_scenario, e.setup ? &e.setup->rules : nullptr);
+                              : start_package_scenario(e.package_scenario, e.setup ? &e.setup->rules : nullptr,
+                                                       e.package_campaign, e.level);
                 if (started && e.setup && !(e.setup->rules == m_app_settings.scenario.rules)) {
                     m_app_settings.scenario = *e.setup;
                     save_settings();
@@ -3634,16 +3664,41 @@ void MapViewer::record_progress() {
         progress =
             assets::parse_progress(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     }
+    if (const auto& part = m_state->world.campaign_part()) {
+        record_campaign_part(progress, *part);
+    }
     const sim::GameIdentity game = game_identity();
     if (progress.ends_campaigns(game.campaign, game.ranking, game.mission_number)) {
         m_video->follow(assets::kCampaignsEndVideo);  // after the success video, whatever the switches
     }
-    if (progress.record_win(game.campaign, game.ranking, game.mission_number)) {
+    if (progress.record_win(game.campaign, game.ranking, game.mission_number) || m_state->world.campaign_part()) {
         const std::string text = assets::write_progress(progress);
         const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
         if (auto status = core::write_file_atomic(file, std::span<const std::uint8_t>(data, text.size())); !status) {
             std::fprintf(stderr, "progress: %s\n", status.error().message.c_str());
         }
+    }
+}
+
+void MapViewer::record_campaign_part(assets::CampaignProgress& progress, const sim::World::CampaignPart& part) {
+    progress.record_package_win(part.campaign, part.part);
+    assets::CampaignCarry carry;
+    if (const sim::Player* local = m_state->world.player(m_local_player)) {
+        carry.money = local->money;
+    }
+    if (sim::ScriptHost* scripts = m_state->simulation.scripts()) {
+        for (sim::ScriptState& s : scripts->save_states()) {
+            if (s.package == m_state->world.package_scenario()) {
+                carry.table = std::move(s.campaign);
+            }
+        }
+    }
+    const std::filesystem::path file =
+        data_folder() / "campaigns" / assets::campaign_carry_file(part.campaign, part.part);
+    std::error_code ec;
+    std::filesystem::create_directories(file.parent_path(), ec);
+    if (auto status = core::write_file_atomic(file, assets::write_campaign_carry(carry)); !status) {
+        std::fprintf(stderr, "campaign: %s\n", status.error().message.c_str());
     }
 }
 

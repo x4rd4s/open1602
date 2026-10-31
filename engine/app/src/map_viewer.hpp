@@ -276,11 +276,16 @@ private:
     /// Turns the package `id` of the mods folder on (with the packages it needs) or off, and
     /// reloads the packages; returns what the screen "Mods" tells about it (Windows-1252).
     std::string toggle_mod(const std::string& id);
-    /// The scenarios of m_packages (docs/modding/scenarios.md), for the menu.
+    /// The scenarios and campaigns of m_packages (docs/modding/scenarios.md), for the menu.
     void load_package_scenarios();
     /// Starts the package scenario `id`: its map with its money and goals, its script with the
-    /// packages' (`rules`: of the start dialog, else the options').
-    core::Status start_package_scenario(const std::string& id, const sim::Rules* rules);
+    /// packages' (`rules`: of the start dialog, else the options'). As part `part` (from 0) of the
+    /// package campaign `campaign`, if not empty, with what the part before left.
+    core::Status start_package_scenario(const std::string& id, const sim::Rules* rules,
+                                        const std::string& campaign = {}, std::uint8_t part = 0);
+    /// A won part of a package's campaign: opens the next part in `progress` and keeps what it
+    /// leaves to it (campaign_carry_file).
+    void record_campaign_part(assets::CampaignProgress& progress, const sim::World::CampaignPart& part);
     /// The packages a game may use here: those in `mods`, then those received from hosts.
     [[nodiscard]] std::vector<assets::ModPackage> known_packages() const;
     /// Drops the session, its beacon and the hosted game; the menus stay as they are.
@@ -428,6 +433,7 @@ private:
     std::vector<assets::ModPackage> m_cached_packages;
     /// The scenarios of m_packages, in their load order.
     std::vector<assets::PackageScenario> m_package_scenarios;
+    std::vector<assets::PackageCampaign> m_package_campaigns;
     sim::Balance m_balance;  ///< the numbers a new game starts with, as the mods change them (docs/modding/balance.md)
     /// Flags, smoke and icons: buildings do not move, so they are collected once at load.
     std::vector<render::BuildingFigure> m_building_figures;

@@ -657,6 +657,17 @@ public:
     /// so that its script goes on when the game is loaded.
     [[nodiscard]] const std::string& package_scenario() const noexcept { return m_package_scenario; }
     void set_package_scenario(std::string id) noexcept { m_package_scenario = std::move(id); }
+    /// A part of a package's campaign (docs/modding/scenarios.md#campaigns): the campaign, the part
+    /// counted from 0 and what the part before left to it (the table `campaign` of its script,
+    /// script::Sandbox::save_table), kept with the savegame (section CAMP).
+    struct CampaignPart {
+        std::string campaign;  ///< "<package>:<name>"
+        std::uint8_t part = 0;
+        std::vector<std::uint8_t> carried;
+        friend bool operator==(const CampaignPart&, const CampaignPart&) = default;
+    };
+    [[nodiscard]] const std::optional<CampaignPart>& campaign_part() const noexcept { return m_campaign_part; }
+    void set_campaign_part(std::optional<CampaignPart> part) noexcept { m_campaign_part = std::move(part); }
     /// The groups each player stored (by PlayerId), kept with the savegame (section UGRP) so that a
     /// loaded game has them again; the original forgets them. Only the interface reads them, and the
     /// game's fingerprint leaves them out: in a multiplayer game every computer knows only its own.
@@ -790,6 +801,7 @@ private:
     std::vector<std::uint8_t> m_simulation_state;
     std::vector<ScriptState> m_script_states;
     std::string m_package_scenario;
+    std::optional<CampaignPart> m_campaign_part;
     std::vector<UnitGroups> m_unit_groups;
     std::optional<Rules> m_saved_rules;
     OriginalBugs m_original_bugs;

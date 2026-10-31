@@ -501,7 +501,7 @@ TEST_CASE("main menu: campaigns by stars then number, each by the header of its 
 }
 
 TEST_CASE("main menu: the packages' scenarios under their own heading, with stars and briefing") {
-    CHECK(app::package_scenario_list({}, "en", "----Mods----").empty());
+    CHECK(app::package_scenario_list({}, {}, "en", "----Mods----").empty());
     std::vector<assets::PackageScenario> scenarios(1);
     assets::PackageScenario& s = scenarios[0];
     s.id = "isles:north";
@@ -511,7 +511,7 @@ TEST_CASE("main menu: the packages' scenarios under their own heading, with star
     s.names.emplace_back("en", "The North");
     s.names.emplace_back("de", "Der Norden");
     s.briefings.emplace_back("de", "Siedelt im Norden.");
-    const auto list = app::package_scenario_list(scenarios, "de", "----Mods----");
+    const auto list = app::package_scenario_list(scenarios, {}, "de", "----Mods----");
     REQUIRE(list.size() == 2);
     CHECK(list[0].separator);
     CHECK(list[0].name == "----Mods----");
@@ -524,4 +524,37 @@ TEST_CASE("main menu: the packages' scenarios under their own heading, with star
     CHECK(list[1].header.ranking == 4);
     CHECK(list[1].package_scenario == "isles:north");
     CHECK(list[1].briefing == "Siedelt im Norden.");
+}
+
+TEST_CASE("main menu: a package's campaign is one entry with a part per scenario") {
+    std::vector<assets::PackageScenario> scenarios(2);
+    scenarios[0].id = "isles:north";
+    scenarios[0].file = std::filesystem::path("north.szs");
+    scenarios[0].briefings.emplace_back("en", "Go north.");
+    scenarios[1].id = "isles:south";
+    scenarios[1].file = std::filesystem::path("south.szs");
+    std::vector<assets::PackageCampaign> campaigns(1);
+    campaigns[0].id = "isles:frost";
+    campaigns[0].names.emplace_back("en", "Frost");
+    campaigns[0].briefings.emplace_back("en", "Two winters.");
+    campaigns[0].stars = 3;
+    campaigns[0].parts = {"isles:north", "isles:south"};
+    const auto list = app::package_scenario_list(scenarios, campaigns, "en", "----Mods----");
+    REQUIRE(list.size() == 4);  // heading, campaign, two scenarios
+    const app::MenuScenario& c = list[1];
+    CHECK(c.name == "Frost");
+    CHECK(c.package_campaign == "isles:frost");
+    CHECK(c.package_scenario.empty());
+    CHECK(c.briefing == "Two winters.");
+    CHECK(c.header.ranking == 3);
+    CHECK(c.base == std::filesystem::path("isles_frost"));
+    REQUIRE(c.files.size() == 2);
+    CHECK(c.files[0].first == 0);
+    CHECK(c.files[1].first == 1);
+    CHECK(c.files[1].second == std::filesystem::path("south.szs"));
+    REQUIRE(c.package_parts.size() == 2);
+    CHECK(c.package_parts[0].scenario == "isles:north");
+    CHECK(c.package_parts[0].briefing == "Go north.");
+    CHECK(c.package_parts[1].briefing.empty());
+    CHECK(list[2].package_scenario == "isles:north");
 }

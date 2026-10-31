@@ -251,22 +251,42 @@ std::vector<MenuScenario> scenario_list(const std::filesystem::path& folder, con
 }
 
 std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageScenario> scenarios,
+                                                std::span<const assets::PackageCampaign> campaigns,
                                                 std::string_view language, std::string heading) {
     std::vector<MenuScenario> out;
-    if (scenarios.empty()) {
+    if (scenarios.empty() && campaigns.empty()) {
         return out;
     }
     MenuScenario head;
     head.name = std::move(heading);
     head.separator = true;
     out.push_back(std::move(head));
+    // Its high scores beside the others, by a name no scenario of the game folder has.
+    const auto base_of = [](std::string id) {
+        std::replace(id.begin(), id.end(), ':', '_');
+        return core::path_from_utf8(id);
+    };
+    for (const assets::PackageCampaign& c : campaigns) {
+        MenuScenario s;
+        s.name = c.name(language);
+        s.base = base_of(c.id);
+        s.header.ranking = c.stars;
+        s.package_campaign = c.id;
+        s.briefing = c.briefing(language);
+        for (std::size_t i = 0; i < c.parts.size(); ++i) {
+            const assets::PackageScenario* part = assets::find_scenario(scenarios, c.parts[i]);
+            if (part == nullptr) {
+                break;  // read_campaigns_file() lets only scenarios of the package through
+            }
+            s.files.emplace_back(static_cast<std::uint8_t>(i), part->file);
+            s.package_parts.push_back(MenuScenario::Part{part->id, part->briefing(language)});
+        }
+        out.push_back(std::move(s));
+    }
     for (const assets::PackageScenario& p : scenarios) {
         MenuScenario s;
         s.name = p.name(language);
-        // Its high scores beside the others, by a name no scenario of the game folder has.
-        std::string base = p.id;
-        std::replace(base.begin(), base.end(), ':', '_');
-        s.base = core::path_from_utf8(base);
+        s.base = base_of(p.id);
         s.files.emplace_back(std::uint8_t{0xFF}, p.file);
         s.header.ranking = p.stars;
         s.package_scenario = p.id;
@@ -447,8 +467,8 @@ void MainMenu::load_scenarios() {
     if (const auto folder = m_game->resolve("Szenes")) {
         m_scenarios = scenario_list(*folder, headings, m_game);
     }
-    std::vector<MenuScenario> own =
-        package_scenario_list(m_package_scenarios, ui::current_language(), ui::tr("menu.package_scenarios"));
+    std::vector<MenuScenario> own = package_scenario_list(m_package_scenarios, m_package_campaigns,
+                                                          ui::current_language(), ui::tr("menu.package_scenarios"));
     m_scenarios.insert(m_scenarios.end(), std::make_move_iterator(own.begin()), std::make_move_iterator(own.end()));
     // The numbered missions above the progress are not offered (0x0048DC90).
     std::erase_if(m_scenarios, [&](const MenuScenario& s) {
@@ -461,6 +481,9 @@ void MainMenu::load_scenarios() {
 std::size_t MainMenu::campaign_parts_open(const MenuScenario& s) const {
     // MISSION.GAD: a part above the campaign's progress is disabled; other scenarios have all.
     constexpr std::size_t kAll = 4;
+    if (!s.package_campaign.empty()) {
+        return m_progress.package_parts_open(s.package_campaign);
+    }
     if (s.header.campaign == assets::ScenarioHeader::kNone) {
         return kAll;
     }
@@ -518,6 +541,10 @@ void MainMenu::load_details() {
     // The briefing: the mission of the human in the file (AUFTRAG4 of the player record).
     // A package's scenario may have one of its own; otherwise the map's.
     m_briefing = s.briefing;
+    if (const std::size_t part = m_variant == 0xFF ? 0 : m_variant;
+        part < s.package_parts.size() && !s.package_parts[part].briefing.empty()) {
+        m_briefing = s.package_parts[part].briefing;
+    }
     std::optional<core::Bytes> map_bytes;
     if (m_briefing.empty()) {
         if (auto read = core::read_file(chosen_file())) {
@@ -778,7 +805,15 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                     ev.path = chosen_file();
                     ev.name = m_name;
                     ev.setup = m_scenario;
-                    ev.package_scenario = m_scenarios[m_chosen].package_scenario;
+                    const MenuScenario& chosen = m_scenarios[m_chosen];
+                    ev.package_scenario = chosen.package_scenario;
+                    if (!chosen.package_campaign.empty()) {
+                        const std::size_t part = m_variant == 0xFF ? 0 : m_variant;
+                        ev.package_campaign = chosen.package_campaign;
+                        ev.package_scenario =
+                            part < chosen.package_parts.size() ? chosen.package_parts[part].scenario : std::string();
+                        ev.level = static_cast<std::uint8_t>(part);
+                    }
                     out.push_back(std::move(ev));
                     break;
                 }

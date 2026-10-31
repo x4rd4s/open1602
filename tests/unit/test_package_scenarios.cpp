@@ -11,6 +11,7 @@
 #include "../test_framework.hpp"
 #include "test_support.hpp"
 
+#include "o1602/assets/high_scores.hpp"
 #include "o1602/assets/package_scenarios.hpp"
 #include "o1602/sim/mission.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -218,4 +219,93 @@ TEST_CASE("package scenarios: the scenario a game was started from survives the 
     auto back = sim::read_game(*bytes, buildings);
     REQUIRE(back.ok());
     CHECK(back->package_scenario() == "isles:north");
+}
+
+TEST_CASE("package campaigns: parts name scenarios of the package, in order, without gaps") {
+    const Package p("o1602_campaigns_read");
+    std::vector<std::string> warnings;
+    const auto scenarios = p.read(
+        "[north]\nfile = \"maps/north.szs\"\n"
+        "[south]\nfile = \"maps/north.szs\"\n",
+        warnings);
+    REQUIRE(scenarios.size() == 2);
+    std::vector<assets::PackageCampaign> campaigns;
+    assets::read_campaigns_file(campaigns, p.package, scenarios,
+                                "[frost]\n"
+                                "name.en = \"Frost\"\n"
+                                "briefing.de = \"Zwei Winter.\"\n"
+                                "stars = 2\n"
+                                "carry.money = true\n"
+                                "part.2 = \"south\"\n"
+                                "part.1 = \"north\"\n"
+                                "[gap]\npart.1 = \"north\"\npart.3 = \"south\"\n"
+                                "[none]\nstars = 1\n"
+                                "[unknown]\npart.1 = \"east\"\n"
+                                "[too_far]\npart.6 = \"north\"\n",
+                                warnings);
+    REQUIRE(campaigns.size() == 1);
+    const assets::PackageCampaign& c = campaigns[0];
+    CHECK(c.id == "isles:frost");
+    CHECK(c.package == "isles");
+    CHECK(c.name("de") == "Frost");
+    CHECK(c.briefing("de") == "Zwei Winter.");
+    CHECK(c.stars == 2);
+    CHECK(c.carry_money);
+    REQUIRE(c.parts.size() == 2);
+    CHECK(c.parts[0] == "isles:north");
+    CHECK(c.parts[1] == "isles:south");
+    CHECK(warnings.size() >= 4);
+    CHECK(assets::find_campaign(campaigns, "isles:frost") == &campaigns[0]);
+    CHECK(assets::find_campaign(campaigns, "isles:gap") == nullptr);
+}
+
+TEST_CASE("package campaigns: won parts open the next, kept in the progress file beside the original's") {
+    assets::CampaignProgress progress;
+    CHECK(progress.package_parts_open("isles:frost") == 0);
+    CHECK(progress.record_package_win("isles:frost", 0));
+    CHECK(!progress.record_package_win("isles:frost", 0));  // nothing further
+    CHECK(progress.package_parts_open("isles:frost") == 1);
+    CHECK(progress.record_win(2, 1, 0xFF));
+    progress.package_campaigns["my mods:long way"] = 3;  // a package's id may hold spaces
+    const assets::CampaignProgress back = assets::parse_progress(assets::write_progress(progress));
+    CHECK(back.package_campaigns == progress.package_campaigns);
+    CHECK(back.campaigns == progress.campaigns);
+    // Lines that are not whole are passed over.
+    CHECK(assets::parse_progress("package 2\npackage x isles:a\npackage 1 \n").package_campaigns.empty());
+}
+
+TEST_CASE("package campaigns: what a won part leaves to the next comes back from its file") {
+    CHECK(assets::campaign_carry_file("isles:frost", 0) == std::filesystem::path("isles_frost.1.carry"));
+    assets::CampaignCarry carry;
+    carry.money = -1234567890123;
+    carry.table = {1, 2, 3, 4};
+    const auto bytes = assets::write_campaign_carry(carry);
+    CHECK(assets::read_campaign_carry(bytes) == carry);
+    const std::vector<std::uint8_t> other{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+    CHECK(!assets::read_campaign_carry(other));
+    CHECK(!assets::read_campaign_carry(std::span(bytes).first(6)));
+}
+
+TEST_CASE("package campaigns: the part and the scripts' campaign tables survive the own savegame") {
+    sim::World world(40, 40);
+    std::vector<sim::Player> players(1);
+    players[0].role = sim::PlayerRole::Human;
+    world.set_players(players);
+    world.set_package_scenario("isles:south");
+    world.set_campaign_part(sim::World::CampaignPart{"isles:frost", 1, {7, 8, 9}});
+    sim::ScriptState plain;
+    plain.package = "isles";
+    plain.data = {1};
+    sim::ScriptState part;
+    part.package = "isles:south";
+    part.data = {2};
+    part.campaign = {3, 4};
+    world.set_script_states({plain, part});
+    const assets::BuildingTable buildings;
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto back = sim::read_game(*bytes, buildings);
+    REQUIRE(back.ok());
+    CHECK(back->campaign_part() == world.campaign_part());
+    CHECK(back->script_states() == world.script_states());
 }
