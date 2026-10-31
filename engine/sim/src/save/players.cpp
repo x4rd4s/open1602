@@ -262,7 +262,7 @@ Decoded::FactionPart read_factions(Reader& in) {
     Decoded::FactionPart part;
     in.list(part.factions, 23, [&](Faction& f) { io_faction(in, f); });
     in.list(part.players, 1, [&](FactionId& f) { in.u8(f); });
-    if (part.factions.empty() || part.factions.size() > kMaxPlayerCount ||
+    if (part.factions.empty() || part.factions.size() > kMaxFactions ||
         std::any_of(part.players.begin(), part.players.end(), [&](FactionId f) { return f >= part.factions.size(); })) {
         in.fail();
     }

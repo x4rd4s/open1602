@@ -125,8 +125,9 @@ void prepare_missions(World& world);
 
 /// Starts a package's scenario (docs/modding/scenarios.md) on `world`, loaded from its map: the
 /// money of every human player, if the scenario gives it, and its goals, if any, as the mission of
-/// every human player, with the briefing in `language` as the mission's text. A goods goal whose
-/// good the world does not know is left out with a warning.
+/// every human player, with the briefing in `language` as the mission's text, and the slots it gives
+/// to factions. A goods goal whose good the world does not know, and a slot that is none or names a
+/// faction the world does not have, are left out with a warning.
 void apply_package_scenario(World& world, const assets::PackageScenario& scenario, std::string_view language,
                             std::vector<std::string>* warnings);
 

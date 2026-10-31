@@ -122,6 +122,7 @@ Value player_table(const sim::World& world, sim::PlayerId id) {
         {"id", std::int64_t{id}},
         {"name", core::cp1252_to_utf8(player->name)},
         {"role", std::string(role)},
+        {"faction", world.faction(*player).id},
         {"money", std::int64_t{player->money}},
         {"inhabitants", static_cast<std::int64_t>(inhabitants_of(world, id))},
         {"playing", player->active()},

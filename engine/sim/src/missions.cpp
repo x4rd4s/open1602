@@ -275,6 +275,34 @@ void apply_package_scenario(World& world, const assets::PackageScenario& scenari
             }
         }
     }
+    // The factions of the slots: the faction must be one of the world (factions.toml of a package
+    // that is on, or of the map saved with it).
+    for (const auto& [slot, id] : scenario.slots) {
+        const auto faction = find_faction(world.factions(), id);
+        if (slot >= players.size() || !faction) {
+            if (warnings != nullptr) {
+                warnings->push_back(scenario.id + ": slot " + std::to_string(slot + 1) +
+                                    (slot >= players.size() ? " is not a slot of the map" : " names no faction " + id));
+            }
+            continue;
+        }
+        Player& p = players[slot];
+        if (world.factions()[*faction].behaviour != FactionBehaviour::Settlers && p.role == PlayerRole::Human) {
+            if (warnings != nullptr) {
+                warnings->push_back(scenario.id + ": slot " + std::to_string(slot + 1) +
+                                    " is a person's; only a faction of the settlers' behaviour takes it");
+            }
+            continue;
+        }
+        if (world.factions()[*faction].behaviour != FactionBehaviour::Settlers) {
+            make_neutral(p, *faction);  // steered by its faction's behaviour, and the scripts
+        } else {
+            p.faction = *faction;
+            if (p.role == PlayerRole::Neutral) {
+                p.role = PlayerRole::Computer;
+            }
+        }
+    }
     const assets::ScenarioGoals& g = scenario.goals;
     if (g.any()) {
         Mission m;

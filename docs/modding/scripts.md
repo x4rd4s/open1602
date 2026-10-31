@@ -45,7 +45,7 @@ The table `game` holds what the game offers a script:
 | `game.package` | the package's id |
 | `game.time()` | the game time in whole seconds |
 | `game.players()` | the players' numbers, a list starting with 0 |
-| `game.player(n)` | player `n` as a table: `id`, `name`, `role` (`"human"`, `"computer"`, `"neutral"`), `money`, `inhabitants`, `playing` (still in the game), `won`; nil for no such player |
+| `game.player(n)` | player `n` as a table: `id`, `name`, `role` (`"human"`, `"computer"`, `"neutral"`), `money`, `inhabitants`, `playing` (still in the game), `won`, `faction` (its id, `"anno1602:settlers"`, [factions.md](factions.md)); nil for no such player |
 | `game.message(id, values, player)` | posts a message of the package's `messages.toml` ([messages.md](messages.md)); `id` is its name there, or `"<package>:<name>"` for another package's; `values` fills its placeholders (a table of names, may be nil); `player` is the only player to see it (nil: everyone) |
 
 ```lua

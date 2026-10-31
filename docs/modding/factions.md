@@ -7,9 +7,10 @@ natives. In Open1602 these are **factions as data**
 faction grows with when more people play are values a mod can change.
 
 **Status:** Done are the base game's four factions as data in every world, the numbers below, saving
-them with the game and the file `factions.toml` that changes them. Still open, with milestone M8:
-factions of a package's own (they need slots in a new game and, to act differently from the
-original's four, a behaviour of their own from a script).
+them with the game, the file `factions.toml` that changes them and, since 2026-10-31, factions of a
+package's own: they act as one of the base game's four, take its slots in new games or the slots a
+package's scenario gives them, and scripts see them. Still open: a behaviour wholly of their own
+beyond what scripts do with the base behaviours.
 
 ## The base game's factions
 
@@ -67,5 +68,32 @@ reach_players = 6
 
 Fields: `nests.base`, `nests.per`, `nests.from`, `nests.min`, `nests.max`, the same for `ships`, and
 `reach_players`, each a number from 0 to 65535. An unknown field or a wrong value is passed over with
-a warning and the rest is used; a table for a faction that does not exist is passed over (a faction
-of a package's own is not supported yet); a file that is no valid data file is passed over as a whole.
+a warning and the rest is used; a table for another package's faction that does not exist is passed
+over; a file that is no valid data file is passed over as a whole.
+
+## Factions of a package's own
+
+A table whose name is a new faction of the package (`[corsairs]` in the package `seas` is
+`seas:corsairs`) adds that faction. It acts as one of the base game's factions, which `behaviour`
+names, and starts with that faction's numbers:
+
+```toml
+# Corsairs instead of the pirates: more nests in large games.
+[corsairs]
+behaviour = "pirates"
+replaces = "anno1602:pirates"
+nests.per = 2
+```
+
+| Field | Value |
+|---|---|
+| `behaviour` | `"settlers"`, `"trader"`, `"pirates"` or `"natives"`: what the simulation does for the faction's players. Required for a new faction; it does not change later |
+| `replaces` | a faction of the same behaviour whose slots the new one takes in the games started afterwards (new games and the original's scenarios and savegames); the first package that replaces a faction gets its slots |
+| the numbers | as above |
+
+A package's scenario gives its slots to factions with `slot.<n>` ([scenarios.md](scenarios.md)).
+The faction of a slot goes into the game with it (section `FACT`). Scripts read it as
+`game.player(n).faction` and act for the faction's players with their functions
+([scripts.md](scripts.md)): money and goods, victory and defeat, messages. The pirates', trader's
+and natives' behaviours look for the first slot of their behaviour, so a second slot of the same
+behaviour beside it does little; to change them, a faction replaces theirs.

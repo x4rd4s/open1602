@@ -158,6 +158,8 @@ namespace {
 /// What a new game starts with as the mods change it.
 struct ModRules {
     std::vector<sim::Faction> factions = sim::base_factions();
+    /// Factions of packages that take the slots of others in new games (factions.toml `replaces`).
+    std::vector<sim::FactionReplacement> faction_replacements;
     sim::Balance balance;
     /// The buildings the packages added, with the Ids `buildings` gave them.
     std::vector<assets::OwnBuilding> own;
@@ -256,7 +258,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     for (const assets::ModPackage& package : packages) {
         if (const auto bytes = core::read_file(package.folder / sim::kFactionFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_faction_file(rules.factions, package.id, text, problems);
+            sim::apply_faction_file(rules.factions, package.id, text, problems, &rules.faction_replacements);
         }
         if (const auto bytes = core::read_file(package.folder / sim::kBalanceFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
@@ -337,6 +339,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         world = sim::start_new_game(game, *buildings, *texts, *options.new_game, &warnings);
         if (world) {
             world->set_factions(rules.factions);
+            world->replace_factions(rules.faction_replacements);
             world->set_balance(rules.balance);
             world->set_packages(assets::content_of(packages));
             world->set_own_buildings(rules.own);
@@ -359,6 +362,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
             world = sim::load_world(*file, *buildings, game, &warnings, options.world);
             if (world) {
                 world->set_factions(rules.factions);  // the original's files have none of their own
+                world->replace_factions(rules.faction_replacements);
                 world->set_balance(rules.balance);
                 world->set_packages(assets::content_of(packages));
                 world->set_own_buildings(rules.own);
@@ -394,6 +398,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     std::unique_ptr<MapViewer> viewer(new MapViewer(game, std::move(buildings).value(), std::move(world).value(),
                                                     std::move(palette).value(), std::move(figures).value(), options));
     viewer->m_factions = std::move(rules.factions);
+    viewer->m_faction_replacements = std::move(rules.faction_replacements);
     viewer->m_balance = rules.balance;
     viewer->m_own_buildings = std::move(rules.own);
     viewer->m_goods = std::move(rules.goods);
@@ -2876,6 +2881,7 @@ core::Status MapViewer::start_package_scenario(const std::string& id, const sim:
 
 void MapViewer::give_mod_content(sim::World& world) const {
     world.set_factions(m_factions);
+    world.replace_factions(m_faction_replacements);
     world.set_balance(m_balance);
     world.set_packages(assets::content_of(m_packages));
     world.set_own_buildings(m_own_buildings);
@@ -3006,6 +3012,7 @@ void MapViewer::reload_mods() {
     }
     ModRules rules = load_mod_rules(m_packages, m_original_buildings, m_original_figures);
     m_factions = std::move(rules.factions);
+    m_faction_replacements = std::move(rules.faction_replacements);
     m_balance = rules.balance;
     m_own_buildings = std::move(rules.own);
     m_goods = std::move(rules.goods);

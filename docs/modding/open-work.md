@@ -182,14 +182,21 @@ main menu lists them under a heading of their own; a saved game remembers its sc
 
 Part 2 done on 2026-10-31 ([scenarios.md](scenarios.md#campaigns)): `campaigns.toml` puts a
 package's scenarios in a row of up to five parts, each opened by winning the one before. The money
-and the table `campaign` of the part's script go on to the next part. Still open: factions of a
-package's own in a scenario (part 3, with item 8).
+and the table `campaign` of the part's script go on to the next part.
+
+Part 3 done on 2026-10-31 with item 8: `slot.<n>` gives the map's slots to factions of packages.
 
 ### 8. Factions of a package's own (section 3)
 
 The base game's four factions are data (`factions.toml` changes their numbers). A new faction needs
 slots in a new game and, to act differently from the original's four, a behaviour from a script.
 Depends on items 2 and 6.
+
+Done on 2026-10-31 ([factions.md](factions.md#factions-of-a-packages-own)): `factions.toml` adds
+factions of the package that act as one of the base game's four; `replaces` gives them its slots in
+new games, `slot.<n>` of a package's scenario the slots of its map; scripts read
+`game.player(n).faction`. Still open: a behaviour of a faction wholly of its own, beyond what
+scripts do with the base behaviours.
 
 ### 9. Island generator, stage 2 (section 5)
 

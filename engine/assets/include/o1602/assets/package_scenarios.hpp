@@ -69,6 +69,9 @@ struct PackageScenario {
     /// Money of every human player at the start; nothing keeps the map's.
     std::optional<std::int32_t> money;
     ScenarioGoals goals;
+    /// Player slots of the map given to a faction (`slot.<n>`): the slot from 0 and the faction's id
+    /// ("anno1602:pirates", "<package>:<name>").
+    std::vector<std::pair<std::uint8_t, std::string>> slots;
 
     /// The name in `language`, else in English, else the first given, else the id.
     [[nodiscard]] std::string name(std::string_view language) const;

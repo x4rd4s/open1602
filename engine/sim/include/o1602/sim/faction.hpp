@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,6 +22,8 @@ namespace o1602::sim {
 
 /// Index into World::factions().
 using FactionId = std::uint8_t;
+/// Factions a world holds at most.
+inline constexpr std::size_t kMaxFactions = std::numeric_limits<FactionId>::max();
 
 /// What the simulation does for a faction's players. Until scripts can give a faction behaviour
 /// of its own (M8), every faction acts as one of the original's.
@@ -93,10 +96,23 @@ inline constexpr std::string_view kBaseFactionPackage = "anno1602";
 /// The file of a content package with its changes to the factions.
 inline constexpr std::string_view kFactionFile = "factions.toml";
 
+/// A faction of a package that takes the slots of another in new games (`replaces`).
+struct FactionReplacement {
+    std::string replaced;  ///< the faction whose slots it takes ("anno1602:pirates")
+    std::string by;        ///< the package's faction
+    friend bool operator==(const FactionReplacement&, const FactionReplacement&) = default;
+};
+
 /// Changes `factions` field by field as the `factions.toml` of `package` (UTF-8) says
-/// (docs/modding/factions.md). Problems go to `warnings` with the file and the line; a field with a
-/// wrong value is passed over, a file that is no valid data file as a whole.
+/// (docs/modding/factions.md), and adds the package's own factions: a table of a new id of the
+/// package with a `behaviour` (one of the base game's: "settlers", "trader", "pirates",
+/// "natives"). A faction of the package with `replaces` goes to `replacements`. Problems go to
+/// `warnings` with the file and the line; a field with a wrong value is passed over, a file that is
+/// no valid data file as a whole.
 void apply_faction_file(std::vector<Faction>& factions, std::string_view package, std::string_view utf8,
-                        std::vector<std::string>& warnings);
+                        std::vector<std::string>& warnings, std::vector<FactionReplacement>* replacements = nullptr);
+
+/// The faction of id `id` in `factions`, nothing if none.
+[[nodiscard]] std::optional<FactionId> find_faction(const std::vector<Faction>& factions, std::string_view id);
 
 }  // namespace o1602::sim

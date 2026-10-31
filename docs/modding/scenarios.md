@@ -6,8 +6,8 @@ difficulty, the money at the start, the goals of the people's mission and a scri
 [open-work.md](open-work.md)).
 
 **Status:** Done on 2026-10-31: scenarios of packages in the scenario list of the main menu, with
-goals, money and a script, and campaigns of them, part by part, with the money and a table of the
-script carried from one part to the next. Still open: factions of a package's own in a scenario.
+goals, money and a script, campaigns of them, part by part, with the money and a table of the script
+carried from one part to the next, and player slots given to factions of packages.
 
 ## The file
 
@@ -42,6 +42,7 @@ goal.goods.tools = 50
 | `name.<language>` | the name in the scenario list; without one the id |
 | `briefing.<language>` | the text of the mission screen and of the mission window; without one the map's mission text |
 | `goal.…` | the goals, see below |
+| `slot.<n>` | the faction of the map's player slot `n` (from 1): a faction of the package by its name, another's by its id (`"anno1602:natives"`, [factions.md](factions.md#factions-of-a-packages-own)). A faction of the settlers' behaviour is steered by the computer unless a person plays the slot; one of another behaviour makes the slot neutral and never takes a person's |
 
 A scenario whose map is missing or outside the package's folder, or with a value that cannot be
 read, is left out; the game's log names the file, the line and the key.

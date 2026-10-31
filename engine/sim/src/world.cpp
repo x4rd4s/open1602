@@ -133,6 +133,21 @@ void World::set_factions(std::vector<Faction> factions) {
     }
 }
 
+void World::replace_factions(const std::vector<FactionReplacement>& replacements) {
+    for (const FactionReplacement& r : replacements) {
+        const auto replaced = find_faction(m_factions, r.replaced);
+        const auto by = find_faction(m_factions, r.by);
+        if (!replaced || !by) {
+            continue;
+        }
+        for (Player& p : m_players) {
+            if (p.faction == *replaced) {
+                p.faction = *by;
+            }
+        }
+    }
+}
+
 PlayerId World::first_of(FactionBehaviour behaviour) const noexcept {
     for (std::size_t p = 0; p < m_players.size(); ++p) {
         if (this->behaviour(m_players[p]) == behaviour) {
