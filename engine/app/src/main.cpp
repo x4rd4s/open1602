@@ -250,12 +250,14 @@ int main(int argc, char** argv) {
     app::setup_diagnostics();
     // What nothing else caught (a length_error, a filesystem_error) ends the program with a
     // message, on Windows in a message box, instead of std::terminate.
+    int code = 1;
     try {
-        return run_program(argc, argv);
+        code = run_program(argc, argv);
     } catch (const std::exception& e) {
         app::report_fatal(std::string("unexpected error: ") + e.what());
     } catch (...) {
         app::report_fatal("unexpected error");
     }
-    return 1;
+    app::report_exit(code);
+    return code;
 }
