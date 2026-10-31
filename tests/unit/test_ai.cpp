@@ -1387,3 +1387,159 @@ TEST_CASE("ai: a computer short of ships buys one a player at peace offers (Rule
     }
     CHECK(!sim::Rules::original().computers_buy_ships);
 }
+
+namespace {
+
+/// Stone walls (a family of straight, curve, T and cross) and a gate, numbered on from the Kontor.
+const std::string kWallRecords =
+    "  @Nummer: 13\n  Id: 22501\n  Kind: 4\n  Gfx: 30\n  Size: 1, 1\n  KreuzBase: 13\n"
+    "  Objekt: HAUS_BAUKOST\n    Money: 10\n    Ziegel: 1\n  EndObj\n"
+    "  @Nummer: 14\n  Id: 22502\n  Kind: 4\n  Gfx: 31\n  Size: 1, 1\n  KreuzBase: 13\n"
+    "  @Nummer: 15\n  Id: 22503\n  Kind: 4\n  Gfx: 32\n  Size: 1, 1\n  KreuzBase: 13\n"
+    "  @Nummer: 16\n  Id: 22504\n  Kind: 4\n  Gfx: 33\n  Size: 1, 1\n  KreuzBase: 13\n"
+    "  @Nummer: 17\n  Id: 20304\n  Kind: 3\n  Gfx: 34\n  Size: 1, 1\n"
+    "  Objekt: HAUS_BAUKOST\n    Money: 20\n    Ziegel: 2\n  EndObj\n";
+
+struct WallCount {
+    std::size_t walls = 0;
+    std::size_t gates = 0;
+    std::size_t inner = 0;  ///< walls with all eight neighbours in the city
+};
+
+WallCount walls_of(const Game& g, const sim::City& city) {
+    WallCount n;
+    const sim::IslandMap& map = g.world.islands()[city.island].map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const sim::MapCell& c = map.top(x, y);
+            const assets::BuildingType* b = c.empty() ? nullptr : g.buildings.by_sprite(c.sprite);
+            if (b == nullptr || c.city != city.index) {
+                continue;
+            }
+            if (b->kind == 3) {
+                ++n.gates;
+            }
+            if (b->kind != 4) {
+                continue;
+            }
+            ++n.walls;
+            bool inside = true;
+            for (std::int32_t dy = -1; dy <= 1; ++dy) {
+                for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                    const auto nx = static_cast<std::int32_t>(x) + dx;
+                    const auto ny = static_cast<std::int32_t>(y) + dy;
+                    inside = inside && map.contains(nx, ny) &&
+                             map.top(static_cast<std::uint32_t>(nx), static_cast<std::uint32_t>(ny)).city == city.index;
+                }
+            }
+            n.inner += inside ? 1U : 0U;
+        }
+    }
+    return n;
+}
+
+sim::City* computer_city(Game& g) {
+    for (const sim::City& c : g.world.cities()) {
+        if (c.owner == kComputer) {
+            return g.world.city(c.island, c.index);
+        }
+    }
+    return nullptr;
+}
+
+}  // namespace
+
+TEST_CASE("ai: a computer at war with the human walls in its city once it has the bricks and gold") {
+    Game g(true, 50'000);
+    g.buildings = make_buildings(kWallRecords);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    g.add_ship(kHuman, 5, 80);  // still in the game
+    g.world.diplomacy().relation(kComputer, kHuman).peace = sim::Treaty::None;
+    g.world.diplomacy().relation(kHuman, kComputer).peace = sim::Treaty::None;
+    found_city(g, s);
+    sim::City* city = computer_city(g);
+    REQUIRE(city != nullptr);
+    // No walls while the bricks are short: below 16 t at war.
+    const std::uint8_t bricks = g.buildings.materials().bricks;
+    city->ensure_ware(bricks);
+    city->goods[bricks] = 15 * sim::kStockUnitsPerTon;
+    run(s, 60'000);
+    CHECK(walls_of(g, *city).walls == 0);
+    // With enough of them the border goes up, a wall on every side of the city but none inside.
+    g.world.player(kComputer)->money = 50'000;
+    REQUIRE(run_until(s, 120'000, [&] {
+        city->goods[bricks] = city->capacity;
+        return walls_of(g, *city).walls >= 20;
+    }));
+    CHECK(walls_of(g, *city).inner == 0);
+    CHECK(walls_of(g, *city).gates == 0);  // never at war
+}
+
+/// Whether the city has a wall at (x, y).
+bool wall_at(const Game& g, const sim::City& city, std::uint32_t x, std::uint32_t y) {
+    const sim::MapCell& c = g.world.islands()[city.island].map.top(x, y);
+    const assets::BuildingType* b = c.empty() ? nullptr : g.buildings.by_sprite(c.sprite);
+    return b != nullptr && b->kind == 4 && c.city == city.index;
+}
+
+TEST_CASE("ai: a computer at peace walls its coast and the border by free beach, not the inland border") {
+    Game g(true, 50'000);
+    g.buildings = make_buildings(kWallRecords);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    sim::City* city = computer_city(g);
+    REQUIRE(city != nullptr);
+    const std::uint8_t bricks = g.buildings.materials().bricks;
+    city->ensure_ware(bricks);
+    // Below the citizens nothing, whatever the bricks.
+    city->goods[bricks] = 60 * sim::kStockUnitsPerTon;
+    run(s, 30'000);
+    CHECK(walls_of(g, *city).walls == 0);
+    // With them, and more than 40 t of bricks.
+    g.world.player(kComputer)->set_unlocked(25, true);
+    run_until(s, 120'000, [&] {
+        city->goods[bricks] = 60 * sim::kStockUnitsPerTon;
+        return false;
+    });
+    CHECK(walls_of(g, *city).walls > 0);
+    CHECK(wall_at(g, *city, 46, 12));  // the beach
+    // The border inland (column 36) faces neither another city nor free beach.
+    for (std::uint32_t y = 0; y < 50; ++y) {
+        CHECK(!wall_at(g, *city, 36, y));
+    }
+}
+
+TEST_CASE("ai: a wall the city grew past is demolished") {
+    Game g(true, 50'000);
+    g.buildings = make_buildings(kWallRecords);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    sim::City* city = computer_city(g);
+    REQUIRE(city != nullptr);
+    sim::IslandMap& map = g.world.island(city->island).map;
+    // A wall on free ground in the middle of the city, away from the coast.
+    std::optional<std::pair<std::int32_t, std::int32_t>> at;
+    for (std::int32_t y = 3; y < 47 && !at; ++y) {
+        for (std::int32_t x = 3; x < 43 && !at; ++x) {
+            bool inside = true;
+            for (std::int32_t dy = -3; dy <= 3; ++dy) {
+                for (std::int32_t dx = -3; dx <= 3; ++dx) {
+                    const sim::MapCell& n =
+                        map.top(static_cast<std::uint32_t>(x + dx), static_cast<std::uint32_t>(y + dy));
+                    inside = inside && n.city == city->index;
+                }
+            }
+            const sim::MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            const std::int32_t k = g.buildings.by_sprite(cell.sprite)->kind;
+            if (inside && (k == 10 || k == 11)) {
+                at.emplace(x, y);
+            }
+        }
+    }
+    REQUIRE(at.has_value());
+    REQUIRE(map.build(*g.buildings.by_id(22501), at->first, at->second, 0, 0, kComputer, city->index).ok());
+    REQUIRE(wall_at(g, *city, static_cast<std::uint32_t>(at->first), static_cast<std::uint32_t>(at->second)));
+    CHECK(run_until(s, 120'000, [&] {
+        return !wall_at(g, *city, static_cast<std::uint32_t>(at->first), static_cast<std::uint32_t>(at->second));
+    }));
+}

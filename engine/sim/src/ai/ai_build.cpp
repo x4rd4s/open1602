@@ -1226,6 +1226,9 @@ void Engine::sweep(AiPlayer& p) {
     std::int32_t seen = 0;
     std::int32_t cleared = 0;
     std::vector<BuildItem> rebuild;
+    // Walls: at war with a human, or at peace from the citizens' level on.
+    const bool war = at_war_with_a_human(p);
+    const bool walls = war || civ_level(p) > 1;
     const auto y = static_cast<std::int32_t>(r->sweep_y);
     while (r->sweep_x < map.width() && seen < 16 && cleared < 20) {
         const auto x = static_cast<std::int32_t>(r->sweep_x);
@@ -1240,6 +1243,19 @@ void Engine::sweep(AiPlayer& p) {
                 demolish_tile(p, x, y);
                 ++cleared;
             }
+            continue;
+        }
+        if (walls && rebuild.size() < 5) {
+            if (std::optional<BuildItem> wall = wall_item(p, *c, t, x, y, war)) {
+                rebuild.push_back(*wall);
+                if (t.kind == kind::kRoad) {
+                    continue;  // the road is gone
+                }
+            }
+        }
+        if (t.kind == kind::kWall && inner_wall(p, x, y)) {
+            demolish_tile(p, x, y);  // the city grew past it
+            ++cleared;
             continue;
         }
         if (t.kind == kind::kRoad) {
@@ -1318,6 +1334,133 @@ void Engine::sweep(AiPlayer& p) {
     if (!rebuild.empty()) {
         build(p, std::move(rebuild), false);
     }
+}
+
+namespace {
+
+/// Land a wall goes on: road, forest, ground, ruin.
+bool wall_land(std::int32_t k) {
+    return k == kind::kRoad || k == kind::kForest || k == kind::kGround || k == kind::kRuin;
+}
+
+bool wall_beach(std::int32_t k) {
+    return k == kind::kBeach || k == kind::kBeachOuter || k == kind::kBeachInner || k == kind::kBeachVariant ||
+           k == kind::kBeachRuin;
+}
+
+/// What the rings around a tile of the city's border hold.
+struct Border {
+    std::int32_t flags = 0;  ///< 1: a neighbour lies outside the city; 2: another city is near
+    std::int32_t land = 0;   ///< land neighbours
+    std::int32_t sea = 0;    ///< sea tiles within two rings
+};
+
+}  // namespace
+
+bool Engine::at_war_with_a_human(const AiPlayer& p) const {
+    const Diplomacy& d = m_world.diplomacy();
+    for (std::size_t h = 0; h < m_world.players().size(); ++h) {
+        const Player& other = m_world.players()[h];
+        if (other.role == PlayerRole::Human && other.status == PlayerStatus::Playing &&
+            d.relation(p.player, static_cast<PlayerId>(h)).peace != Treaty::Signed) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Tile& t, std::int32_t x, std::int32_t y,
+                                           bool war) {
+    // As in the original: enough gold, and 16 t of bricks at war or more than 40 t at peace.
+    const std::uint32_t bricks = c.stock(m_buildings.materials().bricks);
+    if (player(p).money <= 4000 || (war ? bricks < 16U * kTon : bricks <= 40U * kTon)) {
+        return std::nullopt;
+    }
+    const auto scan = [&](std::int32_t n) {
+        Border b;
+        rings(p, RingFilter::Any, x, y, x, y, n, [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t d) {
+            if (d == 0 && o.city != p.city) {
+                b.flags |= 1;
+            }
+            if (o.city != MapCell::kNoCity && o.city != p.city) {
+                // A wall of another city next to the tile starts the flags over.
+                if (d == 0 && o.kind == kind::kWall) {
+                    b.flags = 0;
+                } else {
+                    b.flags |= 2;
+                }
+            }
+            if (wall_land(o.kind) || o.kind == kind::kBuilding) {
+                b.land += d == 0 ? 1 : 0;
+            } else if (o.kind == kind::kSea || o.kind == kind::kSurf || o.kind == kind::kSurfCorner) {
+                b.sea += d < 2 ? 1 : 0;
+            } else if (wall_beach(o.kind) && o.city != p.city) {
+                b.flags |= 2;  // free beach too
+            }
+        });
+        return b;
+    };
+    const assets::BuildingType* wall = by_id(id::kWall);
+    if (wall == nullptr) {
+        return std::nullopt;
+    }
+    if (wall_land(t.kind)) {
+        // Only the border: without a neighbour outside the city the flags cannot come out right,
+        // so the wide scan is skipped.
+        bool border = false;
+        rings(p, RingFilter::Any, x, y, x, y, 1,
+              [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t) { border = border || o.city != p.city; });
+        if (!border) {
+            return std::nullopt;
+        }
+        // At war the border away from other cities, at peace the border towards them.
+        if (scan(war ? 9 : 6).flags != (war ? 1 : 3)) {
+            return std::nullopt;
+        }
+        if (t.kind == kind::kRoad) {
+            demolish_tile(p, x, y);  // at once, whether the wall can be paid or not
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if (wall_beach(t.kind)) {
+        // The coast: beach with land beside it and sea close by (only the first two rings count).
+        const Border b = scan(2);
+        if (b.land == 0 || b.sea == 0) {
+            return std::nullopt;
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if (!war && t.kind == kind::kWall) {
+        // A gate where the wall crosses a straight road, unless a gate is already beside it.
+        const std::array<std::int32_t, 4> k{tile(p.island, x + 1, y).kind, tile(p.island, x - 1, y).kind,
+                                            tile(p.island, x, y + 1).kind, tile(p.island, x, y - 1).kind};
+        if (std::find(k.begin(), k.end(), kind::kGate) != k.end()) {
+            return std::nullopt;
+        }
+        std::uint32_t roads = 0;
+        for (std::size_t i = 0; i < k.size(); ++i) {
+            roads |= k[i] == kind::kRoad ? 1U << i : 0U;
+        }
+        // Roads on both sides along x, or along y, and none on the other two.
+        const bool across_x = roads == 0b0011U;
+        const bool across_y = roads == 0b1100U;
+        const assets::BuildingType* gate = by_id(id::kGate);
+        if (gate == nullptr || (!across_x && !across_y)) {
+            return std::nullopt;
+        }
+        return BuildItem{gate->id, x, y, static_cast<std::uint8_t>(across_x ? 2 : 1), 0};
+    }
+    return std::nullopt;
+}
+
+bool Engine::inner_wall(AiPlayer& p, std::int32_t x, std::int32_t y) {
+    bool coast = false;
+    bool outside = false;
+    rings(p, RingFilter::Any, x, y, x, y, 2, [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t d) {
+        coast = coast || wall_beach(o.kind);
+        outside = outside || (d == 0 && o.city != p.city);
+    });
+    return !coast && !outside;
 }
 
 void Engine::kontor_restore(AiPlayer& p) {
