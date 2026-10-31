@@ -190,6 +190,7 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
     }
     // Half-block units, so that the centres of a block and of the island are whole numbers; the
     // ellipse reaches the blocks next to the edge.
+    const int rim_band = std::min(blocks_x, blocks_y) / 10;
     const int rx = std::max(1, blocks_x - 2);
     const int ry = std::max(1, blocks_y - 2);
     std::vector<int> scores;
@@ -211,7 +212,13 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
                 part = std::max(1, part / 2);
             }
             const int noise = sum / weight;
-            const int score = 1024 - falloff + (noise - 512) * strength / 100;
+            int score = 1024 - falloff + (noise - 512) * strength / 100;
+            // Large islands: the land falls off within a tenth of the side of the edge, so that a
+            // full island never runs straight along its rectangle.
+            const int rim = std::min({bx - 1, by - 1, blocks_x - 2 - bx, blocks_y - 2 - by});
+            if (rim_band >= 3 && rim < rim_band) {
+                score -= (rim_band - rim) * 1024 / rim_band;
+            }
             grid[static_cast<std::size_t>(by) * static_cast<std::size_t>(blocks_x) + static_cast<std::size_t>(bx)] =
                 score;
             scores.push_back(score);

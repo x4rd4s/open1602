@@ -368,3 +368,50 @@ TEST_CASE("island shapes: an island larger than the original's, with ore mountai
     CHECK(c.small == r.small_mountains);
     CHECK(c.land * 2 >= std::size_t{r.width} * r.height);
 }
+
+TEST_CASE("island shapes: a giant does not run straight along its rectangle") {
+    for (const std::uint16_t land : std::array<std::uint16_t, 3>{0, 605, 740}) {
+        for (std::uint64_t seed = 1; seed < 4; ++seed) {
+            sim::shapes::ShapeRequest r;
+            r.width = 480;
+            r.height = 470;
+            r.size = 4;
+            r.number = 2;
+            r.land = land;
+            r.seed = seed;
+            const assets::Island island = sim::shapes::make_island(r);
+            // The longest run of land along each of the four lines two tiles inside the edge.
+            std::vector<std::uint8_t> is_land(std::size_t{r.width} * r.height, 0);
+            std::size_t total = 0;
+            for (const assets::IslandTile& t : island.layers[0]) {
+                const auto c = coast_of(t.cod_id());
+                if (!c || !is_sea(*c)) {
+                    is_land[std::size_t{t.y} * r.width + t.x] = 1;
+                    ++total;
+                }
+            }
+            const auto at = [&](int x, int y) {
+                return is_land[static_cast<std::size_t>(y) * r.width + static_cast<std::size_t>(x)] != 0;
+            };
+            int longest = 0;
+            for (int line = 2; line < 5; ++line) {
+                int west = 0;
+                int east = 0;
+                int north = 0;
+                int south = 0;
+                for (int k = 0; k < r.height; ++k) {
+                    west = at(line, k) ? west + 1 : 0;
+                    east = at(r.width - 1 - line, k) ? east + 1 : 0;
+                    longest = std::max({longest, west, east});
+                }
+                for (int k = 0; k < r.width; ++k) {
+                    north = at(k, line) ? north + 1 : 0;
+                    south = at(k, r.height - 1 - line) ? south + 1 : 0;
+                    longest = std::max({longest, north, south});
+                }
+            }
+            CHECK(longest < 20);  // without a falloff at the edge: up to 210 tiles
+            CHECK(total * 100 >= std::size_t{r.width} * r.height * (land == 0 ? 50 : land / 10 - 5));
+        }
+    }
+}
