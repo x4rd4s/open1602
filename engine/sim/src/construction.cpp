@@ -762,12 +762,10 @@ bool tile_fertile_at(const World& world, const assets::BuildingTable& buildings,
     // Weighted with the Randwachs of the original ground (island + 0xAFC).
     const MapCell& ground = map.ground(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
     const assets::BuildingType* g = ground.empty() ? nullptr : buildings.by_sprite(ground.sprite);
-    const std::uint32_t edge = g != nullptr ? g->edge_growth : 128;
+    // Rules::fertile_fields: poor ground takes nothing from a crop, it grows as the island has it.
+    const bool even = world.fertile_fields() && ware >= ware::kCornField && ware <= ware::kCocoaField;
+    const std::uint32_t edge = g != nullptr && !even ? g->edge_growth : 128;
     std::uint32_t f = std::min<std::uint32_t>(island_fertility(island, ware) * edge >> 7, 128);
-    // Rules::fertile_fields: a crop that grows here at all grows on every tile.
-    if (world.fertile_fields() && f != 0 && ware >= ware::kCornField && ware <= ware::kCocoaField) {
-        f = 128;
-    }
     // A drought takes its share, except from grass, trees and fish.
     if (drought != 0 && ware != ware::kGrass && ware != ware::kTree && ware != ware::kFish) {
         f -= drought * f / 128;
