@@ -29,6 +29,9 @@ namespace o1602::script {
 inline constexpr std::string_view kScriptFile = "script.lua";
 /// The global table of a script the game saves.
 inline constexpr std::string_view kStateTable = "state";
+/// The global table of a campaign part's script that goes on to the next part
+/// (docs/modding/scenarios.md#campaigns).
+inline constexpr std::string_view kCampaignTable = "campaign";
 /// A script that failed this often is stopped for the rest of the game.
 inline constexpr std::size_t kMaxScriptErrors = 10;
 /// Messages posted beyond this many before the game takes them are dropped, the oldest first.

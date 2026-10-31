@@ -3,7 +3,8 @@
 // Scenarios of content packages (docs/modding/scenarios.md, item 7 of docs/modding/open-work.md):
 // `scenarios.toml` names maps a package brings, each with its names and briefing by language, its
 // difficulty, the goals of the people's mission and a script of its own. The map is a scenario file
-// of the original's format (.szs, .szm) or a game saved by Open1602.
+// of the original's format (.szs, .szm) or a game saved by Open1602. `campaigns.toml` puts a
+// package's scenarios in a row.
 #pragma once
 
 #include <cstdint>
@@ -86,5 +87,57 @@ void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPacka
 
 /// The scenario of id `id`, nullptr if none.
 [[nodiscard]] const PackageScenario* find_scenario(std::span<const PackageScenario> scenarios, std::string_view id);
+
+/// The file of a package that names its campaigns.
+inline constexpr std::string_view kCampaignsFile = "campaigns.toml";
+/// Parts of a campaign at most: the choices of the mission screen (MISSION.GAD).
+inline constexpr std::size_t kMaxCampaignParts = 5;
+
+/// A campaign a package brings: scenarios of the package played one after the other, each opened
+/// by winning the one before.
+struct PackageCampaign {
+    std::string id;            ///< "<package>:<name>"
+    std::string package;       ///< the package's id
+    LocalizedNames names;      ///< Windows-1252
+    LocalizedNames briefings;  ///< Windows-1252
+    std::uint8_t stars = 0;    ///< difficulty 0 to 5
+    /// The ids of its scenarios, part 1 first; 1 to kMaxCampaignParts.
+    std::vector<std::string> parts;
+    /// The humans start a part with the money the local player had when winning the one before,
+    /// instead of the part's own.
+    bool carry_money = false;
+
+    [[nodiscard]] std::string name(std::string_view language) const;
+    [[nodiscard]] std::string briefing(std::string_view language) const;
+};
+
+/// Reads `campaigns.toml` of `package` (its text `utf8`) and adds its campaigns to `campaigns`. A
+/// part names a scenario of `scenarios` of the same package by its name; a campaign with a part
+/// that is none, or with a gap between its parts, is passed over with a warning.
+void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPackage& package,
+                         std::span<const PackageScenario> scenarios, std::string_view utf8,
+                         std::vector<std::string>& warnings);
+
+/// The campaigns of `packages` that have a campaigns.toml, in their load order.
+[[nodiscard]] std::vector<PackageCampaign> load_package_campaigns(std::span<const ModPackage> packages,
+                                                                  std::span<const PackageScenario> scenarios,
+                                                                  std::vector<std::string>& warnings);
+
+/// The campaign of id `id`, nullptr if none.
+[[nodiscard]] const PackageCampaign* find_campaign(std::span<const PackageCampaign> campaigns, std::string_view id);
+
+/// What a won part of a package's campaign leaves to the next: the local player's money and the
+/// table `campaign` of the part's script (script::Sandbox::save_table).
+struct CampaignCarry {
+    std::int64_t money = 0;
+    std::vector<std::uint8_t> table;
+    friend bool operator==(const CampaignCarry&, const CampaignCarry&) = default;
+};
+/// The file in the user data folder's `campaigns` that keeps what winning part `part` (from 0) of
+/// campaign `campaign` left: "<package>_<name>.<part + 1>.carry".
+[[nodiscard]] std::filesystem::path campaign_carry_file(std::string_view campaign, std::size_t part);
+[[nodiscard]] std::vector<std::uint8_t> write_campaign_carry(const CampaignCarry& carry);
+/// Nothing if `bytes` is no such file.
+[[nodiscard]] std::optional<CampaignCarry> read_campaign_carry(std::span<const std::uint8_t> bytes);
 
 }  // namespace o1602::assets

@@ -5,9 +5,9 @@ difficulty, the money at the start, the goals of the people's mission and a scri
 ([ADR 0007](../architecture/0007-extensibility-and-modding.md) section 6, item 7 of
 [open-work.md](open-work.md)).
 
-**Status:** Part 1 done on 2026-10-31: scenarios of packages in the scenario list of the main
-menu, with goals, money and a script. Still open: campaigns (a sequence of scenarios with values
-carried from one to the next) and factions of a package's own in a scenario.
+**Status:** Done on 2026-10-31: scenarios of packages in the scenario list of the main menu, with
+goals, money and a script, and campaigns of them, part by part, with the money and a table of the
+script carried from one part to the next. Still open: factions of a package's own in a scenario.
 
 ## The file
 
@@ -78,3 +78,57 @@ again after loading, as long as the package is installed and turned on.
 A map saved by Open1602 (`.o1602`) keeps the packages it was saved with
 ([packages.md](packages.md#which-packages-a-game-uses)): save it with the package turned on, so its
 buildings and goods are part of the map.
+
+## Campaigns
+
+```
+<user data folder>/mods/<package>/campaigns.toml
+```
+
+A campaign plays scenarios of the same package one after the other. One table per campaign; its
+name makes the id `<package>:<name>`:
+
+```toml
+[frost]
+name.en = "Frost"
+name.de = "Frost"
+briefing.en = "Two winters in the north."
+stars = 3
+carry.money = true
+part.1 = "north"
+part.2 = "south"
+```
+
+| Key | Value |
+|---|---|
+| `part.<n>` | the scenario of part `n` (1 to 5, the choices of the mission screen), by its name in the package's `scenarios.toml`. Required: at least `part.1`, and no part left out between the first and the last |
+| `name.<language>`, `briefing.<language>` | as a scenario's; a part's own briefing is shown when it has one |
+| `stars` | difficulty 0 to 5 |
+| `carry.money` | `true`: every human starts a part with the money the player had when winning the part before, instead of the part's `money` |
+
+The campaign is one entry of the scenario list, its parts the choices of the mission screen. At
+first only part 1 is open; winning a part alone opens the next, as the original's campaigns do. The
+progress is kept with the original's (`progress.cfg` in the user data folder, a line
+`package <part> <campaign id>`).
+
+**Carried values.** The script of a part (the scenario's `script`) has a global table `campaign`.
+When a part is won, the game keeps what is in it then, with the player's money, in
+`campaigns/<package>_<name>.<part>.carry` of the user data folder; the next part's script finds it
+in `campaign` after its top level ran, so a top level such as `campaign = {gold = 0}` gives the
+first part its start values. The table is saved with the game (section `SCRP`), so a loaded part
+goes on with it. A part's script also reads `game.campaign` (the campaign's id) and `game.part`
+(the part, from 1).
+
+```lua
+campaign = {heroes = 0}
+
+function on_start()
+    if game.part > 1 then
+        game.message("welcome_back", {heroes = campaign.heroes})
+    end
+end
+
+function on_player_won(player)
+    campaign.heroes = campaign.heroes + 1
+end
+```

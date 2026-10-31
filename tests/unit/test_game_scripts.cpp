@@ -438,3 +438,48 @@ TEST_CASE("script: a scenario's script runs beside its package's, with a state o
     CHECK(states[0].data != states[1].data);
     CHECK(states[0].random != states[1].random);
 }
+
+TEST_CASE("script: a campaign part's script takes the table the part before left and keeps it in the save") {
+    const std::string source =
+        "campaign = {gold = 0}\n"
+        "function on_start() campaign.gold = campaign.gold + 10 * game.part end\n"
+        "function result() return game.campaign .. ' ' .. campaign.gold end\n";
+    // The table the first part left: gold 5, as the script's own top level writes it.
+    std::vector<std::uint8_t> carried;
+    {
+        Game first;
+        first.world.set_package_scenario("isles:north");
+        first.world.set_campaign_part(sim::World::CampaignPart{"isles:frost", 0, {}});
+        std::vector<script::PackageScript> sources;
+        sources.push_back(script::PackageScript{"isles", "campaign = {gold = 5}\n", "isles:north"});
+        auto scripts = first.run(std::move(sources));
+        const auto states = scripts->save_states();
+        REQUIRE(states.size() == 1);
+        carried = states[0].campaign;
+        CHECK(!carried.empty());
+    }
+    Game game;
+    game.world.set_package_scenario("isles:south");
+    game.world.set_campaign_part(sim::World::CampaignPart{"isles:frost", 1, carried});
+    auto sources = one("isles", source);  // the package's own script keeps no campaign table
+    sources.push_back(script::PackageScript{"isles", source, "isles:south"});
+    auto scripts = game.run(std::move(sources));
+    game.ticks(2);
+    const auto states = scripts->save_states();
+    REQUIRE(states.size() == 2);
+    CHECK(states[0].campaign.empty());
+    CHECK(!states[1].campaign.empty());
+
+    // A loaded game goes on with the table as it was saved, not with the one carried.
+    Game loaded;
+    loaded.world.set_package_scenario("isles:south");
+    loaded.world.set_campaign_part(sim::World::CampaignPart{"isles:frost", 1, carried});
+    loaded.world.set_script_states({states[1]});
+    std::vector<script::PackageScript> again;
+    again.push_back(script::PackageScript{"isles", source, "isles:south"});
+    auto loaded_scripts = loaded.run(std::move(again));
+    const auto loaded_states = loaded_scripts->save_states();
+    REQUIRE(loaded_states.size() == 1);
+    CHECK(loaded_states[0].campaign == states[1].campaign);
+    CHECK(loaded_states[0].campaign != carried);
+}

@@ -38,6 +38,7 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `levels.toml` | unlock levels: the original's changed, new ones after the 32nd, also of a new class | [levels.md](levels.md) |
 | `mod.toml` | the package's name, version, dependencies and load order | [packages.md](packages.md) |
 | `scenarios.toml` | scenarios of the package's own: map, names, briefing, stars, money, goals, script | [scenarios.md](scenarios.md) |
+| `campaigns.toml` | campaigns of the package's scenarios, with money and a script table carried from part to part | [scenarios.md](scenarios.md#campaigns) |
 
 Without a mod file the engine already has banners with tinted flags for any number of players
 ([flags.md](flags.md)), up to 12 players, worlds and islands beyond the original's sizes
@@ -177,8 +178,12 @@ Part 1 done on 2026-10-31 ([scenarios.md](scenarios.md)): a package's `scenarios
 (the original's `.szs`/`.szm` or Open1602's `.o1602`) with names and briefings per language, stars,
 money at the start, goals that become the humans' mission and a script of the scenario's own. The
 main menu lists them under a heading of their own; a saved game remembers its scenario (section
-`SCEN`) and runs its script again. Still open: campaigns (part 2) and factions of a package's own
-in a scenario (part 3, with item 8).
+`SCEN`) and runs its script again.
+
+Part 2 done on 2026-10-31 ([scenarios.md](scenarios.md#campaigns)): `campaigns.toml` puts a
+package's scenarios in a row of up to five parts, each opened by winning the one before. The money
+and the table `campaign` of the part's script go on to the next part. Still open: factions of a
+package's own in a scenario (part 3, with item 8).
 
 ### 8. Factions of a package's own (section 3)
 

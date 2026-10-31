@@ -43,6 +43,9 @@ struct CampaignProgress {
     static constexpr std::uint32_t kLastNumbered = 17;
     std::map<std::uint32_t, std::uint32_t> campaigns;  ///< campaign -> next part
     std::uint32_t numbered = kFirstNumbered;
+    /// Campaigns of packages (docs/modding/scenarios.md): campaign id "<package>:<name>" -> the
+    /// furthest part open, counted from 0.
+    std::map<std::string, std::uint32_t> package_campaigns;
 
     /// A single player game won (GameDat_Write 0x00487FB0): a numbered mission n (or 0, 1) that
     /// was the furthest opens n + 1 (at most kLastNumbered); otherwise a campaign opens `part + 1`
@@ -50,12 +53,17 @@ struct CampaignProgress {
     bool record_win(std::uint32_t campaign, std::uint32_t part, std::uint32_t mission_number);
     /// Whether that win ends the campaigns, asked before record_win: the last part (3) of campaign 5
     /// won by way of the campaign rule. The original then plays video 2990 after the success video.
+    /// Part `part` (from 0) of a package's campaign won: opens `part + 1` if that is further than
+    /// before. True if something changed.
+    bool record_package_win(const std::string& campaign, std::uint32_t part);
+    /// The furthest part of a package's campaign that is open, counted from 0.
+    [[nodiscard]] std::uint32_t package_parts_open(const std::string& campaign) const;
     [[nodiscard]] bool ends_campaigns(std::uint32_t campaign, std::uint32_t part,
                                       std::uint32_t mission_number) const noexcept;
 };
 /// The video after the last campaign (VideoSmk/2990.smk).
 inline constexpr std::uint16_t kCampaignsEndVideo = 2990;
-/// Lines "campaign k n" and "numbered n"; unknown lines are passed over.
+/// Lines "campaign k n", "numbered n" and "package n <campaign id>"; unknown lines are passed over.
 [[nodiscard]] CampaignProgress parse_progress(std::string_view text);
 [[nodiscard]] std::string write_progress(const CampaignProgress& progress);
 

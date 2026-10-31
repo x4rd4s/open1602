@@ -13,6 +13,7 @@
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/assets/package_scenarios.hpp"
 #include "o1602/assets/resident_classes.hpp"
 #include "o1602/assets/unlock_levels.hpp"
 #include "o1602/sim/simulation.hpp"
@@ -120,6 +121,11 @@ constexpr std::uint32_t kUnitGroups = tag("UGRP");
 /// The scenario of a package the game was started from (World::package_scenario()), only written
 /// for one. Optional: without it the scenario's script does not run.
 constexpr std::uint32_t kScenario = tag("SCEN");
+/// The part of a package's campaign the game is (World::campaign_part()), only written for one.
+/// Optional: without it a won part opens no next part.
+constexpr std::uint32_t kCampaign = tag("CAMP");
+/// SCRP version 2: each script's table `campaign` after its table `state`.
+constexpr std::uint16_t kScriptsWithCampaign = 2;
 
 /// Upper limit of a package scenario's id: a package's id, ':' and a name of as many bytes.
 constexpr std::size_t kMaxScenarioIdLength = 2 * assets::kMaxPackageIdLength + 1;
@@ -132,7 +138,7 @@ constexpr std::array kKnownSections = {
     kMissions,        kPlayerState,  kCityState, kOrigin,    kQueues,   kStances,   kScores,         kMaterialClocks,
     kPopulationMarks, kTutorial,     kGiveUps,   kFactions,  kLedgers,  kBalance,   kBuildingValues, kPackages,
     kFigureValues,    kOwnBuildings, kGoods,     kClasses,   kLevels,   kUnlocked,  kGoodPictures,   kScripts,
-    kUnitGroups,      kScenario};
+    kUnitGroups,      kScenario,     kCampaign};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -167,6 +173,9 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     }
     if (id == kSimulation) {
         return kSectionedSimulation;
+    }
+    if (id == kScripts) {
+        return kScriptsWithCampaign;
     }
     return id == kIslands || id == kVolcanoes ? kWideCoordinates : 1;
 }
@@ -490,6 +499,9 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
         scripts = &running;
     }
     if (!scripts->empty()) {
+        // Version 1 while no script keeps a campaign table, so that older versions read it.
+        const bool campaign =
+            std::any_of(scripts->begin(), scripts->end(), [](const ScriptState& s) { return !s.campaign.empty(); });
         section(
             out, kScripts,
             [&](Writer& o) {
@@ -498,12 +510,25 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
                     o.u64(s.random.state());
                     o.u64(s.random.increment());
                     o.u8s(s.data);
+                    if (campaign) {
+                        o.u8s(s.campaign);
+                    }
                 });
             },
-            Need::Optional);
+            Need::Optional, campaign ? kScriptsWithCampaign : std::uint16_t{1});
     }
     if (!world.package_scenario().empty()) {
         section(out, kScenario, [&](Writer& o) { o.string(world.package_scenario()); }, Need::Optional);
+    }
+    if (const auto& part = world.campaign_part()) {
+        section(
+            out, kCampaign,
+            [&](Writer& o) {
+                o.string(part->campaign);
+                o.u8(part->part);
+                o.u8s(part->carried);
+            },
+            Need::Optional);
     }
     const auto has_groups = [](const UnitGroups& g) {
         return std::any_of(g.begin(), g.end(), [](const auto& members) { return !members.empty(); });
@@ -806,6 +831,9 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.u64(random);
                     in.u64(increment);
                     in.u8s(s.data);
+                    if (version >= kScriptsWithCampaign) {
+                        in.u8s(s.campaign);
+                    }
                     s.random = Random::from_state(random, increment);
                     // A package's id, or a package scenario's ("<package>:<name>").
                     if (s.package.empty() || s.package.size() > kMaxScenarioIdLength) {
@@ -822,6 +850,18 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.fail();
                 }
                 d.package_scenario = std::move(scenario);
+                break;
+            }
+            case kCampaign: {
+                World::CampaignPart part;
+                in.string(part.campaign);
+                in.u8(part.part);
+                in.u8s(part.carried);
+                if (part.campaign.empty() || part.campaign.size() > kMaxScenarioIdLength ||
+                    part.part >= assets::kMaxCampaignParts) {
+                    in.fail();
+                }
+                d.campaign_part = std::move(part);
                 break;
             }
             case kUnitGroups: {
