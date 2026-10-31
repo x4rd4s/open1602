@@ -150,7 +150,13 @@ its own, called by the simulation at the end of every tick (`sim::ScriptHost`) w
 events (`on_start`, `on_second`, buildings placed, houses changed, players won and defeated); it
 reads the players (`game.player`) and posts the package's messages (`game.message`); its table
 `state` and its random generator are saved with the game (section `SCRP`) and are part of the
-game's fingerprint. Still open: changing the game through commands, more events and functions.
+game's fingerprint.
+
+Part 3 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): a script gives and
+takes money (`game.add_money`) and goods of a city (`game.add_goods`, read with `game.cities` and
+`game.goods`), lets a player win (`game.win`) and puts one out (`game.defeat`). These changes are
+no commands: the simulation makes them at the same point of the tick on every computer
+(`Simulation::script_money` and the others). Still open: more events and functions.
 
 ### 7. Scenarios and campaigns (section 6)
 

@@ -48,6 +48,37 @@ std::optional<std::int64_t> integer(std::span<const Value> args, std::size_t i) 
     return std::nullopt;
 }
 
+/// The ware number of a trade good: a number, "anno1602:<name or number>", "<package>:<name>", or a
+/// name of the package's own goods.toml.
+std::optional<std::uint8_t> ware_argument(const sim::World& world, std::string_view package,
+                                          std::span<const Value> args, std::size_t i) {
+    std::optional<std::uint8_t> ware;
+    if (const auto number = integer(args, i)) {
+        if (*number >= 0 && *number <= 255) {
+            ware = static_cast<std::uint8_t>(*number);
+        }
+    } else if (i < args.size()) {
+        if (const auto* id = std::get_if<std::string>(&args[i])) {
+            ware = assets::ware_of(world.goods(),
+                                   id->find(':') == std::string::npos ? std::string(package) + ":" + *id : *id);
+        }
+    }
+    return ware && world.goods().is_trade(*ware) ? ware : std::nullopt;
+}
+
+/// The city `index` of island `island`; nullptr for none.
+const sim::City* find_city(const sim::World& world, std::int64_t island, std::int64_t index) {
+    if (island < 0 || island > 0xFFFF || index < 0 || index > 0xFF) {
+        return nullptr;
+    }
+    return world.city(static_cast<std::uint16_t>(island), static_cast<std::uint8_t>(index));
+}
+
+/// The whole tons in `amount` (1/32 t), rounded down.
+std::int64_t whole_tons(std::uint32_t amount) {
+    return std::int64_t{amount / 32};
+}
+
 std::string text_of(const Value& value) {
     if (const auto* text = std::get_if<std::string>(&value)) {
         return *text;
@@ -93,6 +124,19 @@ Value player_table(const sim::World& world, sim::PlayerId id) {
         {"playing", player->active()},
         {"won", player->won},
     });
+}
+
+Value city_table(const sim::City& city) {
+    return make_table({
+        {"island", std::int64_t{city.island}},
+        {"city", std::int64_t{city.index}},
+        {"name", core::cp1252_to_utf8(city.name)},
+        {"player", city.owner != sim::kNoPlayer ? Value{std::int64_t{city.owner}} : Value{}},
+    });
+}
+
+core::Error script_error(std::string message) {
+    return core::make_error(core::ErrorCode::ScriptError, std::move(message));
 }
 
 }  // namespace
@@ -177,6 +221,96 @@ void GameScripts::add_api(Package& package) {
         }
         return player_table(*m_world, static_cast<sim::PlayerId>(*id));
     });
+    add("cities", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto player = integer(args, 0);
+        if (!args.empty() && !std::holds_alternative<std::monostate>(args[0]) && !player) {
+            return script_error("game.cities: the player must be a number");
+        }
+        std::vector<Value> cities;
+        for (const sim::City& city : m_world->cities()) {
+            if (!player || city.owner == *player) {
+                cities.push_back(city_table(city));
+            }
+        }
+        return make_table({}, std::move(cities));
+    });
+    add("goods", [this, &package](std::span<const Value> args) -> core::Result<Value> {
+        const auto island = integer(args, 0);
+        const auto index = integer(args, 1);
+        const auto ware = ware_argument(*m_world, package.id, args, 2);
+        if (!island || !index) {
+            return script_error("game.goods: the island and the city must be numbers");
+        }
+        if (!ware) {
+            return script_error("game.goods: no such good");
+        }
+        const sim::City* city = find_city(*m_world, *island, *index);
+        return city != nullptr ? Value{whole_tons(city->stock(*ware))} : Value{};
+    });
+    add("add_money", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto player = integer(args, 0);
+        const auto amount = integer(args, 1);
+        if (m_simulation == nullptr) {
+            return script_error("game.add_money: only while the game runs, not at the top level");
+        }
+        if (!player || !amount) {
+            return script_error("game.add_money: the player and the amount must be integers");
+        }
+        if (*player < 0 || *player >= static_cast<std::int64_t>(m_world->players().size()) ||
+            !m_simulation->script_money(static_cast<sim::PlayerId>(*player), *amount)) {
+            return script_error("game.add_money: no such player");
+        }
+        return Value{std::int64_t{m_world->players()[static_cast<std::size_t>(*player)].money}};
+    });
+    add("add_goods", [this, &package](std::span<const Value> args) -> core::Result<Value> {
+        const auto island = integer(args, 0);
+        const auto index = integer(args, 1);
+        const auto ware = ware_argument(*m_world, package.id, args, 2);
+        const auto tons = integer(args, 3);
+        if (m_simulation == nullptr) {
+            return script_error("game.add_goods: only while the game runs, not at the top level");
+        }
+        if (!island || !index || !tons) {
+            return script_error("game.add_goods: the island, the city and the tons must be integers");
+        }
+        if (!ware) {
+            return script_error("game.add_goods: no such good");
+        }
+        const sim::City* city = find_city(*m_world, *island, *index);
+        if (city == nullptr) {
+            return script_error("game.add_goods: no such city");
+        }
+        // Whole tons only: as much as fits, or as much as nobody has reserved.
+        constexpr std::int64_t kMaxTons = std::int64_t{1} << 40;
+        const std::int64_t wanted = std::clamp(*tons, -kMaxTons, kMaxTons);
+        const std::uint32_t room = city->capacity > city->stock(*ware) ? city->capacity - city->stock(*ware) : 0;
+        const std::int64_t whole =
+            wanted >= 0 ? std::min(wanted, whole_tons(room)) : -std::min(-wanted, whole_tons(city->available(*ware)));
+        const auto changed = m_simulation->script_goods(city->island, city->index, *ware, whole * 32);
+        return Value{changed ? *changed / 32 : std::int64_t{0}};
+    });
+    add("win", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto player = integer(args, 0);
+        if (m_simulation == nullptr) {
+            return script_error("game.win: only while the game runs, not at the top level");
+        }
+        if (!player) {
+            return script_error("game.win: the player's number is missing");
+        }
+        return Value{*player >= 0 && *player < static_cast<std::int64_t>(m_world->players().size()) &&
+                     m_simulation->script_win(static_cast<sim::PlayerId>(*player))};
+    });
+    add("defeat", [this](std::span<const Value> args) -> core::Result<Value> {
+        const auto player = integer(args, 0);
+        if (m_simulation == nullptr) {
+            return script_error("game.defeat: only while the game runs, not at the top level");
+        }
+        if (!player) {
+            return script_error("game.defeat: the player's number is missing");
+        }
+        return Value{*player >= 0 && *player < static_cast<std::int64_t>(m_world->players().size()) &&
+                     m_simulation->script_defeat(static_cast<sim::PlayerId>(*player))};
+    });
     add("message", [this, &package](std::span<const Value> args) -> core::Result<Value> {
         const auto* id = args.empty() ? nullptr : std::get_if<std::string>(&args[0]);
         if (id == nullptr || id->empty()) {
@@ -210,10 +344,12 @@ void GameScripts::add_api(Package& package) {
     });
 }
 
-void GameScripts::after_tick(sim::Simulation& /*simulation*/, const sim::TickEvents& events) {
+void GameScripts::after_tick(sim::Simulation& simulation, const sim::TickEvents& events) {
+    m_simulation = &simulation;
     for (const auto& package : m_packages) {
         dispatch(*package, events);
     }
+    m_simulation = nullptr;
 }
 
 void GameScripts::dispatch(Package& package, const sim::TickEvents& events) {

@@ -215,6 +215,26 @@ public:
     void set_scripts(ScriptHost* scripts) noexcept { m_scripts = scripts; }
     [[nodiscard]] ScriptHost* scripts() const noexcept { return m_scripts; }
 
+    // What the scripts change (docs/modding/scripts.md). Only a ScriptHost calls these, from
+    // after_tick(): every computer of a game and every replay runs the same scripts at the same
+    // point of the tick, so these are no commands and never go over the network.
+
+    /// Adds `amount` to the money of `player` (negative: takes it), held within 32 bits; false for
+    /// no such player.
+    bool script_money(PlayerId player, std::int64_t amount);
+    /// Adds `amount` of `ware` (1/32 t) to the warehouses of the city `city` of island `island`, as
+    /// far as there is room, or takes as much (negative) as nobody has reserved. Returns what
+    /// changed, negative for taken; nothing for no such city or no trade good.
+    std::optional<std::int64_t> script_goods(std::uint16_t island, std::uint8_t city, std::uint8_t ware,
+                                             std::int64_t amount);
+    /// `player` accomplished their task and the game is over for everybody, as with the victory
+    /// conditions; false when the game is over already or the player is no human or computer still
+    /// playing.
+    bool script_win(PlayerId player);
+    /// `player` is out (GameEvent::Reason::Script), nobody credited; false when the game is over or
+    /// the player is not playing.
+    bool script_defeat(PlayerId player);
+
     /// Game speed factor (1 = normal, up to Rules::max_game_speed); 0 pauses. For tools and tests;
     /// a running game changes the speed with a GameSpeedOrder.
     void set_speed(std::uint32_t speed) noexcept;
@@ -284,6 +304,8 @@ private:
                Parts);
     void pay_upkeep();
     void players_tick();
+    /// More than one human takes part.
+    [[nodiscard]] bool multiplayer() const;
     void accomplish(PlayerId winner);
     /// `winner` won with `message`; with `co_winners` also everybody else who meets his mission
     /// or the victory conditions now.
