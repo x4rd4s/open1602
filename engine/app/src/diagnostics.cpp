@@ -2,8 +2,10 @@
 #include "diagnostics.hpp"
 
 #include <SDL3/SDL_filesystem.h>
+#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -43,7 +45,8 @@ namespace o1602::app {
 namespace {
 
 bool g_dialogs = true;
-bool g_log_file = false;  ///< stderr goes into open1602.log
+bool g_log_file = false;                       ///< stderr goes into open1602.log
+volatile std::sig_atomic_t g_termination = 0;  ///< SIGTERM, SIGINT or SIGHUP arrived
 
 /// The first line of every log file: which version, and when (local time), so that a log can be told
 /// apart from the next one and matched with what the player remembers.
@@ -184,6 +187,25 @@ void on_crash(int sig) {
     }
 }
 
+void on_termination(int sig) {
+    g_termination = 1;
+    write_text(sig == SIGTERM  ? "quit: SIGTERM (the system or another program ended the game)\n"
+               : sig == SIGINT ? "quit: SIGINT (Ctrl+C in the terminal)\n"
+                               : "quit: SIGHUP (the terminal or session went away)\n");
+}
+
+/// SDL would turn SIGTERM and SIGINT into a silent SDL_EVENT_QUIT, and SIGHUP ends the program
+/// without a word: here all three are logged and end the game through the main loop.
+void install_termination_handler() {
+    (void)SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+    struct sigaction action = {};
+    action.sa_handler = on_termination;
+    sigemptyset(&action.sa_mask);
+    for (const int sig : {SIGTERM, SIGINT, SIGHUP}) {
+        (void)sigaction(sig, &action, nullptr);
+    }
+}
+
 /// Started by a desktop launcher or the Finder, stderr is the system log's socket or /dev/null,
 /// where nobody looks for it. A terminal, a pipe or a file the user redirected to stays.
 bool stderr_leads_nowhere() {
@@ -220,11 +242,16 @@ void setup_diagnostics() {
     if (stderr_leads_nowhere()) {
         log_to_file();
     }
+    install_termination_handler();
 #endif
     std::set_terminate(on_terminate);
 #if !defined(O1602_SANITIZED)
     install_crash_handler();  // with sanitizers, they report crashes themselves, and better
 #endif
+}
+
+bool termination_requested() {
+    return g_termination != 0;
 }
 
 void report_exit(int code) {

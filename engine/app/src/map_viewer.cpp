@@ -20,6 +20,7 @@
 #include <system_error>
 #include <utility>
 
+#include "diagnostics.hpp"
 #include "fertility_view.hpp"
 #include "tile_status.hpp"
 
@@ -754,6 +755,11 @@ core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGrap
     return core::Ok{};
 }
 
+void MapViewer::quit() {
+    std::fprintf(stderr, "quit: the key for quitting (Ctrl+Q)\n");
+    m_running = false;
+}
+
 int MapViewer::run() {
     std::uint64_t last = platform::ticks_ms();
     const std::uint64_t run_start = last;
@@ -819,6 +825,9 @@ int MapViewer::run() {
                     break;
             }
             SDL_PushEvent(&e);
+        }
+        if (termination_requested()) {
+            m_running = false;  // SIGTERM and the like: ended as by the close button, settings kept
         }
         while (SDL_PollEvent(&event)) {
             switch (m_video->route(event, m_hud.get())) {
@@ -955,9 +964,9 @@ void MapViewer::handle_event(const SDL_Event& original) {
     }
     switch (event.type) {
         case SDL_EVENT_QUIT:
-            // The window's close button, Alt+F4, or the system ending the program (SIGTERM): in the
-            // log, so that such an end is not taken for a crash.
-            std::fprintf(stderr, "quit: the window was closed or the system ended the program\n");
+            // The window's close button, Alt+F4 or the desktop: in the log, so that such an end is not
+            // taken for a crash. Signals are reported by termination_requested().
+            std::fprintf(stderr, "quit: the window was closed\n");
             m_running = false;
             break;
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
@@ -2252,7 +2261,8 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                     break;
                 }
                 if (m_hud && m_hud->menu_active()) {
-                    m_running = false;  // "Beenden" in the main menu
+                    std::fprintf(stderr, "quit: \"Beenden\" in the main menu\n");
+                    m_running = false;
                     break;
                 }
                 // "Ende": the game is kept as lastgame (0x0043BCF0), then back to the main menu
