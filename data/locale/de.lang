@@ -330,7 +330,7 @@ route.show_stops = Zielpunkte {1} zeigen
 route.current_stop = {1} (wird gerade angefahren)
 route.stop_wares = Alle {1} Waren dieses Zielpunkts zeigen
 route.show_stop = Zielpunkt {1} zeigen
-route.back = Zurück zur Route
+route.back = Zur Route
 route.back_to_ship = Zurück zum Schiff, wo die Route gestartet wird (auch Rechtsklick)
 route.no_hold = Kein Laderaum frei: die Ware bleibt für größere Schiffe in der Route
 
