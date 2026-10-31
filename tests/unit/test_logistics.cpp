@@ -212,6 +212,20 @@ TEST_CASE("pathfinding: catchment circle like the original's table") {
     CHECK(m.parity_x == 0);
 }
 
+TEST_CASE("pathfinding: fishers and towers show their circle over the water") {
+    assets::BuildingType b;
+    b.prod_kind = sim::prod::kFisher;
+    CHECK(sim::catchment_covers_water(b));
+    b.prod_kind = sim::prod::kTower;
+    CHECK(sim::catchment_covers_water(b));
+    b.prod_kind = 0;
+    b.kind = sim::kind::kTowerBeach;
+    CHECK(sim::catchment_covers_water(b));
+    b.kind = sim::kind::kBuilding;
+    b.prod_kind = sim::prod::kMarket;
+    CHECK(!sim::catchment_covers_water(b));
+}
+
 TEST_CASE("pathfinding: cheapest route, no corner cutting, goals entered not crossed") {
     const auto buildings = make_buildings();
     sim::IslandMap map(12, 12);

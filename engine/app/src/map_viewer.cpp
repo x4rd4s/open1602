@@ -1123,8 +1123,8 @@ std::optional<render::TileLighting> MapViewer::building_lighting(std::uint16_t i
     }
     render::TileLighting l = render::TileLighting::circle(
         m_local_player, world_catchment(island, sim::catchment_of(*t.building, cell.rotation, sim::TilePos{x, y})));
-    if (t.building->prod_kind == sim::prod::kFisher) {
-        l.water();  // where its boat fishes
+    if (sim::catchment_covers_water(*t.building)) {
+        l.water();  // where a fisher's boat fishes, or a tower shoots at ships
     }
     for (const sim::City& c : m_state->world.cities()) {
         if (c.island == island && c.warehouse_x == x && c.warehouse_y == y) {

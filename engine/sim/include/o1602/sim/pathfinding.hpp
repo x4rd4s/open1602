@@ -62,6 +62,10 @@ struct Catchment {
 [[nodiscard]] Catchment catchment_of(const assets::BuildingType& building, std::uint8_t rotation,
                                      TilePos origin) noexcept;
 
+/// Whether a building's circle reaches out over the water: a fisher's hut, whose boat fishes
+/// there, and towers, which shoot at ships. Its circle is shown lit on the sea as well.
+[[nodiscard]] bool catchment_covers_water(const assets::BuildingType& building) noexcept;
+
 /// What figures walk on besides the buildings they enter (grid builders 0x004706E0, 0x004704D0):
 /// - Roads: roads, squares, bridges, piers and the centre of gates (market carts);
 /// - Land: also open ground and ruins (carriers, farmers), at their slower Wegspeed;
