@@ -159,8 +159,8 @@ constexpr std::array<std::string_view, 3> kShareNames = {"little", "normal", "mu
 // The page of the islands: percent of the map that is land, the sides of the smallest and the
 // largest island in tiles.
 constexpr std::array<std::uint32_t, 8> kLandShares = {10, 15, 20, 25, 30, 35, 40, 45};
-constexpr std::array<std::uint32_t, 8> kSmallest = {16, 20, 25, 30, 40, 50, 60, 80};
-constexpr std::array<std::uint32_t, 9> kLargest = {40, 50, 60, 80, 100, 120, 150, 200, 250};
+constexpr std::array<std::uint32_t, 11> kSmallest = {16, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200};
+constexpr std::array<std::uint32_t, 14> kLargest = {40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 700, 1000};
 static_assert(kLandShares.front() >= Landscape::kMinLand && kLandShares.back() <= Landscape::kMaxLand);
 static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= sim::shapes::kMaxSide);
 
@@ -186,11 +186,11 @@ constexpr Landscape landscape(std::uint8_t land, std::uint16_t min_side, std::ui
 }
 constexpr std::array<IslandPreset, 5> kIslandPresets = {{
     {"varied", Landscape{}},
-    {"archipelago", landscape(18, 16, 60, Landscape::Spread::Even, Landscape::Gap::Narrow, Roughness::Rugged,
+    {"archipelago", landscape(20, 16, 60, Landscape::Spread::Even, Landscape::Gap::Narrow, Roughness::Rugged,
                               Landscape::Outline::Round)},
-    {"continents", landscape(40, 80, 250, Landscape::Spread::Even, Landscape::Gap::Wide, Roughness::Natural,
+    {"continents", landscape(40, 80, 400, Landscape::Spread::Even, Landscape::Gap::Wide, Roughness::Natural,
                              Landscape::Outline::Branched)},
-    {"giants", landscape(30, 25, 250, Landscape::Spread::FewGiants, Landscape::Gap::Wide, Roughness::Natural,
+    {"giants", landscape(30, 25, 500, Landscape::Spread::FewGiants, Landscape::Gap::Wide, Roughness::Natural,
                          Landscape::Outline::Round)},
     {"even", landscape(20, 50, 60, Landscape::Spread::Even, Landscape::Gap::Normal, Roughness::Smooth,
                        Landscape::Outline::Round)},
@@ -299,6 +299,7 @@ sim::WorldSettings EndlessSetup::world_settings() const {
         const sim::WorldSettings sized = sim::settings_for_players(w.players);
         w.width = sized.width;
         w.height = sized.height;
+        w = sim::fit_landscape(w);  // room for the largest island of its own size
     }
     return w;
 }

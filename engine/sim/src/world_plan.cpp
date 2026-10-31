@@ -272,7 +272,10 @@ Dims Planner::own_dims(std::int32_t side) {
     } else {
         other = side * static_cast<std::int32_t>(84 + m_random.below(33)) / 100;
     }
-    other = std::clamp<std::int32_t>(other, shapes::kMinSide, shapes::kMaxSide);
+    // Never longer than the largest side asked for.
+    const std::int32_t longest =
+        std::max<std::int32_t>(side, std::min<std::int32_t>(m_s.landscape.max_side, shapes::kMaxSide));
+    other = std::clamp<std::int32_t>(other, shapes::kMinSide, longest);
     const bool turned = m_random.below(2) == 1;
     const std::int32_t w = turned ? other : side;
     const std::int32_t h = turned ? side : other;
@@ -284,9 +287,13 @@ Dims Planner::draw_dims() {
         return class_dims(draw_size());
     }
     const WorldSettings::Landscape& l = m_s.landscape;
-    const auto lo =
-        static_cast<std::int32_t>(std::clamp<std::uint16_t>(l.min_side, shapes::kMinSide, shapes::kMaxSide));
-    const auto hi = std::max(lo, static_cast<std::int32_t>(std::min(l.max_side, shapes::kMaxSide)));
+    // No larger than the map holds within its edges.
+    const auto room =
+        std::max<std::int32_t>(shapes::kMinSide, static_cast<std::int32_t>(std::min(m_s.width, m_s.height)) -
+                                                     2 * static_cast<std::int32_t>(kEdge));
+    const auto lo = std::min(
+        room, static_cast<std::int32_t>(std::clamp<std::uint16_t>(l.min_side, shapes::kMinSide, shapes::kMaxSide)));
+    const auto hi = std::clamp(static_cast<std::int32_t>(std::min(l.max_side, shapes::kMaxSide)), lo, room);
     const std::int32_t span = hi - lo;
     // A draw u in 0..1000 shaped by the spread: even, small ones more often (u squared), or one in
     // seven from the largest fifth and the rest from the smallest third.
@@ -1123,6 +1130,26 @@ core::Result<WorldPlan> plan_world(const WorldSettings& settings, const std::vec
                                    std::vector<std::string>* warnings) {
     Planner planner(settings, templates, warnings);
     return planner.run();
+}
+
+WorldSettings fit_landscape(WorldSettings settings) {
+    if (settings.shapes != WorldSettings::Shapes::Own || settings.width == 0 || settings.height == 0) {
+        return settings;
+    }
+    const std::uint64_t largest = std::min(settings.landscape.max_side, shapes::kMaxSide);
+    const std::uint64_t w = settings.width;
+    const std::uint64_t h = settings.height;
+    // The factor in per mille: for the shorter side, then for the area (its square root).
+    const std::uint64_t by_side = (largest * 1500 + 2 * kEdge * 1000) / std::min(w, h);
+    const std::uint64_t area = largest * largest * 16 * 1000 * 1000 / (w * h);
+    std::uint64_t by_area = 0;
+    while ((by_area + 1) * (by_area + 1) <= area) {
+        ++by_area;
+    }
+    const std::uint64_t factor = std::max<std::uint64_t>({1000, by_side, by_area});
+    settings.width = static_cast<std::uint32_t>(std::min<std::uint64_t>(w * factor / 1000, WorldSettings::kMaxSide));
+    settings.height = static_cast<std::uint32_t>(std::min<std::uint64_t>(h * factor / 1000, WorldSettings::kMaxSide));
+    return settings;
 }
 
 WorldSettings settings_for_players(std::uint8_t players) {

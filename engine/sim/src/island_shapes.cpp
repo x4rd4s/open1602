@@ -4,7 +4,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "o1602/sim/random.hpp"
@@ -100,6 +102,70 @@ private:
     int m_rows;
     std::vector<int> m_values;
 };
+
+// The sea's depth bands: land and surf, light, middle, dark.
+constexpr int kShore = 0;
+constexpr int kLight = 1;
+constexpr int kMiddle = 2;
+constexpr int kDark = 3;
+
+/// The depth band of every tile: by its distance to the land (Chebyshev, as the templates' bands
+/// run): 1 the surf, 2 light, 3 and 4 middle, from 5 dark, each border moved by a tile here and
+/// there by coarse noise; never dark next to the surf.
+std::vector<std::uint8_t> sea_depth(const LandMap& map, Random& random) {
+    const int w = map.width();
+    const int h = map.height();
+    constexpr int kFar = 8;
+    std::vector<std::uint8_t> distance(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), kFar);
+    std::vector<std::pair<int, int>> wave;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (map.land(x, y)) {
+                distance[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)] = 0;
+                wave.emplace_back(x, y);
+            }
+        }
+    }
+    for (int d = 1; d < kFar && !wave.empty(); ++d) {
+        std::vector<std::pair<int, int>> next;
+        for (const auto& [x, y] : wave) {
+            for (std::size_t k = 0; k < kDirX.size(); ++k) {
+                const int nx = x + kDirX[k];
+                const int ny = y + kDirY[k];
+                if (!map.inside(nx, ny)) {
+                    continue;
+                }
+                auto& v =
+                    distance[static_cast<std::size_t>(ny) * static_cast<std::size_t>(w) + static_cast<std::size_t>(nx)];
+                if (v > d) {
+                    v = static_cast<std::uint8_t>(d);
+                    next.emplace_back(nx, ny);
+                }
+            }
+        }
+        wave = std::move(next);
+    }
+    const Noise wobble(random, w, h, 5);
+    std::vector<std::uint8_t> band(distance.size(), kShore);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const std::size_t i =
+                static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x);
+            const int d = distance[i];
+            if (d <= 1) {
+                continue;
+            }
+            const int v = wobble.at(x, y);
+            const int level = d + (v < 340 ? -1 : v > 683 ? 1 : 0);
+            int b = level <= 2 ? kLight : level <= 4 ? kMiddle : kDark;
+            if (d == 2) {
+                b = std::min(b, kMiddle);  // never dark next to the surf
+            }
+            band[i] = static_cast<std::uint8_t>(b);
+        }
+    }
+    return band;
+}
 
 template <std::size_t N>
 std::uint32_t pick(Random& random, const std::array<std::uint32_t, N>& ids) {
@@ -482,10 +548,38 @@ assets::Island make_island(const ShapeRequest& request) {
     const auto lay = [&](std::uint32_t id, int x, int y, std::uint8_t rotation, std::uint8_t anim) {
         assets::IslandTile t;
         t.id = static_cast<std::uint16_t>(id - assets::IslandTile::kCodIdOffset);
-        t.x = static_cast<std::uint8_t>(x);
-        t.y = static_cast<std::uint8_t>(y);
+        t.x = static_cast<std::uint16_t>(x);
+        t.y = static_cast<std::uint16_t>(y);
         t.bits = tile_bits(rotation, anim, request.number, static_cast<std::uint8_t>(random.below(32)));
         tiles.push_back(t);
+    };
+
+    // The depth of the sea, as the templates have it: past the surf light water, then middle, then
+    // dark (the open sea) from about five tiles out; the bands' edges wander by a tile.
+    const std::vector<std::uint8_t> depth = sea_depth(map, random);
+    const auto depth_at = [&](int x, int y) -> int {
+        return x < 0 || y < 0 || x >= width || y >= height ? kDark : depth[at(x, y)];
+    };
+    // The edge of a band: the lighter water on two sides next to each other, turned towards them
+    // (0 south and west, 1 north and west, 2 north and east, 3 east and south); else none.
+    const auto edge = [&](int x, int y, int band) -> std::optional<std::uint8_t> {
+        const bool n = depth_at(x, y - 1) < band;
+        const bool e = depth_at(x + 1, y) < band;
+        const bool s = depth_at(x, y + 1) < band;
+        const bool w = depth_at(x - 1, y) < band;
+        if (s && w && !n && !e) {
+            return 0;
+        }
+        if (n && w && !s && !e) {
+            return 1;
+        }
+        if (n && e && !s && !w) {
+            return 2;
+        }
+        if (e && s && !n && !w) {
+            return 3;
+        }
+        return std::nullopt;
     };
 
     // The coast and the sea.
@@ -507,9 +601,18 @@ assets::Island make_island(const ShapeRequest& request) {
                 case Coast::InnerCorner:
                     lay(pick(random, ids::kInnerCorner), x, y, c.rotation, 0);
                     break;
-                case Coast::OpenSea:
-                    lay(pick(random, ids::kOpenSea), x, y, static_cast<std::uint8_t>(random.below(4)), phase);
+                case Coast::OpenSea: {
+                    const int band = depth_at(x, y);
+                    const auto turn = static_cast<std::uint8_t>(random.below(4));
+                    if (band == kLight) {
+                        lay(ids::kLightSea, x, y, 0, phase);
+                    } else if (const auto r = edge(x, y, band)) {
+                        lay(band == kMiddle ? ids::kLightEdge : ids::kDarkEdge, x, y, *r, phase);
+                    } else {
+                        lay(band == kMiddle ? ids::kMiddleSea : ids::kDarkSea, x, y, turn, phase);
+                    }
                     break;
+                }
                 case Coast::Surf:
                     lay(pick(random, ids::kSurf), x, y, c.rotation, phase);
                     break;

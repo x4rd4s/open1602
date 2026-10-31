@@ -265,3 +265,86 @@ TEST_CASE("island shapes: every coast, outline and share of land, from the small
         }
     }
 }
+
+TEST_CASE("island shapes: light water past the surf, dark far out, the band edges turned to the light") {
+    sim::shapes::ShapeRequest r;
+    r.width = 140;
+    r.height = 120;
+    r.size = 4;
+    r.number = 3;
+    r.seed = 77;
+    const assets::Island island = sim::shapes::make_island(r);
+    const int w = r.width;
+    const int h = r.height;
+    // 0 land and surf, 1 light, 2 middle, 3 dark; the light edge counts as middle, the dark as dark.
+    std::vector<int> band(static_cast<std::size_t>(w * h), 0);
+    std::vector<std::uint32_t> id(band.size(), 0);
+    std::vector<std::uint8_t> rotation(band.size(), 0);
+    for (const assets::IslandTile& t : island.layers[0]) {
+        const auto i = static_cast<std::size_t>(t.y * w + t.x);
+        id[i] = t.cod_id();
+        rotation[i] = t.rotation();
+        switch (t.cod_id()) {
+            case ids::kLightSea:
+                band[i] = 1;
+                break;
+            case ids::kLightEdge:
+            case ids::kMiddleSea:
+                band[i] = 2;
+                break;
+            case ids::kDarkEdge:
+            case ids::kDarkSea:
+                band[i] = 3;
+                break;
+            default:
+                break;
+        }
+    }
+    const auto band_at = [&](int x, int y) {
+        return x < 0 || y < 0 || x >= w || y >= h ? 3 : band[static_cast<std::size_t>(y * w + x)];
+    };
+    std::array<std::size_t, 4> count{};
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const auto i = static_cast<std::size_t>(y * w + x);
+            const int b = band[i];
+            ++count[static_cast<std::size_t>(b)];
+            if (b == 0) {
+                continue;
+            }
+            // Next to the surf never dark.
+            bool near_surf = false;
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    near_surf = near_surf || (band_at(x + dx, y + dy) == 0 && (dx != 0 || dy != 0));
+                }
+            }
+            CHECK(!(near_surf && b == 3));
+            if (id[i] == ids::kLightEdge || id[i] == ids::kDarkEdge) {
+                // An edge: the lighter water on the two sides it is turned to.
+                const int own = id[i] == ids::kLightEdge ? 2 : 3;
+                const bool n = band_at(x, y - 1) < own;
+                const bool e = band_at(x + 1, y) < own;
+                const bool s = band_at(x, y + 1) < own;
+                const bool west = band_at(x - 1, y) < own;
+                switch (rotation[i]) {
+                    case 0:
+                        CHECK((s && west));
+                        break;
+                    case 1:
+                        CHECK((n && west));
+                        break;
+                    case 2:
+                        CHECK((n && e));
+                        break;
+                    default:
+                        CHECK((e && s));
+                        break;
+                }
+            }
+        }
+    }
+    CHECK(count[1] > 0);
+    CHECK(count[2] > 0);
+    CHECK(count[3] > 0);
+}

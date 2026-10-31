@@ -947,9 +947,9 @@ TEST_CASE("endless setup: the islands' presets and settings, and their lines in 
     app::choose(s, SetupItem::LargestIsland, 0);  // 40
     CHECK(s.world.landscape.max_side == 40);
     CHECK(s.world.landscape.min_side <= 40);
-    app::choose(s, SetupItem::SmallestIsland, app::setup_choices(SetupItem::SmallestIsland) - 1);  // 80
-    CHECK(s.world.landscape.min_side == 80);
-    CHECK(s.world.landscape.max_side == 80);
+    app::choose(s, SetupItem::SmallestIsland, app::setup_choices(SetupItem::SmallestIsland) - 1);  // 200
+    CHECK(s.world.landscape.min_side == 200);
+    CHECK(s.world.landscape.max_side == 200);
     app::choose(s, SetupItem::LandShare, 7);
     CHECK(s.world.landscape.land == 45);
     app::choose(s, SetupItem::Forest, 2);
@@ -980,8 +980,10 @@ TEST_CASE("endless setup: the islands' presets and settings, and their lines in 
     // Values beyond the generator's are left out; any side within it is taken.
     CHECK(app::read_setup_line(back, "island_land", "90"));
     CHECK(back.world.landscape.land == 45);
-    CHECK(app::read_setup_line(back, "island_max", "300"));
-    CHECK(back.world.landscape.max_side == 80);
+    CHECK(app::read_setup_line(back, "island_max", "1200"));
+    CHECK(back.world.landscape.max_side == 200);
+    CHECK(app::read_setup_line(back, "island_max", "900"));  // far beyond the original's
+    CHECK(back.world.landscape.max_side == 900);
     CHECK(app::read_setup_line(back, "island_max", "70"));
     CHECK(back.world.landscape.max_side == 70);
     CHECK(back.world.landscape.min_side == 70);  // follows

@@ -462,3 +462,35 @@ TEST_CASE("world plan: islands of their own size: the same seed the same plan, f
     CHECK(giants >= 1);
     CHECK(giants * 4 <= a->own_islands.size());
 }
+
+TEST_CASE("world plan: the map grows for islands far larger than the original's") {
+    sim::WorldSettings s;
+    CHECK(sim::fit_landscape(s).width == 500);  // templates: as chosen
+    s.shapes = sim::WorldSettings::Shapes::Own;
+    s.landscape.max_side = 100;
+    CHECK(sim::fit_landscape(s).width == 500);  // room enough
+    CHECK(sim::fit_landscape(s).height == 350);
+    s.landscape.max_side = 300;
+    const sim::WorldSettings big = sim::fit_landscape(s);
+    CHECK(big.height >= 450);                        // one and a half times the largest island
+    CHECK(big.width * 350 / 500 + 2 >= big.height);  // the same shape
+    CHECK(big.height * 500 / 350 + 2 >= big.width);
+    CHECK(std::uint64_t{big.width} * big.height * 100 >= std::uint64_t{300} * 300 * 16 * 99);  // room for giants
+    s.landscape.max_side = 1000;
+    CHECK(sim::fit_landscape(s).width == sim::WorldSettings::kMaxSide);
+
+    // Islands of more than 255 tiles, which only Open1602's own chunks can hold.
+    s.landscape.max_side = 400;
+    s.landscape.min_side = 100;
+    s.landscape.spread = sim::WorldSettings::Landscape::Spread::FewGiants;
+    s.landscape.land = 30;
+    s.seed = 5;
+    auto plan = sim::plan_world(sim::fit_landscape(s), templates());
+    REQUIRE(plan.ok());
+    std::uint16_t largest = 0;
+    for (const auto& own : plan->own_islands) {
+        largest = std::max({largest, own.width, own.height});
+        CHECK(std::max(own.width, own.height) <= 400);
+    }
+    CHECK(largest > 255);
+}

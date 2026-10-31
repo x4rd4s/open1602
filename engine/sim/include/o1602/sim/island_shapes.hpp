@@ -34,8 +34,9 @@ enum class Form : std::uint8_t {
 /// Little, the templates' share or much (forest).
 enum class Share : std::uint8_t { Little, Normal, Much };
 
-/// The longest side of an island of its own shape: tile positions are one byte.
-inline constexpr std::uint16_t kMaxSide = 250;
+/// The longest side of an island of its own shape. Beyond 255 tiles the island is kept in
+/// Open1602's chunks (assets::kLargeIslandChunk) and its savegames only, not in the original's.
+inline constexpr std::uint16_t kMaxSide = 1000;
 inline constexpr std::uint16_t kMinSide = 16;
 
 /// What an island of its own shape must have.

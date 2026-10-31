@@ -228,10 +228,14 @@ village or a volcano keep their template.
 
 Part 2 done on 2026-10-31 ([worldgen.md](../re/worldgen.md#islands-of-their-own-size)): with
 "Own" island shapes the plan draws every island's size itself (`WorldSettings::Landscape`): the
-share of the map that is land (5–45 %), the sides of the smallest and the largest island (16–250
-tiles), how the sizes are spread (evenly, many small ones, a few giants), the water between the
+share of the map that is land (5–45 %), the sides of the smallest and the largest island (16–200 and
+40–1000 tiles, four times the original's largest; an island over 255 tiles is kept in Open1602's own
+chunks `O1602ISL` and `O1602HAUS`, which the original cannot read, and the map grows on its own where
+the largest island finds no room), how the sizes are spread (evenly, many small ones, a few giants), the water between the
 islands, the coast (smooth, natural, rugged), the outline (compact, long, branched), forest and ore
-mountains. The sizes are drawn first and placed from the largest; as many islands as the villages
+mountains. The sea around an island of its own shape has the templates' depths: light water past
+the surf, middle, then the dark open sea from about five tiles out, with the band edges turned to the
+lighter side. The sizes are drawn first and placed from the largest; as many islands as the villages
 and volcanoes need become templates. The start dialog has a page of its own for it, "Island world",
 with presets (Original, Varied, Archipelago, Continents, Few giants, Even) and a preview of the world
 the game gets (`sim::preview_world`, "Reroll" draws another world number). Still open: rivers and

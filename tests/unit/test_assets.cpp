@@ -411,6 +411,52 @@ TEST_CASE("islands: header and INSELHAUS tiles") {
     CHECK(island.layers[0][0].bits == 0xDEADBEEF);
 }
 
+TEST_CASE("islands: an island of more than 255 tiles keeps its size, tiles and deposits (O1602ISL)") {
+    std::vector<std::uint8_t> header = {19, 44, 24, 0};  // the low bytes of 300 x 280
+    put_u16(header, 90);
+    put_u16(header, 50);
+    header.resize(116, 0);
+    header[0x1A] = 1;  // one deposit
+    header[0x1C] = 2;  // iron
+    header[0x1D] = 4;  // x low byte
+    header[0x1E] = 5;
+    std::vector<std::uint8_t> large;
+    put_u16(large, 300);
+    put_u16(large, 280);
+    large.push_back(1);
+    put_u16(large, 260);
+    put_u16(large, 261);
+
+    assets::IslandTile far;
+    far.id = 1201;
+    far.x = 299;
+    far.y = 279;
+    far.bits = 0xDEADBEEF;
+    const std::vector<std::uint8_t> tiles = assets::large_tile_bytes({far});
+    CHECK(tiles.size() == 10);
+
+    std::vector<std::uint8_t> file;
+    put_chunk(file, "INSEL5", header);
+    put_chunk(file, std::string(assets::kLargeIslandChunk).c_str(), large);
+    put_chunk(file, std::string(assets::kLargeTilesChunk).c_str(), tiles);
+    auto chunks = assets::ChunkFile::from_bytes(file);
+    REQUIRE(chunks.ok());
+    auto islands = assets::load_islands(*chunks);
+    REQUIRE(islands.ok());
+    REQUIRE(islands->size() == 1);
+    const auto& island = (*islands)[0];
+    CHECK(island.header.width == 300);
+    CHECK(island.header.height == 280);
+    REQUIRE(island.header.deposits.size() == 1);
+    CHECK(island.header.deposits[0].x == 260);
+    CHECK(island.header.deposits[0].y == 261);
+    REQUIRE(island.layers.size() == 1);
+    REQUIRE(island.layers[0].size() == 1);
+    CHECK(island.layers[0][0].x == 299);
+    CHECK(island.layers[0][0].y == 279);
+    CHECK(island.layers[0][0].bits == 0xDEADBEEF);
+}
+
 TEST_CASE("islands: INSEL5 takes its size class from the width, INSEL4 as stored") {
     const auto size_class = [](const char* chunk, std::uint8_t width, std::uint16_t stored) {
         std::vector<std::uint8_t> header = {1, width, 40, 0};

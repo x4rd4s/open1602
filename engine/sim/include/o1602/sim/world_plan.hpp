@@ -104,6 +104,13 @@ struct WorldSettings {
 /// area (WorldSettings::islands).
 [[nodiscard]] WorldSettings settings_for_players(std::uint8_t players);
 
+/// An automatic map size for islands of their own size (Shapes::Own): `settings`' size, larger
+/// where the largest island would find no room - the shorter side at least one and a half times the
+/// largest island and the edges, the area at least sixteen times the largest island's (the start
+/// areas and their islands come first, a giant needs room between them) - keeping the shape, at
+/// most kMaxSide. Other settings keep their size.
+[[nodiscard]] WorldSettings fit_landscape(WorldSettings settings);
+
 /// The start area of one player: his ship's place, his home island and how far "within reach" is.
 struct StartArea {
     std::uint32_t x = 0;  ///< world tile of the ship

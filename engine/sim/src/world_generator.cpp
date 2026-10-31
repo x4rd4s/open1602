@@ -62,20 +62,31 @@ constexpr std::array<StateChunk, 8> kStateChunks = {{{"PRODLIST2", 0x18},
 constexpr std::size_t kHeaderSize = 116;  // INSEL5
 
 struct Mountain {
-    std::uint8_t x = 0;
-    std::uint8_t y = 0;
+    std::uint16_t x = 0;
+    std::uint16_t y = 0;
 };
 
 /// Deposit slots as the island record keeps them (INSEL5 +0x1C, 2 x 8 bytes): bytes the
-/// generator does not write keep what the template had.
+/// generator does not write keep what the template had. The high bytes of the places are
+/// Open1602's, for islands wider or higher than 255 tiles (assets::kLargeIslandChunk).
 struct DepositSlots {
     std::array<std::uint8_t, 16> bytes{};
+    std::array<std::uint8_t, 2> high_x{};
+    std::array<std::uint8_t, 2> high_y{};
     std::uint8_t count = 0;
 
     [[nodiscard]] std::uint8_t ware(std::size_t i) const noexcept { return bytes[8 * i]; }
-    [[nodiscard]] std::uint8_t x(std::size_t i) const noexcept { return bytes[8 * i + 1]; }
-    [[nodiscard]] std::uint8_t y(std::size_t i) const noexcept { return bytes[8 * i + 2]; }
-    [[nodiscard]] bool at(std::uint8_t px, std::uint8_t py) const noexcept {
+    [[nodiscard]] std::uint16_t x(std::size_t i) const noexcept {
+        return static_cast<std::uint16_t>(bytes[8 * i + 1] | (high_x[i] << 8));
+    }
+    [[nodiscard]] std::uint16_t y(std::size_t i) const noexcept {
+        return static_cast<std::uint16_t>(bytes[8 * i + 2] | (high_y[i] << 8));
+    }
+    [[nodiscard]] bool large() const noexcept {
+        return std::any_of(high_x.begin(), high_x.end(), [](std::uint8_t v) { return v != 0; }) ||
+               std::any_of(high_y.begin(), high_y.end(), [](std::uint8_t v) { return v != 0; });
+    }
+    [[nodiscard]] bool at(std::uint16_t px, std::uint16_t py) const noexcept {
         for (std::size_t i = 0; i < count; ++i) {
             if (x(i) == px && y(i) == py) {
                 return true;
@@ -83,15 +94,17 @@ struct DepositSlots {
         }
         return false;
     }
-    void write(std::size_t i, std::uint8_t ware, std::uint8_t px, std::uint8_t py, std::uint16_t amount) noexcept {
+    void write(std::size_t i, std::uint8_t ware, std::uint16_t px, std::uint16_t py, std::uint16_t amount) noexcept {
         bytes[8 * i] = ware;
-        bytes[8 * i + 1] = px;
-        bytes[8 * i + 2] = py;
+        bytes[8 * i + 1] = static_cast<std::uint8_t>(px);
+        bytes[8 * i + 2] = static_cast<std::uint8_t>(py);
+        high_x[i] = static_cast<std::uint8_t>(px >> 8);
+        high_y[i] = static_cast<std::uint8_t>(py >> 8);
         bytes[8 * i + 6] = static_cast<std::uint8_t>(amount);
         bytes[8 * i + 7] = static_cast<std::uint8_t>(amount >> 8);
     }
     /// 0x0046BE60: the slot of the same mountain, else a new one while there is room.
-    bool place(std::uint8_t ware, std::uint8_t px, std::uint8_t py, std::uint8_t kind, std::uint16_t amount) {
+    bool place(std::uint8_t ware, std::uint16_t px, std::uint16_t py, std::uint8_t kind, std::uint16_t amount) {
         std::size_t i = 0;
         while (i < count && !(x(i) == px && y(i) == py)) {
             ++i;
@@ -140,15 +153,29 @@ std::vector<std::uint8_t> tile_bytes(const std::vector<assets::IslandTile>& tile
     std::vector<std::uint8_t> out;
     out.reserve(8 * tiles.size());
     for (const assets::IslandTile& t : tiles) {
-        const std::array<std::uint8_t, 8> e = {static_cast<std::uint8_t>(t.id),
-                                               static_cast<std::uint8_t>(t.id >> 8),
-                                               t.x,
-                                               t.y,
-                                               static_cast<std::uint8_t>(t.bits),
-                                               static_cast<std::uint8_t>(t.bits >> 8),
-                                               static_cast<std::uint8_t>(t.bits >> 16),
-                                               static_cast<std::uint8_t>(t.bits >> 24)};
+        const std::array<std::uint8_t, 8> e = {
+            static_cast<std::uint8_t>(t.id),         static_cast<std::uint8_t>(t.id >> 8),
+            static_cast<std::uint8_t>(t.x),          static_cast<std::uint8_t>(t.y),
+            static_cast<std::uint8_t>(t.bits),       static_cast<std::uint8_t>(t.bits >> 8),
+            static_cast<std::uint8_t>(t.bits >> 16), static_cast<std::uint8_t>(t.bits >> 24)};
         out.insert(out.end(), e.begin(), e.end());
+    }
+    return out;
+}
+
+/// assets::kLargeIslandChunk of an island: its sides and the places of its deposits in 16 bits.
+std::vector<std::uint8_t> large_island(const Slot& slot) {
+    std::vector<std::uint8_t> out;
+    const auto u16 = [&out](std::uint32_t v) {
+        out.push_back(static_cast<std::uint8_t>(v));
+        out.push_back(static_cast<std::uint8_t>(v >> 8));
+    };
+    u16(slot.map->width());
+    u16(slot.map->height());
+    out.push_back(slot.deposits.count);
+    for (std::size_t i = 0; i < slot.deposits.count; ++i) {
+        u16(slot.deposits.x(i));
+        u16(slot.deposits.y(i));
     }
     return out;
 }
@@ -483,8 +510,8 @@ std::vector<Mountain> Generator::mountains(const Slot& slot, int type, bool free
             if (sub.origin_x != static_cast<std::int32_t>(x) || sub.origin_y != static_cast<std::int32_t>(y)) {
                 continue;
             }
-            const auto mx = static_cast<std::uint8_t>(x);
-            const auto my = static_cast<std::uint8_t>(y);
+            const auto mx = static_cast<std::uint16_t>(x);
+            const auto my = static_cast<std::uint16_t>(y);
             if (free_only && slot.deposits.at(mx, my)) {
                 continue;
             }
@@ -725,7 +752,7 @@ std::vector<Mountain> Generator::treasure_spots(const Slot& slot) const {
     // the tile it tested. The draws stay the same.
     std::vector<Mountain> out;
     const auto hit = [&](std::int32_t x, std::int32_t y) {
-        out.push_back(Mountain{static_cast<std::uint8_t>(x), static_cast<std::uint8_t>(y)});
+        out.push_back(Mountain{static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y)});
         return out.size() > kMaxMountains;
     };
     if (h > 1) {
@@ -1214,14 +1241,11 @@ std::vector<std::uint8_t> Generator::village_tiles(const Slot& slot, const std::
                        (std::uint32_t{kNoCity} << 22);
             }
         }
-        const std::array<std::uint8_t, 8> e = {static_cast<std::uint8_t>(t.id),
-                                               static_cast<std::uint8_t>(t.id >> 8),
-                                               t.x,
-                                               t.y,
-                                               static_cast<std::uint8_t>(bits),
-                                               static_cast<std::uint8_t>(bits >> 8),
-                                               static_cast<std::uint8_t>(bits >> 16),
-                                               static_cast<std::uint8_t>(bits >> 24)};
+        const std::array<std::uint8_t, 8> e = {
+            static_cast<std::uint8_t>(t.id),       static_cast<std::uint8_t>(t.id >> 8),
+            static_cast<std::uint8_t>(t.x),        static_cast<std::uint8_t>(t.y),
+            static_cast<std::uint8_t>(bits),       static_cast<std::uint8_t>(bits >> 8),
+            static_cast<std::uint8_t>(bits >> 16), static_cast<std::uint8_t>(bits >> 24)};
         out.insert(out.end(), e.begin(), e.end());
     }
     return out;
@@ -1390,7 +1414,14 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
             }
         }
         out.add("INSEL5", header(*s, craters, owners));
-        out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
+        // An island wider or higher than 255 tiles (of its own shape only) in Open1602's chunks.
+        const bool large = s->map->width() > 255 || s->map->height() > 255 || s->deposits.large();
+        if (large) {
+            out.add(std::string(assets::kLargeIslandChunk), large_island(*s));
+            out.add(std::string(assets::kLargeTilesChunk), assets::large_tile_bytes(s->base.layers.front()));
+        } else {
+            out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
+        }
         out.add("HIRSCH2", {});
         for (const StateChunk& c : kStateChunks) {
             if (auto records = village_records(*s, c, natives); !records.empty()) {
@@ -1420,7 +1451,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
     }
     for (const assets::Chunk& c : scenario.chunks()) {
         if (c.name == "SZENE" || c.name == "RANDTAB" || c.name.rfind("SZENE_", 0) == 0 || c.name == "INSEL5" ||
-            c.name == "INSELHAUS") {
+            c.name == "INSELHAUS" || c.name == assets::kLargeIslandChunk || c.name == assets::kLargeTilesChunk) {
             continue;
         }
         out.add(c.name, scenario.payload(c));
