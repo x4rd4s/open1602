@@ -12,6 +12,7 @@
 #include "o1602/assets/island.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/island_map.hpp"
+#include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/island_templates.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/volcanoes.hpp"
@@ -122,6 +123,7 @@ struct Slot {
     DepositSlots deposits;
     bool treasure = false;
     std::array<std::uint32_t, 2> mountains{};  ///< big (Erzbergnr 0) and small ones among the first 40
+    bool own_shape = false;                    ///< `base` is an island of its own shape, no template
 
     [[nodiscard]] bool has(std::uint8_t ware) const {
         for (std::size_t i = 0; i < deposits.count; ++i) {
@@ -132,6 +134,24 @@ struct Slot {
         return false;
     }
 };
+
+/// The tiles as an INSELHAUS chunk stores them.
+std::vector<std::uint8_t> tile_bytes(const std::vector<assets::IslandTile>& tiles) {
+    std::vector<std::uint8_t> out;
+    out.reserve(8 * tiles.size());
+    for (const assets::IslandTile& t : tiles) {
+        const std::array<std::uint8_t, 8> e = {static_cast<std::uint8_t>(t.id),
+                                               static_cast<std::uint8_t>(t.id >> 8),
+                                               t.x,
+                                               t.y,
+                                               static_cast<std::uint8_t>(t.bits),
+                                               static_cast<std::uint8_t>(t.bits >> 8),
+                                               static_cast<std::uint8_t>(t.bits >> 16),
+                                               static_cast<std::uint8_t>(t.bits >> 24)};
+        out.insert(out.end(), e.begin(), e.end());
+    }
+    return out;
+}
 
 std::shared_ptr<assets::ChunkFile> open(const assets::GameDirectory& game, const std::string& path) {
     const auto resolved = game.resolve(path);
@@ -149,14 +169,18 @@ class Generator {
 public:
     Generator(ScenarioPlan plan, const assets::GameDirectory& game, const assets::BuildingTable& buildings,
               PlanRandom& random, std::vector<std::string>* warnings, std::vector<StartArea> starts = {},
-              std::uint8_t gold_islands = 0)
+              std::uint8_t gold_islands = 0, WorldSettings::Shapes shapes = WorldSettings::Shapes::Templates,
+              std::uint64_t shape_seed = 0)
         : m_plan(std::move(plan)),
           m_game(game),
           m_buildings(buildings),
           m_random(random),
           m_warnings(warnings),
           m_starts(std::move(starts)),
-          m_gold_islands(gold_islands) {}
+          m_gold_islands(gold_islands),
+          m_shapes(shapes),
+          m_shape_seed(shape_seed),
+          m_shape_random(shape_seed, kShapeStream) {}
 
     core::Result<GeneratedWorld> run(const assets::ChunkFile& scenario, bool guarantee);
 
@@ -168,7 +192,10 @@ private:
     }
     void choose_templates();
     void choose_natives();
+    [[nodiscard]] bool wants_own_shape(const ScenarioPlan::Island& e);
     bool load(Slot& slot);
+    void count_mountains(Slot& slot) const;
+    void give_own_shape(Slot& slot) const;
     void hand_out_crops();
     void place_ores();
     void place_treasures();
@@ -211,8 +238,14 @@ private:
     std::vector<std::string>* m_warnings;
     std::vector<StartArea> m_starts;  ///< own worlds (world_plan.hpp): the players' start areas
     std::uint8_t m_gold_islands = 0;  ///< own worlds: exactly this many islands with gold (0: as planned)
-    std::vector<Slot> m_slots;        ///< in the order of the plan
-    std::vector<Slot*> m_by_number;   ///< in the order of the island table (island number)
+    WorldSettings::Shapes m_shapes = WorldSettings::Shapes::Templates;  ///< own worlds: island shapes
+    std::uint64_t m_shape_seed = 0;
+    /// Which islands of a mixed world get their own shape: a stream of its own, so that the
+    /// original's draws of the content stay as they are.
+    static constexpr std::uint64_t kShapeStream = 0x1602'5A4EULL;
+    Random m_shape_random;
+    std::vector<Slot> m_slots;       ///< in the order of the plan
+    std::vector<Slot*> m_by_number;  ///< in the order of the island table (island number)
     std::uint32_t m_max_crops = 2;
     std::uint32_t m_lost = 0;
     std::uint32_t m_guaranteed = 0;
@@ -342,13 +375,58 @@ bool Generator::load(Slot& slot) {
         std::copy_n(slot.loaded_header.begin() + 0x1C, 16, slot.deposits.bytes.begin());
         slot.treasure = slot.loaded_header[0x18] != 0;
     }
+    count_mountains(slot);
+    // An island of its own shape instead of the template: of its size and with as many ore
+    // mountains. Islands with a village or a volcano keep their template.
+    if (slot.own_shape) {
+        if (!slot.village && sim::find_craters(*slot.map, m_buildings).empty()) {
+            give_own_shape(slot);
+        } else {
+            slot.own_shape = false;
+        }
+    }
+    return true;
+}
+
+bool Generator::wants_own_shape(const ScenarioPlan::Island& e) {
+    switch (m_shapes) {
+        case WorldSettings::Shapes::Templates:
+            return false;
+        case WorldSettings::Shapes::Mixed:
+            return (e.flags & 1U) == 0 && m_shape_random.below(2) == 0;
+        case WorldSettings::Shapes::Own:
+            return (e.flags & 1U) == 0;
+    }
+    return false;
+}
+
+void Generator::count_mountains(Slot& slot) const {
+    slot.mountains = {};
     for (const Mountain& m : mountains(slot, 2, false)) {
         const assets::BuildingType* b = m_buildings.by_sprite(slot.map->top(m.x, m.y).sprite);
         if (b != nullptr && b->ore_mountain < 2) {
             ++slot.mountains[b->ore_mountain];
         }
     }
-    return true;
+}
+
+void Generator::give_own_shape(Slot& slot) const {
+    shapes::ShapeRequest r;
+    r.width = slot.base.header.width;
+    r.height = slot.base.header.height;
+    r.climate = slot.plan.climate;
+    r.size = slot.plan.size;
+    r.number = slot.plan.number;
+    r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[0], 255));
+    r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[1], 255));
+    r.seed = m_shape_seed;
+    slot.base = shapes::make_island(r);
+    slot.map = IslandMap::from_island(slot.base, m_buildings, m_warnings, nullptr);
+    // Nothing of the template's header survives: no deposits, no treasure flag.
+    slot.loaded_header.clear();
+    slot.deposits = DepositSlots{};
+    slot.treasure = false;
+    count_mountains(slot);
 }
 
 std::vector<Mountain> Generator::mountains(const Slot& slot, int type, bool free_only) const {
@@ -1014,9 +1092,10 @@ std::vector<std::uint8_t> Generator::header(const Slot& slot, const std::vector<
     h[0x5D] = static_cast<std::uint8_t>(slot.fertility >> 8);
     h[0x5E] = static_cast<std::uint8_t>(slot.fertility >> 16);
     h[0x5F] = static_cast<std::uint8_t>(slot.fertility >> 24);
-    u16(0x60, slot.plan.template_number);
+    u16(0x60, slot.own_shape ? assets::IslandHeader::kNoTemplate : slot.plan.template_number);
     u16(0x62, slot.plan.size);
     h[0x64] = slot.plan.climate;
+    h[0x65] = slot.own_shape ? 1 : 0;  // all tiles stored
     return h;
 }
 
@@ -1213,6 +1292,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
     for (const ScenarioPlan::Island& e : m_plan.islands) {
         Slot slot;
         slot.plan = e;
+        slot.own_shape = wants_own_shape(e);
         if (load(slot)) {
             m_slots.push_back(std::move(slot));
         }
@@ -1272,7 +1352,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
             }
         }
         out.add("INSEL5", header(*s, craters, owners));
-        out.add("INSELHAUS", village_tiles(*s, natives));
+        out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
         out.add("HIRSCH2", {});
         for (const StateChunk& c : kStateChunks) {
             if (auto records = village_records(*s, c, natives); !records.empty()) {
@@ -1283,7 +1363,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
         info.number = s->plan.number;
         info.climate = s->plan.climate;
         info.size = s->plan.size;
-        info.template_number = s->plan.template_number;
+        info.template_number = s->own_shape ? assets::IslandHeader::kNoTemplate : s->plan.template_number;
         info.natives = s->village.has_value();
         info.fertility = s->fertility;
         for (std::size_t i = 0; i < s->deposits.count; ++i) {
@@ -1345,7 +1425,8 @@ core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario,
                                               const WorldStart& start, std::vector<std::string>* warnings) {
     PlanRandom random(start.seed);
     Generator generator(plan.plan, game, buildings, random, warnings,
-                        plan.shared_start ? std::vector<StartArea>{} : plan.starts, plan.gold_islands);
+                        plan.shared_start ? std::vector<StartArea>{} : plan.starts, plan.gold_islands, plan.shapes,
+                        plan.seed);
     return generator.run(scenario, start.guarantee_resources);
 }
 

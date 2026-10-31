@@ -688,6 +688,8 @@ WorldPlan Planner::finish() {
         plan.ores[2].count = m_s.gold_islands;
         out.gold_islands = m_s.gold_islands;
     }
+    out.shapes = m_s.shapes;
+    out.seed = m_s.seed;
     for (std::size_t c = 0; c < kCropBuildings.size(); ++c) {
         plan.crops[c] = ScenarioPlan::Resource{kCropBuildings[c], scaled(kCropCounts[d][c]), 0};
     }

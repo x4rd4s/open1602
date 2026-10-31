@@ -215,8 +215,18 @@ scripts do with the base behaviours.
 
 Stage 1 builds worlds from the original's island templates ([worldgen.md](../re/worldgen.md)).
 Stage 2, islands of their own shapes from height and moisture maps with the rules (climate, size,
-shape, frequencies) as data, is postponed. Climates and templates are already in one registry
-(MD-7, PR #142), which stage 2 builds on.
+shape, frequencies) as data. Climates and templates are already in one registry (MD-7, PR #142),
+which stage 2 builds on.
+
+Part 1 done on 2026-10-31 ([worldgen.md](../re/worldgen.md#island-shapes-world-generator-stage-2)):
+`sim::shapes::make_island` draws an island of its own shape in the size of the template the plan
+placed, with its coast from the templates' tiles (beach, its corners and surf by the rules read from
+all 114 templates), forest of the climate and as many ore mountains as the template. A world's
+setting "island shapes" (`WorldSettings::shapes`, start dialog, `--island-shapes`) chooses the
+original's templates (default), islands of their own shape, or both mixed; islands with a native
+village or a volcano keep their template. Still open: rivers and river mouths, ground of more than
+one kind, rocks around the mountains, islands larger than the templates, villages and volcanoes on
+islands of their own shape, and the rules as data.
 
 ## Order of work
 

@@ -524,6 +524,28 @@ TEST_CASE("endless setup: the gold islands, automatic or a fixed number") {
     CHECK(back.world.gold_islands == 7);
 }
 
+TEST_CASE("endless setup: island shapes, the original's templates by default") {
+    EndlessSetup s;
+    CHECK(s.world.shapes == sim::WorldSettings::Shapes::Templates);
+    CHECK(value_of(s, SetupItem::IslandShapes) == ui::tr("setup.island_shapes.templates"));
+    CHECK(!app::setup_item_used(s, SetupItem::IslandShapes));  // the original's maps keep their templates
+    s.own_world = true;
+    CHECK(app::setup_item_used(s, SetupItem::IslandShapes));
+    app::choose(s, SetupItem::IslandShapes, 2);
+    CHECK(s.world.shapes == sim::WorldSettings::Shapes::Own);
+    CHECK(s.world_settings().shapes == sim::WorldSettings::Shapes::Own);
+    CHECK(!(s == EndlessSetup{}));
+    CHECK(app::write_setup(s).find("endless.island_shapes = own\n") != std::string::npos);
+    CHECK(app::write_setup(EndlessSetup{}).find("endless.island_shapes = templates\n") != std::string::npos);
+    EndlessSetup back;
+    app::read_setup(back, app::write_setup(s));
+    CHECK(back == s);
+    CHECK(app::read_setup_line(back, "island_shapes", "mixed"));
+    CHECK(back.world.shapes == sim::WorldSettings::Shapes::Mixed);
+    CHECK(app::read_setup_line(back, "island_shapes", "round"));  // unknown: unchanged
+    CHECK(back.world.shapes == sim::WorldSettings::Shapes::Mixed);
+}
+
 TEST_CASE("game setup: every group of the dialog ends above its hint") {
     for (const auto scope :
          {app::SetupScope::Endless, app::SetupScope::MultiplayerEndless, app::SetupScope::Scenario}) {

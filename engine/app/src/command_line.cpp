@@ -450,6 +450,18 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
                 return bad(i);
             }
             custom_world = true;
+        } else if (arg == "--island-shapes" && has_value) {
+            const std::string_view mode = argv[++i];
+            if (mode == "templates") {
+                custom.shapes = sim::WorldSettings::Shapes::Templates;
+            } else if (mode == "mixed") {
+                custom.shapes = sim::WorldSettings::Shapes::Mixed;
+            } else if (mode == "own") {
+                custom.shapes = sim::WorldSettings::Shapes::Own;
+            } else {
+                return bad(i);
+            }
+            custom_world = true;
         } else if (arg == "--starts" && has_value) {
             const std::string_view mode = argv[++i];
             if (mode == "spread") {

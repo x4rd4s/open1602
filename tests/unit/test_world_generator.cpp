@@ -9,6 +9,7 @@
 #include <map>
 #include <random>
 #include <set>
+#include <span>
 #include <string>
 #include <tuple>
 
@@ -19,6 +20,7 @@
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/scenario.hpp"
+#include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/validate.hpp"
 #include "o1602/sim/world.hpp"
 #include "o1602/sim/world_generator.hpp"
@@ -56,7 +58,7 @@ constexpr std::array<const char*, 2> kNativeDir = {"NordNat", "SuedNat"};
 constexpr std::array<const char*, 5> kSizeName = {"lit", "mit", "med", "big", "lar"};
 
 /// Ground, forest, a big and a small ore mountain (2 x 2), the mines, the goldsmith and the six
-/// plantations.
+/// plantations; and the tiles of islands of their own shape (island_shapes.hpp).
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     std::string text =
@@ -78,6 +80,33 @@ assets::BuildingTable make_buildings() {
                 "\n  Kind: 14\n  Gfx: " + std::to_string(19 + i) + "\n  Size: 1, 1\n" +
                 "  Objekt: HAUS_PRODTYP\n    Kind: 9\n    Ware: " + std::to_string(kTobacco + i) + "\n  EndObj\n";
     }
+    std::uint32_t number = 7 + static_cast<std::uint32_t>(kCrops.size());
+    std::uint32_t gfx = 100;
+    const auto add = [&](std::span<const std::uint32_t> ids, int kind, std::uint32_t size, int ore) {
+        for (const std::uint32_t id : ids) {
+            text += "  @Nummer: " + std::to_string(number++) + "\n  Id: " + std::to_string(id) +
+                    "\n  Kind: " + std::to_string(kind) + "\n  Gfx: " + std::to_string(gfx) +
+                    "\n  Size: " + std::to_string(size) + ", " + std::to_string(size) + "\n";
+            if (ore >= 0) {
+                text += "  Objekt: HAUS_PRODTYP\n    Kind: 12\n    Ware: 55\n    Erzbergnr: " + std::to_string(ore) +
+                        "\n  EndObj\n";
+            }
+            gfx += size * size;
+        }
+    };
+    namespace ids = sim::shapes::ids;
+    add(ids::kOpenSea, 19, 1, -1);
+    add(ids::kSurf, 22, 1, -1);
+    add(ids::kSurfCorner, 21, 1, -1);
+    add(ids::kSurfBay, 21, 1, -1);
+    add(ids::kBeach, 27, 1, -1);
+    add(ids::kOuterCorner, 25, 1, -1);
+    add(ids::kInnerCorner, 26, 1, -1);
+    add(std::array<std::uint32_t, 1>{ids::kGround}, 11, 1, -1);
+    add(ids::kForestNorth, 10, 1, -1);
+    add(ids::kForestSouth, 10, 1, -1);
+    add(ids::kBigMountain, 15, ids::kBigMountainSize, 0);
+    add(ids::kSmallMountain, 15, ids::kSmallMountainSize, 1);
     text += "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -382,6 +411,7 @@ void check_islands(const sim::GeneratedWorld& w, const assets::ScenarioPlan& pla
         planned[e.number] = e;
     }
     std::set<std::tuple<int, int, int>> templates;
+    std::size_t own_shapes = 0;
     for (std::size_t i = 0; i < w.islands.size(); ++i) {
         const sim::GeneratedIsland& g = w.islands[i];
         if (i > 0) {
@@ -394,8 +424,14 @@ void check_islands(const sim::GeneratedWorld& w, const assets::ScenarioPlan& pla
             CHECK(g.climate == e.climate);
         }
         CHECK(g.climate < 2);
-        CHECK(g.template_number < kTemplateCount[g.climate][g.size]);
-        templates.insert({g.climate, g.size, g.template_number});
+        // An island of its own shape has no template; its mountains lie where it drew them.
+        const bool own_shape = g.template_number == assets::IslandHeader::kNoTemplate;
+        CHECK((own_shape || g.template_number < kTemplateCount[g.climate][g.size]));
+        if (own_shape) {
+            ++own_shapes;
+        } else {
+            templates.insert({g.climate, g.size, g.template_number});
+        }
         CHECK((g.fertility & kBaseFertility) == kBaseFertility);
         // Crops of the island's climate only, sugar and wine not together.
         for (std::uint8_t ware = kTobacco; ware <= kCocoa; ++ware) {
@@ -413,7 +449,7 @@ void check_islands(const sim::GeneratedWorld& w, const assets::ScenarioPlan& pla
         for (const auto& d : g.deposits) {
             CHECK(used.insert(Spot{d.x, d.y}).second);
             if (d.ware == kIron || d.ware == kGold) {
-                CHECK(std::find(mountains.begin(), mountains.end(), Spot{d.x, d.y}) != mountains.end());
+                CHECK((own_shape || std::find(mountains.begin(), mountains.end(), Spot{d.x, d.y}) != mountains.end()));
                 CHECK(d.amount > 0);
             } else {
                 CHECK(d.ware == kTreasure);
@@ -427,7 +463,7 @@ void check_islands(const sim::GeneratedWorld& w, const assets::ScenarioPlan& pla
         }
     }
     // Templates differ within a class (every class has more templates than the plan islands).
-    CHECK(templates.size() == w.islands.size());
+    CHECK(templates.size() + own_shapes == w.islands.size());
 }
 
 }  // namespace
@@ -921,6 +957,79 @@ TEST_CASE("world generator: an own world gives every start home iron, all crops 
         CHECK(warnings.empty());
         CHECK(world->islands().size() == w->islands.size());
         CHECK(sim::validate(*world).ok());
+    }
+}
+
+TEST_CASE("world generator: islands of their own shape instead of templates, but those with a village") {
+    const auto& fake = full_game();
+    const auto templates = sim::island_templates(fake.game, buildings());
+    REQUIRE(!templates.empty());
+    for (const auto shapes : {sim::WorldSettings::Shapes::Own, sim::WorldSettings::Shapes::Mixed}) {
+        std::size_t own = 0;
+        std::size_t kept = 0;
+        for (std::uint64_t seed = 1; seed <= 3; ++seed) {
+            sim::WorldSettings settings;
+            settings.seed = seed;
+            settings.shapes = shapes;
+            std::vector<std::string> warnings;
+            auto plan = sim::plan_world(settings, templates, &warnings);
+            REQUIRE(plan.ok());
+            CHECK(plan->shapes == shapes);
+            sim::WorldStart start;
+            start.seed = seed;
+            const auto file = scenario(standard_plan());
+            auto w = sim::generate_islands(file, *plan, fake.game, buildings(), start, &warnings);
+            REQUIRE(w.ok());
+            CHECK(warnings.empty());
+            REQUIRE(w->islands.size() == plan->plan.islands.size());
+            check_islands(*w, plan->plan, true);
+            for (const auto& g : w->islands) {
+                const bool shaped = g.template_number == assets::IslandHeader::kNoTemplate;
+                CHECK(!(shaped && g.natives));  // a village keeps its template
+                if (shapes == sim::WorldSettings::Shapes::Own) {
+                    CHECK(shaped == !g.natives);
+                }
+                own += shaped ? 1U : 0U;
+                kept += shaped ? 0U : 1U;
+            }
+            // Every start still has iron at home, all crops and gold within reach.
+            for (const sim::StartArea& st : plan->starts) {
+                const auto home =
+                    std::find_if(w->islands.begin(), w->islands.end(),
+                                 [&](const sim::GeneratedIsland& g) { return g.number == st.home_island; });
+                REQUIRE(home != w->islands.end());
+                CHECK(std::any_of(home->deposits.begin(), home->deposits.end(),
+                                  [](const auto& d) { return d.ware == kIron; }));
+            }
+            // The same seed, the same world; the islands load with all their tiles.
+            auto again = sim::generate_islands(file, *plan, fake.game, buildings(), start);
+            REQUIRE(again.ok());
+            CHECK(same_world(*w, *again));
+            auto world = sim::load_world(w->file, buildings(), fake.game, &warnings, start);
+            REQUIRE(world.ok());
+            CHECK(warnings.empty());
+            CHECK(world->islands().size() == w->islands.size());
+            CHECK(sim::validate(*world).ok());
+            for (const sim::WorldIsland& island : world->islands()) {
+                if (island.header.template_number == assets::IslandHeader::kNoTemplate) {
+                    CHECK(island.header.stored_complete);
+                    std::size_t sea = 0;
+                    for (std::uint32_t y = 0; y < island.map.height(); ++y) {
+                        for (std::uint32_t x = 0; x < island.map.width(); ++x) {
+                            const assets::BuildingType* b = buildings().by_sprite(island.map.ground(x, y).sprite);
+                            REQUIRE(b != nullptr);
+                            sea += b->kind == 19 || b->kind == 21 || b->kind == 22 ? 1U : 0U;
+                        }
+                    }
+                    CHECK(sea > 0);
+                    CHECK(sea < std::size_t{island.map.width()} * island.map.height());
+                }
+            }
+        }
+        CHECK(own > 0);
+        if (shapes == sim::WorldSettings::Shapes::Mixed) {
+            CHECK(kept > 0);
+        }
     }
 }
 

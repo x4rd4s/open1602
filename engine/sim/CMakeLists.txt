@@ -50,6 +50,7 @@ add_library(o1602_sim
     src/victory.cpp
     src/save_game.cpp
     src/savegame_writer.cpp
+    src/island_shapes.cpp
     src/island_templates.cpp
     src/world_generator.cpp
     src/world_plan.cpp

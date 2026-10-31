@@ -68,6 +68,7 @@ enum class SetupItem : std::uint8_t {
     Players,
     Islands,
     IslandSizes,
+    IslandShapes,
     Villages,
     VolcanoIslands,
     GoldIslands,

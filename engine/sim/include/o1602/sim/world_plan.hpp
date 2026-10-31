@@ -34,6 +34,12 @@ struct WorldSettings {
         Spread,    ///< every player has a start area of his own, all alike
         Together,  ///< all ships start at one place, as in the original
     };
+    /// The coasts of the islands (world generator stage 2, island_shapes.hpp).
+    enum class Shapes : std::uint8_t {
+        Templates,  ///< the original's island templates, as in the original
+        Mixed,      ///< about half the islands of their own shape
+        Own,        ///< every island of its own shape, but those with a native village or volcano
+    };
     static constexpr std::uint32_t kMinSide = 200;
     static constexpr std::uint32_t kMaxSide = 2000;
     static constexpr std::uint8_t kMaxGoldIslands = 250;  ///< one per island at most
@@ -51,6 +57,7 @@ struct WorldSettings {
     /// and players, plus one within reach of every start that has none. Otherwise exactly this many,
     /// one vein each, as far as the islands have free mountains; the starts get theirs first.
     std::uint8_t gold_islands = 0;
+    Shapes shapes = Shapes::Templates;
     std::uint64_t seed = 0;
 };
 
@@ -94,6 +101,10 @@ struct WorldPlan {
     std::vector<StartArea> starts;  ///< one per player (Together: all at the same place)
     bool shared_start = false;      ///< Together: no start area of one's own to make fair
     std::uint8_t gold_islands = 0;  ///< WorldSettings::gold_islands: 0 as the plan, else exactly this many
+    /// WorldSettings::shapes: which islands get a shape of their own instead of their template (of
+    /// the template's size and with as many ore mountains), drawn from `seed`.
+    WorldSettings::Shapes shapes = WorldSettings::Shapes::Templates;
+    std::uint64_t seed = 0;
 };
 
 /// Island flag of a plan entry that the generator keeps free of a native village (home islands).
