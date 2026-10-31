@@ -86,6 +86,9 @@ struct ChatLine {
     /// Said privately (net::Chat::everyone off); `to` names to whom ("an Euch", "an Anna, Bernd").
     bool whisper = false;
     std::string to;
+    /// Counts up with each line added (add_chat_line), so a chat scrolled back holds still while
+    /// new lines come in; 0 when not counted.
+    std::uint64_t serial = 0;
 };
 
 /// What goes before a line's text: "Anna: ", "Anna (an Euch): "; nothing for a notice.
@@ -193,8 +196,8 @@ public:
     /// The right button only reaches the start dialog's settings.
     std::vector<MultiplayerEvent> mouse(const MultiplayerModel& model, std::int32_t x, std::int32_t y, bool down,
                                         ui::MouseButton button = ui::MouseButton::Left);
-    /// The mouse wheel (`notches` up positive): the games found, or the scenarios or savegames of
-    /// a game being created, a row per notch. False on a screen without a list.
+    /// The mouse wheel (`notches` up positive): the games found, the scenarios or savegames of a
+    /// game being created, or the lobby's chat, a row per notch. False on a screen without a list.
     bool wheel(const MultiplayerModel& model, std::int32_t notches);
     /// Escape: one screen back. Close on the search screen, Leave in a session; nothing when the
     /// menu went back by itself (from creating a game to the search).
@@ -270,6 +273,9 @@ private:
     // Lobby
     std::string m_chat;
     bool m_ready = false;
+    std::size_t m_chat_back = 0;                  ///< lines scrolled back from the newest (mouse wheel)
+    std::size_t m_chat_rows = 0;                  ///< the chat lines the last layout had room for
+    std::uint64_t m_chat_newest = 0;              ///< ChatLine::serial of the newest line at the last layout
     std::optional<std::size_t> m_banner_seat;     ///< the slot whose banner is being chosen
     std::vector<sim::BannerId> m_banner_choices;  ///< the banners of the buttons shown, in order
     /// (Host) The roster entries and names of the spectators shown with a kick button.

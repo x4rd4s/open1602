@@ -252,6 +252,8 @@ void MultiplayerMenu::show_lobby() {
     m_ready = false;
     m_banner_seat.reset();
     m_chat.clear();
+    m_chat_back = 0;
+    m_chat_newest = 0;
     m_form.set_focus(kChat);  // the keys go to the chat
 }
 
@@ -278,7 +280,17 @@ bool MultiplayerMenu::wheel(const MultiplayerModel& model, std::int32_t notches)
                 m_setup.kind == HostSetup::Kind::Scenario ? model.scenarios.size() : model.savegames.size(), kListRows,
                 notches);
             return true;
-        case Screen::Lobby:
+        case Screen::Lobby: {
+            // The chat, back to older lines and forward again (not while the colours are offered).
+            if (m_banner_seat || m_chat_rows == 0) {
+                return true;
+            }
+            const std::size_t count = model.chat.size();
+            const std::size_t last = count > m_chat_rows ? count - m_chat_rows : 0;
+            const std::size_t first = last - std::min(m_chat_back, last);
+            m_chat_back = last - ui::wheel_scroll(first, count, m_chat_rows, notches);
+            return true;
+        }
         case Screen::Connecting:
         case Screen::Settings:
             break;
@@ -663,12 +675,22 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
         m_banner_seat.reset();  // the slot changed hands, or the game started
     }
     const auto chat_lines = static_cast<std::size_t>(std::max(0, (622 - 8 - (chat_top + 8)) / 28));
-    const std::size_t lines = m_banner_seat ? 0 : std::min({model.chat.size(), kChatLines, chat_lines});
+    m_chat_rows = m_banner_seat ? 0 : std::min(kChatLines, chat_lines);
+    // Scrolled back (mouse wheel), the view holds still while new lines come in.
+    const std::uint64_t newest = model.chat.empty() ? 0 : model.chat.back().serial;
+    if (newest < m_chat_newest) {
+        m_chat_back = 0;  // the chat was cleared
+    } else if (m_chat_back > 0) {
+        m_chat_back += static_cast<std::size_t>(newest - m_chat_newest);
+    }
+    m_chat_newest = newest;
+    const std::size_t lines = std::min(model.chat.size(), m_chat_rows);
+    m_chat_back = std::min(m_chat_back, model.chat.size() - lines);
     if (m_banner_seat) {
         layout_banner_choice(model, chat_top + 8);
     }
     for (std::size_t i = 0; i < lines; ++i) {
-        const ChatLine& line = model.chat[model.chat.size() - lines + i];
+        const ChatLine& line = model.chat[model.chat.size() - m_chat_back - lines + i];
         const std::int32_t y = chat_top + 8 + static_cast<std::int32_t>(i) * 28;
         if (line.name.empty()) {
             f.label(Rect{48, y, 604, 28}, line.text, Align::Left, Tone::Dim);
@@ -1130,6 +1152,7 @@ std::vector<MultiplayerEvent> MultiplayerMenu::key(const MultiplayerModel& model
                     e.kind = MultiplayerEvent::Kind::Say;
                     e.text = std::exchange(m_chat, {});
                     out.push_back(std::move(e));
+                    m_chat_back = 0;  // back to the newest lines, to see one's own
                 }
                 break;  // the chat line stays open
             }
