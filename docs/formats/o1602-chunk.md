@@ -122,6 +122,7 @@ whose version 2 carries trade routes with eight stops and version 3 stops with e
 `FLEE` version 3: the eight stops of version 2, each with eight wares instead of the original's
 three (one per hold of the ship, Open1602's page of a stop), the same record per ware.
 `FLEE` version 4: version 3 with the island number of each discovered-by entry as u16.
+`FLEE` version 5: version 4 with a boolean per ship after the white flag: the pirates have already plundered this surrender and leave the ship alone while the flag stays up (Open1602's own; the writer takes it only when a ship under the white flag has it).
 `ISLE` version 3: version 2 with the island number and the x and y of each deposit as u16.
 `PSTA` version 3: version 2 with a boolean per player after the switches: the player closed his city gates to foreign soldiers (Open1602's own; the writer takes it only when a player did).
 `MAPW` (own savegame only) version 2: see [o1602-save.md](o1602-save.md).
