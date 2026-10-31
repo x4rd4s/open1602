@@ -4,12 +4,15 @@
 // and the savegame section SCRP.
 
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "test_support.hpp"
 
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/script/game_scripts.hpp"
@@ -58,7 +61,7 @@ struct Game {
 
 std::vector<script::PackageScript> one(std::string package, std::string source) {
     std::vector<script::PackageScript> sources;
-    sources.push_back(script::PackageScript{std::move(package), std::move(source)});
+    sources.push_back(script::PackageScript{std::move(package), std::move(source), {}});
     return sources;
 }
 
@@ -399,4 +402,39 @@ TEST_CASE("script: scripts decide who wins and who is out") {
     const auto later = scripts->take_notes();
     REQUIRE(later.size() == 1);
     CHECK(later[0].text == "false\tfalse\tfalse\tfalse\tfalse");
+}
+
+TEST_CASE("script: a scenario's script runs beside its package's, with a state of its own") {
+    const std::filesystem::path folder = test::temp_path("o1602_scenario_script");
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder);
+    std::ofstream(folder / "north.lua", std::ios::binary) << "\xEF\xBB\xBFstate = {who = 'scenario'}\n";
+    assets::PackageScenario scenario;
+    scenario.id = "isles:north";
+    scenario.package = "isles";
+    std::vector<std::string> problems;
+    CHECK(!script::read_scenario_script(scenario, problems));  // no script
+    scenario.script = folder / "north.lua";
+    auto read = script::read_scenario_script(scenario, problems);
+    CHECK(problems.empty());
+    REQUIRE(read.has_value());
+    CHECK(read->package == "isles");
+    CHECK(read->name == "isles:north");
+    CHECK(read->source == "state = {who = 'scenario'}\n");
+    scenario.script = folder / "missing.lua";
+    CHECK(!script::read_scenario_script(scenario, problems));
+    CHECK(problems.size() == 1);
+    std::filesystem::remove_all(folder);
+
+    Game game;
+    auto sources = one("isles", "state = {who = 'package'}\n");
+    sources.push_back(std::move(*read));
+    auto scripts = game.run(std::move(sources));
+    game.ticks(2);
+    const auto states = scripts->save_states();
+    REQUIRE(states.size() == 2);
+    CHECK(states[0].package == "isles");
+    CHECK(states[1].package == "isles:north");
+    CHECK(states[0].data != states[1].data);
+    CHECK(states[0].random != states[1].random);
 }

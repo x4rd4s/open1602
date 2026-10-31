@@ -37,6 +37,7 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `figure_images.toml` | the original's figures and ships drawn with a package's images | [graphics.md](graphics.md#figures-and-ships) |
 | `levels.toml` | unlock levels: the original's changed, new ones after the 32nd, also of a new class | [levels.md](levels.md) |
 | `mod.toml` | the package's name, version, dependencies and load order | [packages.md](packages.md) |
+| `scenarios.toml` | scenarios of the package's own: map, names, briefing, stars, money, goals, script | [scenarios.md](scenarios.md) |
 
 Without a mod file the engine already has banners with tinted flags for any number of players
 ([flags.md](flags.md)), up to 12 players, worlds and islands beyond the original's sizes
@@ -171,6 +172,13 @@ of scenarios with transitions. The original's scenarios and campaigns play with 
 Open1602's own for a package's scenario: goals beyond the original's bits, start conditions for
 more players, transitions with carried-over values, texts and videos. Depends on item 6 for
 scripted goals.
+
+Part 1 done on 2026-10-31 ([scenarios.md](scenarios.md)): a package's `scenarios.toml` names maps
+(the original's `.szs`/`.szm` or Open1602's `.o1602`) with names and briefings per language, stars,
+money at the start, goals that become the humans' mission and a script of the scenario's own. The
+main menu lists them under a heading of their own; a saved game remembers its scenario (section
+`SCEN`) and runs its script again. Still open: campaigns (part 2) and factions of a package's own
+in a scenario (part 3, with item 8).
 
 ### 8. Factions of a package's own (section 3)
 

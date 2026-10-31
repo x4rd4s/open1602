@@ -652,6 +652,11 @@ public:
     /// in this game yet.
     [[nodiscard]] const std::vector<ScriptState>& script_states() const noexcept { return m_script_states; }
     void set_script_states(std::vector<ScriptState> states) noexcept { m_script_states = std::move(states); }
+    /// The scenario of a package the game was started from ("<package>:<name>",
+    /// docs/modding/scenarios.md), empty for any other game; kept with the savegame (section SCEN),
+    /// so that its script goes on when the game is loaded.
+    [[nodiscard]] const std::string& package_scenario() const noexcept { return m_package_scenario; }
+    void set_package_scenario(std::string id) noexcept { m_package_scenario = std::move(id); }
     /// The groups each player stored (by PlayerId), kept with the savegame (section UGRP) so that a
     /// loaded game has them again; the original forgets them. Only the interface reads them, and the
     /// game's fingerprint leaves them out: in a multiplayer game every computer knows only its own.
@@ -784,6 +789,7 @@ private:
     std::shared_ptr<const assets::ChunkFile> m_source;
     std::vector<std::uint8_t> m_simulation_state;
     std::vector<ScriptState> m_script_states;
+    std::string m_package_scenario;
     std::vector<UnitGroups> m_unit_groups;
     std::optional<Rules> m_saved_rules;
     OriginalBugs m_original_bugs;

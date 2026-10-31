@@ -6,6 +6,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "o1602/assets/goods.hpp"
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/mission.hpp"
@@ -262,6 +263,70 @@ void prepare_missions(World& world) {
         }
     }
     world.set_game_settings(settings);
+}
+
+void apply_package_scenario(World& world, const assets::PackageScenario& scenario, std::string_view language,
+                            std::vector<std::string>* warnings) {
+    std::vector<Player> players = world.players();
+    if (scenario.money) {
+        for (Player& p : players) {
+            if (p.role == PlayerRole::Human) {
+                p.money = *scenario.money;
+            }
+        }
+    }
+    const assets::ScenarioGoals& g = scenario.goals;
+    if (g.any()) {
+        Mission m;
+        m.text = scenario.briefing(language);
+        const auto set = [&m](std::uint32_t bit, std::int32_t& field, const std::optional<std::int32_t>& value) {
+            if (value) {
+                m.goals |= bit;
+                field = *value;
+            }
+        };
+        set(goal::kInhabitants, m.min_inhabitants, g.inhabitants);
+        set(goal::kCityCount, m.min_cities, g.cities);
+        set(goal::kBalance, m.min_balance, g.balance);
+        set(goal::kTradeBalance, m.min_trade_balance, g.trade_balance);
+        if (g.defeated) {
+            m.goals |= goal::kDefeatedCount;
+            m.min_defeated = *g.defeated;
+        }
+        m.goals |= (g.castle ? goal::kCastle : 0U) | (g.cathedral ? goal::kCathedral : 0U);
+        std::size_t slot = 0;
+        for (const auto& [id, tons] : g.goods) {
+            const auto ware = assets::ware_of(world.goods(), id);
+            if (!ware || !world.goods().is_trade(*ware)) {
+                if (warnings != nullptr) {
+                    warnings->push_back(scenario.id + ": the goal names " + id + ", a good this game does not know");
+                }
+                continue;
+            }
+            m.goals |= slot == 0 ? goal::kGoods1 : goal::kGoods2;
+            m.goods[slot++] = Mission::GoodsGoal{*ware, tons * 32};
+        }
+        if (g.city) {
+            m.goals |= goal::kCity1;
+            m.cities[0] = Mission::CityGoal{g.city->inhabitants, g.city->resident_class, g.city->count};
+        }
+        // Every human plays this mission; the computers keep theirs.
+        std::vector<Mission> missions = world.missions();
+        const auto index = static_cast<MissionId>(std::min<std::size_t>(missions.size(), kNoMission - 1));
+        if (index < missions.size()) {
+            missions[index] = std::move(m);
+        } else {
+            missions.push_back(std::move(m));
+        }
+        for (Player& p : players) {
+            if (p.role == PlayerRole::Human) {
+                p.mission = index;
+            }
+        }
+        world.set_missions(std::move(missions));
+    }
+    world.set_players(std::move(players));
+    prepare_missions(world);
 }
 
 std::uint32_t city_einwohner(const City& city, std::uint32_t workers) noexcept {

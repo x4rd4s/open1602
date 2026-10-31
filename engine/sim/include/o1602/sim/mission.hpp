@@ -13,10 +13,12 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/assets/package_scenarios.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/sim/player.hpp"
 
@@ -120,6 +122,13 @@ struct Mission {
 /// need a nest for new ships and can be defeated) if a mission of any player asks to defeat
 /// them (the original looks at the local player only, S-105).
 void prepare_missions(World& world);
+
+/// Starts a package's scenario (docs/modding/scenarios.md) on `world`, loaded from its map: the
+/// money of every human player, if the scenario gives it, and its goals, if any, as the mission of
+/// every human player, with the briefing in `language` as the mission's text. A goods goal whose
+/// good the world does not know is left out with a warning.
+void apply_package_scenario(World& world, const assets::PackageScenario& scenario, std::string_view language,
+                            std::vector<std::string>* warnings);
 
 /// Einwohner of a city as the city list and the missions count them (0x0047F790): house
 /// inhabitants of all classes plus the workers of its buildings.

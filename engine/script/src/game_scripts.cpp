@@ -15,14 +15,16 @@
 namespace o1602::script {
 
 struct GameScripts::Package {
-    std::string id;
+    std::string id;    ///< the package's
+    std::string name;  ///< what its state is saved under and its notes name (PackageScript::name)
     Sandbox sandbox;
     sim::Random random;
     bool started = false;  ///< on_start ran, or the savegame kept a state
     bool stopped = false;  ///< failed at its top level or too often
     std::size_t errors = 0;
 
-    Package(std::string package, Limits limits) : id(std::move(package)), sandbox(limits) {}
+    Package(std::string package, std::string script_name, Limits limits)
+        : id(std::move(package)), name(std::move(script_name)), sandbox(limits) {}
 };
 
 namespace {
@@ -156,24 +158,39 @@ std::vector<PackageScript> read_package_scripts(std::span<const assets::ModPacka
             continue;
         }
         const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-        scripts.push_back(PackageScript{p.id, std::string(core::skip_utf8_bom(text))});
+        scripts.push_back(PackageScript{p.id, std::string(core::skip_utf8_bom(text)), {}});
     }
     return scripts;
 }
 
+std::optional<PackageScript> read_scenario_script(const assets::PackageScenario& scenario,
+                                                  std::vector<std::string>& problems) {
+    if (scenario.script.empty()) {
+        return std::nullopt;
+    }
+    auto bytes = core::read_file(scenario.script);
+    if (!bytes) {
+        problems.push_back(scenario.id + ": its script: " + bytes.error().message);
+        return std::nullopt;
+    }
+    const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+    return PackageScript{scenario.package, std::string(core::skip_utf8_bom(text)), scenario.id};
+}
+
 GameScripts::GameScripts(std::vector<PackageScript> scripts, const sim::World& world, Limits limits) : m_world(&world) {
     for (PackageScript& script : scripts) {
-        auto package = std::make_unique<Package>(std::move(script.package), limits);
+        std::string name = script.name.empty() ? script.package : std::move(script.name);
+        auto package = std::make_unique<Package>(std::move(script.package), std::move(name), limits);
         Package& p = *package;
         m_packages.push_back(std::move(package));
         add_api(p);
 
         const auto saved = std::find_if(world.script_states().begin(), world.script_states().end(),
-                                        [&](const sim::ScriptState& s) { return s.package == p.id; });
-        p.random = saved != world.script_states().end() ? saved->random : new_random(world, p.id);
+                                        [&](const sim::ScriptState& s) { return s.package == p.name; });
+        p.random = saved != world.script_states().end() ? saved->random : new_random(world, p.name);
         p.started = saved != world.script_states().end();
 
-        if (const core::Status ran = p.sandbox.run(p.id, script.source); !ran) {
+        if (const core::Status ran = p.sandbox.run(p.name, script.source); !ran) {
             fail(p, ran.error().message);
             p.stopped = true;
             continue;
@@ -193,7 +210,7 @@ void GameScripts::add_api(Package& package) {
     sandbox.set_random([&package] { return package.random.next(); });
     sandbox.set_print([this, &package](std::string_view line) {
         if (m_notes.size() < kMaxPendingMessages) {
-            m_notes.push_back(ScriptNote{package.id, std::string(line), false});
+            m_notes.push_back(ScriptNote{package.name, std::string(line), false});
         }
     });
     const auto add = [&sandbox](std::string_view name, Sandbox::HostFunction function) {
@@ -417,13 +434,13 @@ void GameScripts::call(Package& package, std::string_view function, std::span<co
 void GameScripts::fail(Package& package, const std::string& message) {
     ++package.errors;
     if (m_notes.size() < kMaxPendingMessages) {
-        m_notes.push_back(ScriptNote{package.id, message, true});
+        m_notes.push_back(ScriptNote{package.name, message, true});
     }
     if (package.errors >= kMaxScriptErrors && !package.stopped) {
         package.stopped = true;
         if (m_notes.size() < kMaxPendingMessages) {
             m_notes.push_back(ScriptNote{
-                package.id, "stopped for the rest of the game after " + std::to_string(kMaxScriptErrors) + " errors",
+                package.name, "stopped for the rest of the game after " + std::to_string(kMaxScriptErrors) + " errors",
                 true});
         }
     }
@@ -433,14 +450,14 @@ std::vector<sim::ScriptState> GameScripts::save_states() {
     std::vector<sim::ScriptState> states;
     for (const auto& package : m_packages) {
         sim::ScriptState state;
-        state.package = package->id;
+        state.package = package->name;
         state.random = package->random;
         if (auto data = package->sandbox.save_table(kStateTable)) {
             state.data = std::move(data).value();
         } else if (m_notes.size() < kMaxPendingMessages) {
             // Not counted as a failure: saving also happens on one computer alone (a player saves),
             // and the scripts must go on the same everywhere.
-            m_notes.push_back(ScriptNote{package->id, data.error().message, true});
+            m_notes.push_back(ScriptNote{package->name, data.error().message, true});
         }
         states.push_back(std::move(state));
     }
@@ -458,7 +475,7 @@ std::vector<ScriptNote> GameScripts::take_notes() {
 std::vector<std::string> GameScripts::packages() const {
     std::vector<std::string> ids;
     for (const auto& package : m_packages) {
-        ids.push_back(package->id);
+        ids.push_back(package->name);
     }
     return ids;
 }
