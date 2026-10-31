@@ -1622,7 +1622,7 @@ TEST_CASE("ai: a stage's build order from the game's balance (computers.toml) is
     // inhabitants alone want one.
     const auto mills_built = [](bool with_order) {
         Game g;
-        constexpr std::uint32_t kPepperMill = 20992;
+        static constexpr std::uint32_t kPepperMill = 20992;
         g.buildings = make_buildings(
             "  @Nummer: 13\n  Id: 20992\n  Kind: 14\n  Gfx: 100\n  Size: 2, 2\n"
             "  Objekt: HAUS_PRODTYP\n    Kind: 1\n    Maxlager: 4\n    Ware: 59\n"
