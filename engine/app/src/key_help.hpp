@@ -57,7 +57,8 @@ struct KeyHelpEntry {
     const std::vector<KeyHelpEntry>& entries, const std::function<std::string(ui::KeyAction)>& label);
 
 /// Adds the clicks with a modifier that windows know and no key binding names (Shift on the castle's
-/// send-out arrow, on cannons in a ship's hold) to the units of the units and ships page.
+/// send-out arrow, on cannons in a ship's hold) to the units of the units and ships page, and the
+/// building clicked twice (the circles of all of its type on the island) to the map.
 void add_click_lines(std::array<KeyHelpPage, kKeyHelpPages>& pages);
 
 /// The rows line `line` of section `section` takes: its text wrapped to the width of its column.

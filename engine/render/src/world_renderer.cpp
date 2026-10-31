@@ -222,8 +222,14 @@ TileLighting TileLighting::circle(sim::PlayerId player, const sim::Catchment& ar
     TileLighting l;
     l.m_kind = Kind::Circle;
     l.m_player = player;
-    l.m_lit.set(area);
+    l.add_circle(area);
     return l;
+}
+
+TileLighting& TileLighting::add_circle(const sim::Catchment& area) {
+    m_kind = Kind::Circle;
+    m_lit.emplace_back().set(area);
+    return *this;
 }
 
 TileLighting& TileLighting::outline(const sim::Catchment& area) {

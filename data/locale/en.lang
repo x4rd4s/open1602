@@ -77,6 +77,8 @@ keys.click = click
 keys.click.castle_all = Castle, send-out arrow: all trained units
 keys.click.cannons = Cannons in a ship's hold: mount as many as fit
 keys.click.trade_cart = City window, trade cart button: another trade cart (one per Kontor and market)
+keys.click.twice = double click
+keys.click.catchments = Own building with a catchment area: the areas of all buildings of its type on the island
 # Replaces the digit of a group key ("Ctrl+1" becomes "Ctrl+1 .. 0")
 keys.group_digits = 1 .. 0
 keys.modifier.ctrl = Ctrl+
