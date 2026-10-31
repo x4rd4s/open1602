@@ -197,6 +197,18 @@ TEST_CASE("endless setup: the values reach the rules and the world") {
     CHECK(!read.rules.more_carts);
     CHECK(app::setup_item_offered(app::SetupScope::Scenario, SetupItem::TradeCarts));
     CHECK(!EndlessSetup::original().rules.more_carts);
+    // Fertile fields: by the island by default and in the original, every field where the crop grows on choice.
+    CHECK(!s.rules.fertile_fields);
+    CHECK(value_of(s, SetupItem::FertileFields) == ui::tr("setup.fertile_fields.original"));
+    app::choose(s, SetupItem::FertileFields, 1);
+    CHECK(s.rules.fertile_fields);
+    CHECK(app::write_setup(s).find("endless.fertile_fields = all\n") != std::string::npos);
+    app::read_setup(read, app::write_setup(s));
+    CHECK(read.rules.fertile_fields);
+    CHECK(app::read_setup_line(read, "fertile_fields", "original"));
+    CHECK(!read.rules.fertile_fields);
+    CHECK(app::setup_item_offered(app::SetupScope::Scenario, SetupItem::FertileFields));
+    CHECK(!EndlessSetup::original().rules.fertile_fields);
 
     // The world's items count only for a world of its own.
     CHECK(!app::setup_item_used(s, SetupItem::Players));

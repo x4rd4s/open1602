@@ -764,6 +764,10 @@ bool tile_fertile_at(const World& world, const assets::BuildingTable& buildings,
     const assets::BuildingType* g = ground.empty() ? nullptr : buildings.by_sprite(ground.sprite);
     const std::uint32_t edge = g != nullptr ? g->edge_growth : 128;
     std::uint32_t f = std::min<std::uint32_t>(island_fertility(island, ware) * edge >> 7, 128);
+    // Rules::fertile_fields: a crop that grows here at all grows on every tile.
+    if (world.fertile_fields() && f != 0 && ware >= ware::kCornField && ware <= ware::kCocoaField) {
+        f = 128;
+    }
     // A drought takes its share, except from grass, trees and fish.
     if (drought != 0 && ware != ware::kGrass && ware != ware::kTree && ware != ware::kFish) {
         f -= drought * f / 128;
@@ -2322,16 +2326,73 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
     const MapCell& cell =
         world.islands()[island].map.top(static_cast<std::uint32_t>(origin.x), static_cast<std::uint32_t>(origin.y));
     const bool natives = b->city != MapCell::kNoCity && world.acts_as(cell.owner, FactionBehaviour::Natives);
+    const Player* owner = world.player(cell.owner);
+    const bool computer = b->city != MapCell::kNoCity && owner != nullptr && owner->role == PlayerRole::Computer &&
+                          world.acts_as(cell.owner, FactionBehaviour::Settlers);
     Builder builder(world, buildings, island, events);
     builder.destroy(*b);
-    if (natives && !world.original_bugs().native_land && native_village_gone(world, buildings, island, b->city)) {
-        // Open1602: a village without its chief's house, market and huts is gone, and its land is
-        // free for anybody's market; as in the original (OriginalBugs::native_land) the ruin of the
-        // chief's house holds it like a destroyed Kontor.
+    // Open1602: a village without its chief's house, market and huts is gone, and so is a computer
+    // player's city without Kontor, market, tower and houses: its land is free for anybody's
+    // Kontor or market. As in the original (OriginalBugs::native_land) the ruin of the chief's
+    // house or of the Kontor holds it.
+    if (!world.original_bugs().native_land && ((natives && native_village_gone(world, buildings, island, b->city)) ||
+                                               (computer && computer_city_gone(world, buildings, island, b->city)))) {
         builder.dissolve_city(b->city);
     }
     builder.finish();
     return true;
+}
+
+bool computer_city_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                        std::uint8_t city) {
+    if (island >= world.islands().size() || world.city(island, city) == nullptr ||
+        !city_defenceless(world, buildings, island, city)) {
+        return false;
+    }
+    const IslandMap& map = world.islands()[island].map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const MapCell& c = map.top(x, y);
+            if (c.empty() || c.city != city) {
+                continue;
+            }
+            const assets::BuildingType* t = buildings.by_sprite(c.sprite);
+            if (t != nullptr && t->prod_kind == prod::kHouse && !t->destroyed) {
+                return false;  // people still live there
+            }
+        }
+    }
+    return true;
+}
+
+std::size_t give_up_razed_cities(World& world, const assets::BuildingTable& buildings,
+                                 std::vector<ConstructionEvent>* events) {
+    if (world.original_bugs().native_land) {
+        return 0;
+    }
+    std::vector<std::pair<std::uint16_t, std::uint8_t>> gone;
+    for (const City& c : world.cities()) {
+        // Cheap first: only a city whose Kontor lies in ruins is given up.
+        if (!c.warehouse_x || !c.warehouse_y) {
+            continue;
+        }
+        const auto kontor = building_at(world, buildings, c.island, {*c.warehouse_x, *c.warehouse_y});
+        if (!kontor || !kontor->type->destroyed) {
+            continue;
+        }
+        const Player* owner = world.player(c.owner);
+        if (owner != nullptr && owner->role == PlayerRole::Computer &&
+            world.acts_as(c.owner, FactionBehaviour::Settlers) &&
+            computer_city_gone(world, buildings, c.island, c.index)) {
+            gone.emplace_back(c.island, c.index);
+        }
+    }
+    for (const auto& [island, city] : gone) {
+        Builder builder(world, buildings, island, events);
+        builder.dissolve_city(city);
+        builder.finish();
+    }
+    return gone.size();
 }
 
 bool native_village_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,

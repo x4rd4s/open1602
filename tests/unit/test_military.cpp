@@ -63,6 +63,7 @@ assets::BuildingTable make_buildings(bool tree = false, bool village = false) {
             "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"  // open ground
             "  @Nummer: 1\n  Id: 20103\n  Kind: 14\n  Gfx: 2\n  Size: 2, 2\n  Maxenergy: 20\n  NoShotFlg: 1\n"
             "  Ruinenr: 255\n"  // a house
+            "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n"
             "  @Nummer: 2\n  Id: 20104\n  Kind: 14\n  Gfx: 6\n  Size: 2, 2\n  Maxenergy: 50\n  NoShotFlg: 1\n"
             "  Objekt: HAUS_PRODTYP\n    Kind: 22\n  EndObj\n"  // doctor (KLINIK)
             "  @Nummer: 3\n  Id: 20105\n  Kind: 6\n  Gfx: 10\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
@@ -623,6 +624,25 @@ TEST_CASE("military: a Kontor over the destroyed Kontor of a defenceless city ta
     CHECK(f.world.islands()[0].map.top(15, 2).owner == 0);
     CHECK(std::any_of(events.begin(), events.end(),
                       [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityTaken; }));
+    // The same from a ship before the ruin, as its Kontor button offers it.
+    {
+        Field h;
+        h.build(kKontorDestroyed, 20, 5, 1);
+        h.world.city(0, 0)->warehouse_x = 20;
+        h.world.city(0, 0)->warehouse_y = 5;
+        sim::Ship ship = sim::make_ship("Boat", 30, 8, 21, 0);
+        ship.cargo.resize(2);
+        const auto& m = h.buildings.materials();
+        ship.cargo[0] = sim::CargoSlot{m.tools, 30 * 32, 0};
+        ship.cargo[1] = sim::CargoSlot{m.wood, 30 * 32, 0};
+        h.world.add_ship(ship);
+        sim::BuildOrder from_ship = order;
+        from_ship.ship = h.world.ships().back().id;
+        const sim::BuildPlan taken = sim::execute_build(h.world, h.buildings, from_ship, {}, nullptr);
+        CHECK(taken.takeover);
+        CHECK(taken.placed == 1);
+        CHECK(h.world.city(0, 0)->owner == 0);
+    }
     // A city with a standing Kontor cannot be taken.
     Field g;
     g.build(kKontor, 20, 5, 1);
@@ -701,6 +721,68 @@ TEST_CASE("military: as in the original, the ruins of a village without huts kee
     CHECK(f.world.islands()[0].map.top(24, 12).city == 1);
     CHECK(std::none_of(f.construction.begin(), f.construction.end(),
                        [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
+}
+
+TEST_CASE("military: a computer gives up a city without Kontor, market, tower and houses") {
+    for (const bool original : {false, true}) {
+        Field f;
+        sim::OriginalBugs bugs;
+        bugs.native_land = original;
+        f.world.set_original_bugs(bugs);
+        // Player 1, a computer: its Kontor destroyed, two houses left.
+        f.build(kKontorDestroyed, 20, 5, 1);
+        f.world.city(0, 0)->warehouse_x = 20;
+        f.world.city(0, 0)->warehouse_y = 5;
+        for (const std::int32_t x : {14, 16}) {
+            f.build(kHouse, x, 9, 1);
+        }
+        f.world.island(0).map.set_city(24, 12, 0, 1);
+        CHECK(sim::city_defenceless(f.world, f.buildings, 0, 0));
+        CHECK(!sim::computer_city_gone(f.world, f.buildings, 0, 0));
+        f.start();
+        f.military->damage_building(0, 14, 9, 32 * 30, true, 0, &f.construction);
+        f.run(50);
+        REQUIRE(f.world.city(0, 0) != nullptr);  // one house still stands: it can be taken over
+        f.military->damage_building(0, 16, 9, 32 * 30, true, 0, &f.construction);
+        f.run(50);
+        CHECK(f.count(sim::MilitaryEvent::Kind::BuildingDestroyed) == 2);
+        if (original) {
+            // The ruin of the Kontor holds the land, as in the original.
+            CHECK(f.world.city(0, 0) != nullptr);
+            CHECK(f.world.islands()[0].map.top(24, 12).city == 0);
+        } else {
+            CHECK(f.world.city(0, 0) == nullptr);
+            CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+            CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
+        }
+    }
+    // Razed before (a savegame): given up with the cities' next check.
+    {
+        Field r;
+        r.build(kKontorDestroyed, 20, 5, 1);
+        r.world.city(0, 0)->warehouse_x = 20;
+        r.world.city(0, 0)->warehouse_y = 5;
+        std::vector<sim::ConstructionEvent> events;
+        CHECK(sim::give_up_razed_cities(r.world, r.buildings, &events) == 1);
+        CHECK(r.world.city(0, 0) == nullptr);
+        CHECK(std::any_of(events.begin(), events.end(),
+                          [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
+        // Not a city whose Kontor stands, nor one of a human player.
+        Field k;
+        k.build(kKontor, 20, 5, 1);
+        k.world.city(0, 0)->warehouse_x = 20;
+        k.world.city(0, 0)->warehouse_y = 5;
+        k.build(kKontorDestroyed, 10, 5, 0, 1);
+        CHECK(sim::give_up_razed_cities(k.world, k.buildings, nullptr) == 0);
+    }
+    // A human player's city stays.
+    Field h;
+    h.build(kKontorDestroyed, 20, 5, 0);
+    h.build(kHouse, 14, 9, 0);
+    h.start();
+    h.military->damage_building(1, 14, 9, 32 * 30, true, 0, &h.construction);
+    h.run(50);
+    CHECK(h.world.city(0, 0) != nullptr);
 }
 
 TEST_CASE("military: a group keeps its shape; queued orders follow one after another") {
@@ -931,6 +1013,7 @@ assets::BuildingTable make_ruin_buildings() {
         "  @Nummer: 1\n  Id: 20102\n  Kind: 23\n  Gfx: 1\n  Size: 1, 1\n"                   // beach
         "  @Nummer: 2\n  Id: 20103\n  Kind: 14\n  Gfx: 2\n  Size: 2, 2\n  Maxenergy: 20\n"  // a house
         "  Ruinenr: 255\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n"
         "  @Nummer: 3\n  Id: 20108\n  Kind: 35\n  Gfx: 30\n  Size: 2, 2\n  Maxenergy: 20\n"
         "  KreuzBase: 6\n  Ausbauflg: 1\n  Ruinenr: 8\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n  EndObj\n"  // Kontor I

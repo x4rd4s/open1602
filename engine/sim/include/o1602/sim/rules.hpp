@@ -193,8 +193,9 @@ struct OriginalBugs {
 
     // Opponents
     /// A native village that lost its chief's house, market and huts keeps its land: the ruins hold
-    /// it as a destroyed Kontor does, and nobody can build there (fixed: the village is gone and its
-    /// land is free).
+    /// it as a destroyed Kontor does, and nobody can build there; so does a computer player's city
+    /// without Kontor, market, tower and houses (fixed: the village or city is gone and its land is
+    /// free).
     bool native_land = false;
     /// S-097 to S-099, the original's computer players (docs/re/ai.md): while a settlement ship
     /// sails no city develops, a city whose colony search failed waits for it for ever, an
@@ -295,6 +296,13 @@ struct Rules {
     /// Which towns are discovered from the start (players, natives, pirates) or only by ship.
     Reveal reveal = Reveal::Original;
 
+    /// Open1602: every field bears where its crop grows on the island at all. In the original only
+    /// some tiles of an island carry a crop, more the more fertile the island is for it (all of them
+    /// only on a fully fertile one); with this setting every tile carries as on a fully fertile
+    /// island. An island that does not grow the crop still does not, and droughts still wither.
+    /// Off by default and with the original's settings.
+    bool fertile_fields = false;
+
     /// Bugs of the original brought back; none by default, also in savegames of the original.
     OriginalBugs bugs{};
 
@@ -325,6 +333,7 @@ struct Rules {
         r.computers_buy_ships = false;
         r.more_carts = false;
         r.reveal = Reveal::Original;
+        r.fertile_fields = false;
         r.bugs = OriginalBugs::all();
         return r;
     }

@@ -225,9 +225,9 @@ inline constexpr assets::Rgba kCircleOutline{255, 230, 0, 255};
 /// Tiles drawn darker, as the original does while the player builds (the fourth byte of its world
 /// map cells picks a shading table, 0x00486B60): only the land the player can build on stays lit. A clicked
 /// building with a catchment narrows that to the land inside its circle, a clicked Kontor adds
-/// the water its ships trade from. A building being placed shows its own circle as a dashed border,
-/// drawn whole, over land and water alike; the circle of a building still clicked stays lit beside it.
-/// The land of other players can get a dotted border too (History Edition).
+/// the water its ships trade from, a clicked fisher's hut the water inside its circle. A building being placed shows
+/// its own circle as a dashed border, drawn whole, over land and water alike; the circle of a building still clicked
+/// stays lit beside it. The land of other players can get a dotted border too (History Edition).
 class TileLighting {
 public:
     /// The tiles a building covers, in world tiles.
@@ -252,6 +252,11 @@ public:
     /// while the player builds.
     TileLighting& foreign_borders() noexcept {
         m_foreign_borders = true;
+        return *this;
+    }
+    /// Keeps the water inside the lit circle lit too: the fishing grounds of a fisher's hut.
+    TileLighting& water() noexcept {
+        m_water = true;
         return *this;
     }
     /// Keeps the water lit that ships reach the building at tile (x, y) of `island` from.
@@ -302,6 +307,7 @@ private:
     Circle m_lit;      ///< the land of a clicked building (Kind::Circle)
     Circle m_outline;  ///< the building being placed
     bool m_foreign_borders = false;
+    bool m_water = false;  ///< the water in m_lit stays lit
     // The building whose harbour water stays lit (world == nullptr: none).
     const sim::World* m_world = nullptr;
     const assets::BuildingTable* m_buildings = nullptr;

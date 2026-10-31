@@ -60,7 +60,7 @@ constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 constexpr Group kGroups[] = {
     {"setup.group.economy", SetupItem::Refund, SetupItem::TradeCarts, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
-    {"setup.group.disasters", SetupItem::Droughts, SetupItem::Volcanoes, kLeft},
+    {"setup.group.nature", SetupItem::FertileFields, SetupItem::Volcanoes, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},
     {"setup.group.opponents", SetupItem::ComputerPlayers, SetupItem::Reveal, kRight},
 };
@@ -228,12 +228,16 @@ void GameSettingsMenu::layout() {
                                             kMinLabelW, kRowW - 4 - kMinValueW);
     const std::int32_t value_w = kRowW - 4 - label_w;
     // A group's frame and heading; the top of its first row.
+    // Without a heading (the ways to the other pages) the frame holds just the rows.
     const auto group = [&](std::string_view heading, std::int32_t rows, std::int32_t x) {
         std::int32_t& y0 = x < kScreen.x + kScreen.w / 2 ? left_y : right_y;
-        f.panel(Rect{x, y0, kGroupW, 44 + rows * kRowH});
-        f.label(Rect{x + 12, y0 + 6, kRowW, 32}, ui::tr(heading), Align::Left, Tone::Heading);
-        const std::int32_t first = y0 + 40;
-        y0 += 44 + rows * kRowH + kGap;
+        const std::int32_t head = heading.empty() ? 8 : 44;
+        f.panel(Rect{x, y0, kGroupW, head + rows * kRowH});
+        if (!heading.empty()) {
+            f.label(Rect{x + 12, y0 + 6, kRowW, 32}, ui::tr(heading), Align::Left, Tone::Heading);
+        }
+        const std::int32_t first = y0 + head - 4;
+        y0 += head + rows * kRowH + kGap;
         return first;
     };
     // A row's label; the place of its value.
@@ -264,7 +268,7 @@ void GameSettingsMenu::layout() {
     if (m_page == Page::Settings) {
         // Below the disasters: the ways to the pages of the victory conditions and of the original's
         // bugs, each with what is chosen (to look at too, for a game that is only shown).
-        std::int32_t top = group("setup.group.more", victory_row ? 2 : 1, kLeft);
+        std::int32_t top = group({}, victory_row ? 2 : 1, kLeft);
         if (victory_row) {
             const Rect value = row(kLeft, top, ui::tr("setup.victory"), m_setup.rules.victory.active());
             f.button(kVictory, value, ui::tr("setup.victory.open", {victory_summary(m_setup.rules.victory)}));

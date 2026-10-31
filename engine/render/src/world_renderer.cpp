@@ -294,6 +294,9 @@ bool TileLighting::dimmed(std::int64_t x, std::int64_t y, const sim::MapCell* ce
                                static_cast<std::int32_t>(y))) {
         return false;
     }
+    if (cell == nullptr && m_water && m_kind == Kind::Circle && in_circle(x, y)) {
+        return false;
+    }
     if (cell == nullptr || cell->owner != m_player) {
         return true;
     }

@@ -147,6 +147,8 @@ public:
     /// The selection changed: the windows follow (a single ship in the info mode, groups and land
     /// units in the military mode).
     void selection_changed(bool box);
+    /// The units are no longer selected: from the military mode back to the player status.
+    void leave_military_mode();
     /// Orders to the simulation; those that cannot be taken back wait for an answer (ADR 0010).
     void submit_orders(std::vector<sim::Command> orders, bool sound = true);
     /// The field of the farm (plantation, forester) at the island tile on the open ground it

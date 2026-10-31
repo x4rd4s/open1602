@@ -167,6 +167,18 @@ struct ConstructionEvent {
 [[nodiscard]] bool native_village_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                                        std::uint8_t city);
 
+/// Whether a computer player gives up its city `city` (Open1602): defenceless (city_defenceless)
+/// and no house of it standing. Nobody lives there to take over, and its Kontor's ruin would hold
+/// the land for ever.
+[[nodiscard]] bool computer_city_gone(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                                      std::uint8_t city);
+
+/// Dissolves every city a computer player has given up (computer_city_gone), its land becoming
+/// free; nothing with OriginalBugs::native_land. Checked with the cities every 10 s, so that a
+/// city razed in a savegame goes too. Returns how many went.
+std::size_t give_up_razed_cities(World& world, const assets::BuildingTable& buildings,
+                                 std::vector<ConstructionEvent>* events);
+
 /// Builds what plan_build() accepts and pays for it. New cities take the next name of
 /// `city_names` (round robin, World::city_name_index()).
 BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, const BuildOrder& order,
@@ -223,8 +235,9 @@ void fit_connection(World& world, const assets::BuildingTable& buildings, std::u
 
 /// Destroys the building with origin `origin` to ruins without an order of its owner (a fire,
 /// 0x00463F40): like demolishing, the territory is checked again afterwards. A native village
-/// left without its chief's house, market and huts (native_village_gone) is dissolved, and its
-/// land becomes free (not with OriginalBugs::native_land).
+/// left without its chief's house, market and huts (native_village_gone) and a city a computer
+/// player gives up (computer_city_gone) are dissolved, and their land becomes free (not with
+/// OriginalBugs::native_land).
 bool destroy_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island, TilePos origin,
                       std::vector<ConstructionEvent>* events);
 

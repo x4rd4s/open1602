@@ -10,6 +10,7 @@
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
+#include "o1602/sim/save_game.hpp"
 #include "o1602/sim/simulation.hpp"
 
 using namespace o1602;
@@ -558,6 +559,59 @@ TEST_CASE("construction: fields grow where the island is fertile, forest becomes
     REQUIRE(withered.placed == 1);
     CHECK(original.at(7, 13)->id != kField);
     CHECK(original.world.players()[0].money < before);
+}
+
+TEST_CASE("construction: with every field fertile a crop bears on every tile where it grows at all") {
+    // Tobacco in the north without its bit grows half: pattern 2, 16 of 32 tiles carry.
+    const auto refused = [](bool all, std::uint32_t fertility) {
+        Island island(fertility, 0);
+        island.world.set_fertile_fields(all);
+        island.found();
+        std::size_t n = 0;
+        for (std::int32_t x = 7; x <= 12; ++x) {
+            n += island.build({{kField, x, 13, 0, 0}}).items[0].refusal == sim::BuildRefusal::Infertile ? 1U : 0U;
+        }
+        return n;
+    };
+    CHECK(refused(false, 0x0U) > 0);
+    CHECK(refused(true, 0x0U) == 0);
+    // An island that does not grow the crop still does not (but for the original's two tiles in 32).
+    Island south(0x0U, 1);
+    south.world.set_fertile_fields(true);
+    south.found();
+    std::size_t barren = 0;
+    for (std::int32_t x = 7; x <= 12; ++x) {
+        barren += south.build({{kField, x, 13, 0, 0}}).items[0].refusal == sim::BuildRefusal::Infertile ? 1U : 0U;
+    }
+    CHECK(barren == 4);
+    // Droughts still take their share.
+    Island dry(0x0U, 0);
+    dry.world.set_fertile_fields(true);
+    dry.found();
+    dry.world.island(0).drought.strength = 0x60;
+    std::size_t withered = 0;
+    for (std::int32_t x = 7; x <= 12; ++x) {
+        withered += sim::tile_fertile(dry.world, dry.buildings, 0, sim::ware::kTobaccoField, x, 13) ? 0U : 1U;
+    }
+    CHECK(withered > 0);
+}
+
+TEST_CASE("construction: the rule for fertile fields is kept in the savegame") {
+    const assets::BuildingTable buildings = make_buildings();
+    for (const bool all : {false, true}) {
+        sim::World world(60, 40);
+        sim::Rules rules;
+        rules.fertile_fields = all;
+        world.set_saved_rules(rules);
+        auto bytes = sim::write_game(world, buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, buildings);
+        REQUIRE(loaded.ok());
+        REQUIRE(loaded->saved_rules().has_value());
+        CHECK(loaded->saved_rules()->fertile_fields == all);
+    }
+    CHECK(!sim::Rules::original().fertile_fields);
+    CHECK(!sim::Rules::open1602().fertile_fields);
 }
 
 TEST_CASE("construction: forest is planted on every tile, fertile or not") {

@@ -671,6 +671,10 @@ public:
     /// from its rules; they are not saved, the rules are.
     [[nodiscard]] const OriginalBugs& original_bugs() const noexcept { return m_original_bugs; }
     void set_original_bugs(const OriginalBugs& bugs) noexcept { m_original_bugs = bugs; }
+    /// Whether every field bears where its crop grows at all (Rules::fertile_fields), set like the
+    /// bugs above.
+    [[nodiscard]] bool fertile_fields() const noexcept { return m_fertile_fields; }
+    void set_fertile_fields(bool on) noexcept { m_fertile_fields = on; }
 
     /// Eruptions, lava in flight and the time of the next eruption (volcanoes.hpp).
     [[nodiscard]] const VolcanoState& volcanoes() const noexcept { return m_volcanoes; }
@@ -783,6 +787,7 @@ private:
     std::vector<UnitGroups> m_unit_groups;
     std::optional<Rules> m_saved_rules;
     OriginalBugs m_original_bugs;
+    bool m_fertile_fields = false;
     std::vector<CostBuilding> m_cost_buildings;
     std::unordered_map<std::uint64_t, std::uint32_t> m_house_index;       ///< key: island, y, x
     std::unordered_map<std::uint64_t, std::uint32_t> m_production_index;  ///< key: island, y, x

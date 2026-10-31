@@ -49,7 +49,8 @@ enum RuleKey : std::uint16_t {
     kRevealNone = 41,       // 1: Reveal::None, under its own key so older versions read the original's way
     kNoShipPurchases = 42,  // 1: the computers buy no ships (Rules::computers_buy_ships off)
     kBugNativeLand = 43,
-    kOneCart = 44,  // 1: one trade cart per player and island (Rules::more_carts off)
+    kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
+    kFertileFields = 45,  // 1: every field bears where its crop grows (Rules::fertile_fields)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -199,6 +200,10 @@ void write_rules(Writer& out, const Rules& r) {
     if (!r.more_carts) {
         values.emplace_back(kOneCart, 1U);
     }
+    // Every field bearing only when so: the original's way keeps the bytes.
+    if (r.fertile_fields) {
+        values.emplace_back(kFertileFields, 1U);
+    }
     // The towns shown from the start only when there are any: the original's way keeps the bytes.
     if (r.reveal == Reveal::All) {
         values.emplace_back(kReveal, 2U);
@@ -327,6 +332,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kOneCart:
                 r.more_carts = v == 0;
+                break;
+            case kFertileFields:
+                r.fertile_fields = v != 0;
                 break;
             case kWinInhabitants:
                 r.victory.inhabitants = v;

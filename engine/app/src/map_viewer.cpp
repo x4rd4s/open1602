@@ -1117,6 +1117,9 @@ std::optional<render::TileLighting> MapViewer::building_lighting(std::uint16_t i
     }
     render::TileLighting l = render::TileLighting::circle(
         m_local_player, world_catchment(island, sim::catchment_of(*t.building, cell.rotation, sim::TilePos{x, y})));
+    if (t.building->prod_kind == sim::prod::kFisher) {
+        l.water();  // where its boat fishes
+    }
     for (const sim::City& c : m_state->world.cities()) {
         if (c.island == island && c.warehouse_x == x && c.warehouse_y == y) {
             l.harbour(m_state->world, m_buildings, island, x, y);  // the Kontor: the water of its ships too

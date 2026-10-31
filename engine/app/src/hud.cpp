@@ -1855,8 +1855,10 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
         const float unit = std::max(1.0F, std::round(static_cast<float>(s)));
         const SDL_Rect clip{at.x, at.y, at.w, at.h};
         SDL_SetRenderClipRect(m_sdl, &clip);
-        // The visible part of the map as in the original (0x0043B0E0): each edge dashed, two pixels
-        // on and two off (0x00498010), white over a blue shadow one pixel lower.
+        // The visible part of the map, each edge dashed two pixels on and two off as in the
+        // original. The original draws its single pixels white over a blue shadow one pixel lower,
+        // which hardly shows on the blue sea and the light islands; Open1602 draws the dashes as
+        // squares of the interface's scale, white with a black border all round.
         std::array<SDL_FPoint, 4> corners{};
         for (std::size_t i = 0; i < 4; ++i) {
             corners[i] = SDL_FPoint{static_cast<float>(at.x + view[i].first * fx),
@@ -1875,14 +1877,20 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
                 }
             }
         }
-        std::vector<SDL_FPoint> shadow = dashes;
-        for (SDL_FPoint& p : shadow) {
-            p.y += unit;
+        std::vector<SDL_FRect> border;
+        std::vector<SDL_FRect> marks;
+        border.reserve(dashes.size());
+        marks.reserve(dashes.size());
+        for (const SDL_FPoint& p : dashes) {
+            const float x = std::floor(p.x - unit / 2.0F);
+            const float y = std::floor(p.y - unit / 2.0F);
+            border.push_back(SDL_FRect{x - 1.0F, y - 1.0F, unit + 2.0F, unit + 2.0F});
+            marks.push_back(SDL_FRect{x, y, unit, unit});
         }
-        SDL_SetRenderDrawColor(m_sdl, 0, 0, 255, 255);
-        SDL_RenderPoints(m_sdl, shadow.data(), static_cast<int>(shadow.size()));
+        SDL_SetRenderDrawColor(m_sdl, 0, 0, 0, 255);
+        SDL_RenderFillRects(m_sdl, border.data(), static_cast<int>(border.size()));
         SDL_SetRenderDrawColor(m_sdl, 255, 255, 255, 255);
-        SDL_RenderPoints(m_sdl, dashes.data(), static_cast<int>(dashes.size()));
+        SDL_RenderFillRects(m_sdl, marks.data(), static_cast<int>(marks.size()));
         // The own ships, and in military mode the own land units, as blue squares of 2 x 2 pixels
         // (0x0045D1E0, 0x0045D2B0); nothing of the other players.
         SDL_SetRenderDrawColor(m_sdl, 0, 0, 255, 255);

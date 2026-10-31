@@ -63,6 +63,7 @@ Simulation::Simulation(World& world, const assets::BuildingTable& buildings, con
         m_rules = *world.saved_rules();  // the settings the game was started with
     }
     world.set_original_bugs(m_rules.bugs);
+    world.set_fertile_fields(m_rules.fertile_fields);
 }
 
 Simulation::Simulation(World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
@@ -978,6 +979,10 @@ void Simulation::cities_step() {
     }
     advance_cities(*m_world, *m_buildings, m_city_events.sink());
     m_military.natives_tick();
+    // Cities a computer player has given up, also those razed before (a savegame).
+    const std::size_t first = m_construction_events.size();
+    give_up_razed_cities(*m_world, *m_buildings, m_construction_events.sink());
+    handle(m_construction_events.events(), first);
 }
 
 void Simulation::city_events_step() {
