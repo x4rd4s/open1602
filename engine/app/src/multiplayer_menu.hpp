@@ -16,6 +16,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -279,9 +280,22 @@ private:
     // Lobby
     std::string m_chat;
     bool m_ready = false;
-    std::size_t m_chat_back = 0;                  ///< lines scrolled back from the newest (mouse wheel)
-    std::size_t m_chat_rows = 0;                  ///< the chat lines the last layout had room for
-    std::uint64_t m_chat_newest = 0;              ///< ChatLine::serial of the newest line at the last layout
+    /// A row of the chat as shown: a line wrapped to the chat's width gives one or more.
+    struct ChatRow {
+        std::size_t line = 0;      ///< index in MultiplayerModel::chat
+        std::uint64_t serial = 0;  ///< the line's ChatLine::serial
+        std::string text;          ///< the row's part of chat_prefix() + text
+        bool first = false;        ///< the line's first row (the one with the name)
+    };
+    /// The chat's rows for the model, wrapped anew only when the lines or the font changed.
+    const std::vector<ChatRow>& chat_rows(const MultiplayerModel& model);
+    std::size_t m_chat_back = 0;            ///< rows scrolled back from the newest (mouse wheel)
+    std::size_t m_chat_rows = 0;            ///< the chat rows the last layout had room for
+    std::uint64_t m_chat_newest = 0;        ///< ChatLine::serial of the newest line at the last layout
+    const ui::Font* m_chat_font = nullptr;  ///< the font of the last draw(), to wrap the chat with
+    std::vector<ChatRow> m_chat_wrapped;    ///< chat_rows() as last made
+    /// What m_chat_wrapped was made of: the first and last lines' serials, their count, the font.
+    std::tuple<std::uint64_t, std::uint64_t, std::size_t, const ui::Font*> m_chat_wrapped_for{};
     std::optional<std::size_t> m_banner_seat;     ///< the slot whose banner is being chosen
     std::vector<sim::BannerId> m_banner_choices;  ///< the banners of the buttons shown, in order
     /// (Host) The roster entries and names of the spectators shown with a kick button.
