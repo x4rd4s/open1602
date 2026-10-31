@@ -568,16 +568,16 @@ assets::Island make_island(const ShapeRequest& request) {
         const bool s = depth_at(x, y + 1) < band;
         const bool w = depth_at(x - 1, y) < band;
         if (s && w && !n && !e) {
-            return 0;
+            return std::uint8_t{0};
         }
         if (n && w && !s && !e) {
-            return 1;
+            return std::uint8_t{1};
         }
         if (n && e && !s && !w) {
-            return 2;
+            return std::uint8_t{2};
         }
         if (e && s && !n && !w) {
-            return 3;
+            return std::uint8_t{3};
         }
         return std::nullopt;
     };
