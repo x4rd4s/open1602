@@ -199,10 +199,12 @@ struct ShipCommand {
         /// 1 t of cannons from a hold becomes a mounted cannon (op 0x19 +1), `count` times while
         /// a hold has 1 t and the ship room for another (Open1602: more than one at once).
         MountCannon,
-        UnmountCannon,  ///< "Kanonenbestückung reduzieren": a mounted cannon back into a hold as 1 t
-        Dump,           ///< "Waren über Bord werfen": the goods of `hold` (0xFF = all holds) are lost
-        Rename,         ///< `name`, 1 to kMaxNameLength bytes (Windows-1252)
-        OfferForSale,   ///< at Preis * `factor` / 128 (factor 0..384; op 0x20/0x21)
+        /// "Kanonenbestückung reduzieren": a mounted cannon back into a hold as 1 t, `count` times
+        /// while there is room (Open1602: more than one at once).
+        UnmountCannon,
+        Dump,          ///< "Waren über Bord werfen": the goods of `hold` (0xFF = all holds) are lost
+        Rename,        ///< `name`, 1 to kMaxNameLength bytes (Windows-1252)
+        OfferForSale,  ///< at Preis * `factor` / 128 (factor 0..384; op 0x20/0x21)
         WithdrawSale,
         Buy,  ///< `player` buys the ship at its price from its owner (0x84D)
         /// The white flag up (`on`: the ship stops and decides nothing more, never fires) or down
@@ -220,7 +222,8 @@ struct ShipCommand {
     };
     static constexpr std::size_t kMaxNameLength = 40;
     static constexpr std::uint16_t kMaxSaleFactor = 384;
-    /// MountCannon: every free place the cannons on board fill.
+    /// MountCannon: every free place the cannons on board fill; UnmountCannon: every mounted cannon
+    /// the holds have room for.
     static constexpr std::uint8_t kAllCannons = 0xFF;
     PlayerId player = kNoPlayer;
     std::uint32_t ship = 0;
@@ -231,7 +234,7 @@ struct ShipCommand {
     bool on = true;       ///< WhiteFlag
     std::uint16_t x = 0;  ///< Patrol: world tile
     std::uint16_t y = 0;
-    std::uint8_t count = 1;  ///< MountCannon: cannons at most, kAllCannons = as many as fit
+    std::uint8_t count = 1;  ///< Mount-/UnmountCannon: cannons at most, kAllCannons = as many as fit
 };
 
 /// "Fahrenden Händler anfordern" (city panel button 43026): a city's owner without a trade cart on

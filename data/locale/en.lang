@@ -76,6 +76,7 @@ keys.heading.view = Display
 keys.click = click
 keys.click.castle_all = Castle, send-out arrow: all trained units
 keys.click.cannons = Cannons in a ship's hold: mount as many as fit
+keys.click.cannons_unmount = Mounted cannons of a ship: unmount as many as the hold has room for
 keys.click.trade_cart = City window, trade cart button: another trade cart (one per Kontor and market)
 keys.click.twice = double click
 keys.click.catchments = Own building with a catchment area: the areas of all buildings of its type on the island
@@ -320,6 +321,10 @@ city.default = City {2} on island {1}
 ship.default = Ship {1}
 # A hold of cannons in an own ship's window ({1}: the goods, as "10t Cannons")
 ship.cannon_hold = {1} (click: mount one, Shift+click: as many as fit)
+# The mounted cannons of an own ship ({1}: the game's text, as "2 Cannons")
+ship.cannons_mounted = {1} (Shift+click: unmount all into the hold)
+# The button that takes a mounted cannon off ({1}: its help line from the game's texts)
+ship.cannons_unmount = {1} (Shift+click: all that fit into the hold)
 # The castle's send-out arrow ({1}: its help line from the game's texts)
 # The city window's trade cart button while another cart is allowed ({1}: its help line from the game's texts)
 city.cart_more = {1} (Shift+click: another trade cart)

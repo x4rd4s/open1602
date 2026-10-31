@@ -61,6 +61,7 @@ keys.click = Klick
 keys.click.castle_all = Burg, Aussenden-Pfeil: alle fertigen Einheiten
 keys.click.trade_cart = Stadtfenster, Händlerknopf: ein weiterer fahrender Händler (einer je Kontor und Markt)
 keys.click.cannons = Kanonen im Laderaum: so viele montieren wie Platz haben
+keys.click.cannons_unmount = Montierte Kanonen eines Schiffs: so viele abrüsten wie im Laderaum Platz haben
 keys.click.twice = Doppelklick
 keys.click.catchments = Eigenes Gebäude mit Einzugsbereich: die Bereiche aller gleichen Gebäude auf der Insel
 keys.modifier.ctrl = Strg+
@@ -297,6 +298,10 @@ city.default = Stadt {2} auf Insel {1}
 ship.default = Schiff {1}
 # A hold of cannons in an own ship's window ({1}: the goods, as "10t Cannons")
 ship.cannon_hold = {1} (Klick: eine Kanone montieren, Umschalt+Klick: so viele wie Platz haben)
+# The mounted cannons of an own ship ({1}: the game's text, as "2 Cannons")
+ship.cannons_mounted = {1} (Umschalt+Klick: alle in den Laderaum abrüsten)
+# The button that takes a mounted cannon off ({1}: its help line from the game's texts)
+ship.cannons_unmount = {1} (Umschalt+Klick: so viele, wie in den Laderaum passen)
 # The castle's send-out arrow ({1}: its help line from the game's texts)
 # The city window's trade cart button while another cart is allowed ({1}: its help line from the game's texts)
 city.cart_more = {1} (Umschalt+Klick: ein weiterer fahrender Händler)
