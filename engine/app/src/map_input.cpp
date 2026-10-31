@@ -340,6 +340,25 @@ void MapInput::handle_key(int key, int scancode, std::uint16_t mod) {
         m_hud->close_help();
         return;
     }
+    if (m_hud && m_hud->choosing()) {
+        // A choice: the keys 1 to 9 take that option, Enter and Escape the first.
+        std::optional<int> index;
+        if (key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_ESCAPE) {
+            index = 0;
+        } else if (key >= static_cast<int>(SDLK_1) && key <= static_cast<int>(SDLK_9)) {
+            const int n = key - static_cast<int>(SDLK_1);
+            if (static_cast<std::size_t>(n) < m_hud->choice_count()) {
+                index = n;
+            }
+        }
+        if (index) {
+            m_hud->close_question();
+            Hud::Action a{Hud::Action::Kind::Answer};
+            a.step = *index;
+            m_host.apply_hud(a);
+        }
+        return;
+    }
     if (m_hud && m_hud->asking()) {
         // The question: Enter answers yes, Escape no.
         if (key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_ESCAPE) {

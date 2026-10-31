@@ -358,6 +358,8 @@ Hud::Hud(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets
         }
         const std::uint8_t grey = ui::nearest_colour(palette, 128, 128, 128);
         m_multiplayer->set_banners(std::move(menu_banners), grey);
+        m_banner_palette = banner_colours;
+        m_other_banner_palette = grey;
         m_chat->set_banners(std::move(banner_colours), grey);
     }
     if (auto tutor = assets::load_gad(game, "TUTOR.GAD")) {
@@ -814,6 +816,10 @@ void Hud::draw_question() {
     if (!m_question) {
         return;
     }
+    if (!m_choices.empty()) {
+        draw_choices();
+        return;
+    }
     const double s = m_menu_active ? m_menu_scale : m_regions.scale;
     // Centred on the main menu's window, in the game on the map.
     const ui::Rect& v = m_menu_active ? m_regions.full : m_regions.game_view;
@@ -851,6 +857,90 @@ void Hud::draw_question() {
     text(ui::tr("dialog.yes"), m_yes.x - box.x + m_yes.w / 2, m_yes.y - box.y + px(28));
     text(ui::tr("dialog.no"), m_no.x - box.x + m_no.w / 2, m_no.y - box.y + px(28));
     m_renderer->draw(items, box.x, box.y, s);
+}
+
+void Hud::draw_choices() {
+    const double s = m_menu_active ? m_menu_scale : m_regions.scale;
+    const ui::Rect& v = m_menu_active ? m_regions.full : m_regions.game_view;
+    const auto px = [&](double d) { return static_cast<std::int32_t>(d * s); };
+    // One button per option, in two columns when there are more than seven.
+    const std::size_t n = m_choices.size();
+    const std::size_t columns = n > 7 ? 2 : 1;
+    const std::size_t rows = (n + columns - 1) / columns;
+    constexpr double kButtonW = 300;
+    constexpr double kButtonH = 30;
+    constexpr double kGap = 8;
+    constexpr double kTop = 80;
+    const double width = std::max(520.0, static_cast<double>(columns) * (kButtonW + kGap) - kGap + 60);
+    const double height = kTop + static_cast<double>(rows) * (kButtonH + kGap) + 16;
+    const ui::Rect box{v.x + (v.w - px(width)) / 2, v.y + std::max(0, (v.h - px(height)) / 2), px(width), px(height)};
+    constexpr std::uint8_t kGold = 215;  // (202, 172, 52) in STADTFLD.COL
+    constexpr std::uint8_t kDark = 28;   // (35, 23, 12)
+    m_renderer->fill(ui::Rect{box.x - px(3), box.y - px(3), box.w + px(6), box.h + px(6)}, kGold);
+    m_renderer->fill(box, kDark);
+    std::vector<ui::DrawItem> items;
+    const auto text = [&](const std::string& t, std::int32_t x, std::int32_t y, ui::Align align) {
+        ui::DrawItem d;
+        d.kind = ui::DrawItem::Kind::Text;
+        d.block = 0;
+        d.colour = 4;
+        d.align = align;
+        d.x = x;
+        d.y = y;
+        d.text = t;
+        items.push_back(d);
+    };
+    const std::string& q = *m_question;
+    const std::size_t nl = q.find('\n');
+    text(q.substr(0, nl), box.w / 2, px(32), ui::Align::Centre);
+    if (nl != std::string::npos) {
+        text(q.substr(nl + 1), box.w / 2, px(56), ui::Align::Centre);
+    }
+    m_choice_rects.clear();
+    const double left = (width - (static_cast<double>(columns) * (kButtonW + kGap) - kGap)) / 2;
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::size_t column = i / rows;
+        const std::size_t row = i % rows;
+        const ui::Rect b{box.x + px(left + static_cast<double>(column) * (kButtonW + kGap)),
+                         box.y + px(kTop + static_cast<double>(row) * (kButtonH + kGap)), px(kButtonW), px(kButtonH)};
+        m_choice_rects.push_back(b);
+        m_renderer->fill(b, kGold);
+        m_renderer->fill(ui::Rect{b.x + px(2), b.y + px(2), b.w - px(4), b.h - px(4)}, kDark);
+        double text_x = 12;
+        if (const auto& banner = m_choices[i].banner) {
+            const std::uint8_t colour =
+                *banner < m_banner_palette.size() ? m_banner_palette[*banner] : m_other_banner_palette;
+            m_renderer->fill(ui::Rect{b.x + px(8), b.y + px(7), px(24), px(16)}, kGold);
+            m_renderer->fill(ui::Rect{b.x + px(9), b.y + px(8), px(22), px(14)}, colour);
+            text_x = 42;
+        }
+        text(m_choices[i].text, b.x - box.x + px(text_x), b.y - box.y + px(24), ui::Align::Left);
+    }
+    m_renderer->draw(items, box.x, box.y, s);
+}
+
+std::optional<Hud::Action> Hud::choice_mouse(std::int32_t x, std::int32_t y, bool down) {
+    // As the question's buttons: pressed and released on the same option.
+    std::int32_t at = kChoiceElsewhere;
+    for (std::size_t i = 0; i < m_choice_rects.size(); ++i) {
+        if (m_choice_rects[i].contains(x, y)) {
+            at = static_cast<std::int32_t>(i);
+        }
+    }
+    if (down) {
+        if (m_choice_press == kNoChoice) {
+            m_choice_press = at;
+        }
+        return std::nullopt;
+    }
+    const std::int32_t pressed = std::exchange(m_choice_press, kNoChoice);
+    if (pressed == kNoChoice || at != pressed || at < 0) {
+        return std::nullopt;
+    }
+    Action a{Action::Kind::Answer};
+    a.step = at;
+    close_question();
+    return a;
 }
 
 ui::Rect Hud::display_rect() const {
@@ -1015,7 +1105,7 @@ void Hud::reset_game() {
     m_events.clear();
     m_offers.clear();
     m_selection = Selection{};
-    m_question.reset();
+    close_question();
     m_help.reset();
     m_goods_open = false;
     m_modal_press = ModalPress::None;
@@ -1369,6 +1459,9 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down,
             }
         }
         return std::nullopt;
+    }
+    if (m_question && !m_choices.empty()) {
+        return choice_mouse(x, y, down);
     }
     if (m_question) {
         // The question takes every click until it is answered: pressed and released on the same

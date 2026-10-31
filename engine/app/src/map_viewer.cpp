@@ -1070,7 +1070,13 @@ void MapViewer::update(std::uint32_t delta_ms) {
         apply_session_events();  // may end the session
     } else {
         m_session_roles.clear();
-        m_state->simulation.advance(delta_ms, before_tick);
+        if (!m_pending_load) {
+            m_state->simulation.advance(delta_ms, before_tick);
+        } else if (m_hud && !m_hud->asking()) {
+            // A game waiting for its player: the one behind the question waits too, and the
+            // question comes back when another one (leaving the program?) took its place.
+            m_hud->ask_choice(ui::tr("dialog.choose_player"), m_pending_load->options);
+        }
         m_tick_fraction = m_state->simulation.tick_fraction();
     }
     update_chat();
@@ -2258,6 +2264,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                 }
                 break;
             }
+            if (m_pending_load) {
+                finish_pending_load(static_cast<std::size_t>(std::max(action.step, 0)));
+                break;
+            }
             // The question before scuttling, disbanding or war.
             m_input->answer(action.step != 0);
             break;
@@ -2834,11 +2844,68 @@ core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::
     if (!world) {
         return world.error();
     }
+    m_pending_load.reset();
+    if (std::vector<sim::PlayerId> players = player_choice(*world); !players.empty()) {
+        // The game does not know this person: they choose their player first. The game behind the
+        // question stands still until then.
+        std::vector<Hud::ChoiceOption> options;
+        for (const sim::PlayerId id : players) {
+            const sim::Player& p = world->players()[id];
+            std::string text = player_name(p);
+            if (const render::Banner* b = m_banners.get(p.banner)) {
+                text += " (" + banner_name(b->id) + ")";
+            }
+            options.push_back(Hud::ChoiceOption{std::move(text), p.banner});
+        }
+        m_pending_load = PendingLoad{std::move(world).value(),
+                                     path,
+                                     rules != nullptr ? std::optional<sim::Rules>(*rules) : std::nullopt,
+                                     warnings,
+                                     std::move(players),
+                                     options};
+        if (m_hud) {
+            m_hud->ask_choice(ui::tr("dialog.choose_player"), std::move(options));
+        } else {
+            finish_pending_load(0);
+        }
+        return core::Ok{};
+    }
     if (auto replaced = replace_world(std::move(world).value(), path, rules); !replaced) {
         return replaced;
     }
     report_load_problems(warnings);
     return core::Ok{};
+}
+
+std::vector<sim::PlayerId> MapViewer::player_choice(const sim::World& world) const {
+    const std::uint64_t own = net::player_verifier(m_app_settings.player_id);
+    std::vector<sim::PlayerId> players = sim::human_players(world);
+    const bool known =
+        std::any_of(players.begin(), players.end(), [&](sim::PlayerId id) { return world.players()[id].owner == own; });
+    if (own == 0 || players.size() < 2 || known) {
+        return {};
+    }
+    return players;
+}
+
+void MapViewer::finish_pending_load(std::size_t option) {
+    if (!m_pending_load) {
+        return;
+    }
+    PendingLoad load = std::move(*m_pending_load);
+    m_pending_load.reset();
+    const sim::PlayerId chosen = load.players[std::min(option, load.players.size() - 1)];
+    // From now on the game knows this person as the chosen player.
+    sim::take_player(load.world, chosen, net::player_verifier(m_app_settings.player_id));
+    if (auto replaced = replace_world(std::move(load.world), load.path, load.rules ? &*load.rules : nullptr);
+        !replaced) {
+        m_events.notify(ui::tr("notice.load_failed", {ui::error_text(replaced.error(), "load")}), "notice.load_failed",
+                        platform::ticks_ms());
+        return;
+    }
+    report_load_problems(load.warnings);
+    std::fprintf(stderr, "game loaded as player %u: %s\n", static_cast<unsigned>(chosen),
+                 core::path_to_utf8(load.path).c_str());
 }
 
 void MapViewer::load_package_scenarios() {

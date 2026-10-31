@@ -398,6 +398,24 @@ TEST_CASE("players: alone, a person plays the human player they played before") 
     CHECK(none.world.players()[0].owner == 0);
 }
 
+TEST_CASE("players: a person chooses the player of a game that does not know them") {
+    Game g;  // two human players
+    CHECK((sim::human_players(g.world) == std::vector<sim::PlayerId>{0, 1}));
+    sim::take_player(g.world, 1, 99);
+    CHECK(g.world.players()[1].role == sim::PlayerRole::Human);
+    CHECK(g.world.players()[1].owner == 99);
+    CHECK(g.world.players()[0].role == sim::PlayerRole::Computer);
+    CHECK((sim::human_players(g.world) == std::vector<sim::PlayerId>{1}));
+    // Not a human player (any more): nothing changes.
+    sim::take_player(g.world, 0, 99);
+    CHECK(g.world.players()[0].role == sim::PlayerRole::Computer);
+    CHECK(g.world.players()[0].owner == 0);
+    // A player out of the game is not offered.
+    Game h;
+    h.world.player(0)->status = sim::PlayerStatus::Absent;
+    CHECK((sim::human_players(h.world) == std::vector<sim::PlayerId>{1}));
+}
+
 TEST_CASE("commands: a player closes and opens his city gates") {
     Game g;
     g.simulation.schedule(0, sim::GateOrder{1, true});
