@@ -39,6 +39,7 @@ constexpr std::int32_t kRouteDown = 58303;
 constexpr std::int32_t kRouteShip = 58304;
 constexpr std::int32_t kRouteShipGfx = 2;    ///< GFXSHIPLIST + this: the ship list's arrow, red
 constexpr std::int32_t kRouteShipPress = 2;  ///< and yellow while pressed, as the stops' symbols
+constexpr std::int32_t kRouteShipGap = 2;    ///< between it and "copy route" (room for the text)
 constexpr std::int32_t kMusikDown = 49011;
 constexpr std::int32_t kMusikUp = 49012;
 constexpr std::int32_t kStopShift = 4;    ///< how much closer the stops move to each other
@@ -137,9 +138,9 @@ assets::GadgetLayout with_route_row(assets::GadgetLayout route, const std::optio
         ship.press_offset = kRouteShipPress;
         ship.size = {36, 25};
         ship.offset = {0, 0};
-        ship.pos = {label.pos[0], top + (kRouteRowHeight - ship.size[1]) / 2};
+        ship.pos = {symbol->pos[0], top + (kRouteRowHeight - ship.size[1]) / 2};  // under the stops' symbols
         route.gadgets.push_back(ship);
-        left = ship.pos[0] + ship.size[0] + kRouteArrowGap;
+        left = ship.pos[0] + ship.size[0] + kRouteShipGap;
     }
     assets::Gadget arrow_down = *down;
     arrow_down.id = kRouteDown;
