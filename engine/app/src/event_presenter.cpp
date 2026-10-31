@@ -142,6 +142,7 @@ void add_chat_line(std::deque<ChatLine>* chat, ChatLine line, bool echo) {
     if (chat == nullptr) {
         return;
     }
+    line.serial = chat->empty() ? 1 : chat->back().serial + 1;
     chat->push_back(std::move(line));
     while (chat->size() > kChatKept) {
         chat->pop_front();

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "event_presenter.hpp"
 #include "multiplayer_menu.hpp"
 #include "multiplayer_texts.hpp"
 
@@ -258,6 +259,73 @@ TEST_CASE("multiplayer menu: the mouse wheel scrolls the scenarios of a game bei
     CHECK(!find_text(menu, model, "Karte 8").has_value());
     CHECK(menu.wheel(model, 50));  // up, not before the first
     CHECK(find_text(menu, model, "Karte 0").has_value());
+}
+
+TEST_CASE("multiplayer menu: the mouse wheel scrolls the lobby's chat, which holds still for new lines") {
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.game = "Endless game";
+    lobby.seats.resize(4);
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.name = "Anna";
+    model.session = &host;
+    model.hosting = true;
+    const auto say = [&](int n) {
+        app::ChatLine line;
+        line.text = "Line " + std::to_string(n);
+        app::add_chat_line(&model.chat, std::move(line), false);
+    };
+    for (int n = 0; n < 30; ++n) {
+        say(n);
+    }
+    menu.show_lobby();
+    // Four slots leave room for eleven lines: the newest show.
+    CHECK(find_text(menu, model, "Line 29").has_value());
+    CHECK(find_text(menu, model, "Line 19").has_value());
+    CHECK(!find_text(menu, model, "Line 18").has_value());
+
+    CHECK(menu.wheel(model, 3));  // back three lines
+    CHECK(find_text(menu, model, "Line 16").has_value());
+    CHECK(find_text(menu, model, "Line 26").has_value());
+    CHECK(!find_text(menu, model, "Line 27").has_value());
+
+    // A new line does not move what is being read.
+    say(30);
+    CHECK(find_text(menu, model, "Line 16").has_value());
+    CHECK(!find_text(menu, model, "Line 27").has_value());
+
+    CHECK(menu.wheel(model, 50));  // not before the oldest
+    CHECK(find_text(menu, model, "Line 0").has_value());
+    CHECK(find_text(menu, model, "Line 10").has_value());
+    CHECK(!find_text(menu, model, "Line 11").has_value());
+
+    CHECK(menu.wheel(model, -50));  // not past the newest
+    CHECK(find_text(menu, model, "Line 30").has_value());
+    CHECK(!find_text(menu, model, "Line 19").has_value());
+
+    // Following the newest lines, a new one shows at once.
+    say(31);
+    CHECK(find_text(menu, model, "Line 31").has_value());
+
+    // Saying something goes back to the newest lines.
+    CHECK(menu.wheel(model, 5));
+    CHECK(!find_text(menu, model, "Line 31").has_value());
+    menu.type("Hallo");
+    (void)menu.key(model, 13);
+    CHECK(find_text(menu, model, "Line 31").has_value());
+
+    // A cleared chat starts over at the newest lines.
+    CHECK(menu.wheel(model, 5));
+    model.chat.clear();
+    for (int n = 0; n < 20; ++n) {
+        say(n);
+    }
+    CHECK(find_text(menu, model, "Line 19").has_value());
 }
 
 TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
