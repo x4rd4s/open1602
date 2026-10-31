@@ -657,3 +657,76 @@ TEST_CASE("script: a treaty offered in the game reaches the scripts in the same 
     REQUIRE(!notes.empty());
     CHECK(notes[0].text.starts_with("peace_offered\t0\t1"));
 }
+
+TEST_CASE("script: scripts read and change the players' missions") {
+    Game game;
+    sim::Mission map_mission;
+    map_mission.goals = sim::goal::kCity1 | sim::goal::kCity2;
+    map_mission.text =
+        "Zwei St\xe4"
+        "dte";
+    game.world.set_missions({map_mission});
+    auto players = game.world.players();
+    players[0].mission = 0;
+    players[1].mission = 0;
+    game.world.set_players(players);
+    auto scripts =
+        game.run(one("goals",
+                     "function on_start()\n"
+                     "  local m = game.mission(0)\n"
+                     "  print(m.text, m.other, m.inhabitants, game.mission(9), game.mission(1).other)\n"
+                     "  print(game.set_mission(0, {inhabitants = 500, castle = true, balance = -20,\n"
+                     "                             goods = {['anno1602:tools'] = 20},\n"
+                     "                             city = {inhabitants = 300, class = 2, count = 50},\n"
+                     "                             text = 'Gr\xc3\xbc\xc3\x9f"
+                     "e'}))\n"
+                     "  m = game.mission(0)\n"
+                     "  print(m.text, m.inhabitants, m.castle, m.cathedral, m.balance, m.goods['anno1602:tools'],\n"
+                     "        m.city.inhabitants, m.city.class, m.city.count, m.other)\n"
+                     "  print(game.mission(1).other, game.set_mission(1, {cities = 2}), game.mission(1).cities)\n"
+                     "  print(game.set_mission(1, {}), game.mission(1), game.set_mission(9, {cities = 1}))\n"
+                     "end\n"
+                     "function on_second(s)\n"
+                     "  if s == 1 then game.set_mission(0, {gold = 1}) end\n"
+                     "  if s == 2 then game.set_mission(0, {goods = {pepper = 1}}) end\n"
+                     "  if s == 3 then game.set_mission(0, {cities = -1}) end\n"
+                     "end\n"));
+    game.ticks(1);
+    const auto notes = scripts->take_notes();
+    REQUIRE(notes.size() == 5);
+    CHECK(notes[0].text ==
+          "Zwei St\xc3\xa4"
+          "dte\ttrue\tnil\tnil\ttrue");
+    CHECK(notes[1].text == "true");
+    CHECK(notes[2].text ==
+          "Gr\xc3\xbc\xc3\x9f"
+          "e\t500\ttrue\tnil\t-20\t20\t300\t2\t50\tnil");
+    // The computer kept the map's mission until the script gave it one of its own.
+    CHECK(notes[3].text == "true\ttrue\t2");
+    CHECK(notes[4].text == "true\tnil\tfalse");
+    // Player 0 took a new slot, as player 1 still named the map's; no slot is left over.
+    REQUIRE(game.world.missions().size() == 2);
+    CHECK(game.world.players()[0].mission == 1);
+    CHECK(game.world.players()[1].mission == sim::kNoMission);
+    const sim::Mission& own = game.world.missions()[1];
+    CHECK(own.goals == (sim::goal::kInhabitants | sim::goal::kCastle | sim::goal::kBalance | sim::goal::kGoods1 |
+                        sim::goal::kCity1));
+    CHECK(own.text ==
+          "Gr\xfc\xdf"
+          "e");
+    CHECK(own.goods[0].amount == 20 * 32);
+    CHECK(game.world.missions()[0].goals == (sim::goal::kCityCount | sim::goal::kComputers));
+    game.ticks(60);
+    const auto later = scripts->take_notes();
+    CHECK(has_error(later, "game.set_mission: there is no goal gold"));
+    CHECK(has_error(later, "game.set_mission: the goal names goals:pepper, a good this game does not know"));
+    CHECK(has_error(later, "game.set_mission: cities must be a whole number from 0 to"));
+    CHECK(game.world.players()[0].mission == 1);
+}
+
+TEST_CASE("script: game.set_mission changes no mission at the top level") {
+    Game game;
+    auto scripts = game.run(one("eager", "game.set_mission(0, {cities = 1})"));
+    CHECK(has_error(scripts->take_notes(), "eager:1: game.set_mission: only while the game runs"));
+    CHECK(game.world.missions().empty());
+}

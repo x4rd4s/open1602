@@ -27,6 +27,7 @@
 #include "o1602/sim/island_events.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/military.hpp"
+#include "o1602/sim/mission.hpp"
 #include "o1602/sim/production_cycle.hpp"
 #include "o1602/sim/rules.hpp"
 #include "o1602/sim/scripting.hpp"
@@ -243,6 +244,11 @@ public:
     /// Destroys the building of a city on tile (x, y) of island `island` to ruins, as a fire does,
     /// whoever owns it; false if none stands there (ground, forest and rocks outside cities stay).
     bool script_destroy(std::uint16_t island, std::int32_t x, std::int32_t y);
+
+    /// Gives `player` the mission `mission`, or none, from now on. The player gets a slot of their
+    /// own, so whoever shared the old mission keeps it; a computer's mission counts for it (goal
+    /// kComputers). False for no such player or one that is neither a human nor a computer.
+    bool script_mission(PlayerId player, std::optional<Mission> mission);
 
     /// Game speed factor (1 = normal, up to Rules::max_game_speed); 0 pauses. For tools and tests;
     /// a running game changes the speed with a GameSpeedOrder.

@@ -123,6 +123,12 @@ struct Mission {
 /// them (the original looks at the local player only, S-105).
 void prepare_missions(World& world);
 
+/// The mission of goals as a scenario gives them (docs/modding/scenarios.md), with `text`
+/// (Windows-1252) as its description. A good the world does not know, and a third good, are left
+/// out with a warning that starts with `source`.
+[[nodiscard]] Mission mission_from_goals(const World& world, const assets::ScenarioGoals& goals, std::string text,
+                                         std::string_view source, std::vector<std::string>* warnings);
+
 /// Starts a package's scenario (docs/modding/scenarios.md) on `world`, loaded from its map: the
 /// money of every human player, if the scenario gives it, and its goals, if any, as the mission of
 /// every human player, with the briefing in `language` as the mission's text, and the slots it gives

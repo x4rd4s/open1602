@@ -265,6 +265,45 @@ void prepare_missions(World& world) {
     world.set_game_settings(settings);
 }
 
+Mission mission_from_goals(const World& world, const assets::ScenarioGoals& g, std::string text,
+                           std::string_view source, std::vector<std::string>* warnings) {
+    Mission m;
+    m.text = std::move(text);
+    const auto set = [&m](std::uint32_t bit, std::int32_t& field, const std::optional<std::int32_t>& value) {
+        if (value) {
+            m.goals |= bit;
+            field = *value;
+        }
+    };
+    set(goal::kInhabitants, m.min_inhabitants, g.inhabitants);
+    set(goal::kCityCount, m.min_cities, g.cities);
+    set(goal::kBalance, m.min_balance, g.balance);
+    set(goal::kTradeBalance, m.min_trade_balance, g.trade_balance);
+    if (g.defeated) {
+        m.goals |= goal::kDefeatedCount;
+        m.min_defeated = *g.defeated;
+    }
+    m.goals |= (g.castle ? goal::kCastle : 0U) | (g.cathedral ? goal::kCathedral : 0U);
+    std::size_t slot = 0;
+    for (const auto& [id, tons] : g.goods) {
+        const auto ware = assets::ware_of(world.goods(), id);
+        if (!ware || !world.goods().is_trade(*ware) || slot >= m.goods.size()) {
+            if (warnings != nullptr) {
+                warnings->push_back(std::string(source) + ": the goal names " + id +
+                                    (slot >= m.goods.size() ? ", a third good" : ", a good this game does not know"));
+            }
+            continue;
+        }
+        m.goals |= slot == 0 ? goal::kGoods1 : goal::kGoods2;
+        m.goods[slot++] = Mission::GoodsGoal{*ware, tons * 32};
+    }
+    if (g.city) {
+        m.goals |= goal::kCity1;
+        m.cities[0] = Mission::CityGoal{g.city->inhabitants, g.city->resident_class, g.city->count};
+    }
+    return m;
+}
+
 void apply_package_scenario(World& world, const assets::PackageScenario& scenario, std::string_view language,
                             std::vector<std::string>* warnings) {
     std::vector<Player> players = world.players();
@@ -303,41 +342,8 @@ void apply_package_scenario(World& world, const assets::PackageScenario& scenari
             }
         }
     }
-    const assets::ScenarioGoals& g = scenario.goals;
-    if (g.any()) {
-        Mission m;
-        m.text = scenario.briefing(language);
-        const auto set = [&m](std::uint32_t bit, std::int32_t& field, const std::optional<std::int32_t>& value) {
-            if (value) {
-                m.goals |= bit;
-                field = *value;
-            }
-        };
-        set(goal::kInhabitants, m.min_inhabitants, g.inhabitants);
-        set(goal::kCityCount, m.min_cities, g.cities);
-        set(goal::kBalance, m.min_balance, g.balance);
-        set(goal::kTradeBalance, m.min_trade_balance, g.trade_balance);
-        if (g.defeated) {
-            m.goals |= goal::kDefeatedCount;
-            m.min_defeated = *g.defeated;
-        }
-        m.goals |= (g.castle ? goal::kCastle : 0U) | (g.cathedral ? goal::kCathedral : 0U);
-        std::size_t slot = 0;
-        for (const auto& [id, tons] : g.goods) {
-            const auto ware = assets::ware_of(world.goods(), id);
-            if (!ware || !world.goods().is_trade(*ware)) {
-                if (warnings != nullptr) {
-                    warnings->push_back(scenario.id + ": the goal names " + id + ", a good this game does not know");
-                }
-                continue;
-            }
-            m.goals |= slot == 0 ? goal::kGoods1 : goal::kGoods2;
-            m.goods[slot++] = Mission::GoodsGoal{*ware, tons * 32};
-        }
-        if (g.city) {
-            m.goals |= goal::kCity1;
-            m.cities[0] = Mission::CityGoal{g.city->inhabitants, g.city->resident_class, g.city->count};
-        }
+    if (scenario.goals.any()) {
+        Mission m = mission_from_goals(world, scenario.goals, scenario.briefing(language), scenario.id, warnings);
         // Every human plays this mission; the computers keep theirs.
         std::vector<Mission> missions = world.missions();
         const auto index = static_cast<MissionId>(std::min<std::size_t>(missions.size(), kNoMission - 1));
