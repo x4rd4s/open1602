@@ -1,13 +1,15 @@
-# Computer players and the goods of packages
+# Computer players
 
 The computer players build the production chains of the packages' goods without a file of their
-own: what they build comes from the building table and the classes' needs
+own: what they build comes from the building table and the classes' needs. What they get from
+nowhere is a value of `balance.toml`
 ([ADR 0007](../architecture/0007-extensibility-and-modding.md) section 3, item 5 of
 [open-work.md](open-work.md), MD-4).
 
 **Status:** Part 1 done on 2026-10-31: the producers of a package's goods that a class needs, down
-to their farms and to the original's raw materials. Still open: the original's own Needs, the stage
-orders, the public buildings and the cheat amounts as data (they stay as the original has them).
+to their farms and to the original's raw materials. Part 2 done on 2026-10-31: what they get from
+nowhere, as values of `balance.toml`. Still open: the original's own Needs, the stage orders and the
+public buildings as data (they stay as the original has them).
 
 ## What the computers build
 
@@ -50,8 +52,35 @@ The computers count the producers of a package's goods in slots after the origin
 `AIST` of the savegame, version 5); a game of the original has no such slots, and its computers
 play as before.
 
+## What they get from nowhere
+
+The original gives its computer players money and goods on every difficulty: steady money while
+they are poor, money and bricks for a new city, and money, wood, tools, food and bricks while they are
+behind the others. The amounts are values of the table `[computers]` of a package's
+[`balance.toml`](balance.md#the-values), the original's by default:
+
+```toml
+# mods/fair/balance.toml: computers without gifts
+[computers]
+steady_money = 0
+founding_money = 0
+founding_bricks = 0
+subsidy_poor_money = 0
+subsidy_money = 0
+subsidy_wood = 0
+subsidy_tools = 0
+colony_wood = 0
+colony_tools = 0
+colony_food = 0
+colony_bricks = 0
+```
+
+A game keeps them with its other balance values (section `BALA` version 2 of the savegame).
+
 ## In the code
 
 `engine/sim/src/ai/ai_chains.hpp`: `package_needs` (the producers from the building table),
 `package_wanted` (how many a city wants); `Engine::package_chains` in `ai_planner.cpp` plans them,
-the survey counts them (`Engine::package_slot`).
+the survey counts them (`Engine::package_slot`). The cheats: `Balance::ai_*`
+(`engine/sim/include/o1602/sim/balance.hpp`), read by `Engine::cheats()` through `cheats_of`
+(`ai_tables.hpp`).

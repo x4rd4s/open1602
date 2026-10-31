@@ -47,6 +47,8 @@ namespace o1602::sim::ai {
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
+struct Cheats;  // ai_tables.hpp
+
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
     std::vector<std::pair<std::int32_t, std::int32_t>> sheep;
@@ -341,6 +343,8 @@ private:
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);
+    /// The money and goods the computers get from nowhere, from the game's balance.
+    [[nodiscard]] Cheats cheats() const;
     /// The slot of the package's Need that makes `w`, if any.
     [[nodiscard]] std::optional<std::uint8_t> package_slot(std::uint8_t w) const;
     bool need_houses(AiPlayer& p, std::uint32_t n);

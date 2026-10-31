@@ -49,6 +49,10 @@ void Engine::task_develop(AiPlayer& p) {
     run_stage(p, *c, *r);
 }
 
+Cheats Engine::cheats() const {
+    return cheats_of(m_world.balance());
+}
+
 void Engine::tutorial_money(AiPlayer& p) {
     // 0x00428E30: at most once a second (P+0x10), money below 3791 gets 379.
     if (now_ms() - p.refresh_ms <= 1000) {
@@ -56,8 +60,8 @@ void Engine::tutorial_money(AiPlayer& p) {
     }
     p.refresh_ms = now_ms();
     Player& pl = player(p);
-    if (pl.money < kCheats.steady_below) {
-        pl.money = money_plus(pl.money, std::int64_t{kCheats.steady_money});
+    if (pl.money < cheats().steady_below) {
+        pl.money = money_plus(pl.money, std::int64_t{cheats().steady_money});
     }
 }
 
@@ -95,9 +99,9 @@ void Engine::refresh_city(AiPlayer& p) {
     }
     p.refresh_ms = now_ms();
     Player& pl = player(p);
-    if (pl.money < kCheats.steady_below) {
+    if (pl.money < cheats().steady_below) {
         pl.money = money_plus(
-            pl.money, std::int64_t{kCheats.steady_money});  // the original's steady money (cheat), on every difficulty
+            pl.money, std::int64_t{cheats().steady_money});  // the original's steady money (cheat), on every difficulty
     }
     if (!threatened(p) && behind(p)) {
         subsidy(p, 1);
@@ -112,18 +116,18 @@ void Engine::subsidy(AiPlayer& p, std::int32_t m) {
         return;
     }
     Player& pl = player(p);
-    if (pl.money < kCheats.subsidy_poor_below) {
-        pl.money = money_plus(pl.money, static_cast<std::int64_t>(kCheats.subsidy_poor * m));
-    } else if (pl.money < kCheats.subsidy_below && civ_level(p) >= 1) {
-        pl.money = money_plus(pl.money, static_cast<std::int64_t>(kCheats.subsidy * m));
+    if (pl.money < cheats().subsidy_poor_below) {
+        pl.money = money_plus(pl.money, static_cast<std::int64_t>(cheats().subsidy_poor * m));
+    } else if (pl.money < cheats().subsidy_below && civ_level(p) >= 1) {
+        pl.money = money_plus(pl.money, static_cast<std::int64_t>(cheats().subsidy * m));
     }
     const auto& mat = m_buildings.materials();
     const auto u = static_cast<std::uint32_t>(m);
-    if (p.score >= 1 && p.present[kSlotWoodcutter] && c->stock(mat.wood) < kCheats.subsidy_wood * kStockUnitsPerTon) {
-        add_goods(*c, mat.wood, kCheats.subsidy_wood * kStockUnitsPerTon * u);
+    if (p.score >= 1 && p.present[kSlotWoodcutter] && c->stock(mat.wood) < cheats().subsidy_wood * kStockUnitsPerTon) {
+        add_goods(*c, mat.wood, cheats().subsidy_wood * kStockUnitsPerTon * u);
     }
-    if (p.score >= 2 && c->stock(mat.tools) < kCheats.subsidy_tools * kStockUnitsPerTon) {
-        add_goods(*c, mat.tools, kCheats.subsidy_tools * kStockUnitsPerTon * u);
+    if (p.score >= 2 && c->stock(mat.tools) < cheats().subsidy_tools * kStockUnitsPerTon) {
+        add_goods(*c, mat.tools, cheats().subsidy_tools * kStockUnitsPerTon * u);
     }
     // The bricks of the original need a score of 20, which never comes (docs/re/ai.md).
     if (population(*c, 2) >= 50) {
