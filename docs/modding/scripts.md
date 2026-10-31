@@ -9,7 +9,8 @@ the game's commands ([ADR 0007](../architecture/0007-extensibility-and-modding.m
 script reads the players and posts the package's messages, and its table `state` is saved with the
 game. Since 2026-10-31 a script also gives and takes money and goods and decides who wins and who
 is out, hears what happens to cities, in disasters, to ships, in fights and in diplomacy, reads
-cities, ships and treaties and makes peace and war.
+cities, ships and treaties and makes peace and war, builds, demolishes and destroys buildings and
+sends ships.
 
 ## The script
 
@@ -123,11 +124,16 @@ ware number.
 | `game.defeat(player)` | `player` is out of the game, nobody counts as having defeated them; true if so, false when the game is over or the player is not playing |
 | `game.set_peace(a, b, on)` | peace between `a` and `b` (`on` true) or war (false), both ways at once and without asking either; true if it changed |
 | `game.set_trade(a, b, on)` | the trade treaty between `a` and `b` signed or ended the same way; true if it changed |
+| `game.build(player, island, building, x, y, rotation)` | builds for `player` as the player would: inside their city, unlocked, paid with their gold and the city's goods; `building` is named as in `buildings.toml` (`"anno1602:<name or number>"`, `"<package>:<name>"`, a name of the package's own or the number), (`x`, `y`) its corner on the island, `rotation` 0 to 3 (nil: 0). Returns true, or why not (`"money"`, `"terrain"`, `"outside the city"` ...) |
+| `game.demolish(player, island, x, y)` | demolishes the building of `player` on the tile as the player would; returns how many buildings went (0 or 1) |
+| `game.destroy(island, x, y)` | destroys the building of a city on the tile to ruins, as a fire does, whoever owns it; true if one stood there (ground, forest and rocks outside cities stay) |
+| `game.move_ship(ship, x, y)` | sends the ship (its id) to world tile `x`, `y`, as its owner would; `x` nil stops it; true if it sails, false for no such ship, the free trader's, or a tile off the map |
 
 They work only while the game runs, in the `on_...` functions, not at the top level of the script.
 Every computer of a multiplayer game makes the same changes at the same moment, so they need no
 command over the network, and a replay makes them again. What a script changes reaches no script as
-an event (`game.win` calls no `on_player_won`, `game.set_peace` no `on_diplomacy`): the script knows what it did, and so does no script
+an event (`game.win` calls no `on_player_won`, `game.set_peace` no `on_diplomacy`, `game.build` no
+`on_building_placed`): the script knows what it did, and so does no script
 end up calling itself for ever.
 
 ```lua

@@ -184,8 +184,12 @@ volcanoes and droughts, to ships (launched, traded, discovered, attacked, sunk, 
 diplomacy (`on_city`, `on_disaster`, `on_volcano`, `on_drought`, `on_ship`, `on_military`,
 `on_diplomacy`); they read a city's inhabitants (`game.city`), the ships (`game.ships`) and the
 treaties (`game.relation`), and make peace and war and trade treaties (`game.set_peace`,
-`game.set_trade`). Still open: placing and removing buildings, moving ships and units, and goals
-of a mission changed by a script.
+`game.set_trade`).
+
+Part 5 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): scripts build and
+demolish for a player as the player would (`game.build`, `game.demolish`, paid and checked like the
+build tool), destroy a building to ruins (`game.destroy`) and send ships (`game.move_ship`). Still
+open: moving land units, and goals of a mission changed by a script.
 
 ### 7. Scenarios and campaigns (section 6)
 

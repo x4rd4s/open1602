@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <numeric>
 #include <optional>
 #include <span>
@@ -68,6 +69,34 @@ std::optional<std::uint8_t> ware_argument(const sim::World& world, std::string_v
         }
     }
     return ware && world.goods().is_trade(*ware) ? ware : std::nullopt;
+}
+
+/// The haeuser.cod Id of a building: a number, "anno1602:<name or number>", "<package>:<name>" of a
+/// package's own_buildings.toml, or a name of the package's own.
+std::optional<std::uint32_t> building_argument(const sim::World& world, std::string_view package,
+                                               std::span<const Value> args, std::size_t i) {
+    if (const auto number = integer(args, i)) {
+        return *number >= 0 && *number <= 0xFFFFFF ? std::optional<std::uint32_t>(static_cast<std::uint32_t>(*number))
+                                                   : std::nullopt;
+    }
+    const auto* id = i < args.size() ? std::get_if<std::string>(&args[i]) : nullptr;
+    if (id == nullptr) {
+        return std::nullopt;
+    }
+    const std::string full = id->find(':') == std::string::npos ? std::string(package) + ":" + *id : *id;
+    if (const assets::OwnBuilding* own = assets::find_own_building(world.own_buildings(), full)) {
+        return own->number;
+    }
+    return assets::original_building_id(full);
+}
+
+/// A player's number among the world's players; nothing for another value.
+std::optional<sim::PlayerId> player_argument(const sim::World& world, std::span<const Value> args, std::size_t i) {
+    const auto n = integer(args, i);
+    if (!n || *n < 0 || *n >= static_cast<std::int64_t>(world.players().size())) {
+        return std::nullopt;
+    }
+    return static_cast<sim::PlayerId>(*n);
 }
 
 /// The city `index` of island `island`; nullptr for none.
@@ -405,6 +434,103 @@ void GameScripts::add_api(Package& package) {
     };
     add("set_peace", treaty("set_peace", true));
     add("set_trade", treaty("set_trade", false));
+    add("build", [this, &package](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.build: only while the game runs, not at the top level");
+        }
+        const auto player = player_argument(*m_world, args, 0);
+        const auto island = integer(args, 1);
+        const auto building = building_argument(*m_world, package.id, args, 2);
+        const auto x = integer(args, 3);
+        const auto y = integer(args, 4);
+        const auto rotation = args.size() > 5 && !std::holds_alternative<std::monostate>(args[5])
+                                  ? integer(args, 5)
+                                  : std::optional<std::int64_t>(0);
+        if (!player) {
+            return script_error("game.build: no such player");
+        }
+        if (!building) {
+            return script_error("game.build: no such building");
+        }
+        if (!island || !x || !y || !rotation || *island < 0 || *island > 0xFFFF || *rotation < 0 || *rotation > 3 ||
+            std::abs(*x) > 0xFFFF || std::abs(*y) > 0xFFFF) {
+            return script_error("game.build: the island, x, y and the rotation (0 to 3) must be integers");
+        }
+        sim::BuildOrder order;
+        order.player = *player;
+        order.island = static_cast<std::uint16_t>(*island);
+        order.orient_to_road = false;
+        order.items.push_back(sim::BuildItem{*building, static_cast<std::int32_t>(*x), static_cast<std::int32_t>(*y),
+                                             static_cast<std::uint8_t>(*rotation), 0});
+        const sim::CommandResult result = m_simulation->execute(order);
+        if (!result.build || result.build->items.empty()) {
+            return Value{std::string("refused")};
+        }
+        const sim::PlannedBuild& item = result.build->items.front();
+        return item.ok() ? Value{true} : Value{std::string(sim::refusal_name(item.refusal))};
+    });
+    add("demolish", [this](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.demolish: only while the game runs, not at the top level");
+        }
+        const auto player = player_argument(*m_world, args, 0);
+        const auto island = integer(args, 1);
+        const auto x = integer(args, 2);
+        const auto y = integer(args, 3);
+        if (!player) {
+            return script_error("game.demolish: no such player");
+        }
+        if (!island || !x || !y || *island < 0 || *island > 0xFFFF || std::abs(*x) > 0xFFFF || std::abs(*y) > 0xFFFF) {
+            return script_error("game.demolish: the island, x and y must be integers");
+        }
+        sim::DemolishOrder order;
+        order.player = *player;
+        order.island = static_cast<std::uint16_t>(*island);
+        order.from = sim::TilePos{static_cast<std::int32_t>(*x), static_cast<std::int32_t>(*y)};
+        order.to = order.from;
+        return Value{static_cast<std::int64_t>(m_simulation->execute(order).demolished)};
+    });
+    add("destroy", [this](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.destroy: only while the game runs, not at the top level");
+        }
+        const auto island = integer(args, 0);
+        const auto x = integer(args, 1);
+        const auto y = integer(args, 2);
+        if (!island || !x || !y) {
+            return script_error("game.destroy: the island, x and y must be integers");
+        }
+        return Value{*island >= 0 && *island <= 0xFFFF && std::abs(*x) <= 0xFFFF && std::abs(*y) <= 0xFFFF &&
+                     m_simulation->script_destroy(static_cast<std::uint16_t>(*island), static_cast<std::int32_t>(*x),
+                                                  static_cast<std::int32_t>(*y))};
+    });
+    add("move_ship", [this](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.move_ship: only while the game runs, not at the top level");
+        }
+        const auto id = integer(args, 0);
+        const bool stop = args.size() < 2 || std::holds_alternative<std::monostate>(args[1]);
+        const auto x = integer(args, 1);
+        const auto y = integer(args, 2);
+        if (!id || (!stop && (!x || !y))) {
+            return script_error("game.move_ship: the ship's id and a world tile x, y (or nil to stop) are needed");
+        }
+        const auto& ships = m_world->ships();
+        const auto ship = std::find_if(ships.begin(), ships.end(), [&](const sim::Ship& s) { return s.id == *id; });
+        if (ship == ships.end() || ship->owner == sim::kNoPlayer) {
+            return Value{false};
+        }
+        if (!stop && (*x < 0 || *y < 0 || *x >= m_world->width() || *y >= m_world->height())) {
+            return Value{false};
+        }
+        sim::ShipOrder order;
+        order.player = ship->owner;
+        order.ship = ship->id;
+        if (!stop) {
+            order.target = sim::Target::position(static_cast<std::uint32_t>(*x), static_cast<std::uint32_t>(*y));
+        }
+        return Value{m_simulation->execute(order).accepted};
+    });
     add("add_money", [this](std::span<const Value> args) -> core::Result<Value> {
         const auto player = integer(args, 0);
         const auto amount = integer(args, 1);

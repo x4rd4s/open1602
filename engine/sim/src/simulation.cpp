@@ -1261,6 +1261,29 @@ bool Simulation::script_treaty(PlayerId a, PlayerId b, bool peace, bool sign) {
     return true;
 }
 
+bool Simulation::script_destroy(std::uint16_t island, std::int32_t x, std::int32_t y) {
+    if (island >= m_world->islands().size()) {
+        return false;
+    }
+    // Only what belongs to a city: ground, forest and rocks outside stay.
+    const auto b = building_at(*m_world, *m_buildings, island, TilePos{x, y});
+    if (!b || b->city == MapCell::kNoCity || b->type->kind == kind::kGround || b->origin.x < 0 || b->origin.y < 0) {
+        return false;
+    }
+    // Unchanged original terrain (rocks, beach) stays too, as demolishing leaves it.
+    const IslandMap& map = m_world->islands()[island].map;
+    const auto ox = static_cast<std::uint32_t>(b->origin.x);
+    const auto oy = static_cast<std::uint32_t>(b->origin.y);
+    if (b->type->kind != kind::kForest && map.top(ox, oy).sprite == map.ground(ox, oy).sprite &&
+        map.top(ox, oy).rotation == map.ground(ox, oy).rotation) {
+        return false;
+    }
+    const std::size_t first = m_construction_events.size();
+    const bool destroyed = destroy_building(*m_world, *m_buildings, island, b->origin, m_construction_events.sink());
+    handle(m_construction_events.events(), first);
+    return destroyed;
+}
+
 std::optional<std::int64_t> Simulation::script_goods(std::uint16_t island, std::uint8_t city, std::uint8_t ware,
                                                      std::int64_t amount) {
     City* c = m_world->city(island, city);
