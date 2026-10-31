@@ -1393,6 +1393,64 @@ TEST_CASE("selection panels: the route editor's ship button and a right click le
     CHECK(out.empty());
 }
 
+TEST_CASE("selection panels: copy route gives the selected ship's stops to the ship clicked on") {
+    Game g("o1602-test-selection-route-copy", true);
+    Town t;
+    sim::Ship trader = sim::make_ship("Coaster", 30, 30, 0, kLocal);
+    trader.route.stops[0].target = sim::Target::city_of(0, 0);
+    t.world.add_ship(trader);
+    t.world.add_ship(sim::make_ship("Warship", 40, 30, 0, kLocal));  // an empty route
+    t.world.add_ship(sim::make_ship("Stranger", 50, 30, 0, kOther));
+    sim::Simulation simulation(t.world, t.buildings, t.figures);
+    SelectionPanels panels(*g.dir);
+    const PanelContext c{simulation, t.buildings, t.figures, &g.texts, kLocal};
+    const auto select = [&](std::size_t i) {
+        Selection s;
+        s.kind = Selection::Kind::Ship;
+        s.ship = t.world.ships()[i].id;
+        s.serial = static_cast<std::uint32_t>(i + 1);
+        return s;
+    };
+    constexpr std::int32_t kRouteEditor = 38021;
+    constexpr std::int32_t kRouteCopy = 58301;
+    std::vector<sim::Command> out;
+    const Selection s = select(0);
+    SelectionPanel* p = panels.panel_for(s, c);
+    REQUIRE(p != nullptr);
+    p->refresh(s, c);
+    const auto click = [&](const Selection& on, std::int32_t id) {
+        p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, id}, on, c, out);
+        p->refresh(on, c);
+    };
+    click(s, kRouteEditor);
+    REQUIRE(p->panel().layout().find(kRouteCopy) != nullptr);
+    click(s, kRouteCopy);
+    REQUIRE(p->picking());
+    // A click on the sea or on a stranger's ship gives the route to nobody.
+    p->picked(50, 30, s, c, out);
+    CHECK(!p->picking());
+    CHECK(out.empty());
+    // A click on the own warship with its empty route: it takes the trader's stops.
+    click(s, kRouteCopy);
+    p->picked(41, 31, s, c, out);
+    REQUIRE(out.size() == 1);
+    const auto* copy = std::get_if<sim::RouteEdit>(&out[0]);
+    REQUIRE(copy != nullptr);
+    CHECK(copy->op == sim::RouteEdit::Op::CopyFrom);
+    CHECK(copy->ship == t.world.ships()[1].id);
+    CHECK(copy->target == sim::Target::other_ship(t.world.ships()[0].id));
+    // A ship without a city on its route has nothing to copy: the button does not wait for a click.
+    out.clear();
+    const Selection w = select(1);
+    p = panels.panel_for(w, c);
+    REQUIRE(p != nullptr);
+    p->refresh(w, c);
+    click(w, kRouteEditor);
+    click(w, kRouteCopy);
+    CHECK(!p->picking());
+    CHECK(out.empty());
+}
+
 TEST_CASE("selection panels: at the pirates' Kontor a ship trades and deals with the pirates") {
     Game g("o1602-test-selection-pirates");
     Town t;
