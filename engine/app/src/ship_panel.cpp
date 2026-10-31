@@ -31,11 +31,16 @@ using namespace panel_detail;
 constexpr std::uint8_t kCannonWare = sim::ware::kCannons;
 constexpr std::array<std::uint32_t, 4> kSteps{32, 5 * 32, 10 * 32, 50 * 32};  // 1, 5, 10, 50 t
 
-// Open1602's row below the four stops of ROUTE.GAD: "copy route" on the left, the list arrows of
-// MUSIK.GAD on the right to show the stops 1-4 or 5-8.
+// Open1602's row below the four stops of ROUTE.GAD: back to the ship's page (the ship list's
+// arrow) and "copy route" on the left, the list arrows of MUSIK.GAD on the right to show the stops
+// 1-4 or 5-8.
 constexpr std::int32_t kRouteCopy = 58301;
 constexpr std::int32_t kRouteUp = 58302;
 constexpr std::int32_t kRouteDown = 58303;
+constexpr std::int32_t kRouteShip = 58304;
+constexpr std::int32_t kRouteShipGfx = 2;    ///< GFXSHIPLIST + this: the ship list's arrow, red
+constexpr std::int32_t kRouteShipPress = 2;  ///< and yellow while pressed, as the stops' symbols
+constexpr std::int32_t kRouteShipGap = 2;    ///< between it and "copy route" (room for the text)
 constexpr std::int32_t kMusikDown = 49011;
 constexpr std::int32_t kMusikUp = 49012;
 constexpr std::int32_t kStopShift = 4;    ///< how much closer the stops move to each other
@@ -125,6 +130,19 @@ assets::GadgetLayout with_route_row(assets::GadgetLayout route, const std::optio
         last->pos[1] + last->size[1] + kRouteRowGap;  // copied: the gadgets grow below (last is moved)
     const std::int32_t right = name->pos[0] + name->size[0];
     const assets::Gadget label = *name;
+    std::int32_t left = label.pos[0] + 4;
+    if (const assets::Gadget* symbol = route.find(58041)) {  // a button of the same sheet
+        assets::Gadget ship = *symbol;
+        ship.id = kRouteShip;
+        ship.base = static_cast<std::int32_t>(route.gadgets.size());
+        ship.gfx = route.constant("GFXSHIPLIST").value_or(620) + kRouteShipGfx;
+        ship.press_offset = kRouteShipPress;
+        ship.size = {36, 25};
+        ship.offset = {0, 0};
+        ship.pos = {symbol->pos[0], top + (kRouteRowHeight - ship.size[1]) / 2};  // under the stops' symbols
+        route.gadgets.push_back(ship);
+        left = ship.pos[0] + ship.size[0] + kRouteShipGap;
+    }
     assets::Gadget arrow_down = *down;
     arrow_down.id = kRouteDown;
     arrow_down.base = static_cast<std::int32_t>(route.gadgets.size());
@@ -140,8 +158,8 @@ assets::GadgetLayout with_route_row(assets::GadgetLayout route, const std::optio
     copy.kind = assets::GadgetKind::TextLeft;
     copy.base = static_cast<std::int32_t>(route.gadgets.size());
     copy.block = kRouteFont;
-    copy.pos = {label.pos[0] + 4, top};
-    copy.size = {arrow_up.pos[0] - label.pos[0] - 4 - kRouteArrowGap, kRouteRowHeight};
+    copy.pos = {left, top};
+    copy.size = {arrow_up.pos[0] - left - kRouteArrowGap, kRouteRowHeight};
     copy.offset = {0, static_cast<std::int16_t>(kRouteRowHeight - 5)};
     route.gadgets.push_back(copy);
     // `+N` at the top right of each stop's second ware, on a small plate: its own page.
@@ -630,6 +648,11 @@ public:
                 m_page = Page::Root;
                 return true;
         }
+    }
+    /// The route editor, its pickers and choosing a stop: a right click goes back step by step to
+    /// the ship's page, where the route is started.
+    [[nodiscard]] bool steps_back() const override {
+        return picking() || m_page == Page::Route || m_page == Page::PickOwn || m_page == Page::PickForeign;
     }
     std::optional<Request> take_request() override { return std::exchange(m_request, std::nullopt); }
     /// The mouse wheel over the trade route's list of stops: a page (four stops) per notch, as its
@@ -1636,6 +1659,14 @@ private:
                        std::vector<sim::Command>& out) {
         if (e.kind == ui::PanelEvent::Kind::Clicked && m_route_row) {
             switch (e.id) {
+                case kRouteShip:
+                    // Back to the ship's page, where the route is started.
+                    m_page = Page::Root;
+                    m_stop_page.reset();
+                    m_pick_stop.reset();
+                    m_pick_copy = false;
+                    m_cart_chain = false;
+                    return;
                 case kRouteUp:
                 case kRouteDown:
                     if (m_stop_page) {
@@ -1760,6 +1791,8 @@ private:
                                : ui::tr("route.show_stops", {range(std::min(m_route_page + 1, route_pages() - 1))});
                 case kRouteCopy:
                     return ui::tr(m_stop_page ? "route.back" : "route.copy_help");
+                case kRouteShip:
+                    return ui::tr("route.back_to_ship");
                 default:
                     break;
             }

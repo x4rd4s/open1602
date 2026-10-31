@@ -825,11 +825,12 @@ void MapInput::handle_event(const SDL_Event& event) {
                                        static_cast<std::int32_t>(event.button.y), true, ui::MouseButton::Right);
                 } else if (event.button.button == SDL_BUTTON_RIGHT) {
                     // A right click on the minimap sends the selection there (ADR 0010), elsewhere on
-                    // the panel it goes back to the player status.
+                    // the panel it goes back to the player status; from a page that leads somewhere
+                    // (a ship's route editor) a page back.
                     if (const auto t = m_hud->minimap_tile(static_cast<std::int32_t>(event.button.x),
                                                            static_cast<std::int32_t>(event.button.y))) {
                         order_to_tile(t->first, t->second, (SDL_GetModState() & SDL_KMOD_SHIFT) != 0);
-                    } else {
+                    } else if (!m_hud->step_back()) {
                         (void)back_to_status();
                     }
                 }
@@ -878,6 +879,9 @@ void MapInput::handle_event(const SDL_Event& event) {
                     !(m_hud && (m_hud->modal() || m_hud->menu_active()))) {
                     if (m_original_mouse) {
                         cancel_action();
+                    } else if (m_hud && m_hud->picking() && m_hud->step_back()) {
+                        // Choosing a route stop on the map: the right click ends the choice, the
+                        // ship does not sail off.
                     } else if (!m_units.empty() && cancel_build_step()) {
                         // A building in hand goes first, even with a ship selected (the Kontor to
                         // found from it); the ship stays selected and does not sail off.

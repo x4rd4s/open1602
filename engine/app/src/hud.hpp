@@ -189,6 +189,9 @@ public:
     void map_click(std::uint32_t x, std::uint32_t y);
     /// Escape: a window goes back a page or stops picking; false if nothing did.
     bool back();
+    /// A right click: the selected object's window goes back a page if it is on one that steps
+    /// back (SelectionPanel::steps_back); false if it is not.
+    bool step_back();
     /// Commands the windows gave since the last call.
     [[nodiscard]] std::vector<sim::Command> take_commands() { return std::exchange(m_commands, {}); }
     /// Switches the mode (also from the keys); returns what the tool should do.
