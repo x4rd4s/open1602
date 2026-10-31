@@ -15,6 +15,7 @@
 
 #include "app_settings.hpp"
 #include "build_tool.hpp"
+#include "catchment_view.hpp"
 #include "command_sink.hpp"
 #include "event_presenter.hpp"
 #include "game_sound.hpp"
@@ -382,10 +383,10 @@ private:
     [[nodiscard]] render::TileLighting tile_lighting() const;
     /// A catchment given in tiles of `island` in world tiles.
     [[nodiscard]] sim::Catchment world_catchment(std::uint16_t island, sim::Catchment area) const;
-    /// Lighting of the local player's building at tile (x, y) of `island`: the land inside its
-    /// circle (and a Kontor's harbour); none for other buildings and those without a circle.
-    [[nodiscard]] std::optional<render::TileLighting> building_lighting(std::uint16_t island, std::uint16_t x,
-                                                                        std::uint16_t y) const;
+    /// Lighting of the local player's clicked building `clicked`: the land inside its circle (and a
+    /// Kontor's harbour); clicked again, inside the circles of all the player's buildings of its type
+    /// on the island. None for other buildings and those without a circle.
+    [[nodiscard]] std::optional<render::TileLighting> building_lighting(const Selection& clicked) const;
     /// The status line over the map under the mouse: the unit or what stands on the tile (0x0040A3D0).
     [[nodiscard]] std::string tile_status() const;
     /// Results of building and demolishing (messages, flags of new buildings).
@@ -564,8 +565,20 @@ private:
     std::unique_ptr<Hud> m_hud;                     ///< panel and status bar (after the window), may be null
     /// Mouse and keys on the map, the selection (after the window, the sound and the panel).
     std::unique_ptr<MapInput> m_input;
-    std::vector<render::TileMark> m_tile_marks;    ///< red ground under what cannot be built, a dragged field
-    render::TileLighting m_lighting;               ///< tiles drawn darker this frame
+    std::vector<render::TileMark> m_tile_marks;  ///< red ground under what cannot be built, a dragged field
+    render::TileLighting m_lighting;             ///< tiles drawn darker this frame
+    /// The circles of the clicked building (catchment_circles), kept while the selection and the
+    /// buildings stay the same: for a type without production entries (towers) they come from a
+    /// search of the whole island.
+    struct CircleCache {
+        Selection clicked;
+        bool same_type = false;
+        std::uint64_t construction = 0;
+        std::optional<CatchmentCircles> circles;
+        bool valid = false;
+    };
+    mutable CircleCache m_circle_cache;
+    std::uint64_t m_construction_serial = 0;       ///< counts the frames in which buildings came or went
     std::optional<sim::BuildBill> m_pending_bill;  ///< costs of the order the build tool shows
     sim::PlayerFigures m_player_figures;           ///< the info panel's figures, refreshed once a second
     std::int64_t m_player_points = 0;              ///< the info panel's "Punkte", refreshed with them

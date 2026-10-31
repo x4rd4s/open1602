@@ -60,6 +60,7 @@ information fit in and the controls follow today's real-time strategy games (202
 | Ctrl+F / Ctrl+K | frame rate / coordinates of the tile under the mouse in the map's corner (History Edition) |
 | Ctrl+B | fertility view: the tiles of the island tinted green where the selected farm's crop bears and red where not (Open1602; with a field, plantation or farm in the build tool, for its crop; never on by itself) |
 | M | unit identification: the coat of arms on a pole over each own land unit, on / off (History Edition; none over ships or other players' units) |
+| Double-click (or a second click) on an own building with a catchment | the circles of all own buildings of its type on the island lit together, also while building (Open1602; one click: its own circle, as in the original) |
 
 **Windows**
 

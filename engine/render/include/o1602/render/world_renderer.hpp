@@ -7,7 +7,9 @@
 // where (vx, vy) are world coordinates after view rotation.
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
@@ -224,10 +226,12 @@ inline constexpr assets::Rgba kCircleOutline{255, 230, 0, 255};
 
 /// Tiles drawn darker, as the original does while the player builds (the fourth byte of its world
 /// map cells picks a shading table, 0x00486B60): only the land the player can build on stays lit. A clicked
-/// building with a catchment narrows that to the land inside its circle, a clicked Kontor adds
+/// building with a catchment narrows that to the land inside its circle, a clicked Kontor or shipyard adds
 /// the water its ships trade from, a clicked fisher's hut the water inside its circle. A building being placed shows
 /// its own circle as a dashed border, drawn whole, over land and water alike; the circle of a building still clicked
-/// stays lit beside it. The land of other players can get a dotted border too (History Edition).
+/// stays lit beside it. The land of other players can get a dotted border too (History Edition). A building clicked
+/// twice lights the circles of all the player's buildings of its type on the island together (Open1602's own, for
+/// planning a city).
 class TileLighting {
 public:
     /// The tiles a building covers, in world tiles.
@@ -245,6 +249,9 @@ public:
     /// Only the land of `player` inside the circle `area` (world tiles) stays lit.
     [[nodiscard]] static TileLighting circle(sim::PlayerId player, const sim::Catchment& area);
 
+    /// Lights the land inside the circle `area` (world tiles) too, besides the circles lit so far.
+    TileLighting& add_circle(const sim::Catchment& area);
+
     /// Adds the border of the circle `area` (world tiles) without narrowing the lit land: a circle
     /// of its own, apart from the lit one.
     TileLighting& outline(const sim::Catchment& area);
@@ -254,21 +261,26 @@ public:
         m_foreign_borders = true;
         return *this;
     }
-    /// Keeps the water inside the lit circle lit too: the fishing grounds of a fisher's hut.
+    /// Keeps the water inside the lit circles lit too: the fishing grounds of a fisher's hut.
     TileLighting& water() noexcept {
         m_water = true;
         return *this;
     }
-    /// Keeps the water lit that ships reach the building at tile (x, y) of `island` from.
+    /// Keeps the water lit that ships reach the building at tile (x, y) of `island` from (a Kontor, a
+    /// shipyard); called again, that of further buildings of the same island too.
     TileLighting& harbour(const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                           std::uint32_t x, std::uint32_t y);
 
     [[nodiscard]] bool active() const noexcept { return m_kind != Kind::None; }
     /// Whether a circle gets a dashed border.
     [[nodiscard]] bool outlined() const noexcept { return !m_outline.empty(); }
-    /// Whether world tile (x, y) lies in the lit circle.
-    [[nodiscard]] bool in_circle(std::int64_t x, std::int64_t y) const noexcept { return m_lit.contains(x, y); }
-    /// Whether any tile of the `width` x `height` world tiles from (x, y) lies in the lit circle.
+    /// How many circles are lit.
+    [[nodiscard]] std::size_t circles() const noexcept { return m_lit.size(); }
+    /// Whether world tile (x, y) lies in a lit circle.
+    [[nodiscard]] bool in_circle(std::int64_t x, std::int64_t y) const noexcept {
+        return std::any_of(m_lit.begin(), m_lit.end(), [&](const Circle& c) { return c.contains(x, y); });
+    }
+    /// Whether any tile of the `width` x `height` world tiles from (x, y) lies in a lit circle.
     [[nodiscard]] bool in_circle(std::int64_t x, std::int64_t y, std::uint32_t width,
                                  std::uint32_t height) const noexcept;
     /// Whether the land of other players gets a dotted border.
@@ -304,16 +316,19 @@ private:
 
     Kind m_kind = Kind::None;
     sim::PlayerId m_player = sim::kNoPlayer;
-    Circle m_lit;      ///< the land of a clicked building (Kind::Circle)
-    Circle m_outline;  ///< the building being placed
+    std::vector<Circle> m_lit;  ///< the land of the clicked building(s) (Kind::Circle)
+    Circle m_outline;           ///< the building being placed
     bool m_foreign_borders = false;
-    bool m_water = false;  ///< the water in m_lit stays lit
-    // The building whose harbour water stays lit (world == nullptr: none).
+    bool m_water = false;  ///< the water in the m_lit circles stays lit
+    // The buildings whose harbour water stays lit (world == nullptr: none).
+    struct Harbour {
+        std::uint32_t x = 0;
+        std::uint32_t y = 0;
+    };
     const sim::World* m_world = nullptr;
     const assets::BuildingTable* m_buildings = nullptr;
     std::uint16_t m_island = 0;
-    std::uint32_t m_x = 0;
-    std::uint32_t m_y = 0;
+    std::vector<Harbour> m_harbours;
 };
 
 /// Everything besides the tiles that goes into the world draw list.
