@@ -462,7 +462,7 @@ setup.map.own = A world of its own
 setup.size = Size
 # {1}: width, {2}: height in tiles
 setup.size.value = {1} × {2}
-setup.size.auto = Auto ({1} × {2})
+setup.size.auto = Auto {1}×{2}
 setup.players = Players
 setup.islands = Islands
 setup.island_sizes = Island sizes
@@ -549,7 +549,7 @@ setup.original = Original rules
 setup.defaults = Open1602 defaults
 setup.back = Back
 setup.start = Start game
-setup.hint = Click: next value, right click: previous. Everything stays with the game and its savegames; a world of its own has the players chosen.
+setup.hint = Click: next value, right click: previous. Everything stays with the game and its savegames.
 setup.title.multiplayer = Multiplayer game: settings
 setup.title.scenario = New scenario: settings
 setup.title.savegame = Saved game: settings

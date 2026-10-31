@@ -476,8 +476,8 @@ void Generator::give_own_shape(Slot& slot) const {
             big = std::max<std::uint32_t>(big, 1);
             small = std::max<std::uint32_t>(small, 1);
         }
-        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 30));
-        r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(small, 30));
+        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 255));
+        r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(small, 255));
     } else {
         // In the place of its template: as large, with as many ore mountains.
         r.width = slot.base.header.width;

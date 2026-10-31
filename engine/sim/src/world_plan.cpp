@@ -579,7 +579,8 @@ void Planner::place_land(bool warn_full) {
     // finds room only while the map is still empty. An island that finds none is tried smaller;
     // what is still missing then is filled with new draws until the map is full.
     constexpr std::uint32_t kTries = 300;
-    constexpr std::uint32_t kMisses = 40;  // islands in a row that found no room: the map is full
+    constexpr std::uint32_t kMisses = 40;    // islands in a row that found no room: the map is full
+    constexpr std::int32_t kScanSide = 100;  // from this side on a missed island is searched for
     const std::uint64_t target = own_target(m_s);
     std::uint64_t placed = 0;
     for (const Planned& p : m_islands) {
@@ -588,26 +589,48 @@ void Planner::place_land(bool warn_full) {
     const auto w = static_cast<std::int32_t>(m_s.width);
     const auto h = static_cast<std::int32_t>(m_s.height);
     const auto edge = static_cast<std::int32_t>(kEdge);
-    const auto place = [&](Dims first) {
+    const auto place = [&](Dims first, bool search) {
         for (std::optional<Dims> d = first; d; d = smaller(*d)) {
             if (w <= 2 * edge + d->w || h <= 2 * edge + d->h) {
                 continue;
             }
-            for (std::uint32_t t = 0; t < kTries; ++t) {
+            std::optional<Rect> found;
+            for (std::uint32_t t = 0; t < kTries && !found; ++t) {
                 const Rect rect{edge + static_cast<std::int32_t>(
                                            m_random.below(static_cast<std::uint32_t>(w - 2 * edge - d->w + 1))),
                                 edge + static_cast<std::int32_t>(
                                            m_random.below(static_cast<std::uint32_t>(h - 2 * edge - d->h + 1))),
                                 d->w, d->h};
                 if (fits(rect)) {
-                    Planned p;
-                    p.rect = rect;
-                    p.size = d->size;
-                    p.own = true;
-                    m_islands.push_back(p);
-                    placed += std::uint64_t(rect.w) * std::uint64_t(rect.h);
-                    return true;
+                    found = rect;
                 }
+            }
+            if (!found && search && std::max(d->w, d->h) >= kScanSide) {
+                // A large island of the first draws that random places missed: every place on a
+                // lattice of a sixth of its side, one of those with room at random, before it is
+                // tried smaller.
+                const std::int32_t step = std::max<std::int32_t>(4, std::min(d->w, d->h) / 6);
+                std::vector<Rect> room;
+                for (std::int32_t y = edge; y + d->h <= h - edge; y += step) {
+                    for (std::int32_t x = edge; x + d->w <= w - edge; x += step) {
+                        const Rect rect{x, y, d->w, d->h};
+                        if (fits(rect)) {
+                            room.push_back(rect);
+                        }
+                    }
+                }
+                if (!room.empty()) {
+                    found = room[m_random.below(static_cast<std::uint32_t>(room.size()))];
+                }
+            }
+            if (found) {
+                Planned p;
+                p.rect = *found;
+                p.size = d->size;
+                p.own = true;
+                m_islands.push_back(p);
+                placed += std::uint64_t(found->w) * std::uint64_t(found->h);
+                return true;
             }
         }
         return false;
@@ -624,11 +647,11 @@ void Planner::place_land(bool warn_full) {
         if (placed >= target || m_islands.size() >= kMaxPlannedIslands) {
             break;
         }
-        place(d);
+        place(d, true);
     }
     std::uint32_t misses = 0;
     while (placed < target && m_islands.size() < kMaxPlannedIslands && misses < kMisses) {
-        misses = place(draw_dims()) ? 0 : misses + 1;
+        misses = place(draw_dims(), false) ? 0 : misses + 1;
     }
     if (warn_full && placed * 10 < target * 9) {
         warn("the map is full after " + std::to_string(m_islands.size()) + " islands, " +

@@ -320,6 +320,10 @@ TEST_CASE("island shapes: light water past the surf, dark far out, the band edge
                 }
             }
             CHECK(!(near_surf && b == 3));
+            // On the rectangle's edge the open sea, but next to the surf.
+            if (x == 0 || y == 0 || x == w - 1 || y == h - 1) {
+                CHECK((near_surf || b == 3));
+            }
             if (id[i] == ids::kLightEdge || id[i] == ids::kDarkEdge) {
                 // An edge: the lighter water on the two sides it is turned to.
                 const int own = id[i] == ids::kLightEdge ? 2 : 3;
@@ -347,4 +351,20 @@ TEST_CASE("island shapes: light water past the surf, dark far out, the band edge
     CHECK(count[1] > 0);
     CHECK(count[2] > 0);
     CHECK(count[3] > 0);
+}
+
+TEST_CASE("island shapes: an island larger than the original's, with ore mountains for its size") {
+    sim::shapes::ShapeRequest r;
+    r.width = 300;
+    r.height = 280;
+    r.size = 4;
+    r.number = 4;
+    r.big_mountains = 60;
+    r.small_mountains = 90;
+    r.seed = 3;
+    const assets::Island island = sim::shapes::make_island(r);
+    const Checked c = check_island(island, r);
+    CHECK(c.big == r.big_mountains);
+    CHECK(c.small == r.small_mountains);
+    CHECK(c.land * 2 >= std::size_t{r.width} * r.height);
 }

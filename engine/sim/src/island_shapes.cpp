@@ -156,7 +156,10 @@ std::vector<std::uint8_t> sea_depth(const LandMap& map, Random& random) {
                 continue;
             }
             const int v = wobble.at(x, y);
-            const int level = d + (v < 340 ? -1 : v > 683 ? 1 : 0);
+            // Towards the rectangle's edge the sea deepens, so that the bands end in the dark open
+            // sea around the island and not in a straight line along the edge.
+            const int rim = std::min({x, y, w - 1 - x, h - 1 - y});
+            const int level = std::max(d + (v < 340 ? -1 : v > 683 ? 1 : 0), 5 - 2 * rim);
             int b = level <= 2 ? kLight : level <= 4 ? kMiddle : kDark;
             if (d == 2) {
                 b = std::min(b, kMiddle);  // never dark next to the surf
@@ -179,6 +182,12 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
     const int spacing = std::max(3, std::min(blocks_x, blocks_y) / spread);
     const Noise coarse(random, blocks_x, blocks_y, spacing);
     const Noise fine(random, blocks_x, blocks_y, std::max(2, spacing / 2));
+    // Large islands: finer octaves down to a few blocks, each of half the weight, so that their
+    // coasts do not run straight between the lattice points of the coarse noise.
+    std::vector<Noise> detail;
+    for (int s = spacing / 4; s >= 3; s /= 2) {
+        detail.emplace_back(random, blocks_x, blocks_y, s);
+    }
     // Half-block units, so that the centres of a block and of the island are whole numbers; the
     // ellipse reaches the blocks next to the edge.
     const int rx = std::max(1, blocks_x - 2);
@@ -193,7 +202,15 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
             // 0 in the centre, 1024 on the ellipse touching the margin.
             const int falloff = static_cast<int>((std::int64_t{dx} * dx * 1024) / (std::int64_t{rx} * rx) +
                                                  (std::int64_t{dy} * dy * 1024) / (std::int64_t{ry} * ry));
-            const int noise = (2 * coarse.at(bx, by) + fine.at(bx, by)) / 3;
+            int sum = 8 * coarse.at(bx, by) + 4 * fine.at(bx, by);
+            int weight = 12;
+            int part = 2;
+            for (const Noise& n : detail) {
+                sum += n.at(bx, by) * part;
+                weight += part;
+                part = std::max(1, part / 2);
+            }
+            const int noise = sum / weight;
             const int score = 1024 - falloff + (noise - 512) * strength / 100;
             grid[static_cast<std::size_t>(by) * static_cast<std::size_t>(blocks_x) + static_cast<std::size_t>(bx)] =
                 score;
@@ -629,9 +646,9 @@ assets::Island make_island(const ShapeRequest& request) {
 
     // Ore mountains on inland, with a tile of room around them so that roads and mines reach them.
     const auto place_mountains = [&](std::uint8_t count, std::uint8_t size, std::span<const std::uint32_t> kinds) {
-        constexpr std::uint32_t kTries = 400;
+        const std::uint32_t tries = 400 + 40 * std::uint32_t{count};  // many on a large island
         std::uint8_t placed = 0;
-        for (std::uint32_t t = 0; t < kTries && placed < count; ++t) {
+        for (std::uint32_t t = 0; t < tries && placed < count; ++t) {
             const int x0 = static_cast<int>(random.below(static_cast<std::uint32_t>(width - size)));
             const int y0 = static_cast<int>(random.below(static_cast<std::uint32_t>(height - size)));
             bool free = true;
@@ -657,7 +674,11 @@ assets::Island make_island(const ShapeRequest& request) {
     place_mountains(request.small_mountains, ids::kSmallMountainSize, ids::kSmallMountain);
 
     // Forest in patches (the north has more of it, as its templates), ground elsewhere.
-    const Noise forest(random, width, height, std::max(4, std::min(width, height) / 5));
+    // Patches of about a template's (a fifth of a big template's side, at most 24 tiles across on
+    // large islands), their edges frayed by a finer noise.
+    const int patch = std::clamp(std::min(width, height) / 5, 4, 24);
+    const Noise forest(random, width, height, patch);
+    const Noise fray(random, width, height, std::max(2, patch / 3));
     constexpr std::array<int, 3> kForestShift = {130, 0, -130};  // Little, Normal, Much
     const int forest_line = (request.climate == 0 ? 470 : 580) + kForestShift[static_cast<std::size_t>(request.forest)];
     const auto& trees = request.climate == 0 ? ids::kForestNorth : ids::kForestSouth;
@@ -666,7 +687,7 @@ assets::Island make_island(const ShapeRequest& request) {
             if (taken[at(x, y)] != 0 || !map.land(x, y)) {
                 continue;
             }
-            if (forest.at(x, y) >= forest_line) {
+            if ((2 * forest.at(x, y) + fray.at(x, y)) / 3 >= forest_line) {
                 lay(pick(random, trees), x, y, 0, 0);
             } else {
                 lay(ids::kGround, x, y, 0, 0);
