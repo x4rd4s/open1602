@@ -139,8 +139,10 @@ GameSettingsMenu::~GameSettingsMenu() {
 }
 
 void GameSettingsMenu::wait_preview() {
+    // The preview being made may be of settings since changed: then the next one starts when it
+    // is done. Wait until the preview is of the settings as they are.
     update_preview();
-    if (m_pending.valid()) {
+    while (m_pending.valid()) {
         m_pending.wait();
         update_preview();
     }
