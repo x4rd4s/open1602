@@ -188,8 +188,11 @@ treaties (`game.relation`), and make peace and war and trade treaties (`game.set
 
 Part 5 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): scripts build and
 demolish for a player as the player would (`game.build`, `game.demolish`, paid and checked like the
-build tool), destroy a building to ruins (`game.destroy`) and send ships (`game.move_ship`). Still
-open: moving land units, and goals of a mission changed by a script.
+build tool), destroy a building to ruins (`game.destroy`) and send ships (`game.move_ship`).
+
+Part 6 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): scripts read a player's
+mission (`game.mission`) and give a player new goals or none (`game.set_mission`), by the keys of a
+scenario's goals. Still open: moving land units.
 
 ### 7. Scenarios and campaigns (section 6)
 

@@ -113,6 +113,7 @@ ware number.
 | `game.city(island, city)` | the city as `game.cities` gives it, and `inhabitants` (in all) and `classes` (a list of its inhabitants per class, the first class first); nil for no such city |
 | `game.ships(player)` | the ships of `player` (nil: all), a list of tables: `id`, `name`, `player` (nil without an owner), `figure` (its number in `figuren.cod`), `x`, `y` (the world tile it is on), `cannons`, `trader` (the free trader's) |
 | `game.relation(a, b)` | the treaties between players `a` and `b`: `peace` and `trade`, each `"signed"`, `"none"` (war, or no trade treaty), `"offered"` (by `a`) or `"received"` (from `b`), and `hostile` (their units fight); nil for no such players or the same player twice |
+| `game.mission(player)` | the mission of `player` as a table: `text` and its goals by the keys of a scenario's goals ([scenarios.md](scenarios.md#goals)): `inhabitants`, `cities`, `balance`, `trade_balance`, `defeated`, `castle`, `cathedral`, `goods` (a table of goods' ids and tons) and `city` (`inhabitants`, `class`, `count`); `other` is true if it has goals or loss conditions of the original's maps these keys do not name. Nil for no mission or no such player |
 
 ## What a script changes
 
@@ -128,6 +129,7 @@ ware number.
 | `game.demolish(player, island, x, y)` | demolishes the building of `player` on the tile as the player would; returns how many buildings went (0 or 1) |
 | `game.destroy(island, x, y)` | destroys the building of a city on the tile to ruins, as a fire does, whoever owns it; true if one stood there (ground, forest and rocks outside cities stay) |
 | `game.move_ship(ship, x, y)` | sends the ship (its id) to world tile `x`, `y`, as its owner would; `x` nil stops it; true if it sails, false for no such ship, the free trader's, or a tile off the map |
+| `game.set_mission(player, goals)` | gives `player` these goals as their mission from now on, all of which must hold at the same time, as a scenario's: a table with the keys `game.mission` gives (a good named as above, at most two) and `text`, the description; nil or a table without goals: no mission. Whoever shared the old mission keeps it; a computer's mission counts for it as for a person. True if so, false for no such player or a neutral one |
 
 They work only while the game runs, in the `on_...` functions, not at the top level of the script.
 Every computer of a multiplayer game makes the same changes at the same moment, so they need no

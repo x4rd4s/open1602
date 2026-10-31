@@ -1302,6 +1302,48 @@ std::optional<std::int64_t> Simulation::script_goods(std::uint16_t island, std::
     return -std::int64_t{taken};
 }
 
+bool Simulation::script_mission(PlayerId player, std::optional<Mission> mission) {
+    Player* p = m_world->player(player);
+    if (p == nullptr || (p->role != PlayerRole::Human && p->role != PlayerRole::Computer)) {
+        return false;
+    }
+    if (!mission) {
+        p->mission = kNoMission;
+        return true;
+    }
+    if (p->role == PlayerRole::Computer) {
+        mission->goals |= goal::kComputers;
+    }
+    // The player's own slot if nobody else names it, else a slot nobody names, else a new one.
+    const auto named_by_other = [&](std::size_t slot) {
+        for (std::size_t i = 0; i < m_world->players().size(); ++i) {
+            if (i != player && m_world->players()[i].mission == slot) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::vector<Mission> missions = m_world->missions();
+    std::size_t slot = p->mission;
+    if (slot >= missions.size() || named_by_other(slot)) {
+        slot = 0;
+        while (slot < missions.size() && (slot == p->mission || named_by_other(slot))) {
+            ++slot;
+        }
+    }
+    if (slot >= kNoMission) {
+        return false;
+    }
+    if (slot == missions.size()) {
+        missions.push_back(std::move(*mission));
+    } else {
+        missions[slot] = std::move(*mission);
+    }
+    m_world->set_missions(std::move(missions));
+    p->mission = static_cast<MissionId>(slot);
+    return true;
+}
+
 bool Simulation::script_win(PlayerId player) {
     const Player* p = m_world->player(player);
     if (m_world->game_end() || p == nullptr || !p->active() ||

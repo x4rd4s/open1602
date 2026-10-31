@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <span>
@@ -234,6 +235,160 @@ Value city_details(const sim::City& city) {
 
 core::Error script_error(std::string message) {
     return core::make_error(core::ErrorCode::ScriptError, std::move(message));
+}
+
+/// The goal bits game.mission and game.set_mission name (the keys of a scenario's goals).
+constexpr std::uint32_t kScriptGoals = sim::goal::kInhabitants | sim::goal::kCityCount | sim::goal::kBalance |
+                                       sim::goal::kTradeBalance | sim::goal::kDefeatedCount | sim::goal::kCastle |
+                                       sim::goal::kCathedral | sim::goal::kGoods1 | sim::goal::kGoods2 |
+                                       sim::goal::kCity1 | sim::goal::kComputers;
+
+/// A mission as game.mission gives it: its text and the goals by the keys of a scenario's goals;
+/// `other` if it has goals or loss conditions these keys do not name (missions of the original's maps).
+Value mission_table(const sim::World& world, const sim::Mission& m) {
+    namespace goal = sim::goal;
+    std::vector<std::pair<std::string, Value>> fields{{"text", core::cp1252_to_utf8(m.text)}};
+    const auto number = [&](std::uint32_t bit, const char* name, std::int64_t value) {
+        if ((m.goals & bit) != 0) {
+            fields.emplace_back(name, value);
+        }
+    };
+    number(goal::kInhabitants, "inhabitants", m.min_inhabitants);
+    number(goal::kCityCount, "cities", m.min_cities);
+    number(goal::kBalance, "balance", m.min_balance);
+    number(goal::kTradeBalance, "trade_balance", m.min_trade_balance);
+    number(goal::kDefeatedCount, "defeated", m.min_defeated);
+    if ((m.goals & goal::kCastle) != 0) {
+        fields.emplace_back("castle", true);
+    }
+    if ((m.goals & goal::kCathedral) != 0) {
+        fields.emplace_back("cathedral", true);
+    }
+    std::vector<std::pair<std::string, Value>> goods;
+    for (std::size_t i = 0; i < m.goods.size(); ++i) {
+        if ((m.goals & (i == 0 ? goal::kGoods1 : goal::kGoods2)) != 0) {
+            goods.emplace_back(good_id(world, m.goods[i].ware), whole_tons(m.goods[i].amount));
+        }
+    }
+    if (!goods.empty()) {
+        fields.emplace_back("goods", make_table(std::move(goods)));
+    }
+    if ((m.goals & goal::kCity1) != 0) {
+        const sim::Mission::CityGoal& city = m.cities[0];
+        fields.emplace_back("city", make_table({
+                                        {"inhabitants", std::int64_t{city.inhabitants}},
+                                        {"class", std::int64_t{city.resident_class}},
+                                        {"count", std::int64_t{city.count}},
+                                    }));
+    }
+    if ((m.goals & ~kScriptGoals) != 0 || m.losses != 0) {
+        fields.emplace_back("other", true);
+    }
+    return make_table(std::move(fields));
+}
+
+/// An integer field of a table within [low, high]; an error naming `what` otherwise.
+core::Result<std::int64_t> bounded(const Value& value, std::string_view what, std::int64_t low, std::int64_t high) {
+    const auto* number = std::get_if<std::int64_t>(&value);
+    if (number == nullptr || *number < low || *number > high) {
+        return script_error("game.set_mission: " + std::string(what) + " must be a whole number from " +
+                            std::to_string(low) + " to " + std::to_string(high));
+    }
+    return *number;
+}
+
+/// The fields of a table argument; nullptr for another value.
+const Table* table_of(const Value& value) {
+    const auto* table = std::get_if<std::shared_ptr<const Table>>(&value);
+    return table != nullptr ? table->get() : nullptr;
+}
+
+/// The goals of game.set_mission, by the keys of a scenario's goals, and its `text` (UTF-8).
+core::Result<assets::ScenarioGoals> goals_argument(const Table& table, std::string_view package, std::string& text) {
+    constexpr std::int64_t kMaxInt = std::numeric_limits<std::int32_t>::max();
+    constexpr std::int64_t kMaxTons = std::numeric_limits<std::uint32_t>::max() / 32;
+    assets::ScenarioGoals goals;
+    for (const auto& [name, value] : table.fields) {
+        if (name == "text") {
+            const auto* string = std::get_if<std::string>(&value);
+            if (string == nullptr) {
+                return script_error("game.set_mission: text must be a string");
+            }
+            text = *string;
+        } else if (name == "inhabitants" || name == "cities" || name == "balance" || name == "trade_balance") {
+            const bool money = name == "balance" || name == "trade_balance";
+            auto n = bounded(value, name, money ? -kMaxInt : 0, kMaxInt);
+            if (!n) {
+                return n.error();
+            }
+            auto& field = name == "inhabitants" ? goals.inhabitants
+                          : name == "cities"    ? goals.cities
+                          : name == "balance"   ? goals.balance
+                                                : goals.trade_balance;
+            field = static_cast<std::int32_t>(*n);
+        } else if (name == "defeated") {
+            auto n = bounded(value, name, 0, std::numeric_limits<std::uint16_t>::max());
+            if (!n) {
+                return n.error();
+            }
+            goals.defeated = static_cast<std::uint16_t>(*n);
+        } else if (name == "castle" || name == "cathedral") {
+            const auto* flag = std::get_if<bool>(&value);
+            if (flag == nullptr) {
+                return script_error("game.set_mission: " + name + " must be true or false");
+            }
+            (name == "castle" ? goals.castle : goals.cathedral) = *flag;
+        } else if (name == "goods") {
+            const Table* goods = table_of(value);
+            if (goods == nullptr || !goods->items.empty()) {
+                return script_error("game.set_mission: goods must be a table of goods' names and tons");
+            }
+            for (const auto& [good, tons] : goods->fields) {
+                auto n = bounded(tons, "the tons of " + good, 0, kMaxTons);
+                if (!n) {
+                    return n.error();
+                }
+                goals.goods.emplace_back(good.find(':') == std::string::npos ? std::string(package) + ":" + good : good,
+                                         static_cast<std::uint32_t>(*n));
+            }
+        } else if (name == "city") {
+            const Table* city = table_of(value);
+            if (city == nullptr) {
+                return script_error("game.set_mission: city must be a table");
+            }
+            assets::ScenarioCityGoal goal;
+            for (const auto& [key, field] : city->fields) {
+                if (key == "inhabitants") {
+                    auto n = bounded(field, "city.inhabitants", 0, kMaxInt);
+                    if (!n) {
+                        return n.error();
+                    }
+                    goal.inhabitants = static_cast<std::int32_t>(*n);
+                } else if (key == "class") {
+                    auto n = bounded(field, "city.class", 0, std::numeric_limits<std::uint8_t>::max());
+                    if (!n) {
+                        return n.error();
+                    }
+                    goal.resident_class = static_cast<std::uint8_t>(*n);
+                } else if (key == "count") {
+                    auto n = bounded(field, "city.count", 0, kMaxInt);
+                    if (!n) {
+                        return n.error();
+                    }
+                    goal.count = static_cast<std::uint32_t>(*n);
+                } else {
+                    return script_error("game.set_mission: a city goal has no " + key);
+                }
+            }
+            goals.city = goal;
+        } else {
+            return script_error("game.set_mission: there is no goal " + name);
+        }
+    }
+    if (goals.goods.size() > 2) {
+        return script_error("game.set_mission: at most two goods");
+    }
+    return goals;
 }
 
 }  // namespace
@@ -594,6 +749,44 @@ void GameScripts::add_api(Package& package) {
         }
         return Value{*player >= 0 && *player < static_cast<std::int64_t>(m_world->players().size()) &&
                      m_simulation->script_defeat(static_cast<sim::PlayerId>(*player))};
+    });
+    add("mission", [this](std::span<const Value> args) -> core::Result<Value> {
+        if (!integer(args, 0)) {
+            return script_error("game.mission: the player's number is missing");
+        }
+        const auto player = player_argument(*m_world, args, 0);
+        const sim::Mission* mission = player ? m_world->mission_of(m_world->players()[*player]) : nullptr;
+        return mission != nullptr ? mission_table(*m_world, *mission) : Value{};
+    });
+    add("set_mission", [this, &package](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.set_mission: only while the game runs, not at the top level");
+        }
+        if (!integer(args, 0)) {
+            return script_error("game.set_mission: the player's number is missing");
+        }
+        std::optional<sim::Mission> mission;
+        if (args.size() > 1 && !std::holds_alternative<std::monostate>(args[1])) {
+            const Table* table = table_of(args[1]);
+            if (table == nullptr) {
+                return script_error("game.set_mission: the goals must be a table");
+            }
+            std::string text;
+            auto goals = goals_argument(*table, package.id, text);
+            if (!goals) {
+                return goals.error();
+            }
+            if (goals->any()) {
+                std::vector<std::string> problems;
+                mission = sim::mission_from_goals(*m_world, *goals, core::utf8_to_cp1252(text), "game.set_mission",
+                                                  &problems);
+                if (!problems.empty()) {
+                    return script_error(problems.front());
+                }
+            }
+        }
+        const auto player = player_argument(*m_world, args, 0);
+        return Value{player && m_simulation->script_mission(*player, std::move(mission))};
     });
     add("message", [this, &package](std::span<const Value> args) -> core::Result<Value> {
         const auto* id = args.empty() ? nullptr : std::get_if<std::string>(&args[0]);
