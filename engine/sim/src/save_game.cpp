@@ -126,7 +126,11 @@ core::Result<core::Bytes> pack_game(const core::Bytes& sections, const SaveOptio
     std::uint16_t flags = 0;
     core::Bytes stored;
     if (options.compress && core::has_zlib()) {
-        auto packed = core::zlib_deflate(sections);
+        // A game of a world of thousands of tiles a side has hundreds of MiB of sections: the
+        // fastest level packs them about four times as fast, for a somewhat larger file, so that
+        // saving (and a host packing the game for a computer) does not hold the game for seconds.
+        constexpr std::size_t kLarge = std::size_t{64} << 20;
+        auto packed = core::zlib_deflate(sections, sections.size() > kLarge ? 1 : 6);
         if (!packed) {
             return packed.error();
         }

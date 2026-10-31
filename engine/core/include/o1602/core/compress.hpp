@@ -17,7 +17,8 @@ namespace o1602::core {
 [[nodiscard]] bool has_zlib() noexcept;
 
 /// A zlib stream of `data` (level 6). Fails if the build has no zlib.
-[[nodiscard]] Result<std::vector<std::uint8_t>> zlib_deflate(std::span<const std::uint8_t> data);
+/// `level` 1 (fastest) .. 9 (smallest); 6 is zlib's default.
+[[nodiscard]] Result<std::vector<std::uint8_t>> zlib_deflate(std::span<const std::uint8_t> data, int level = 6);
 
 /// The data of a zlib stream, which must be exactly `size` bytes long.
 [[nodiscard]] Result<std::vector<std::uint8_t>> zlib_inflate(std::span<const std::uint8_t> stream, std::size_t size);

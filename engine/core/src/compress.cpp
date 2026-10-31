@@ -19,20 +19,21 @@ bool has_zlib() noexcept {
 #endif
 }
 
-Result<std::vector<std::uint8_t>> zlib_deflate(std::span<const std::uint8_t> data) {
+Result<std::vector<std::uint8_t>> zlib_deflate(std::span<const std::uint8_t> data, int level) {
 #if defined(O1602_HAVE_ZLIB)
     if (data.size() > std::numeric_limits<uLong>::max()) {
         return make_error(ErrorCode::OutOfRange, "zlib: data too large");
     }
     uLongf size = compressBound(static_cast<uLong>(data.size()));
     std::vector<std::uint8_t> out(size);
-    if (compress2(out.data(), &size, data.data(), static_cast<uLong>(data.size()), 6) != Z_OK) {
+    if (compress2(out.data(), &size, data.data(), static_cast<uLong>(data.size()), std::clamp(level, 1, 9)) != Z_OK) {
         return make_error(ErrorCode::InvalidFormat, "zlib: compression failed");
     }
     out.resize(size);
     return out;
 #else
     (void)data;
+    (void)level;
     return make_error(ErrorCode::Unsupported, "zlib: this build of Open1602 has no zlib");
 #endif
 }
