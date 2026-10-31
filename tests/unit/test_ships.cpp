@@ -1035,6 +1035,32 @@ TEST_CASE("ships: a ship offered for sale changes hands for its price") {
     CHECK(!fleet.command(cmd(0, id, Op::Buy)));
 }
 
+TEST_CASE("ships: an offer for sale is announced once, price changes stay quiet") {
+    Sea sea;
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    const std::uint32_t id = sea.add(10, 10).id;
+    using Op = sim::ShipCommand::Op;
+    const auto offers = [&fleet] {
+        const auto events = fleet.take_events();
+        return std::count_if(events.begin(), events.end(),
+                             [](const sim::ShipEvent& e) { return e.kind == sim::ShipEvent::Kind::OfferedForSale; });
+    };
+    sim::ShipCommand offer = cmd(0, id, Op::OfferForSale);
+    CHECK(fleet.command(offer));
+    CHECK(offers() == 1);
+    // Dragging the price slider: many price changes, no new announcement.
+    for (std::uint16_t factor = 64; factor <= 256; factor += 8) {
+        offer.factor = factor;
+        CHECK(fleet.command(offer));
+    }
+    CHECK(offers() == 0);
+    CHECK(sea.world.ship(id)->sale_factor == 256);
+    // Withdrawn and offered again: a new offer, announced again.
+    CHECK(fleet.command(cmd(0, id, Op::WithdrawSale)));
+    CHECK(fleet.command(offer));
+    CHECK(offers() == 1);
+}
+
 TEST_CASE("ships: white flag, scuttling and patrols") {
     Sea sea;
     sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);

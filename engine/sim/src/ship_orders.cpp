@@ -127,15 +127,21 @@ bool Fleet::command(const ShipCommand& c) {
             }
             ship->name = c.name;
             return true;
-        case ShipCommand::Op::OfferForSale:
+        case ShipCommand::Op::OfferForSale: {
             if (!own || c.factor > ShipCommand::kMaxSaleFactor) {
                 return false;
             }
+            // Only a new offer is announced to the other players; changing the price of a ship
+            // already for sale (dragging the price slider sends one command per step) stays quiet.
+            const bool announce = !ship->for_sale;
             ship->for_sale = true;
             ship->sale_factor = c.factor;
-            m_events.push_back(
-                ShipEvent{ShipEvent::Kind::OfferedForSale, ship->id, ship->owner, 0, 0, 0, 0, sale_price(*ship)});
+            if (announce) {
+                m_events.push_back(
+                    ShipEvent{ShipEvent::Kind::OfferedForSale, ship->id, ship->owner, 0, 0, 0, 0, sale_price(*ship)});
+            }
             return true;
+        }
         case ShipCommand::Op::WithdrawSale:
             if (!own || !ship->for_sale) {
                 return false;
