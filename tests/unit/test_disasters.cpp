@@ -372,6 +372,32 @@ TEST_CASE("disasters: doctors cure on foot, firemen put out fires along the road
     CHECK(count(events, sim::DisasterEvent::Kind::Ended, false) == 2);
 }
 
+TEST_CASE("disasters: the fire brigade puts out a fire right next to its own building") {
+    Town town;
+    town.place(kBrunnen, 14, 8);
+    town.place(kBakery, 12, 8);  // x 12..13: touches the fire brigade's tile at (14, 8)
+    town.finish({{14, 8}, {12, 8}});
+    sim::Logistics logistics(town.world, town.buildings, town.figures);
+    sim::start_disaster(town.world, town.buildings, 0, {12, 8}, sim::Disaster::Kind::Fire, sim::kFireDuration, nullptr);
+    logistics.handle(
+        sim::ProductionEvent{sim::ProductionEvent::Kind::NeedsRawGoods, *town.world.production_index(0, 14, 8), 0, 0});
+    REQUIRE(logistics.walkers().size() == 1);
+    bool worked_at_home = false;
+    for (int t = 0; t < 20 * 60 && logistics.walkers().size() != 0; ++t) {
+        logistics.tick();
+        logistics.walkers().for_each([&](sim::Handle, const sim::Walker& w) {
+            if (w.working()) {
+                worked_at_home =
+                    w.tile == sim::TilePos{14, 8} && w.direction == sim::direction_between(w.tile, {12, 8});
+            }
+        });
+    }
+    CHECK(worked_at_home);
+    CHECK(logistics.walkers().size() == 0);
+    CHECK(town.at(12, 8) == nullptr);
+    CHECK(logistics.stats().extinguished == 1);
+}
+
 TEST_CASE("disasters: the fire brigade does not reach a building away from the roads") {
     Town town;
     town.place(kBrunnen, 14, 8);

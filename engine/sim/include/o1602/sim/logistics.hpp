@@ -286,6 +286,8 @@ private:
     bool find_disaster(Walker& walker, const BuildingAt& home, const assets::FigureType& figure);
     /// A doctor or fireman has worked at a building: it is cured or put out; then the next one.
     void responder_done(Handle handle, Walker& walker);
+    /// A doctor or fireman at the disaster: starts his work there.
+    void begin_response(Walker& walker);
     /// Robbers (0x0045A780): waiting, chasing, fleeing.
     void robber_wait(Handle handle, Walker& robber);
     void robber_chase(Handle handle, Walker& robber);
