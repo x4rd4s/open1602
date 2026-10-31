@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -903,6 +904,207 @@ TEST_CASE("game setup: a savegame's values take the room their labels leave, in 
             }
             // Without fonts every byte is 9 units: wider than a button's room for the longest values.
             CHECK(find_text(menu, value_of(menu.setup(), item)).has_value());
+        }
+    }
+    ui::set_language(ui::kFallbackLanguage);
+}
+
+TEST_CASE("endless setup: the islands' presets and settings, and their lines in settings.cfg") {
+    using Landscape = sim::WorldSettings::Landscape;
+    EndlessSetup s;
+    CHECK(app::islands_summary(s) == ui::tr("setup.island_preset.original"));
+    // Only a world of its own has islands to shape; the shapes' items only for islands of their own.
+    CHECK(!app::setup_item_used(s, SetupItem::IslandPreset));
+    s.own_world = true;
+    CHECK(app::setup_item_used(s, SetupItem::IslandPreset));
+    CHECK(app::setup_item_used(s, SetupItem::Islands));
+    CHECK(!app::setup_item_used(s, SetupItem::LandShare));
+    CHECK(!app::setup_item_used(s, SetupItem::OreMountains));
+
+    // Every preset after the original's is a world of islands of their own, matched again.
+    for (std::size_t i = 1; i < app::setup_choices(SetupItem::IslandPreset); ++i) {
+        app::choose(s, SetupItem::IslandPreset, i);
+        CHECK(s.world.shapes == sim::WorldSettings::Shapes::Own);
+        CHECK(app::setup_choice(s, SetupItem::IslandPreset) == i);
+        CHECK(s.world.landscape.min_side <= s.world.landscape.max_side);
+        CHECK(app::setup_item_used(s, SetupItem::LandShare));
+        CHECK(!app::setup_item_used(s, SetupItem::Islands));  // the land decides how many
+        CHECK(!app::setup_item_used(s, SetupItem::IslandSizes));
+    }
+    app::choose(s, SetupItem::IslandPreset, 1);
+    CHECK(s.world.landscape == Landscape{});
+    CHECK(app::islands_summary(s) == ui::tr("setup.island_preset.varied"));
+    app::choose(s, SetupItem::IslandPreset, 0);
+    CHECK(s.world.shapes == sim::WorldSettings::Shapes::Templates);
+
+    // A setting of its own: "own settings".
+    app::choose(s, SetupItem::IslandPreset, 3);  // continents
+    app::choose(s, SetupItem::Coast, 2);
+    CHECK(s.world.landscape.coast == sim::shapes::Roughness::Rugged);
+    CHECK(app::setup_value(s, SetupItem::IslandPreset) == ui::tr("setup.island_preset.custom"));
+    CHECK(app::islands_summary(s) == ui::tr("setup.island_preset.custom"));
+    // The smallest island never larger than the largest: the other one follows.
+    app::choose(s, SetupItem::LargestIsland, 0);  // 40
+    CHECK(s.world.landscape.max_side == 40);
+    CHECK(s.world.landscape.min_side <= 40);
+    app::choose(s, SetupItem::SmallestIsland, app::setup_choices(SetupItem::SmallestIsland) - 1);  // 200
+    CHECK(s.world.landscape.min_side == 200);
+    CHECK(s.world.landscape.max_side == 200);
+    app::choose(s, SetupItem::LandShare, 7);
+    CHECK(s.world.landscape.land == 45);
+    app::choose(s, SetupItem::Forest, 2);
+    app::choose(s, SetupItem::OreMountains, 0);
+    app::choose(s, SetupItem::SizeSpread, 2);
+    app::choose(s, SetupItem::IslandGap, 0);
+    app::choose(s, SetupItem::Outline, 1);
+    CHECK(s.world.landscape.forest == sim::shapes::Share::Much);
+    CHECK(s.world.landscape.mountains == sim::shapes::Share::Little);
+    CHECK(s.world.landscape.spread == Landscape::Spread::FewGiants);
+    CHECK(s.world.landscape.gap == Landscape::Gap::Narrow);
+    CHECK(s.world.landscape.outline == Landscape::Outline::Long);
+    CHECK(s.world_settings().landscape == s.world.landscape);
+    CHECK(!(s == EndlessSetup{}));
+
+    // settings.cfg keeps all of it; the world's number is not kept.
+    s.world_seed = 1234;
+    const std::string text = app::write_setup(s);
+    CHECK(text.find("endless.island_land = 45\n") != std::string::npos);
+    CHECK(text.find("endless.island_spread = giants\n") != std::string::npos);
+    CHECK(text.find("endless.island_outline = long\n") != std::string::npos);
+    CHECK(text.find("seed") == std::string::npos);
+    EndlessSetup back;
+    app::read_setup(back, text);
+    CHECK(back == s);
+    CHECK(back.world_seed == 0);
+    CHECK(back.world.landscape == s.world.landscape);
+    // Values beyond the generator's are left out; any side within it is taken.
+    CHECK(app::read_setup_line(back, "island_land", "90"));
+    CHECK(back.world.landscape.land == 45);
+    CHECK(app::read_setup_line(back, "island_max", "1200"));
+    CHECK(back.world.landscape.max_side == 200);
+    CHECK(app::read_setup_line(back, "island_max", "900"));  // far beyond the original's
+    CHECK(back.world.landscape.max_side == 900);
+    CHECK(app::read_setup_line(back, "island_max", "70"));
+    CHECK(back.world.landscape.max_side == 70);
+    CHECK(back.world.landscape.min_side == 70);  // follows
+    CHECK(app::setup_value_custom(back, SetupItem::LargestIsland));
+    CHECK(app::read_setup_line(back, "island_coast", "jagged"));  // unknown: kept
+    CHECK(back.world.landscape.coast == sim::shapes::Roughness::Rugged);
+}
+
+namespace {
+
+/// A world for the preview without the game's files: one island, two starts.
+core::Result<sim::WorldPreview> fake_world(const EndlessSetup& setup, std::uint8_t /*level*/) {
+    sim::WorldPreview p;
+    p.width = 100;
+    p.height = 70;
+    p.tiles.assign(100 * 70, sim::WorldPreview::Tile::Sea);
+    for (std::uint32_t y = 20; y < 40; ++y) {
+        for (std::uint32_t x = 30; x < 60; ++x) {
+            p.tiles[y * 100 + x] = x == 30 ? sim::WorldPreview::Tile::Beach : sim::WorldPreview::Tile::Forest;
+        }
+    }
+    p.islands = 1;
+    p.land = 20 * 30;
+    p.starts = {{10, 10}, {90, 60}};
+    if (setup.world.landscape.land == 45) {
+        return core::make_error(core::ErrorCode::LimitExceeded, "too much land");
+    }
+    return p;
+}
+
+}  // namespace
+
+TEST_CASE("game setup: the page of the islands, with a preview of the world the game gets") {
+    EndlessSetup s;
+    s.own_world = true;
+    app::GameSettingsMenu menu;
+    menu.set_preview_maker(fake_world);
+    app::GameSettingsMenu::PreviewColours colours{};
+    for (std::size_t i = 0; i < colours.size(); ++i) {
+        colours[i] = static_cast<std::uint8_t>(100 + i);
+    }
+    menu.set_preview_colours(colours);
+    menu.open(s, app::SetupScope::Endless);
+    // A row of the world's group opens the page; the page's items are not on the first one.
+    CHECK(!find_text(menu, app::setup_label(SetupItem::Coast)).has_value());
+    CHECK(click(menu, ui::tr("setup.island_page.open", {ui::tr("setup.island_preset.original")})) ==
+          app::GameSettingsMenu::Result::None);
+    CHECK(menu.islands_page());
+    CHECK(find_text(menu, ui::tr("setup.title.islands")).has_value());
+    CHECK(menu.setup().world_seed != 0);  // the preview's world is the game's
+    menu.wait_preview();
+    REQUIRE(menu.preview().has_value());
+    CHECK(find_text(menu, ui::tr("setup.preview.stats", {"1", "9"})).has_value());  // 600 of 7000 tiles
+    // The picture: the forest, the beach and the starts in their colours.
+    std::array<bool, sim::WorldPreview::kTiles + 1> seen{};
+    for (const ui::DrawItem& d : menu.draw(kNoFonts)) {
+        if (d.kind == ui::DrawItem::Kind::Fill && d.colour >= 100 && d.colour < 100 + static_cast<int>(seen.size())) {
+            seen[static_cast<std::size_t>(d.colour - 100)] = true;
+        }
+    }
+    CHECK(seen[static_cast<std::size_t>(sim::WorldPreview::Tile::Sea)]);
+    CHECK(seen[static_cast<std::size_t>(sim::WorldPreview::Tile::Forest)]);
+    CHECK(seen[static_cast<std::size_t>(sim::WorldPreview::Tile::Beach)]);
+    CHECK(seen[sim::WorldPreview::kTiles]);
+    CHECK(!seen[static_cast<std::size_t>(sim::WorldPreview::Tile::Mountain)]);
+
+    // Another world: a new number, shown.
+    const std::uint64_t first = menu.setup().world_seed;
+    char text[24];
+    std::snprintf(text, sizeof(text), "%llX", static_cast<unsigned long long>(first));
+    CHECK(find_text(menu, ui::tr("setup.preview.seed", {text})).has_value());
+    CHECK(click(menu, ui::tr("setup.preview.reroll")) == app::GameSettingsMenu::Result::None);
+    CHECK(menu.setup().world_seed != first);
+
+    // The presets and the items change the world; a world that cannot be made says why.
+    (void)click(menu, value_of(menu.setup(), SetupItem::IslandPreset));
+    CHECK(menu.setup().world.shapes == sim::WorldSettings::Shapes::Own);
+    while (menu.setup().world.landscape.land != 45) {
+        (void)click(menu, app::setup_value(menu.setup(), SetupItem::LandShare));
+    }
+    menu.wait_preview();
+    CHECK(!menu.preview().has_value());
+    CHECK(find_text(menu, ui::tr("setup.preview.failed", {"too much land"})).has_value());
+
+    // Back to the settings, where the row names the page's choice; the game gets the world shown.
+    CHECK(menu.back());
+    CHECK(!menu.islands_page());
+    CHECK(find_text(menu, ui::tr("setup.island_page.open", {ui::tr("setup.island_preset.custom")})).has_value());
+    const std::uint64_t shown = menu.setup().world_seed;
+    CHECK(click(menu, ui::tr("setup.start")) == app::GameSettingsMenu::Result::Start);
+    CHECK(menu.setup().world_seed == shown);
+}
+
+TEST_CASE("game setup: the islands' page ends above its hint, in English and German, for the original's maps too") {
+    for (const char* language : {"en", "de"}) {
+        ui::set_language(language);
+        for (const bool own : {true, false}) {
+            EndlessSetup s;
+            s.own_world = own;
+            app::GameSettingsMenu menu;
+            menu.open(s, app::SetupScope::Endless);
+            (void)click(menu, ui::tr("setup.island_page.open", {ui::tr("setup.island_preset.original")}));
+            REQUIRE(menu.islands_page());
+            const std::string hint = ui::tr(own ? "setup.hint.islands" : "setup.hint.islands.original");
+            std::int32_t hint_y = INT32_MAX;
+            std::int32_t rows_y = 0;
+            for (const ui::DrawItem& d : menu.draw(kNoFonts)) {
+                if (d.kind != ui::DrawItem::Kind::Text || d.text.empty()) {
+                    continue;
+                }
+                if (d.text.size() > 20 && hint.compare(0, 20, d.text, 0, 20) == 0) {
+                    hint_y = std::min(hint_y, d.y);
+                } else if (d.text == app::setup_label(SetupItem::OreMountains)) {
+                    rows_y = d.y;
+                }
+            }
+            REQUIRE(hint_y != INT32_MAX);
+            CHECK(rows_y > 0);
+            CHECK(rows_y + 27 <= hint_y);
+            // Without a maker there is no preview, and no button to reroll is needed for it to work.
+            CHECK(!menu.preview().has_value());
         }
     }
     ui::set_language(ui::kFallbackLanguage);

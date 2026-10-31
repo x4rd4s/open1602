@@ -62,20 +62,31 @@ constexpr std::array<StateChunk, 8> kStateChunks = {{{"PRODLIST2", 0x18},
 constexpr std::size_t kHeaderSize = 116;  // INSEL5
 
 struct Mountain {
-    std::uint8_t x = 0;
-    std::uint8_t y = 0;
+    std::uint16_t x = 0;
+    std::uint16_t y = 0;
 };
 
 /// Deposit slots as the island record keeps them (INSEL5 +0x1C, 2 x 8 bytes): bytes the
-/// generator does not write keep what the template had.
+/// generator does not write keep what the template had. The high bytes of the places are
+/// Open1602's, for islands wider or higher than 255 tiles (assets::kLargeIslandChunk).
 struct DepositSlots {
     std::array<std::uint8_t, 16> bytes{};
+    std::array<std::uint8_t, 2> high_x{};
+    std::array<std::uint8_t, 2> high_y{};
     std::uint8_t count = 0;
 
     [[nodiscard]] std::uint8_t ware(std::size_t i) const noexcept { return bytes[8 * i]; }
-    [[nodiscard]] std::uint8_t x(std::size_t i) const noexcept { return bytes[8 * i + 1]; }
-    [[nodiscard]] std::uint8_t y(std::size_t i) const noexcept { return bytes[8 * i + 2]; }
-    [[nodiscard]] bool at(std::uint8_t px, std::uint8_t py) const noexcept {
+    [[nodiscard]] std::uint16_t x(std::size_t i) const noexcept {
+        return static_cast<std::uint16_t>(bytes[8 * i + 1] | (high_x[i] << 8));
+    }
+    [[nodiscard]] std::uint16_t y(std::size_t i) const noexcept {
+        return static_cast<std::uint16_t>(bytes[8 * i + 2] | (high_y[i] << 8));
+    }
+    [[nodiscard]] bool large() const noexcept {
+        return std::any_of(high_x.begin(), high_x.end(), [](std::uint8_t v) { return v != 0; }) ||
+               std::any_of(high_y.begin(), high_y.end(), [](std::uint8_t v) { return v != 0; });
+    }
+    [[nodiscard]] bool at(std::uint16_t px, std::uint16_t py) const noexcept {
         for (std::size_t i = 0; i < count; ++i) {
             if (x(i) == px && y(i) == py) {
                 return true;
@@ -83,15 +94,17 @@ struct DepositSlots {
         }
         return false;
     }
-    void write(std::size_t i, std::uint8_t ware, std::uint8_t px, std::uint8_t py, std::uint16_t amount) noexcept {
+    void write(std::size_t i, std::uint8_t ware, std::uint16_t px, std::uint16_t py, std::uint16_t amount) noexcept {
         bytes[8 * i] = ware;
-        bytes[8 * i + 1] = px;
-        bytes[8 * i + 2] = py;
+        bytes[8 * i + 1] = static_cast<std::uint8_t>(px);
+        bytes[8 * i + 2] = static_cast<std::uint8_t>(py);
+        high_x[i] = static_cast<std::uint8_t>(px >> 8);
+        high_y[i] = static_cast<std::uint8_t>(py >> 8);
         bytes[8 * i + 6] = static_cast<std::uint8_t>(amount);
         bytes[8 * i + 7] = static_cast<std::uint8_t>(amount >> 8);
     }
     /// 0x0046BE60: the slot of the same mountain, else a new one while there is room.
-    bool place(std::uint8_t ware, std::uint8_t px, std::uint8_t py, std::uint8_t kind, std::uint16_t amount) {
+    bool place(std::uint8_t ware, std::uint16_t px, std::uint16_t py, std::uint8_t kind, std::uint16_t amount) {
         std::size_t i = 0;
         while (i < count && !(x(i) == px && y(i) == py)) {
             ++i;
@@ -140,15 +153,29 @@ std::vector<std::uint8_t> tile_bytes(const std::vector<assets::IslandTile>& tile
     std::vector<std::uint8_t> out;
     out.reserve(8 * tiles.size());
     for (const assets::IslandTile& t : tiles) {
-        const std::array<std::uint8_t, 8> e = {static_cast<std::uint8_t>(t.id),
-                                               static_cast<std::uint8_t>(t.id >> 8),
-                                               t.x,
-                                               t.y,
-                                               static_cast<std::uint8_t>(t.bits),
-                                               static_cast<std::uint8_t>(t.bits >> 8),
-                                               static_cast<std::uint8_t>(t.bits >> 16),
-                                               static_cast<std::uint8_t>(t.bits >> 24)};
+        const std::array<std::uint8_t, 8> e = {
+            static_cast<std::uint8_t>(t.id),         static_cast<std::uint8_t>(t.id >> 8),
+            static_cast<std::uint8_t>(t.x),          static_cast<std::uint8_t>(t.y),
+            static_cast<std::uint8_t>(t.bits),       static_cast<std::uint8_t>(t.bits >> 8),
+            static_cast<std::uint8_t>(t.bits >> 16), static_cast<std::uint8_t>(t.bits >> 24)};
         out.insert(out.end(), e.begin(), e.end());
+    }
+    return out;
+}
+
+/// assets::kLargeIslandChunk of an island: its sides and the places of its deposits in 16 bits.
+std::vector<std::uint8_t> large_island(const Slot& slot) {
+    std::vector<std::uint8_t> out;
+    const auto u16 = [&out](std::uint32_t v) {
+        out.push_back(static_cast<std::uint8_t>(v));
+        out.push_back(static_cast<std::uint8_t>(v >> 8));
+    };
+    u16(slot.map->width());
+    u16(slot.map->height());
+    out.push_back(slot.deposits.count);
+    for (std::size_t i = 0; i < slot.deposits.count; ++i) {
+        u16(slot.deposits.x(i));
+        u16(slot.deposits.y(i));
     }
     return out;
 }
@@ -170,7 +197,8 @@ public:
     Generator(ScenarioPlan plan, const assets::GameDirectory& game, const assets::BuildingTable& buildings,
               PlanRandom& random, std::vector<std::string>* warnings, std::vector<StartArea> starts = {},
               std::uint8_t gold_islands = 0, WorldSettings::Shapes shapes = WorldSettings::Shapes::Templates,
-              std::uint64_t shape_seed = 0)
+              std::uint64_t shape_seed = 0, std::vector<WorldPlan::OwnIsland> own_islands = {},
+              WorldSettings::Landscape landscape = {})
         : m_plan(std::move(plan)),
           m_game(game),
           m_buildings(buildings),
@@ -180,7 +208,9 @@ public:
           m_gold_islands(gold_islands),
           m_shapes(shapes),
           m_shape_seed(shape_seed),
-          m_shape_random(shape_seed, kShapeStream) {}
+          m_shape_random(shape_seed, kShapeStream),
+          m_own_islands(std::move(own_islands)),
+          m_landscape(landscape) {}
 
     core::Result<GeneratedWorld> run(const assets::ChunkFile& scenario, bool guarantee);
 
@@ -244,6 +274,8 @@ private:
     /// original's draws of the content stay as they are.
     static constexpr std::uint64_t kShapeStream = 0x1602'5A4EULL;
     Random m_shape_random;
+    std::vector<WorldPlan::OwnIsland> m_own_islands;  ///< Shapes::Own: sides of the islands of their own shape
+    WorldSettings::Landscape m_landscape;
     std::vector<Slot> m_slots;       ///< in the order of the plan
     std::vector<Slot*> m_by_number;  ///< in the order of the island table (island number)
     std::uint32_t m_max_crops = 2;
@@ -267,7 +299,7 @@ void Generator::choose_templates() {
             }
         }
         e.climate &= 1U;
-        if (e.template_number != ScenarioPlan::kRandomTemplate) {
+        if (e.template_number != ScenarioPlan::kRandomTemplate || (e.flags & kPlanOwnShape) != 0) {
             continue;
         }
         std::vector<bool> used(kTemplateCount[e.climate][e.size], false);
@@ -317,7 +349,7 @@ void Generator::choose_natives() {
         std::vector<std::size_t> candidates;
         for (std::size_t i = 0; i < m_plan.islands.size(); ++i) {
             const ScenarioPlan::Island& e = m_plan.islands[i];
-            if (e.climate == climate && (e.flags & kPlanNoVillage) == 0 &&
+            if (e.climate == climate && (e.flags & (kPlanNoVillage | kPlanOwnShape)) == 0 &&
                 m_game.resolve(template_path(e.climate, e.size, e.template_number, true)).has_value() &&
                 (m_starts.empty() || village_fits(e))) {
                 candidates.push_back(i);
@@ -334,6 +366,10 @@ void Generator::choose_natives() {
 
 bool Generator::load(Slot& slot) {
     const ScenarioPlan::Island& e = slot.plan;
+    if ((e.flags & kPlanOwnShape) != 0) {
+        give_own_shape(slot);
+        return true;
+    }
     const std::string base_path = template_path(e.climate, e.size, e.template_number, false);
     const auto base_file = open(m_game, base_path);
     if (!base_file) {
@@ -389,13 +425,16 @@ bool Generator::load(Slot& slot) {
 }
 
 bool Generator::wants_own_shape(const ScenarioPlan::Island& e) {
+    if ((e.flags & kPlanOwnShape) != 0) {
+        return true;
+    }
     switch (m_shapes) {
         case WorldSettings::Shapes::Templates:
             return false;
         case WorldSettings::Shapes::Mixed:
             return (e.flags & 1U) == 0 && m_shape_random.below(2) == 0;
         case WorldSettings::Shapes::Own:
-            return (e.flags & 1U) == 0;
+            return false;  // the plan's islands of their own shape are flagged, the rest are templates
     }
     return false;
 }
@@ -412,14 +451,40 @@ void Generator::count_mountains(Slot& slot) const {
 
 void Generator::give_own_shape(Slot& slot) const {
     shapes::ShapeRequest r;
-    r.width = slot.base.header.width;
-    r.height = slot.base.header.height;
     r.climate = slot.plan.climate;
     r.size = slot.plan.size;
     r.number = slot.plan.number;
-    r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[0], 255));
-    r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[1], 255));
     r.seed = m_shape_seed;
+    const auto own = std::find_if(m_own_islands.begin(), m_own_islands.end(),
+                                  [&](const WorldPlan::OwnIsland& o) { return o.number == slot.plan.number; });
+    if ((slot.plan.flags & kPlanOwnShape) != 0 && own != m_own_islands.end()) {
+        // Of its own size: ore mountains by its area, as the templates have them (a big template,
+        // 70 x 60, one big and two small ones), the home island at least one of each.
+        r.width = own->width;
+        r.height = own->height;
+        r.roughness = m_landscape.coast;
+        r.form = m_landscape.outline == WorldSettings::Landscape::Outline::Branched ? shapes::Form::Branched
+                                                                                    : shapes::Form::Compact;
+        r.forest = m_landscape.forest;
+        r.land = m_landscape.fill();
+        constexpr std::array<std::uint32_t, 3> kPercent = {50, 100, 200};  // Little, Normal, Much
+        const std::uint32_t percent = kPercent[static_cast<std::size_t>(m_landscape.mountains)];
+        const std::uint32_t area = std::uint32_t{own->width} * own->height;
+        std::uint32_t big = area * percent / 100 / 3500;
+        std::uint32_t small = (area * percent / 100 + 1000) / 2000;
+        if ((slot.plan.flags & kPlanNoVillage) != 0) {  // a home island
+            big = std::max<std::uint32_t>(big, 1);
+            small = std::max<std::uint32_t>(small, 1);
+        }
+        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 255));
+        r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(small, 255));
+    } else {
+        // In the place of its template: as large, with as many ore mountains.
+        r.width = slot.base.header.width;
+        r.height = slot.base.header.height;
+        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[0], 255));
+        r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[1], 255));
+    }
     slot.base = shapes::make_island(r);
     slot.map = IslandMap::from_island(slot.base, m_buildings, m_warnings, nullptr);
     // Nothing of the template's header survives: no deposits, no treasure flag.
@@ -445,8 +510,8 @@ std::vector<Mountain> Generator::mountains(const Slot& slot, int type, bool free
             if (sub.origin_x != static_cast<std::int32_t>(x) || sub.origin_y != static_cast<std::int32_t>(y)) {
                 continue;
             }
-            const auto mx = static_cast<std::uint8_t>(x);
-            const auto my = static_cast<std::uint8_t>(y);
+            const auto mx = static_cast<std::uint16_t>(x);
+            const auto my = static_cast<std::uint16_t>(y);
             if (free_only && slot.deposits.at(mx, my)) {
                 continue;
             }
@@ -687,7 +752,7 @@ std::vector<Mountain> Generator::treasure_spots(const Slot& slot) const {
     // the tile it tested. The draws stay the same.
     std::vector<Mountain> out;
     const auto hit = [&](std::int32_t x, std::int32_t y) {
-        out.push_back(Mountain{static_cast<std::uint8_t>(x), static_cast<std::uint8_t>(y)});
+        out.push_back(Mountain{static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y)});
         return out.size() > kMaxMountains;
     };
     if (h > 1) {
@@ -1176,14 +1241,11 @@ std::vector<std::uint8_t> Generator::village_tiles(const Slot& slot, const std::
                        (std::uint32_t{kNoCity} << 22);
             }
         }
-        const std::array<std::uint8_t, 8> e = {static_cast<std::uint8_t>(t.id),
-                                               static_cast<std::uint8_t>(t.id >> 8),
-                                               t.x,
-                                               t.y,
-                                               static_cast<std::uint8_t>(bits),
-                                               static_cast<std::uint8_t>(bits >> 8),
-                                               static_cast<std::uint8_t>(bits >> 16),
-                                               static_cast<std::uint8_t>(bits >> 24)};
+        const std::array<std::uint8_t, 8> e = {
+            static_cast<std::uint8_t>(t.id),       static_cast<std::uint8_t>(t.id >> 8),
+            static_cast<std::uint8_t>(t.x),        static_cast<std::uint8_t>(t.y),
+            static_cast<std::uint8_t>(bits),       static_cast<std::uint8_t>(bits >> 8),
+            static_cast<std::uint8_t>(bits >> 16), static_cast<std::uint8_t>(bits >> 24)};
         out.insert(out.end(), e.begin(), e.end());
     }
     return out;
@@ -1352,7 +1414,14 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
             }
         }
         out.add("INSEL5", header(*s, craters, owners));
-        out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
+        // An island wider or higher than 255 tiles (of its own shape only) in Open1602's chunks.
+        const bool large = s->map->width() > 255 || s->map->height() > 255 || s->deposits.large();
+        if (large) {
+            out.add(std::string(assets::kLargeIslandChunk), large_island(*s));
+            out.add(std::string(assets::kLargeTilesChunk), assets::large_tile_bytes(s->base.layers.front()));
+        } else {
+            out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
+        }
         out.add("HIRSCH2", {});
         for (const StateChunk& c : kStateChunks) {
             if (auto records = village_records(*s, c, natives); !records.empty()) {
@@ -1364,6 +1433,8 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
         info.climate = s->plan.climate;
         info.size = s->plan.size;
         info.template_number = s->own_shape ? assets::IslandHeader::kNoTemplate : s->plan.template_number;
+        info.width = s->base.header.width;
+        info.height = s->base.header.height;
         info.natives = s->village.has_value();
         info.fertility = s->fertility;
         for (std::size_t i = 0; i < s->deposits.count; ++i) {
@@ -1380,7 +1451,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
     }
     for (const assets::Chunk& c : scenario.chunks()) {
         if (c.name == "SZENE" || c.name == "RANDTAB" || c.name.rfind("SZENE_", 0) == 0 || c.name == "INSEL5" ||
-            c.name == "INSELHAUS") {
+            c.name == "INSELHAUS" || c.name == assets::kLargeIslandChunk || c.name == assets::kLargeTilesChunk) {
             continue;
         }
         out.add(c.name, scenario.payload(c));
@@ -1426,7 +1497,7 @@ core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario,
     PlanRandom random(start.seed);
     Generator generator(plan.plan, game, buildings, random, warnings,
                         plan.shared_start ? std::vector<StartArea>{} : plan.starts, plan.gold_islands, plan.shapes,
-                        plan.seed);
+                        plan.seed, plan.own_islands, plan.landscape);
     return generator.run(scenario, start.guarantee_resources);
 }
 

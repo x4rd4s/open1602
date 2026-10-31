@@ -479,6 +479,13 @@ inline constexpr std::array<std::uint32_t, 6> kPlanCrops{21336, 21342, 21340, 21
 /// mountains (big 4 x 4, small 3 x 3).
 namespace island_shape {
 inline constexpr std::array<std::uint32_t, 5> kOpenSea{21201, 21202, 21203, 21204, 21209};
+/// The sea by its depth, from the coast out: light (Hell), the edge from light to middle
+/// (Übergang, turned towards the light), middle, the edge from middle to dark, dark (the open sea).
+inline constexpr std::uint32_t kLightSea = 21203;
+inline constexpr std::uint32_t kLightEdge = 21202;
+inline constexpr std::uint32_t kMiddleSea = 21204;
+inline constexpr std::uint32_t kDarkEdge = 21209;
+inline constexpr std::uint32_t kDarkSea = 21201;
 inline constexpr std::array<std::uint32_t, 5> kSurf{21214, 21215, 21216, 21217, 21218};
 inline constexpr std::array<std::uint32_t, 1> kSurfCorner{21207};
 inline constexpr std::array<std::uint32_t, 2> kSurfBay{21206, 21221};

@@ -227,3 +227,191 @@ TEST_CASE("island shapes: the same request gives the same island, another seed a
                                  });
     CHECK(!same);
 }
+
+TEST_CASE("island shapes: every coast, outline and share of land, from the smallest to the largest side") {
+    using sim::shapes::Form;
+    using sim::shapes::Roughness;
+    struct Size {
+        std::uint16_t width, height;
+    };
+    constexpr std::array<Size, 4> kSizes = {{{16, 16}, {64, 24}, {180, 120}, {250, 250}}};
+    for (const Size& s : kSizes) {
+        for (const auto roughness : {Roughness::Smooth, Roughness::Natural, Roughness::Rugged}) {
+            for (const auto form : {Form::Compact, Form::Branched}) {
+                for (const std::uint16_t land : std::array<std::uint16_t, 2>{0, 740}) {
+                    sim::shapes::ShapeRequest r;
+                    r.width = s.width;
+                    r.height = s.height;
+                    r.size = 4;
+                    r.number = 9;
+                    r.roughness = roughness;
+                    r.form = form;
+                    r.land = land;
+                    r.big_mountains = s.width >= 100 ? 6 : 0;
+                    r.small_mountains = s.width >= 100 ? 8 : 0;
+                    r.seed = std::uint64_t{s.width} * 31U + static_cast<std::uint64_t>(roughness) * 7U +
+                             static_cast<std::uint64_t>(form) + land;
+                    const assets::Island island = sim::shapes::make_island(r);
+                    const Checked c = check_island(island, r);
+                    const std::size_t area = std::size_t{s.width} * s.height;
+                    CHECK(c.land * 5 >= area);  // never a speck
+                    if (land >= 700 && form == Form::Compact && s.width >= 100) {
+                        CHECK(c.land * 100 >= area * 58);  // a world of much land: fuller islands
+                    }
+                    CHECK(c.big == r.big_mountains);
+                    CHECK(c.small == r.small_mountains);
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("island shapes: light water past the surf, dark far out, the band edges turned to the light") {
+    sim::shapes::ShapeRequest r;
+    r.width = 140;
+    r.height = 120;
+    r.size = 4;
+    r.number = 3;
+    r.seed = 77;
+    const assets::Island island = sim::shapes::make_island(r);
+    const int w = r.width;
+    const int h = r.height;
+    // 0 land and surf, 1 light, 2 middle, 3 dark; the light edge counts as middle, the dark as dark.
+    std::vector<int> band(static_cast<std::size_t>(w * h), 0);
+    std::vector<std::uint32_t> id(band.size(), 0);
+    std::vector<std::uint8_t> rotation(band.size(), 0);
+    for (const assets::IslandTile& t : island.layers[0]) {
+        const auto i = static_cast<std::size_t>(t.y * w + t.x);
+        id[i] = t.cod_id();
+        rotation[i] = t.rotation();
+        switch (t.cod_id()) {
+            case ids::kLightSea:
+                band[i] = 1;
+                break;
+            case ids::kLightEdge:
+            case ids::kMiddleSea:
+                band[i] = 2;
+                break;
+            case ids::kDarkEdge:
+            case ids::kDarkSea:
+                band[i] = 3;
+                break;
+            default:
+                break;
+        }
+    }
+    const auto band_at = [&](int x, int y) {
+        return x < 0 || y < 0 || x >= w || y >= h ? 3 : band[static_cast<std::size_t>(y * w + x)];
+    };
+    std::array<std::size_t, 4> count{};
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const auto i = static_cast<std::size_t>(y * w + x);
+            const int b = band[i];
+            ++count[static_cast<std::size_t>(b)];
+            if (b == 0) {
+                continue;
+            }
+            // Next to the surf never dark.
+            bool near_surf = false;
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    near_surf = near_surf || (band_at(x + dx, y + dy) == 0 && (dx != 0 || dy != 0));
+                }
+            }
+            CHECK(!(near_surf && b == 3));
+            // On the rectangle's edge the open sea, but next to the surf.
+            if (x == 0 || y == 0 || x == w - 1 || y == h - 1) {
+                CHECK((near_surf || b == 3));
+            }
+            if (id[i] == ids::kLightEdge || id[i] == ids::kDarkEdge) {
+                // An edge: the lighter water on the two sides it is turned to.
+                const int own = id[i] == ids::kLightEdge ? 2 : 3;
+                const bool n = band_at(x, y - 1) < own;
+                const bool e = band_at(x + 1, y) < own;
+                const bool s = band_at(x, y + 1) < own;
+                const bool west = band_at(x - 1, y) < own;
+                switch (rotation[i]) {
+                    case 0:
+                        CHECK((s && west));
+                        break;
+                    case 1:
+                        CHECK((n && west));
+                        break;
+                    case 2:
+                        CHECK((n && e));
+                        break;
+                    default:
+                        CHECK((e && s));
+                        break;
+                }
+            }
+        }
+    }
+    CHECK(count[1] > 0);
+    CHECK(count[2] > 0);
+    CHECK(count[3] > 0);
+}
+
+TEST_CASE("island shapes: an island larger than the original's, with ore mountains for its size") {
+    sim::shapes::ShapeRequest r;
+    r.width = 300;
+    r.height = 280;
+    r.size = 4;
+    r.number = 4;
+    r.big_mountains = 60;
+    r.small_mountains = 90;
+    r.seed = 3;
+    const assets::Island island = sim::shapes::make_island(r);
+    const Checked c = check_island(island, r);
+    CHECK(c.big == r.big_mountains);
+    CHECK(c.small == r.small_mountains);
+    CHECK(c.land * 2 >= std::size_t{r.width} * r.height);
+}
+
+TEST_CASE("island shapes: a giant does not run straight along its rectangle") {
+    for (const std::uint16_t land : std::array<std::uint16_t, 3>{0, 605, 740}) {
+        for (std::uint64_t seed = 1; seed < 4; ++seed) {
+            sim::shapes::ShapeRequest r;
+            r.width = 480;
+            r.height = 470;
+            r.size = 4;
+            r.number = 2;
+            r.land = land;
+            r.seed = seed;
+            const assets::Island island = sim::shapes::make_island(r);
+            // The longest run of land along each of the four lines two tiles inside the edge.
+            std::vector<std::uint8_t> is_land(std::size_t{r.width} * r.height, 0);
+            std::size_t total = 0;
+            for (const assets::IslandTile& t : island.layers[0]) {
+                const auto c = coast_of(t.cod_id());
+                if (!c || !is_sea(*c)) {
+                    is_land[std::size_t{t.y} * r.width + t.x] = 1;
+                    ++total;
+                }
+            }
+            const auto at = [&](int x, int y) {
+                return is_land[static_cast<std::size_t>(y) * r.width + static_cast<std::size_t>(x)] != 0;
+            };
+            int longest = 0;
+            for (int line = 2; line < 5; ++line) {
+                int west = 0;
+                int east = 0;
+                int north = 0;
+                int south = 0;
+                for (int k = 0; k < r.height; ++k) {
+                    west = at(line, k) ? west + 1 : 0;
+                    east = at(r.width - 1 - line, k) ? east + 1 : 0;
+                    longest = std::max({longest, west, east});
+                }
+                for (int k = 0; k < r.width; ++k) {
+                    north = at(k, line) ? north + 1 : 0;
+                    south = at(k, r.height - 1 - line) ? south + 1 : 0;
+                    longest = std::max({longest, north, south});
+                }
+            }
+            CHECK(longest < 20);  // without a falloff at the edge: up to 210 tiles
+            CHECK(total * 100 >= std::size_t{r.width} * r.height * (land == 0 ? 50 : land / 10 - 5));
+        }
+    }
+}

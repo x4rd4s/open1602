@@ -12,6 +12,7 @@
 #include <ctime>
 #include <filesystem>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <random>
 #include <span>
@@ -2685,6 +2686,7 @@ void MapViewer::load_options() {
         menu->set_name(m_app_settings.player_name);
         menu->set_endless_setup(m_app_settings.endless);
         menu->set_scenario_setup(m_app_settings.scenario);
+        menu->set_preview_maker(preview_maker());
         menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);
         menu->set_tutorial_chapter(m_app_settings.tutorial_chapter);
     }
@@ -3341,6 +3343,38 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     return core::Ok{};
 }
 
+namespace {
+
+/// The world of a new endless game: from `seed`, the original's maps or one of its own.
+void endless_world(sim::NewGameOptions& o, const sim::WorldStart& base, const EndlessSetup& setup, std::uint64_t seed) {
+    o.world = base;
+    o.world.seed = seed;
+    o.layout = sim::layout_for_seed(o.world.seed);
+    o.world.guarantee_resources = setup.rules.guarantee_resources;
+    if (setup.own_world) {
+        sim::WorldSettings custom = setup.world_settings();
+        custom.players = static_cast<std::uint8_t>(std::min<std::size_t>(custom.players, sim::kMaxPlayers));
+        o.custom = custom;
+    }
+}
+
+}  // namespace
+
+GameSettingsMenu::PreviewMaker MapViewer::preview_maker() const {
+    // Copies: the preview is made on a thread of its own while the game's tables may change.
+    return [game = m_game, buildings = std::make_shared<const assets::BuildingTable>(m_buildings),
+            base = m_options.world](const EndlessSetup& setup, std::uint8_t level) {
+        auto texts = assets::TextTable::load(game);
+        if (!texts) {
+            return core::Result<sim::WorldPreview>(texts.error());
+        }
+        sim::NewGameOptions o;
+        o.difficulty = std::min<std::uint8_t>(level, sim::NewGameOptions::kDifficulties - 1);
+        endless_world(o, base, setup, setup.world_seed);
+        return sim::preview_world(game, *buildings, *texts, o);
+    };
+}
+
 core::Status MapViewer::start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
                                       const EndlessSetup& setup) {
     if (m_session && m_session->ended()) {
@@ -3362,15 +3396,9 @@ core::Status MapViewer::start_endless(std::uint8_t level, sim::BannerId banner, 
     const bool further = banner >= sim::kOriginalPlayers;
     o.colour = further ? 0 : static_cast<std::uint8_t>(banner);
     o.name = name;
-    o.world = m_options.world;
-    o.world.seed = (std::uint64_t{device()} << 32U) | device();
-    o.layout = sim::layout_for_seed(o.world.seed);
-    o.world.guarantee_resources = setup.rules.guarantee_resources;
-    if (setup.own_world) {
-        sim::WorldSettings custom = setup.world_settings();
-        custom.players = static_cast<std::uint8_t>(std::min<std::size_t>(custom.players, sim::kMaxPlayers));
-        o.custom = custom;
-    }
+    // The world the islands' page showed, else a new one.
+    const std::uint64_t seed = setup.world_seed != 0 ? setup.world_seed : (std::uint64_t{device()} << 32U) | device();
+    endless_world(o, m_options.world, setup, seed);
     const std::time_t now = std::time(nullptr);
     if (const std::tm* t = std::localtime(&now)) {
         o.game_id =

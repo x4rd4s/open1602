@@ -88,7 +88,33 @@ struct Planned {
     std::uint8_t climate = kEither;  ///< climate::kNorth, kSouth, or kEither: not yet decided
     bool home = false;
     std::uint16_t template_number = ScenarioPlan::kRandomTemplate;
+    bool own = false;      ///< Shapes::Own: an island of its own shape, `rect` its size
+    bool village = false;  ///< Shapes::Own: a template island meant for a native village
+    bool volcano = false;  ///< Shapes::Own: a template island meant for a volcano
 };
+
+/// The sides of an island to place and its size class.
+struct Dims {
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    std::uint8_t size = 0;
+};
+
+/// The size class of an island of its own shape: the narrowest template width of each class
+/// (the loader takes the class of an INSEL5 from its width), by the longer side.
+std::uint8_t class_of(std::int32_t w, std::int32_t h) {
+    constexpr std::array<std::int32_t, 4> kFrom = {33, 43, 56, 76};  // mit, med, big, lar
+    const std::int32_t side = std::max(w, h);
+    std::uint8_t size = 0;
+    for (const std::int32_t f : kFrom) {
+        size = static_cast<std::uint8_t>(size + (side >= f ? 1 : 0));
+    }
+    return size;
+}
+
+Dims class_dims(std::uint8_t size) {
+    return Dims{static_cast<std::int32_t>(kClassWidth[size]), static_cast<std::int32_t>(kClassHeight[size]), size};
+}
 
 struct Point {
     std::int32_t x = 0;
@@ -109,6 +135,48 @@ std::int32_t isqrt(std::int64_t v) {
     return static_cast<std::int32_t>(r);
 }
 
+/// Native villages of a world of `islands`: four per 18 islands as the original.
+std::uint32_t village_count(const WorldSettings& s, std::uint32_t islands) {
+    std::uint32_t per18 = 0;
+    switch (s.natives) {
+        case Amount::None:
+            per18 = 0;
+            break;
+        case Amount::Few:
+            per18 = 2;
+            break;
+        case Amount::Normal:
+            per18 = 4;
+            break;
+        case Amount::Many:
+            per18 = 7;
+            break;
+    }
+    return (islands * per18 + kPlanIslands / 2) / kPlanIslands;
+}
+
+/// Islands with a volcano at most: one per player (none/few/many: 0, half, double), at most 10
+/// (20 craters in a world).
+std::uint32_t volcano_limit(const WorldSettings& s) {
+    std::uint32_t limit = 0;
+    const std::uint32_t players = s.players;
+    switch (s.volcanoes) {
+        case Amount::None:
+            limit = 0;
+            break;
+        case Amount::Few:
+            limit = std::max<std::uint32_t>(1, players / 2);
+            break;
+        case Amount::Normal:
+            limit = players;
+            break;
+        case Amount::Many:
+            limit = 2 * players;
+            break;
+    }
+    return std::min<std::uint32_t>(limit, 10);
+}
+
 class Planner {
 public:
     Planner(const WorldSettings& s, const std::vector<TemplateInfo>& templates, std::vector<std::string>* warnings)
@@ -125,11 +193,20 @@ private:
     [[nodiscard]] bool fits(const Rect& r) const;
     [[nodiscard]] std::uint8_t band(const Rect& r) const;
     [[nodiscard]] std::uint8_t draw_size();
+    /// Shapes::Own: whether islands get their own sizes; their sides as the landscape says.
+    [[nodiscard]] bool free_sizes() const noexcept { return m_s.shapes == WorldSettings::Shapes::Own; }
+    [[nodiscard]] Dims draw_dims();
+    [[nodiscard]] Dims own_dims(std::int32_t side);
+    /// The same island a quarter smaller, nothing below the smallest side.
+    [[nodiscard]] std::optional<Dims> smaller(const Dims& d) const;
+    [[nodiscard]] std::int32_t gap() const noexcept;
     void place_starts();
     void place_homes();
     void place_locals(std::uint32_t total);
     void place_rest(std::uint32_t total);
-    bool place_near(const Point& start, std::uint8_t size, std::uint32_t min_r, std::uint32_t max_r, bool home);
+    void place_land(bool warn_full);
+    void keep_templates();
+    bool place_near(const Point& start, Dims dims, std::uint32_t min_r, std::uint32_t max_r, bool home);
     void decide_climates();
     bool place_for_climate(std::size_t start, std::uint8_t climate);
     void choose_templates();
@@ -153,7 +230,7 @@ bool Planner::fits(const Rect& r) const {
     if (r.x < edge || r.y < edge || r.x + r.w > w - edge || r.y + r.h > h - edge) {
         return false;
     }
-    const auto gap = static_cast<std::int32_t>(kGap);
+    const std::int32_t gap = this->gap();
     for (const Planned& p : m_islands) {
         const Rect& o = p.rect;
         if (!(r.x + r.w + gap <= o.x || o.x + o.w + gap <= r.x || r.y + r.h + gap <= o.y || o.y + o.h + gap <= r.y)) {
@@ -169,6 +246,83 @@ bool Planner::fits(const Rect& r) const {
         }
     }
     return true;
+}
+
+std::int32_t Planner::gap() const noexcept {
+    if (!free_sizes()) {
+        return static_cast<std::int32_t>(kGap);
+    }
+    switch (m_s.landscape.gap) {
+        case WorldSettings::Landscape::Gap::Narrow:
+            return 4;
+        case WorldSettings::Landscape::Gap::Normal:
+            break;
+        case WorldSettings::Landscape::Gap::Wide:
+            return 20;
+    }
+    return static_cast<std::int32_t>(kGap);
+}
+
+Dims Planner::own_dims(std::int32_t side) {
+    // The other side by the outline: round islands up to a sixth shorter or longer, long ones
+    // a half to a third as wide, turned either way.
+    std::int32_t other = side;
+    if (m_s.landscape.outline == WorldSettings::Landscape::Outline::Long) {
+        other = side * static_cast<std::int32_t>(34 + m_random.below(20)) / 100;
+    } else {
+        other = side * static_cast<std::int32_t>(84 + m_random.below(33)) / 100;
+    }
+    // Never longer than the largest side asked for.
+    const std::int32_t longest =
+        std::max<std::int32_t>(side, std::min<std::int32_t>(m_s.landscape.max_side, shapes::kMaxSide));
+    other = std::clamp<std::int32_t>(other, shapes::kMinSide, longest);
+    const bool turned = m_random.below(2) == 1;
+    const std::int32_t w = turned ? other : side;
+    const std::int32_t h = turned ? side : other;
+    return Dims{w, h, class_of(w, h)};
+}
+
+Dims Planner::draw_dims() {
+    if (!free_sizes()) {
+        return class_dims(draw_size());
+    }
+    const WorldSettings::Landscape& l = m_s.landscape;
+    // No larger than the map holds within its edges.
+    const auto room =
+        std::max<std::int32_t>(shapes::kMinSide, static_cast<std::int32_t>(std::min(m_s.width, m_s.height)) -
+                                                     2 * static_cast<std::int32_t>(kEdge));
+    const auto lo = std::min(
+        room, static_cast<std::int32_t>(std::clamp<std::uint16_t>(l.min_side, shapes::kMinSide, shapes::kMaxSide)));
+    const auto hi = std::clamp(static_cast<std::int32_t>(std::min(l.max_side, shapes::kMaxSide)), lo, room);
+    const std::int32_t span = hi - lo;
+    // A draw u in 0..1000 shaped by the spread: even, small ones more often (u squared), or one in
+    // seven from the largest fifth and the rest from the smallest third.
+    const auto u = static_cast<std::int32_t>(m_random.below(1001));
+    using Spread = WorldSettings::Landscape::Spread;
+    if (l.spread == Spread::Mixed) {
+        return own_dims(lo + static_cast<std::int32_t>(std::int64_t{span} * u * u / 1000000));
+    }
+    if (l.spread == Spread::FewGiants) {
+        return own_dims(m_random.below(7) == 0 ? hi - span / 5 * u / 1000 : lo + span / 3 * u / 1000);
+    }
+    return own_dims(lo + span * u / 1000);
+}
+
+std::optional<Dims> Planner::smaller(const Dims& d) const {
+    const std::int32_t least = free_sizes() ? std::max<std::int32_t>(shapes::kMinSide, m_s.landscape.min_side * 2 / 3)
+                                            : static_cast<std::int32_t>(kClassWidth[0]);
+    if (!free_sizes()) {
+        if (d.size == 0) {
+            return std::nullopt;
+        }
+        return class_dims(static_cast<std::uint8_t>(d.size - 1));
+    }
+    const std::int32_t w = d.w * 3 / 4;
+    const std::int32_t h = d.h * 3 / 4;
+    if (std::min(w, h) < least) {
+        return std::nullopt;
+    }
+    return Dims{w, h, class_of(w, h)};
 }
 
 std::uint8_t Planner::band(const Rect& r) const {
@@ -268,9 +422,9 @@ void Planner::place_starts() {
     m_reach = static_cast<std::uint32_t>(std::clamp(isqrt(min_distance2(m_starts)) * 60 / 100, 70, 140));
 }
 
-bool Planner::place_near(const Point& start, std::uint8_t size, std::uint32_t min_r, std::uint32_t max_r, bool home) {
-    const auto cw = static_cast<std::int32_t>(kClassWidth[size]);
-    const auto ch = static_cast<std::int32_t>(kClassHeight[size]);
+bool Planner::place_near(const Point& start, Dims dims, std::uint32_t min_r, std::uint32_t max_r, bool home) {
+    const std::int32_t cw = dims.w;
+    const std::int32_t ch = dims.h;
     // Homes first face the map centre (most room), then the other directions.
     const std::int32_t toward = [&] {
         const std::int32_t dx = static_cast<std::int32_t>(m_s.width / 2) - start.x;
@@ -310,8 +464,9 @@ bool Planner::place_near(const Point& start, std::uint8_t size, std::uint32_t mi
         if (fits(rect)) {
             Planned p;
             p.rect = rect;
-            p.size = size;
+            p.size = dims.size;
             p.home = home;
+            p.own = free_sizes();
             m_islands.push_back(p);
             return true;
         }
@@ -327,17 +482,21 @@ void Planner::place_homes() {
     if (m_s.starts == WorldSettings::Starts::Together) {
         return;
     }
-    const std::uint8_t wanted = m_s.sizes == WorldSettings::Sizes::Small ? 2 : 3;
+    // Of its own shape: as large as a big template, if the landscape allows, the same for all.
+    const Dims wanted =
+        free_sizes()
+            ? own_dims(std::clamp<std::int32_t>(70, std::max<std::int32_t>(shapes::kMinSide, m_s.landscape.min_side),
+                                                std::max<std::int32_t>(shapes::kMinSide, m_s.landscape.max_side)))
+            : class_dims(m_s.sizes == WorldSettings::Sizes::Small ? 2 : 3);
     for (std::size_t i = 0; i < m_starts.size(); ++i) {
-        for (std::uint8_t size = wanted;; --size) {
-            if (place_near(m_starts[i], size, kShipClear, kShipClear + 14, true)) {
+        for (std::optional<Dims> dims = wanted; dims; dims = smaller(*dims)) {
+            if (place_near(m_starts[i], *dims, kShipClear, kShipClear + 14, true)) {
                 m_home[i] = static_cast<std::int32_t>(m_islands.size() - 1);
                 break;
             }
-            if (size == 0) {
-                warn("no room for the home island of player " + std::to_string(i));
-                break;
-            }
+        }
+        if (m_home[i] < 0) {
+            warn("no room for the home island of player " + std::to_string(i));
         }
     }
 }
@@ -351,15 +510,22 @@ void Planner::place_locals(std::uint32_t total) {
         (total > m_islands.size() ? total - static_cast<std::uint32_t>(m_islands.size()) : 0U) /
             static_cast<std::uint32_t>(m_starts.size()) / 2U,
         2U, 4U);  // with the home three islands: two of the north and one of the south
-    std::vector<std::uint8_t> sizes;
+    std::vector<Dims> sizes;
     for (std::uint32_t k = 0; k < per_start; ++k) {
-        sizes.push_back(std::min<std::uint8_t>(draw_size(), 3));
+        sizes.push_back(free_sizes() ? draw_dims() : class_dims(std::min<std::uint8_t>(draw_size(), 3)));
     }
-    std::sort(sizes.rbegin(), sizes.rend());  // the large ones first, while there is room
-    for (const std::uint8_t size : sizes) {
+    // The large ones first, while there is room.
+    std::stable_sort(sizes.begin(), sizes.end(),
+                     [](const Dims& a, const Dims& b) { return std::int64_t{a.w} * a.h > std::int64_t{b.w} * b.h; });
+    for (const Dims& dims : sizes) {
         for (const Point& start : m_starts) {
-            if (!place_near(start, size, m_reach * 40 / 100, m_reach * 90 / 100, false) && size > 0) {
-                place_near(start, static_cast<std::uint8_t>(size - 1), m_reach * 40 / 100, m_reach * 90 / 100, false);
+            if (!place_near(start, dims, m_reach * 40 / 100, m_reach * 90 / 100, false)) {
+                // One step smaller; islands of their own shape down to the smallest side.
+                for (std::optional<Dims> d = smaller(dims); d; d = free_sizes() ? smaller(*d) : std::nullopt) {
+                    if (place_near(start, *d, m_reach * 40 / 100, m_reach * 90 / 100, false)) {
+                        break;
+                    }
+                }
             }
         }
     }
@@ -400,6 +566,139 @@ void Planner::place_rest(std::uint32_t total) {
     }
 }
 
+std::uint64_t own_target(const WorldSettings& s) {
+    // The rectangles of the islands: the land over the share of a rectangle that is land.
+    const WorldSettings::Landscape& l = s.landscape;
+    const std::uint64_t land =
+        std::clamp(l.land, WorldSettings::Landscape::kMinLand, WorldSettings::Landscape::kMaxLand);
+    return std::uint64_t{s.width} * s.height * land / 100 * 1000 / l.fill();
+}
+
+void Planner::place_land(bool warn_full) {
+    // The sizes are drawn first, until they hold the land, and placed from the largest: a giant
+    // finds room only while the map is still empty. An island that finds none is tried smaller;
+    // what is still missing then is filled with new draws until the map is full.
+    constexpr std::uint32_t kTries = 300;
+    constexpr std::uint32_t kMisses = 40;    // islands in a row that found no room: the map is full
+    constexpr std::int32_t kScanSide = 100;  // from this side on a missed island is searched for
+    const std::uint64_t target = own_target(m_s);
+    std::uint64_t placed = 0;
+    for (const Planned& p : m_islands) {
+        placed += std::uint64_t(p.rect.w) * std::uint64_t(p.rect.h);
+    }
+    const auto w = static_cast<std::int32_t>(m_s.width);
+    const auto h = static_cast<std::int32_t>(m_s.height);
+    const auto edge = static_cast<std::int32_t>(kEdge);
+    const auto place = [&](Dims first, bool search) {
+        for (std::optional<Dims> d = first; d; d = smaller(*d)) {
+            if (w <= 2 * edge + d->w || h <= 2 * edge + d->h) {
+                continue;
+            }
+            std::optional<Rect> found;
+            for (std::uint32_t t = 0; t < kTries && !found; ++t) {
+                const Rect rect{edge + static_cast<std::int32_t>(
+                                           m_random.below(static_cast<std::uint32_t>(w - 2 * edge - d->w + 1))),
+                                edge + static_cast<std::int32_t>(
+                                           m_random.below(static_cast<std::uint32_t>(h - 2 * edge - d->h + 1))),
+                                d->w, d->h};
+                if (fits(rect)) {
+                    found = rect;
+                }
+            }
+            if (!found && search && std::max(d->w, d->h) >= kScanSide) {
+                // A large island of the first draws that random places missed: every place on a
+                // lattice of a sixth of its side, one of those with room at random, before it is
+                // tried smaller.
+                const std::int32_t step = std::max<std::int32_t>(4, std::min(d->w, d->h) / 6);
+                std::vector<Rect> room;
+                for (std::int32_t y = edge; y + d->h <= h - edge; y += step) {
+                    for (std::int32_t x = edge; x + d->w <= w - edge; x += step) {
+                        const Rect rect{x, y, d->w, d->h};
+                        if (fits(rect)) {
+                            room.push_back(rect);
+                        }
+                    }
+                }
+                if (!room.empty()) {
+                    found = room[m_random.below(static_cast<std::uint32_t>(room.size()))];
+                }
+            }
+            if (found) {
+                Planned p;
+                p.rect = *found;
+                p.size = d->size;
+                p.own = true;
+                m_islands.push_back(p);
+                placed += std::uint64_t(found->w) * std::uint64_t(found->h);
+                return true;
+            }
+        }
+        return false;
+    };
+
+    std::vector<Dims> wanted;
+    std::uint64_t drawn = placed;
+    while (drawn < target && m_islands.size() + wanted.size() < kMaxPlannedIslands) {
+        wanted.push_back(draw_dims());
+        drawn += std::uint64_t(wanted.back().w) * std::uint64_t(wanted.back().h);
+    }
+    std::stable_sort(wanted.begin(), wanted.end(), [](const Dims& a, const Dims& b) { return a.w * a.h > b.w * b.h; });
+    for (const Dims& d : wanted) {
+        if (placed >= target || m_islands.size() >= kMaxPlannedIslands) {
+            break;
+        }
+        place(d, true);
+    }
+    std::uint32_t misses = 0;
+    while (placed < target && m_islands.size() < kMaxPlannedIslands && misses < kMisses) {
+        misses = place(draw_dims(), false) ? 0 : misses + 1;
+    }
+    if (warn_full && placed * 10 < target * 9) {
+        warn("the map is full after " + std::to_string(m_islands.size()) + " islands, " +
+             std::to_string(placed * 100 / std::max<std::uint64_t>(target, 1)) + " % of the land");
+    }
+}
+
+void Planner::keep_templates() {
+    // Native villages and volcanoes come with the original's templates: as many islands as the
+    // world has of them become one, the largest class that fits in their place, in its middle.
+    const std::uint32_t villages = village_count(m_s, static_cast<std::uint32_t>(m_islands.size()));
+    const std::uint32_t volcanoes = volcano_limit(m_s);
+    // Islands of about a template's size first, so that the giants stay.
+    std::vector<std::size_t> candidates;
+    std::vector<std::size_t> larger;
+    for (std::size_t i = 0; i < m_islands.size(); ++i) {
+        const Rect& r = m_islands[i].rect;
+        if (!m_islands[i].home && r.w >= static_cast<std::int32_t>(kClassWidth[0]) &&
+            r.h >= static_cast<std::int32_t>(kClassHeight[0])) {
+            const bool fitting = std::max(r.w, r.h) <= static_cast<std::int32_t>(kClassWidth[3]) * 5 / 4;
+            (fitting ? candidates : larger).push_back(i);
+        }
+    }
+    const auto wanted = static_cast<std::size_t>(villages + volcanoes);
+    if (candidates.size() < wanted) {
+        candidates.insert(candidates.end(), larger.begin(), larger.end());
+    }
+    for (std::uint32_t k = 0; k < villages + volcanoes && !candidates.empty(); ++k) {
+        const std::size_t pick = m_random.below(static_cast<std::uint32_t>(candidates.size()));
+        Planned& p = m_islands[candidates[pick]];
+        candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(pick));
+        std::uint8_t size = 0;
+        for (std::uint8_t c = 1; c <= 3; ++c) {  // villages and volcanoes are on lit .. big
+            if (p.rect.w >= static_cast<std::int32_t>(kClassWidth[c]) &&
+                p.rect.h >= static_cast<std::int32_t>(kClassHeight[c])) {
+                size = c;
+            }
+        }
+        const Dims d = class_dims(size);
+        p.rect = Rect{p.rect.cx() - d.w / 2, p.rect.cy() - d.h / 2, d.w, d.h};
+        p.size = size;
+        p.own = false;
+        p.village = k < villages;
+        p.volcano = !p.village;
+    }
+}
+
 std::vector<std::size_t> Planner::in_reach(std::size_t start) const {
     std::vector<std::size_t> out;
     const std::int64_t r2 = std::int64_t{m_reach} * m_reach;
@@ -417,9 +716,14 @@ bool Planner::place_for_climate(std::size_t start, std::uint8_t climate) {
     // towards that band first (north up), from far to near, middle islands before small ones.
     const Point& st = m_starts[start];
     const std::int32_t toward = climate == climate::kNorth ? 48 : 16;  // 1/64 turns: up or down
-    for (std::uint8_t size = 2;; --size) {
-        const auto cw = static_cast<std::int32_t>(kClassWidth[size]);
-        const auto ch = static_cast<std::int32_t>(kClassHeight[size]);
+    const Dims first =
+        free_sizes()
+            ? own_dims(std::clamp<std::int32_t>(50, std::max<std::int32_t>(shapes::kMinSide, m_s.landscape.min_side),
+                                                std::max<std::int32_t>(shapes::kMinSide, m_s.landscape.max_side)))
+            : class_dims(2);
+    for (std::optional<Dims> dims = first; dims; dims = smaller(*dims)) {
+        const std::int32_t cw = dims->w;
+        const std::int32_t ch = dims->h;
         for (auto r = static_cast<std::int32_t>(m_reach * 95 / 100); r >= static_cast<std::int32_t>(m_reach * 25 / 100);
              r -= 3) {
             for (std::int32_t step = 0; step <= 32; ++step) {
@@ -433,16 +737,15 @@ bool Planner::place_for_climate(std::size_t start, std::uint8_t climate) {
                 }
                 Planned p;
                 p.rect = rect;
-                p.size = size;
+                p.size = dims->size;
                 p.climate = climate;
+                p.own = free_sizes();
                 m_islands.push_back(p);
                 return true;
             }
         }
-        if (size == 0) {
-            return false;
-        }
     }
+    return false;
 }
 
 void Planner::decide_climates() {
@@ -532,23 +835,7 @@ void Planner::decide_climates() {
 void Planner::choose_templates() {
     // A template of the island's climate and class that no other island has; homes take one
     // without a volcano and with ore mountains; volcano islands up to the setting.
-    std::uint32_t volcano_limit = 0;
-    const std::uint32_t players = m_s.players;
-    switch (m_s.volcanoes) {
-        case Amount::None:
-            volcano_limit = 0;
-            break;
-        case Amount::Few:
-            volcano_limit = std::max<std::uint32_t>(1, players / 2);
-            break;
-        case Amount::Normal:
-            volcano_limit = players;
-            break;
-        case Amount::Many:
-            volcano_limit = 2 * players;
-            break;
-    }
-    volcano_limit = std::min<std::uint32_t>(volcano_limit, 10);  // at most 20 craters in a world
+    const std::uint32_t limit = volcano_limit(m_s);
     std::uint32_t volcanoes = 0;
     std::vector<const TemplateInfo*> used;
     // Homes first: they have the strictest wishes.
@@ -559,6 +846,9 @@ void Planner::choose_templates() {
     std::stable_partition(order.begin(), order.end(), [&](std::size_t i) { return m_islands[i].home; });
     for (const std::size_t i : order) {
         Planned& p = m_islands[i];
+        if (p.own) {
+            continue;
+        }
         std::vector<const TemplateInfo*> all;
         for (const TemplateInfo& t : m_templates) {
             if (t.climate == p.climate && t.size == p.size && t.number < kTemplateCount[t.climate][t.size]) {
@@ -581,8 +871,14 @@ void Planner::choose_templates() {
             }
             return c.empty() ? nullptr : c[m_random.below(static_cast<std::uint32_t>(c.size()))];
         };
-        const bool volcano_allowed = volcanoes < volcano_limit;
+        const bool volcano_allowed = volcanoes < limit;
         const TemplateInfo* chosen = nullptr;
+        // Shapes::Own: the islands kept as templates are there for a village or a volcano.
+        if (p.village) {
+            chosen = pick([&](const TemplateInfo* t) { return !is_used(t) && t->village && !t->volcano; });
+        } else if (p.volcano && volcano_allowed) {
+            chosen = pick([&](const TemplateInfo* t) { return !is_used(t) && t->volcano; });
+        }
         if (p.home) {
             chosen = pick([&](const TemplateInfo* t) {
                 return !is_used(t) && !t->volcano && t->big_mountains >= 1 &&
@@ -640,33 +936,22 @@ WorldPlan Planner::finish() {
         ScenarioPlan::Island e;
         e.climate = p.climate;
         e.size = p.size;
-        e.flags = p.home ? kPlanNoVillage : 0;
+        e.flags = static_cast<std::uint8_t>((p.home ? kPlanNoVillage : 0) | (p.own ? kPlanOwnShape : 0));
         e.number = static_cast<std::uint8_t>(k);
         e.template_number = p.template_number;
         e.x = static_cast<std::uint32_t>(p.rect.x);
         e.y = static_cast<std::uint32_t>(p.rect.y);
         plan.islands.push_back(e);
-        per_climate[p.climate & 1U] += p.home ? 0U : 1U;
+        per_climate[p.climate & 1U] += p.home || p.own ? 0U : 1U;
+        if (p.own) {
+            out.own_islands.push_back(WorldPlan::OwnIsland{e.number, static_cast<std::uint16_t>(p.rect.w),
+                                                           static_cast<std::uint16_t>(p.rect.h)});
+        }
     }
 
     // Villages: four per 18 islands as the original, shared by the climates' island counts.
     const auto islands = static_cast<std::uint32_t>(m_islands.size());
-    std::uint32_t per18 = 0;
-    switch (m_s.natives) {
-        case Amount::None:
-            per18 = 0;
-            break;
-        case Amount::Few:
-            per18 = 2;
-            break;
-        case Amount::Normal:
-            per18 = 4;
-            break;
-        case Amount::Many:
-            per18 = 7;
-            break;
-    }
-    const std::uint32_t villages = (islands * per18 + kPlanIslands / 2) / kPlanIslands;
+    const std::uint32_t villages = village_count(m_s, islands);
     const std::uint32_t free_islands = per_climate[0] + per_climate[1];
     plan.natives[0] = free_islands != 0 ? (villages * per_climate[0] + free_islands / 2) / free_islands : 0;
     plan.natives[1] = villages > plan.natives[0] ? villages - plan.natives[0] : 0;
@@ -690,6 +975,7 @@ WorldPlan Planner::finish() {
     }
     out.shapes = m_s.shapes;
     out.seed = m_s.seed;
+    out.landscape = m_s.landscape;
     for (std::size_t c = 0; c < kCropBuildings.size(); ++c) {
         plan.crops[c] = ScenarioPlan::Resource{kCropBuildings[c], scaled(kCropCounts[d][c]), 0};
     }
@@ -759,13 +1045,25 @@ core::Result<WorldPlan> Planner::run() {
     }
     const std::uint64_t area = std::uint64_t{m_s.width} * m_s.height;
     auto total = static_cast<std::uint32_t>((area * density / 100 + kTilesPerIsland / 2) / kTilesPerIsland);
+    if (free_sizes()) {
+        // As many as the land takes at the middle size (for the islands near the starts).
+        const std::uint64_t side = (std::uint64_t{m_s.landscape.min_side} + m_s.landscape.max_side) / 2;
+        total = static_cast<std::uint32_t>(
+            std::min<std::uint64_t>(own_target(m_s) / std::max<std::uint64_t>(side * side, 1), kMaxPlannedIslands));
+    }
     total = std::clamp<std::uint32_t>(total, std::uint32_t{m_s.players} + 2U, kMaxPlannedIslands);
 
     place_starts();
     place_homes();
     place_locals(total);
     decide_climates();  // while there is still room for an island a start needs
-    place_rest(total);
+    if (free_sizes()) {
+        place_land(false);
+        keep_templates();
+        place_land(true);  // the land the templates took less
+    } else {
+        place_rest(total);
+    }
     for (Planned& island : m_islands) {
         if (island.climate == kEither) {
             const std::uint8_t b = band(island.rect);
@@ -777,6 +1075,14 @@ core::Result<WorldPlan> Planner::run() {
 }
 
 }  // namespace
+
+std::uint16_t WorldSettings::Landscape::fill() const {
+    // 560 per mille (the templates' middle) up to 25 % land, then 9 more for each percent: at 45 %
+    // the rectangles take about 61 % of the map. Branched islands have 120 less.
+    const int l = std::clamp<int>(land, kMinLand, kMaxLand);
+    const int compact = 560 + 9 * std::max(0, l - 25);
+    return static_cast<std::uint16_t>(outline == Outline::Branched ? compact - 120 : compact);
+}
 
 std::vector<TemplateInfo> island_templates(const assets::GameDirectory& game, const assets::BuildingTable& buildings) {
     std::vector<TemplateInfo> out;
@@ -847,6 +1153,26 @@ core::Result<WorldPlan> plan_world(const WorldSettings& settings, const std::vec
                                    std::vector<std::string>* warnings) {
     Planner planner(settings, templates, warnings);
     return planner.run();
+}
+
+WorldSettings fit_landscape(WorldSettings settings) {
+    if (settings.shapes != WorldSettings::Shapes::Own || settings.width == 0 || settings.height == 0) {
+        return settings;
+    }
+    const std::uint64_t largest = std::min(settings.landscape.max_side, shapes::kMaxSide);
+    const std::uint64_t w = settings.width;
+    const std::uint64_t h = settings.height;
+    // The factor in per mille: for the shorter side, then for the area (its square root).
+    const std::uint64_t by_side = (largest * 1500 + 2 * kEdge * 1000) / std::min(w, h);
+    const std::uint64_t area = largest * largest * 16 * 1000 * 1000 / (w * h);
+    std::uint64_t by_area = 0;
+    while ((by_area + 1) * (by_area + 1) <= area) {
+        ++by_area;
+    }
+    const std::uint64_t factor = std::max<std::uint64_t>({1000, by_side, by_area});
+    settings.width = static_cast<std::uint32_t>(std::min<std::uint64_t>(w * factor / 1000, WorldSettings::kMaxSide));
+    settings.height = static_cast<std::uint32_t>(std::min<std::uint64_t>(h * factor / 1000, WorldSettings::kMaxSide));
+    return settings;
 }
 
 WorldSettings settings_for_players(std::uint8_t players) {

@@ -18,6 +18,7 @@
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/core/result.hpp"
+#include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/limits.hpp"
 
 namespace o1602::sim {
@@ -37,8 +38,43 @@ struct WorldSettings {
     /// The coasts of the islands (world generator stage 2, island_shapes.hpp).
     enum class Shapes : std::uint8_t {
         Templates,  ///< the original's island templates, as in the original
-        Mixed,      ///< about half the islands of their own shape
-        Own,        ///< every island of its own shape, but those with a native village or volcano
+        Mixed,      ///< about half the islands of their own shape, in the templates' sizes
+        /// Every island of its own shape and size as `landscape` says, but those with a native
+        /// village or a volcano (templates); `islands` and `sizes` do not count then.
+        Own,
+    };
+    /// The islands of a world of islands of their own shape (Shapes::Own).
+    struct Landscape {
+        /// How the sizes are spread between the smallest and the largest side.
+        enum class Spread : std::uint8_t {
+            Even,       ///< any size as often
+            Mixed,      ///< small ones more often, as the original's plans
+            FewGiants,  ///< mostly small islands and a few of the largest
+        };
+        enum class Gap : std::uint8_t { Narrow, Normal, Wide };  ///< water between two islands
+        enum class Outline : std::uint8_t {
+            Round,     ///< about as wide as high, one body of land
+            Long,      ///< up to three times as long as wide
+            Branched,  ///< arms and peninsulas
+        };
+        static constexpr std::uint8_t kMinLand = 5;  ///< percent of the map
+        static constexpr std::uint8_t kMaxLand = 45;
+
+        std::uint8_t land = 15;        ///< percent of the map that is land (the original's plans: about 13)
+        std::uint16_t min_side = 30;   ///< tiles, at least shapes::kMinSide
+        std::uint16_t max_side = 100;  ///< tiles, at most shapes::kMaxSide
+        Spread spread = Spread::Mixed;
+        Gap gap = Gap::Normal;
+        shapes::Roughness coast = shapes::Roughness::Natural;
+        Outline outline = Outline::Round;
+        shapes::Share forest = shapes::Share::Normal;
+        shapes::Share mountains = shapes::Share::Normal;  ///< ore mountains for the size of an island
+
+        friend bool operator==(const Landscape&, const Landscape&) = default;
+
+        /// Per mille of an island's rectangle that is land (shapes::ShapeRequest::land): as the
+        /// templates up to a quarter of the map, fuller above, so that much land fits the map.
+        [[nodiscard]] std::uint16_t fill() const;
     };
     static constexpr std::uint32_t kMinSide = 200;
     static constexpr std::uint32_t kMaxSide = 2000;
@@ -58,6 +94,7 @@ struct WorldSettings {
     /// one vein each, as far as the islands have free mountains; the starts get theirs first.
     std::uint8_t gold_islands = 0;
     Shapes shapes = Shapes::Templates;
+    Landscape landscape;
     std::uint64_t seed = 0;
 };
 
@@ -66,6 +103,13 @@ struct WorldSettings {
 /// the square root of the players; four or fewer keep the original's size. The islands follow the
 /// area (WorldSettings::islands).
 [[nodiscard]] WorldSettings settings_for_players(std::uint8_t players);
+
+/// An automatic map size for islands of their own size (Shapes::Own): `settings`' size, larger
+/// where the largest island would find no room - the shorter side at least one and a half times the
+/// largest island and the edges, the area at least sixteen times the largest island's (the start
+/// areas and their islands come first, a giant needs room between them) - keeping the shape, at
+/// most kMaxSide. Other settings keep their size.
+[[nodiscard]] WorldSettings fit_landscape(WorldSettings settings);
 
 /// The start area of one player: his ship's place, his home island and how far "within reach" is.
 struct StartArea {
@@ -105,10 +149,21 @@ struct WorldPlan {
     /// the template's size and with as many ore mountains), drawn from `seed`.
     WorldSettings::Shapes shapes = WorldSettings::Shapes::Templates;
     std::uint64_t seed = 0;
+    /// Shapes::Own: the islands of their own shape (plan flag kPlanOwnShape) with their sides, and
+    /// how they look.
+    struct OwnIsland {
+        std::uint8_t number = 0;
+        std::uint16_t width = 0;
+        std::uint16_t height = 0;
+    };
+    std::vector<OwnIsland> own_islands;
+    WorldSettings::Landscape landscape;
 };
 
 /// Island flag of a plan entry that the generator keeps free of a native village (home islands).
 inline constexpr std::uint8_t kPlanNoVillage = 2;
+/// Island flag of a plan entry that is an island of its own shape and size (WorldPlan::own_islands).
+inline constexpr std::uint8_t kPlanOwnShape = 4;
 
 /// Plans a world. The same settings and seed give the same plan.
 [[nodiscard]] core::Result<WorldPlan> plan_world(const WorldSettings& settings,

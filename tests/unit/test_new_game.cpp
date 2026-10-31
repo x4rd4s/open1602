@@ -614,6 +614,47 @@ TEST_CASE("new game: an endless game: its islands from the plan, the same seed t
     CHECK(!same_world(*world, *other));
 }
 
+TEST_CASE("new game: the preview of a world is the world the game gets, in small") {
+    const auto& fake = installation();
+    auto world = sim::start_new_game(fake.game, buildings(), texts(), options(7));
+    REQUIRE(world.ok());
+    auto preview = sim::preview_world(fake.game, buildings(), texts(), options(7));
+    REQUIRE(preview.ok());
+    CHECK(preview->width == world->width());
+    CHECK(preview->height == world->height());
+    REQUIRE(preview->tiles.size() == std::size_t{preview->width} * preview->height);
+    CHECK(preview->islands == world->islands().size());
+    CHECK(preview->land > 0);
+    // Land only where an island is, the open sea elsewhere; every ship's place a start.
+    std::uint64_t land = 0;
+    for (std::uint32_t y = 0; y < preview->height; ++y) {
+        for (std::uint32_t x = 0; x < preview->width; ++x) {
+            const auto t = preview->at(x, y);
+            const bool water = t == sim::WorldPreview::Tile::Sea || t == sim::WorldPreview::Tile::Surf;
+            land += water ? 0U : 1U;
+            if (world->cell(x, y).island == sim::World::kSea) {
+                CHECK(t == sim::WorldPreview::Tile::Sea);
+            }
+        }
+    }
+    CHECK(land == preview->land);
+    CHECK(!preview->starts.empty());
+    for (const sim::Ship& ship : world->ships()) {
+        CHECK(std::any_of(preview->starts.begin(), preview->starts.end(),
+                          [&](const sim::WorldPreview::Start& st) { return st.x == ship.x && st.y == ship.y; }));
+    }
+    // The same seed, the same picture; another, another world.
+    auto again = sim::preview_world(fake.game, buildings(), texts(), options(7));
+    REQUIRE(again.ok());
+    CHECK(again->tiles == preview->tiles);
+    const sim::WorldPreview of = sim::preview_of(*world, buildings());
+    CHECK(of.tiles == preview->tiles);
+    // Settings the game refuses, the preview refuses too.
+    sim::NewGameOptions bad = options(7);
+    bad.difficulty = sim::NewGameOptions::kDifficulties;
+    CHECK(!sim::preview_world(fake.game, buildings(), texts(), bad).ok());
+}
+
 TEST_CASE("new game: the seed picks the map, so the same seed is the same map") {
     for (std::uint64_t seed = 0; seed < 100; ++seed) {
         const std::uint8_t layout = sim::layout_for_seed(seed);

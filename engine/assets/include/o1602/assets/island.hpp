@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "o1602/assets/chunk_file.hpp"
@@ -84,8 +85,10 @@ struct IslandTile {
     /// Building / terrain id. Matches the "Id" values in haeuser.cod minus 20000
     /// (e.g. 1201 -> IDMEER+0 = 21201). Verified for all ids of NORD/big.scp, see docs/formats/scp.md.
     std::uint16_t id = 0;
-    std::uint8_t x = 0;
-    std::uint8_t y = 0;
+    /// One byte each in the original's INSELHAUS; 16 bits for Open1602's islands wider or higher
+    /// than 255 tiles (chunk O1602HAUS, kLargeTilesChunk).
+    std::uint16_t x = 0;
+    std::uint16_t y = 0;
     /// Packed attributes, decoded by the accessors below (layout from the build routine
     /// 1602.exe @ 0x004084D0, see docs/formats/scp.md).
     std::uint32_t bits = 0;
@@ -107,6 +110,17 @@ struct Island {
     /// Each INSELHAUS chunk following the header is one layer.
     std::vector<std::vector<IslandTile>> layers;
 };
+
+/// Open1602's chunks for islands wider or higher than 255 tiles, which the original's records
+/// cannot hold (island coordinates are one byte there). After an INSEL5:
+/// - kLargeIslandChunk: width and height (u16 each), the number of deposits (u8) and for each its x
+///   and y (u16 each); they replace the header's one-byte values.
+/// - kLargeTilesChunk: a layer of tiles as INSELHAUS, 10 bytes each: id u16, x u16, y u16, bits u32.
+inline constexpr std::string_view kLargeIslandChunk = "O1602ISL";
+inline constexpr std::string_view kLargeTilesChunk = "O1602HAUS";
+
+/// The bytes of kLargeTilesChunk for these tiles.
+[[nodiscard]] std::vector<std::uint8_t> large_tile_bytes(const std::vector<IslandTile>& tiles);
 
 /// Extracts all islands from a chunk file (.SCP island template, .SZS/.SZM scenario, .GAM savegame).
 core::Result<std::vector<Island>> load_islands(const ChunkFile& file);

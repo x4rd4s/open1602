@@ -824,6 +824,7 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                 ev.name = m_name;
                 ev.setup = m_endless;
                 out.push_back(std::move(ev));
+                m_endless.world_seed = 0;  // the next game a new world, unless the islands' page shows one
                 break;
             }
             case GameSettingsMenu::Result::Back:
@@ -984,6 +985,7 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                                    ? static_cast<sim::BannerId>(e.id - kBanner)
                                    : static_cast<sim::BannerId>(sim::kFirstExtraBanner + (e.id - kMoreArms));
                     m_settings.open(m_endless, SetupScope::Endless);
+                    m_settings.set_level(m_variant == 0xFF ? 0 : m_variant);
                     m_screen = Screen::Settings;
                 }
                 break;

@@ -17,6 +17,7 @@ namespace {
 
 constexpr std::size_t kMinHeaderSize = 8;
 constexpr std::size_t kTileSize = 8;
+constexpr std::size_t kLargeTileSize = 10;
 
 /// Size class of an INSEL5 island by its width, as the original's loader sets it (0x00469900) before it
 /// builds the template path: the stored value is ignored. Wider islands keep it.
@@ -92,25 +93,72 @@ core::Result<IslandHeader> parse_header(const Chunk& chunk, std::span<const std:
     return h;
 }
 
-core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> data) {
-    if (data.size() % kTileSize != 0) {
-        return make_error(ErrorCode::InvalidFormat, "INSELHAUS size is not a multiple of 8");
+core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> data, bool large) {
+    const std::size_t size = large ? kLargeTileSize : kTileSize;
+    if (data.size() % size != 0) {
+        return make_error(ErrorCode::InvalidFormat,
+                          large ? "O1602HAUS size is not a multiple of 10" : "INSELHAUS size is not a multiple of 8");
     }
     std::vector<IslandTile> tiles;
-    tiles.reserve(data.size() / kTileSize);
+    tiles.reserve(data.size() / size);
     core::ByteReader r(data);
     while (!r.at_end()) {
         IslandTile t;
         t.id = *r.u16();
-        t.x = *r.u8();
-        t.y = *r.u8();
+        if (large) {
+            t.x = *r.u16();
+            t.y = *r.u16();
+        } else {
+            t.x = *r.u8();
+            t.y = *r.u8();
+        }
         t.bits = *r.u32();
         tiles.push_back(t);
     }
     return tiles;
 }
 
+/// kLargeIslandChunk: the sizes and deposit places the header's bytes cannot hold.
+core::Status apply_large_island(IslandHeader& h, std::span<const std::uint8_t> data) {
+    core::ByteReader r(data);
+    const auto width = r.u16();
+    const auto height = r.u16();
+    const auto count = r.u8();
+    if (!width || !height || !count) {
+        return make_error(ErrorCode::InvalidFormat, "O1602ISL chunk too small");
+    }
+    h.width = *width;
+    h.height = *height;
+    for (std::size_t i = 0; i < *count; ++i) {
+        const auto x = r.u16();
+        const auto y = r.u16();
+        if (!x || !y) {
+            return make_error(ErrorCode::InvalidFormat, "O1602ISL chunk too small");
+        }
+        if (i < h.deposits.size()) {
+            h.deposits[i].x = *x;
+            h.deposits[i].y = *y;
+        }
+    }
+    return core::Ok{};
+}
+
 }  // namespace
+
+std::vector<std::uint8_t> large_tile_bytes(const std::vector<IslandTile>& tiles) {
+    std::vector<std::uint8_t> out;
+    out.reserve(kLargeTileSize * tiles.size());
+    for (const IslandTile& t : tiles) {
+        for (const std::uint32_t v : {std::uint32_t{t.id}, std::uint32_t{t.x}, std::uint32_t{t.y}}) {
+            out.push_back(static_cast<std::uint8_t>(v));
+            out.push_back(static_cast<std::uint8_t>(v >> 8));
+        }
+        for (std::uint32_t k = 0; k < 4; ++k) {
+            out.push_back(static_cast<std::uint8_t>(t.bits >> (8 * k)));
+        }
+    }
+    return out;
+}
 
 std::string IslandHeader::template_path() const {
     // Name tables of the original: 0x0049A8A4 (climate directories) and 0x0049A890 (size prefixes).
@@ -134,11 +182,18 @@ core::Result<std::vector<Island>> load_islands(const ChunkFile& file) {
                 return header.error();
             }
             islands.push_back(Island{std::move(header).value(), {}});
-        } else if (chunk.name == "INSELHAUS") {
+        } else if (chunk.name == kLargeIslandChunk) {
             if (islands.empty()) {
-                return make_error(ErrorCode::InvalidFormat, "INSELHAUS chunk without preceding island header");
+                return make_error(ErrorCode::InvalidFormat, "O1602ISL chunk without preceding island header");
             }
-            auto tiles = parse_tiles(file.payload(chunk));
+            if (auto status = apply_large_island(islands.back().header, file.payload(chunk)); !status) {
+                return status.error();
+            }
+        } else if (chunk.name == "INSELHAUS" || chunk.name == kLargeTilesChunk) {
+            if (islands.empty()) {
+                return make_error(ErrorCode::InvalidFormat, chunk.name + " chunk without preceding island header");
+            }
+            auto tiles = parse_tiles(file.payload(chunk), chunk.name == kLargeTilesChunk);
             if (!tiles) {
                 return tiles.error();
             }
