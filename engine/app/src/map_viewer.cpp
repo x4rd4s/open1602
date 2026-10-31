@@ -2906,6 +2906,11 @@ void MapViewer::finish_pending_load(std::size_t option) {
     report_load_problems(load.warnings);
     std::fprintf(stderr, "game loaded as player %u: %s\n", static_cast<unsigned>(chosen),
                  core::path_to_utf8(load.path).c_str());
+    if (m_load_problems == 0) {
+        const std::string file = core::path_to_utf8(load.path.filename());
+        m_events.notify(ui::tr("notice.game_loaded", {utf8_to_cp1252(file)}), "notice.game_loaded " + file,
+                        platform::ticks_ms());
+    }
 }
 
 void MapViewer::load_package_scenarios() {
@@ -3604,7 +3609,8 @@ void MapViewer::quick_load() {
     if (!status) {
         m_events.notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}), "notice.load_failed",
                         platform::ticks_ms());
-    } else if (m_load_problems == 0) {  // else the note says what went wrong while loading
+    } else if (m_load_problems == 0 && !m_pending_load) {  // else the note says what went wrong while loading
+        // (or the game waits for its player: finish_pending_load says so)
         const std::string file = core::path_to_utf8(path.filename());
         m_events.notify(ui::tr("notice.game_loaded", {utf8_to_cp1252(file)}), "notice.game_loaded " + file,
                         platform::ticks_ms());
