@@ -438,6 +438,26 @@ TEST_CASE("multiplayer menu: joining, the lobby shows how far the game on its wa
     CHECK(find_text(menu, model, "10 von 40 MB").has_value());
 }
 
+TEST_CASE("multiplayer menu: a lobby without a title is the host's game, in this computer's language") {
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.seats.resize(4);
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.session = &host;
+    menu.show_lobby();
+    CHECK(find_text(menu, model, "Anna's game").has_value());
+    {
+        const LanguageGuard german("de");
+        CHECK(find_text(menu, model, "Spiel von Anna").has_value());
+    }
+    host.set_lobby_info("Abend", {}, {});
+    CHECK(find_text(menu, model, "Abend").has_value());
+    CHECK(!find_text(menu, model, "Anna's game").has_value());
+}
+
 TEST_CASE("multiplayer menu: the host sends a spectator away") {
     net::LoopbackNetwork network;
     net::Lobby lobby;

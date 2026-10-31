@@ -612,7 +612,16 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     }
     const net::Lobby& lobby = session->lobby();
     const sim::PlayerId me = session->local_seat();
-    f.label(kHeading, lobby.title, Align::Left, Tone::Heading);
+    // A game hosted without a title (from the command line) is "<host>'s game" in this computer's
+    // language; without a host in the roster, the menu's heading.
+    std::string title = lobby.title;
+    if (title.empty()) {
+        const auto host = std::find_if(session->roster().begin(), session->roster().end(),
+                                       [](const net::Member& m) { return m.host; });
+        title = host != session->roster().end() && !host->name.empty() ? tr(MpText::DefaultTitle, host->name)
+                                                                       : tr(MpText::Multiplayer);
+    }
+    f.label(kHeading, title, Align::Left, Tone::Heading);
     f.label(Rect{560, 32, 424, 32}, model.hosting ? tr(MpText::HostPort, std::to_string(model.port)) : lobby.game,
             Align::Right, Tone::Dim);
 
