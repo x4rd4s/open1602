@@ -1054,6 +1054,21 @@ TEST_CASE("selection panels: the military windows of one ship and of a fleet giv
     CHECK(std::get_if<sim::ShipCommand>(&out[0])->hold == 0xFF);
     out.clear();
 
+    // Shift + click on the mounted cannons or the button that takes one off: all of them come off;
+    // a plain click on the mounted cannons does nothing.
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 51012}, none, c, out);
+    CHECK(out.empty());
+    c.shift = true;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 51012}, none, c, out);
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 51011}, none, c, out);
+    c.shift = false;
+    REQUIRE(out.size() == 2);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        CHECK(op(i) == sim::ShipCommand::Op::UnmountCannon);
+        CHECK(std::get_if<sim::ShipCommand>(&out[i])->count == sim::ShipCommand::kAllCannons);
+    }
+    out.clear();
+
     // Patrol: the far end is the next click on the map.
     p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 51022}, none, c, out);
     CHECK(p->picking());
@@ -1289,6 +1304,15 @@ TEST_CASE("selection panels: the ship window gives the orders of a ship at sea a
     CHECK(op(1) == sim::ShipCommand::Op::UnmountCannon);
     CHECK(op(2) == sim::ShipCommand::Op::MountCannon);
     CHECK(op(3) == sim::ShipCommand::Op::Scuttle);
+    out.clear();
+
+    // Shift + click on the mounted cannons: all of them come off in one command.
+    PanelContext shifted = c;
+    shifted.shift = true;
+    p->clicked(ui::PanelEvent{ui::PanelEvent::Kind::Clicked, 38007}, pioneer, shifted, out);
+    REQUIRE(out.size() == 1);
+    CHECK(op(0) == sim::ShipCommand::Op::UnmountCannon);
+    CHECK(std::get_if<sim::ShipCommand>(&out[0])->count == sim::ShipCommand::kAllCannons);
     out.clear();
 
     // The route editor is a page of its own; Escape and a right click come back.

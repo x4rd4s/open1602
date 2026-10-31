@@ -27,8 +27,8 @@ constexpr std::array<std::array<const char*, 2>, kKeyHelpPages> kSectionHeadings
 /// The page and section of the clicks of add_click_lines(): ships and units selected.
 constexpr KeyHelpPlace kClickPlace{3, 1};
 /// What each click does (keys.click.<name>), all with Shift.
-constexpr std::array<const char*, 3> kShiftClicks = {"keys.click.castle_all", "keys.click.cannons",
-                                                     "keys.click.trade_cart"};
+constexpr std::array<const char*, 4> kShiftClicks = {"keys.click.castle_all", "keys.click.cannons",
+                                                     "keys.click.cannons_unmount", "keys.click.trade_cart"};
 
 }  // namespace
 

@@ -77,33 +77,37 @@ bool Fleet::command(const ShipCommand& c) {
             return mounted > 0;
         }
         case ShipCommand::Op::UnmountCannon: {
-            // Needs room for 1 t of cannons: a hold with cannons and space, or an empty hold.
-            if (!own || ship->cannons == 0) {
+            // Each needs room for 1 t of cannons: a hold with cannons and space, else an empty hold;
+            // `count` times, or until the mounted cannons or the room run out.
+            if (!own) {
                 return false;
             }
-            CargoSlot* target = nullptr;
             const std::span<CargoSlot> usable(ship->cargo.data(), holds(*ship));
-            for (CargoSlot& slot : usable) {
-                if (slot.ware == cannons && slot.amount + kTon <= kHoldCapacity) {
-                    target = &slot;
-                    break;
-                }
-            }
-            if (target == nullptr) {
+            const auto room = [&]() -> CargoSlot* {
                 for (CargoSlot& slot : usable) {
-                    if (slot.ware == 0) {
-                        target = &slot;
-                        break;
+                    if (slot.ware == cannons && slot.amount + kTon <= kHoldCapacity) {
+                        return &slot;
                     }
                 }
+                for (CargoSlot& slot : usable) {
+                    if (slot.ware == 0) {
+                        return &slot;
+                    }
+                }
+                return nullptr;
+            };
+            std::uint8_t unmounted = 0;
+            while (unmounted < c.count && ship->cannons > 0) {
+                CargoSlot* target = room();
+                if (target == nullptr) {
+                    break;
+                }
+                target->ware = cannons;
+                target->amount += kTon;
+                --ship->cannons;
+                ++unmounted;
             }
-            if (target == nullptr) {
-                return false;
-            }
-            target->ware = cannons;
-            target->amount += kTon;
-            --ship->cannons;
-            return true;
+            return unmounted > 0;
         }
         case ShipCommand::Op::Dump: {
             // Every hold (or the one named) but soldiers on board; the goods are gone.

@@ -83,14 +83,14 @@ TEST_CASE("key help: the clicks with Shift in windows join the units, also witho
     auto pages = app::key_help_pages({{KeyAction::Stop, "H"}}, label);
     app::add_click_lines(pages);
     REQUIRE(pages[3].sections.size() == 1);
-    REQUIRE(pages[3].sections[0].lines.size() == 4);
+    REQUIRE(pages[3].sections[0].lines.size() == 5);
     CHECK(pages[3].sections[0].lines[0].keys == "H");
     CHECK(pages[3].sections[0].lines[1].keys == "Shift+click");
     CHECK(pages[3].sections[0].lines[1].text == "Castle, send-out arrow: all trained units");
     auto none = app::key_help_pages({}, label);
     app::add_click_lines(none);
     REQUIRE(none[3].sections.size() == 1);
-    CHECK(none[3].sections[0].lines.size() == 3);
+    CHECK(none[3].sections[0].lines.size() == 4);
     CHECK(none[3].sections[0].heading == "Ships and units selected");
 }
 

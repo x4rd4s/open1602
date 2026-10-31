@@ -998,6 +998,46 @@ TEST_CASE("ships: Shift fills every free cannon place at once, as far as the can
     CHECK(sea.world.ship(id)->cannons == 5);
 }
 
+TEST_CASE("ships: Shift takes every mounted cannon off, as far as the holds have room") {
+    Sea sea;
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    sim::Ship& ship = sea.add(10, 10);
+    const std::uint32_t id = ship.id;
+    using Op = sim::ShipCommand::Op;
+    sim::ShipCommand all = cmd(0, id, Op::UnmountCannon);
+    all.count = sim::ShipCommand::kAllCannons;
+    // Cannons in a hold are topped up first, then an empty hold takes the rest.
+    ship.cannons = 6;
+    ship.cargo[0] = sim::CargoSlot{kWood, 20 * kTon, 0};
+    ship.cargo[1] = sim::CargoSlot{13, sim::kHoldCapacity - 2 * kTon, 100};
+    CHECK(fleet.command(all));
+    CHECK(sea.world.ship(id)->cannons == 0);
+    CHECK(sea.world.ship(id)->cargo[1].amount == sim::kHoldCapacity);
+    CHECK(sea.world.ship(id)->cargo[2].ware == 13);
+    CHECK(sea.world.ship(id)->cargo[2].amount == 4 * kTon);
+    CHECK(!fleet.command(all));  // nothing left to take off
+    // Not someone else's ship.
+    sea.world.ship(id)->cannons = 3;
+    all.player = 1;
+    CHECK(!fleet.command(all));
+    CHECK(sea.world.ship(id)->cannons == 3);
+    all.player = 0;
+    // Holds full of other goods but one ton of room for cannons: one comes off, two stay.
+    for (auto& slot : sea.world.ship(id)->cargo) {
+        slot = sim::CargoSlot{kWood, kTon, 0};
+    }
+    sea.world.ship(id)->cargo[0] = sim::CargoSlot{13, sim::kHoldCapacity - kTon, 100};
+    CHECK(fleet.command(all));
+    CHECK(sea.world.ship(id)->cannons == 2);
+    CHECK(sea.world.ship(id)->cargo[0].amount == sim::kHoldCapacity);
+    CHECK(!fleet.command(all));
+    CHECK(sea.world.ship(id)->cannons == 2);
+    // A count of one takes one, as the button without Shift.
+    sea.world.ship(id)->cargo[1] = sim::CargoSlot{};
+    CHECK(fleet.command(cmd(0, id, Op::UnmountCannon)));
+    CHECK(sea.world.ship(id)->cannons == 1);
+}
+
 TEST_CASE("ships: a ship offered for sale changes hands for its price") {
     Sea sea;
     sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);

@@ -124,7 +124,13 @@ public:
                 break;
             case kCannonsDown:
                 if (ship->cannons > 0) {
-                    out.emplace_back(command(sim::ShipCommand::Op::UnmountCannon));
+                    out.emplace_back(unmount_cannons(*ship, c));
+                }
+                break;
+            case kCannons:
+                // Open1602: Shift+click on the mounted cannons takes them all off.
+                if (c.shift && ship->cannons > 0) {
+                    out.emplace_back(unmount_cannons(*ship, c));
                 }
                 break;
             default:
@@ -172,10 +178,9 @@ public:
         }
         switch (id) {
             case kCannonsDown:
-                return help_line(c, 119);
+                return unmount_cannon_help(*ship, c);
             case kCannons:
-                return ship->cannons > 0 ? ui::format_text(c.text("GAME", 23), {std::int64_t{ship->cannons}})
-                                         : c.text("GAME", 24);
+                return mounted_cannons_help(*ship, c);
             case kHealthHover:
                 return help_line(c, 121);
             case kStop:

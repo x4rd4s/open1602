@@ -50,6 +50,35 @@ inline sim::ShipCommand mount_cannons(const sim::Ship& ship, std::size_t hold, c
     return o;
 }
 
+/// A click on the mounted cannons (or the button that takes one off) of an own ship: one of them
+/// into a hold, with Shift as many as the holds have room for (Open1602), all in one command.
+inline sim::ShipCommand unmount_cannons(const sim::Ship& ship, const PanelContext& c) {
+    sim::ShipCommand o;
+    o.player = c.local;
+    o.ship = ship.id;
+    o.op = sim::ShipCommand::Op::UnmountCannon;
+    if (c.shift) {
+        o.count = sim::ShipCommand::kAllCannons;
+    }
+    return o;
+}
+
+/// The help line of the mounted cannons of a ship ("2 Kanonen"); with cannons on an own ship it
+/// tells that Shift+click takes them all off (Open1602).
+inline std::string mounted_cannons_help(const sim::Ship& ship, const PanelContext& c) {
+    if (ship.cannons == 0) {
+        return c.text("GAME", 24);
+    }
+    std::string text = ui::format_text(c.text("GAME", 23), {std::int64_t{ship.cannons}});
+    return ship.owner == c.local ? ui::tr("ship.cannons_mounted", {text}) : text;
+}
+
+/// The help line of the button that takes a mounted cannon off, with how Shift takes them all (Open1602).
+inline std::string unmount_cannon_help(const sim::Ship& ship, const PanelContext& c) {
+    std::string text = help_line(c, 119);
+    return ship.owner == c.local && ship.cannons > 0 ? ui::tr("ship.cannons_unmount", {text}) : text;
+}
+
 /// The help line of a hold of a ship: its goods ("10t Kanonen"), or empty. With `mounting` (a click
 /// mounts them), cannons in an own ship with a free cannon place tell how (Open1602).
 inline std::string hold_help(const sim::Ship& ship, std::size_t hold, const PanelContext& c, bool mounting) {
