@@ -102,6 +102,14 @@ void Form::label(Rect r, std::string text, Align align, Tone tone) {
     m_widgets.push_back(std::move(w));
 }
 
+void Form::speech(Rect r, std::string speaker, std::uint8_t ink, std::string text, Tone tone) {
+    Widget w = make(Widget::Kind::Speech, -1, r, std::move(speaker));
+    w.value = std::move(text);
+    w.colour = ink;
+    w.tone = tone;
+    m_widgets.push_back(std::move(w));
+}
+
 void Form::entry(Rect r, std::string label, std::string value, Tone label_tone, Tone value_tone) {
     Widget w = make(Widget::Kind::Entry, -1, r, std::move(label));
     w.value = std::move(value);
@@ -309,6 +317,23 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& font
             case Widget::Kind::Label:
                 text(w.rect, w.text, w.align, colour_of(w.tone));
                 break;
+            case Widget::Kind::Speech: {
+                // Cut as one line; the name in its ink (all of it, when the cut reaches into the
+                // name), the rest right behind it.
+                text(w.rect, w.text + w.value, Align::Left, colour_of(w.tone));
+                DrawItem& line = out.back();
+                const bool whole_name = line.text.compare(0, w.text.size(), w.text) == 0;
+                const std::size_t split = whole_name ? w.text.size() : line.text.size();
+                DrawItem rest = line;
+                rest.text = line.text.substr(split);
+                line.text.resize(split);
+                line.ink = w.colour;
+                rest.x = line.x + static_cast<std::int32_t>(std::lround(text_width(font, line.text) * s));
+                if (!rest.text.empty()) {
+                    out.push_back(std::move(rest));
+                }
+                break;
+            }
             case Widget::Kind::Entry: {
                 // The value first, on the right; the label in what is left beside it.
                 const std::string value = fit_text(font, w.value, std::max(w.rect.w - 2.0 * kPadding, 0.0), false);

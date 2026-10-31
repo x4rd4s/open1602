@@ -93,7 +93,8 @@ private:
     Texture package_icon(const assets::PackageIcon& icon, int mode, std::int32_t colour);
     /// The font of a slot and size: the large one where that size has none, nullptr for none.
     [[nodiscard]] const ui::Font* font(std::int32_t slot, ui::ArtSize size) const noexcept;
-    Texture text(const std::string& s, std::int32_t slot, ui::ArtSize size, std::int32_t colour);
+    /// Text in text colour `colour`, its letters in palette colour `ink` unless that is -1 (DrawItem::ink).
+    Texture text(const std::string& s, std::int32_t slot, ui::ArtSize size, std::int32_t colour, std::int32_t ink = -1);
     Texture make(const std::vector<std::uint8_t>& rgba, std::int32_t w, std::int32_t h);
     [[nodiscard]] double art_scale() const noexcept;
 

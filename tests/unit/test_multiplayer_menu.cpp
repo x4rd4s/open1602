@@ -509,6 +509,8 @@ namespace {
 
 /// The palette colour of banner 0 in the tests; the others follow (none is a colour of the form).
 constexpr std::int32_t kFirstColour = 150;
+/// The palette colour of banner 0's names in the chat (made legible); the others follow.
+constexpr std::int32_t kFirstText = 200;
 
 /// The menu's banners as the game gives them (Hud): the original's seven and the further colours.
 std::vector<app::MenuBanner> menu_banners() {
@@ -516,7 +518,8 @@ std::vector<app::MenuBanner> menu_banners() {
     table.add_more_players();
     std::vector<app::MenuBanner> banners;
     for (std::size_t i = 0; i < table.size(); ++i) {
-        banners.push_back(app::MenuBanner{static_cast<std::uint8_t>(kFirstColour + i), table.banners()[i].id});
+        banners.push_back(app::MenuBanner{static_cast<std::uint8_t>(kFirstColour + i), table.banners()[i].id,
+                                          static_cast<std::uint8_t>(kFirstText + i)});
     }
     return banners;
 }
@@ -638,6 +641,71 @@ TEST_CASE("multiplayer menu: choosing a banner in the lobby") {
     events = click(theirs, their_model, "Teal");
     REQUIRE(events.size() == 1);
     CHECK(events[0].banner == 9);
+}
+
+TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their colour") {
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.seats = app::endless_seats(4);
+    lobby.banners = app::player_banners();
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+
+    MultiplayerMenu menu(ui::FormStyle{});
+    menu.set_banners(menu_banners(), 1);
+    app::MultiplayerModel model;
+    model.name = "Anna";
+    model.session = &host;
+    model.hosting = true;
+    const auto say = [&](std::string name, std::string text, sim::PlayerId seat, bool whisper = false) {
+        app::ChatLine line;
+        line.name = std::move(name);
+        line.text = std::move(text);
+        line.seat = seat;
+        line.whisper = whisper;
+        line.to = whisper ? "to you" : "";
+        app::add_chat_line(&model.chat, std::move(line), false);
+    };
+    say("Anna", "Hallo", 0);
+    say("Bernd", "Psst", 2, true);
+    say("Zoe", "Moin", sim::kNoPlayer);  // a spectator
+    app::ChatLine notice;
+    notice.text = "Bernd joined";
+    app::add_chat_line(&model.chat, std::move(notice), false);
+    menu.show_lobby();
+
+    const std::vector<ui::DrawItem> items = menu.draw(model, kNoFonts);
+    const auto text = [&](const std::string& t) -> const ui::DrawItem* {
+        const auto it = std::find_if(items.begin(), items.end(), [&](const ui::DrawItem& d) {
+            return d.kind == ui::DrawItem::Kind::Text && d.text == t;
+        });
+        return it != items.end() ? &*it : nullptr;
+    };
+    const ui::FormStyle style;
+    // The name in the banner's colour, the rest right behind it in the line's.
+    const ui::DrawItem* anna = text("Anna");
+    const ui::DrawItem* hallo = text(": Hallo");
+    REQUIRE(anna != nullptr);
+    REQUIRE(hallo != nullptr);
+    CHECK(anna->ink == kFirstText + 0);
+    CHECK(anna->colour == style.text);
+    CHECK(hallo->ink == -1);
+    CHECK(hallo->colour == style.text);
+    CHECK(hallo->y == anna->y);
+    CHECK(hallo->x == anna->x + 4 * 9);  // without a font every byte is 9 units wide
+    // A whisper keeps its colour behind the name.
+    const ui::DrawItem* bernd = text("Bernd");
+    const ui::DrawItem* psst = text(" (to you): Psst");
+    REQUIRE(bernd != nullptr);
+    REQUIRE(psst != nullptr);
+    CHECK(bernd->ink == kFirstText + 2);
+    CHECK(psst->colour == style.heading);
+    // A spectator has no colour, a notice no name.
+    REQUIRE(text("Zoe: Moin") != nullptr);
+    CHECK(text("Zoe: Moin")->ink == -1);
+    REQUIRE(text("Bernd joined") != nullptr);
+    CHECK(text("Bernd joined")->ink == -1);
 }
 
 TEST_CASE("multiplayer menu: the host's settings travel in the lobby") {

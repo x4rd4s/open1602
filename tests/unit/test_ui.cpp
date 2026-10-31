@@ -595,6 +595,53 @@ TEST_CASE("ui: a form of Open1602's own: clicks, focus, cut texts and the scale"
     CHECK(texts[1] == "******");
 }
 
+TEST_CASE("ui: a banner's colour made legible as text on a dark ground") {
+    const assets::Rgba ground{35, 23, 12, 255};
+    CHECK(ui::contrast(assets::Rgba{0, 0, 0, 255}, assets::Rgba{255, 255, 255, 255}) > 20.9);
+    CHECK(ui::contrast(ground, ground) == 1.0);
+    // Light enough already: unchanged.
+    const assets::Rgba yellow{255, 219, 57, 255};
+    const assets::Rgba y = ui::legible_on(yellow, ground, 4.5);
+    CHECK((y.r == yellow.r && y.g == yellow.g && y.b == yellow.b));
+    // A dark blue gets lighter, still bluish, and reaches the contrast.
+    const assets::Rgba blue{0, 0, 241, 255};
+    const assets::Rgba b = ui::legible_on(blue, ground, 4.5);
+    CHECK(ui::contrast(blue, ground) < 4.5);
+    CHECK(ui::contrast(b, ground) >= 4.5);
+    CHECK(b.b > b.r);
+    CHECK(b.r == b.g);
+    CHECK(b.r < 200);  // not washed out to white
+}
+
+TEST_CASE("ui: a form's chat line: the speaker's name in its ink, the rest behind it, cut as one") {
+    ui::Form form;
+    form.set_scale(2.0);
+    form.speech(ui::Rect{10, 10, 300, 30}, "Anna", 150, ": Hallo", ui::Form::Tone::Heading);
+    auto items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Anna");
+    CHECK(items[0].ink == 150);
+    CHECK(items[0].colour == ui::FormStyle{}.heading);
+    CHECK(items[1].text == ": Hallo");
+    CHECK(items[1].ink == -1);
+    CHECK(items[1].colour == ui::FormStyle{}.heading);
+    CHECK(items[1].x == items[0].x + 4 * 9 * 2);  // 9 units a byte without a font, at scale 2
+    // Too long: cut at the end, the name whole.
+    form.clear();
+    form.speech(ui::Rect{10, 10, 100, 30}, "Anna", 150, ": " + std::string(40, 'x'));
+    items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Anna");
+    CHECK(items[1].text.ends_with("..."));
+    // A box too narrow for the name: all of what is left in the name's ink.
+    form.clear();
+    form.speech(ui::Rect{10, 10, 60, 30}, "Annabella", 150, ": Hallo");
+    items = form.draw({nullptr, nullptr, nullptr});
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text.ends_with("..."));
+    CHECK(items[0].ink == 150);
+}
+
 TEST_CASE("ui: a form's cycle buttons take the right button, its other widgets only the left one") {
     using ui::MouseButton;
     ui::Form form;

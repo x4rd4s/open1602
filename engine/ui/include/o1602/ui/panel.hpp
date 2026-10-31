@@ -87,6 +87,9 @@ struct DrawItem {
     std::int32_t block = 0;
     std::int32_t gfx = 0;
     std::int32_t colour = 0;
+    /// Text: the letters in this palette colour instead of the text colour's (a player's name in
+    /// their banner's colour; the shadow stays the text colour's); -1: the text colour's.
+    std::int32_t ink = -1;
     Align align = Align::Left;
     bool half = false;   ///< drawn as a 50 % checkerboard (Alphaflg)
     bool faded = false;  ///< sprite, mask or fill on the screen's even pixels only (0x004073C0)

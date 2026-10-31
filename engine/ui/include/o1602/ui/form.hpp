@@ -66,6 +66,9 @@ public:
     void swatch(Rect r, std::uint8_t colour);
     /// Text in the box, cut to its width; vertically centred.
     void label(Rect r, std::string text, Align align = Align::Left, Tone tone = Tone::Normal);
+    /// A line of a chat, left aligned and cut to the box as one text: the speaker's name in palette
+    /// colour `ink` (their banner's colour), what follows it (": Hallo") in the tone.
+    void speech(Rect r, std::string speaker, std::uint8_t ink, std::string text, Tone tone = Tone::Normal);
     /// A label on the left and its value on the right of one box, as a list of settings shown
     /// only: the value gets the room it needs, the label what is left.
     void entry(Rect r, std::string label, std::string value, Tone label_tone = Tone::Normal,
@@ -115,18 +118,30 @@ public:
 
     /// The widgets' boxes and texts as laid out, for tests and the owner.
     struct Widget {
-        enum class Kind : std::uint8_t { Panel, Swatch, Label, Entry, Paragraph, Button, Field, Check, Row, Slider };
+        enum class Kind : std::uint8_t {
+            Panel,
+            Swatch,
+            Label,
+            Speech,
+            Entry,
+            Paragraph,
+            Button,
+            Field,
+            Check,
+            Row,
+            Slider
+        };
         Kind kind = Kind::Label;
         Id id = 0;
         Rect rect;
         std::string text;
-        std::string value;  ///< entry: the text on the right
+        std::string value;  ///< entry: the text on the right; speech: what follows the name
         Align align = Align::Left;
         Tone tone = Tone::Normal;
         Tone value_tone = Tone::Normal;  ///< entry
-        std::uint8_t colour = 0;
-        std::int32_t line = 0;  ///< paragraph: line height
-        double position = 0.0;  ///< slider: where the knob is (0..1)
+        std::uint8_t colour = 0;         ///< swatch: its colour; speech: the name's
+        std::int32_t line = 0;           ///< paragraph: line height
+        double position = 0.0;           ///< slider: where the knob is (0..1)
         bool enabled = true;
         bool on = false;      ///< selected, checked, secret
         bool cycles = false;  ///< button: the right button chooses the previous value

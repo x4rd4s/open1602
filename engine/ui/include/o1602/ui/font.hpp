@@ -44,8 +44,16 @@ inline constexpr std::int32_t kTextBrightRed = 15;
 /// Nearest palette colour by squared RGB distance, the first of equals (0x004031B0).
 [[nodiscard]] std::uint8_t nearest_colour(const assets::Palette& palette, std::uint8_t r, std::uint8_t g,
                                           std::uint8_t b) noexcept;
+/// The contrast of two colours (WCAG): 1 for equal ones up to 21 for black and white.
+[[nodiscard]] double contrast(const assets::Rgba& a, const assets::Rgba& b) noexcept;
+/// `colour` as text on `ground`: itself where it reaches `min_contrast`, else mixed with white just
+/// enough to reach it (a dark blue becomes a lighter one of the same hue).
+[[nodiscard]] assets::Rgba legible_on(const assets::Rgba& colour, const assets::Rgba& ground,
+                                      double min_contrast) noexcept;
 /// The recolouring of text colour `index` (out of range: 0) for a palette.
 [[nodiscard]] Recolour text_recolour(const assets::Palette& palette, std::size_t index);
+/// The same with the letters in palette colour `body` (a player's banner colour), the shadow kept.
+[[nodiscard]] Recolour text_recolour(const assets::Palette& palette, std::size_t index, std::uint8_t body);
 
 class Font {
 public:

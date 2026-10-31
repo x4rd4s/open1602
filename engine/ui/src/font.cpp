@@ -2,6 +2,7 @@
 #include "o1602/ui/font.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <utility>
 
@@ -74,6 +75,38 @@ std::uint8_t nearest_colour(const assets::Palette& palette, std::uint8_t r, std:
     return best;
 }
 
+namespace {
+
+double luminance(const assets::Rgba& c) noexcept {
+    const auto channel = [](std::uint8_t v) {
+        const double x = v / 255.0;
+        return x <= 0.04045 ? x / 12.92 : std::pow((x + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
+}
+
+}  // namespace
+
+double contrast(const assets::Rgba& a, const assets::Rgba& b) noexcept {
+    const double la = luminance(a);
+    const double lb = luminance(b);
+    return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
+}
+
+assets::Rgba legible_on(const assets::Rgba& colour, const assets::Rgba& ground, double min_contrast) noexcept {
+    // A twentieth of the way to white at a time: few steps, and no more lightening than needed.
+    for (int step = 0; step <= 20; ++step) {
+        const auto mix = [step](std::uint8_t v) {
+            return static_cast<std::uint8_t>(std::lround(v + (255.0 - v) * step / 20.0));
+        };
+        const assets::Rgba c{mix(colour.r), mix(colour.g), mix(colour.b), colour.a};
+        if (contrast(c, ground) >= min_contrast) {
+            return c;
+        }
+    }
+    return assets::Rgba{255, 255, 255, colour.a};
+}
+
 Recolour text_recolour(const assets::Palette& palette, std::size_t index) {
     Recolour r{};
     for (std::size_t i = 0; i < r.size(); ++i) {
@@ -82,6 +115,12 @@ Recolour text_recolour(const assets::Palette& palette, std::size_t index) {
     const TextColour& c = text_colour(index);
     r[kBody] = nearest_colour(palette, c.body[0], c.body[1], c.body[2]);
     r[kShadow] = nearest_colour(palette, c.shadow[0], c.shadow[1], c.shadow[2]);
+    return r;
+}
+
+Recolour text_recolour(const assets::Palette& palette, std::size_t index, std::uint8_t body) {
+    Recolour r = text_recolour(palette, index);
+    r[kBody] = body;
     return r;
 }
 
