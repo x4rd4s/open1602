@@ -14,6 +14,7 @@
 
 #include "ai_engine.hpp"
 
+#include "o1602/sim/balance.hpp"
 #include "o1602/sim/houses.hpp"
 
 namespace o1602::sim::ai {
@@ -185,7 +186,8 @@ inline std::uint8_t first_crop(PlayerId player) {
     }
 }
 
-/// The original's cheats: money and goods the computers get on every difficulty.
+/// The original's cheats: money and goods the computers get on every difficulty. The defaults are
+/// the original's; a game takes them from its balance (`cheats_of`, balance.toml's [computers]).
 struct Cheats {
     std::int32_t steady_below = 3791;   ///< task 5: money below this ...
     std::int32_t steady_money = 379;    ///< ... gets this much
@@ -205,7 +207,32 @@ struct Cheats {
     std::uint32_t food_below = 19, food = 9;
     std::uint32_t bricks_below = 19, bricks = 9;
 };
-inline constexpr Cheats kCheats{};
+
+/// The cheats of a game's balance.
+inline Cheats cheats_of(const Balance& b) {
+    const auto money = [](std::uint32_t v) { return static_cast<std::int32_t>(v); };  // at most 10^6
+    Cheats c;
+    c.steady_below = money(b.ai_steady_below);
+    c.steady_money = money(b.ai_steady_money);
+    c.founding_below = money(b.ai_founding_below);
+    c.founding_money = money(b.ai_founding_money);
+    c.founding_bricks = b.ai_founding_bricks;
+    c.subsidy_poor_below = money(b.ai_subsidy_poor_below);
+    c.subsidy_poor = money(b.ai_subsidy_poor_money);
+    c.subsidy_below = money(b.ai_subsidy_below);
+    c.subsidy = money(b.ai_subsidy_money);
+    c.subsidy_wood = b.ai_subsidy_wood;
+    c.subsidy_tools = b.ai_subsidy_tools;
+    c.wood_below = b.ai_colony_wood_below;
+    c.wood = b.ai_colony_wood;
+    c.tools_below = b.ai_colony_tools_below;
+    c.tools = b.ai_colony_tools;
+    c.food_below = b.ai_colony_food_below;
+    c.food = b.ai_colony_food;
+    c.bricks_below = b.ai_colony_bricks_below;
+    c.bricks = b.ai_colony_bricks;
+    return c;
+}
 
 /// Raw materials the subsidy tops up (one ton per step below three) in cities of 50 settlers
 /// with more than three of their producers.

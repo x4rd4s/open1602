@@ -137,6 +137,48 @@ TEST_CASE("balance: a game keeps its values in the savegame, a damaged value loa
     CHECK(!sim::read_game(*damaged, buildings).ok());
 }
 
+TEST_CASE("balance: the computers' cheats are values of [computers], saved in BALA version 2 when changed") {
+    sim::Balance balance;
+    CHECK(balance.ai_steady_below == 3791);
+    CHECK(balance.ai_steady_money == 379);
+    CHECK(balance.ai_founding_bricks == 8);
+    CHECK(balance.ai_colony_bricks == 9);
+    CHECK(sim::balance_version(balance) == 1);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "fair",
+                            "# Computers without gifts.\n"
+                            "[computers]\n"
+                            "steady_money = 0\n"
+                            "founding_bricks = 0\n"
+                            "subsidy_money = 2000000\n",
+                            warnings);
+    CHECK(balance.ai_steady_money == 0);
+    CHECK(balance.ai_founding_bricks == 0);
+    CHECK(balance.ai_subsidy_money == 1793);
+    REQUIRE(warnings.size() == 1);
+    CHECK(warnings[0] == "fair/balance.toml line 5: 'subsidy_money' must be a number from 0 to 100000");
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithComputers);
+
+    // Saved and loaded again, as are values of version 1 alone (written as version 1, which an
+    // Open1602 before the computers' values reads).
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+    sim::Balance old;
+    old.fire_spread = 3;
+    world.set_balance(old);
+    auto old_bytes = sim::write_game(world, buildings);
+    REQUIRE(old_bytes.ok());
+    auto old_loaded = sim::read_game(*old_bytes, buildings);
+    REQUIRE(old_loaded.ok());
+    CHECK(old_loaded->balance() == old);
+}
+
 TEST_CASE("balance: a package changes values of the original's buildings") {
     sim::Balance balance;
     std::vector<std::string> warnings;
