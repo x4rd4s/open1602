@@ -129,8 +129,9 @@ struct Computer {
 
     Computer(net::LoopbackNetwork& network, std::string name, std::uint64_t token = 0, std::uint64_t content = kContent,
              net::SessionConfig config = {}, std::string password = {},
-             std::vector<assets::ContentPackage> packages = {}, bool fetch_packages = false) {
+             std::vector<assets::ContentPackage> packages = {}, bool fetch_packages = false, std::uint64_t player = 0) {
         net::Hello hello;
+        hello.player = player;
         hello.content = content;
         hello.packages = std::move(packages);
         hello.fetch_packages = fetch_packages;
@@ -142,6 +143,13 @@ struct Computer {
         session = std::make_unique<net::ClientSession>(
             std::move(link), hello, [this](std::span<const std::uint8_t> save) { return game.load(save); }, config);
     }
+
+    /// A person with the player ID of their installation (net::Hello::player).
+    struct Person {
+        std::uint64_t player = 0;
+    };
+    Computer(net::LoopbackNetwork& network, std::string name, Person person, std::uint64_t token = 0)
+        : Computer(network, std::move(name), token, kContent, {}, {}, {}, false, person.player) {}
 
     void update(std::uint32_t ms, const sim::Simulation::BeforeTick& before = {}) {
         session->update(ms, before);
@@ -704,6 +712,127 @@ TEST_CASE("net: the computer plays on for someone who left, until he is back") {
     CHECK(b->game.world->players()[2].role == sim::PlayerRole::Human);
     CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
     CHECK(host.session->fingerprints_matched() == host.session->fingerprints_compared());
+}
+
+TEST_CASE("net: a person comes back into the slot they played by their player ID, without the token") {
+    net::LoopbackNetwork network(25, 10);
+    net::SessionConfig config;
+    config.take_over_ms = 1000;
+    config.player = 1;
+    Host host(network, config, Game::fresh(4));  // four human slots
+    Computer a(network, "Anna", Computer::Person{11});
+    run_for(network, host, {&a}, 2000);
+    auto b = std::make_unique<Computer>(network, "Bernd", Computer::Person{22});
+    run_for(network, host, {&a, b.get()}, 2000);
+    REQUIRE(b->session->playing());
+    REQUIRE(b->session->local_seat() == 2);
+    // Every computer's game knows who plays which slot, the host's own too.
+    for (const Game* g : {&host.game, &a.game, &b->game}) {
+        CHECK(g->world->players()[0].owner == net::player_verifier(1));
+        CHECK(g->world->players()[1].owner == net::player_verifier(11));
+        CHECK(g->world->players()[2].owner == net::player_verifier(22));
+        CHECK(g->world->players()[3].owner == 0);
+    }
+    CHECK(host.game.world->players().size() == 5);
+
+    // Bernd's program ends (no token any more); the computer plays his slot after a while.
+    network.cut(*b->transport);
+    run_for(network, host, {&a, b.get()}, 3000);
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Computer);
+    CHECK(host.game.world->players()[2].owner == net::player_verifier(22));
+
+    // Someone new gets the slot nobody played, not Bernd's.
+    Computer c(network, "Clara", Computer::Person{33});
+    run_for(network, host, {&a, &c}, 2000);
+    REQUIRE(c.session->playing());
+    CHECK(c.session->local_seat() == 3);
+
+    // Bernd starts again and joins without a token: his slot and his colour again.
+    b = std::make_unique<Computer>(network, "Bernd", Computer::Person{22});
+    run_for(network, host, {&a, b.get(), &c}, 2000);
+    REQUIRE(b->session->playing());
+    CHECK(b->session->local_seat() == 2);
+    CHECK(host.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(a.game.world->players()[2].role == sim::PlayerRole::Human);
+    CHECK(host.count(net::SessionEvent::Kind::Desync) == 0);
+    CHECK(host.session->fingerprints_matched() == host.session->fingerprints_compared());
+}
+
+TEST_CASE("net: another person's slot only when no other is free") {
+    net::LoopbackNetwork network(5, 0);
+    net::SessionConfig config;
+    config.take_over_ms = 500;
+    Host host(network, config, Game::fresh(4));
+    Computer a(network, "Anna", Computer::Person{11});
+    auto b = std::make_unique<Computer>(network, "Bernd", Computer::Person{22});
+    run_for(network, host, {&a, b.get()}, 2000);
+    REQUIRE(b->session->local_seat() == 2);
+    network.cut(*b->transport);
+    run_for(network, host, {&a, b.get()}, 2000);
+
+    // Two newcomers: the slot nobody played first, then Bernd's, as there is no other.
+    Computer c(network, "Clara", Computer::Person{33});
+    run_for(network, host, {&a, &c}, 1500);
+    CHECK(c.session->local_seat() == 3);
+    Computer d(network, "Dora", Computer::Person{44});
+    run_for(network, host, {&a, &c, &d}, 1500);
+    REQUIRE(d.session->playing());
+    CHECK(d.session->local_seat() == 2);
+    run_for(network, host, {&a, &c, &d}, 500);
+    CHECK(host.game.world->players()[2].owner == net::player_verifier(44));  // Dora's now
+}
+
+TEST_CASE("net: a person sent away has no claim to the slot they played") {
+    net::LoopbackNetwork network(5, 0);
+    Host host(network, {}, Game::fresh(4));
+    Computer a(network, "Anna", Computer::Person{11});
+    auto d = std::make_unique<Computer>(network, "Dora", Computer::Person{44});
+    run_for(network, host, {&a, d.get()}, 2000);
+    REQUIRE(d->session->local_seat() == 2);
+    host.session->kick(2);
+    run_for(network, host, {&a, d.get()}, 2000);
+    CHECK(d->session->ended());
+    // Back with her ID, she comes in like anyone new: the free slot nobody played, not hers.
+    d = std::make_unique<Computer>(network, "Dora", Computer::Person{44});
+    run_for(network, host, {&a, d.get()}, 2000);
+    REQUIRE(d->session->playing());
+    CHECK(d->session->local_seat() == 3);
+}
+
+TEST_CASE("net: in the lobby of a savegame, each person finds the slot they played") {
+    net::LoopbackNetwork network(5, 0);
+    net::Lobby lobby;
+    lobby.seats = {net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 0, net::player_verifier(1)},
+                   net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 1, net::player_verifier(22)},
+                   net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 2, 0},
+                   net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 3, net::player_verifier(11)}};
+    net::SessionConfig config;
+    config.player = 1;
+    net::HostSession host(network.listen(), lobby, 0, "Gastgeber", kContent, config);
+    // A newcomer first: the slot nobody played, not Anna's or Bernd's.
+    Computer c(network, "Clara", Computer::Person{33});
+    Computer a(network, "Anna", Computer::Person{11});
+    Computer b(network, "Bernd", Computer::Person{22});
+    for (int i = 0; i < 100; ++i) {
+        network.advance(kStepMs);
+        host.update(kStepMs);
+        c.update(kStepMs);
+        if (i > 20) {
+            a.update(kStepMs);
+            b.update(kStepMs);
+        }
+    }
+    CHECK(c.session->local_seat() == 2);
+    CHECK(a.session->local_seat() == 3);
+    CHECK(b.session->local_seat() == 1);
+}
+
+TEST_CASE("net: the player ID's verifier gives the ID not away") {
+    CHECK(net::player_verifier(0) == 0);
+    CHECK(net::player_verifier(5) != 0);
+    CHECK(net::player_verifier(5) != 5);
+    CHECK(net::player_verifier(5) == net::player_verifier(5));
+    CHECK(net::player_verifier(5) != net::player_verifier(6));
 }
 
 TEST_CASE("net: without the setting, the slot of someone who left gives no orders") {

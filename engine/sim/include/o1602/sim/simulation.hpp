@@ -103,6 +103,8 @@ struct PlayerRename {
 struct PlayerControl {
     PlayerId player = kNoPlayer;
     bool computer = false;
+    /// The person who takes the slot (Player::owner); 0 keeps the slot's owner as it is.
+    std::uint64_t owner = 0;
 };
 
 /// Closes or opens all the gates of a player's cities (Player::gates_closed). Closed, they let only

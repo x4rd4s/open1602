@@ -83,6 +83,20 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    on by default, shown in the lobby and passed to a successor host); without it, a slot that was
    left gives no commands until someone comes back. The player's name is set as a `PlayerRename`
    of that player.
+   **Player IDs** (protocol version 24). The token lives only as long as the program; to know a
+   person again after a restart, each installation draws a random 64-bit player ID once and keeps
+   it in `settings.cfg` (`player_id`). `Hello` carries it, and the host passes a one-way verifier of
+   it, the first 8 bytes of SHA-256 of "open1602 player" and the ID, into the game with the
+   `PlayerControl` that gives a person a slot (and for every human slot when the game starts,
+   the host's own included): `Player::owner`, saved with the game (`PSTA` version 4), the same on
+   every computer and so also known to a successor host. A computer without a token gets the
+   slot whose owner is its person, if nobody plays it, also when newcomers may not join the
+   running game; a newcomer gets a slot of another person only when no other slot is free (and
+   then owns it). A person kicked in the session has no such claim. When a savegame is hosted,
+   the lobby knows each slot's owner (`LobbySeat::owner`, not sent): the host takes its own slot,
+   and each person who comes in finds theirs; computer players a person played before are open
+   for them. Loaded alone (no session), a game gives the person the human player they own, else
+   the first, and the computer plays the other human players (`sim::take_single_player`).
 9. **Same data.** When a computer joins, the host checks the protocol version (from the first three
    bytes of `Hello`, which never change, so that any other version is told so) and a fingerprint of the
    game data the simulation depends on (`haeuser.cod`, `figuren.cod`), and the game's password if it

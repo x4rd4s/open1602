@@ -26,7 +26,7 @@ namespace o1602::net {
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
-inline constexpr std::uint16_t kProtocolVersion = 23;
+inline constexpr std::uint16_t kProtocolVersion = 24;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -90,6 +90,10 @@ struct Hello {
     /// The person agreed to download the packages it lacks (Refused::share_bytes): the host sends
     /// them (PackageFiles) before it takes the computer in.
     bool fetch_packages = false;
+    /// The player ID of the installation (random, kept in its settings; 0: none). The host gives
+    /// the person the slot they played before in this game (Player::owner, player_verifier()),
+    /// even after a restart of the program or a change of host.
+    std::uint64_t player = 0;
 };
 
 /// Commands of the computer's player, in the order given; the host puts them into the next frame
@@ -219,6 +223,9 @@ struct LobbySeat {
     /// The banner the slot's player gets (colour, flag, coat of arms). It stays with the slot when
     /// players come and go; no two slots of a lobby with Lobby::banners share one.
     sim::BannerId banner = 0;
+    /// (Host only, not sent) Who played the slot in the savegame of the lobby (Player::owner): that
+    /// person comes back into it, others take it only if no other slot is free.
+    std::uint64_t owner = 0;
     friend bool operator==(const LobbySeat&, const LobbySeat&) = default;
 };
 
@@ -293,6 +300,11 @@ struct SeatToken {
 /// What a token is checked against after the host changed: the first 8 bytes of
 /// SHA-256(salt, token), both little endian. One way: the verifier does not give the token away.
 [[nodiscard]] std::uint64_t token_verifier(std::uint64_t token, std::uint64_t salt) noexcept;
+
+/// What a game keeps of the person who played a slot (sim::Player::owner): the first 8 bytes of
+/// SHA-256 of "open1602 player" and the player ID (Hello::player). One way: the savegame, which every
+/// computer of the game gets, does not give the ID away. 0 for no ID (and never for one).
+[[nodiscard]] std::uint64_t player_verifier(std::uint64_t player) noexcept;
 
 /// (Host, to its successor only) What the successor needs to carry the game on when the host leaves:
 /// the slots' token verifiers, so that the others get their slots back, and the slots the computer

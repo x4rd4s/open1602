@@ -132,6 +132,10 @@ struct Player {
     /// The player closed the gates of his cities (GateOrder): foreign soldiers cannot pass them.
     /// The original's gates have no state; any soldier walks through their middle.
     bool gates_closed = false;
+    /// The person who played this slot last: a verifier of the player ID of their installation
+    /// (net::player_verifier), so that they get the slot back when they join again or load the
+    /// game alone. 0: nobody known (a computer player, or a game from before).
+    std::uint64_t owner = 0;
 
     [[nodiscard]] bool active() const noexcept { return status == PlayerStatus::Playing; }
 

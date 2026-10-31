@@ -283,6 +283,7 @@ void io(A& a, T& t)
 {
     a(t.player);
     a(t.computer);
+    a(t.owner);
 }
 
 template <class A, class T>
@@ -315,6 +316,7 @@ public:
     void operator()(const std::uint8_t& v) { m_out.u8(v); }
     void operator()(const std::uint16_t& v) { m_out.u16(v); }
     void operator()(const std::uint32_t& v) { m_out.u32(v); }
+    void operator()(const std::uint64_t& v) { m_out.u64(v); }
     void operator()(const std::int16_t& v) { m_out.u16(static_cast<std::uint16_t>(v)); }
     void operator()(const std::int32_t& v) { m_out.i32(v); }
     void operator()(const std::string& v) { m_out.string(v); }
@@ -369,6 +371,7 @@ public:
     void operator()(std::uint8_t& v) { v = m_state.u8(); }
     void operator()(std::uint16_t& v) { v = m_state.u16(); }
     void operator()(std::uint32_t& v) { v = m_state.u32(); }
+    void operator()(std::uint64_t& v) { v = m_state.u64(); }
     void operator()(std::int16_t& v) { v = static_cast<std::int16_t>(m_state.u16()); }
     void operator()(std::int32_t& v) { v = m_state.i32(); }
     void operator()(std::string& v) {

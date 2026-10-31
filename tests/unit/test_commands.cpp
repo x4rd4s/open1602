@@ -80,7 +80,7 @@ std::vector<sim::Command> every_kind() {
     all.emplace_back(rename_ship);
     all.emplace_back(sim::GameSpeedOrder{1, sim::GameSpeedOrder::Op::SetSpeed, 4});
     all.emplace_back(sim::PlayerRename{1, "Merlin"});
-    all.emplace_back(sim::PlayerControl{1, true});
+    all.emplace_back(sim::PlayerControl{1, true, 0xFEDC'BA98'7654'3210ULL});
     all.emplace_back(sim::GateOrder{1, true});
     all.emplace_back(sim::CartRequest{1, 2, 3, 40, 50, 41, 52});
     return all;
@@ -146,6 +146,7 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     const auto control = std::get<sim::PlayerControl>(*sim::decode_command(sim::encode_command(all[all.size() - 3])));
     CHECK(control.player == 1);
     CHECK(control.computer);
+    CHECK(control.owner == 0xFEDC'BA98'7654'3210ULL);
     const auto cart = std::get<sim::CartRequest>(*sim::decode_command(sim::encode_command(all.back())));
     CHECK(cart.island == 2);
     CHECK(cart.city == 3);
@@ -344,16 +345,57 @@ TEST_CASE("commands: a slot changes hands between the computer and a person") {
     g.simulation.schedule(1, sim::PlayerControl{1, false});
     g.simulation.tick();
     CHECK(g.world.players()[1].role == sim::PlayerRole::Human);
+    CHECK(g.world.players()[1].owner == 0);
+    (void)g.simulation.take_command_results();
+
+    // The game keeps who took the slot; the computer taking over leaves it.
+    g.simulation.schedule(2, sim::PlayerControl{1, false, 42});
+    g.simulation.tick();
+    CHECK(g.world.players()[1].owner == 42);
+    g.simulation.schedule(3, sim::PlayerControl{1, true});
+    g.simulation.tick();
+    CHECK(g.world.players()[1].role == sim::PlayerRole::Computer);
+    CHECK(g.world.players()[1].owner == 42);
+    g.simulation.schedule(4, sim::PlayerControl{1, false, 43});
+    g.simulation.tick();
+    CHECK(g.world.players()[1].owner == 43);
     (void)g.simulation.take_command_results();
 
     // Nobody steers a slot that is out of the game.
     g.world.player(0)->status = sim::PlayerStatus::Absent;
-    g.simulation.schedule(2, sim::PlayerControl{0, true});
+    g.simulation.schedule(5, sim::PlayerControl{0, true});
     g.simulation.tick();
     CHECK(g.world.players()[0].role == sim::PlayerRole::Human);
     const auto results = g.simulation.take_command_results();
     REQUIRE(results.size() == 1);
     CHECK(!results[0].accepted);
+}
+
+TEST_CASE("players: alone, a person plays the human player they played before") {
+    Game g;  // two human players
+    g.world.player(1)->owner = 77;
+    CHECK(sim::take_single_player(g.world, 77) == 1);
+    CHECK(g.world.players()[1].role == sim::PlayerRole::Human);
+    CHECK(g.world.players()[0].role == sim::PlayerRole::Computer);  // the computer plays the other
+    CHECK(sim::first_human_player(g.world) == 1);
+
+    // Someone the game does not know: the first human player, which is theirs from now on.
+    Game other;
+    other.world.player(1)->owner = 77;
+    CHECK(sim::take_single_player(other.world, 88) == 0);
+    CHECK(other.world.players()[0].owner == 88);
+    CHECK(other.world.players()[1].role == sim::PlayerRole::Computer);
+    CHECK(other.world.players()[1].owner == 77);  // kept for that person
+
+    // Without an ID nothing is given; a world without people stays as it is.
+    Game none;
+    CHECK(sim::take_single_player(none.world, 0) == 0);
+    CHECK(none.world.players()[0].owner == 0);
+    for (std::size_t p = 0; p < none.world.players().size(); ++p) {
+        none.world.player(static_cast<sim::PlayerId>(p))->role = sim::PlayerRole::Computer;
+    }
+    CHECK(sim::take_single_player(none.world, 5) == sim::kNoPlayer);
+    CHECK(none.world.players()[0].owner == 0);
 }
 
 TEST_CASE("commands: a player closes and opens his city gates") {

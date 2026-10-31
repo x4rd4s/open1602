@@ -111,6 +111,9 @@ struct SessionConfig {
     std::uint32_t max_resyncs = 2;
     /// (Host) Computers must give it to come in; empty: anyone may.
     std::string password;
+    /// (Host, also after a host migration) The player ID of this computer's person (Hello::player):
+    /// the game keeps who plays the host's slot (sim::Player::owner) as it does for the others.
+    std::uint64_t player = 0;
     /// Chat lines one computer may send per second; more are dropped.
     std::uint32_t max_chat_per_second = 5;
     /// (Host, also after a host migration) Spectators may write in the chat, to everyone; without,
@@ -418,6 +421,8 @@ private:
     void forget_token(Seat seat);
     /// A kicked computer's address: no newcomer from there for the rest of the session (MS-12).
     void ban(const std::string& address);
+    /// A kicked person: not back into their slot by their player ID (seat_of_owner).
+    void ban_owner(std::uint64_t owner);
     /// Keeps a person's slot from newcomers for `ms`, for its player to come back with the token.
     void reserve(Seat seat, std::uint32_t ms);
     [[nodiscard]] bool reserved(Seat seat) const;
@@ -426,7 +431,13 @@ private:
     /// Tells the successor what it needs to carry the game on, if that changed (Standby).
     void hand_over();
     [[nodiscard]] Peer* peer_of(LinkId link);
-    [[nodiscard]] Seat free_seat(Seat wanted) const;
+    /// A slot for a computer that comes in: `wanted` if it is free, else the first free one,
+    /// leaving those of other people (owner_of) to them while another is free.
+    [[nodiscard]] Seat free_seat(Seat wanted, std::uint64_t owner = 0) const;
+    /// The person who played a slot (sim::Player::owner; in the lobby, the savegame's).
+    [[nodiscard]] std::uint64_t owner_of(Seat seat) const;
+    /// The free slot the person `owner` played before, kNoPlayer if none.
+    [[nodiscard]] Seat seat_of_owner(std::uint64_t owner) const;
     [[nodiscard]] bool seat_taken(Seat seat) const;
     /// A person's slot was left: the computer takes it over after a while (m_vacant).
     void vacate(Seat seat);
@@ -496,6 +507,7 @@ private:
     std::uint64_t m_matched = 0;
     std::vector<LinkId> m_roster_links;    ///< the link of each roster() entry (unused for the host's own)
     std::vector<std::string> m_banned;     ///< addresses of computers kicked: not taken in again (MS-12)
+    std::vector<std::uint64_t> m_kicked;   ///< owners of slots kicked: not back into them by their ID
     std::optional<LinkId> m_standby_link;  ///< the successor, as last told
     Standby m_standby;                     ///< what it was told
     bool m_standby_changed = true;

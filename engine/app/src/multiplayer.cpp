@@ -63,6 +63,7 @@ core::Status MapViewer::start_multiplayer() {
         }
         net::SessionConfig config;
         config.pack_wait_ms = kPackWaitMs;
+        config.player = m_app_settings.player_id;
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_state->simulation, m_buildings,
                                                        m_local_player, name, content_fingerprint(), config);
         host_session()->share_packages(shared_packages());
@@ -606,10 +607,14 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
         }
         for (std::size_t s = 0; s < count; ++s) {
             net::LobbySeat seat;
-            seat.kind = !playable(s)                                   ? net::LobbySeat::Kind::Reserved
-                        : players[s].role == sim::PlayerRole::Computer ? net::LobbySeat::Kind::Computer
-                                                                       : net::LobbySeat::Kind::Open;
+            // A computer player that a person played before (who left, or a game played on alone)
+            // is open for that person again.
+            const bool computer = players[s].role == sim::PlayerRole::Computer && players[s].owner == 0;
+            seat.kind = !playable(s) ? net::LobbySeat::Kind::Reserved
+                        : computer   ? net::LobbySeat::Kind::Computer
+                                     : net::LobbySeat::Kind::Open;
             seat.banner = players[s].banner;
+            seat.owner = players[s].owner;
             lobby.seats.push_back(std::move(seat));
         }
         if (lobby.seats.empty()) {
@@ -630,15 +635,28 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
         lobby.setup = lobby_setup(setup.game_settings(), setup.scope());
     }
     // The host plays the first open slot (the first slot if all are computers), unless it only hosts.
+    // A savegame's host plays the slot it played before, if the game knows it.
     sim::PlayerId seat = sim::kNoPlayer;
     if (!setup.dedicated) {
-        const auto open = std::find_if(lobby.seats.begin(), lobby.seats.end(),
-                                       [](const net::LobbySeat& s) { return s.kind == net::LobbySeat::Kind::Open; });
+        const std::uint64_t own = net::player_verifier(m_app_settings.player_id);
+        auto open = std::find_if(lobby.seats.begin(), lobby.seats.end(), [own](const net::LobbySeat& s) {
+            return s.kind == net::LobbySeat::Kind::Open && own != 0 && s.owner == own;
+        });
+        if (open == lobby.seats.end()) {
+            open = std::find_if(lobby.seats.begin(), lobby.seats.end(), [](const net::LobbySeat& s) {
+                return s.kind == net::LobbySeat::Kind::Open && s.owner == 0;
+            });
+        }
+        if (open == lobby.seats.end()) {
+            open = std::find_if(lobby.seats.begin(), lobby.seats.end(),
+                                [](const net::LobbySeat& s) { return s.kind == net::LobbySeat::Kind::Open; });
+        }
         seat = static_cast<sim::PlayerId>(open != lobby.seats.end() ? open - lobby.seats.begin() : 0);
     }
     net::SessionConfig config;
     config.pack_wait_ms = kPackWaitMs;
     config.password = setup.password;
+    config.player = m_app_settings.player_id;
     config.join_running = setup.join_running;
     config.spectators = setup.spectators;
     config.spectators_chat = setup.spectators_chat;
@@ -831,6 +849,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     }
     hello.name = name.empty() ? ui::tr("menu.default_name") : name;
     hello.password = password;
+    hello.player = m_app_settings.player_id;  // the host knows the slot this person played before
     if (m_rejoin && m_rejoin->address == address && m_rejoin->port == port) {
         // Back to the host this computer played at: its own slot, not the next free one (MS-4).
         hello.seat = m_rejoin->seat;
@@ -839,6 +858,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     m_local_player = sim::kNoPlayer;  // until the host sends the game
     net::SessionConfig config;
     config.pack_wait_ms = kPackWaitMs;  // for when this computer hosts next
+    config.player = m_app_settings.player_id;
     auto client = std::make_unique<net::ClientSession>(
         std::move(transport).value(), hello,
         [this](std::span<const std::uint8_t> save) { return load_from_host(save); }, config);
