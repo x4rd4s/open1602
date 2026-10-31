@@ -245,6 +245,11 @@ int cmd_new_world(const Args& args) {
                   : it->second == "large" ? sim::WorldSettings::Sizes::Large
                                           : sim::WorldSettings::Sizes::Mixed;
     }
+    if (const auto it = args.options.find("--island-shapes"); it != args.options.end()) {
+        w.shapes = it->second == "own"     ? sim::WorldSettings::Shapes::Own
+                   : it->second == "mixed" ? sim::WorldSettings::Shapes::Mixed
+                                           : sim::WorldSettings::Shapes::Templates;
+    }
     if (const auto gold = args.number("--gold-islands")) {
         w.gold_islands = static_cast<std::uint8_t>(std::min<std::size_t>(*gold, sim::WorldSettings::kMaxGoldIslands));
     }

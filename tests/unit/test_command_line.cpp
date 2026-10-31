@@ -82,8 +82,15 @@ TEST_CASE("command line: a new game with its own world, and the player's name") 
     CHECK(c->options.multiplayer->role == app::ViewerOptions::Multiplayer::Role::Host);
     CHECK(c->options.multiplayer->port == 2700);
     CHECK(c->options.multiplayer->name == "J\xfcrgen");
+    CHECK(c->new_game->custom->shapes == sim::WorldSettings::Shapes::Templates);
     // An own world is a new game.
     CHECK(error_of({"--world", "300x400"}).find("--new-game") != std::string::npos);
+    const auto own = parse({"--new-game", "0", "--island-shapes", "own"});
+    REQUIRE(static_cast<bool>(own));
+    REQUIRE(own->new_game.has_value());
+    REQUIRE(own->new_game->custom.has_value());
+    CHECK(own->new_game->custom->shapes == sim::WorldSettings::Shapes::Own);
+    CHECK(error_of({"--new-game", "0", "--island-shapes", "round"}) == "bad value for --island-shapes: round");
 }
 
 TEST_CASE("command line: wrong values are named, not taken in part") {

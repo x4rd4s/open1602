@@ -71,7 +71,7 @@ struct GeneratedIsland {
     std::uint8_t number = 0;
     std::uint8_t climate = 0;
     std::uint8_t size = 0;
-    std::uint16_t template_number = 0;
+    std::uint16_t template_number = 0;  ///< assets::IslandHeader::kNoTemplate: a shape of its own
     bool natives = false;
     std::uint32_t fertility = 0;  ///< INSEL5 +0x5C
     std::vector<assets::IslandHeader::Deposit> deposits;

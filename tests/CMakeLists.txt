@@ -34,6 +34,7 @@ add_executable(o1602_tests
     unit/test_random.cpp
     unit/test_houses.cpp
     unit/test_island_events.cpp
+    unit/test_island_shapes.cpp
     unit/test_construction.cpp
     unit/test_build_tool.cpp
     unit/test_order_questions.cpp

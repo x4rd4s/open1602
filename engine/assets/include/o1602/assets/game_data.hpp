@@ -474,6 +474,27 @@ inline constexpr std::array<std::uint32_t, 15> kRuins{kRuin,      kRuin + 9,  kR
                                                       22123,      22124,      22210,      22240,      20823};
 /// The ripe fields the original's plans place (Endlosspiel<D><V>.szs), in their order.
 inline constexpr std::array<std::uint32_t, 6> kPlanCrops{21336, 21342, 21340, 21332, 21344, 21338};
+/// The tiles of islands of their own shape (sim/island_shapes.hpp): the variants the templates use
+/// for each tile of the coast, ground (IDWEIDE+21), the forests of north and south, and the ore
+/// mountains (big 4 x 4, small 3 x 3).
+namespace island_shape {
+inline constexpr std::array<std::uint32_t, 5> kOpenSea{21201, 21202, 21203, 21204, 21209};
+inline constexpr std::array<std::uint32_t, 5> kSurf{21214, 21215, 21216, 21217, 21218};
+inline constexpr std::array<std::uint32_t, 1> kSurfCorner{21207};
+inline constexpr std::array<std::uint32_t, 2> kSurfBay{21206, 21221};
+inline constexpr std::array<std::uint32_t, 9> kBeach{21012, 21013, 21014, 21015, 21016, 21017, 21018, 21019, 21020};
+inline constexpr std::array<std::uint32_t, 2> kOuterCorner{21051, 21052};
+inline constexpr std::array<std::uint32_t, 4> kInnerCorner{21031, 21032, 21033, 21034};
+inline constexpr std::uint32_t kGround = kMeadow;
+inline constexpr std::array<std::uint32_t, 10> kForestNorth{21304, 21306, 21308, 21310, 21312,
+                                                            21314, 21316, 21318, 21322, 21324};
+inline constexpr std::array<std::uint32_t, 10> kForestSouth{22802, 22804, 22806, 22808, 22810,
+                                                            22812, 22814, 22816, 22820, 22822};
+inline constexpr std::array<std::uint32_t, 2> kBigMountain{kBigOreMountain, 21109};
+inline constexpr std::array<std::uint32_t, 2> kSmallMountain{21103, 21107};
+inline constexpr std::uint8_t kBigMountainSize = 4;
+inline constexpr std::uint8_t kSmallMountainSize = 3;
+}  // namespace island_shape
 /// The list the original keeps after the build menu's (0x00498610), named from Text.cod
 /// [LANDSCHAFT]: the natives' and pirates' buildings and a few others.
 inline constexpr std::array<std::uint32_t, 17> kLandscape{22201, 22202, 22203, 22204, 22205, 22231, 22232, 22233, 22234,

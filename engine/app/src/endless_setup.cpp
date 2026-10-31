@@ -21,6 +21,7 @@ namespace {
 
 using Amount = sim::WorldSettings::Amount;
 using Sizes = sim::WorldSettings::Sizes;
+using Shapes = sim::WorldSettings::Shapes;
 using Starts = sim::WorldSettings::Starts;
 
 // The values the dialog offers.
@@ -144,6 +145,7 @@ constexpr std::array<std::string_view, 3> kRevealNames = {"none", "original", "a
 constexpr std::array<std::string_view, 4> kAmountNames = {"none", "few", "normal", "many"};
 constexpr std::array<std::string_view, 3> kSizeNames = {"small", "mixed", "large"};
 constexpr std::array<std::string_view, 2> kStartNames = {"spread", "together"};
+constexpr std::array<std::string_view, 3> kShapeNames = {"templates", "mixed", "own"};
 constexpr std::array<std::string_view, 4> kMonumentNames = {"none", "castle", "cathedral", "both"};
 
 template <std::size_t N>
@@ -241,7 +243,7 @@ bool operator==(const EndlessSetup& a, const EndlessSetup& b) noexcept {
     return a.rules == b.rules && a.own_world == b.own_world && a.auto_size == b.auto_size && x.width == y.width &&
            x.height == y.height && x.players == y.players && x.islands == y.islands && x.sizes == y.sizes &&
            x.natives == y.natives && x.volcanoes == y.volcanoes && x.gold_islands == y.gold_islands &&
-           x.starts == y.starts;
+           x.starts == y.starts && x.shapes == y.shapes;
 }
 
 namespace {
@@ -333,6 +335,8 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kIslandAmounts.size();
         case SetupItem::IslandSizes:
             return kSizeNames.size();
+        case SetupItem::IslandShapes:
+            return kShapeNames.size();
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
             return kAmounts.size();
@@ -452,6 +456,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return w.islands == Amount::None ? 0 : index_of(kIslandAmounts, w.islands);
         case SetupItem::IslandSizes:
             return std::min<std::size_t>(static_cast<std::size_t>(w.sizes), kSizeNames.size() - 1);
+        case SetupItem::IslandShapes:
+            return std::min<std::size_t>(static_cast<std::size_t>(w.shapes), kShapeNames.size() - 1);
         case SetupItem::Villages:
             return index_of(kAmounts, w.natives);
         case SetupItem::VolcanoIslands:
@@ -589,6 +595,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::IslandSizes:
             w.sizes = static_cast<Sizes>(choice);
             break;
+        case SetupItem::IslandShapes:
+            w.shapes = static_cast<Shapes>(std::min<std::size_t>(choice, kShapeNames.size() - 1));
+            break;
         case SetupItem::Villages:
             w.natives = kAmounts[choice];
             break;
@@ -696,6 +705,7 @@ bool setup_item_used(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::Players:
         case SetupItem::Islands:
         case SetupItem::IslandSizes:
+        case SetupItem::IslandShapes:
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
         case SetupItem::GoldIslands:
@@ -899,6 +909,7 @@ std::string setup_label(SetupItem item) {
         "setup.players",
         "setup.islands",
         "setup.island_sizes",
+        "setup.island_shapes",
         "setup.villages",
         "setup.volcano_islands",
         "setup.gold_islands",
@@ -1001,6 +1012,11 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             static constexpr std::array<std::string_view, 3> kKeys = {
                 "setup.island_sizes.small", "setup.island_sizes.mixed", "setup.island_sizes.large"};
             return ui::tr(kKeys[choice]);
+        }
+        case SetupItem::IslandShapes: {
+            static constexpr std::array<std::string_view, 3> kKeys = {
+                "setup.island_shapes.templates", "setup.island_shapes.mixed", "setup.island_shapes.own"};
+            return ui::tr(kKeys[std::min<std::size_t>(choice, kKeys.size() - 1)]);
         }
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
@@ -1305,6 +1321,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (const auto i = name_index(kSizeNames, value)) {
             w.sizes = static_cast<Sizes>(*i);
         }
+    } else if (key == "island_shapes") {
+        if (const auto i = name_index(kShapeNames, value)) {
+            w.shapes = static_cast<Shapes>(*i);
+        }
     } else if (key == "starts") {
         if (const auto i = name_index(kStartNames, value)) {
             w.starts = *i == 1 ? Starts::Together : Starts::Spread;
@@ -1353,6 +1373,8 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("players", std::to_string(w.players));
     line("islands", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.islands), kAmountNames.size() - 1)]);
     line("island_sizes", kSizeNames[std::min<std::size_t>(static_cast<std::size_t>(w.sizes), 2)]);
+    line("island_shapes",
+         kShapeNames[std::min<std::size_t>(static_cast<std::size_t>(w.shapes), kShapeNames.size() - 1)]);
     line("villages", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.natives), kAmountNames.size() - 1)]);
     line("volcano_islands",
          kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.volcanoes), kAmountNames.size() - 1)]);
