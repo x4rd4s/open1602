@@ -679,6 +679,7 @@ stats.legend_out = Abgang (t/Min)
 stats.legend_stock = Lagerbestand (t)
 stats.supply_value = {1} % (Bedarf {2} t/Min)
 stats.working = {1} von {2} arbeiten
+stats.waiting_for_room = {1} warten auf Platz im Lager
 stats.short_of_raw = {1} ohne Rohstoffe
 stats.switched_off = {1} abgeschaltet
 stats.kontor_help = {1} t/Min in den letzten {2} Min, Klick zeigt die Warenbilanz

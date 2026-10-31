@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
+#include "o1602/assets/figure_table.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::sim {
@@ -44,7 +45,23 @@ inline constexpr std::uint8_t kMinRate = 64;
 inline constexpr std::uint16_t kMaxStatisticsSeconds = 239;
 
 /// One game second of all production buildings of `world`, in list order. `events` may be null.
-void advance_production(World& world, const assets::BuildingTable& buildings, std::vector<ProductionEvent>* events);
+/// `figures` (may be null) gives the walks of farmers, hunters and fishers for the goods statistics.
+void advance_production(World& world, const assets::BuildingTable& buildings, std::vector<ProductionEvent>* events,
+                        const assets::FigureTable* figures = nullptr);
+
+/// The rate (x/128) of the cycle the building's raw material allows now; 0 if it allows none (less
+/// than kMinRate, burning, no product).
+[[nodiscard]] std::uint32_t cycle_rate(const Production& p, const assets::BuildingType& b) noexcept;
+
+/// Game seconds the building needs for its product (produce_amount) when it works at full speed,
+/// as its window's productivity counts it: the interval, and for farms, hunters and fishers also
+/// the walks of their worker for the raw material (the worker's figure from `figures`, if given).
+[[nodiscard]] std::uint32_t full_speed_seconds(const assets::BuildingType& b, const assets::FigureTable* figures);
+
+/// Whether a producer stands still only for want of room: its own store is full, it has the raw
+/// material for a cycle, and no cart can take its goods away because the warehouse of `city` is
+/// full as well. With more room it would go on (the goods statistics count it as production).
+[[nodiscard]] bool waits_for_room(const Production& p, const assets::BuildingType& b, const City& city) noexcept;
 
 /// The cycle step of one building (exposed for tests): called when its countdown has run out.
 void finish_cycle(Production& p, const assets::BuildingType& b, std::uint32_t index,

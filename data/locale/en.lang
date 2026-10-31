@@ -724,6 +724,7 @@ stats.legend_stock = Stock (t)
 stats.supply_value = {1} % (demand {2} t/min)
 # The buildings making the good: {1} of {2} at work, {1} waiting for raw material, {1} switched off
 stats.working = {1} of {2} working
+stats.waiting_for_room = {1} waiting for room in the warehouse
 stats.short_of_raw = {1} without raw material
 stats.switched_off = {1} switched off
 # The help of a good in a Kontor's stock: {1} the trend in tons a minute, {2} the minutes it is averaged over

@@ -15,6 +15,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -756,6 +757,20 @@ bool matches(const char* name, std::span<const std::uint8_t> data, std::span<con
     return same;
 }
 
+/// The version of the section `tag` in an own savegame, 0 if it has none.
+std::uint16_t section_version(const core::Bytes& bytes, std::string_view tag) {
+    std::size_t at = kFileHeader;
+    while (at + 12 <= bytes.size()) {
+        const auto u16 = [&](std::size_t i) { return static_cast<std::uint16_t>(bytes[i] | bytes[i + 1] << 8U); };
+        const std::uint32_t size = u16(at + 8) | static_cast<std::uint32_t>(u16(at + 10)) << 16U;
+        if (std::string_view(reinterpret_cast<const char*>(bytes.data() + at), 4) == tag) {
+            return u16(at + 4);
+        }
+        at += 12 + size;
+    }
+    return 0;
+}
+
 // clang-format off
 constexpr Golden kSaveNarrow[] = {
     {"META", 1, 0, 37, 0x5A2EBCE3},
@@ -993,4 +1008,19 @@ TEST_CASE("save format: the goods statistics of the cities come back (GLDG)") {
     CHECK(back->history == city.history);
     CHECK(back->history.last_quarters().size() == 4);
     CHECK(save(*loaded, buildings) == bytes);
+    CHECK(section_version(bytes, "GLDG") == 1);  // nothing withheld: the bytes of version 1
+
+    // What producers withheld for a full warehouse needs version 2.
+    city.book(19, sim::GoodsFlow::Withheld, 40);
+    city.ledger.close_minute(city.goods);
+    const core::Bytes withheld = save(world, buildings);
+    CHECK(section_version(withheld, "GLDG") == 2);
+    auto again = sim::read_game(withheld, buildings, &warnings);
+    REQUIRE(again.ok());
+    CHECK(warnings.empty());
+    const sim::City* other = again->city(city.island, city.index);
+    REQUIRE(other != nullptr);
+    CHECK(other->ledger.totals(19, 1).of(sim::GoodsFlow::Withheld) == 40);
+    CHECK(other->ledger == city.ledger);
+    CHECK(save(*again, buildings) == withheld);
 }

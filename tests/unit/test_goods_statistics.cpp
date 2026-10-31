@@ -5,9 +5,11 @@
 #include "../test_framework.hpp"
 
 #include "o1602/assets/cod_parser.hpp"
+#include "o1602/assets/figure_table.hpp"
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/goods_ledger.hpp"
 #include "o1602/sim/goods_statistics.hpp"
+#include "o1602/sim/production_cycle.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -168,6 +170,113 @@ TEST_CASE("goods statistics: how long a stock lasts") {
     CHECK(sim::minutes_left(8 * kTon, t) == 4U);
     t.flow[static_cast<std::size_t>(GoodsFlow::Produced)] = 10 * kTon;
     CHECK(!sim::minutes_left(8 * kTon, t));  // it does not fall
+}
+
+TEST_CASE("goods statistics: what was withheld for a full warehouse counts as production") {
+    sim::FlowTotals t;
+    t.minutes = 5;
+    t.flow[static_cast<std::size_t>(GoodsFlow::Produced)] = 4 * kTon;
+    t.flow[static_cast<std::size_t>(GoodsFlow::Withheld)] = 6 * kTon;
+    t.flow[static_cast<std::size_t>(GoodsFlow::Residents)] = 8 * kTon;
+    // Not a movement: the stock changes by in minus out only.
+    CHECK(!sim::is_inflow(GoodsFlow::Withheld));
+    CHECK(!sim::is_outflow(GoodsFlow::Withheld));
+    CHECK(t.net() == -4 * static_cast<std::int64_t>(kTon));
+    CHECK(t.production() == 10 * kTon);
+    CHECK(t.balance() == 2 * static_cast<std::int64_t>(kTon));
+    CHECK(!sim::minutes_left(30 * kTon, t));  // a full store does not run out
+    sim::GoodsSample g;
+    g.flow[static_cast<std::size_t>(GoodsFlow::Produced)] = kTon;
+    g.flow[static_cast<std::size_t>(GoodsFlow::Withheld)] = kTon;
+    g.flow[static_cast<std::size_t>(GoodsFlow::Residents)] = 3 * kTon;
+    CHECK(g.balance() == -static_cast<std::int64_t>(kTon));
+}
+
+namespace {
+
+constexpr std::uint32_t kWeaver = 20503;
+constexpr std::uint32_t kFisher = 20601;
+
+/// A weaver (1 t wool for 1 t cloth in 20 s, store 4 t) and a fishery with a boat (Figurnr 5).
+assets::BuildingTable make_producers() {
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
+    const auto doc = assets::cod::parse(
+        "Objekt: HAUS\n"
+        "  @Nummer: 0\n  Id: 20503\n  Gfx: 0\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 1\n    Maxlager: 4\n    Maxnorohst: 5\n"
+        "    Ware: 19\n    Rohstoff: 18\n    Rohmenge: 1\n    Prodmenge: 1\n    Interval: 20\n  EndObj\n"
+        "  @Nummer: +1\n  Id: 20601\n  Gfx: 10\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 6\n    Maxlager: 4\n    Radius: 3\n    Figurnr: 5\n"
+        "    Ware: 14\n    Rohstoff: 14\n    Rohmenge: 1\n    Prodmenge: 1\n    Interval: 30\n  EndObj\n"
+        "EndObj\n",
+        types);
+    auto table = assets::BuildingTable::from_cod(doc);
+    REQUIRE(table.ok());
+    return std::move(table).value();
+}
+
+}  // namespace
+
+TEST_CASE("goods statistics: a producer idle only for a full warehouse books what it would make") {
+    const auto buildings = make_producers();
+    sim::World world = make_world();
+    sim::IslandMap& map = world.island(0).map;
+    REQUIRE(map.place(*buildings.by_id(kWeaver), 4, 4, 0, 0, 0, 0).ok());
+    sim::Production weaver;
+    weaver.island = 0;
+    weaver.x = 4;
+    weaver.y = 4;
+    weaver.raw = 4 * kTon;
+    weaver.stock = 4 * kTon;  // its own store is full
+    world.productions().push_back(weaver);
+    sim::City& c = city(world, 0, 0);
+    c.goods[kCloth] = c.capacity;  // and so is the warehouse
+    for (int s = 0; s < 200; ++s) {
+        sim::advance_production(world, buildings, nullptr);
+    }
+    const sim::Production& p = world.productions().back();
+    CHECK(p.rate == 0);
+    CHECK(sim::waits_for_room(p, *buildings.by_id(kWeaver), c));
+    c.ledger.close_minute(c.goods);
+    sim::FlowTotals t = c.ledger.totals(kCloth, 1);
+    CHECK(t.of(GoodsFlow::Produced) == 0);
+    CHECK(t.of(GoodsFlow::Withheld) >= 9 * kTon);  // 1 t in 20 s, over about 200 s
+    CHECK(t.of(GoodsFlow::Withheld) <= 11 * kTon);
+    CHECK(t.of(GoodsFlow::Workshops) == 0);
+    const sim::GoodsScope scope{0, std::nullopt};
+    const std::vector<sim::GoodsProducers> producers = sim::goods_producers(world, buildings, scope, kCloth);
+    REQUIRE(producers.size() == 1);
+    CHECK(producers[0].waiting_for_room == 1);
+    CHECK(producers[0].working == 0);
+
+    // With room in the warehouse it only waits for a cart: nothing more is withheld.
+    c.goods[kCloth] = 10 * kTon;
+    CHECK(!sim::waits_for_room(world.productions().back(), *buildings.by_id(kWeaver), c));
+    for (int s = 0; s < 100; ++s) {
+        sim::advance_production(world, buildings, nullptr);
+    }
+    c.ledger.close_minute(c.goods);
+    CHECK(c.ledger.totals(kCloth, 1).of(GoodsFlow::Withheld) == 0);
+    // Room for less than a cart's ton counts as full; without raw material it would not work anyway.
+    c.goods[kCloth] = c.capacity - kTon + 1;
+    CHECK(sim::waits_for_room(world.productions().back(), *buildings.by_id(kWeaver), c));
+    world.productions().back().raw = 0;
+    CHECK(!sim::waits_for_room(world.productions().back(), *buildings.by_id(kWeaver), c));
+    world.productions().back().raw = kTon / 2 - 1;  // less than half a cycle's
+    CHECK(!sim::waits_for_room(world.productions().back(), *buildings.by_id(kWeaver), c));
+}
+
+TEST_CASE("goods statistics: a fishery at full speed counts the walks of its boat") {
+    const auto buildings = make_producers();
+    const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+    const auto doc =
+        assets::cod::parse("Objekt: FIGUR\n  Nummer: 5\n  Gfx: 0\n  Speed: 400\n  Worktime: 2.0\nEndObj\n", types);
+    auto figures = assets::FigureTable::from_cod(doc);
+    REQUIRE(figures.ok());
+    // 4 tiles out at 2 tiles a second, 2 s at work: 4 s per ton of fish before the 30 s of the cycle.
+    CHECK(sim::full_speed_seconds(*buildings.by_id(kFisher), &figures.value()) == 34);
+    CHECK(sim::full_speed_seconds(*buildings.by_id(kFisher), nullptr) == 30);
+    CHECK(sim::full_speed_seconds(*buildings.by_id(kWeaver), &figures.value()) == 20);
 }
 
 TEST_CASE("goods statistics: the early warning comes once, before the store is empty") {

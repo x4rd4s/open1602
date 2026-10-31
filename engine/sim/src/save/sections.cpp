@@ -156,6 +156,9 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     if (id == kScores) {
         return kWideScores;
     }
+    if (id == kLedgers) {
+        return kLedgerWithheld;
+    }
     if (id == kSimulation) {
         return kSectionedSimulation;
     }
@@ -435,7 +438,8 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
     if (std::ranges::any_of(world.cities(), [](const City& c) {
             return c.ledger.minutes_closed() != 0 || !c.ledger.wares().empty() || c.history.minutes_closed() != 0;
         })) {
-        section(out, kLedgers, [&](Writer& o) { write_ledgers(o, world); }, Need::Optional);
+        const std::uint16_t ledgers_at = ledgers_version(world);
+        section(out, kLedgers, [&](Writer& o) { write_ledgers(o, world, ledgers_at); }, Need::Optional, ledgers_at);
     }
     const std::uint16_t scores_at = scores_version(world);
     section(out, kScores, [&](Writer& o) { write_scores(o, world, scores_at); }, Need::Required, scores_at);
@@ -853,7 +857,7 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                 d.population_marks = read_population_marks(in);
                 break;
             case kLedgers:
-                d.ledgers = read_ledgers(in);
+                d.ledgers = read_ledgers(in, version);
                 break;
             case kScores:
                 d.scores = read_scores(in, version);
