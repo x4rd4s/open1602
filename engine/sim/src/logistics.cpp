@@ -589,15 +589,7 @@ void Logistics::arrive(Handle h, Walker& w) {
         return;
     }
     if (responds(w.kind) && !w.returning) {
-        // At the building: works for Worktime, the fireman facing it (0x004599D0, 0x0045A040).
-        if (w.kind == WalkerKind::Firefighter && w.target) {
-            if (const auto at = building_at(*m_world, *m_buildings, w.island, *w.target)) {
-                w.direction = direction_between(w.tile, centre_tile(*at));
-            }
-        }
-        const assets::FigureType* fig = m_figures->get(w.figure);
-        w.work_ms = std::max<std::uint32_t>(fig != nullptr ? fig->work_time_ms : 0, 1);
-        w.animation = 2;
+        begin_response(w);
         return;
     }
     if (w.returning) {
@@ -1713,7 +1705,24 @@ void Logistics::send_responder(std::uint32_t home, WalkerKind kind) {
     if (!find_disaster(w, *hb, *fig)) {
         return;
     }
+    if (w.path.empty()) {
+        // The fire touches the tile the fireman starts on: he puts it out from his own building
+        // at once, as in the original, instead of not setting out at all.
+        begin_response(w);
+    }
     launch(std::move(w));
+}
+
+void Logistics::begin_response(Walker& w) {
+    // At the building: works for Worktime, the fireman facing it.
+    if (w.kind == WalkerKind::Firefighter && w.target) {
+        if (const auto at = building_at(*m_world, *m_buildings, w.island, *w.target)) {
+            w.direction = direction_between(w.tile, centre_tile(*at));
+        }
+    }
+    const assets::FigureType* fig = m_figures->get(w.figure);
+    w.work_ms = std::max<std::uint32_t>(fig != nullptr ? fig->work_time_ms : 0, 1);
+    w.animation = 2;
 }
 
 bool Logistics::find_disaster(Walker& w, const BuildingAt& hb, const assets::FigureType& fig) {
