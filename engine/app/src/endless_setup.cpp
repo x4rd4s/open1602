@@ -23,6 +23,9 @@ using Amount = sim::WorldSettings::Amount;
 using Sizes = sim::WorldSettings::Sizes;
 using Shapes = sim::WorldSettings::Shapes;
 using Starts = sim::WorldSettings::Starts;
+using Landscape = sim::WorldSettings::Landscape;
+using Share = sim::shapes::Share;
+using Roughness = sim::shapes::Roughness;
 
 // The values the dialog offers.
 constexpr std::array<std::uint8_t, 3> kRefundPercents = {25, 50, 75};  // between none and full
@@ -147,6 +150,72 @@ constexpr std::array<std::string_view, 3> kSizeNames = {"small", "mixed", "large
 constexpr std::array<std::string_view, 2> kStartNames = {"spread", "together"};
 constexpr std::array<std::string_view, 3> kShapeNames = {"templates", "mixed", "own"};
 constexpr std::array<std::string_view, 4> kMonumentNames = {"none", "castle", "cathedral", "both"};
+constexpr std::array<std::string_view, 3> kSpreadNames = {"even", "mixed", "giants"};
+constexpr std::array<std::string_view, 3> kGapNames = {"narrow", "normal", "wide"};
+constexpr std::array<std::string_view, 3> kCoastNames = {"smooth", "natural", "rugged"};
+constexpr std::array<std::string_view, 3> kOutlineNames = {"round", "long", "branched"};
+constexpr std::array<std::string_view, 3> kShareNames = {"little", "normal", "much"};
+
+// The page of the islands: percent of the map that is land, the sides of the smallest and the
+// largest island in tiles.
+constexpr std::array<std::uint32_t, 8> kLandShares = {10, 15, 20, 25, 30, 35, 40, 45};
+constexpr std::array<std::uint32_t, 8> kSmallest = {16, 20, 25, 30, 40, 50, 60, 80};
+constexpr std::array<std::uint32_t, 9> kLargest = {40, 50, 60, 80, 100, 120, 150, 200, 250};
+static_assert(kLandShares.front() >= Landscape::kMinLand && kLandShares.back() <= Landscape::kMaxLand);
+static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= sim::shapes::kMaxSide);
+
+/// The kinds of world of the page's first item, after the original's islands: the islands of their
+/// own shape as they come (Landscape's defaults), many small ones, a few large bodies of land, a few
+/// giants among small ones, and islands all of about one size.
+struct IslandPreset {
+    std::string_view name;  ///< "setup.island_preset.<name>"
+    Landscape landscape;
+};
+constexpr Landscape landscape(std::uint8_t land, std::uint16_t min_side, std::uint16_t max_side,
+                              Landscape::Spread spread, Landscape::Gap gap, Roughness coast,
+                              Landscape::Outline outline) {
+    Landscape l;
+    l.land = land;
+    l.min_side = min_side;
+    l.max_side = max_side;
+    l.spread = spread;
+    l.gap = gap;
+    l.coast = coast;
+    l.outline = outline;
+    return l;
+}
+constexpr std::array<IslandPreset, 5> kIslandPresets = {{
+    {"varied", Landscape{}},
+    {"archipelago", landscape(18, 16, 60, Landscape::Spread::Even, Landscape::Gap::Narrow, Roughness::Rugged,
+                              Landscape::Outline::Round)},
+    {"continents", landscape(40, 80, 250, Landscape::Spread::Even, Landscape::Gap::Wide, Roughness::Natural,
+                             Landscape::Outline::Branched)},
+    {"giants", landscape(30, 25, 250, Landscape::Spread::FewGiants, Landscape::Gap::Wide, Roughness::Natural,
+                         Landscape::Outline::Round)},
+    {"even", landscape(20, 50, 60, Landscape::Spread::Even, Landscape::Gap::Normal, Roughness::Smooth,
+                       Landscape::Outline::Round)},
+}};
+
+/// The preset choice the setup is (0 the original's islands), or nothing.
+std::optional<std::size_t> island_preset(const sim::WorldSettings& w) {
+    if (w.shapes == Shapes::Templates) {
+        return 0;
+    }
+    if (w.shapes != Shapes::Own) {
+        return std::nullopt;
+    }
+    for (std::size_t i = 0; i < kIslandPresets.size(); ++i) {
+        if (kIslandPresets[i].landscape == w.landscape) {
+            return i + 1;
+        }
+    }
+    return std::nullopt;
+}
+
+template <class E>
+std::size_t enum_choice(E e, std::size_t n) {
+    return std::min<std::size_t>(static_cast<std::size_t>(e), n - 1);
+}
 
 template <std::size_t N>
 std::optional<std::size_t> name_index(const std::array<std::string_view, N>& names, std::string_view v) {
@@ -243,7 +312,7 @@ bool operator==(const EndlessSetup& a, const EndlessSetup& b) noexcept {
     return a.rules == b.rules && a.own_world == b.own_world && a.auto_size == b.auto_size && x.width == y.width &&
            x.height == y.height && x.players == y.players && x.islands == y.islands && x.sizes == y.sizes &&
            x.natives == y.natives && x.volcanoes == y.volcanoes && x.gold_islands == y.gold_islands &&
-           x.starts == y.starts && x.shapes == y.shapes;
+           x.starts == y.starts && x.shapes == y.shapes && x.landscape == y.landscape;
 }
 
 namespace {
@@ -335,8 +404,27 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kIslandAmounts.size();
         case SetupItem::IslandSizes:
             return kSizeNames.size();
+        case SetupItem::IslandPreset:
+            return kIslandPresets.size() + 1;
         case SetupItem::IslandShapes:
             return kShapeNames.size();
+        case SetupItem::LandShare:
+            return kLandShares.size();
+        case SetupItem::SmallestIsland:
+            return kSmallest.size();
+        case SetupItem::LargestIsland:
+            return kLargest.size();
+        case SetupItem::SizeSpread:
+            return kSpreadNames.size();
+        case SetupItem::IslandGap:
+            return kGapNames.size();
+        case SetupItem::Coast:
+            return kCoastNames.size();
+        case SetupItem::Outline:
+            return kOutlineNames.size();
+        case SetupItem::Forest:
+        case SetupItem::OreMountains:
+            return kShareNames.size();
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
             return kAmounts.size();
@@ -456,8 +544,28 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return w.islands == Amount::None ? 0 : index_of(kIslandAmounts, w.islands);
         case SetupItem::IslandSizes:
             return std::min<std::size_t>(static_cast<std::size_t>(w.sizes), kSizeNames.size() - 1);
+        case SetupItem::IslandPreset:
+            return island_preset(w).value_or(0);
         case SetupItem::IslandShapes:
-            return std::min<std::size_t>(static_cast<std::size_t>(w.shapes), kShapeNames.size() - 1);
+            return enum_choice(w.shapes, kShapeNames.size());
+        case SetupItem::LandShare:
+            return nearest(kLandShares, w.landscape.land);
+        case SetupItem::SmallestIsland:
+            return nearest(kSmallest, w.landscape.min_side);
+        case SetupItem::LargestIsland:
+            return nearest(kLargest, w.landscape.max_side);
+        case SetupItem::SizeSpread:
+            return enum_choice(w.landscape.spread, kSpreadNames.size());
+        case SetupItem::IslandGap:
+            return enum_choice(w.landscape.gap, kGapNames.size());
+        case SetupItem::Coast:
+            return enum_choice(w.landscape.coast, kCoastNames.size());
+        case SetupItem::Outline:
+            return enum_choice(w.landscape.outline, kOutlineNames.size());
+        case SetupItem::Forest:
+            return enum_choice(w.landscape.forest, kShareNames.size());
+        case SetupItem::OreMountains:
+            return enum_choice(w.landscape.mountains, kShareNames.size());
         case SetupItem::Villages:
             return index_of(kAmounts, w.natives);
         case SetupItem::VolcanoIslands:
@@ -595,8 +703,56 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::IslandSizes:
             w.sizes = static_cast<Sizes>(choice);
             break;
+        case SetupItem::IslandPreset:
+            if (choice == 0) {
+                w.shapes = Shapes::Templates;
+            } else {
+                w.shapes = Shapes::Own;
+                w.landscape = kIslandPresets[choice - 1].landscape;
+            }
+            break;
         case SetupItem::IslandShapes:
             w.shapes = static_cast<Shapes>(std::min<std::size_t>(choice, kShapeNames.size() - 1));
+            break;
+        case SetupItem::LandShare:
+            w.landscape.land = static_cast<std::uint8_t>(kLandShares[choice]);
+            break;
+        case SetupItem::SmallestIsland: {
+            // The largest island at least as large: the next side offered.
+            Landscape& l = w.landscape;
+            l.min_side = static_cast<std::uint16_t>(kSmallest[choice]);
+            if (l.max_side < l.min_side) {
+                l.max_side = static_cast<std::uint16_t>(*std::find_if(
+                    kLargest.begin(), kLargest.end(), [&](std::uint32_t side) { return side >= l.min_side; }));
+            }
+            break;
+        }
+        case SetupItem::LargestIsland: {
+            Landscape& l = w.landscape;
+            l.max_side = static_cast<std::uint16_t>(kLargest[choice]);
+            if (l.min_side > l.max_side) {
+                l.min_side = static_cast<std::uint16_t>(*std::find_if(
+                    kSmallest.rbegin(), kSmallest.rend(), [&](std::uint32_t side) { return side <= l.max_side; }));
+            }
+            break;
+        }
+        case SetupItem::SizeSpread:
+            w.landscape.spread = static_cast<Landscape::Spread>(choice);
+            break;
+        case SetupItem::IslandGap:
+            w.landscape.gap = static_cast<Landscape::Gap>(choice);
+            break;
+        case SetupItem::Coast:
+            w.landscape.coast = static_cast<Roughness>(choice);
+            break;
+        case SetupItem::Outline:
+            w.landscape.outline = static_cast<Landscape::Outline>(choice);
+            break;
+        case SetupItem::Forest:
+            w.landscape.forest = static_cast<Share>(choice);
+            break;
+        case SetupItem::OreMountains:
+            w.landscape.mountains = static_cast<Share>(choice);
             break;
         case SetupItem::Villages:
             w.natives = kAmounts[choice];
@@ -701,10 +857,23 @@ void choose_previous(EndlessSetup& setup, SetupItem item) {
 
 bool setup_item_used(const EndlessSetup& setup, SetupItem item) noexcept {
     switch (item) {
-        case SetupItem::WorldSize:
-        case SetupItem::Players:
         case SetupItem::Islands:
         case SetupItem::IslandSizes:
+            // Islands of their own size follow the page of the islands.
+            return setup.own_world && setup.world.shapes != Shapes::Own;
+        case SetupItem::LandShare:
+        case SetupItem::SmallestIsland:
+        case SetupItem::LargestIsland:
+        case SetupItem::SizeSpread:
+        case SetupItem::IslandGap:
+        case SetupItem::Coast:
+        case SetupItem::Outline:
+        case SetupItem::Forest:
+        case SetupItem::OreMountains:
+            return setup.own_world && setup.world.shapes == Shapes::Own;
+        case SetupItem::WorldSize:
+        case SetupItem::Players:
+        case SetupItem::IslandPreset:
         case SetupItem::IslandShapes:
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
@@ -741,6 +910,10 @@ std::string victory_summary(const sim::VictoryConditions& v) {
 sim::OriginalBugs page_bugs(sim::OriginalBugs bugs) noexcept {
     bugs.classic_ai = false;
     return bugs;
+}
+
+std::string islands_summary(const EndlessSetup& setup) {
+    return setup_value(setup, SetupItem::IslandPreset);
 }
 
 std::string bugs_summary(const sim::OriginalBugs& bugs) {
@@ -909,7 +1082,6 @@ std::string setup_label(SetupItem item) {
         "setup.players",
         "setup.islands",
         "setup.island_sizes",
-        "setup.island_shapes",
         "setup.villages",
         "setup.volcano_islands",
         "setup.gold_islands",
@@ -921,6 +1093,17 @@ std::string setup_label(SetupItem item) {
         "setup.pirates",
         "setup.pirate_nests",
         "setup.reveal",
+        "setup.island_preset",
+        "setup.island_shapes",
+        "setup.coast",
+        "setup.outline",
+        "setup.land",
+        "setup.smallest_island",
+        "setup.largest_island",
+        "setup.size_spread",
+        "setup.island_gap",
+        "setup.forest",
+        "setup.ore_mountains",
         "setup.win.inhabitants",
         "setup.win.class",
         "setup.win.class_inhabitants",
@@ -1018,6 +1201,26 @@ std::string setup_value(SetupItem item, std::size_t choice) {
                 "setup.island_shapes.templates", "setup.island_shapes.mixed", "setup.island_shapes.own"};
             return ui::tr(kKeys[std::min<std::size_t>(choice, kKeys.size() - 1)]);
         }
+        case SetupItem::IslandPreset:
+            return ui::tr(choice == 0 ? std::string("setup.island_preset.original")
+                                      : "setup.island_preset." + std::string(kIslandPresets[choice - 1].name));
+        case SetupItem::LandShare:
+            return ui::tr("setup.win.percent", {std::to_string(kLandShares[choice])});
+        case SetupItem::SmallestIsland:
+            return ui::tr("setup.tiles", {std::to_string(kSmallest[choice])});
+        case SetupItem::LargestIsland:
+            return ui::tr("setup.tiles", {std::to_string(kLargest[choice])});
+        case SetupItem::SizeSpread:
+            return ui::tr("setup.size_spread." + std::string(kSpreadNames[choice]));
+        case SetupItem::IslandGap:
+            return ui::tr("setup.island_gap." + std::string(kGapNames[choice]));
+        case SetupItem::Coast:
+            return ui::tr("setup.coast." + std::string(kCoastNames[choice]));
+        case SetupItem::Outline:
+            return ui::tr("setup.outline." + std::string(kOutlineNames[choice]));
+        case SetupItem::Forest:
+        case SetupItem::OreMountains:
+            return ui::tr("setup.share." + std::string(kShareNames[choice]));
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
             return amount_text(kAmounts[choice]);
@@ -1149,6 +1352,26 @@ std::optional<std::string> custom_value(const EndlessSetup& setup, SetupItem ite
                 return std::to_string(w.gold_islands);
             }
             break;
+        case SetupItem::IslandPreset:
+            if (!island_preset(w)) {
+                return ui::tr("setup.island_preset.custom");
+            }
+            break;
+        case SetupItem::LandShare:
+            if (!offered(kLandShares, std::uint32_t{w.landscape.land})) {
+                return ui::tr("setup.win.percent", {std::to_string(w.landscape.land)});
+            }
+            break;
+        case SetupItem::SmallestIsland:
+            if (!offered(kSmallest, std::uint32_t{w.landscape.min_side})) {
+                return ui::tr("setup.tiles", {std::to_string(w.landscape.min_side)});
+            }
+            break;
+        case SetupItem::LargestIsland:
+            if (!offered(kLargest, std::uint32_t{w.landscape.max_side})) {
+                return ui::tr("setup.tiles", {std::to_string(w.landscape.max_side)});
+            }
+            break;
         case SetupItem::WinInhabitants:
             return condition(kWinInhabitants, v.inhabitants, "setup.win.number");
         case SetupItem::WinClassInhabitants:
@@ -1184,6 +1407,9 @@ std::string setup_value(const EndlessSetup& setup, SetupItem item) {
     if (item == SetupItem::WorldSize && setup.auto_size) {
         const sim::WorldSettings w = setup.world_settings();
         return ui::tr("setup.size.auto", {std::to_string(w.width), std::to_string(w.height)});
+    }
+    if (item == SetupItem::IslandPreset && !island_preset(setup.world)) {
+        return ui::tr("setup.island_preset.custom");  // the items below say what
     }
     if (const auto custom = custom_value(setup, item)) {
         return ui::tr("setup.value.own", {*custom});
@@ -1325,6 +1551,39 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (const auto i = name_index(kShapeNames, value)) {
             w.shapes = static_cast<Shapes>(*i);
         }
+    } else if (key == "island_land") {
+        if (n && *n >= Landscape::kMinLand && *n <= Landscape::kMaxLand) {
+            w.landscape.land = static_cast<std::uint8_t>(*n);
+        }
+    } else if (key == "island_min" || key == "island_max") {
+        if (n && *n >= sim::shapes::kMinSide && *n <= sim::shapes::kMaxSide) {
+            Landscape& l = w.landscape;
+            (key == "island_min" ? l.min_side : l.max_side) = static_cast<std::uint16_t>(*n);
+            // The other one follows: the smallest island is never larger than the largest.
+            if (l.min_side > l.max_side) {
+                (key == "island_min" ? l.max_side : l.min_side) = static_cast<std::uint16_t>(*n);
+            }
+        }
+    } else if (key == "island_spread") {
+        if (const auto i = name_index(kSpreadNames, value)) {
+            w.landscape.spread = static_cast<Landscape::Spread>(*i);
+        }
+    } else if (key == "island_gap") {
+        if (const auto i = name_index(kGapNames, value)) {
+            w.landscape.gap = static_cast<Landscape::Gap>(*i);
+        }
+    } else if (key == "island_coast") {
+        if (const auto i = name_index(kCoastNames, value)) {
+            w.landscape.coast = static_cast<Roughness>(*i);
+        }
+    } else if (key == "island_outline") {
+        if (const auto i = name_index(kOutlineNames, value)) {
+            w.landscape.outline = static_cast<Landscape::Outline>(*i);
+        }
+    } else if (key == "island_forest" || key == "island_mountains") {
+        if (const auto i = name_index(kShareNames, value)) {
+            (key == "island_forest" ? w.landscape.forest : w.landscape.mountains) = static_cast<Share>(*i);
+        }
     } else if (key == "starts") {
         if (const auto i = name_index(kStartNames, value)) {
             w.starts = *i == 1 ? Starts::Together : Starts::Spread;
@@ -1373,8 +1632,17 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("players", std::to_string(w.players));
     line("islands", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.islands), kAmountNames.size() - 1)]);
     line("island_sizes", kSizeNames[std::min<std::size_t>(static_cast<std::size_t>(w.sizes), 2)]);
-    line("island_shapes",
-         kShapeNames[std::min<std::size_t>(static_cast<std::size_t>(w.shapes), kShapeNames.size() - 1)]);
+    line("island_shapes", kShapeNames[enum_choice(w.shapes, kShapeNames.size())]);
+    const Landscape& l = w.landscape;
+    line("island_land", std::to_string(l.land));
+    line("island_min", std::to_string(l.min_side));
+    line("island_max", std::to_string(l.max_side));
+    line("island_spread", kSpreadNames[enum_choice(l.spread, kSpreadNames.size())]);
+    line("island_gap", kGapNames[enum_choice(l.gap, kGapNames.size())]);
+    line("island_coast", kCoastNames[enum_choice(l.coast, kCoastNames.size())]);
+    line("island_outline", kOutlineNames[enum_choice(l.outline, kOutlineNames.size())]);
+    line("island_forest", kShareNames[enum_choice(l.forest, kShareNames.size())]);
+    line("island_mountains", kShareNames[enum_choice(l.mountains, kShareNames.size())]);
     line("villages", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.natives), kAmountNames.size() - 1)]);
     line("volcano_islands",
          kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.volcanoes), kAmountNames.size() - 1)]);

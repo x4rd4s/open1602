@@ -366,3 +366,99 @@ TEST_CASE("world plan: a fixed number of gold islands replaces the level's gold"
     CHECK(fixed->plan.ores[0].count == by_level->plan.ores[0].count);
     CHECK(fixed->plan.islands.size() == by_level->plan.islands.size());
 }
+
+namespace {
+
+/// Shapes::Own: an island's rectangle, of its own sides or its template's class.
+Box own_box(const sim::WorldPlan& p, const assets::ScenarioPlan::Island& i) {
+    for (const auto& o : p.own_islands) {
+        if (o.number == i.number) {
+            return Box{i.x, i.y, o.width, o.height};
+        }
+    }
+    return box(i);
+}
+
+}  // namespace
+
+TEST_CASE("world plan: islands of their own size cover the land asked for, within the sides asked for") {
+    using Landscape = sim::WorldSettings::Landscape;
+    for (const std::uint8_t land : std::array<std::uint8_t, 3>{10, 25, 45}) {
+        for (const auto spread : {Landscape::Spread::Even, Landscape::Spread::Mixed, Landscape::Spread::FewGiants}) {
+            sim::WorldSettings s;
+            s.shapes = sim::WorldSettings::Shapes::Own;
+            s.landscape.land = land;
+            s.landscape.min_side = 20;
+            s.landscape.max_side = 160;
+            s.landscape.spread = spread;
+            s.seed = land * 7U + static_cast<std::uint64_t>(spread);
+            auto plan = sim::plan_world(s, templates());
+            REQUIRE(plan.ok());
+            CHECK(plan->shapes == sim::WorldSettings::Shapes::Own);
+            CHECK(plan->landscape == s.landscape);
+            const auto& islands = plan->plan.islands;
+            std::uint64_t area = 0;
+            std::size_t own = 0;
+            for (std::size_t a = 0; a < islands.size(); ++a) {
+                const Box ra = own_box(*plan, islands[a]);
+                area += static_cast<std::uint64_t>(ra.w * ra.h);
+                CHECK(ra.x >= 20);
+                CHECK(ra.y >= 20);
+                CHECK(ra.x + ra.w <= s.width - 20);
+                CHECK(ra.y + ra.h <= s.height - 20);
+                const bool shaped = (islands[a].flags & sim::kPlanOwnShape) != 0;
+                if (shaped) {
+                    ++own;
+                    CHECK(std::max(ra.w, ra.h) <= s.landscape.max_side);
+                    CHECK(std::min(ra.w, ra.h) >= sim::shapes::kMinSide);
+                } else {
+                    CHECK(islands[a].size <= 3);  // a template for a village or a volcano
+                }
+                for (std::size_t b = a + 1; b < islands.size(); ++b) {
+                    const Box rb = own_box(*plan, islands[b]);
+                    CHECK((ra.x + ra.w + 4 <= rb.x || rb.x + rb.w + 4 <= ra.x || ra.y + ra.h + 4 <= rb.y ||
+                           rb.y + rb.h + 4 <= ra.y));
+                }
+            }
+            CHECK(own == plan->own_islands.size());
+            CHECK(own * 2 > islands.size());
+            // The land the rectangles hold: about what was asked; with much land and many small
+            // islands, the water between them leaves less room.
+            const std::uint64_t map = std::uint64_t{s.width} * s.height;
+            const std::uint64_t land_tiles = area * s.landscape.fill() / 1000;
+            CHECK(land_tiles * 100 >= map * land * (land >= 45 ? 70 : land >= 25 ? 80 : 90) / 100);
+            CHECK(land_tiles * 100 <= map * land * 130 / 100);
+            // Every start keeps a big home island without a village, both climates within reach.
+            for (const sim::StartArea& st : plan->starts) {
+                REQUIRE(st.home_island < islands.size());
+                CHECK((islands[st.home_island].flags & sim::kPlanNoVillage) != 0);
+            }
+        }
+    }
+}
+
+TEST_CASE("world plan: islands of their own size: the same seed the same plan, few giants are giants") {
+    sim::WorldSettings s;
+    s.shapes = sim::WorldSettings::Shapes::Own;
+    s.landscape.spread = sim::WorldSettings::Landscape::Spread::FewGiants;
+    s.landscape.min_side = 20;
+    s.landscape.max_side = 200;
+    s.landscape.land = 30;
+    s.width = 1000;  // room for giants between the start areas
+    s.height = 700;
+    s.seed = 11;
+    auto a = sim::plan_world(s, templates());
+    auto b = sim::plan_world(s, templates());
+    REQUIRE(a.ok());
+    REQUIRE(b.ok());
+    REQUIRE(a->own_islands.size() == b->own_islands.size());
+    std::size_t giants = 0;
+    for (std::size_t i = 0; i < a->own_islands.size(); ++i) {
+        CHECK(a->own_islands[i].number == b->own_islands[i].number);
+        CHECK(a->own_islands[i].width == b->own_islands[i].width);
+        CHECK(a->own_islands[i].height == b->own_islands[i].height);
+        giants += std::max(a->own_islands[i].width, a->own_islands[i].height) >= 150 ? 1U : 0U;
+    }
+    CHECK(giants >= 1);
+    CHECK(giants * 4 <= a->own_islands.size());
+}

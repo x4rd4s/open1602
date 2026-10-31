@@ -107,9 +107,10 @@ std::uint32_t pick(Random& random, const std::array<std::uint32_t, N>& ids) {
 }
 
 /// Land blocks of 2 x 2 tiles: noise plus a falloff from the centre, as much land as `share`
-/// (per mille) of the blocks.
-LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t share) {
-    const int spacing = std::max(3, std::min(blocks_x, blocks_y) / 4);
+/// (per mille) of the blocks. `strength`: the noise against the falloff, percent; `spread`: the
+/// lattice of the noise in parts of the shorter side (more parts, smaller features).
+LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t share, int strength, int spread) {
+    const int spacing = std::max(3, std::min(blocks_x, blocks_y) / spread);
     const Noise coarse(random, blocks_x, blocks_y, spacing);
     const Noise fine(random, blocks_x, blocks_y, std::max(2, spacing / 2));
     // Half-block units, so that the centres of a block and of the island are whole numbers; the
@@ -127,7 +128,7 @@ LandMap block_land(Random& random, int blocks_x, int blocks_y, std::uint32_t sha
             const int falloff = static_cast<int>((std::int64_t{dx} * dx * 1024) / (std::int64_t{rx} * rx) +
                                                  (std::int64_t{dy} * dy * 1024) / (std::int64_t{ry} * ry));
             const int noise = (2 * coarse.at(bx, by) + fine.at(bx, by)) / 3;
-            const int score = 1024 - falloff + (noise - 512) * 3 / 2;
+            const int score = 1024 - falloff + (noise - 512) * strength / 100;
             grid[static_cast<std::size_t>(by) * static_cast<std::size_t>(blocks_x) + static_cast<std::size_t>(bx)] =
                 score;
             scores.push_back(score);
@@ -304,12 +305,17 @@ bool smooth(LandMap& map) {
 }
 
 /// A land mask that only needs coast tiles of the templates, or nothing.
-std::optional<LandMap> land_mask(Random& random, int width, int height) {
+std::optional<LandMap> land_mask(Random& random, int width, int height, Roughness roughness, Form form,
+                                 std::uint16_t land) {
     const int blocks_x = width / 2;
     const int blocks_y = height / 2;
-    // The templates are 40..60 % land.
-    const std::uint32_t share = 480 + random.below(160);
-    LandMap blocks = block_land(random, blocks_x, blocks_y, share);
+    // The templates are 40..60 % land; branched islands less, their arms reach as far.
+    const bool branched = form == Form::Branched;
+    const std::uint32_t low = land == 0 ? (branched ? 380U : 480U) : std::clamp<std::uint32_t>(land, 380, 800) - 80U;
+    const std::uint32_t share = low + random.below(160);
+    constexpr std::array<int, 3> kStrength = {80, 150, 230};  // Smooth, Natural, Rugged
+    const int strength = kStrength[static_cast<std::size_t>(roughness)] + (branched ? 60 : 0);
+    LandMap blocks = block_land(random, blocks_x, blocks_y, share, strength, branched ? 7 : 4);
     round_off(blocks);
     close_corners(blocks);
     one_island(blocks);
@@ -445,13 +451,13 @@ std::optional<CoastTile> coast_tile(bool land, std::uint8_t n) {
 }
 
 assets::Island make_island(const ShapeRequest& request) {
-    const int width = std::clamp<int>(request.width, 16, 255);
-    const int height = std::clamp<int>(request.height, 16, 255);
+    const int width = std::clamp<int>(request.width, kMinSide, kMaxSide);
+    const int height = std::clamp<int>(request.height, kMinSide, kMaxSide);
     Random random(request.seed, 0x1602'15'1AULL + request.number);
 
     std::optional<LandMap> mask;
     for (std::uint32_t attempt = 0; attempt < kAttempts && !mask; ++attempt) {
-        mask = land_mask(random, width, height);
+        mask = land_mask(random, width, height, request.roughness, request.form, request.land);
     }
     const LandMap map = mask ? std::move(*mask) : rectangle(width, height);
 
@@ -549,7 +555,8 @@ assets::Island make_island(const ShapeRequest& request) {
 
     // Forest in patches (the north has more of it, as its templates), ground elsewhere.
     const Noise forest(random, width, height, std::max(4, std::min(width, height) / 5));
-    const int forest_line = request.climate == 0 ? 470 : 580;
+    constexpr std::array<int, 3> kForestShift = {130, 0, -130};  // Little, Normal, Much
+    const int forest_line = (request.climate == 0 ? 470 : 580) + kForestShift[static_cast<std::size_t>(request.forest)];
     const auto& trees = request.climate == 0 ? ids::kForestNorth : ids::kForestSouth;
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {

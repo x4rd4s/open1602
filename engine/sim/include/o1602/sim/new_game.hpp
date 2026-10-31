@@ -113,4 +113,38 @@ std::optional<PlayerId> take_banner(World& world, PlayerId who, BannerId banner)
                                                  const NewGameOptions& options,
                                                  std::vector<std::string>* warnings = nullptr);
 
+/// A new world in small (the start dialog's preview of the islands): what lies on every tile and
+/// where the ships start.
+struct WorldPreview {
+    enum class Tile : std::uint8_t {
+        Sea,   ///< open sea and the islands' water
+        Surf,  ///< the sea along a coast
+        Beach,
+        Ground,
+        Forest,
+        Mountain,    ///< ore mountains, rocks and slopes
+        Settlement,  ///< buildings: native villages
+    };
+    static constexpr std::size_t kTiles = 7;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::vector<Tile> tiles;  ///< row by row, width x height
+    std::uint32_t islands = 0;
+    std::uint64_t land = 0;  ///< tiles that are no water
+    struct Start {
+        std::uint32_t x = 0;
+        std::uint32_t y = 0;
+    };
+    std::vector<Start> starts;  ///< the ships at the start (all of them at one place: one)
+
+    [[nodiscard]] Tile at(std::uint32_t x, std::uint32_t y) const { return tiles[std::size_t{y} * width + x]; }
+};
+
+/// The world start_new_game() makes for these options, in small: the same seed, the same world.
+[[nodiscard]] core::Result<WorldPreview> preview_world(const assets::GameDirectory& game,
+                                                       const assets::BuildingTable& buildings,
+                                                       const assets::TextTable& text, const NewGameOptions& options);
+/// The preview of a world that is made already.
+[[nodiscard]] WorldPreview preview_of(const World& world, const assets::BuildingTable& buildings);
+
 }  // namespace o1602::sim

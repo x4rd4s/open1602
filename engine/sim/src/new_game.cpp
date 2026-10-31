@@ -278,6 +278,84 @@ core::Result<World> start_new_game(const assets::GameDirectory& game, const asse
     return world;
 }
 
+WorldPreview preview_of(const World& world, const assets::BuildingTable& buildings) {
+    using Tile = WorldPreview::Tile;
+    namespace bk = assets::kind;
+    WorldPreview out;
+    out.width = world.width();
+    out.height = world.height();
+    out.islands = static_cast<std::uint32_t>(world.islands().size());
+    out.tiles.assign(std::size_t{out.width} * out.height, Tile::Sea);
+    for (std::uint32_t y = 0; y < out.height; ++y) {
+        for (std::uint32_t x = 0; x < out.width; ++x) {
+            const World::Cell& c = world.cell(x, y);
+            if (c.island == World::kSea) {
+                continue;
+            }
+            const MapCell& top = world.islands()[c.island].map.top(c.local_x, c.local_y);
+            const assets::BuildingType* b = top.empty() ? nullptr : buildings.by_sprite(top.sprite);
+            Tile t = Tile::Ground;
+            switch (b != nullptr ? b->kind : bk::kSea) {
+                case bk::kSea:
+                    t = Tile::Sea;
+                    break;
+                case bk::kSurf:
+                case bk::kSurfCorner:
+                case bk::kRiverMouth:
+                    t = Tile::Surf;
+                    break;
+                case bk::kBeach:
+                case bk::kBeachMouth:
+                case bk::kBeachOuter:
+                case bk::kBeachInner:
+                case bk::kBeachVariant:
+                    t = Tile::Beach;
+                    break;
+                case bk::kForest:
+                    t = Tile::Forest;
+                    break;
+                case bk::kRock:
+                case bk::kSlope:
+                case bk::kSlopeCorner:
+                case bk::kSlopeSpring:
+                case bk::kMine:
+                    t = Tile::Mountain;
+                    break;
+                case bk::kBuilding:
+                case bk::kBeachHouse:
+                case bk::kSquare:
+                case bk::kRoad:
+                case bk::kHq:
+                    t = Tile::Settlement;
+                    break;
+                default:
+                    break;
+            }
+            out.tiles[std::size_t{y} * out.width + x] = t;
+            out.land += t == Tile::Sea || t == Tile::Surf ? 0U : 1U;
+        }
+    }
+    for (const Ship& ship : world.ships()) {
+        const auto x = static_cast<std::uint32_t>(ship.x);
+        const auto y = static_cast<std::uint32_t>(ship.y);
+        const bool known = std::any_of(out.starts.begin(), out.starts.end(),
+                                       [&](const WorldPreview::Start& s) { return s.x == x && s.y == y; });
+        if (!known) {
+            out.starts.push_back({x, y});
+        }
+    }
+    return out;
+}
+
+core::Result<WorldPreview> preview_world(const assets::GameDirectory& game, const assets::BuildingTable& buildings,
+                                         const assets::TextTable& text, const NewGameOptions& options) {
+    auto world = start_new_game(game, buildings, text, options);
+    if (!world) {
+        return world.error();
+    }
+    return preview_of(*world, buildings);
+}
+
 core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t players) {
     if (players <= kOriginalPlayers) {
         return core::Ok{};

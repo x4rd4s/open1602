@@ -150,6 +150,11 @@ public:
     }
     [[nodiscard]] const EndlessSetup& scenario_setup() const noexcept { return m_scenario; }
     /// Colours of Open1602's own screens (the start dialog).
+    /// The preview of the world on the start dialog's page of the islands.
+    void set_preview_maker(GameSettingsMenu::PreviewMaker maker) { m_settings.set_preview_maker(std::move(maker)); }
+    void set_preview_colours(const GameSettingsMenu::PreviewColours& colours) {
+        m_settings.set_preview_colours(colours);
+    }
     void set_form_style(const ui::FormStyle& style) {
         m_settings.set_style(style);
         m_mods.set_style(style);

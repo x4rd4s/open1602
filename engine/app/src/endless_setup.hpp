@@ -33,6 +33,10 @@ struct EndlessSetup {
     /// original's 500 x 350 for four or fewer, more sea and land for more; `world`'s size is then
     /// not used. The islands follow the area.
     bool auto_size = true;
+    /// The world's number (sim::WorldSettings::seed, sim::WorldStart::seed): 0 a new one for every
+    /// game; the page of the islands sets one for its preview, so that the game gets the world it
+    /// showed. Not in settings.cfg, and not compared: the dialog's presets do not touch it.
+    std::uint64_t world_seed = 0;
 
     /// Open1602's rules on the original's maps. A multiplayer game's own world, if it gets one,
     /// has all starts at one place, as the original's multiplayer maps.
@@ -68,7 +72,6 @@ enum class SetupItem : std::uint8_t {
     Players,
     Islands,
     IslandSizes,
-    IslandShapes,
     Villages,
     VolcanoIslands,
     GoldIslands,
@@ -81,6 +84,19 @@ enum class SetupItem : std::uint8_t {
     Pirates,
     PirateNests,
     Reveal,
+    // Islands (a page of their own with a preview of the world, endless games only;
+    // sim::WorldSettings::shapes and ::landscape)
+    IslandPreset,  ///< sets the items below at once: the original's islands or a kind of world
+    IslandShapes,
+    Coast,
+    Outline,
+    LandShare,
+    SmallestIsland,
+    LargestIsland,
+    SizeSpread,
+    IslandGap,
+    Forest,
+    OreMountains,
     // Victory conditions (a page of their own, endless games only; sim::VictoryConditions)
     WinInhabitants,
     WinClass,
@@ -114,6 +130,17 @@ enum class SetupItem : std::uint8_t {
 [[nodiscard]] constexpr bool victory_item(SetupItem item) noexcept {
     return item >= SetupItem::WinInhabitants && item <= SetupItem::WinComputers;
 }
+/// Whether an item is on the page of the islands.
+[[nodiscard]] constexpr bool island_item(SetupItem item) noexcept {
+    return item >= SetupItem::IslandPreset && item <= SetupItem::OreMountains;
+}
+/// Whether an item shapes the islands of a world of islands of their own shape and size (the
+/// page's items after the shapes).
+[[nodiscard]] constexpr bool landscape_item(SetupItem item) noexcept {
+    return item >= SetupItem::Coast && item <= SetupItem::OreMountains;
+}
+/// The page of the islands in a few words: the preset it matches, or "own settings".
+[[nodiscard]] std::string islands_summary(const EndlessSetup& setup);
 /// Whether an item is on the page "Original settings". The computer players (ClassicAi) are a bug of
 /// the original too, but have their row with the opponents; the page's presets switch them as well.
 [[nodiscard]] constexpr bool bug_item(SetupItem item) noexcept {

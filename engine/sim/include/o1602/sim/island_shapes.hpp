@@ -17,15 +17,42 @@
 
 namespace o1602::sim::shapes {
 
+/// How an island's coast runs.
+enum class Roughness : std::uint8_t {
+    Smooth,   ///< long, even stretches of beach
+    Natural,  ///< as the templates
+    Rugged,   ///< bays and capes everywhere
+};
+
+/// The outline of an island within its rectangle (the rectangle's sides decide whether it is
+/// long or round).
+enum class Form : std::uint8_t {
+    Compact,   ///< one body of land
+    Branched,  ///< arms and peninsulas, deep bays
+};
+
+/// Little, the templates' share or much (forest).
+enum class Share : std::uint8_t { Little, Normal, Much };
+
+/// The longest side of an island of its own shape: tile positions are one byte.
+inline constexpr std::uint16_t kMaxSide = 250;
+inline constexpr std::uint16_t kMinSide = 16;
+
 /// What an island of its own shape must have.
 struct ShapeRequest {
-    std::uint16_t width = 0;  ///< in tiles, as the template the plan placed (at least 16, at most 255)
+    std::uint16_t width = 0;  ///< in tiles (at least 16, at most kMaxSide)
     std::uint16_t height = 0;
     std::uint8_t climate = 0;          ///< 0 north, 1 south: the forest
     std::uint8_t size = 0;             ///< size class 0 lit .. 4 lar, for the header
     std::uint8_t number = 0;           ///< island number, kept in every tile
     std::uint8_t big_mountains = 0;    ///< ore mountains for big veins (4 x 4)
     std::uint8_t small_mountains = 0;  ///< ore mountains for small veins (3 x 3)
+    Roughness roughness = Roughness::Natural;
+    Form form = Form::Compact;
+    Share forest = Share::Normal;
+    /// Per mille of the rectangle that is land, about: 0 as the templates (480..640, branched
+    /// 380..540). Up to 800 for worlds of much land.
+    std::uint16_t land = 0;
     std::uint64_t seed = 0;
 };
 

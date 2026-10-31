@@ -458,7 +458,7 @@ void check_islands(const sim::GeneratedWorld& w, const assets::ScenarioPlan& pla
                     return d.x >= m.x && d.x < m.x + 2 && d.y >= m.y && d.y < m.y + 2;
                 });
                 CHECK(!on_mountain);
-                CHECK((d.x >= 1 && d.x + 1U < side(g.size) && d.y >= 1 && d.y + 1U < side(g.size)));
+                CHECK((d.x >= 1 && d.x + 1U < g.width && d.y >= 1 && d.y + 1U < g.height));
             }
         }
     }
@@ -987,7 +987,13 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
                 const bool shaped = g.template_number == assets::IslandHeader::kNoTemplate;
                 CHECK(!(shaped && g.natives));  // a village keeps its template
                 if (shapes == sim::WorldSettings::Shapes::Own) {
-                    CHECK(shaped == !g.natives);
+                    // Free sizes: the plan decides which islands keep a template (for a village or
+                    // a volcano).
+                    const auto planned =
+                        std::find_if(plan->plan.islands.begin(), plan->plan.islands.end(),
+                                     [&](const assets::ScenarioPlan::Island& p) { return p.number == g.number; });
+                    REQUIRE(planned != plan->plan.islands.end());
+                    CHECK(shaped == ((planned->flags & sim::kPlanOwnShape) != 0));
                 }
                 own += shaped ? 1U : 0U;
                 kept += shaped ? 0U : 1U;

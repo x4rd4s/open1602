@@ -227,3 +227,41 @@ TEST_CASE("island shapes: the same request gives the same island, another seed a
                                  });
     CHECK(!same);
 }
+
+TEST_CASE("island shapes: every coast, outline and share of land, from the smallest to the largest side") {
+    using sim::shapes::Form;
+    using sim::shapes::Roughness;
+    struct Size {
+        std::uint16_t width, height;
+    };
+    constexpr std::array<Size, 4> kSizes = {{{16, 16}, {64, 24}, {180, 120}, {250, 250}}};
+    for (const Size& s : kSizes) {
+        for (const auto roughness : {Roughness::Smooth, Roughness::Natural, Roughness::Rugged}) {
+            for (const auto form : {Form::Compact, Form::Branched}) {
+                for (const std::uint16_t land : std::array<std::uint16_t, 2>{0, 740}) {
+                    sim::shapes::ShapeRequest r;
+                    r.width = s.width;
+                    r.height = s.height;
+                    r.size = 4;
+                    r.number = 9;
+                    r.roughness = roughness;
+                    r.form = form;
+                    r.land = land;
+                    r.big_mountains = s.width >= 100 ? 6 : 0;
+                    r.small_mountains = s.width >= 100 ? 8 : 0;
+                    r.seed = std::uint64_t{s.width} * 31U + static_cast<std::uint64_t>(roughness) * 7U +
+                             static_cast<std::uint64_t>(form) + land;
+                    const assets::Island island = sim::shapes::make_island(r);
+                    const Checked c = check_island(island, r);
+                    const std::size_t area = std::size_t{s.width} * s.height;
+                    CHECK(c.land * 5 >= area);  // never a speck
+                    if (land >= 700 && form == Form::Compact && s.width >= 100) {
+                        CHECK(c.land * 100 >= area * 58);  // a world of much land: fuller islands
+                    }
+                    CHECK(c.big == r.big_mountains);
+                    CHECK(c.small == r.small_mountains);
+                }
+            }
+        }
+    }
+}
