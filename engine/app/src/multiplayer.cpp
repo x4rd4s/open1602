@@ -67,8 +67,6 @@ core::Status MapViewer::start_multiplayer() {
         m_session = std::make_unique<net::HostSession>(std::move(transport).value(), m_state->simulation, m_buildings,
                                                        m_local_player, name, content_fingerprint(), config);
         host_session()->share_packages(shared_packages());
-        // The lobby's heading, as a game hosted from the menu has it by default.
-        host_session()->set_lobby_info(mp_text(MpText::DefaultTitle, name), {}, {});
         m_command_sink.set_session(m_session.get());
         m_command_sink.submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
