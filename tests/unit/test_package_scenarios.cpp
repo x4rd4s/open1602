@@ -309,3 +309,50 @@ TEST_CASE("package campaigns: the part and the scripts' campaign tables survive 
     CHECK(back->campaign_part() == world.campaign_part());
     CHECK(back->script_states() == world.script_states());
 }
+
+TEST_CASE("package scenarios: slots of the map go to the factions the scenario names") {
+    const Package p("o1602_scenarios_slots");
+    std::vector<std::string> warnings;
+    const auto read = p.read(
+        "[north]\nfile = \"maps/north.szs\"\n"
+        "slot.2 = \"corsairs\"\nslot.3 = \"anno1602:natives\"\nslot.0 = \"corsairs\"\nslot.x = \"corsairs\"\n"
+        "[south]\nfile = \"maps/north.szs\"\nslot.4 = \"corsairs\"\n",
+        warnings);
+    REQUIRE(read.size() == 1);  // the north names slots that are none
+    CHECK(read[0].id == "isles:south");
+    CHECK(warnings.size() == 3);
+    REQUIRE(read[0].slots.size() == 1);
+    CHECK(read[0].slots[0].first == 3);
+    CHECK(read[0].slots[0].second == "isles:corsairs");
+
+    sim::World world(40, 40);
+    std::vector<sim::Faction> factions = sim::base_factions();
+    sim::Faction corsairs = factions[sim::faction::kPirates];
+    corsairs.id = "isles:corsairs";
+    factions.push_back(corsairs);
+    sim::Faction league = factions[sim::faction::kSettlers];
+    league.id = "isles:league";
+    factions.push_back(league);
+    std::vector<sim::Player> players(5);
+    players[0].role = sim::PlayerRole::Human;
+    players[1].role = sim::PlayerRole::Computer;
+    sim::make_neutral(players[2], sim::faction::kNatives);
+    world.set_players(players);
+    world.set_factions(factions);
+    assets::PackageScenario s;
+    s.id = "isles:south";
+    s.slots = {{0, "isles:corsairs"},  // a person's slot stays the settlers'
+               {1, "isles:corsairs"},
+               {2, "isles:league"},
+               {3, "isles:nobody"},
+               {9, "isles:league"}};
+    warnings.clear();
+    sim::apply_package_scenario(world, s, "en", &warnings);
+    CHECK(warnings.size() == 3);
+    CHECK(world.players()[0].faction == sim::faction::kSettlers);
+    CHECK(world.players()[0].role == sim::PlayerRole::Human);
+    CHECK(world.players()[1].faction == 4);
+    CHECK(world.players()[1].role == sim::PlayerRole::Neutral);
+    CHECK(world.players()[2].faction == 5);
+    CHECK(world.players()[2].role == sim::PlayerRole::Computer);  // the settlers' behaviour: the computer steers
+}

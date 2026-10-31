@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <limits>
 #include <system_error>
 #include <utility>
@@ -72,6 +73,8 @@ constexpr std::int64_t kMaxInt32 = std::numeric_limits<std::int32_t>::max();
 constexpr std::int64_t kMinInt32 = std::numeric_limits<std::int32_t>::min();
 constexpr std::uint8_t kMaxStars = 5;
 constexpr std::size_t kMaxGoods = 2;
+/// The highest player slot a scenario names (slot numbers are a u8 from 0, kNoPlayer excluded).
+constexpr std::uint32_t kMaxSlot = 255;
 /// Tons a goods goal may ask: the amount is kept in 1/32 t in 32 bits.
 constexpr std::int64_t kMaxTons = std::numeric_limits<std::uint32_t>::max() / 32;
 
@@ -150,6 +153,19 @@ void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPacka
                     refuse(e, "is a text");
                 } else {
                     s.briefings.emplace_back(b, core::utf8_to_cp1252(*text));
+                }
+            } else if (e.key.starts_with("slot.")) {
+                // slot.3 = "corsairs": the package's faction; "anno1602:natives": another's.
+                std::uint32_t n = 0;
+                const std::string_view digits = std::string_view(e.key).substr(5);
+                const auto [end, ec] = std::from_chars(digits.data(), digits.data() + digits.size(), n);
+                if (ec != std::errc{} || end != digits.data() + digits.size() || n < 1 || n > kMaxSlot) {
+                    refuse(e, "is no player slot: slots are numbered 1 to " + std::to_string(kMaxSlot));
+                } else if (text == nullptr || text->empty()) {
+                    refuse(e, "is the id of a faction");
+                } else {
+                    std::string faction = text->find(':') == std::string::npos ? package.id + ":" + *text : *text;
+                    s.slots.emplace_back(static_cast<std::uint8_t>(n - 1), std::move(faction));
                 }
             } else if (e.key.starts_with("goal.")) {
                 ScenarioGoals& g = s.goals;

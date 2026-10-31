@@ -412,6 +412,7 @@ private:
     /// The factions a new game starts with: the base game's as the mods change them
     /// (docs/modding/factions.md). A savegame of Open1602 keeps its own.
     std::vector<sim::Faction> m_factions = sim::base_factions();
+    std::vector<sim::FactionReplacement> m_faction_replacements;
     /// The buildings the packages added and the Ids the tables gave them (docs/modding/own-buildings.md);
     /// a game keeps them (section OWNB), so its tiles name the same buildings again.
     std::vector<assets::OwnBuilding> m_own_buildings;

@@ -194,7 +194,7 @@ TEST_CASE("script: players, messages and errors") {
                                 "  local p = game.player(0)\n"
                                 "  game.message('lit', {name = p.name, money = p.money, role = game.player(1).role})\n"
                                 "  game.message('other:hello', nil, 1)\n"
-                                "  print(#game.players(), game.player(1).name, game.player(5))\n"
+                                "  print(#game.players(), game.player(1).name, game.player(5), p.faction)\n"
                                 "end\n"
                                 "function on_second() error('no lamp oil') end\n"));
     game.ticks(1);
@@ -211,7 +211,7 @@ TEST_CASE("script: players, messages and errors") {
     const auto notes = scripts->take_notes();
     REQUIRE(notes.size() == 1);
     CHECK(!notes[0].error);
-    CHECK(notes[0].text == "2\tEx\xc3\xa9ter\tnil");
+    CHECK(notes[0].text == "2\tEx\xc3\xa9ter\tnil\tanno1602:settlers");
 
     // A script that keeps failing is stopped after kMaxScriptErrors.
     game.ticks(20 * static_cast<int>(script::kMaxScriptErrors + 2));

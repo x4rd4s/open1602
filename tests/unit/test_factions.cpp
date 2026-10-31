@@ -108,7 +108,7 @@ TEST_CASE("factions: a package changes the base game's factions field by field")
     CHECK(warnings[0] == "bigworld/factions.toml line 9: unknown field 'colour'");
     CHECK(warnings[1] == "bigworld/factions.toml line 10: 'ships.from' must be a number from 0 to 65535");
     CHECK(warnings[2].find("there is no faction anno1602:vikings") != std::string::npos);
-    CHECK(warnings[3].find("there is no faction bigworld:corsairs") != std::string::npos);
+    CHECK(warnings[3].find("the new faction bigworld:corsairs needs 'behaviour'") != std::string::npos);
 
     // A file that is no data file changes nothing.
     warnings.clear();
@@ -116,4 +116,54 @@ TEST_CASE("factions: a package changes the base game's factions field by field")
     sim::apply_faction_file(factions, "broken", "[\"anno1602:pirates\"]\nnests.per = \"3\n", warnings);
     CHECK(factions == before);
     CHECK(warnings.size() == 1);
+}
+
+TEST_CASE("factions: a package adds factions of its own that act as a base game's and may take its slots") {
+    std::vector<sim::Faction> factions = sim::base_factions();
+    std::vector<std::string> warnings;
+    std::vector<sim::FactionReplacement> replacements;
+    sim::apply_faction_file(factions, "seas",
+                            "[corsairs]\n"
+                            "behaviour = \"pirates\"\n"
+                            "replaces = \"anno1602:pirates\"\n"
+                            "nests.per = 2\n"
+                            "[\"seas:guild\"]\n"
+                            "behaviour = \"trader\"\n"
+                            "replaces = \"anno1602:pirates\"\n"
+                            "[tribe]\n"
+                            "behaviour = \"elves\"\n"
+                            "[\"other:navy\"]\n"
+                            "behaviour = \"settlers\"\n",
+                            warnings, &replacements);
+    REQUIRE(factions.size() == 6);
+    CHECK(factions[4].id == "seas:corsairs");
+    CHECK(factions[4].behaviour == sim::FactionBehaviour::Pirates);
+    CHECK(factions[4].nests.per == 2);
+    CHECK(factions[4].ships == sim::base_factions()[sim::faction::kPirates].ships);
+    CHECK(factions[5].id == "seas:guild");
+    CHECK(factions[5].behaviour == sim::FactionBehaviour::Trader);
+    REQUIRE(replacements.size() == 1);
+    CHECK(replacements[0] == (sim::FactionReplacement{"anno1602:pirates", "seas:corsairs"}));
+    // The guild acts otherwise than the pirates, the tribe names no behaviour, the navy no faction
+    // of the package.
+    REQUIRE(warnings.size() == 3);
+    CHECK(warnings[0].find("another behaviour") != std::string::npos);
+    CHECK(warnings[1].find("needs 'behaviour'") != std::string::npos);
+    CHECK(warnings[2].find("only under its own name") != std::string::npos);
+    CHECK(sim::find_faction(factions, "seas:guild") == sim::FactionId{5});
+    CHECK(!sim::find_faction(factions, "seas:tribe"));
+
+    // In a game the corsairs take the pirates' slots and are saved with it.
+    sim::World world(20, 20);
+    std::vector<sim::Player> players(3);
+    players[0].role = sim::PlayerRole::Human;
+    sim::make_neutral(players[1], sim::faction::kPirates);
+    sim::make_neutral(players[2], sim::faction::kNatives);
+    world.set_players(players);
+    world.set_factions(factions);
+    world.replace_factions(replacements);
+    CHECK(world.players()[1].faction == 4);
+    CHECK(world.behaviour(world.players()[1]) == sim::FactionBehaviour::Pirates);
+    CHECK(world.players()[2].faction == sim::faction::kNatives);
+    CHECK(world.first_of(sim::FactionBehaviour::Pirates) == 1);
 }

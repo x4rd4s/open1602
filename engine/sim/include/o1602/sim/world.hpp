@@ -480,6 +480,9 @@ public:
     [[nodiscard]] const std::vector<Faction>& factions() const noexcept { return m_factions; }
     /// Replaces the factions; a player of a faction that is no longer there becomes a settler.
     void set_factions(std::vector<Faction> factions);
+    /// Gives the slots of each replaced faction to the faction that replaces it (factions.toml
+    /// `replaces`), in order; a replacement whose factions this world does not have does nothing.
+    void replace_factions(const std::vector<FactionReplacement>& replacements);
     /// The values of the balance this game plays with (balance.hpp): the original's unless a
     /// package changed them before the game started.
     [[nodiscard]] const Balance& balance() const noexcept { return m_balance; }
