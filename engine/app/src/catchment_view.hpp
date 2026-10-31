@@ -20,6 +20,7 @@ namespace o1602::app {
 struct CatchmentCircles {
     const assets::BuildingType* type = nullptr;  ///< the clicked building's type
     std::vector<sim::Catchment> circles;         ///< the clicked building's own circle first
+    std::vector<sim::TilePos> origins;           ///< the buildings' origins, in the order of `circles`
 };
 
 /// Whether a building of `type` shows a catchment circle when clicked: production and public

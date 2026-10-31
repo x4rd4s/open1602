@@ -99,6 +99,9 @@ TEST_CASE("catchment view: clicked again, all the player's buildings of its type
     REQUIRE(c->circles.size() == 2);
     CHECK(c->circles[0].centre.x == 10);
     CHECK(c->circles[1].centre.x == 0);
+    REQUIRE(c->origins.size() == 2);
+    CHECK((c->origins[0] == sim::TilePos{10, 2}));
+    CHECK((c->origins[1] == sim::TilePos{0, 2}));
     // A tavern has no other tavern.
     const auto tavern = app::catchment_circles(world, buildings, 0, 0, 30, 2, true);
     REQUIRE(tavern.has_value());
@@ -142,4 +145,20 @@ TEST_CASE("catchment view: several lit circles light the land inside any of them
     CHECK(l.dimmed(15, 10, &own));  // between the circles
     CHECK(l.in_circle(14, 9, 7, 1));
     CHECK(!l.in_circle(14, 9, 3, 1));
+}
+
+TEST_CASE("catchment view: the harbours of several buildings keep the water lit around each") {
+    const assets::BuildingTable buildings = make_buildings();
+    const sim::World world = make_world(buildings);  // the island at world tiles (10, 10)
+    sim::Catchment a;
+    a.centre = sim::TilePos{11, 13};
+    a.radius = 1;
+    render::TileLighting l = render::TileLighting::circle(0, a);
+    CHECK(l.dimmed(10, 5, nullptr));  // the sea north of the island, 5 rows above the chapel at x 0
+    l.harbour(world, buildings, 0, 0, 2);
+    CHECK(!l.dimmed(10, 9, nullptr));  // within 5 tiles of the chapel at x 0
+    CHECK(l.dimmed(20, 9, nullptr));   // not near the chapel at x 0
+    l.harbour(world, buildings, 0, 10, 2);
+    CHECK(!l.dimmed(10, 9, nullptr));  // both
+    CHECK(!l.dimmed(20, 9, nullptr));
 }

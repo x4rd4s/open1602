@@ -52,6 +52,7 @@ std::optional<CatchmentCircles> catchment_circles(const sim::World& world, const
     CatchmentCircles out;
     out.type = &type;
     out.circles.push_back(sim::catchment_of(type, cell.rotation, sim::TilePos{x, y}));
+    out.origins.push_back(sim::TilePos{x, y});
     if (!same_type) {
         return out;
     }
@@ -60,8 +61,9 @@ std::optional<CatchmentCircles> catchment_circles(const sim::World& world, const
             return;  // the clicked one, already first
         }
         if (const auto rotation = origin_of(map, buildings, type, player, ox, oy)) {
-            out.circles.push_back(sim::catchment_of(
-                type, *rotation, sim::TilePos{static_cast<std::int32_t>(ox), static_cast<std::int32_t>(oy)}));
+            const sim::TilePos origin{static_cast<std::int32_t>(ox), static_cast<std::int32_t>(oy)};
+            out.circles.push_back(sim::catchment_of(type, *rotation, origin));
+            out.origins.push_back(origin);
         }
     };
     if (world.production_index(island, x, y)) {

@@ -1170,10 +1170,11 @@ std::optional<render::TileLighting> MapViewer::building_lighting(const Selection
     if (sim::catchment_covers_water(*c.type)) {
         l.water();  // where a fisher's boat fishes, or a tower shoots at ships
     }
-    for (const sim::City& city : m_state->world.cities()) {
-        if (city.island == clicked.island && city.warehouse_x == clicked.x && city.warehouse_y == clicked.y) {
-            l.harbour(m_state->world, m_buildings, clicked.island, clicked.x,
-                      clicked.y);  // the Kontor: its ships' water
+    // A Kontor and a shipyard: also the water their ships come from, as in the original.
+    if (c.type->prod_kind == sim::prod::kKontor || c.type->prod_kind == sim::prod::kShipyard) {
+        for (const sim::TilePos& o : c.origins) {
+            l.harbour(m_state->world, m_buildings, clicked.island, static_cast<std::uint32_t>(o.x),
+                      static_cast<std::uint32_t>(o.y));
         }
     }
     return l;

@@ -226,7 +226,7 @@ inline constexpr assets::Rgba kCircleOutline{255, 230, 0, 255};
 
 /// Tiles drawn darker, as the original does while the player builds (the fourth byte of its world
 /// map cells picks a shading table, 0x00486B60): only the land the player can build on stays lit. A clicked
-/// building with a catchment narrows that to the land inside its circle, a clicked Kontor adds
+/// building with a catchment narrows that to the land inside its circle, a clicked Kontor or shipyard adds
 /// the water its ships trade from, a clicked fisher's hut the water inside its circle. A building being placed shows
 /// its own circle as a dashed border, drawn whole, over land and water alike; the circle of a building still clicked
 /// stays lit beside it. The land of other players can get a dotted border too (History Edition). A building clicked
@@ -266,7 +266,8 @@ public:
         m_water = true;
         return *this;
     }
-    /// Keeps the water lit that ships reach the building at tile (x, y) of `island` from.
+    /// Keeps the water lit that ships reach the building at tile (x, y) of `island` from (a Kontor, a
+    /// shipyard); called again, that of further buildings of the same island too.
     TileLighting& harbour(const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                           std::uint32_t x, std::uint32_t y);
 
@@ -319,12 +320,15 @@ private:
     Circle m_outline;           ///< the building being placed
     bool m_foreign_borders = false;
     bool m_water = false;  ///< the water in the m_lit circles stays lit
-    // The building whose harbour water stays lit (world == nullptr: none).
+    // The buildings whose harbour water stays lit (world == nullptr: none).
+    struct Harbour {
+        std::uint32_t x = 0;
+        std::uint32_t y = 0;
+    };
     const sim::World* m_world = nullptr;
     const assets::BuildingTable* m_buildings = nullptr;
     std::uint16_t m_island = 0;
-    std::uint32_t m_x = 0;
-    std::uint32_t m_y = 0;
+    std::vector<Harbour> m_harbours;
 };
 
 /// Everything besides the tiles that goes into the world draw list.
