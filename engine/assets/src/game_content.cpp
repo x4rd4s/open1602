@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <new>
+#include <optional>
 #include <set>
 #include <system_error>
 #include <utility>
@@ -161,6 +163,85 @@ int compare_versions(std::string_view a, std::string_view b) noexcept {
     return 0;
 }
 
+namespace {
+
+/// One comparison of a version requirement ("<2", ">=1.2", "1.2"), without the blanks around it.
+struct VersionBound {
+    std::string_view op;  ///< ">=", ">", "<=", "<" or "="
+    std::string_view version;
+};
+
+std::string_view trimmed(std::string_view text) noexcept {
+    while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
+/// The comparisons of `requirement`, separated by commas; nothing if one is not valid.
+std::optional<std::vector<VersionBound>> version_bounds(std::string_view requirement) {
+    std::vector<VersionBound> bounds;
+    for (;;) {
+        const std::size_t comma = requirement.find(',');
+        std::string_view item = trimmed(requirement.substr(0, comma));
+        VersionBound bound{">=", {}};
+        for (const std::string_view op : {">=", "<=", ">", "<", "="}) {
+            if (item.starts_with(op)) {
+                bound.op = op;
+                item = trimmed(item.substr(op.size()));
+                break;
+            }
+        }
+        if (!valid_version(item)) {
+            return std::nullopt;
+        }
+        bound.version = item;
+        bounds.push_back(bound);
+        if (comma == std::string_view::npos) {
+            return bounds;
+        }
+        requirement.remove_prefix(comma + 1);
+    }
+}
+
+}  // namespace
+
+bool valid_version_requirement(std::string_view requirement) noexcept {
+    if (requirement.empty()) {
+        return true;
+    }
+    try {
+        return version_bounds(requirement).has_value();
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
+}
+
+bool version_meets(std::string_view version, std::string_view requirement) noexcept {
+    if (requirement.empty()) {
+        return true;
+    }
+    if (version.empty() || !valid_version(version)) {
+        return false;
+    }
+    std::optional<std::vector<VersionBound>> bounds;
+    try {
+        bounds = version_bounds(requirement);
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
+    if (!bounds) {
+        return false;
+    }
+    return std::all_of(bounds->begin(), bounds->end(), [&](const VersionBound& b) {
+        const int c = compare_versions(version, b.version);
+        return b.op == ">=" ? c >= 0 : b.op == ">" ? c > 0 : b.op == "<=" ? c <= 0 : b.op == "<" ? c < 0 : c == 0;
+    });
+}
+
 core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vector<std::string>& warnings) {
     auto tables = core::parse_data_file(utf8);
     if (!tables) {
@@ -191,8 +272,10 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
                     read.version = *text;
                 }
             } else if (auto id = key_after(e.key, "depends.")) {
-                if (text == nullptr || (!text->empty() && !valid_version(*text))) {
-                    warnings.push_back(at + e.key + " must be the lowest version needed, such as \"1.0\", or \"\"");
+                if (text == nullptr || !valid_version_requirement(*text)) {
+                    warnings.push_back(at + e.key +
+                                       " must be the versions needed, such as \"1.0\" (or later), \">=1.2, <2\" or "
+                                       "\"\" (any)");
                 } else if (*id == package.id) {
                     warnings.push_back(at + "a package does not depend on itself");
                 } else {
@@ -228,17 +311,19 @@ std::uint64_t package_hash(const std::filesystem::path& folder) {
     return h;
 }
 
-std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods, std::vector<std::string>& warnings,
-                                          std::span<const std::string> disabled) {
+std::vector<ModPackage> read_mod_packages(const std::filesystem::path& mods, std::vector<std::string>& warnings,
+                                          std::vector<PackageProblem>* problems) {
     std::vector<ModPackage> packages;
-    for (ModPackage& package : mod_packages(mods)) {
-        if (std::find(disabled.begin(), disabled.end(), package.id) != disabled.end()) {
-            warnings.push_back(package.id + ": turned off; the package is not loaded");
-            continue;
+    const auto unreadable = [&](const ModPackage& package, std::string why) {
+        warnings.push_back(std::move(why) + "; the package is not loaded");
+        if (problems != nullptr) {
+            problems->push_back(PackageProblem{package.id, PackageProblem::Kind::Unreadable, {}, {}, {}});
         }
+    };
+    for (ModPackage& package : mod_packages(mods)) {
         if (package.id.size() > kMaxPackageIdLength) {
-            warnings.push_back(package.id + ": a package's name has at most " + std::to_string(kMaxPackageIdLength) +
-                               " bytes; the package is not loaded");
+            unreadable(package,
+                       package.id + ": a package's name has at most " + std::to_string(kMaxPackageIdLength) + " bytes");
             continue;
         }
         const std::filesystem::path manifest = package.folder / kManifestFile;
@@ -251,45 +336,114 @@ std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods, std
                     package, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), warnings);
             }
             if (!read) {
-                warnings.push_back(read.error().message + "; the package is not loaded");
+                unreadable(package, read.error().message);
                 continue;
             }
         }
-        package.hash = package_hash(package.folder);
         packages.push_back(std::move(package));
     }
-    return order_packages(std::move(packages), warnings);
+    return packages;
 }
 
-std::vector<ModPackage> order_packages(std::vector<ModPackage> packages, std::vector<std::string>& warnings) {
+std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods, std::vector<std::string>& warnings,
+                                          std::span<const std::string> disabled,
+                                          std::vector<PackageProblem>* problems) {
+    std::vector<PackageProblem> found;
+    std::vector<ModPackage> packages =
+        order_packages(read_mod_packages(mods, warnings, &found), warnings, disabled, &found);
+    for (ModPackage& package : packages) {
+        package.hash = package_hash(package.folder);
+    }
+    if (problems != nullptr) {
+        problems->insert(problems->end(), found.begin(), found.end());
+    }
+    return packages;
+}
+
+namespace {
+
+std::string problem_text(const PackageProblem& p) {
+    using Kind = PackageProblem::Kind;
+    const std::string needs = p.dependency + (p.versions.empty() ? "" : " " + p.versions);
+    switch (p.kind) {
+        case Kind::TurnedOff:
+            return "turned off";
+        case Kind::Unreadable:
+            return "its manifest cannot be read";
+        case Kind::Missing:
+            return "needs the package " + needs + ", which is not there";
+        case Kind::WrongVersion:
+            return "needs " + needs + ", but " + (p.found.empty() ? "it has no version" : "it is " + p.found);
+        case Kind::DependencyOff:
+            return "needs " + p.dependency + ", which is turned off";
+        case Kind::DependencyBroken:
+            return "needs " + p.dependency + ", which is not loaded itself";
+        case Kind::Circle:
+            return "its dependencies or load order go round in a circle";
+    }
+    return {};
+}
+
+}  // namespace
+
+std::vector<ModPackage> order_packages(std::vector<ModPackage> packages, std::vector<std::string>& warnings,
+                                       std::span<const std::string> disabled, std::vector<PackageProblem>* problems) {
+    std::vector<PackageProblem> found = problems != nullptr ? *problems : std::vector<PackageProblem>{};
+    const std::size_t known = found.size();
+    const auto leave_out = [&](PackageProblem problem) {
+        warnings.push_back(problem.package + ": " + problem_text(problem) + "; the package is not loaded");
+        found.push_back(std::move(problem));
+    };
     std::sort(packages.begin(), packages.end(), [](const ModPackage& a, const ModPackage& b) { return a.id < b.id; });
+    // Every installed package, for what a dependency is when it is left out.
+    const std::vector<ModPackage> installed = packages;
+    const auto installed_as = [&](std::string_view id) -> const ModPackage* {
+        const auto it =
+            std::find_if(installed.begin(), installed.end(), [&](const ModPackage& p) { return p.id == id; });
+        return it != installed.end() ? &*it : nullptr;
+    };
+    const auto problem_of = [&](std::string_view id) -> const PackageProblem* {
+        const auto it =
+            std::find_if(found.begin(), found.end(), [&](const PackageProblem& p) { return p.package == id; });
+        return it != found.end() ? &*it : nullptr;
+    };
+    std::erase_if(packages, [&](const ModPackage& p) {
+        if (std::find(disabled.begin(), disabled.end(), p.id) == disabled.end()) {
+            return false;
+        }
+        leave_out(PackageProblem{p.id, PackageProblem::Kind::TurnedOff, {}, {}, {}});
+        return true;
+    });
     const auto find = [&](std::string_view id) {
         return std::find_if(packages.begin(), packages.end(), [&](const ModPackage& p) { return p.id == id; });
     };
-    // Out go the packages whose dependencies are not there, until none is left out any more: one
-    // that goes may take others with it.
+    // Out go the packages whose dependencies are not there as they need them, until none is left
+    // out any more: one that goes may take others with it.
     for (bool changed = true; changed;) {
         changed = false;
-        for (auto p = packages.begin(); p != packages.end(); ++p) {
+        for (auto p = packages.begin(); p != packages.end() && !changed; ++p) {
             for (const PackageDependency& d : p->depends) {
-                const auto other = find(d.id);
-                std::string problem;
-                if (other == packages.end()) {
-                    problem = "needs the package " + d.id + (d.min_version.empty() ? "" : " " + d.min_version) +
-                              ", which is not there";
-                } else if (!d.min_version.empty() &&
-                           (other->version.empty() || compare_versions(other->version, d.min_version) < 0)) {
-                    problem = "needs " + d.id + " " + d.min_version + " or later, but " +
-                              (other->version.empty() ? "it has no version" : "it is " + other->version);
+                using Kind = PackageProblem::Kind;
+                PackageProblem problem{p->id, Kind::Missing, d.id, d.versions, {}};
+                const ModPackage* other = installed_as(d.id);
+                const PackageProblem* gone = problem_of(d.id);
+                if (other == nullptr) {
+                    problem.kind = gone != nullptr ? Kind::DependencyBroken : Kind::Missing;  // unreadable
+                } else if (!version_meets(other->version, d.versions)) {
+                    problem.kind = Kind::WrongVersion;
+                    problem.found = other->version;
+                } else if (find(d.id) != packages.end()) {
+                    continue;
+                } else {
+                    problem.kind =
+                        gone != nullptr && gone->kind == Kind::TurnedOff ? Kind::DependencyOff : Kind::DependencyBroken;
                 }
-                if (!problem.empty()) {
-                    warnings.push_back(p->id + ": " + problem + "; the package is not loaded");
-                    packages.erase(p);
-                    changed = true;
-                    break;
+                if (problem.kind != Kind::Missing && problem.kind != Kind::WrongVersion) {
+                    problem.versions.clear();
                 }
-            }
-            if (changed) {
+                leave_out(std::move(problem));
+                packages.erase(p);
+                changed = true;
                 break;
             }
         }
@@ -337,14 +491,70 @@ std::vector<ModPackage> order_packages(std::vector<ModPackage> packages, std::ve
     }
     for (std::size_t i = 0; i < n; ++i) {
         if (!placed[i]) {
-            warnings.push_back(packages[i].id +
-                               ": its dependencies or load order go round in a circle; the package is not loaded");
+            leave_out(PackageProblem{packages[i].id, PackageProblem::Kind::Circle, {}, {}, {}});
         }
+    }
+    if (problems != nullptr) {
+        problems->insert(problems->end(), found.begin() + static_cast<std::ptrdiff_t>(known), found.end());
     }
     std::vector<ModPackage> out;
     out.reserve(order.size());
     for (const std::size_t i : order) {
         out.push_back(std::move(packages[i]));
+    }
+    return out;
+}
+
+std::vector<std::string> dependencies_to_turn_on(std::span<const ModPackage> installed, std::string_view id,
+                                                 std::span<const std::string> disabled) {
+    std::set<std::string, std::less<>> needed;
+    std::vector<std::string_view> open{id};
+    while (!open.empty()) {
+        const std::string_view current = open.back();
+        open.pop_back();
+        const auto package =
+            std::find_if(installed.begin(), installed.end(), [&](const ModPackage& p) { return p.id == current; });
+        if (package == installed.end()) {
+            continue;
+        }
+        for (const PackageDependency& d : package->depends) {
+            const auto other =
+                std::find_if(installed.begin(), installed.end(), [&](const ModPackage& p) { return p.id == d.id; });
+            if (other != installed.end() && d.id != id && version_meets(other->version, d.versions) &&
+                needed.insert(d.id).second) {
+                open.emplace_back(other->id);
+            }
+        }
+    }
+    std::vector<std::string> out;
+    for (const ModPackage& p : installed) {
+        if (needed.contains(p.id) && std::find(disabled.begin(), disabled.end(), p.id) != disabled.end()) {
+            out.push_back(p.id);
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> packages_needing(std::span<const ModPackage> installed, std::string_view id) {
+    std::set<std::string, std::less<>> needing;
+    for (bool changed = true; changed;) {
+        changed = false;
+        for (const ModPackage& p : installed) {
+            if (p.id == id || needing.contains(p.id)) {
+                continue;
+            }
+            if (std::any_of(p.depends.begin(), p.depends.end(),
+                            [&](const PackageDependency& d) { return d.id == id || needing.contains(d.id); })) {
+                needing.insert(p.id);
+                changed = true;
+            }
+        }
+    }
+    std::vector<std::string> out;
+    for (const ModPackage& p : installed) {
+        if (needing.contains(p.id)) {
+            out.push_back(p.id);
+        }
     }
     return out;
 }

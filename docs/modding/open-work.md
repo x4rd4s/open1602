@@ -60,6 +60,11 @@ and load no others for it. Also done: a host sends missing packages to a compute
 agrees (kept in `mods-cache`), and the main menu's screen "Mods" turns packages on and off and adds
 received ones to the `mods` folder. Still open: packages as archives, not only folders.
 
+Dependencies done on 2026-10-31 ([packages.md](packages.md#versions-a-package-needs)), at the
+owner's request: `depends.<id>` takes version ranges (`">=1.2, <2"`); turning a package on in the
+screen "Mods" turns on what it needs, turning one off names what is not loaded without it; a
+package that cannot be loaded says why in the screen (missing, wrong version, turned off, not
+loaded itself, circle), not only in the log.
 ### 2. Content registry with string ids (section 2)
 
 Part a done on 2026-10-26 ([values.md](values.md)): a package changes single values of the

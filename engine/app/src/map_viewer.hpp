@@ -272,6 +272,9 @@ private:
     void reload_mods();
     /// Copies the received package in `folder` into the mods folder; what the screen "Mods" says.
     std::string adopt_mod(const std::filesystem::path& folder);
+    /// Turns the package `id` of the mods folder on (with the packages it needs) or off, and
+    /// reloads the packages; returns what the screen "Mods" tells about it (Windows-1252).
+    std::string toggle_mod(const std::string& id);
     /// The packages a game may use here: those in `mods`, then those received from hosts.
     [[nodiscard]] std::vector<assets::ModPackage> known_packages() const;
     /// Drops the session, its beacon and the hosted game; the menus stay as they are.

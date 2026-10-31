@@ -39,10 +39,10 @@ struct ContentPackage {
     friend bool operator==(const ContentPackage&, const ContentPackage&) = default;
 };
 
-/// "Needs that package, at least at that version" (`depends.<id> = "1.2"` in the manifest).
+/// "Needs that package, in one of these versions" (`depends.<id> = ">=1.2, <2"` in the manifest).
 struct PackageDependency {
     std::string id;
-    std::string min_version;  ///< empty: any version
+    std::string versions;  ///< a version requirement (valid_version_requirement); empty: any version
 };
 
 /// A folder of <data folder>/mods: its id is the folder's name. The rest comes from its manifest
@@ -73,6 +73,14 @@ struct ModPackage {
 /// "1.10" > "1.9"): negative, 0 or positive.
 [[nodiscard]] int compare_versions(std::string_view a, std::string_view b) noexcept;
 
+/// Whether `requirement` is one a dependency may give: empty (any version), or comparisons with
+/// versions separated by commas, all of which must hold: `>=1.2`, `>1.2`, `<=1.2`, `<2`, `=1.2.3`.
+/// A version without a comparison is the lowest one needed (`1.2` is `>=1.2`).
+[[nodiscard]] bool valid_version_requirement(std::string_view requirement) noexcept;
+/// Whether `version` meets a valid `requirement`. Any version, also none, meets the empty one; no
+/// version meets any other.
+[[nodiscard]] bool version_meets(std::string_view version, std::string_view requirement) noexcept;
+
 /// Reads the manifest text of `package` (the contents of its mod.toml) into it. What is wrong is
 /// passed over with a warning that names the file and the line; a file that cannot be read at all
 /// is an error and changes nothing.
@@ -83,19 +91,59 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
 /// system for equal files; a file that cannot be read counts differently from an empty one.
 [[nodiscard]] std::uint64_t package_hash(const std::filesystem::path& folder);
 
+/// Why a package is not loaded.
+struct PackageProblem {
+    enum class Kind : std::uint8_t {
+        TurnedOff,         ///< turned off in the menu of mods
+        Unreadable,        ///< its manifest cannot be read, or its id is too long
+        Missing,           ///< `dependency` is not installed
+        WrongVersion,      ///< `dependency` is installed as `found` (empty: no version), not in `versions`
+        DependencyOff,     ///< `dependency` is turned off
+        DependencyBroken,  ///< `dependency` cannot be loaded itself
+        Circle,            ///< its dependencies and load order go round in a circle
+    };
+    std::string package;
+    Kind kind = Kind::Unreadable;
+    std::string dependency;
+    std::string versions;  ///< Missing, WrongVersion: what the package needs of `dependency`
+    std::string found;     ///< WrongVersion
+    friend bool operator==(const PackageProblem&, const PackageProblem&) = default;
+};
+
+/// The folders of `mods` with their manifests read, in the order of mod_packages(); those whose
+/// manifest cannot be read, or whose id is too long, are left out with a warning and, if
+/// `problems` is given, a PackageProblem::Unreadable there. No hashes yet.
+[[nodiscard]] std::vector<ModPackage> read_mod_packages(const std::filesystem::path& mods,
+                                                        std::vector<std::string>& warnings,
+                                                        std::vector<PackageProblem>* problems = nullptr);
+
 /// The packages of `mods` that can be loaded, in their load order: each with its manifest read and
 /// its hash. A package comes after the ones it depends on and the ones it wants to come after;
 /// otherwise in the order of the bytes of their ids. A package whose manifest cannot be read, whose
-/// dependency is missing or too old, or that is part of a circle of dependencies is left out, and
-/// a warning says why (as are the packages that depend on it). So is a package whose id is in
-/// `disabled` (turned off in the menu of mods), and with it those that depend on it.
+/// dependency is missing, in a version it does not take, turned off or not loaded itself, that is
+/// part of a circle, or whose id is in `disabled` (turned off in the menu of mods), is left out, and
+/// a warning says why; so does a PackageProblem in `problems`, if given.
 [[nodiscard]] std::vector<ModPackage> load_mod_packages(const std::filesystem::path& mods,
                                                         std::vector<std::string>& warnings,
-                                                        std::span<const std::string> disabled = {});
-/// The same for packages whose manifests were read already (and whose hashes are set): the order,
-/// without the packages that cannot be loaded.
+                                                        std::span<const std::string> disabled = {},
+                                                        std::vector<PackageProblem>* problems = nullptr);
+/// The same for packages whose manifests were read already: the order, without the packages that
+/// cannot be loaded. A package `problems` names already (Unreadable) counts as installed but not
+/// loadable.
 [[nodiscard]] std::vector<ModPackage> order_packages(std::vector<ModPackage> packages,
-                                                     std::vector<std::string>& warnings);
+                                                     std::vector<std::string>& warnings,
+                                                     std::span<const std::string> disabled = {},
+                                                     std::vector<PackageProblem>* problems = nullptr);
+
+/// What turning `id` on in the menu of mods turns on with it: the packages of `installed` (manifests
+/// read) among `disabled` that it needs, also through other packages it needs, as long as their
+/// version is one it takes; in the order of `installed`.
+[[nodiscard]] std::vector<std::string> dependencies_to_turn_on(std::span<const ModPackage> installed,
+                                                               std::string_view id,
+                                                               std::span<const std::string> disabled);
+/// The packages of `installed` that need `id`, also through other packages: what is not loaded
+/// without it; in the order of `installed`.
+[[nodiscard]] std::vector<std::string> packages_needing(std::span<const ModPackage> installed, std::string_view id);
 
 /// What a game names (ContentPackage) of the packages it was started with.
 [[nodiscard]] std::vector<ContentPackage> content_of(std::span<const ModPackage> packages);
