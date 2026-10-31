@@ -63,6 +63,7 @@ public:
         io(*this, v);
     }
     [[nodiscard]] bool ok() const { return true; }
+    void fail() {}
 
 private:
     core::ByteWriter& m_out;
@@ -115,6 +116,7 @@ public:
         io(*this, v);
     }
     [[nodiscard]] bool ok() const { return m_in.ok(); }
+    void fail() { m_in.fail(); }
 
 private:
     StateIn& m_in;
@@ -126,6 +128,31 @@ void io(A& a, SlotState& s) {
     a(s.count);
     a(s.attempts);
     a(s.fail_level);
+}
+
+/// The slots of a city record or of a player (kAllSlots). From state version 5 on, their number up to
+/// the last one in use (at least kSlots) and then each; before, the original's kSlots.
+template <class A, class T>
+void slot_array(A& a, std::array<T, kAllSlots>& v) {
+    std::uint32_t n = kSlots;
+    if (a.version() >= kStateWithPackageSlots) {
+        if constexpr (!A::kLoading) {
+            for (std::uint32_t k = kAllSlots; k > kSlots; --k) {
+                if (!(v[k - 1] == T{})) {
+                    n = k;
+                    break;
+                }
+            }
+        }
+        a(n);
+        if (n < kSlots || n > kAllSlots) {
+            a.fail();
+            return;
+        }
+    }
+    for (std::uint32_t k = 0; k < n; ++k) {
+        a(v[k]);
+    }
 }
 
 template <class A>
@@ -147,7 +174,7 @@ void io(A& a, CityPlan& r) {
     a(r.land);
     a(r.land_percent);
     a(r.flags);
-    a(r.slots);
+    slot_array(a, r.slots);
     a(r.doctor);
     a(r.posts);
     a(r.post_cursor);
@@ -314,7 +341,7 @@ void io(A& a, AiPlayer& p) {
     a(p.skip_layout);
     a(p.max_stage);
     a(p.score);
-    a(p.present);
+    slot_array(a, p.present);
     a(p.plans);
     a(p.search);
     a(p.segments);

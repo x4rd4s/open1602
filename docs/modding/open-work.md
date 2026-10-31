@@ -140,6 +140,13 @@ package's production chain. Needed: needs and producers derived from the buildin
 a table keyed by building family, stage orders and cheat amounts as data with today's values as
 defaults. Depends on items 2 and 3.
 
+Part 1 done on 2026-10-31 ([computer-players.md](computer-players.md)): a good of a package that a
+class needs gets its producer from the building table, its raw material its own, down to a farm or
+a good of the original; a city wants as many as its inhabitants and the producers that use the good
+need, at most eight, after the list of its stage. They count in slots after the original's 55
+(savegame `AIST` version 5). Still open: the original's Needs, slots, stage orders, public buildings
+and cheat amounts as data.
+
 ### 6. Lua scripts (section 6)
 
 `engine/script` exists only as a README. Needed: Lua 5.4 with a deterministic, sandboxed interface
