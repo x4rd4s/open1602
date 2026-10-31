@@ -499,3 +499,29 @@ TEST_CASE("main menu: campaigns by stars then number, each by the header of its 
     CHECK((names == std::vector<std::string>{"Kampagnen", "Zeta", "Beta", "Alpha"}));
     std::filesystem::remove_all(folder);
 }
+
+TEST_CASE("main menu: the packages' scenarios under their own heading, with stars and briefing") {
+    CHECK(app::package_scenario_list({}, "en", "----Mods----").empty());
+    std::vector<assets::PackageScenario> scenarios(1);
+    assets::PackageScenario& s = scenarios[0];
+    s.id = "isles:north";
+    s.package = "isles";
+    s.file = std::filesystem::path("mods") / "isles" / "north.szs";
+    s.stars = 4;
+    s.names.emplace_back("en", "The North");
+    s.names.emplace_back("de", "Der Norden");
+    s.briefings.emplace_back("de", "Siedelt im Norden.");
+    const auto list = app::package_scenario_list(scenarios, "de", "----Mods----");
+    REQUIRE(list.size() == 2);
+    CHECK(list[0].separator);
+    CHECK(list[0].name == "----Mods----");
+    CHECK(!list[1].separator);
+    CHECK(list[1].name == "Der Norden");
+    CHECK(list[1].base == std::filesystem::path("isles_north"));
+    REQUIRE(list[1].files.size() == 1);
+    CHECK(list[1].files[0].first == 0xFF);
+    CHECK(list[1].files[0].second == s.file);
+    CHECK(list[1].header.ranking == 4);
+    CHECK(list[1].package_scenario == "isles:north");
+    CHECK(list[1].briefing == "Siedelt im Norden.");
+}

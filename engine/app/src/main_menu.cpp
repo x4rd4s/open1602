@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <map>
 #include <random>
 #include <utility>
@@ -249,6 +250,32 @@ std::vector<MenuScenario> scenario_list(const std::filesystem::path& folder, con
     return out;
 }
 
+std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageScenario> scenarios,
+                                                std::string_view language, std::string heading) {
+    std::vector<MenuScenario> out;
+    if (scenarios.empty()) {
+        return out;
+    }
+    MenuScenario head;
+    head.name = std::move(heading);
+    head.separator = true;
+    out.push_back(std::move(head));
+    for (const assets::PackageScenario& p : scenarios) {
+        MenuScenario s;
+        s.name = p.name(language);
+        // Its high scores beside the others, by a name no scenario of the game folder has.
+        std::string base = p.id;
+        std::replace(base.begin(), base.end(), ':', '_');
+        s.base = core::path_from_utf8(base);
+        s.files.emplace_back(std::uint8_t{0xFF}, p.file);
+        s.header.ranking = p.stars;
+        s.package_scenario = p.id;
+        s.briefing = p.briefing(language);
+        out.push_back(std::move(s));
+    }
+    return out;
+}
+
 std::optional<CampaignPart> campaign_part_of(const std::filesystem::path& file) {
     const std::array<std::string, 4> headings{};
     for (const MenuScenario& s : scenario_list(file.parent_path(), headings, nullptr)) {
@@ -420,6 +447,9 @@ void MainMenu::load_scenarios() {
     if (const auto folder = m_game->resolve("Szenes")) {
         m_scenarios = scenario_list(*folder, headings, m_game);
     }
+    std::vector<MenuScenario> own =
+        package_scenario_list(m_package_scenarios, ui::current_language(), ui::tr("menu.package_scenarios"));
+    m_scenarios.insert(m_scenarios.end(), std::make_move_iterator(own.begin()), std::make_move_iterator(own.end()));
     // The numbered missions above the progress are not offered (0x0048DC90).
     std::erase_if(m_scenarios, [&](const MenuScenario& s) {
         const std::uint32_t n = s.header.mission_number;
@@ -486,9 +516,16 @@ void MainMenu::load_details() {
     const MenuScenario& s = m_scenarios[m_chosen];
     m_briefing_line = 0;
     // The briefing: the mission of the human in the file (AUFTRAG4 of the player record).
-    m_briefing.clear();
-    if (auto bytes = core::read_file(chosen_file())) {
-        if (auto file = assets::ChunkFile::from_bytes(std::move(bytes).value())) {
+    // A package's scenario may have one of its own; otherwise the map's.
+    m_briefing = s.briefing;
+    std::optional<core::Bytes> map_bytes;
+    if (m_briefing.empty()) {
+        if (auto read = core::read_file(chosen_file())) {
+            map_bytes = std::move(read).value();
+        }
+    }
+    if (map_bytes) {
+        if (auto file = assets::ChunkFile::from_bytes(std::move(*map_bytes))) {
             const auto players = assets::load_players(*file);
             const auto missions = assets::load_missions(*file);
             if (missions && !missions->empty()) {
@@ -741,6 +778,7 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                     ev.path = chosen_file();
                     ev.name = m_name;
                     ev.setup = m_scenario;
+                    ev.package_scenario = m_scenarios[m_chosen].package_scenario;
                     out.push_back(std::move(ev));
                     break;
                 }

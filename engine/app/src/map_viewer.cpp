@@ -403,6 +403,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_figure_looks = std::move(rules.looks);
     assets::apply_figure_looks(viewer->m_figures, viewer->m_original_figures, viewer->m_figure_looks);
     viewer->m_packages = std::move(packages);
+    viewer->load_package_scenarios();
     {
         std::vector<std::string> problems;
         viewer->m_cached_packages = assets::cached_packages(data_folder() / "mods-cache", problems);
@@ -2653,6 +2654,7 @@ void MapViewer::load_options() {
         menu->set_name(m_app_settings.player_name);
         menu->set_endless_setup(m_app_settings.endless);
         menu->set_scenario_setup(m_app_settings.scenario);
+        menu->set_package_scenarios(m_package_scenarios);
         menu->set_tutorial_chapter(m_app_settings.tutorial_chapter);
     }
 }
@@ -2807,6 +2809,42 @@ core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::
     return core::Ok{};
 }
 
+void MapViewer::load_package_scenarios() {
+    std::vector<std::string> problems;
+    m_package_scenarios = assets::load_package_scenarios(m_packages, problems);
+    for (const std::string& p : problems) {
+        std::fprintf(stderr, "mods: %s\n", p.c_str());
+    }
+}
+
+core::Status MapViewer::start_package_scenario(const std::string& id, const sim::Rules* rules) {
+    const assets::PackageScenario* scenario = assets::find_scenario(m_package_scenarios, id);
+    if (scenario == nullptr) {
+        return core::make_error(core::ErrorCode::NotFound, "no scenario " + id);
+    }
+    if (m_session) {
+        return core::make_error(core::ErrorCode::Unsupported, "no other game while a multiplayer game runs");
+    }
+    std::size_t warning_count = 0;
+    auto world = read_world(scenario->file, &warning_count);
+    if (!world) {
+        return world.error();
+    }
+    std::vector<std::string> warnings;
+    sim::apply_package_scenario(*world, *scenario, ui::current_language(), &warnings);
+    world->set_package_scenario(scenario->id);
+    // A game saved as the map: its scripts start anew, as in any new game.
+    world->set_script_states({});
+    for (const std::string& w : warnings) {
+        std::fprintf(stderr, "warning: %s\n", w.c_str());
+    }
+    if (auto replaced = replace_world(std::move(world).value(), scenario->file, rules); !replaced) {
+        return replaced;
+    }
+    report_load_problems(warning_count + warnings.size());
+    return core::Ok{};
+}
+
 void MapViewer::give_mod_content(sim::World& world) const {
     world.set_factions(m_factions);
     world.set_balance(m_balance);
@@ -2832,7 +2870,19 @@ void MapViewer::use_game_packages() {
     ui::set_build_menu(
         ui::load_build_menu_mods(ui::original_build_menu(), used, m_buildings, problems, m_own_buildings));
     try {
-        m_state->use_scripts(script::read_package_scripts(used, problems));
+        std::vector<script::PackageScript> scripts = script::read_package_scripts(used, problems);
+        // A package's scenario runs its own script after the packages'.
+        if (const std::string& id = m_state->world.package_scenario(); !id.empty()) {
+            const std::vector<assets::PackageScenario> scenarios = assets::load_package_scenarios(used, problems);
+            if (const assets::PackageScenario* scenario = assets::find_scenario(scenarios, id)) {
+                if (auto own = script::read_scenario_script(*scenario, problems)) {
+                    scripts.push_back(std::move(*own));
+                }
+            } else {
+                problems.push_back(id + ": the game's scenario is not installed; its script does not run");
+            }
+        }
+        m_state->use_scripts(std::move(scripts));
     } catch (const std::bad_alloc&) {
         problems.emplace_back("not enough memory for the scripts");
     }
@@ -2910,6 +2960,12 @@ void MapViewer::reload_mods() {
     m_packages = assets::load_mod_packages(data_folder() / "mods", problems, m_app_settings.disabled_mods);
     for (const std::string& p : problems) {
         std::fprintf(stderr, "mods: %s\n", p.c_str());
+    }
+    load_package_scenarios();
+    if (m_hud) {
+        if (MainMenu* menu = m_hud->menu()) {
+            menu->set_package_scenarios(m_package_scenarios);
+        }
     }
     // The packages' own buildings go into tables without any (the game's and the next game's), so
     // that turning a package on or off gives the same Ids again (docs/modding/own-buildings.md).
@@ -3271,7 +3327,9 @@ void MapViewer::apply_menu() {
                     save_settings();
                     menu->set_tutorial_chapter(*e.tutorial_chapter);
                 }
-                started = load_game(e.path, e.setup ? &e.setup->rules : nullptr);
+                started = e.package_scenario.empty()
+                              ? load_game(e.path, e.setup ? &e.setup->rules : nullptr)
+                              : start_package_scenario(e.package_scenario, e.setup ? &e.setup->rules : nullptr);
                 if (started && e.setup && !(e.setup->rules == m_app_settings.scenario.rules)) {
                     m_app_settings.scenario = *e.setup;
                     save_settings();

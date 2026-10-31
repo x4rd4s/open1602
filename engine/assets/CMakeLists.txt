@@ -14,6 +14,7 @@ add_library(o1602_assets
     src/goods.cpp
     src/original_names.cpp
     src/own_buildings.cpp
+    src/package_scenarios.cpp
     src/package_graphics.cpp
     src/resident_classes.cpp
     src/figure_looks.cpp

@@ -27,6 +27,7 @@ with milestone M8: packages as archives and adding content of a package's own
     classes.toml       classes of inhabitants, changed and new (classes.md)
     levels.toml        unlock levels, changed and new (levels.md)
     script.lua         the package's script (scripts.md)
+    scenarios.toml     scenarios of the package's own (scenarios.md)
     graphics.toml      PNG images of the package's own (graphics.md)
     icons.toml         PNG icons of the package's own (graphics.md)
     figure_images.toml figures and ships drawn with the package's images (graphics.md)

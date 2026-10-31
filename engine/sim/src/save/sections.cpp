@@ -117,6 +117,12 @@ constexpr std::uint32_t kScripts = tag("SCRP");
 /// The groups the players stored (World::unit_groups()), only written when there are any and not
 /// for the game's fingerprint. Optional: without them the groups are empty.
 constexpr std::uint32_t kUnitGroups = tag("UGRP");
+/// The scenario of a package the game was started from (World::package_scenario()), only written
+/// for one. Optional: without it the scenario's script does not run.
+constexpr std::uint32_t kScenario = tag("SCEN");
+
+/// Upper limit of a package scenario's id: a package's id, ':' and a name of as many bytes.
+constexpr std::size_t kMaxScenarioIdLength = 2 * assets::kMaxPackageIdLength + 1;
 
 /// Every section this version reads; others are of a later version.
 constexpr std::array kKnownSections = {
@@ -126,7 +132,7 @@ constexpr std::array kKnownSections = {
     kMissions,        kPlayerState,  kCityState, kOrigin,    kQueues,   kStances,   kScores,         kMaterialClocks,
     kPopulationMarks, kTutorial,     kGiveUps,   kFactions,  kLedgers,  kBalance,   kBuildingValues, kPackages,
     kFigureValues,    kOwnBuildings, kGoods,     kClasses,   kLevels,   kUnlocked,  kGoodPictures,   kScripts,
-    kUnitGroups};
+    kUnitGroups,      kScenario};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -496,6 +502,9 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
             },
             Need::Optional);
     }
+    if (!world.package_scenario().empty()) {
+        section(out, kScenario, [&](Writer& o) { o.string(world.package_scenario()); }, Need::Optional);
+    }
     const auto has_groups = [](const UnitGroups& g) {
         return std::any_of(g.begin(), g.end(), [](const auto& members) { return !members.empty(); });
     };
@@ -798,11 +807,21 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.u64(increment);
                     in.u8s(s.data);
                     s.random = Random::from_state(random, increment);
-                    if (s.package.empty() || s.package.size() > assets::kMaxPackageIdLength) {
+                    // A package's id, or a package scenario's ("<package>:<name>").
+                    if (s.package.empty() || s.package.size() > kMaxScenarioIdLength) {
                         in.fail();
                     }
                 });
                 d.script_states = std::move(states);
+                break;
+            }
+            case kScenario: {
+                std::string scenario;
+                in.string(scenario);
+                if (scenario.empty() || scenario.size() > kMaxScenarioIdLength) {
+                    in.fail();
+                }
+                d.package_scenario = std::move(scenario);
                 break;
             }
             case kUnitGroups: {

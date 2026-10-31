@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -25,6 +26,7 @@
 #include "o1602/assets/gad.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/high_scores.hpp"
+#include "o1602/assets/package_scenarios.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/text_table.hpp"
 #include "o1602/render/banner.hpp"
@@ -42,7 +44,16 @@ struct MenuScenario {
     std::vector<std::pair<std::uint8_t, std::filesystem::path>> files;
     assets::ScenarioHeader header;
     bool separator = false;  ///< a heading line ("----Kampagnen----")
+    /// A package's scenario (docs/modding/scenarios.md): its id ("<package>:<name>") and its
+    /// briefing (Windows-1252, empty: the map's mission text). Empty for the game folder's.
+    std::string package_scenario;
+    std::string briefing;
 };
+
+/// The entries of the packages' scenarios under their heading (`heading`, Windows-1252), in the
+/// packages' load order, in `language`; none without any.
+[[nodiscard]] std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageScenario> scenarios,
+                                                              std::string_view language, std::string heading);
 
 /// The scenarios of the game folder in the menu's order: originals (tutorial, endless game,
 /// numbered missions by number), campaigns by stars and number, the other adventures by stars,
@@ -91,6 +102,8 @@ struct MenuEvent {
     std::optional<EndlessSetup> setup{};
     /// Scenario: the chapter of the tutorial, nothing for another scenario.
     std::optional<std::uint8_t> tutorial_chapter{};
+    /// Scenario: the id of a package's scenario (`path` is its map), empty for another.
+    std::string package_scenario{};
 };
 
 class MainMenu {
@@ -118,6 +131,10 @@ public:
     [[nodiscard]] const EndlessSetup& endless_setup() const noexcept { return m_endless; }
     /// The rules the start dialog of a scenario offers first (the last ones chosen).
     void set_scenario_setup(const EndlessSetup& setup) { m_scenario = setup; }
+    /// The scenarios of the packages new games use, listed after the game folder's.
+    void set_package_scenarios(std::vector<assets::PackageScenario> scenarios) {
+        m_package_scenarios = std::move(scenarios);
+    }
     [[nodiscard]] const EndlessSetup& scenario_setup() const noexcept { return m_scenario; }
     /// Colours of Open1602's own screens (the start dialog).
     void set_form_style(const ui::FormStyle& style) {
@@ -223,6 +240,7 @@ private:
     ui::Form m_base_form;
     EndlessSetup m_endless;
     EndlessSetup m_scenario;
+    std::vector<assets::PackageScenario> m_package_scenarios;
     /// The banners in the hall of the colour screen (FARBWAHL.GAD), which show a further colour.
     struct HallBanner {
         std::int32_t flag = 0;     ///< its picture
