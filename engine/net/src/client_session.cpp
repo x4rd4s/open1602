@@ -140,33 +140,28 @@ void ClientSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeT
     if (!m_transport) {
         return;
     }
-    m_incoming.clear();
-    m_transport->poll(m_incoming);
-    for (TransportEvent& e : m_incoming) {
-        if (m_ended || !m_transport) {
+    if (!m_whole.empty()) {
+        const std::vector<std::uint8_t> whole = std::exchange(m_whole, {});
+        receive(whole);
+    }
+    // The events held back behind a whole message first, then those that came since.
+    for (bool polled = false;;) {
+        while (m_next < m_incoming.size() && m_whole.empty() && !m_ended && m_transport) {
+            handle(m_incoming[m_next++]);
+        }
+        if (polled || m_next < m_incoming.size() || !m_whole.empty() || m_ended || !m_transport) {
             break;
         }
-        switch (e.kind) {
-            case TransportEvent::Kind::Connected:
-                m_connected = true;
-                send(kHost, m_hello);
-                break;
-            case TransportEvent::Kind::Disconnected:
-                if (m_connect && !m_welcomed) {
-                    m_connected = false;
-                    m_transport.reset();  // and again in a moment
-                    break;
-                }
-                if (m_welcomed && !m_host_leaving && m_reconnect && m_simulation != nullptr && m_lobby.started) {
-                    reconnect();  // only this computer's connection may have broken (MS-2)
-                    break;
-                }
-                end(m_welcomed ? EndReason::HostLeft : EndReason::ConnectFailed);
-                break;
-            case TransportEvent::Kind::Received:
-                receive(e.data);
-                break;
-        }
+        m_incoming.clear();
+        m_next = 0;
+        m_transport->poll(m_incoming);
+        polled = true;
+    }
+    if (!m_transport || m_ended) {
+        // Whatever was held belongs to a connection that is over.
+        m_incoming.clear();
+        m_next = 0;
+        m_whole.clear();
     }
     if (!m_transport) {
         return;
@@ -182,6 +177,40 @@ void ClientSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeT
     send_commands();
     report(real_ms);
     m_transport->flush();
+}
+
+void ClientSession::handle(TransportEvent& e) {
+    switch (e.kind) {
+        case TransportEvent::Kind::Connected:
+            m_connected = true;
+            send(kHost, m_hello);
+            break;
+        case TransportEvent::Kind::Disconnected:
+            if (m_connect && !m_welcomed) {
+                m_connected = false;
+                m_transport.reset();  // and again in a moment
+                break;
+            }
+            if (m_welcomed && !m_host_leaving && m_reconnect && m_simulation != nullptr && m_lobby.started) {
+                reconnect();  // only this computer's connection may have broken (MS-2)
+                break;
+            }
+            end(m_welcomed ? EndReason::HostLeft : EndReason::ConnectFailed);
+            break;
+        case TransportEvent::Kind::Received:
+            receive(e.data);
+            break;
+    }
+}
+
+ClientSession::JoinStage ClientSession::join_stage() const noexcept {
+    if (!m_welcomed || m_ended || !m_lobby.started || m_simulation != nullptr) {
+        return JoinStage::None;
+    }
+    if (!m_whole.empty()) {
+        return JoinStage::Loading;
+    }
+    return m_part.empty() ? JoinStage::Waiting : JoinStage::Receiving;
 }
 
 void ClientSession::receive(std::span<const std::uint8_t> bytes) {
@@ -200,13 +229,13 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
         m_part_total = part->total;
         m_part.insert(m_part.end(), part->bytes.begin(), part->bytes.end());
         if (m_part.size() == m_part_total) {
-            const std::vector<std::uint8_t> whole = std::move(m_part);
+            std::vector<std::uint8_t> whole = std::move(m_part);
             m_part.clear();
             if (whole[0] == static_cast<std::uint8_t>(Message(Part{}).index())) {
                 end(EndReason::ProtocolError);  // parts of parts
                 return;
             }
-            receive(whole);
+            m_whole = std::move(whole);  // read with the next update()
         }
         return;
     }

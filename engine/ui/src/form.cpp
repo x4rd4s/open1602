@@ -228,6 +228,12 @@ void Form::slider(Id id, Rect r, double position, bool enabled) {
     m_widgets.push_back(std::move(w));
 }
 
+void Form::progress(Rect r, double done) {
+    Widget w = make(Widget::Kind::Progress, -1, r);
+    w.position = std::isfinite(done) ? std::clamp(done, 0.0, 1.0) : 0.0;
+    m_widgets.push_back(std::move(w));
+}
+
 const Form::Widget* Form::held_slider() const noexcept {
     if (!m_pressed || *m_pressed < 0 || m_pressed_with != MouseButton::Left) {
         return nullptr;
@@ -469,6 +475,18 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& font
                 fill(Rect{knob_x, w.rect.y, kKnob, w.rect.h}, m_style.frame);
                 if (!w.enabled) {
                     raster(w.rect);
+                }
+                break;
+            }
+            case Widget::Kind::Progress: {
+                // The ground of a field, and the part done in gold, a gap inside its frame.
+                framed(w.rect, m_style.field);
+                constexpr std::int32_t inset = kBorder + 2;
+                const std::int32_t room = std::max(w.rect.w - 2 * inset, 0);
+                const auto done = static_cast<std::int32_t>(std::lround(w.position * room));
+                if (done > 0) {
+                    fill(Rect{w.rect.x + inset, w.rect.y + inset, done, std::max(w.rect.h - 2 * inset, 0)},
+                         m_style.frame);
                 }
                 break;
             }

@@ -120,6 +120,10 @@ enum class MpText : std::uint16_t {
     ChatReadOnly,
     ChatMissed,
     PackageKept,
+    GameWaiting,
+    GameReceiving,
+    GameBytes,
+    GameLoading,
 };
 
 /// The catalogue key of a text ("net.player_joined").
@@ -129,6 +133,7 @@ enum class MpText : std::uint16_t {
 [[nodiscard]] std::string mp_log(MpText id, std::string_view value = {});
 /// The text with its "{1}" replaced by `value` (a name, a number).
 [[nodiscard]] std::string mp_text(MpText id, std::string_view value);
+[[nodiscard]] std::string mp_text(MpText id, std::string_view first, std::string_view second);
 /// Why a session ended or a computer was refused, for the player.
 [[nodiscard]] std::string mp_text(net::EndReason reason);
 /// `packages` (RefuseReason::Packages): the packages of the game this computer lacks.

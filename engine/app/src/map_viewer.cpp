@@ -1085,6 +1085,9 @@ void MapViewer::update(std::uint32_t delta_ms) {
         m_tick_fraction = m_session->tick_fraction();
         announce_take_overs();
         apply_session_events();  // may end the session
+        // As it is now, for the frame drawn next: the menu's model is filled before the session
+        // runs, and a game that came whole is loaded with the next update (and holds that frame).
+        join_to_model();
     } else {
         m_session_roles.clear();
         if (!m_pending_load) {

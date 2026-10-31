@@ -121,7 +121,11 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     it receives of a packet until it is whole, so a large limit let anyone make the host hold 32 MiB
     per connection, MS-7); larger messages, a game or many frames at once, travel as `Part`s of
     256 KiB, one after another, and are put together by the computer (up to 128 MiB, for worlds of
-    4000 × 4000 tiles). The host encodes a game once for every computer that gets it in the same update. At most 4 connections
+    4000 × 4000 tiles). The host encodes a game once for every computer that gets it in the same update.
+    While the game comes in, the joining computer's lobby shows a progress bar
+    (`ClientSession::join_stage()`: the host still writes it, its parts come in with the bytes so far,
+    it is loaded); the whole message is read one update after its last part, so that a frame can
+    show the loading first. At most 4 connections
     come from one address, the host takes at most 8 spectators (`max_spectators`), and a computer it
     kicked does not come back in the same session unless it returns to a slot with its token (MS-12).
 11. **Lobby.** A host may start without a game: it holds a `Lobby` with the title, a description of

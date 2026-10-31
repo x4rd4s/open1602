@@ -2446,6 +2446,74 @@ TEST_CASE("net: a message larger than a packet travels in parts and arrives whol
     CHECK(b.session->end_reason() == net::EndReason::ProtocolError);
 }
 
+TEST_CASE("net: a joining computer tells how far the game on its way has come") {
+    using Stage = net::ClientSession::JoinStage;
+    net::LoopbackNetwork network(5, 0);
+    auto host = network.listen();
+    Computer a(network, "Anna");
+    net::Lobby lobby;
+    lobby.seats.resize(4);
+    // A game larger than a packet (one that cannot be loaded: only its way matters here).
+    const std::vector<std::uint8_t> game =
+        net::encode(net::Snapshot{1, 0, 1, true, std::vector<std::uint8_t>(3 * net::kMaxPacketBytes, 0)});
+    const auto parts = net::packets(game);
+    REQUIRE(parts.size() > 3);
+    std::optional<net::LinkId> link;
+    const auto step = [&] {
+        network.advance(kStepMs);
+        std::vector<net::TransportEvent> events;
+        host->poll(events);
+        for (const auto& e : events) {
+            if (e.kind == net::TransportEvent::Kind::Received && !link) {
+                link = e.link;
+                host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 0xA77A}));
+                host->send(e.link, net::encode(lobby));
+            }
+        }
+        a.update(kStepMs);
+    };
+    for (int i = 0; i < 10; ++i) {
+        step();
+    }
+    REQUIRE(a.session->welcomed());
+    CHECK(a.session->join_stage() == Stage::None);  // in the lobby, before the start
+    CHECK(a.session->total_bytes() == 0);
+
+    lobby.started = true;
+    host->send(*link, net::encode(lobby));
+    step();
+    step();
+    CHECK(a.session->join_stage() == Stage::Waiting);  // the host writes the game
+
+    // The pieces one by one: the bytes so far grow towards the whole.
+    std::uint64_t before = 0;
+    for (std::size_t i = 0; i + 1 < parts.size(); ++i) {
+        host->send(*link, parts[i]);
+        step();
+        step();
+        CHECK(a.session->join_stage() == Stage::Receiving);
+        CHECK(a.session->total_bytes() == game.size());
+        CHECK(a.session->received_bytes() > before);
+        CHECK(a.session->received_bytes() < game.size());
+        before = a.session->received_bytes();
+    }
+    // The last piece: whole, and loaded only with the next update, so that a frame can say so.
+    host->send(*link, parts.back());
+    network.advance(kStepMs);
+    a.update(kStepMs);
+    for (int i = 0; i < 4 && a.session->join_stage() != Stage::Loading; ++i) {
+        network.advance(kStepMs);
+        a.update(kStepMs);
+    }
+    CHECK(a.session->join_stage() == Stage::Loading);
+    CHECK(a.session->received_bytes() == game.size());
+    CHECK(!a.session->ended());
+    a.update(kStepMs);
+    CHECK(a.session->ended());
+    CHECK(a.session->end_reason() == net::EndReason::LoadFailed);
+    CHECK(a.session->join_stage() == Stage::None);
+}
+
 TEST_CASE("net: the host takes a few spectators, not any number (MS-12)") {
     net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;

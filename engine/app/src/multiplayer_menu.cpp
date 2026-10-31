@@ -775,7 +775,11 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
             }
         }
     }
-    f.paragraph(Rect{684, 560, 292, 100}, tr(model.hosting ? MpText::StartHint : MpText::WaitHostStart), Tone::Dim);
+    if (model.join != net::ClientSession::JoinStage::None) {
+        layout_join_progress(model, Rect{684, 560, 292, 100});
+    } else {
+        f.paragraph(Rect{684, 560, 292, 100}, tr(model.hosting ? MpText::StartHint : MpText::WaitHostStart), Tone::Dim);
+    }
 
     f.button(kLeave, Rect{40, kBottomY, 180, 44}, tr(MpText::Leave));
     if (!model.hosting && me != sim::kNoPlayer) {
@@ -835,6 +839,30 @@ void MultiplayerMenu::layout_banner_choice(const MultiplayerModel& model, std::i
         f.label(Rect{x + 24, y, cell_w - 30, cell_h - 2}, banner_label(banner), Align::Left,
                 other_person ? Tone::Dim : Tone::Normal);
         m_banner_choices.push_back(banner);
+    }
+}
+
+void MultiplayerMenu::layout_join_progress(const MultiplayerModel& model, Rect box) {
+    // What happens now, the bar, and below it the megabytes while the game comes in.
+    using Stage = net::ClientSession::JoinStage;
+    ui::Form& f = m_form;
+    const MpText what = model.join == Stage::Waiting     ? MpText::GameWaiting
+                        : model.join == Stage::Receiving ? MpText::GameReceiving
+                                                         : MpText::GameLoading;
+    f.paragraph(Rect{box.x, box.y, box.w, 48}, tr(what), Tone::Heading);
+    double done = 0.0;
+    if (model.join == Stage::Loading) {
+        done = 1.0;
+    } else if (model.join == Stage::Receiving && model.join_total > 0) {
+        done = static_cast<double>(model.join_received) / static_cast<double>(model.join_total);
+    }
+    f.progress(Rect{box.x + 8, box.y + 52, box.w - 16, 20}, done);
+    if (model.join == Stage::Receiving && model.join_total > 0) {
+        constexpr std::uint64_t kMiB = std::uint64_t{1} << 20;
+        const std::uint64_t received = model.join_received / kMiB;
+        const std::uint64_t total = (model.join_total + kMiB - 1) / kMiB;
+        f.label(Rect{box.x, box.y + 74, box.w, 26},
+                mp_text(MpText::GameBytes, std::to_string(received), std::to_string(total)), Align::Centre, Tone::Dim);
     }
 }
 

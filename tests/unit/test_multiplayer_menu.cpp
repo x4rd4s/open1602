@@ -86,7 +86,7 @@ TEST_CASE("multiplayer menu: addresses with and without a port") {
 TEST_CASE("multiplayer menu: every text in both languages, with its value") {
     const ui::Catalogue english = ui::builtin_catalogue("en");
     const ui::Catalogue german = ui::builtin_catalogue("de");
-    for (std::size_t i = 0; i <= static_cast<std::size_t>(MpText::ChooseBanner); ++i) {
+    for (std::size_t i = 0; i <= static_cast<std::size_t>(MpText::GameLoading); ++i) {
         const std::string_view key = app::mp_key(static_cast<MpText>(i));
         CHECK(english.find(key) != nullptr);
         CHECK(german.find(key) != nullptr);
@@ -380,6 +380,62 @@ TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
     const auto back = menu.back();
     REQUIRE(back.has_value());
     CHECK(back->kind == MultiplayerEvent::Kind::Leave);
+}
+
+TEST_CASE("multiplayer menu: joining, the lobby shows how far the game on its way has come") {
+    using Stage = net::ClientSession::JoinStage;
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.seats.resize(4);
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.session = &host;  // only its lobby is shown
+    menu.show_lobby();
+    // Without fonts a paragraph is one line, cut to the box: what it begins with.
+    const auto shows = [&](std::string_view start) {
+        const auto items = menu.draw(model, kNoFonts);
+        return std::any_of(items.begin(), items.end(), [&](const ui::DrawItem& d) {
+            return d.kind == ui::DrawItem::Kind::Text && d.text.starts_with(start);
+        });
+    };
+    CHECK(shows("The host starts"));
+
+    // The gold part of the bar (its frame is gold too, but higher and as wide as the bar).
+    const auto bar_done = [&]() -> std::optional<std::int32_t> {
+        for (const ui::DrawItem& d : menu.draw(model, kNoFonts)) {
+            if (d.kind != ui::DrawItem::Kind::Text && d.colour == ui::FormStyle{}.frame && d.x == 696 && d.y == 616) {
+                return d.w;
+            }
+        }
+        return std::nullopt;
+    };
+    model.join = Stage::Waiting;
+    CHECK(shows("The host is preparing"));
+    CHECK(!shows("The host starts"));
+    CHECK(!bar_done().has_value());
+
+    model.join = Stage::Receiving;
+    model.join_received = 10U << 20;
+    model.join_total = (40U << 20) - 5;
+    CHECK(find_text(menu, model, "Receiving the game ...").has_value());
+    CHECK(find_text(menu, model, "10 of 40 MB").has_value());
+    REQUIRE(bar_done().has_value());
+    CHECK(*bar_done() == 67);  // a quarter of the 268 inside
+
+    model.join = Stage::Loading;
+    CHECK(find_text(menu, model, "Loading the game ...").has_value());
+    CHECK(bar_done() == std::optional<std::int32_t>(268));
+
+    const LanguageGuard german("de");
+    model.join = Stage::Receiving;
+    CHECK(find_text(menu, model,
+                    "Das Spiel wird \xFC"
+                    "bertragen ...")
+              .has_value());
+    CHECK(find_text(menu, model, "10 von 40 MB").has_value());
 }
 
 TEST_CASE("multiplayer menu: the host sends a spectator away") {
