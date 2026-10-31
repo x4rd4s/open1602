@@ -205,6 +205,14 @@ The original knows 640 x 480, 800 x 600 and 1024 x 768 and three zoom levels. Op
   0.15 s and keeps the point under the mouse in place. Picking by the sprites' pixels works at any
   scale.
 
+## Open1602's own windows (2026-10-31)
+
+Every window that has no layout in the original game's files is a `ui::Form` in the shared
+`ui::FormStyle` (gold frame, dark ground), so that settings, multiplayer, chat and questions in the
+game look and answer the same: title in the heading tone, buttons 44 design units high, the default
+button highlighted, Enter and Escape for the default and cancel. The rules for new windows are in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#user-interface).
+
 ## Consequences
 - Input runs through an action → key table (settings file), not through fixed keys in the
   code. The game's default keys are entries of that table (done, `keys.cfg`).

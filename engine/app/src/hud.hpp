@@ -208,16 +208,13 @@ public:
     void ask(std::string question) {
         m_question = std::move(question);
         m_choices.clear();
-        m_choice_rects.clear();
         m_modal_press = ModalPress::None;
     }
     [[nodiscard]] bool asking() const noexcept { return m_question.has_value(); }
     void close_question() noexcept {
         m_question.reset();
         m_choices.clear();
-        m_choice_rects.clear();
         m_modal_press = ModalPress::None;
-        m_choice_press = kNoChoice;
     }
     /// One of several answers, a button each (which player to play in a game loaded alone): with
     /// a banner, a field of its colour beside the text.
@@ -230,9 +227,7 @@ public:
     void ask_choice(std::string question, std::vector<ChoiceOption> options) {
         m_question = std::move(question);
         m_choices = std::move(options);
-        m_choice_rects.clear();
         m_modal_press = ModalPress::None;
-        m_choice_press = kNoChoice;
     }
     [[nodiscard]] bool choosing() const noexcept { return m_question.has_value() && !m_choices.empty(); }
     [[nodiscard]] std::size_t choice_count() const noexcept { return m_choices.size(); }
@@ -580,25 +575,21 @@ private:
     std::optional<std::string> m_question;
     std::optional<std::array<KeyHelpPage, kKeyHelpPages>> m_help;
     std::size_t m_help_page = 0;
-    ui::Rect m_yes;  ///< the buttons of the question as last drawn
-    ui::Rect m_no;
     /// Where the left button went down while the question or the key overview was shown: they
     /// answer to a click (press and release), never to the pointer merely passing over a button.
     enum class ModalPress : std::uint8_t { None, Yes, No, Elsewhere };
     ModalPress m_modal_press = ModalPress::None;
-    std::vector<ChoiceOption> m_choices;   ///< the options of ask_choice(), empty for yes and no
-    std::vector<ui::Rect> m_choice_rects;  ///< their buttons as last drawn
-    /// Where the left button went down among the options: an index, kNoChoice (not down) or
-    /// kChoiceElsewhere.
-    static constexpr std::int32_t kNoChoice = -1;
-    static constexpr std::int32_t kChoiceElsewhere = -2;
-    std::int32_t m_choice_press = kNoChoice;
+    std::vector<ChoiceOption> m_choices;  ///< the options of ask_choice(), empty for yes and no
+    /// The window of the question (ask, ask_choice), built as Open1602's other windows (the
+    /// settings of a game): a heading, a button per answer, a field of a banner's colour beside it.
+    ui::Form m_question_form;
     /// The banners' colours in the palette (by BannerId) for the options' fields; grey for others.
     std::vector<std::uint8_t> m_banner_palette;
     std::uint8_t m_other_banner_palette = 0;
     void draw_question();
-    void draw_choices();
-    [[nodiscard]] std::optional<Action> choice_mouse(std::int32_t x, std::int32_t y, bool down);
+    /// Lays the question out in m_question_form; its place on the screen.
+    [[nodiscard]] ui::Rect layout_question();
+    [[nodiscard]] std::optional<Action> question_mouse(std::int32_t x, std::int32_t y, bool down);
     /// "Auftrag ansehen": the mission's text in the window above the status bar (TUTOR.GAD).
     void draw_mission(const sim::World& world);
     void draw_help();

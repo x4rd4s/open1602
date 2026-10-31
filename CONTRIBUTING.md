@@ -24,6 +24,26 @@
 - Simulation (`engine/sim`): deterministic, no floating point in the state (ADR 0004).
 - Every file starts with `// SPDX-License-Identifier: GPL-3.0-or-later`.
 
+## User interface
+
+Windows and dialogs that have no layout in the original game's files (menus, questions, settings,
+chat, lobby) all look and behave alike. This is binding for every new window and every change to one:
+
+- **Build them with `ui::Form`** (`engine/ui/include/o1602/ui/form.hpp`) and the shared
+  `ui::FormStyle` that `Hud` sets up for Open1602's own windows (gold frame, dark ground, the hover and
+  selected colours). No hand-drawn rectangles, borders or button looks; a widget the form lacks is
+  added to `ui::Form`, so that every window gets it.
+- **Layout**: a framed `panel` as the window, laid out in design units of the 1024 x 768 screen and
+  centred in the game view (full-screen menus: in the window). The title is a left-aligned `label` in
+  the `Heading` tone, explanations are `paragraph`s, values shown only are `entry`s. Buttons are 44
+  units high with centred text and 8 units apart; rows of settings are 36 units high.
+- **Behaviour**: the default button is `selected`; hover and press come from the form. Enter takes
+  the default, Escape cancels or closes, and numbered choices also answer to the keys 1 to 9. Player
+  colours are shown as a `swatch` of the banner's palette colour.
+- **Texts** go through the localisation, at least in English and German; no visible text is written into the code.
+- Windows that keep the original game's look (the parchment of the goods balance) use the same
+  form with their own `FormStyle`, not code of their own.
+
 ## Reverse engineering
 
 - Enter new function/variable names in `re/symbols/*.csv` with confidence and evidence.

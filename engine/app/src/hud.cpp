@@ -295,6 +295,7 @@ Hud::Hud(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets
         m_multiplayer = std::make_unique<MultiplayerMenu>(style);
         m_menu->set_form_style(style);
         m_display = std::make_unique<DisplayMenu>(style);
+        m_question_form.set_style(style);
         m_chat = std::make_unique<ChatWindow>(style);
         // The window "Warenbilanz" as a parchment: ink on sandstone, the grounds at half strength.
         GoodsStyle goods;
@@ -816,129 +817,102 @@ void Hud::draw_question() {
     if (!m_question) {
         return;
     }
-    if (!m_choices.empty()) {
-        draw_choices();
-        return;
-    }
-    const double s = m_menu_active ? m_menu_scale : m_regions.scale;
-    // Centred on the main menu's window, in the game on the map.
-    const ui::Rect& v = m_menu_active ? m_regions.full : m_regions.game_view;
-    const auto px = [&](double d) { return static_cast<std::int32_t>(d * s); };
-    const ui::Rect box{v.x + (v.w - px(520)) / 2, v.y + (v.h - px(130)) / 2, px(520), px(130)};
-    constexpr std::uint8_t kGold = 215;  // (202, 172, 52) in STADTFLD.COL
-    constexpr std::uint8_t kDark = 28;   // (35, 23, 12)
-    m_renderer->fill(ui::Rect{box.x - px(3), box.y - px(3), box.w + px(6), box.h + px(6)}, kGold);
-    m_renderer->fill(box, kDark);
-    m_yes = ui::Rect{box.x + px(90), box.y + px(80), px(140), px(34)};
-    m_no = ui::Rect{box.x + box.w - px(230), box.y + px(80), px(140), px(34)};
-    std::vector<ui::DrawItem> items;
-    const auto text = [&](const std::string& t, std::int32_t x, std::int32_t y) {
-        ui::DrawItem d;
-        d.kind = ui::DrawItem::Kind::Text;
-        d.block = 0;
-        d.colour = 4;
-        d.align = ui::Align::Centre;
-        d.x = x;
-        d.y = y;
-        d.text = t;
-        items.push_back(d);
-    };
-    // Up to two lines, broken at '\n'.
-    const std::string& q = *m_question;
-    const std::size_t nl = q.find('\n');
-    text(q.substr(0, nl), box.w / 2, px(36));
-    if (nl != std::string::npos) {
-        text(q.substr(nl + 1), box.w / 2, px(62));
-    }
-    for (const ui::Rect* b : {&m_yes, &m_no}) {
-        m_renderer->fill(*b, kGold);
-        m_renderer->fill(ui::Rect{b->x + px(2), b->y + px(2), b->w - px(4), b->h - px(4)}, kDark);
-    }
-    text(ui::tr("dialog.yes"), m_yes.x - box.x + m_yes.w / 2, m_yes.y - box.y + px(28));
-    text(ui::tr("dialog.no"), m_no.x - box.x + m_no.w / 2, m_no.y - box.y + px(28));
-    m_renderer->draw(items, box.x, box.y, s);
+    const ui::Rect r = layout_question();
+    m_renderer->draw(m_question_form.draw(m_renderer->fonts(m_question_form.scale())), r.x, r.y,
+                     m_question_form.scale());
 }
 
-void Hud::draw_choices() {
+namespace {
+
+// The question's window in design units, built as the settings' windows (ui::Form): a heading,
+// buttons 44 high, the answer of Enter highlighted.
+constexpr std::int32_t kQuestionButtonW = 320;
+constexpr std::int32_t kQuestionButtonH = 44;
+constexpr std::int32_t kQuestionGap = 8;
+constexpr std::int32_t kQuestionSwatch = 28;
+constexpr std::int32_t kQuestionMargin = 24;
+constexpr std::int32_t kQuestionTextY = 54;  ///< the question's lines after the first
+constexpr std::int32_t kQuestionLine = 22;
+constexpr std::int32_t kYesNoW = 180;
+constexpr ui::Form::Id kQuestionYes = 1;
+constexpr ui::Form::Id kQuestionNo = 2;
+constexpr ui::Form::Id kQuestionOption = 10;
+
+}  // namespace
+
+ui::Rect Hud::layout_question() {
     const double s = m_menu_active ? m_menu_scale : m_regions.scale;
     const ui::Rect& v = m_menu_active ? m_regions.full : m_regions.game_view;
-    const auto px = [&](double d) { return static_cast<std::int32_t>(d * s); };
-    // One button per option, in two columns when there are more than seven.
+    // Yes and no side by side; options one under the other, in two columns when there are more
+    // than seven.
     const std::size_t n = m_choices.size();
-    const std::size_t columns = n > 7 ? 2 : 1;
-    const std::size_t rows = (n + columns - 1) / columns;
-    constexpr double kButtonW = 300;
-    constexpr double kButtonH = 30;
-    constexpr double kGap = 8;
-    constexpr double kTop = 80;
-    const double width = std::max(520.0, static_cast<double>(columns) * (kButtonW + kGap) - kGap + 60);
-    const double height = kTop + static_cast<double>(rows) * (kButtonH + kGap) + 16;
-    const ui::Rect box{v.x + (v.w - px(width)) / 2, v.y + std::max(0, (v.h - px(height)) / 2), px(width), px(height)};
-    constexpr std::uint8_t kGold = 215;  // (202, 172, 52) in STADTFLD.COL
-    constexpr std::uint8_t kDark = 28;   // (35, 23, 12)
-    m_renderer->fill(ui::Rect{box.x - px(3), box.y - px(3), box.w + px(6), box.h + px(6)}, kGold);
-    m_renderer->fill(box, kDark);
-    std::vector<ui::DrawItem> items;
-    const auto text = [&](const std::string& t, std::int32_t x, std::int32_t y, ui::Align align) {
-        ui::DrawItem d;
-        d.kind = ui::DrawItem::Kind::Text;
-        d.block = 0;
-        d.colour = 4;
-        d.align = align;
-        d.x = x;
-        d.y = y;
-        d.text = t;
-        items.push_back(d);
-    };
     const std::string& q = *m_question;
     const std::size_t nl = q.find('\n');
-    text(q.substr(0, nl), box.w / 2, px(32), ui::Align::Centre);
+    const auto more_lines =
+        nl == std::string::npos ? 0 : static_cast<std::int32_t>(std::count(q.begin(), q.end(), '\n'));
+    const std::int32_t top = std::max(100, kQuestionTextY + more_lines * kQuestionLine + 2 * kQuestionGap);
+    const std::int32_t columns = n > 7 ? 2 : 1;
+    const auto rows = n == 0 ? 1
+                             : static_cast<std::int32_t>((n + static_cast<std::size_t>(columns) - 1) /
+                                                         static_cast<std::size_t>(columns));
+    const std::int32_t cell = kQuestionSwatch + kQuestionGap + kQuestionButtonW;
+    const std::int32_t row_width = columns * cell + (columns - 1) * 2 * kQuestionGap;
+    const std::int32_t width = std::max(560, row_width + 2 * kQuestionMargin);
+    const std::int32_t height = top + rows * (kQuestionButtonH + kQuestionGap) - kQuestionGap + kQuestionMargin;
+    ui::Form& f = m_question_form;
+    f.set_scale(s);
+    f.clear();
+    f.panel(ui::Rect{0, 0, width, height});
+    f.label(ui::Rect{kQuestionMargin, 14, width - 2 * kQuestionMargin, 40}, q.substr(0, nl), ui::Align::Left,
+            ui::Form::Tone::Heading);
     if (nl != std::string::npos) {
-        text(q.substr(nl + 1), box.w / 2, px(56), ui::Align::Centre);
+        f.paragraph(ui::Rect{kQuestionMargin, kQuestionTextY, width - 2 * kQuestionMargin, more_lines * kQuestionLine},
+                    q.substr(nl + 1), ui::Form::Tone::Normal, kQuestionLine);
     }
-    m_choice_rects.clear();
-    const double left = (width - (static_cast<double>(columns) * (kButtonW + kGap) - kGap)) / 2;
+    if (n == 0) {
+        // Enter answers yes: that button is highlighted.
+        const std::int32_t y = top;
+        const std::int32_t gap = 40;
+        const std::int32_t x = (width - 2 * kYesNoW - gap) / 2;
+        f.button(kQuestionYes, ui::Rect{x, y, kYesNoW, kQuestionButtonH}, ui::tr("dialog.yes"), true, true);
+        f.button(kQuestionNo, ui::Rect{x + kYesNoW + gap, y, kYesNoW, kQuestionButtonH}, ui::tr("dialog.no"));
+    }
+    const std::int32_t left = (width - row_width) / 2;
     for (std::size_t i = 0; i < n; ++i) {
-        const std::size_t column = i / rows;
-        const std::size_t row = i % rows;
-        const ui::Rect b{box.x + px(left + static_cast<double>(column) * (kButtonW + kGap)),
-                         box.y + px(kTop + static_cast<double>(row) * (kButtonH + kGap)), px(kButtonW), px(kButtonH)};
-        m_choice_rects.push_back(b);
-        m_renderer->fill(b, kGold);
-        m_renderer->fill(ui::Rect{b.x + px(2), b.y + px(2), b.w - px(4), b.h - px(4)}, kDark);
-        double text_x = 12;
+        const auto column = static_cast<std::int32_t>(i / static_cast<std::size_t>(rows));
+        const auto row = static_cast<std::int32_t>(i % static_cast<std::size_t>(rows));
+        const std::int32_t x = left + column * (cell + 2 * kQuestionGap);
+        const std::int32_t y = top + row * (kQuestionButtonH + kQuestionGap);
         if (const auto& banner = m_choices[i].banner) {
             const std::uint8_t colour =
                 *banner < m_banner_palette.size() ? m_banner_palette[*banner] : m_other_banner_palette;
-            m_renderer->fill(ui::Rect{b.x + px(8), b.y + px(7), px(24), px(16)}, kGold);
-            m_renderer->fill(ui::Rect{b.x + px(9), b.y + px(8), px(22), px(14)}, colour);
-            text_x = 42;
+            f.panel(ui::Rect{x, y + 6, kQuestionSwatch, kQuestionButtonH - 12});
+            f.swatch(ui::Rect{x + 2, y + 8, kQuestionSwatch - 4, kQuestionButtonH - 16}, colour);
         }
-        text(m_choices[i].text, b.x - box.x + px(text_x), b.y - box.y + px(24), ui::Align::Left);
+        // Enter takes the first option: it is highlighted.
+        f.button(kQuestionOption + static_cast<ui::Form::Id>(i),
+                 ui::Rect{x + kQuestionSwatch + kQuestionGap, y, kQuestionButtonW, kQuestionButtonH}, m_choices[i].text,
+                 true, i == 0);
     }
-    m_renderer->draw(items, box.x, box.y, s);
+    const auto w = static_cast<std::int32_t>(width * s);
+    const auto h = static_cast<std::int32_t>(height * s);
+    return {v.x + std::max(0, (v.w - w) / 2), v.y + std::max(0, (v.h - h) / 2), w, h};
 }
 
-std::optional<Hud::Action> Hud::choice_mouse(std::int32_t x, std::int32_t y, bool down) {
-    // As the question's buttons: pressed and released on the same option.
-    std::int32_t at = kChoiceElsewhere;
-    for (std::size_t i = 0; i < m_choice_rects.size(); ++i) {
-        if (m_choice_rects[i].contains(x, y)) {
-            at = static_cast<std::int32_t>(i);
-        }
-    }
-    if (down) {
-        if (m_choice_press == kNoChoice) {
-            m_choice_press = at;
-        }
-        return std::nullopt;
-    }
-    const std::int32_t pressed = std::exchange(m_choice_press, kNoChoice);
-    if (pressed == kNoChoice || at != pressed || at < 0) {
+std::optional<Hud::Action> Hud::question_mouse(std::int32_t x, std::int32_t y, bool down) {
+    const ui::Rect r = layout_question();
+    const auto id = m_question_form.mouse(x - r.x, y - r.y, down);
+    if (!id) {
         return std::nullopt;
     }
     Action a{Action::Kind::Answer};
-    a.step = at;
+    if (*id == kQuestionYes || *id == kQuestionNo) {
+        a.step = *id == kQuestionYes ? 1 : 0;
+    } else if (*id >= kQuestionOption && static_cast<std::size_t>(*id - kQuestionOption) < m_choices.size()) {
+        a.step = *id - kQuestionOption;
+    } else {
+        return std::nullopt;
+    }
     close_question();
     return a;
 }
@@ -1460,32 +1434,10 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down,
         }
         return std::nullopt;
     }
-    if (m_question && !m_choices.empty()) {
-        return choice_mouse(x, y, down);
-    }
     if (m_question) {
         // The question takes every click until it is answered: pressed and released on the same
         // button (as the original's buttons), so passing over "Ja" answers nothing.
-        const ModalPress at = m_yes.contains(x, y)  ? ModalPress::Yes
-                              : m_no.contains(x, y) ? ModalPress::No
-                                                    : ModalPress::Elsewhere;
-        if (down) {
-            if (m_modal_press == ModalPress::None) {
-                m_modal_press = at;
-            }
-            return std::nullopt;
-        }
-        const ModalPress pressed = std::exchange(m_modal_press, ModalPress::None);
-        if (pressed == ModalPress::None) {
-            return std::nullopt;  // the pointer only moved
-        }
-        if (at == pressed && at != ModalPress::Elsewhere) {
-            Action a{Action::Kind::Answer};
-            a.step = at == ModalPress::Yes ? 1 : 0;
-            m_question.reset();
-            return a;
-        }
-        return std::nullopt;
+        return question_mouse(x, y, down);
     }
     if (m_end_active) {
         std::int32_t ox = 0;
