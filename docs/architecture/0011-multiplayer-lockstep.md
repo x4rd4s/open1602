@@ -49,7 +49,7 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    own slot (review point 6), none from spectators, and only commands every computer can read back
    (`sim::command_size`; the host's own too). Only the host hands slots to the computer
    (`PlayerControl`); every player may pause, go on, set the game speed and rename himself, at most
-   four times a second. With the setting „Only the host sets speed“ (`host_controls_speed`,
+   four times a second. With the setting „Speed: host only“ (`host_controls_speed`,
    MS-20) the host takes no pause, resume or speed orders from the others. A message that makes no
    sense, a message to the host larger than 1 MiB and a connection without `Hello` after 3 s
    disconnect the computer.

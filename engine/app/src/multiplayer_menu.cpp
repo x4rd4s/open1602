@@ -612,7 +612,8 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
     }
     const net::Lobby& lobby = session->lobby();
     const sim::PlayerId me = session->local_seat();
-    f.label(kHeading, lobby.title, Align::Left, Tone::Heading);
+    // A lobby without a title (an older host's) still has a heading, as every screen of the menu.
+    f.label(kHeading, lobby.title.empty() ? tr(MpText::Multiplayer) : lobby.title, Align::Left, Tone::Heading);
     f.label(Rect{560, 32, 424, 32}, model.hosting ? tr(MpText::HostPort, std::to_string(model.port)) : lobby.game,
             Align::Right, Tone::Dim);
 
