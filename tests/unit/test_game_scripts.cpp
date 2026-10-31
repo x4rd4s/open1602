@@ -408,7 +408,7 @@ TEST_CASE("script: a scenario's script runs beside its package's, with a state o
     const std::filesystem::path folder = test::temp_path("o1602_scenario_script");
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);
-    std::ofstream(folder / "north.lua") << "\xEF\xBB\xBFstate = {who = 'scenario'}\n";
+    std::ofstream(folder / "north.lua", std::ios::binary) << "\xEF\xBB\xBFstate = {who = 'scenario'}\n";
     assets::PackageScenario scenario;
     scenario.id = "isles:north";
     scenario.package = "isles";

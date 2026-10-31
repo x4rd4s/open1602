@@ -121,7 +121,8 @@ TEST_CASE("package scenarios: a scenario with a wrong field, no map or a map out
 
 TEST_CASE("package scenarios: the installed packages' scenarios in their order") {
     const Package p("o1602_scenarios_load");
-    std::ofstream(p.package.folder / "scenarios.toml") << "\xEF\xBB\xBF[north]\nfile = \"maps/north.szs\"\n";
+    std::ofstream(p.package.folder / "scenarios.toml", std::ios::binary)
+        << "\xEF\xBB\xBF[north]\nfile = \"maps/north.szs\"\n";
     assets::ModPackage other = p.package;
     other.id = "empty";
     other.folder = p.package.folder / "maps";  // no scenarios.toml
