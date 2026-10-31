@@ -428,7 +428,9 @@ void Engine::task_workshop(AiPlayer& p) {
     } else if (task == kStonemason) {
         done = search_stonemason(p);
     } else {
-        done = search_workshop(p, task == kCannonFoundry);
+        // A package's workshop of another footprint than the original's 2 x 2 is placed by its size.
+        const bool sized = p.search.slot >= kSlots && (b->size_x != 2 || b->size_y != 2);
+        done = search_workshop(p, task == kCannonFoundry || sized);
     }
     if (!done) {
         return;
@@ -1191,7 +1193,10 @@ bool Engine::survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t 
     if (w == ware::kAlcohol) {
         count(kSlotAlcohol);
     }
-    const std::optional<std::uint8_t> slot = producer_slot(w, raw, t.type->id);
+    std::optional<std::uint8_t> slot = producer_slot(w, raw, t.type->id);
+    if (!slot) {
+        slot = package_slot(w);
+    }
     if (!slot) {
         return true;
     }

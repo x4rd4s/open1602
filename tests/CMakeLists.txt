@@ -100,6 +100,7 @@ add_executable(o1602_tests
     unit/test_ai_arena.cpp
     unit/test_ai_military.cpp
     unit/test_ai_landing.cpp
+    unit/test_ai_chains.cpp
     unit/test_ai_tables.cpp
     unit/test_save_fuzz.cpp
     unit/test_save_format.cpp

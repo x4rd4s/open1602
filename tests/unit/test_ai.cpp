@@ -475,8 +475,8 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     const std::uint64_t hash = s.state_hash();
     // Names left empty without Text.cod (MD-10); SIMU in parts (DS-3); tiles by blocks (TB-26); a ship
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
-    // the revised bread chain by default.
-    constexpr std::uint64_t kExpected = 0x2e2f860e06bad5adULL;
+    // the revised bread chain by default; the computers' state version 5 (the slots counted).
+    constexpr std::uint64_t kExpected = 0xa3d2080bccbe303fULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -623,9 +623,14 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     sim::ComputerPlayers computers(s);
     REQUIRE(computers.load(in, 2));
     // Saved again as the newest version: one byte more per computer, and no request (version 3),
-    // and the search's target (version 4).
+    // the search's target (version 4) and the number of slots of each computer and city (version 5).
     const std::vector<std::uint8_t> again = saved(computers);
-    CHECK(again.size() == v2.size() + state.players.size() * (1 + 2 * sizeof(std::int32_t)));
+    std::size_t plans = 0;
+    for (const sim::ai::AiPlayer& p : state.players) {
+        plans += p.plans.size();
+    }
+    CHECK(again.size() == v2.size() + state.players.size() * (1 + 2 * sizeof(std::int32_t) + sizeof(std::uint32_t)) +
+                              plans * sizeof(std::uint32_t));
     core::ByteReader back(again);
     sim::StateIn reader(back);
     sim::ai::State loaded;
@@ -1542,4 +1547,54 @@ TEST_CASE("ai: a wall the city grew past is demolished") {
     CHECK(run_until(s, 120'000, [&] {
         return !wall_at(g, *city, static_cast<std::uint32_t>(at->first), static_cast<std::uint32_t>(at->second));
     }));
+}
+
+TEST_CASE("ai: a computer builds the producer of a package's good its inhabitants need (MD-4)") {
+    // A workshop of a package (2 x 2) makes ware 59 out of nothing; the city's class needs it.
+    Game g;
+    constexpr std::uint32_t kPepperMill = 20992;
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 20992\n  Kind: 14\n  Gfx: 100\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 1\n    Maxlager: 4\n    Ware: 59\n"
+        "    Prodmenge: 1\n    Interval: 20\n  EndObj\n"
+        "  Objekt: HAUS_BAUKOST\n    Money: 50\n  EndObj\n");
+    assets::ResidentClass settlers;
+    settlers.max_per_house = 10;
+    settlers.needs.push_back({59, 100});
+    g.buildings.set_resident_classes({settlers});
+    g.buildings.by_id(kKontor)->ware = sim::ware::kAll;  // the Kontor holds every good: workshops go near it
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s, 60'000);  // and its first roads
+    sim::City* city = nullptr;
+    for (const sim::City& c : g.world.cities()) {
+        if (c.owner == kComputer) {
+            city = g.world.city(c.island, c.index);
+        }
+    }
+    REQUIRE(city != nullptr);
+    // 100 inhabitants use 7.3 t a minute of it; a workshop makes 3 t: the city wants three.
+    city->inhabitants.assign(1, 100);
+    const sim::IslandMap& map = g.world.island(city->island).map;
+    const auto mills = [&] {
+        std::size_t n = 0;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::MapCell& cell = map.top(x, y);
+                const assets::BuildingType* b = g.buildings.by_sprite(cell.sprite);
+                n += b != nullptr && b->id == kPepperMill && cell.owner == kComputer ? 1U : 0U;
+            }
+        }
+        return n / 4;  // four tiles each
+    };
+    CHECK(run_until(s, 600'000, [&] {
+        city->inhabitants.assign(1, 100);
+        return mills() != 0;
+    }));
+    // The survey counts it in the first slot after the original's.
+    run(s, 60'000);
+    const auto view = s.computers().view();
+    REQUIRE(view[0].plans.size() >= 1);
+    REQUIRE(view[0].plans[0].slots.size() == sim::ai::kSlots + 1);
+    CHECK(view[0].plans[0].slots[sim::ai::kSlots][0] == mills());
+    CHECK(mills() >= 1);
 }

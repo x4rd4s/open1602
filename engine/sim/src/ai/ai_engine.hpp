@@ -17,6 +17,7 @@
 #include <span>
 #include <vector>
 
+#include "ai_chains.hpp"
 #include "ai_state.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -202,6 +203,8 @@ public:
     /// Whether a state read from a save or a host's snapshot can be run on this world: every
     /// value a step uses as an index or a count is in range (HI-1).
     [[nodiscard]] bool accepts(const State& state) const;
+    /// The producers of the packages' goods the computers build (ai_chains.hpp).
+    [[nodiscard]] const std::vector<PackageNeed>& package_needs() const noexcept { return m_package_needs; }
 
 private:
     // ---- ai_core.cpp ----
@@ -335,6 +338,11 @@ private:
     bool colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field);
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
+    /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
+    bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
+    bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);
+    /// The slot of the package's Need that makes `w`, if any.
+    [[nodiscard]] std::optional<std::uint8_t> package_slot(std::uint8_t w) const;
     bool need_houses(AiPlayer& p, std::uint32_t n);
     bool need_market(AiPlayer& p, std::uint32_t n);
     bool need_kontor(AiPlayer& p, std::uint32_t level);
@@ -541,6 +549,8 @@ private:
     Player m_nobody;  ///< stands in for a player slot that is gone
     /// Producers by ware (0x006C2B20): up to four records per ware, in file order.
     std::vector<std::vector<const assets::BuildingType*>> m_producers;
+    /// The producers of the packages' goods, slots kSlots and up (ai_chains.hpp).
+    std::vector<PackageNeed> m_package_needs;
 
     /// Soldiers and ships counted once per AI tick (TB-9): the computers ask for them per island
     /// and per player many times a tick. Used only inside tick(), where the units change only

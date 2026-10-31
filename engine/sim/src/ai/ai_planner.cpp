@@ -971,7 +971,10 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
-    const auto needs = [&](std::span<const StageNeed> o) { return first_need(p, c, r, money, o); };
+    // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
+    const auto needs = [&](std::span<const StageNeed> o) {
+        return first_need(p, c, r, money, o) || package_chains(p, c, r);
+    };
 
     switch (r.stage) {
         case stage::kFounded: {
@@ -1375,6 +1378,70 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
         reserve(p, *b, field_money);
     }
     return d->type == NeedType::D ? pushed : true;
+}
+
+std::optional<std::uint8_t> Engine::package_slot(std::uint8_t w) const {
+    for (const PackageNeed& n : m_package_needs) {
+        if (n.ware == w) {
+            return n.slot;
+        }
+    }
+    return std::nullopt;
+}
+
+bool Engine::package_chains(AiPlayer& p, const City& c, const CityPlan& r) {
+    if (m_package_needs.empty()) {
+        return false;
+    }
+    std::vector<std::uint32_t> use(m_package_needs.size());
+    for (std::size_t i = 0; i < use.size(); ++i) {
+        use[i] = demand(c, m_package_needs[i].ware);
+    }
+    const std::vector<std::uint32_t> wanted = package_wanted(m_package_needs, use);
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        if (wanted[i] != 0 && package_need(p, c, r, m_package_needs[i], wanted[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted) {
+    const SlotState& s = r.slots[n.slot];
+    if (s.count >= wanted || s.attempts >= 2) {
+        return false;
+    }
+    // A workshop waits for the producer of its raw material. The original's Need of it is asked
+    // for one; one of a package's comes in its own turn, as the city wants it too.
+    if (n.raw_slot != kNoSlot && r.slots[n.raw_slot].count == 0) {
+        if (n.raw_slot >= kSlots) {
+            return false;
+        }
+        const std::size_t before = p.stack.size();
+        (void)need(p, n.raw_slot, 1);
+        return p.stack.size() > before;
+    }
+    if (n.fertile != 0 && fertility(c.island, n.fertile) == 0) {
+        return false;
+    }
+    const assets::BuildingType* b = by_id(n.building);
+    if (b == nullptr || !unlocked(p, *b)) {
+        return false;
+    }
+    std::int64_t field_money = 0;
+    if (n.field != 0) {
+        if (const assets::BuildingType* f = producer(n.field, 0)) {
+            field_money = 64 * std::int64_t{f->build_cost.money};
+        }
+    }
+    if (!affordable(p, c, *b) || std::int64_t{player(p).money} <= field_money + b->build_cost.money) {
+        return false;
+    }
+    if (!plan_building(p, n.task, *b, n.slot, false, false)) {
+        return false;
+    }
+    reserve(p, *b, field_money);
+    return true;
 }
 
 bool Engine::need_iron_mine(AiPlayer& p, std::uint32_t n) {

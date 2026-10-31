@@ -19,9 +19,10 @@ namespace o1602::sim::ai {
 
 /// Version of the saved state of the computer players. 2 dropped what nothing read (GB-5): the
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
-/// target of a search (Search::target_x/target_y, task kClaimLand). Every version from
-/// kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 4;
+/// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
+/// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
+inline constexpr std::uint32_t kStateVersion = 5;
+inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the original's dispatcher (AI_RunTask 0x00429AA0). The numbers are kept so the
@@ -147,6 +148,9 @@ enum Slot : std::uint8_t {
     kSlotDenkmal = 0x36,
 };
 inline constexpr std::size_t kSlots = 0x37;
+/// Slots of a city record with those of the packages' producers (kSlots and up, ai_chains.hpp): one
+/// for every value of a slot number, so no slot number reaches past the record.
+inline constexpr std::size_t kAllSlots = 0x100;
 
 /// Flags of a city record (R+0x30).
 namespace city_flag {
@@ -190,6 +194,7 @@ struct SlotState {
     std::uint16_t count = 0;
     std::uint16_t attempts = 0;
     std::uint16_t fail_level = 0;
+    friend bool operator==(const SlotState&, const SlotState&) = default;
 };
 
 /// A market of the city that soldiers guard (R+0x188).
@@ -211,7 +216,7 @@ struct CityPlan {
     std::uint32_t land = 0;          ///< R+0x1C: usable land of the city, tiles
     std::uint32_t land_percent = 0;  ///< R+0x18
     std::uint32_t flags = 0;         ///< R+0x30, city_flag
-    std::array<SlotState, kSlots> slots{};
+    std::array<SlotState, kAllSlots> slots{};
     std::optional<std::pair<std::uint16_t, std::uint16_t>> doctor;  ///< R+0x28/+0x2C: tile of the Klinik
     std::vector<GuardPost> posts;                                   ///< R+0x188: the city's markets
     std::uint8_t post_cursor = 0;                                   ///< R+0x184
@@ -377,11 +382,11 @@ struct AiPlayer {
     bool home_valid = false;        ///< +0x3E7C
     std::uint16_t home_island = 0;
     std::uint8_t home_city = 0;
-    bool skip_layout = false;            ///< +0x3E74
-    std::uint8_t max_stage = 0;          ///< +0x10640: highest stage any city reached
-    std::uint8_t score = 0;              ///< +0x1063C: development score 0..4
-    std::array<bool, kSlots> present{};  ///< +0x10644: the player has a building of slot k
-    std::vector<CityPlan> plans;         ///< the city records
+    bool skip_layout = false;               ///< +0x3E74
+    std::uint8_t max_stage = 0;             ///< +0x10640: highest stage any city reached
+    std::uint8_t score = 0;                 ///< +0x1063C: development score 0..4
+    std::array<bool, kAllSlots> present{};  ///< +0x10644: the player has a building of slot k
+    std::vector<CityPlan> plans;            ///< the city records
     // Building
     Search search;
     std::vector<Segment> segments;  ///< +0x1DF0/+0x1DF4

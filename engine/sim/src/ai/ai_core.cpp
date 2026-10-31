@@ -44,6 +44,7 @@ Engine::Engine(Simulation& sim, State& state)
             list.push_back(&b);
         }
     }
+    m_package_needs = ai::package_needs(m_buildings);
 }
 
 CommandResult Engine::execute(const Command& command) {
@@ -130,9 +131,9 @@ bool Engine::accepts(const State& state) const {
             }
         }
         const Search& s = p.search;
-        if (s.segment < 0 || s.slot >= kSlots || s.remaining < -kMaxSpan || s.remaining > kMaxSpan ||
-            s.extra < -kMaxSpan || s.extra > kMaxSpan || s.target_x < -1 || s.target_x > kMaxSpan || s.target_y < -1 ||
-            s.target_y > kMaxSpan) {
+        if (s.segment < 0 || s.slot >= kSlots + m_package_needs.size() || s.remaining < -kMaxSpan ||
+            s.remaining > kMaxSpan || s.extra < -kMaxSpan || s.extra > kMaxSpan || s.target_x < -1 ||
+            s.target_x > kMaxSpan || s.target_y < -1 || s.target_y > kMaxSpan) {
             return false;
         }
     }
@@ -783,7 +784,8 @@ std::vector<ComputerPlayers::View> ComputerPlayers::view() const {
         v.stack = p.stack;
         for (const ai::CityPlan& r : p.plans) {
             View::City c{r.island, r.city, r.stage, r.flags, {}};
-            for (const ai::SlotState& s : r.slots) {
+            for (std::size_t k = 0; k < ai::kSlots + m_engine->package_needs().size(); ++k) {
+                const ai::SlotState& s = r.slots[k];
                 c.slots.push_back({s.count, s.attempts, s.fail_level});
             }
             v.plans.push_back(std::move(c));
