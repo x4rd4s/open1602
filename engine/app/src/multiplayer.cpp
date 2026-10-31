@@ -429,6 +429,10 @@ void MapViewer::apply_multiplayer_menu() {
         model.hosting = host != nullptr;
         model.everyone_ready = host != nullptr && host->everyone_ready();
         model.port = m_hosted ? m_hosted->port : net::kDefaultPort;
+        const net::ClientSession* client = client_session();
+        model.join = client != nullptr ? client->join_stage() : net::ClientSession::JoinStage::None;
+        model.join_received = client != nullptr ? client->received_bytes() : 0;
+        model.join_total = client != nullptr ? client->total_bytes() : 0;
     };
     session_to_model();
     for (const MultiplayerEvent& e : m_hud->take_multiplayer_events()) {

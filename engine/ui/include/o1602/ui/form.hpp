@@ -101,6 +101,9 @@ public:
     /// follows the mouse while the button is held; letting go, wherever, clicks it, and
     /// slid_to() tells where the knob was let go.
     void slider(Id id, Rect r, double position, bool enabled = true);
+    /// A bar that fills from the left as something goes on: `done` of it (0..1), in the frame's
+    /// gold inside a field's ground.
+    void progress(Rect r, double done);
 
     /// The field that takes the keys, if any.
     [[nodiscard]] std::optional<Id> focus() const noexcept { return m_focus; }
@@ -140,7 +143,8 @@ public:
             Field,
             Check,
             Row,
-            Slider
+            Slider,
+            Progress
         };
         Kind kind = Kind::Label;
         Id id = 0;
@@ -152,7 +156,7 @@ public:
         Tone value_tone = Tone::Normal;  ///< entry
         std::uint8_t colour = 0;         ///< swatch: its colour; speech: the name's
         std::int32_t line = 0;           ///< paragraph: line height
-        double position = 0.0;           ///< slider: where the knob is (0..1)
+        double position = 0.0;           ///< slider: where the knob is; progress: how far (0..1)
         bool enabled = true;
         bool on = false;      ///< selected, checked, secret
         bool cycles = false;  ///< button: the right button chooses the previous value

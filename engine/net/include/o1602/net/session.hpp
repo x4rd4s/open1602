@@ -562,6 +562,22 @@ public:
     [[nodiscard]] std::uint64_t token() const noexcept { return m_token; }
     /// Frames received but not run yet.
     [[nodiscard]] std::uint64_t frames_in_hand() const noexcept { return m_closed - m_frames; }
+
+    /// How far the game on its way from the host has come, for a progress display while joining.
+    enum class JoinStage : std::uint8_t {
+        None,       ///< not waiting for a game: in the lobby before the start, or playing
+        Waiting,    ///< the game has started; the host is still writing it for this computer
+        Receiving,  ///< its pieces are coming in (received_bytes() of total_bytes())
+        Loading,    ///< it is here and is loaded with the next update()
+    };
+    [[nodiscard]] JoinStage join_stage() const noexcept;
+    /// Bytes of the large message coming in pieces so far, and its size (0 if none comes now).
+    [[nodiscard]] std::uint64_t received_bytes() const noexcept {
+        return m_whole.empty() ? m_part.size() : m_whole.size();
+    }
+    [[nodiscard]] std::uint64_t total_bytes() const noexcept {
+        return m_whole.empty() ? (m_part.empty() ? 0 : m_part_total) : m_whole.size();
+    }
     /// The host left the running game and it can move on: this computer hosts it next
     /// (hosts_next()), or follows the successor at successor_address().
     [[nodiscard]] bool can_migrate() const noexcept;
@@ -576,6 +592,8 @@ private:
     friend class HostSession;  // made from a ClientSession when the host leaves
 
     void receive(std::span<const std::uint8_t> bytes);
+    /// One event of the transport, as update() takes them in turn.
+    void handle(TransportEvent& e);
     void load(Snapshot& m);
     void turn(Turn& m);
     void package_files(PackageFiles& m);
@@ -602,6 +620,10 @@ private:
     std::deque<sim::Command> m_outgoing;
     std::vector<std::uint8_t> m_part;  ///< the pieces so far of a message that comes in Parts
     std::uint32_t m_part_total = 0;    ///< its size
+    /// A message whose last piece came, read at the next update(): the frame between can show that
+    /// it is being loaded. The transport events after it wait in m_incoming from m_next on.
+    std::vector<std::uint8_t> m_whole;
+    std::size_t m_next = 0;
     KeepPackage m_keep_package;
     /// The files so far of a package that comes in several PackageFiles messages.
     std::optional<PackageFiles> m_package;

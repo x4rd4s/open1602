@@ -108,6 +108,10 @@ struct MultiplayerModel {
     bool everyone_ready = false;             ///< (host) every other player is ready
     std::uint16_t port = net::kDefaultPort;  ///< (host) the game's port
     std::deque<ChatLine> chat;               ///< newest last
+    /// (joining) How far the game from the host has come, and the bytes of it so far and in all.
+    net::ClientSession::JoinStage join = net::ClientSession::JoinStage::None;
+    std::uint64_t join_received = 0;
+    std::uint64_t join_total = 0;
 };
 
 struct MultiplayerEvent {
@@ -222,6 +226,8 @@ private:
     void layout_create(const MultiplayerModel& model);
     void layout_lobby(const MultiplayerModel& model);
     void layout_connecting();
+    /// The game from the host on its way (MultiplayerModel::join), in `box` of the lobby.
+    void layout_join_progress(const MultiplayerModel& model, ui::Rect box);
     /// The start dialog over the screen: the host's settings to choose, or to look at.
     void open_settings(const EndlessSetup& setup, SetupScope scope, GameSettingsMenu::Mode mode);
     /// Back from the start dialog to the screen it was opened from.
