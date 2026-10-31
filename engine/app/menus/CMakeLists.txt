@@ -11,6 +11,7 @@
 add_library(o1602_menus
     ../src/app_settings.cpp
     ../src/build_tool.cpp
+    ../src/catchment_view.cpp
     ../src/chat_window.cpp
     ../src/command_line.cpp
     ../src/command_sink.cpp

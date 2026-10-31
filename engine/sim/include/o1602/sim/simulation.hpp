@@ -240,6 +240,9 @@ public:
     /// ended, both ways at once and without the other's answer; false for no such players, the
     /// same player twice, or no change.
     bool script_treaty(PlayerId a, PlayerId b, bool peace, bool sign);
+    /// Destroys the building of a city on tile (x, y) of island `island` to ruins, as a fire does,
+    /// whoever owns it; false if none stands there (ground, forest and rocks outside cities stay).
+    bool script_destroy(std::uint16_t island, std::int32_t x, std::int32_t y);
 
     /// Game speed factor (1 = normal, up to Rules::max_game_speed); 0 pauses. For tools and tests;
     /// a running game changes the speed with a GameSpeedOrder.

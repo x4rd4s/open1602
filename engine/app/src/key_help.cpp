@@ -29,6 +29,21 @@ constexpr KeyHelpPlace kClickPlace{3, 1};
 /// What each click does (keys.click.<name>), all with Shift.
 constexpr std::array<const char*, 4> kShiftClicks = {"keys.click.castle_all", "keys.click.cannons",
                                                      "keys.click.cannons_unmount", "keys.click.trade_cart"};
+/// The page and section of a building clicked twice: the map.
+constexpr KeyHelpPlace kTwicePlace{0, 0};
+
+/// The section at `place` of `pages`, added (with its heading) when it has no lines yet.
+KeyHelpSection& section_at(std::array<KeyHelpPage, kKeyHelpPages>& pages, KeyHelpPlace place) {
+    KeyHelpPage& page = pages[place.page];
+    const std::string heading = ui::tr(kSectionHeadings[place.page][place.section]);
+    auto section = std::find_if(page.sections.begin(), page.sections.end(),
+                                [&](const KeyHelpSection& s) { return s.heading == heading; });
+    if (section == page.sections.end()) {
+        page.sections.push_back(KeyHelpSection{heading, {}});
+        section = page.sections.end() - 1;
+    }
+    return *section;
+}
 
 }  // namespace
 
@@ -153,18 +168,13 @@ std::array<KeyHelpPage, kKeyHelpPages> key_help_pages(const std::vector<KeyHelpE
 }
 
 void add_click_lines(std::array<KeyHelpPage, kKeyHelpPages>& pages) {
-    KeyHelpPage& page = pages[kClickPlace.page];
-    const std::string heading = ui::tr(kSectionHeadings[kClickPlace.page][kClickPlace.section]);
-    auto section = std::find_if(page.sections.begin(), page.sections.end(),
-                                [&](const KeyHelpSection& s) { return s.heading == heading; });
-    if (section == page.sections.end()) {
-        page.sections.push_back(KeyHelpSection{heading, {}});
-        section = page.sections.end() - 1;
-    }
+    KeyHelpSection& units = section_at(pages, kClickPlace);
     const std::string keys = ui::tr("keys.modifier.shift") + ui::tr("keys.click");
     for (const char* text : kShiftClicks) {
-        section->lines.push_back(KeyHelpLine{keys, ui::tr(text)});
+        units.lines.push_back(KeyHelpLine{keys, ui::tr(text)});
     }
+    section_at(pages, kTwicePlace)
+        .lines.push_back(KeyHelpLine{ui::tr("keys.click.twice"), ui::tr("keys.click.catchments")});
 }
 
 namespace {

@@ -1145,28 +1145,36 @@ sim::Catchment MapViewer::world_catchment(std::uint16_t island, sim::Catchment a
     return area;
 }
 
-std::optional<render::TileLighting> MapViewer::building_lighting(std::uint16_t island, std::uint16_t x,
-                                                                 std::uint16_t y) const {
-    // A catchment worth showing: production and public buildings, not houses (their Radius is
-    // only how far they look for a market).
-    if (island >= m_state->world.islands().size() || !m_state->world.islands()[island].map.contains(x, y)) {
+std::optional<render::TileLighting> MapViewer::building_lighting(const Selection& clicked) const {
+    // A second click on the same building lights all of its type on the island (Open1602's own).
+    const bool same_type = clicked.again > 0;
+    CircleCache& cache = m_circle_cache;
+    if (!cache.valid || !cache.clicked.same_object(clicked) || cache.clicked.serial != clicked.serial ||
+        cache.same_type != same_type || cache.construction != m_construction_serial) {
+        cache.clicked = clicked;
+        cache.same_type = same_type;
+        cache.construction = m_construction_serial;
+        cache.circles = catchment_circles(m_state->world, m_buildings, m_local_player, clicked.island, clicked.x,
+                                          clicked.y, same_type);
+        cache.valid = true;
+    }
+    if (!cache.circles || cache.circles->circles.empty()) {
         return std::nullopt;
     }
-    const sim::IslandMap& map = m_state->world.islands()[island].map;
-    const sim::MapCell& cell = map.top(x, y);
-    const sim::SubTile t = map.sub_tile(m_buildings, x, y);
-    if (t.building == nullptr || cell.owner != m_local_player || t.building->radius <= 0 ||
-        t.building->prod_kind == sim::prod::kHouse) {
-        return std::nullopt;
+    const CatchmentCircles& c = *cache.circles;
+    render::TileLighting l =
+        render::TileLighting::circle(m_local_player, world_catchment(clicked.island, c.circles[0]));
+    for (std::size_t i = 1; i < c.circles.size(); ++i) {
+        l.add_circle(world_catchment(clicked.island, c.circles[i]));
     }
-    render::TileLighting l = render::TileLighting::circle(
-        m_local_player, world_catchment(island, sim::catchment_of(*t.building, cell.rotation, sim::TilePos{x, y})));
-    if (sim::catchment_covers_water(*t.building)) {
+    if (sim::catchment_covers_water(*c.type)) {
         l.water();  // where a fisher's boat fishes, or a tower shoots at ships
     }
-    for (const sim::City& c : m_state->world.cities()) {
-        if (c.island == island && c.warehouse_x == x && c.warehouse_y == y) {
-            l.harbour(m_state->world, m_buildings, island, x, y);  // the Kontor: the water of its ships too
+    // A Kontor and a shipyard: also the water their ships come from, as in the original.
+    if (c.type->prod_kind == sim::prod::kKontor || c.type->prod_kind == sim::prod::kShipyard) {
+        for (const sim::TilePos& o : c.origins) {
+            l.harbour(m_state->world, m_buildings, clicked.island, static_cast<std::uint32_t>(o.x),
+                      static_cast<std::uint32_t>(o.y));
         }
     }
     return l;
@@ -1182,7 +1190,7 @@ render::TileLighting MapViewer::tile_lighting() const {
         // houses around a chapel. Otherwise all the player's land.
         std::optional<render::TileLighting> lit;
         if (clicked != nullptr) {
-            lit = building_lighting(clicked->island, clicked->x, clicked->y);
+            lit = building_lighting(*clicked);
         }
         render::TileLighting l = lit ? std::move(*lit) : render::TileLighting::territory(m_local_player);
         // Other players' land with a dotted border, as in the History Edition (the original only dims it).
@@ -1192,14 +1200,14 @@ render::TileLighting MapViewer::tile_lighting() const {
         // A building with a catchment being placed: the border of its circle at the mouse.
         const assets::BuildingType* b = m_tool.mode() == BuildTool::Mode::Build ? m_tool.selected() : nullptr;
         const auto spot = m_input->spot_at_mouse();
-        if (b != nullptr && spot && b->radius > 0 && b->prod_kind != sim::prod::kHouse) {
+        if (b != nullptr && spot && shows_catchment(*b)) {
             l.outline(world_catchment(spot->island,
                                       sim::catchment_of(*b, m_tool.rotation(), sim::TilePos{spot->x, spot->y})));
         }
         return l;
     }
     if (clicked != nullptr && m_hud->mode() == Hud::kModeInfo) {
-        if (auto l = building_lighting(clicked->island, clicked->x, clicked->y)) {
+        if (auto l = building_lighting(*clicked)) {
             return *l;
         }
     }
@@ -1210,6 +1218,9 @@ void MapViewer::apply_construction() {
     m_events.command_results(m_state->simulation.take_command_results());
     const std::vector<sim::ConstructionEvent> events = m_state->simulation.take_construction_events();
     const bool changed = !events.empty();
+    if (changed) {
+        ++m_construction_serial;  // the circles of a clicked building's type may change
+    }
     m_sound->construction(m_state->world, events);
     for (const sim::ConstructionEvent& e : events) {
         // A production entry that was freed or taken by a new building starts from its saved phase.

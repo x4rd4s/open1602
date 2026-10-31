@@ -222,8 +222,14 @@ TileLighting TileLighting::circle(sim::PlayerId player, const sim::Catchment& ar
     TileLighting l;
     l.m_kind = Kind::Circle;
     l.m_player = player;
-    l.m_lit.set(area);
+    l.add_circle(area);
     return l;
+}
+
+TileLighting& TileLighting::add_circle(const sim::Catchment& area) {
+    m_kind = Kind::Circle;
+    m_lit.emplace_back().set(area);
+    return *this;
 }
 
 TileLighting& TileLighting::outline(const sim::Catchment& area) {
@@ -235,9 +241,11 @@ TileLighting& TileLighting::harbour(const sim::World& world, const assets::Build
                                     std::uint16_t island, std::uint32_t x, std::uint32_t y) {
     m_world = &world;
     m_buildings = &buildings;
+    if (island != m_island) {
+        m_harbours.clear();  // the circles are of one island
+    }
     m_island = island;
-    m_x = x;
-    m_y = y;
+    m_harbours.push_back(Harbour{x, y});
     return *this;
 }
 
@@ -290,8 +298,10 @@ bool TileLighting::dimmed(std::int64_t x, std::int64_t y, const sim::MapCell* ce
     }
     // The harbour: water and the unclaimed coast, as far as the ships reach.
     if (m_world != nullptr && (cell == nullptr || cell->owner == sim::kNoPlayer || cell->owner == m_player) &&
-        sim::building_in_reach(*m_world, *m_buildings, m_island, m_x, m_y, static_cast<std::int32_t>(x),
-                               static_cast<std::int32_t>(y))) {
+        std::any_of(m_harbours.begin(), m_harbours.end(), [&](const Harbour& h) {
+            return sim::building_in_reach(*m_world, *m_buildings, m_island, h.x, h.y, static_cast<std::int32_t>(x),
+                                          static_cast<std::int32_t>(y));
+        })) {
         return false;
     }
     if (cell == nullptr && m_water && m_kind == Kind::Circle && in_circle(x, y)) {

@@ -92,6 +92,11 @@ TEST_CASE("key help: the clicks with Shift in windows join the units, also witho
     REQUIRE(none[3].sections.size() == 1);
     CHECK(none[3].sections[0].lines.size() == 4);
     CHECK(none[3].sections[0].heading == "Ships and units selected");
+    // A building clicked twice joins the map.
+    REQUIRE(none[0].sections.size() == 1);
+    REQUIRE(none[0].sections[0].lines.size() == 1);
+    CHECK(none[0].sections[0].lines[0].keys == "double click");
+    CHECK(none[0].sections[0].heading == "Map");
 }
 
 TEST_CASE("key help: two sections side by side, one section split into two columns") {

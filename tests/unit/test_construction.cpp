@@ -8,6 +8,7 @@
 #include "build_tool.hpp"
 
 #include "o1602/assets/cod_parser.hpp"
+#include "o1602/script/game_scripts.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -1056,4 +1057,44 @@ TEST_CASE("construction: \"plant all farm fields\" at a forester leaves the stan
     for (const sim::BuildItem& item : order->items) {
         CHECK(!(item.x == 8 && item.y == 11));
     }
+}
+
+TEST_CASE("construction: scripts build, demolish and destroy as the game would, and steer ships") {
+    Island island;
+    island.found();
+    assets::FigureTable figures;
+    sim::Simulation simulation(island.world, island.buildings, figures);
+    simulation.set_city_names(island.names);
+    std::vector<script::PackageScript> sources;
+    sources.push_back(script::PackageScript{
+        "builder",
+        "function on_start()\n"
+        "  print(game.build(0, 0, 'anno1602:20401', 7, 10), game.build(0, 0, 20401, 7, 10))\n"
+        "  print(game.build(1, 0, 20401, 8, 10), game.demolish(0, 0, 7, 10), game.demolish(0, 0, 7, 10))\n"
+        "  print(game.build(0, 0, 20401, 8, 12), game.destroy(0, 8, 12), game.destroy(0, 9, 12))\n"
+        "  local ship = game.ships(0)[1]\n"
+        "  print(game.move_ship(ship.id, 60, 61), game.move_ship(999, 60, 61))\n"
+        "  game.build(0, 0, 'nothing', 1, 1)\n"
+        "end\n",
+        {}});
+    script::GameScripts scripts(std::move(sources), island.world);
+    simulation.set_scripts(&scripts);
+    const std::int32_t money = island.world.players()[0].money;
+    simulation.tick();
+    simulation.set_scripts(nullptr);
+    const auto notes = scripts.take_notes();
+    REQUIRE(notes.size() == 5);
+    CHECK(notes[0].text.starts_with("true\t"));
+    CHECK(notes[0].text != "true\ttrue");       // the tile is taken now
+    CHECK(!notes[1].text.starts_with("true"));  // not in another player's city
+    CHECK(notes[1].text.ends_with("\t1\t0"));
+    CHECK(notes[2].text == "true\ttrue\tfalse");
+    CHECK(notes[3].text == "true\tfalse");
+    CHECK(notes[4].error);
+    CHECK(notes[4].text.find("game.build: no such building") != std::string::npos);
+    CHECK(island.world.players()[0].money == money - 10);  // two roads, paid as the player builds
+    const sim::Ship& ship = island.world.ships()[0];
+    CHECK(ship.order.kind == sim::Target::Kind::Position);
+    CHECK(ship.order.x == 60);
+    CHECK(ship.order.y == 61);
 }

@@ -283,6 +283,19 @@ std::size_t usable_holds(const Ship& ship, const assets::FigureTable& figures) {
     return std::min(n, ship.cargo.size());
 }
 
+std::size_t fullest_hold(const Ship& ship, const assets::FigureTable& figures) {
+    std::size_t best = 0;
+    std::uint32_t most = 0;
+    for (std::size_t h = usable_holds(ship, figures); h-- > 0;) {
+        const CargoSlot& slot = ship.cargo[h];
+        if (slot.ware != 0 && slot.amount > most) {
+            most = slot.amount;
+            best = h;
+        }
+    }
+    return best;
+}
+
 std::size_t usable_route_entries(const Ship& ship, const assets::FigureTable& figures) {
     return std::clamp(usable_holds(ship, figures), RouteStop::kOriginalEntries, RouteStop::kEntries);
 }

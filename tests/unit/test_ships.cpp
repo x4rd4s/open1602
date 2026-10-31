@@ -1312,3 +1312,23 @@ TEST_CASE("ships: with S-012 brought back the Kontor's window trades with a ship
         CHECK(fleet.transfer(sim::CargoTransfer{0, id, kWood, true, 10 * kTon}) == 0);
     }
 }
+
+TEST_CASE("ships: the goods exchange starts at the fullest hold, an empty ship at the first") {
+    Sea sea;
+    sim::Ship& ship = sea.add(30, 25);
+    ship.cargo.resize(8);  // as the original keeps them; the type's holds come first
+    const std::size_t holds = sim::usable_holds(ship, sea.figures);
+    REQUIRE(holds >= 3);
+    CHECK(sim::fullest_hold(ship, sea.figures) == 0);
+    ship.cargo[1] = sim::CargoSlot{kWood, 5 * kTon, 0};
+    CHECK(sim::fullest_hold(ship, sea.figures) == 1);
+    ship.cargo[2] = sim::CargoSlot{kTools, 7 * kTon, 0};
+    CHECK(sim::fullest_hold(ship, sea.figures) == 2);
+    // Equally full holds: the last of them, as in the original.
+    ship.cargo[0] = sim::CargoSlot{kWood, 7 * kTon, 0};
+    CHECK(sim::fullest_hold(ship, sea.figures) == 2);
+    // Holds beyond the type's are not looked at, nor amounts without a ware.
+    ship.cargo[holds] = sim::CargoSlot{kWood, 50 * kTon, 0};
+    ship.cargo[1] = sim::CargoSlot{0, 60 * kTon, 0};
+    CHECK(sim::fullest_hold(ship, sea.figures) == 2);
+}
