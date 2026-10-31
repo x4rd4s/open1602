@@ -236,6 +236,10 @@ public:
     /// `player` is out (GameEvent::Reason::Script), nobody credited; false when the game is over or
     /// the player is not playing.
     bool script_defeat(PlayerId player);
+    /// The peace (`peace`) or the trade treaty between players `a` and `b` is signed (`sign`) or
+    /// ended, both ways at once and without the other's answer; false for no such players, the
+    /// same player twice, or no change.
+    bool script_treaty(PlayerId a, PlayerId b, bool peace, bool sign);
 
     /// Game speed factor (1 = normal, up to Rules::max_game_speed); 0 pauses. For tools and tests;
     /// a running game changes the speed with a GameSpeedOrder.

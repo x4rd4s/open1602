@@ -142,6 +142,8 @@ public:
     void decay(PlayerId a) noexcept;
 
     [[nodiscard]] std::vector<DiplomacyNotice> take_notices() { return m_notices.take(); }
+    /// The messages not taken yet (for the scripts: EventBuffer::since()).
+    [[nodiscard]] const EventBuffer<DiplomacyNotice>& notices() const noexcept { return m_notices; }
     /// A message from outside the treaties (a computer's answer to a founding, ComputerPlayers).
     void notify(const DiplomacyNotice& notice) { m_notices.push(notice); }
 

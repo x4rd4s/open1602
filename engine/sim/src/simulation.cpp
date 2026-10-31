@@ -896,6 +896,13 @@ void Simulation::tick_timed(std::span<std::uint64_t> step_ns) {
     const std::uint64_t construction_before = m_construction_events.total();
     const std::uint64_t houses_before = m_house_events.total();
     const std::uint64_t game_before = m_game_events.total();
+    const std::uint64_t city_before = m_city_events.total();
+    const std::uint64_t disaster_before = m_disaster_events.total();
+    const std::uint64_t volcano_before = m_volcano_events.total();
+    const std::uint64_t island_before = m_island_events.total();
+    const std::uint64_t ship_before = m_ship_events.total();
+    const std::uint64_t military_before = m_military_events.total();
+    const std::uint64_t diplomacy_before = m_world->diplomacy().notices().total();
     apply_commands();
     if (m_paused) {
         return;  // paused by a command of this tick: the game time stands still
@@ -919,7 +926,15 @@ void Simulation::tick_timed(std::span<std::uint64_t> step_ns) {
         const auto construction = copy(m_construction_events.since(construction_before));
         const auto houses = copy(m_house_events.since(houses_before));
         const auto game = copy(m_game_events.since(game_before));
-        m_scripts->after_tick(*this, TickEvents{construction, houses, game});
+        const auto cities = copy(m_city_events.since(city_before));
+        const auto disasters = copy(m_disaster_events.since(disaster_before));
+        const auto volcanoes = copy(m_volcano_events.since(volcano_before));
+        const auto islands = copy(m_island_events.since(island_before));
+        const auto ships = copy(m_ship_events.since(ship_before));
+        const auto military = copy(m_military_events.since(military_before));
+        const auto diplomacy = copy(m_world->diplomacy().notices().since(diplomacy_before));
+        m_scripts->after_tick(*this, TickEvents{construction, houses, game, cities, disasters, volcanoes, islands,
+                                                ships, military, diplomacy});
     }
     trim_events();
     if (m_tick_observer) {
@@ -1226,6 +1241,23 @@ bool Simulation::script_money(PlayerId player, std::int64_t amount) {
         return false;
     }
     p->money = money_plus(p->money, amount);
+    return true;
+}
+
+bool Simulation::script_treaty(PlayerId a, PlayerId b, bool peace, bool sign) {
+    const std::size_t players = m_world->players().size();
+    if (a >= players || b >= players || a == b) {
+        return false;
+    }
+    Diplomacy& diplomacy = m_world->diplomacy();
+    const Treaty value = sign ? Treaty::Signed : Treaty::None;
+    Treaty& ab = peace ? diplomacy.relation(a, b).peace : diplomacy.relation(a, b).trade;
+    Treaty& ba = peace ? diplomacy.relation(b, a).peace : diplomacy.relation(b, a).trade;
+    if (ab == value && ba == value) {
+        return false;
+    }
+    ab = value;
+    ba = value;
     return true;
 }
 
