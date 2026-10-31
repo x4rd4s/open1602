@@ -22,6 +22,7 @@
 #include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/ai.hpp"
 #include "o1602/sim/balance.hpp"
+#include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -1614,4 +1615,59 @@ TEST_CASE("ai: the computers' cheats come from the game's balance (balance.toml 
     const std::int32_t original = money_after_founding(799);
     CHECK(money_after_founding(5799) == original + 5000);
     CHECK(money_after_founding(0) == original - 799);
+}
+
+TEST_CASE("ai: a stage's build order from the game's balance (computers.toml) is what the city builds (MD-4)") {
+    // The pioneers' order of a package asks for two workshops of a package's good, where the
+    // inhabitants alone want one.
+    const auto mills_built = [](bool with_order) {
+        Game g;
+        static constexpr std::uint32_t kPepperMill = 20992;
+        g.buildings = make_buildings(
+            "  @Nummer: 13\n  Id: 20992\n  Kind: 14\n  Gfx: 100\n  Size: 2, 2\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 1\n    Maxlager: 4\n    Ware: 59\n"
+            "    Prodmenge: 1\n    Interval: 20\n  EndObj\n"
+            "  Objekt: HAUS_BAUKOST\n    Money: 50\n  EndObj\n");
+        assets::ResidentClass settlers;
+        settlers.max_per_house = 10;
+        settlers.needs.push_back({59, 100});
+        g.buildings.set_resident_classes({settlers});
+        g.buildings.by_id(kKontor)->ware = sim::ware::kAll;
+        if (with_order) {
+            sim::Balance balance;
+            balance.computer_orders.push_back(
+                {sim::ComputerList::Pioneers, {sim::ComputerNeed{sim::ComputerNeed::Kind::Package, 59, 2}}});
+            REQUIRE(sim::valid(balance));
+            g.world.set_balance(balance);
+        }
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s, 60'000);
+        sim::City* city = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                city = g.world.city(c.island, c.index);
+            }
+        }
+        REQUIRE(city != nullptr);
+        const sim::IslandMap& map = g.world.island(city->island).map;
+        const auto mills = [&] {
+            std::size_t n = 0;
+            for (std::uint32_t y = 0; y < map.height(); ++y) {
+                for (std::uint32_t x = 0; x < map.width(); ++x) {
+                    const sim::MapCell& cell = map.top(x, y);
+                    const assets::BuildingType* b = g.buildings.by_sprite(cell.sprite);
+                    n += b != nullptr && b->id == kPepperMill && cell.owner == kComputer ? 1U : 0U;
+                }
+            }
+            return n / 4;
+        };
+        // Ten inhabitants use 0.7 t a minute: one workshop is enough for them.
+        for (std::uint32_t t = 0; t < 600'000; t += 10'000) {
+            city->inhabitants.assign(1, 10);
+            run(s, 10'000);
+        }
+        return mills();
+    };
+    CHECK(mills_built(false) == 1);
+    CHECK(mills_built(true) == 2);
 }

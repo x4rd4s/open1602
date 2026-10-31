@@ -522,300 +522,8 @@ std::uint32_t Engine::luxury_in_stock(const AiPlayer& p, const City& c, const Ci
 // Build orders of the stages (task 5, docs/re/ai.md)
 //
 // Each stage of a city tries what it needs in a fixed order and stops at the first entry that
-// finds something to do. The orders are data, so that balancing them or a mod's own stage does
-// not mean editing the conditions of run_stage().
-
-namespace {
-
-namespace order {
-using Kind = StageNeed::Kind;
-using When = StageNeed::When;
-constexpr StageNeed building(std::uint8_t slot, std::uint32_t n) {
-    return {Kind::Building, slot, n};
-}
-constexpr StageNeed market(std::uint32_t n) {
-    return {Kind::Market, 0, n};
-}
-constexpr StageNeed houses(std::uint32_t n) {
-    return {Kind::Houses, 0, n};
-}
-constexpr StageNeed public_building(std::uint8_t slot, std::uint32_t n, When cov) {
-    return {Kind::Public, slot, n, cov};
-}
-constexpr StageNeed kontor(std::uint32_t level) {
-    return {Kind::Kontor, 0, level};
-}
-constexpr StageNeed castle() {
-    return {Kind::Castle};
-}
-constexpr StageNeed monument() {
-    return {Kind::Monument};
-}
-constexpr StageNeed shipyard() {
-    return {Kind::Shipyard};
-}
-constexpr StageNeed processing() {
-    return {Kind::Processing};
-}
-constexpr StageNeed iron_tools() {
-    return {Kind::IronTools};
-}
-constexpr StageNeed weapons() {
-    return {Kind::Weapons};
-}
-constexpr StageNeed luxury(std::uint32_t n, When exclusive, When when = When::Always) {
-    return {Kind::Luxury, 0, n, exclusive, when};
-}
-constexpr StageNeed colony_luxury(std::uint32_t tiles_per_field) {
-    return {Kind::ColonyLuxury, 0, tiles_per_field};
-}
-constexpr StageNeed tower(std::uint32_t n, When when = When::Always) {
-    return {Kind::Tower, 0, n, When::Never, when};
-}
-constexpr StageNeed roads_if_mason() {
-    return {Kind::RoadsIfMason};
-}
-constexpr StageNeed colony(std::uint32_t mode) {
-    return {Kind::Colony, 0, mode};
-}
-}  // namespace order
-
-using namespace order;
-constexpr When kAlways = When::Always;
-constexpr When kNever = When::Never;
-constexpr When k4000 = When::Gold4000;
-constexpr When k5000 = When::Gold5000;
-constexpr When k8000 = When::Gold8000;
-
-constexpr std::array kFoundedOrder = {market(1), building(kSlotFisher, 1), building(kSlotWoodcutter, 1), houses(8)};
-constexpr std::array kColonyOrder = {market(0), processing()};
-constexpr std::array kColonyMaterials = {building(kSlotQuarry, 1), building(kSlotWoodcutter, 1),
-                                         building(kSlotStonemason, 1)};
-constexpr std::array kPioneersOrder = {market(0),
-                                       building(kSlotWoodcutter, 1),
-                                       houses(8),
-                                       public_building(kSlotKapelle, 0, kAlways),
-                                       houses(16),
-                                       building(kSlotCattle, 2),
-                                       building(kSlotButcher, 1)};
-constexpr std::array kSettlersOrder = {market(0),
-                                       building(kSlotWoodcutter, 2),
-                                       building(kSlotSheep, 2),
-                                       building(kSlotWebstube, 1),
-                                       building(kSlotFisher, 2),
-                                       building(kSlotCattle, 2),
-                                       building(kSlotButcher, 1),
-                                       houses(18),
-                                       public_building(kSlotKapelle, 0, kAlways),
-                                       building(kSlotQuarry, 1),
-                                       building(kSlotStonemason, 1),
-                                       houses(24)};
-constexpr std::array kSecondOrder = {market(0),
-                                     building(kSlotSheep, 2),
-                                     building(kSlotWebstube, 1),
-                                     building(kSlotFisher, 2),
-                                     houses(18),
-                                     public_building(kSlotKapelle, 0, kAlways),
-                                     building(kSlotQuarry, 1),
-                                     building(kSlotStonemason, 2),
-                                     houses(22),
-                                     building(kSlotCattle, 2),
-                                     building(kSlotButcher, 1),
-                                     public_building(kSlotBrunnen, 1, kNever)};
-constexpr std::array kSecondLuxuryOrder = {market(0),
-                                           houses(18),
-                                           public_building(kSlotKapelle, 0, kAlways),
-                                           houses(24),
-                                           public_building(kSlotBrunnen, 1, kNever),
-                                           public_building(kSlotKlinik, 1, kNever),
-                                           processing(),
-                                           colony_luxury(128),
-                                           tower(6)};
-constexpr std::array kSecondFarmingOrder = {market(0),
-                                            public_building(kSlotKapelle, 0, kAlways),
-                                            houses(24),
-                                            public_building(kSlotBrunnen, 1, kNever),
-                                            public_building(kSlotKlinik, 1, kNever),
-                                            processing()};
-constexpr std::array kMainOrder = {market(0),
-                                   kontor(2),
-                                   building(kSlotFisher, 3),
-                                   building(kSlotWoodcutter, 2),
-                                   building(kSlotGrain, 4),
-                                   building(kSlotMill, 2),
-                                   building(kSlotBakery, 1),
-                                   building(kSlotQuarry, 1),
-                                   building(kSlotStonemason, 1),
-                                   houses(30),
-                                   public_building(kSlotKapelle, 0, kAlways),
-                                   houses(32),
-                                   building(kSlotSheep, 4),
-                                   building(kSlotWebstube, 2),
-                                   castle()};
-/// With 4000 gold the main city also works up its goods (one condition in the original).
-constexpr std::array kMainRichOrder = {StageNeed{StageNeed::Kind::Processing, 0, 0, kNever, k4000},
-                                       StageNeed{StageNeed::Kind::IronTools, 0, 0, kNever, k4000},
-                                       luxury(4, kAlways, k4000)};
-constexpr std::array kMain2Order = {
-    market(0),         public_building(kSlotKapelle, 0, kAlways), houses(34), castle(), processing(), iron_tools(),
-    luxury(4, kAlways)};
-constexpr std::array kCitizensOrder = {processing(),
-                                       weapons(),
-                                       market(0),
-                                       kontor(3),
-                                       public_building(kSlotWirt, 1, k4000),
-                                       public_building(kSlotSchule, 1, k4000),
-                                       public_building(kSlotKlinik, 1, k4000),
-                                       building(kSlotQuarry, 1),
-                                       building(kSlotStonemason, 1),
-                                       public_building(kSlotBrunnen, 1, k4000),
-                                       public_building(kSlotKapelle, 0, kAlways),
-                                       houses(36),
-                                       castle(),
-                                       iron_tools(),
-                                       luxury(6, kAlways),
-                                       roads_if_mason()};
-constexpr std::array kCitizens2Order = {processing(),
-                                        weapons(),
-                                        market(0),
-                                        public_building(kSlotWirt, 1, k4000),
-                                        public_building(kSlotSchule, 1, k4000),
-                                        public_building(kSlotKlinik, 1, k4000),
-                                        public_building(kSlotGalgen, 1, kAlways),
-                                        public_building(kSlotBrunnen, 1, kAlways),
-                                        castle(),
-                                        building(kSlotCattle, 4),
-                                        building(kSlotButcher, 2),
-                                        public_building(kSlotKapelle, 0, kAlways),
-                                        houses(38),
-                                        building(kSlotSheep, 6),
-                                        building(kSlotWebstube, 3),
-                                        monument(),
-                                        iron_tools(),
-                                        luxury(6, kNever),
-                                        tower(6, k4000),
-                                        roads_if_mason(),
-                                        colony(2)};
-constexpr std::array kCitizensSmallOrder = {processing(),
-                                            weapons(),
-                                            market(0),
-                                            public_building(kSlotWirt, 0, k4000),
-                                            public_building(kSlotSchule, 0, k4000),
-                                            public_building(kSlotKlinik, 0, k4000),
-                                            castle(),
-                                            public_building(kSlotGalgen, 2, kAlways),
-                                            public_building(kSlotBrunnen, 1, kAlways),
-                                            building(kSlotCattle, 4),
-                                            public_building(kSlotKapelle, 0, kAlways),
-                                            houses(48),
-                                            building(kSlotQuarry, 1),
-                                            building(kSlotStonemason, 1),
-                                            iron_tools(),
-                                            luxury(6, kNever),
-                                            tower(16, k4000),
-                                            roads_if_mason(),
-                                            colony(2)};
-constexpr std::array kMerchantsOrder = {processing(),
-                                        weapons(),
-                                        market(0),
-                                        castle(),
-                                        public_building(kSlotWirt, 0, k4000),
-                                        public_building(kSlotSchule, 0, k4000),
-                                        public_building(kSlotKlinik, 0, k4000),
-                                        public_building(kSlotGalgen, 1, kAlways),
-                                        public_building(kSlotBrunnen, 1, kAlways),
-                                        building(kSlotCattle, 4),
-                                        building(kSlotButcher, 2),
-                                        public_building(kSlotKapelle, 0, kAlways),
-                                        houses(40),
-                                        building(kSlotQuarry, 1),
-                                        building(kSlotStonemason, 2),
-                                        monument(),
-                                        iron_tools(),
-                                        luxury(8, kAlways),
-                                        colony(3)};
-/// Once the merchants' luxury is in stock: bath house and church.
-constexpr std::array kMerchantsLuxuryOrder = {public_building(kSlotBadehaus, 1, kNever),
-                                              public_building(kSlotKirche, 1, kNever)};
-constexpr std::array kMerchantsTail = {tower(16, k5000), roads_if_mason()};
-/// The second stage of merchants; a city with little land stays there (kMerchantsSmall), which
-/// differs only in the luxury goods it shares.
-constexpr std::array<StageNeed, 19> merchants2_order(When exclusive) {
-    return {weapons(),
-            market(0),
-            castle(),
-            kontor(4),
-            public_building(kSlotWirt, 0, k4000),
-            public_building(kSlotSchule, 0, k4000),
-            public_building(kSlotKlinik, 0, k4000),
-            public_building(kSlotGalgen, 1, kAlways),
-            public_building(kSlotBrunnen, 1, kAlways),
-            public_building(kSlotBadehaus, 1, kNever),
-            public_building(kSlotKirche, 1, kNever),
-            building(kSlotCattle, 6),
-            building(kSlotButcher, 3),
-            houses(42),
-            shipyard(),
-            monument(),
-            processing(),
-            iron_tools(),
-            luxury(8, exclusive)};
-}
-constexpr std::array kMerchants2Order = merchants2_order(kAlways);
-constexpr std::array kMerchantsSmallOrder = merchants2_order(kNever);
-constexpr std::array kMerchants2Tail = {tower(16, k5000), roads_if_mason(), colony(3)};
-constexpr std::array kMerchantsSmallTail = {tower(20, k4000), roads_if_mason(), colony(3)};
-constexpr std::array kAristocratsOrder = {processing(),
-                                          weapons(),
-                                          market(0),
-                                          castle(),
-                                          building(kSlotTailor, 1),
-                                          public_building(kSlotKapelle, 0, kAlways),
-                                          public_building(kSlotWirt, 0, k8000),
-                                          public_building(kSlotSchule, 0, k8000),
-                                          public_building(kSlotKlinik, 0, k8000),
-                                          public_building(kSlotGalgen, 1, kAlways),
-                                          public_building(kSlotBrunnen, 1, kAlways),
-                                          public_building(kSlotBadehaus, 1, k8000),
-                                          public_building(kSlotKirche, 1, k8000),
-                                          building(kSlotCattle, 6),
-                                          building(kSlotButcher, 3),
-                                          houses(44),
-                                          building(kSlotGoldsmith, 1),
-                                          shipyard(),
-                                          monument(),
-                                          iron_tools(),
-                                          luxury(10, kAlways),
-                                          tower(16, k5000),
-                                          roads_if_mason()};
-constexpr std::array kAristocrats2Order = {processing(),
-                                           weapons(),
-                                           market(0),
-                                           castle(),
-                                           kontor(4),
-                                           public_building(kSlotKapelle, 0, kAlways),
-                                           public_building(kSlotWirt, 0, kNever),
-                                           public_building(kSlotSchule, 0, kNever),
-                                           public_building(kSlotKlinik, 0, kNever),
-                                           public_building(kSlotGalgen, 1, kAlways),
-                                           public_building(kSlotBrunnen, 1, kAlways),
-                                           public_building(kSlotBadehaus, 1, kNever),
-                                           public_building(kSlotKirche, 1, kNever),
-                                           public_building(kSlotHochschule, 1, k8000),
-                                           public_building(kSlotTheater, 1, k8000),
-                                           building(kSlotCattle, 6),
-                                           building(kSlotButcher, 3),
-                                           houses(46),
-                                           building(kSlotGoldsmith, 1),
-                                           shipyard(),
-                                           monument(),
-                                           iron_tools(),
-                                           luxury(10, kAlways),
-                                           tower(20, k4000),
-                                           roads_if_mason(),
-                                           colony(4)};
-
-}  // namespace
+// finds something to do. The orders are data (computer_orders.hpp): the original's, or a package's
+// from its computers.toml.
 
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
                         std::span<const StageNeed> needs) {
@@ -887,6 +595,9 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 break;
             case StageNeed::Kind::Colony:
                 found = want_colony(p, static_cast<std::uint8_t>(n.n), false, false);
+                break;
+            case StageNeed::Kind::Package:
+                found = package_order(p, c, r, n.slot, n.n);
                 break;
         }
         if (found) {
@@ -976,8 +687,8 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
-    const auto needs = [&](std::span<const StageNeed> o) {
-        return first_need(p, c, r, money, o) || package_chains(p, c, r);
+    const auto needs = [&](ComputerList list) {
+        return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
     };
 
     switch (r.stage) {
@@ -1000,7 +711,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kColony);
                 return;
             }
-            if (needs(kFoundedOrder)) {
+            if (needs(ComputerList::Founded)) {
                 return;
             }
             if (now_ms() - r.stage_ms >= kStage0AbandonMs) {
@@ -1009,7 +720,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kColony: {
-            if (needs(kColonyOrder)) {
+            if (needs(ComputerList::Colony)) {
                 return;
             }
             if (full_crops(c.island) == 0) {
@@ -1020,7 +731,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             } else if (colony_luxury(p, c, r, 120)) {
                 return;
             }
-            if (needs(kColonyMaterials)) {
+            if (needs(ComputerList::ColonyMaterials)) {
                 return;
             }
             nothing_to_do(p);
@@ -1032,7 +743,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kSettlers);
                 return;
             }
-            if (needs(kPioneersOrder)) {
+            if (needs(ComputerList::Pioneers)) {
                 return;
             }
             if (now_ms() - r.stage_ms >= kStage14AbandonMs) {
@@ -1062,7 +773,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                     }
                 }
             }
-            if (needs(kSettlersOrder)) {
+            if (needs(ComputerList::Settlers)) {
                 return;
             }
             if (population(c, 1) >= 135) {
@@ -1071,21 +782,21 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kSecond: {
-            if (needs(kSecondOrder)) {
+            if (needs(ComputerList::Second)) {
                 return;
             }
             set_stage(p, r, full_crops(c.island) != 0 ? stage::kSecondLuxury : stage::kSecondFarming);
             return;
         }
         case stage::kSecondLuxury: {
-            if (needs(kSecondLuxuryOrder)) {
+            if (needs(ComputerList::SecondLuxury)) {
                 return;
             }
             nothing_to_do(p);
             return;
         }
         case stage::kSecondFarming: {
-            if (needs(kSecondFarmingOrder) || farm_animals(p, r) || need_tower(p, 1, 6)) {
+            if (needs(ComputerList::SecondFarming) || farm_animals(p, r) || need_tower(p, 1, 6)) {
                 return;
             }
             nothing_to_do(p);
@@ -1099,7 +810,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kMain2);
                 return;
             }
-            if (needs(kMainOrder) || needs(kMainRichOrder)) {
+            if (needs(ComputerList::Main) || needs(ComputerList::MainRich)) {
                 return;
             }
             if (money >= 4000) {
@@ -1113,7 +824,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kCitizens);
                 return;
             }
-            if (needs(kMain2Order)) {
+            if (needs(ComputerList::Main2)) {
                 return;
             }
             nothing_to_do(p);
@@ -1124,7 +835,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
             }
-            if (needs(kCitizensOrder)) {
+            if (needs(ComputerList::Citizens)) {
                 return;
             }
             nothing_to_do(p);
@@ -1135,14 +846,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, r.land < 951 ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
-            if (needs(kCitizens2Order)) {
+            if (needs(ComputerList::Citizens2)) {
                 return;
             }
             nothing_to_do(p);
             return;
         }
         case stage::kCitizensSmall: {
-            if (needs(kCitizensSmallOrder)) {
+            if (needs(ComputerList::CitizensSmall)) {
                 return;
             }
             nothing_to_do(p);
@@ -1153,13 +864,13 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kMerchants2);
                 return;
             }
-            if (needs(kMerchantsOrder)) {
+            if (needs(ComputerList::Merchants)) {
                 return;
             }
-            if (luxury_in_stock(p, c, r, 3) > 2 && needs(kMerchantsLuxuryOrder)) {
+            if (luxury_in_stock(p, c, r, 3) > 2 && needs(ComputerList::MerchantsLuxury)) {
                 return;
             }
-            if (needs(kMerchantsTail)) {
+            if (needs(ComputerList::MerchantsTail)) {
                 return;
             }
             nothing_to_do(p);
@@ -1172,8 +883,8 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, r.land < 1101 ? stage::kMerchantsSmall : stage::kAristocrats);
                 return;
             }
-            if (small ? needs(kMerchantsSmallOrder) || needs(kMerchantsSmallTail)
-                      : needs(kMerchants2Order) || needs(kMerchants2Tail)) {
+            if (small ? needs(ComputerList::MerchantsSmall) || needs(ComputerList::MerchantsSmallTail)
+                      : needs(ComputerList::Merchants2) || needs(ComputerList::Merchants2Tail)) {
                 return;
             }
             nothing_to_do(p);
@@ -1187,14 +898,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kAristocrats2);
                 return;
             }
-            if (needs(kAristocratsOrder)) {
+            if (needs(ComputerList::Aristocrats)) {
                 return;
             }
             nothing_to_do(p);
             return;
         }
         case stage::kAristocrats2: {
-            if (needs(kAristocrats2Order)) {
+            if (needs(ComputerList::Aristocrats2)) {
                 return;
             }
             nothing_to_do(p);
@@ -1405,6 +1116,17 @@ bool Engine::package_chains(AiPlayer& p, const City& c, const CityPlan& r) {
     for (std::size_t i = 0; i < wanted.size(); ++i) {
         if (wanted[i] != 0 && package_need(p, c, r, m_package_needs[i], wanted[i])) {
             return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::package_order(AiPlayer& p, const City& c, const CityPlan& r, std::uint8_t w, std::uint32_t wanted) {
+    // An order's entry for a good of a package: as many producers as it says, where the computers
+    // have a producer for the good (package_needs).
+    for (const PackageNeed& n : m_package_needs) {
+        if (n.ware == w) {
+            return package_need(p, c, r, n, wanted);
         }
     }
     return false;

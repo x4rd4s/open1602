@@ -148,7 +148,10 @@ need, at most eight, after the list of its stage. They count in slots after the 
 
 Part 2 done on 2026-10-31 ([computer-players.md](computer-players.md#what-they-get-from-nowhere)):
 the cheat amounts are values of `balance.toml`'s table `[computers]` (savegame `BALA` version 2).
-Still open: the original's Needs, slots, stage orders and public buildings as data.
+
+Part 3 done on 2026-10-31 ([computer-players.md](computer-players.md#in-which-order)): the stage
+orders, with the public buildings, are lists of `computers.toml` (savegame `AIOR`); an entry may
+name a package's good. Still open: the original's Needs, slots and when a stage moves on as data.
 
 ### 6. Lua scripts (section 6)
 

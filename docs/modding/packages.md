@@ -22,6 +22,7 @@ with milestone M8: packages as archives and adding content of a package's own
     balance.toml       numbers of the game (balance.md)
     buildings.toml     values of the original's buildings (values.md)
     figures.toml       values of the original's figures (values.md)
+    computers.toml     build orders of the computer players (computer-players.md)
     own_buildings.toml buildings of the package's own (own-buildings.md)
     goods.toml         trade goods of the package's own (goods.md)
     classes.toml       classes of inhabitants, changed and new (classes.md)

@@ -102,6 +102,8 @@ struct Decoded {
     std::optional<std::vector<BuildingValue>> building_values;
     /// The changed values of figures (FIGV).
     std::optional<std::vector<FigureValue>> figure_values;
+    /// The computers' build orders a package changed (AIOR).
+    std::optional<std::vector<ComputerOrder>> computer_orders;
     /// Missions and the end of the game (MISN).
     struct MissionPart {
         std::vector<Mission> missions;
