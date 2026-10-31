@@ -911,9 +911,12 @@ void Simulation::tick_timed(std::span<std::uint64_t> step_ns) {
         }
     }
     if (m_scripts != nullptr) {
-        const TickEvents events{m_construction_events.since(construction_before), m_house_events.since(houses_before),
-                                m_game_events.since(game_before)};
-        m_scripts->after_tick(*this, events);
+        // Copies: what the scripts change adds events of its own to the buffers.
+        const auto copy = [](auto events) { return std::vector(events.begin(), events.end()); };
+        const auto construction = copy(m_construction_events.since(construction_before));
+        const auto houses = copy(m_house_events.since(houses_before));
+        const auto game = copy(m_game_events.since(game_before));
+        m_scripts->after_tick(*this, TickEvents{construction, houses, game});
     }
     trim_events();
     if (m_tick_observer) {
@@ -1137,11 +1140,7 @@ void Simulation::players_tick() {
     if (m_world->game_end()) {
         return;
     }
-    std::size_t humans = 0;
-    for (const Player& p : m_world->players()) {
-        humans += p.role == PlayerRole::Human && p.status != PlayerStatus::Absent ? 1 : 0;
-    }
-    const bool multiplayer = humans > 1;
+    const bool multiplayer = this->multiplayer();
     // The victory conditions of an endless game: alone "your task is fulfilled", with others the
     // message with the winner's colour, as the original's multiplayer races.
     const VictoryConditions& victory = m_rules.victory;
@@ -1208,6 +1207,60 @@ void Simulation::players_tick() {
                 break;
         }
     }
+}
+
+bool Simulation::multiplayer() const {
+    std::size_t humans = 0;
+    for (const Player& p : m_world->players()) {
+        humans += p.role == PlayerRole::Human && p.status != PlayerStatus::Absent ? 1 : 0;
+    }
+    return humans > 1;
+}
+
+bool Simulation::script_money(PlayerId player, std::int64_t amount) {
+    Player* p = m_world->player(player);
+    if (p == nullptr) {
+        return false;
+    }
+    p->money = money_plus(p->money, amount);
+    return true;
+}
+
+std::optional<std::int64_t> Simulation::script_goods(std::uint16_t island, std::uint8_t city, std::uint8_t ware,
+                                                     std::int64_t amount) {
+    City* c = m_world->city(island, city);
+    if (c == nullptr || !m_world->goods().is_trade(ware)) {
+        return std::nullopt;
+    }
+    c->ensure_ware(ware);
+    if (amount >= 0) {
+        const std::uint32_t room = c->capacity > c->goods[ware] ? c->capacity - c->goods[ware] : 0;
+        const auto added = static_cast<std::uint32_t>(std::min<std::int64_t>(amount, room));
+        c->goods[ware] += added;
+        return std::int64_t{added};
+    }
+    const auto taken = static_cast<std::uint32_t>(std::min<std::int64_t>(-amount, c->available(ware)));
+    c->goods[ware] -= taken;
+    return -std::int64_t{taken};
+}
+
+bool Simulation::script_win(PlayerId player) {
+    const Player* p = m_world->player(player);
+    if (m_world->game_end() || p == nullptr || !p->active() ||
+        (p->role != PlayerRole::Human && p->role != PlayerRole::Computer)) {
+        return false;
+    }
+    accomplish(player, multiplayer() ? kColourWinMessage : kMissionMessage, false);
+    return true;
+}
+
+bool Simulation::script_defeat(PlayerId player) {
+    const Player* p = m_world->player(player);
+    if (m_world->game_end() || p == nullptr || !p->active()) {
+        return false;
+    }
+    defeat(player, GameEvent::Reason::Script, false);
+    return true;
 }
 
 void Simulation::accomplish(PlayerId winner) {

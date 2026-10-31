@@ -86,6 +86,9 @@ private:
     void add_api(Package& package);
 
     const sim::World* m_world;
+    /// The running game while after_tick() calls the scripts: what may change it. Null otherwise
+    /// (the top levels run when the game is set up), so changing it then is an error.
+    sim::Simulation* m_simulation = nullptr;
     std::vector<std::unique_ptr<Package>> m_packages;
     std::vector<ScriptMessage> m_messages;
     std::vector<ScriptNote> m_notes;

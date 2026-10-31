@@ -327,3 +327,76 @@ TEST_CASE("script: the state of the scripts goes through the savegame section") 
     REQUIRE(loaded.script_states().size() == 1);
     CHECK(loaded.script_states()[0] == state);
 }
+
+TEST_CASE("script: scripts give and take money and goods") {
+    Game game;
+    sim::City city;
+    city.island = 3;
+    city.index = 1;
+    city.owner = 0;
+    city.name = "Port Royal";
+    city.capacity = 50 * 32;
+    game.world.add_city(city);
+    auto scripts =
+        game.run(one("trade",
+                     "function on_start()\n"
+                     "  print(game.add_money(0, 1500), game.add_money(1, -10))\n"
+                     "  local c = game.cities(0)[1]\n"
+                     "  print(#game.cities(), #game.cities(1), c.name, c.island, c.city, c.player)\n"
+                     "  print(game.add_goods(3, 1, 'anno1602:tools', 30), game.add_goods(3, 1, 22, 30))\n"
+                     "  print(game.goods(3, 1, 'anno1602:tools'), game.add_goods(3, 1, 'anno1602:tools', -70))\n"
+                     "  print(game.goods(3, 1, 'anno1602:tools'), game.goods(4, 0, 'anno1602:tools'))\n"
+                     "  game.add_goods(3, 1, 'pepper', 1)\n"
+                     "end\n"
+                     "function on_second() game.add_money(7, 1) end\n"));
+    game.ticks(1);
+    const auto notes = scripts->take_notes();
+    REQUIRE(notes.size() == 6);
+    CHECK(notes[0].text == "6500\t-10");
+    CHECK(notes[1].text == "1\t0\tPort Royal\t3\t1\t0");
+    CHECK(notes[2].text == "30\t20");
+    CHECK(notes[3].text == "50\t-50");
+    CHECK(notes[4].text == "0\tnil");
+    CHECK(game.world.players()[0].money == 6500);
+    CHECK(game.world.city(3, 1)->stock(22) == 0);
+    CHECK(has_error(notes, "trade:8: game.add_goods: no such good"));
+    game.ticks(19);
+    CHECK(has_error(scripts->take_notes(), "game.add_money: no such player"));
+}
+
+TEST_CASE("script: scripts cannot change the game at their top level") {
+    Game game;
+    auto scripts = game.run(one("eager", "game.add_money(0, 100)"));
+    CHECK(has_error(scripts->take_notes(), "eager:1: game.add_money: only while the game runs"));
+    CHECK(game.world.players()[0].money == 5000);
+}
+
+TEST_CASE("script: scripts decide who wins and who is out") {
+    Game game;
+    auto scripts = game.run(one("duel",
+                                "function on_second(s)\n"
+                                "  print(game.defeat(1), game.defeat(1), game.win(1), game.win(0), game.win(0))\n"
+                                "end\n"
+                                "function on_player_won(p) print('won', p) end\n"
+                                "function on_player_defeated(p) print('out', p) end\n"));
+    game.ticks(20);
+    const auto notes = scripts->take_notes();
+    // What a script does reaches no script as an event: it knows what it did.
+    REQUIRE(notes.size() == 1);
+    CHECK(notes[0].text == "true\tfalse\tfalse\ttrue\tfalse");
+    CHECK(game.world.players()[1].status == sim::PlayerStatus::Defeated);
+    CHECK(game.world.players()[0].won);
+    REQUIRE(game.world.game_end().has_value());
+    CHECK(game.world.game_end()->winner == 0);
+    const auto events = game.simulation.take_game_events();
+    REQUIRE(events.size() == 3);
+    CHECK(events[0].kind == sim::GameEvent::Kind::PlayerDefeated);
+    CHECK(events[0].reason == sim::GameEvent::Reason::Script);
+    CHECK(events[0].by == sim::kNoPlayer);
+    CHECK(events[1].kind == sim::GameEvent::Kind::MissionAccomplished);
+    CHECK(events[2].kind == sim::GameEvent::Kind::GameOver);
+    game.ticks(20);
+    const auto later = scripts->take_notes();
+    REQUIRE(later.size() == 1);
+    CHECK(later[0].text == "false\tfalse\tfalse\tfalse\tfalse");
+}

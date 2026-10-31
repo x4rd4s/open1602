@@ -187,6 +187,7 @@ struct GameEvent {
         Bankrupt,       ///< money below -1000 and no positive balance for 200 s
         MissionFailed,  ///< a loss condition of the mission
         Retired,        ///< a computer with no city and no ship (AI root 0x00429070) or pirates without ships and nest
+        Script,         ///< a script of a content package (Simulation::script_defeat)
     };
     Kind kind = Kind::GameOver;
     PlayerId player = kNoPlayer;

@@ -7,8 +7,8 @@ the game's commands ([ADR 0007](../architecture/0007-extensibility-and-modding.m
 **Status:** Done on 2026-10-27: Lua 5.4.8 is built in (`third_party/lua`), every package may bring a
 `script.lua`, which the game runs in a sandbox at the end of every tick with what happened in it, a
 script reads the players and posts the package's messages, and its table `state` is saved with the
-game. Still open: changing the game through commands (gold, goods, victory and defeat) and more
-events.
+game. Since 2026-10-31 a script also gives and takes money and goods and decides who wins and who
+is out. Still open: more events.
 
 ## The script
 
@@ -55,6 +55,47 @@ function on_building_placed(e)
     state.lit = state.lit + 1
     game.message("lit", {name = game.player(e.player).name, count = state.lit})
   end
+end
+```
+
+Cities are named by their island and their number on it, as `game.cities()` lists them. A good is
+named as in a package's data files: `"anno1602:tools"` (a good of the original by name or number,
+[names](goods.md#the-file)), `"<package>:<name>"`, a name of the package's own `goods.toml`, or its
+ware number.
+
+| Function | What it gives |
+|---|---|
+| `game.cities(player)` | the cities of `player` (nil: all), a list of tables: `island`, `city` (its number on the island), `name`, `player` (nil without an owner) |
+| `game.goods(island, city, good)` | the whole tons of `good` in the city's warehouses; nil for no such city |
+
+## What a script changes
+
+| Function | What it does |
+|---|---|
+| `game.add_money(player, amount)` | gives `player` this much gold (negative: takes it; the money may go below 0) and returns what the player has then |
+| `game.add_goods(island, city, good, tons)` | puts whole tons of `good` into the city's warehouses, as many as fit, or takes them (negative), as many as are there and not promised to a carrier; returns the tons that changed (negative: taken) |
+| `game.win(player)` | `player` accomplished their task and the game is over for everybody, as when the victory conditions are met; true if so, false when the game is over already or the player is no human or computer still playing |
+| `game.defeat(player)` | `player` is out of the game, nobody counts as having defeated them; true if so, false when the game is over or the player is not playing |
+
+They work only while the game runs, in the `on_...` functions, not at the top level of the script.
+Every computer of a multiplayer game makes the same changes at the same moment, so they need no
+command over the network, and a replay makes them again. What a script changes reaches no script as
+an event (`game.win` calls no `on_player_won`): the script knows what it did, and so does no script
+end up calling itself for ever.
+
+```lua
+-- mods/bounty/script.lua: 1000 gold and 10 tons of tools for every fifth house that rises
+state = state or {houses = 0}
+
+function on_house_changed(e)
+  if e.kind ~= "upgraded" then return end
+  state.houses = state.houses + 1
+  if state.houses % 5 == 0 then
+    local city = game.cities(0)[1]
+    game.add_money(0, 1000)
+    if city then game.add_goods(city.island, city.city, "anno1602:tools", 10) end
+  end
+  if state.houses >= 100 then game.win(0) end
 end
 ```
 
