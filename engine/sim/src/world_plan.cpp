@@ -654,8 +654,14 @@ void Planner::place_land(bool warn_full) {
         misses = place(draw_dims(), false) ? 0 : misses + 1;
     }
     if (warn_full && placed * 10 < target * 9) {
-        warn("the map is full after " + std::to_string(m_islands.size()) + " islands, " +
-             std::to_string(placed * 100 / std::max<std::uint64_t>(target, 1)) + " % of the land");
+        const std::string share = std::to_string(placed * 100 / std::max<std::uint64_t>(target, 1)) + " % of the land";
+        if (m_islands.size() >= kMaxPlannedIslands) {
+            // An island's number is a byte in its tiles: a large map of small islands runs out first.
+            warn("a world has at most " + std::to_string(kMaxPlannedIslands) + " islands, " + share +
+                 "; larger islands fill more");
+        } else {
+            warn("the map is full after " + std::to_string(m_islands.size()) + " islands, " + share);
+        }
     }
 }
 

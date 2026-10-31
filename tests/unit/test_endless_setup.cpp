@@ -867,11 +867,17 @@ TEST_CASE("endless setup: a value none of the choices is shows as it is and step
     CHECK(!app::setup_value_custom(s, SetupItem::Players));
     app::choose_next(s, SetupItem::Players);
     CHECK(s.world.players == 3);
-    // The generator's largest worlds are offered.
+    // The nearest by area, then larger ones up to the generator's largest, 4000 x 4000.
     app::choose_next(s, SetupItem::WorldSize);
     CHECK(!app::setup_value_custom(s, SetupItem::WorldSize));
     CHECK(s.world.width == 2000);
-    CHECK(s.world.height == 2000);
+    CHECK(s.world.height == 1400);
+    app::choose_next(s, SetupItem::WorldSize);
+    CHECK(s.world.width == 2800);
+    app::choose_next(s, SetupItem::WorldSize);
+    app::choose_next(s, SetupItem::WorldSize);
+    CHECK(s.world.width == sim::WorldSettings::kMaxSide);
+    CHECK(s.world.height == sim::WorldSettings::kMaxSide);
     EndlessSetup wide;
     app::read_setup(wide, "endless.world = 2000x1400\n");
     CHECK(!app::setup_value_custom(wide, SetupItem::WorldSize));

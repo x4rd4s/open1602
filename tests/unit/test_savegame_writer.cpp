@@ -17,6 +17,7 @@
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/game_directory.hpp"
+#include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_extension.hpp"
 #include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/world.hpp"
@@ -670,4 +671,28 @@ TEST_CASE("save game: a larger own world is written with its size and loads back
     auto again = sim::write_savegame(loaded, buildings);
     REQUIRE(again.ok());
     CHECK(*again == *bytes);
+}
+
+TEST_CASE("save game: a world of 4000 tiles with an island of 1000 is saved and loaded, not as .GAM") {
+    const auto buildings = make_buildings();
+    sim::World world(4000, 1100);
+    sim::WorldIsland island = make_island(buildings, 0, 1000, 600, 2900, 400);
+    island.header.width = 1000;  // the helper's header keeps a byte
+    island.header.height = 600;
+    REQUIRE(world.add_island(std::move(island)).ok());
+    std::vector<sim::Player> players(2);
+    players[0].name = "Anna";
+    players[1].role = sim::PlayerRole::Computer;
+    players[1].banner = 1;
+    world.set_players(players);
+    world.add_ship(sim::make_ship("Weit", 3990, 1090, kShipFigure, 0));
+    world.add_ship(sim::make_ship("Fern", 10, 10, kShipFigure, 1));
+    CHECK(!sim::write_savegame(world, buildings).ok());  // the original's chunks keep a byte
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->width() == 4000);
+    CHECK(loaded->height() == 1100);
+    check_same(world, *loaded);
 }

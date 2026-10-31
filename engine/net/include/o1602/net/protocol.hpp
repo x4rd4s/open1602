@@ -36,7 +36,8 @@ inline constexpr std::uint32_t kMaxRosterMembers = 256;
 /// Computers a host takes besides itself: one fewer than a Roster holds, so that every roster it
 /// sends decodes (LC-1).
 inline constexpr std::uint32_t kMaxMembers = kMaxRosterMembers - 1;
-inline constexpr std::uint32_t kMaxSnapshotBytes = 32U << 20;
+/// A whole game, packed: a fresh world of 4000 x 4000 tiles is about 35 MiB, a played one more.
+inline constexpr std::uint32_t kMaxSnapshotBytes = 128U << 20;
 static_assert(kMaxSnapshotBytes + (64U << 10) <= kMaxMessageBytes, "a game must fit into one message");
 /// The largest message a computer sends the host (its commands and reports; the host refuses more).
 inline constexpr std::size_t kMaxMessageToHost = 1U << 20;

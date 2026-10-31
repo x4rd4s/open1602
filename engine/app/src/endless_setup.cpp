@@ -34,8 +34,15 @@ constexpr std::array<std::uint32_t, 4> kUnits = {100, 250, 500, 0};
 constexpr std::array<std::uint32_t, 2> kSpeeds = {4, 8};
 /// Map sizes: smaller than the original's, its 500 x 350, then larger ones of the same shape, then
 /// the generator's largest (sim::WorldSettings::kMaxSide).
-constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 7> kSizes = {
-    {{350, 250}, {500, 350}, {700, 490}, {1000, 700}, {1400, 980}, {2000, 1400}, {2000, 2000}}};
+constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 9> kSizes = {{{350, 250},
+                                                                            {500, 350},
+                                                                            {700, 490},
+                                                                            {1000, 700},
+                                                                            {1400, 980},
+                                                                            {2000, 1400},
+                                                                            {2800, 1960},
+                                                                            {4000, 2800},
+                                                                            {4000, 4000}}};
 static_assert(kSizes.back().first <= sim::WorldSettings::kMaxSide &&
               kSizes.back().second <= sim::WorldSettings::kMaxSide);
 constexpr std::uint8_t kFewestPlayers = 2;

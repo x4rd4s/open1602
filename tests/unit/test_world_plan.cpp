@@ -161,13 +161,13 @@ TEST_CASE("world plan: the same settings and seed give the same plan, another se
     CHECK(differs);
 }
 
-TEST_CASE("world plan: any size from 200 to 2000 tiles and up to sim::kMaxPlayers players") {
+TEST_CASE("world plan: any size from 200 to 4000 tiles and up to sim::kMaxPlayers players") {
     struct Case {
         std::uint32_t w, h;
         std::uint8_t players;
     };
     for (const Case c : {Case{200, 200, 1}, Case{300, 250, 2}, Case{500, 350, 3}, Case{800, 600, 6}, Case{1000, 700, 8},
-                         Case{2000, 2000, 12}, Case{2000, 300, 4}}) {
+                         Case{2000, 2000, 12}, Case{2000, 300, 4}, Case{4000, 4000, 12}}) {
         sim::WorldSettings s;
         s.width = c.w;
         s.height = c.h;
