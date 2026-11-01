@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -407,14 +408,19 @@ void write_zip(const std::filesystem::path& path, const std::vector<test::ZipFil
     REQUIRE(core::write_file(path, test::make_zip(files)).ok());
 }
 
+/// A file of exactly these bytes (an ofstream in text mode writes "\r\n" on Windows).
+void write_bytes(const std::filesystem::path& path, std::string_view text) {
+    REQUIRE(core::write_file(path, std::vector<std::uint8_t>(text.begin(), text.end())).ok());
+}
+
 }  // namespace
 
 TEST_CASE("game content: a zip archive is a package with the hash of the same files in a folder") {
     Folder root("o1602_package_archives_test");
     const std::filesystem::path mods = root.root / "mods";
     std::filesystem::create_directories(mods / "folder" / "gfx");
-    root.write("mods/folder/mod.toml", "version = \"1\"\n");
-    root.write("mods/folder/gfx/tower.txt", "tower");
+    write_bytes(mods / "folder" / "mod.toml", "version = \"1\"\n");
+    write_bytes(mods / "folder" / "gfx" / "tower.txt", "tower");
     const bool deflate = core::has_zlib();
     // The same files packed with their folder, and a package of its own.
     write_zip(mods / "Packed.ZIP", {{"packed/", ""},
