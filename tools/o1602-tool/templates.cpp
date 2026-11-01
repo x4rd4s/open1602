@@ -35,6 +35,9 @@ namespace {
 
 namespace kind = assets::kind;
 
+/// The surf before a river mouth; the other ids of its kind (22) are surf along a straight coast.
+constexpr std::uint32_t kMouthSurfId = assets::id::island_shape::kMouthSurf;
+
 /// One letter per kind for the maps.
 char letter(std::int32_t k) {
     switch (k) {
@@ -49,7 +52,7 @@ char letter(std::int32_t k) {
         case kind::kBeachVariant:
             return '.';
         case kind::kBeachMouth:
-            return 'b';
+            return 'B';
         case kind::kRiverMouth:
             return 'M';
         case kind::kRiver:
@@ -169,7 +172,7 @@ int cmd_template_stats(const Args& args) {
                             kinds[at(x, y)] = b.kind;
                             tile_ids[at(x, y)] = b.id;
                             rotations[at(x, y)] = static_cast<std::uint8_t>(map.top(ux, uy).rotation & 3U);
-                            river = river || b.kind == kind::kRiver || b.kind == kind::kRiverMouth;
+                            river = river || b.kind == kind::kRiver || b.id == kMouthSurfId;
                         }
                     }
                     with_rivers += river ? 1U : 0U;
@@ -244,18 +247,20 @@ int cmd_template_stats(const Args& args) {
                         printed += show_river ? 1U : 0U;
                         printed_natives += show_natives ? 1U : 0U;
                         std::printf(
-                            "map %s (%dx%d): ~ sea , surf . beach b beach mouth M river mouth r river c "
-                            "river corner = bridge R rock f forest s/S/Q slope m mine # other\n",
+                            "map %s (%dx%d): ~ sea , surf . beach B beach mouth M surf before a river mouth "
+                            "0-3 river, a-d river corner (by rotation) = bridge R rock f forest s/S/Q slope "
+                            "m mine # other\n",
                             name.c_str(), w, h);
                         for (std::int32_t y = 0; y < h; ++y) {
                             std::string line;
                             for (std::int32_t x = 0; x < w; ++x) {
                                 const std::int32_t k = kinds[at(x, y)];
                                 line += k < 0 ? '?' : letter(k);
-                                if (k == kind::kRiver || k == kind::kRiverCorner || k == kind::kRiverMouth) {
-                                    line.back() = static_cast<char>(line.back() == 'r'   ? '0' + rotations[at(x, y)]
-                                                                    : line.back() == 'c' ? 'a' + rotations[at(x, y)]
-                                                                                         : 'M');
+                                if (k == kind::kRiver || k == kind::kRiverCorner) {
+                                    line.back() = static_cast<char>(k == kind::kRiver ? '0' + rotations[at(x, y)]
+                                                                                      : 'a' + rotations[at(x, y)]);
+                                } else if (k == kind::kRiverMouth && tile_ids[at(x, y)] != kMouthSurfId) {
+                                    line.back() = ',';  // straight surf of the same kind
                                 }
                             }
                             std::printf("  %s\n", line.c_str());

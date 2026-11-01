@@ -56,6 +56,9 @@ int footprint(std::uint32_t id) {
     if (one_of(id, ids::kSmallMountain)) {
         return ids::kSmallMountainSize;
     }
+    if (one_of(id, ids::kRiverBend)) {
+        return ids::kRiverBendSize;
+    }
     return 1;
 }
 
@@ -440,7 +443,7 @@ TEST_CASE("island shapes: mountains in a ring of slopes turned to them, ground o
     for (const assets::IslandTile& t : island.layers[0]) {
         id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
         rotation[static_cast<std::size_t>(t.y * w + t.x)] = t.rotation();
-        if (footprint(t.cod_id()) > 1) {
+        if (footprint(t.cod_id()) > 1 && !one_of(t.cod_id(), ids::kRiverBend)) {
             mountains.push_back(&t);
         }
         const bool ground = std::any_of(ids::kGroundMix.begin(), ids::kGroundMix.end(),
@@ -522,8 +525,10 @@ TEST_CASE("island shapes: a volcano only where one is asked for, in its ring of 
     }
 }
 
-TEST_CASE("island shapes: rivers from a spring on a mountain's slopes straight to a river mouth") {
+TEST_CASE("island shapes: rivers from a spring on a mountain's slopes, with bends, to a river mouth") {
     std::size_t rivers = 0;
+    std::size_t bends = 0;
+    std::size_t straights = 0;
     for (std::uint64_t seed = 0; seed < 30; ++seed) {
         sim::shapes::ShapeRequest r;
         r.width = 100;
@@ -539,30 +544,73 @@ TEST_CASE("island shapes: rivers from a spring on a mountain's slopes straight t
         const int h = island.header.height;
         std::vector<std::uint32_t> id(static_cast<std::size_t>(w * h), 0);
         std::vector<std::uint8_t> rotation(id.size(), 0);
+        std::vector<int> bend(id.size(), -1);  // the tile's bend, by its index in the layer
         std::vector<std::pair<int, int>> springs;
-        for (const assets::IslandTile& t : island.layers[0]) {
-            id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
-            rotation[static_cast<std::size_t>(t.y * w + t.x)] = t.rotation();
+        const auto at = [&](int x, int y) { return static_cast<std::size_t>(y * w + x); };
+        const auto& layer = island.layers[0];
+        for (std::size_t i = 0; i < layer.size(); ++i) {
+            const assets::IslandTile& t = layer[i];
+            const int size = footprint(t.cod_id());
+            for (int y = t.y; y < t.y + size; ++y) {
+                for (int x = t.x; x < t.x + size; ++x) {
+                    id[at(x, y)] = t.cod_id();
+                    rotation[at(x, y)] = t.rotation();
+                    if (one_of(t.cod_id(), ids::kRiverBend)) {
+                        bend[at(x, y)] = static_cast<int>(i);
+                    }
+                }
+            }
             if (t.cod_id() == ids::kSpring) {
                 springs.emplace_back(t.x, t.y);
             }
         }
-        const auto at = [&](int x, int y) { return static_cast<std::size_t>(y * w + x); };
+        std::vector<std::uint8_t> seen(id.size(), 0);
         for (const auto& [sx, sy] : springs) {
             // The river leaves the spring on its east side at rotation 0 (north at 3, south at 1,
-            // west at 2), runs straight, turned across its way, and ends in a mouth turned as the
-            // beach, with its surf beyond.
+            // west at 2). A straight piece lies across its way; a bend at rotation r joins its sides
+            // r and r + 1 (north 0, east 1, south 2, west 3), the river coming in and going out on
+            // its diagonal. The river ends in a mouth turned as the beach, with its surf beyond.
             constexpr std::array<int, 4> kDx = {0, 1, 0, -1};
             constexpr std::array<int, 4> kDy = {-1, 0, 1, 0};
-            const int way = (rotation[at(sx, sy)] + 1) % 4;
+            int way = (rotation[at(sx, sy)] + 1) % 4;
             int x = sx + kDx[static_cast<std::size_t>(way)];
             int y = sy + kDy[static_cast<std::size_t>(way)];
             int length = 0;
-            while (one_of(id[at(x, y)], ids::kRiver)) {
-                CHECK(rotation[at(x, y)] % 2 == (way % 2 == 0 ? 1 : 0));
-                ++length;
-                x += kDx[static_cast<std::size_t>(way)];
-                y += kDy[static_cast<std::size_t>(way)];
+            bool after_bend = false;
+            while (one_of(id[at(x, y)], ids::kRiver) || one_of(id[at(x, y)], ids::kRiverBend)) {
+                if (one_of(id[at(x, y)], ids::kRiver)) {
+                    CHECK(rotation[at(x, y)] % 2 == (way % 2 == 0 ? 1 : 0));
+                    CHECK(seen[at(x, y)] == 0);
+                    seen[at(x, y)] = 1;
+                    ++length;
+                    ++straights;
+                    after_bend = false;
+                    x += kDx[static_cast<std::size_t>(way)];
+                    y += kDy[static_cast<std::size_t>(way)];
+                    continue;
+                }
+                CHECK(!after_bend);  // a straight piece between two bends
+                const assets::IslandTile& b = layer[static_cast<std::size_t>(bend[at(x, y)])];
+                const int in = (way + 2) % 4;
+                const int turned = b.rotation();
+                const int out = turned == in ? (turned + 1) % 4 : (turned + 1) % 4 == in ? turned : -1;
+                REQUIRE(out >= 0);  // it joins the side the river comes in by
+                const int ex = x + kDx[static_cast<std::size_t>(way)] + kDx[static_cast<std::size_t>(out)];
+                const int ey = y + kDy[static_cast<std::size_t>(way)] + kDy[static_cast<std::size_t>(out)];
+                CHECK(std::min(x, ex) == b.x);  // the river comes in and goes out on its diagonal
+                CHECK(std::min(y, ey) == b.y);
+                for (int ty = b.y; ty < b.y + ids::kRiverBendSize; ++ty) {
+                    for (int tx = b.x; tx < b.x + ids::kRiverBendSize; ++tx) {
+                        CHECK(seen[at(tx, ty)] == 0);
+                        seen[at(tx, ty)] = 1;
+                    }
+                }
+                way = out;
+                x = ex + kDx[static_cast<std::size_t>(way)];
+                y = ey + kDy[static_cast<std::size_t>(way)];
+                length += 2;
+                after_bend = true;
+                ++bends;
             }
             CHECK(length >= 3);
             REQUIRE(id[at(x, y)] == ids::kRiverMouth);
@@ -573,6 +621,14 @@ TEST_CASE("island shapes: rivers from a spring on a mountain's slopes straight t
             CHECK(rotation[at(sea_x, sea_y)] == rotation[at(x, y)]);
             ++rivers;
         }
+        // Every piece of river belongs to a river from a spring.
+        for (std::size_t i = 0; i < id.size(); ++i) {
+            if (one_of(id[i], ids::kRiver) || one_of(id[i], ids::kRiverBend)) {
+                CHECK(seen[i] == 1);
+            }
+        }
     }
-    CHECK(rivers >= 20);  // most islands with mountains get one or more
+    CHECK(rivers >= 20);         // most islands with mountains get one or more
+    CHECK(bends >= rivers / 2);  // as in the templates, about two straight tiles to a bend
+    CHECK(straights >= bends);
 }

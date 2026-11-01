@@ -511,11 +511,16 @@ inline constexpr std::uint8_t kSmallMountainSize = 3;
 inline constexpr std::array<std::uint32_t, 8> kSlope{22302, 22303, 22304, 22305, 22306, 22307, 22308, 22310};
 inline constexpr std::uint32_t kSlopeCorner = 22322;
 /// A river: from a spring (kind 33, a slope with the river on its east side at rotation 0) in
-/// straight pieces (kind 16, the river running east and west at rotation 0) to a river mouth on the
-/// beach (kind 24, the river on its north side, the sea on its south at rotation 0) with the surf
-/// before a river mouth (kind 22, the mouth on its north side at rotation 0).
+/// straight pieces (kind 16, the river running east and west at rotation 0) and bends (kind 17,
+/// 2x2, joining the block's north and east side at rotation r = 0, sides r and r + 1 as it turns:
+/// north 0, east 1, south 2, west 3; the river comes in and goes out by tiles on the block's
+/// diagonal) to a river mouth on the beach (kind 24, the river on its north side, the sea on its
+/// south at rotation 0) with the surf before a river mouth (kind 22, the mouth on its north side at
+/// rotation 0).
 inline constexpr std::uint32_t kSpring = 22311;
 inline constexpr std::array<std::uint32_t, 2> kRiver{20901, 20902};
+inline constexpr std::array<std::uint32_t, 2> kRiverBend{20904, 20905};
+inline constexpr std::uint8_t kRiverBendSize = 2;
 inline constexpr std::uint32_t kRiverMouth = 21071;
 inline constexpr std::uint32_t kMouthSurf = 21208;
 /// The kinds of ground the templates mix, tile by tile (patches of one or two tiles), with how
