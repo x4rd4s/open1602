@@ -225,13 +225,13 @@ int cmd_new_world(const Args& args) {
     options.difficulty = static_cast<std::uint8_t>(std::min<std::size_t>(args.number("--level").value_or(0), 3));
     options.world.seed = args.number("--seed").value_or(1);
     options.world.guarantee_resources = true;
-    sim::WorldSettings w;
+    // A world for more than the original's players grows with them, as in the game's start dialog.
+    sim::WorldSettings w = sim::settings_for_players(
+        static_cast<std::uint8_t>(std::clamp<std::size_t>(args.number("--players").value_or(4), 1, sim::kMaxPlayers)));
     if (const auto size = args.pair("--world", 'x')) {
         w.width = static_cast<std::uint32_t>(std::max(0, size->first));
         w.height = static_cast<std::uint32_t>(std::max(0, size->second));
     }
-    w.players =
-        static_cast<std::uint8_t>(std::clamp<std::size_t>(args.number("--players").value_or(4), 1, sim::kMaxPlayers));
     // A .o1602 holds any number of players; a .gam the original's seven slots, of which the natives
     // (two climates) and the pirates take three: told before the world is made.
     const fs::path out_path{std::string(args.positional[0])};
