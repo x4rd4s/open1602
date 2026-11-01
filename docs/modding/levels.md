@@ -8,9 +8,8 @@ all classes above it in one city, so a level may ask for a class a package added
 ([own-buildings.md](own-buildings.md)).
 
 **Status:** Done are the file `levels.toml`, levels after the 32nd, the field `level` of a package's
-buildings and the savegame. Still open: a message of a package's own when a new level is reached (the
-original's messages name only its own levels), and the computer players, who plan with the
-original's levels (item 5).
+buildings, the savegame and the message a level gives when it is reached (`message`, 2026-11-01).
+Still open: the computer players, who plan with the original's levels (item 5).
 
 ## The file
 
@@ -39,12 +38,37 @@ min_inhabitants = 400
 |---|---|---|
 | `class` | a class of inhabitants, `anno1602:<name or number>` or `<package>:<name>` | whose inhabitants count, with those of the classes above it (`BGruppe`) |
 | `min_inhabitants` | 0 to 10000000 | how many of them one city of the player needs (`Minwohn`) |
+| `message` | a message, `<package>:<name>` of [messages.toml](messages.md) or `anno1602:<number>`; `""` for none | what the player is told when a city reaches the level; without it the original's ("Euer Volk wünscht eine Schule") for its levels and none for a package's |
 
 A table that names no level, with a field that is no field of a level or with a value outside its
 limits is passed over with a warning that names the file and the line. A game has at most 255
 levels: a building keeps its level in a byte.
 
 A level, once reached, stays unlocked for the player, as in the original.
+
+## The message of a level
+
+When a city of the player reaches a level, the original tells what the people now wish for, for
+the levels that have a building ("Euer Volk wünscht eine Schule"). `message` names a message of
+its own: one of a package's `messages.toml`, with its text, icon, voice and video, or one of the
+original's. `{city}` in its text is the city's name. `""` tells nothing.
+
+```toml
+# mods/spice/levels.toml
+[harbour]
+class = "spice:governors"
+min_inhabitants = 400
+message = "spice:harbour_open"
+
+# mods/spice/messages.toml
+[harbour_open]
+like = 0x3C
+text = "The governors of {city} want a harbour."
+text.de = "Die Statthalter von {city} wünschen einen Hafen."
+```
+
+A message no package has is written to the log, and the level gives the original's message, if it
+has one.
 
 ### Names of the original's levels
 

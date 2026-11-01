@@ -8,9 +8,10 @@ A content package may change the original's five classes of inhabitants (pioneer
 ([own-buildings.md](own-buildings.md)).
 
 **Status:** Done are the file `classes.toml`, houses of a new class, the house window, the goods
-window and the savegame; levels a new class unlocks are in [levels.md](levels.md). Still open, with
-the next steps of item 3: public buildings of a class's own (a new class needs what
-the class it copies needs) and the tax rows of the city window (it has rows for the original's five).
+window, the savegame, the public buildings a class needs (`public`, 2026-11-01) and the page
+"Population" of the goods window, which has a row with inhabitants, satisfaction and tax and a line
+of its own colour in the chart for each of up to eight classes; levels a new class unlocks are in
+[levels.md](levels.md).
 The computer players build the producers of the packages' goods a class needs
 ([computer-players.md](computer-players.md)).
 
@@ -49,6 +50,7 @@ name.de = "Statthalter"
 | `tax` | 0 to 10000 | what an inhabitant pays, times 100 (`Steuer`: 1.4 is 140) |
 | `share` | 0 to 100 | the supply of its goods, in percent, it asks for at the normal tax (`Prozent`) |
 | `hiscore` | 0 to 10000 | points per inhabitant for the score (`Hiscore`) |
+| `public` | a text, as `"market, chapel \| church"` | the public buildings a house of the class needs in its reach ([below](#public-buildings)); without it those of the original's class it copies |
 | `need."<good>"` | 0 to 100000 | kg of the good per 100 inhabitants and minute (`Ware`: 0.6 t is 600); 0 takes the need away |
 | `name.<language>` | a text | the name in that language; a new class needs one |
 | `like` | a class, `anno1602:<name or number>` or `<package>:<name>` | for a new class: the class it copies |
@@ -73,15 +75,51 @@ class = "spice:governors"
 gfx = 2200
 ```
 
-Without such a house nobody rises into the class. A new class needs the public buildings of the
-class it copies, shows that class's faces in the house window, and has its needs, values and name
-of its own.
+Without such a house nobody rises into the class. A new class shows the faces of the class it
+copies in the house window, and has its needs, public buildings, values and name of its own.
+
+## Public buildings
+
+A house rises into a class only when the public buildings the class needs are in its reach, and
+it is content only while they are. `public` names them: choices separated by commas, the buildings
+of a choice by `|`, any one of which will do. `""` needs none.
+
+```toml
+["anno1602:settlers"]
+public = "market, chapel | church, tavern"   # settlers also want a tavern
+
+[governors]
+like = "anno1602:aristocrats"
+public = "market, church, college, theatre, doctor"
+```
+
+| Name | Building of the original | Also counts |
+|---|---|---|
+| `market` | marketplace | |
+| `kontor` | Kontor (the pioneers take it for a market: `market \| kontor`) | |
+| `chapel` | chapel | |
+| `church` | church | cathedral |
+| `tavern` | tavern | |
+| `school` | school | |
+| `college` | college | |
+| `bathhouse` | bath house | |
+| `theatre` | theatre | |
+| `doctor` | doctor | |
+| `gallows` | gallows | |
+
+A building of a package counts as the building it copies (`like` in
+[own-buildings.md](own-buildings.md)). At most eight choices. Without `public`, a class needs what
+the original's needs: pioneers `market | kontor`; settlers `market, chapel | church`; citizens also
+`tavern, school | college`; merchants `market, tavern, church, school | college, bathhouse`;
+aristocrats `market, tavern, church, college, bathhouse, theatre`. A new class needs what the class
+it copies needs. The house window shows a choice by its first building; the doctor and the gallows
+have no place in it.
 
 ## Savegames
 
-A game keeps its classes, the original's as the packages changed them and the new ones (section
-`CLAS` of [o1602-save.md](../formats/o1602-save.md)), so a running game does not change when a
-package is changed or removed. A game with more than five classes cannot be saved as a savegame of
+A game keeps its classes, the original's as the packages changed them and the new ones, with
+their public buildings (sections `CLAS` and `CPUB` of [o1602-save.md](../formats/o1602-save.md)),
+so a running game does not change when a package is changed or removed. A game with more than five classes cannot be saved as a savegame of
 the original (`.gam`).
 
 ## In the code

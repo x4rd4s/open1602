@@ -152,6 +152,27 @@ void GameSound::set_settings(const audio::AudioSettings& settings) {
     apply();
 }
 
+void GameSound::set_package_sounds(std::span<const assets::PackageSound> sounds) {
+    if (std::equal(sounds.begin(), sounds.end(), m_package_sounds.begin(), m_package_sounds.end())) {
+        return;
+    }
+    m_package_sounds.assign(sounds.begin(), sounds.end());
+    std::vector<std::shared_ptr<const audio::Pcm>> decoded;
+    for (const assets::PackageSound& sound : m_package_sounds) {
+        const std::size_t slot = sound.number - assets::kFirstPackageSound;
+        if (decoded.size() <= slot) {
+            decoded.resize(slot + 1);
+        }
+        auto pcm = audio::SoundBank::decode_file(sound.file);
+        if (!pcm) {
+            std::fprintf(stderr, "sounds.toml: %s: %s\n", sound.id.c_str(), pcm.error().message.c_str());
+            continue;
+        }
+        decoded[slot] = std::make_shared<const audio::Pcm>(std::move(pcm).value());
+    }
+    m_effects.set_package_sounds(std::move(decoded));
+}
+
 void GameSound::set_package_music(std::vector<audio::MusicTrack> tracks) {
     if (tracks == m_package_music) {
         return;

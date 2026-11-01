@@ -244,9 +244,23 @@ core::Status apply_decoded(World& world, Decoded& d) {
         world.set_goods(std::move(*d.goods));
     }
     if (d.classes) {
+        if (d.class_public) {
+            for (auto& [c, needs] : *d.class_public) {
+                if (c < d.classes->size()) {
+                    (*d.classes)[c].public_needs = std::move(needs);
+                }
+            }
+        }
         world.set_resident_classes(std::move(*d.classes));
     }
     if (d.levels) {
+        if (d.level_messages) {
+            for (auto& [n, message] : *d.level_messages) {
+                if (n < d.levels->size()) {
+                    (*d.levels)[n].message = std::move(message);  // one LEVL has not: passed over
+                }
+            }
+        }
         world.set_infra_levels(std::move(*d.levels));
     }
     if (d.unlocked_more) {

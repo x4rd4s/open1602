@@ -2,9 +2,9 @@
 #include "o1602/audio/package_music.hpp"
 
 #include <algorithm>
-#include <cstring>
 
 #include "o1602/assets/game_content.hpp"
+#include "o1602/assets/package_sounds.hpp"
 #include "o1602/core/data_file.hpp"
 #include "o1602/core/file.hpp"
 
@@ -14,16 +14,6 @@ namespace {
 
 std::string line_of(const std::string& where, std::size_t line) {
     return where + " line " + std::to_string(line) + ": ";
-}
-
-/// Whether the file starts as a WAVE, Ogg or FLAC file does (sound_file.hpp).
-bool sound_file(const std::filesystem::path& path) {
-    const auto head = core::read_file_head(path, 4);
-    if (!head || head->bytes.size() < 4) {
-        return false;
-    }
-    const auto is = [&](const char* magic) { return std::memcmp(head->bytes.data(), magic, 4) == 0; };
-    return is("RIFF") || is("OggS") || is("fLaC");
 }
 
 }  // namespace
@@ -78,7 +68,7 @@ void apply_music_file(std::vector<MusicTrack>& tracks, std::string_view package,
             continue;
         }
         track.file = folder / core::path_from_utf8(file);
-        if (!sound_file(track.file)) {
+        if (!assets::is_sound_file(track.file)) {
             warnings.push_back(at + file + " is missing or no WAV, Ogg Vorbis or FLAC file");
             continue;
         }

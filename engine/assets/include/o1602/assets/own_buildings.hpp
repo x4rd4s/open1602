@@ -17,6 +17,7 @@
 #include "o1602/assets/goods.hpp"
 #include "o1602/assets/own_figures.hpp"
 #include "o1602/assets/package_graphics.hpp"
+#include "o1602/assets/package_sounds.hpp"
 
 namespace o1602::assets {
 
@@ -41,11 +42,12 @@ struct OwnBuilding {
 /// `classes`: what `class` may name (resident_classes.hpp), by default the classes of `table`;
 /// `levels`: what `level` may name (unlock_levels.hpp), by default the levels of `table`; `images`:
 /// what `gfx` may name besides the original's sprite numbers (package_graphics.hpp); `figures` and
-/// `own_figures`: what `figure` may name (own_figures.hpp), no figure at all without `figures`.
+/// `own_figures`: what `figure` may name (own_figures.hpp), no figure at all without `figures`;
+/// `sounds`: what `build_sound` may name (package_sounds.hpp).
 void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& own, std::string_view package,
                               std::string_view utf8, std::vector<std::string>& warnings, const Goods& goods = {},
                               std::span<const ResidentClass> classes = {}, std::span<const InfraLevel> levels = {},
                               std::span<const PackageImage> images = {}, const FigureTable* figures = nullptr,
-                              std::span<const OwnFigure> own_figures = {});
+                              std::span<const OwnFigure> own_figures = {}, std::span<const PackageSound> sounds = {});
 
 }  // namespace o1602::assets

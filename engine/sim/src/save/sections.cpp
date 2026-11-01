@@ -112,9 +112,15 @@ constexpr std::uint32_t kGoodPictures = tag("GPIC");
 /// resident_classes.hpp), only written when they differ from haeuser.cod's. Required: houses name
 /// the classes, and their needs drive the economy.
 constexpr std::uint32_t kClasses = tag("CLAS");
+/// The public buildings classes.toml gave classes of their own (ResidentClass::public_needs), only
+/// written when a class has them. Required: they decide which houses rise.
+constexpr std::uint32_t kClassPublic = tag("CPUB");
 /// The unlock levels as packages changed and added them (World::infra_levels(), unlock_levels.hpp),
 /// only written when they differ from haeuser.cod's. Required: buildings name the levels.
 constexpr std::uint32_t kLevels = tag("LEVL");
+/// The messages levels.toml gave unlock levels (InfraLevel::message), only written when a level has
+/// one. Optional: without them the levels give the original's messages.
+constexpr std::uint32_t kLevelMessages = tag("LMSG");
 /// The levels after the original's 32 the players unlocked (Player::infra_more), only written when
 /// one did. Required: without them the players lose what they may build.
 constexpr std::uint32_t kUnlocked = tag("UNLK");
@@ -137,20 +143,17 @@ constexpr std::uint16_t kScriptsWithCampaign = 2;
 constexpr std::size_t kMaxScenarioIdLength = 2 * assets::kMaxPackageIdLength + 1;
 
 /// Every section this version reads; others are of a later version.
-constexpr std::array kKnownSections = {kRules,           kWorld,        kIslands,        kTiles,
-                                       kPlayers,         kCities,       kProductions,    kHouses,
-                                       kGrowth,          kCosts,        kShips,          kSoldiers,
-                                       kAnimals,         kDisasters,    kVolcanoes,      kSimulation,
-                                       kFleet,           kEpochs,       kArmy,           kDiplomacy,
-                                       kExplored,        kMap,          kWorld2,         kMeta,
-                                       kMissions,        kPlayerState,  kCityState,      kOrigin,
-                                       kQueues,          kStances,      kScores,         kMaterialClocks,
-                                       kPopulationMarks, kTutorial,     kGiveUps,        kFactions,
-                                       kLedgers,         kBalance,      kBuildingValues, kPackages,
-                                       kFigureValues,    kOwnBuildings, kGoods,          kClasses,
-                                       kLevels,          kUnlocked,     kGoodPictures,   kScripts,
-                                       kUnitGroups,      kScenario,     kCampaign,       kComputerOrders,
-                                       kOwnFigures};
+constexpr std::array kKnownSections = {
+    kRules,        kWorld,          kIslands,         kTiles,      kPlayers,        kCities,
+    kProductions,  kHouses,         kGrowth,          kCosts,      kShips,          kSoldiers,
+    kAnimals,      kDisasters,      kVolcanoes,       kSimulation, kFleet,          kEpochs,
+    kArmy,         kDiplomacy,      kExplored,        kMap,        kWorld2,         kMeta,
+    kMissions,     kPlayerState,    kCityState,       kOrigin,     kQueues,         kStances,
+    kScores,       kMaterialClocks, kPopulationMarks, kTutorial,   kGiveUps,        kFactions,
+    kLedgers,      kBalance,        kBuildingValues,  kPackages,   kFigureValues,   kOwnBuildings,
+    kGoods,        kClasses,        kLevels,          kUnlocked,   kGoodPictures,   kScripts,
+    kClassPublic,  kUnitGroups,     kScenario,        kCampaign,   kComputerOrders, kOwnFigures,
+    kLevelMessages};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -424,6 +427,20 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
             });
         });
     }
+    std::vector<std::uint8_t> own_public;
+    for (std::size_t c = 0; c < world.resident_classes().size(); ++c) {
+        if (world.resident_classes()[c].public_needs) {
+            own_public.push_back(static_cast<std::uint8_t>(c));
+        }
+    }
+    if (!own_public.empty()) {
+        section(out, kClassPublic, [&](Writer& o) {
+            o.list(own_public, 5, [&](std::uint8_t c) {
+                o.u8(c);
+                o.list(*world.resident_classes()[c].public_needs, 2, [&](std::uint16_t any) { o.u16(any); });
+            });
+        });
+    }
     if (!world.infra_levels().empty()) {
         section(out, kLevels, [&](Writer& o) {
             o.list(world.infra_levels(), 9, [&](const assets::InfraLevel& l) {
@@ -432,6 +449,23 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
                 o.u32(l.min_inhabitants);
             });
         });
+    }
+    std::vector<std::uint8_t> told;
+    for (std::size_t n = 0; n < world.infra_levels().size(); ++n) {
+        if (world.infra_levels()[n].message) {
+            told.push_back(static_cast<std::uint8_t>(n));
+        }
+    }
+    if (!told.empty()) {
+        section(
+            out, kLevelMessages,
+            [&](Writer& o) {
+                o.list(told, 5, [&](std::uint8_t n) {
+                    o.u8(n);
+                    o.string(*world.infra_levels()[n].message);
+                });
+            },
+            Need::Optional);
     }
     std::vector<std::size_t> unlocked_more;
     for (std::size_t p = 0; p < world.players().size(); ++p) {
@@ -851,6 +885,24 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                 d.classes = std::move(classes);
                 break;
             }
+            case kClassPublic: {
+                std::vector<std::pair<std::uint8_t, std::vector<std::uint16_t>>> own;
+                in.list(own, 5, [&](std::pair<std::uint8_t, std::vector<std::uint16_t>>& p) {
+                    in.u8(p.first);
+                    in.list(p.second, 2, [&](std::uint16_t& any) {
+                        in.u16(any);
+                        // The public buildings of classes.toml (resident_classes.hpp).
+                        if (any == 0 || (any & ~assets::public_building::kAll) != 0) {
+                            in.fail();
+                        }
+                    });
+                    if (p.first >= assets::kMaxResidentClasses || p.second.size() > assets::kMaxPublicNeeds) {
+                        in.fail();
+                    }
+                });
+                d.class_public = std::move(own);
+                break;
+            }
             case kLevels: {
                 std::vector<assets::InfraLevel> levels;
                 in.list(levels, 9, [&](assets::InfraLevel& l) {
@@ -866,6 +918,20 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     in.fail();
                 }
                 d.levels = std::move(levels);
+                break;
+            }
+            case kLevelMessages: {
+                std::vector<std::pair<std::uint8_t, std::string>> messages;
+                in.list(messages, 5, [&](std::pair<std::uint8_t, std::string>& m) {
+                    in.u8(m.first);
+                    in.string(m.second);
+                    // levels.toml: "" or "<package>:<name>".
+                    if (!m.second.empty() &&
+                        (m.second.find(':') == std::string::npos || m.second.size() > assets::kMaxMessageId)) {
+                        in.fail();
+                    }
+                });
+                d.level_messages = std::move(messages);
                 break;
             }
             case kUnlocked: {

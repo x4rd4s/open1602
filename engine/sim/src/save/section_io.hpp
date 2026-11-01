@@ -88,8 +88,12 @@ struct Decoded {
     std::optional<std::vector<std::pair<std::uint8_t, std::string>>> good_pictures;
     /// The classes of inhabitants of the game (CLAS).
     std::optional<std::vector<assets::ResidentClass>> classes;
+    /// The public buildings of classes of their own, by class number (CPUB).
+    std::optional<std::vector<std::pair<std::uint8_t, std::vector<std::uint16_t>>>> class_public;
     /// The unlock levels of the game (LEVL).
     std::optional<std::vector<assets::InfraLevel>> levels;
+    /// The messages of unlock levels, by level number (LMSG).
+    std::optional<std::vector<std::pair<std::uint8_t, std::string>>> level_messages;
     /// The levels after the original's a player unlocked (UNLK).
     struct UnlockedMore {
         std::uint8_t player = 0;

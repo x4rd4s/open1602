@@ -44,7 +44,7 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
                               std::string_view utf8, std::vector<std::string>& warnings, const Goods& goods,
                               std::span<const ResidentClass> classes, std::span<const InfraLevel> levels,
                               std::span<const PackageImage> images, const FigureTable* figures,
-                              std::span<const OwnFigure> own_figures) {
+                              std::span<const OwnFigure> own_figures, std::span<const PackageSound> sounds) {
     const std::string where = std::string(package) + "/" + std::string(kOwnBuildingsFile);
     auto tables = core::parse_data_file(utf8);
     if (!tables) {
@@ -80,6 +80,7 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         std::optional<std::uint8_t> resident_class;
         std::optional<std::uint8_t> level;
         std::optional<std::uint32_t> figure;
+        const PackageSound* build_sound = nullptr;
         const PackageImage* image = nullptr;
         bool ok = true;
         for (const core::DataEntry& e : t.entries) {
@@ -159,6 +160,13 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
                                        "names no single figure (anno1602:<name or number> or <package>:<name>)");
                     ok = false;
                 }
+            } else if (e.key == "build_sound") {
+                const std::string* s = e.value.string();
+                build_sound = s != nullptr ? find_package_sound(sounds, *s) : nullptr;
+                if (build_sound == nullptr) {
+                    warnings.push_back(field + "names no sound of a package (sounds.toml, <package>:<name>)");
+                    ok = false;
+                }
             } else {
                 warnings.push_back(field + "is no field of a building of a package and is passed over");
             }
@@ -201,6 +209,9 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         }
         if (figure) {
             b.worker_figure = static_cast<std::uint16_t>(*figure);
+        }
+        if (build_sound != nullptr) {
+            b.build_sound = build_sound->number;
         }
         // The image holds every sprite the building draws: its tiles, turned four ways, in every
         // frame of its animation (render::building_sprite).

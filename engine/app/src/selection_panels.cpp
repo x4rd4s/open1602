@@ -1126,11 +1126,10 @@ private:
     }};
 
     /// What a class needs of public buildings (Class_RequiredServices 0x0047F320).
-    /// A class a package added needs what the original's class it looks like needs.
+    /// A class a package added needs what classes.toml gives it, else what the original's class it
+    /// looks like needs.
     static std::uint32_t required(const PanelContext& c, std::uint32_t cls) {
-        return cls <= 255
-                   ? sim::required_panel_services(sim::service_class(c.buildings, static_cast<std::uint8_t>(cls)))
-                   : 0;
+        return cls <= 255 ? sim::required_panel_services(c.buildings, static_cast<std::uint8_t>(cls)) : 0;
     }
     /// Goods a next class asks for only once their level is reached (sim::infra::ware_level).
     static bool ware_unlocked(std::uint8_t w, const sim::Player* owner) {

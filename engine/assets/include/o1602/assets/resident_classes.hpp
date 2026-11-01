@@ -26,6 +26,34 @@ inline constexpr std::string_view kClassesFile = "classes.toml";
 /// (sim::kCityClasses).
 inline constexpr std::size_t kMaxResidentClasses = 8;
 
+/// The public buildings a class may need (ResidentClass::public_needs): the bits of the house's
+/// buildings in reach as the simulation keeps them (sim::House::services), and the market.
+namespace public_building {
+inline constexpr std::uint16_t kChapel = 1U << 2;
+inline constexpr std::uint16_t kChurch = 1U << 3;  ///< also the cathedral
+inline constexpr std::uint16_t kTavern = 1U << 4;
+inline constexpr std::uint16_t kSchool = 1U << 5;
+inline constexpr std::uint16_t kBathhouse = 1U << 6;
+inline constexpr std::uint16_t kTheatre = 1U << 7;
+inline constexpr std::uint16_t kCollege = 1U << 8;
+inline constexpr std::uint16_t kDoctor = 1U << 9;
+inline constexpr std::uint16_t kKontor = 1U << 10;
+inline constexpr std::uint16_t kGallows = 1U << 11;
+inline constexpr std::uint16_t kMarket = 1U << 15;  ///< no bit of House::services: the market
+inline constexpr std::uint16_t kAll =
+    kChapel | kChurch | kTavern | kSchool | kBathhouse | kTheatre | kCollege | kDoctor | kKontor | kGallows | kMarket;
+}  // namespace public_building
+
+/// Choices of public buildings a class may need at most.
+inline constexpr std::size_t kMaxPublicNeeds = 8;
+
+/// The public buildings `text` names (the field `public` of classes.toml): choices separated by
+/// commas, the buildings of a choice by '|', as "market, chapel | church, tavern"; "" needs none.
+/// Names: market, kontor, chapel, church, tavern, school, college, bathhouse, theatre, doctor,
+/// gallows. Nothing, and `error` says why, for an unknown name, an empty choice or more than
+/// kMaxPublicNeeds choices.
+[[nodiscard]] std::optional<std::vector<std::uint16_t>> public_needs_of(std::string_view text, std::string& error);
+
 /// Changes `classes` as `classes.toml` of `package` says, in the order of the file: a table
 /// ["anno1602:<name or number>"] or ["<package>:<name>"] changes a class there is, a table [<name>]
 /// adds the class `<package>:<name>` after the last. A table that cannot be read is passed over

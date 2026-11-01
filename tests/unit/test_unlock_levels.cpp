@@ -206,8 +206,13 @@ TEST_CASE("levels: a game keeps its levels and what its players reached") {
     std::vector<std::string> warnings;
     assets::apply_levels_file(levels, "spice",
                               "[harbour]\nclass = \"anno1602:settlers\"\nmin_inhabitants = 400\n"
-                              "[\"anno1602:market\"]\nmin_inhabitants = 60\n",
+                              "message = \"spice:harbour_open\"\n"
+                              "[\"anno1602:market\"]\nmin_inhabitants = 60\nmessage = \"\"\n",
                               warnings, buildings.resident_classes());
+    REQUIRE(warnings.empty());
+    REQUIRE(levels[33].message == std::optional<std::string>("spice:harbour_open"));
+    REQUIRE(levels[1].message == std::optional<std::string>(""));
+    CHECK(!levels[2].message);
     sim::World world(60, 40);
     world.set_players(std::vector<sim::Player>(2));
     world.set_infra_levels(levels);
@@ -229,4 +234,25 @@ TEST_CASE("levels: a game keeps its levels and what its players reached") {
 
     // The original's savegame has no room for a 33rd level.
     CHECK(!sim::savegame_chunks(world, buildings).ok());
+}
+
+TEST_CASE("levels: a level names the message a player gets on reaching it") {
+    const auto buildings = make_buildings();
+    std::vector<assets::InfraLevel> levels = buildings.infra_levels();
+    std::vector<std::string> warnings;
+    assets::apply_levels_file(levels, "spice",
+                              "[\"anno1602:tavern\"]\n"
+                              "message = \"anno1602:0x3D\"\n"
+                              "[\"anno1602:church\"]\n"
+                              "message = \"church\"\n"  // line 4: no package
+                              "[\"anno1602:school\"]\n"
+                              "message = 3\n",  // line 6: no text
+                              warnings, buildings.resident_classes());
+    CHECK(levels[4].message == std::optional<std::string>("anno1602:0x3D"));
+    CHECK(!levels[5].message);
+    CHECK(!levels[3].message);
+    REQUIRE(warnings.size() == 2);
+    const std::string expected = "'message' names no message (<package>:<name> or anno1602:<number>, \"\" for none)";
+    CHECK(warnings[0] == "spice/levels.toml line 4: " + expected);
+    CHECK(warnings[1] == "spice/levels.toml line 6: " + expected);
 }

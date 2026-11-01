@@ -75,6 +75,8 @@ public:
     explicit EventPresenter(PlayerLabel label);
     /// The players' banners, for messages that name a colour (none: the colourless ones).
     void set_banners(const render::BannerTable* banners) noexcept { m_banners = banners; }
+    /// The messages of the game, for those levels.toml gives its levels (InfraLevel::message).
+    void set_messages(const MessageTable* messages) noexcept { m_messages = messages; }
     /// The goods' names (Text.cod [WARE], by ware number, Windows-1252) for Open1602's messages.
     void set_ware_names(std::vector<std::string> names) { m_ware_names = std::move(names); }
     /// Whether wars and peace between two other players are told (DisplaySettings::rival_wars).
@@ -168,6 +170,7 @@ private:
 
     PlayerLabel m_label;
     const render::BannerTable* m_banners = nullptr;
+    const MessageTable* m_messages = nullptr;
     /// The rivals' city sizes told (owner << 8 | message).
     std::vector<std::uint32_t> m_rival_sizes;
     std::vector<std::string> m_ware_names;

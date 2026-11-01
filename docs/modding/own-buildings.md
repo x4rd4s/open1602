@@ -39,6 +39,7 @@ size_y = 2
 | `class` | a class of inhabitants, `anno1602:<name or number>` or `<package>:<name>` ([classes.md](classes.md)), for a house only | whose house it is |
 | `figure` | one figure: `anno1602:<name or number>` ([names](values.md#names)) or `<package>:<name>` ([own-figures.md](own-figures.md)) | its carriers or workers (`Figurnr`) |
 | `ware`, `raw`, `raw2` | a good by string id: `anno1602:<name or number>` or `<package>:<name>` ([goods.md](goods.md)), `""` for none | what it makes, and the first and second good it uses |
+| `build_sound` | a sound of a package, `<package>:<name>` ([sounds.md](sounds.md#sounds-of-buildings-and-figures)) | the sound when it is built |
 
 A field that is not given keeps what `like` has. A table without `like`, with a field that is no
 field of a building or with a value outside its limits is passed over with a warning that names the

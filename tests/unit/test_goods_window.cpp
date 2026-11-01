@@ -268,3 +268,47 @@ TEST_CASE("goods window: a good the original does not know (a mod's) shows under
     (void)w.draw(world, assets::BuildingTable{}, kFigures, 1, kNoFonts);
     CHECK(!shows(w, kRow + kModWare));
 }
+
+TEST_CASE("goods window: eight classes of inhabitants, each a row with its tax and a colour of its own") {
+    sim::World world = make_world();
+    std::vector<assets::ResidentClass> classes(sim::kCityClasses);
+    for (std::size_t k = 0; k < classes.size(); ++k) {
+        classes[k].id = "mod:class" + std::to_string(k);
+        classes[k].names = {{"en", "Class" + std::to_string(k)}};
+        classes[k].max_per_house = 10;
+    }
+    assets::BuildingTable buildings;
+    buildings.set_resident_classes(classes);
+    sim::City& c = city(world, 0, 0);
+    c.inhabitants.assign(sim::kCityClasses, 0);
+    c.satisfaction.assign(sim::kCityClasses, 128);
+    c.tax_rate.assign(sim::kCityClasses, 128);
+    for (std::size_t k = 0; k < sim::kCityClasses; ++k) {
+        c.inhabitants[k] = static_cast<std::uint32_t>(10 + k);
+        c.tax_rate[k] = static_cast<std::uint8_t>(64 + 16 * k);
+    }
+
+    app::GoodsStyle style;
+    for (std::size_t i = 0; i < style.series.size(); ++i) {
+        style.series[i] = static_cast<std::uint8_t>(200 + i);
+    }
+    GoodsWindow w(style, names(25), 192);
+    w.open();
+    (void)w.draw(world, buildings, kFigures, 0, kNoFonts);
+    click(w, kTab + static_cast<ui::Form::Id>(GoodsWindow::Tab::Population));
+    const auto items = w.draw(world, buildings, kFigures, 0, kNoFonts);
+    std::int32_t last_row = 0;
+    for (std::size_t k = 0; k < sim::kCityClasses; ++k) {
+        CHECK(draws_text(items, "Class" + std::to_string(k)));
+        CHECK(draws_text(items, ui::tr("stats.percent", {std::to_string((64 + 16 * k) / 4)})));
+        // Its box in the table: a colour no other class has.
+        const auto box = std::ranges::find_if(items, [&](const ui::DrawItem& d) {
+            return d.kind == ui::DrawItem::Kind::Fill && d.w == 10 && d.h == 10 &&
+                   d.colour == static_cast<std::int32_t>(200 + k);
+        });
+        REQUIRE(box != items.end());
+        CHECK(box->y > last_row);
+        last_row = box->y;
+    }
+    CHECK(last_row < GoodsWindow::kHeight - 200);  // the chart keeps its room below the table
+}

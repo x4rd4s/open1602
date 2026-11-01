@@ -33,6 +33,7 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `goods.toml` | trade goods of the package's own: price, icon, names | [goods.md](goods.md) |
 | `classes.toml` | classes of inhabitants: the original's changed, new ones after them, needs of any good | [classes.md](classes.md) |
 | `music.toml` | music tracks of the package's own (WAV, Ogg Vorbis, FLAC), normal or battle music | [sounds.md](sounds.md) |
+| `sounds.toml` | sounds of the package's own (WAV, Ogg Vorbis, FLAC) for its buildings and figures | [sounds.md](sounds.md#sounds-of-buildings-and-figures) |
 | `graphics.toml` | PNG images of the package's own, drawn by its buildings at all three zoom levels | [graphics.md](graphics.md) |
 | `icons.toml` | PNG icons of the package's own for the build menu, goods and messages | [graphics.md](graphics.md#icons) |
 | `figure_images.toml` | the original's figures and ships drawn with a package's images | [graphics.md](graphics.md#figures-and-ships) |
@@ -111,8 +112,12 @@ class (`class`), and a game keeps its classes (section `CLAS`).
 Part 3 done on 2026-10-26 ([levels.md](levels.md)): `levels.toml` changes the original's unlock
 levels and adds levels after the 32nd, up to 255, also of a class a package added; a building of a
 package needs one (`level`), and a game keeps its levels and what its players reached (sections
-`LEVL`, `UNLK`). Still open: public buildings of a class's own, the city window's tax rows for more
-than five classes, messages of a package's own for its levels, and pictures of the goods' own.
+`LEVL`, `UNLK`). A good shows an icon of a package's own (`picture`, [goods.md](goods.md)). Public
+buildings of a class's own done on 2026-11-01 ([classes.md](classes.md#public-buildings)):
+`public = "market, chapel | church"` in `classes.toml`, kept in the save (section `CPUB`). The
+goods window's page "Population" has a row (inhabitants, satisfaction, tax) and a chart colour of
+its own for each of up to eight classes (2026-11-01). A level names the message it gives when it
+is reached (`message` in `levels.toml`, section `LMSG`, 2026-11-01).
 
 ### 4. Graphics and sound of a package's own (section 2)
 
@@ -135,8 +140,10 @@ sprite numbers from 100000, which every sheet of the interface draws; the build 
 
 Part 4 done on 2026-10-27 ([graphics.md](graphics.md#figures-and-ships)): `figure_images.toml`
 draws the original's figures and ships with a package's images (the image is checked to hold every
-sprite the figure draws). Still open: sounds of a package's buildings and figures, and videos of a
-mod's own (figures of a package's own are done, item 2).
+sprite the figure draws). Part 5 done on 2026-11-01 ([sounds.md](sounds.md#sounds-of-buildings-and-figures)):
+`sounds.toml` numbers a package's sounds from 1000, and its buildings (`build_sound`) and figures
+(`sound`, `shot_sound`, `hit_sound`) name them. Still open: videos of a mod's own (figures of a
+package's own are done, item 2).
 
 ### 5. Computer players from data (section 3; MD-4)
 

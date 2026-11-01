@@ -22,7 +22,7 @@ constexpr std::uint16_t kMessageTreasure = 0x2E;
 constexpr std::uint16_t kMessageShipForSale = 0x0A;
 
 /// A message, with where it happened and the player it is about.
-Announcement announce(std::uint16_t message, std::optional<std::pair<double, double>> tile = std::nullopt,
+Announcement announce(MessageId message, std::optional<std::pair<double, double>> tile = std::nullopt,
                       std::optional<sim::PlayerId> about = std::nullopt) {
     Announcement a;
     a.message = message;
@@ -201,6 +201,21 @@ std::vector<Notice> EventPresenter::city_events(const sim::World& world, sim::Pl
             out.emplace_back(announce(0x48, spot));
         } else if (e.kind == sim::CityEvent::Kind::Unlocked) {
             std::fprintf(stderr, "%s: build level %u reached\n", name.c_str(), e.infra);
+            // levels.toml's message, if it gave the level one (docs/modding/levels.md).
+            const auto& levels = world.infra_levels();
+            const std::optional<std::string>* own = e.infra < levels.size() ? &levels[e.infra].message : nullptr;
+            if (own != nullptr && own->has_value()) {
+                if ((*own)->empty()) {
+                    continue;  // none
+                }
+                if (const auto message = m_messages != nullptr ? m_messages->find(**own) : std::nullopt) {
+                    Announcement a = announce(*message, spot);
+                    a.text = m_messages->text(*message, ui::current_language(), {{"city", name}});
+                    out.emplace_back(std::move(a));
+                    continue;
+                }
+                std::fprintf(stderr, "levels.toml: no message \"%s\" (messages.toml)\n", (*own)->c_str());
+            }
             if (const auto message = wish_message(e.infra)) {
                 out.emplace_back(announce(*message, spot));
             }

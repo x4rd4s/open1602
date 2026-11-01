@@ -37,7 +37,9 @@ struct GoodsStyle {
     std::uint8_t stock = 0;   ///< the stock in the chart (at half strength)
     std::uint8_t shadow = 0;  ///< the window's shadow (at half strength)
     /// The lines of the charts of the inhabitants and the finances, one per series.
-    std::array<std::uint8_t, 6> series{};
+    /// Eight: the taxes or the first class and one for each further class a game may have
+    /// (sim::kCityClasses).
+    std::array<std::uint8_t, 8> series{};
 };
 
 class GoodsWindow {
