@@ -61,7 +61,9 @@ description, dependencies and load order; the hash of a package's files; the pac
 in its savegame (section `PACK`); multiplayer games let in only computers with the game's packages
 and load no others for it. Also done: a host sends missing packages to a computer whose player
 agrees (kept in `mods-cache`), and the main menu's screen "Mods" turns packages on and off and adds
-received ones to the `mods` folder. Still open: packages as archives, not only folders.
+received ones to the `mods` folder. Packages as zip archives, not only folders, done on
+2026-11-01 ([packages.md](packages.md#a-package-as-a-zip-archive)): unpacked into `mods-unpacked`,
+with the hash of the same files in a folder.
 
 Dependencies done on 2026-10-31 ([packages.md](packages.md#versions-a-package-needs)), at the
 owner's request: `depends.<id>` takes version ranges (`">=1.2, <2"`); turning a package on in the

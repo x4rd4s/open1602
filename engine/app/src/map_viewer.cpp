@@ -3131,7 +3131,8 @@ ModsModel MapViewer::mods_model() const {
         e.description = core::utf8_to_cp1252(p.description);
         e.state = State::Received;
         std::error_code ec;
-        e.adoptable = !std::filesystem::exists(mods / core::path_from_utf8(p.id), ec);
+        e.adoptable = !std::filesystem::exists(mods / core::path_from_utf8(p.id), ec) &&
+                      !std::filesystem::exists(mods / core::path_from_utf8(p.id + ".zip"), ec);
         model.entries.push_back(std::move(e));
     }
     return model;

@@ -10,8 +10,10 @@
 
 #include "../test_framework.hpp"
 #include "test_support.hpp"
+#include "zip_support.hpp"
 
 #include "o1602/assets/game_content.hpp"
+#include "o1602/core/file.hpp"
 
 using namespace o1602;
 
@@ -397,4 +399,87 @@ TEST_CASE("game content: a received package is kept in the cache only with the p
     std::ofstream(stored->folder / "gfx" / "tower.txt") << "changed";
     CHECK(assets::cached_packages(cache.root, warnings).empty());
     CHECK(warnings.size() == 1);
+}
+
+namespace {
+
+void write_zip(const std::filesystem::path& path, const std::vector<test::ZipFile>& files) {
+    REQUIRE(core::write_file(path, test::make_zip(files)).ok());
+}
+
+}  // namespace
+
+TEST_CASE("game content: a zip archive is a package with the hash of the same files in a folder") {
+    Folder root("o1602_package_archives_test");
+    const std::filesystem::path mods = root.root / "mods";
+    std::filesystem::create_directories(mods / "folder" / "gfx");
+    root.write("mods/folder/mod.toml", "version = \"1\"\n");
+    root.write("mods/folder/gfx/tower.txt", "tower");
+    const bool deflate = core::has_zlib();
+    // The same files packed with their folder, and a package of its own.
+    write_zip(mods / "Packed.ZIP", {{"packed/", ""},
+                                    {"packed/mod.toml", "version = \"1\"\n"},
+                                    {"packed/gfx/tower.txt", "tower", deflate},
+                                    {"__MACOSX/packed/._mod.toml", "junk"}});
+    write_zip(mods / "addon.zip", {{"mod.toml", "name = \"Addon\"\nversion = \"2\"\ndepends.Packed = \"1\"\n"}});
+    // A folder and an archive of one id: the folder is the package.
+    std::filesystem::create_directories(mods / "twice");
+    write_zip(mods / "twice.zip", {{"mod.toml", "version = \"9\""}});
+
+    const std::vector<assets::ModPackage> found = assets::mod_packages(mods);
+    CHECK(ids(found) == "Packed addon folder twice");
+    CHECK(found[0].folder.empty());
+    CHECK(found[0].archive == mods / "Packed.ZIP");
+    CHECK(found[3].archive.empty());
+
+    std::vector<std::string> warnings;
+    const std::vector<assets::ModPackage> packages = assets::load_mod_packages(mods, warnings);
+    CHECK(warnings.empty());
+    REQUIRE(ids(packages) == "Packed addon folder twice");
+    const std::filesystem::path unpacked = assets::unpacked_packages_folder(mods);
+    CHECK(unpacked == root.root / "mods-unpacked");
+    CHECK(packages[0].folder.parent_path() == unpacked);
+    CHECK(packages[0].version == "1");
+    CHECK(packages[0].hash == packages[2].hash);
+    CHECK(std::filesystem::exists(packages[0].folder / "gfx" / "tower.txt"));
+    CHECK(!std::filesystem::exists(packages[0].folder / "__MACOSX"));
+    CHECK(packages[1].name == "Addon");
+
+    // A changed archive is unpacked again; what the old one left behind is removed.
+    const std::filesystem::path before = packages[0].folder;
+    write_zip(mods / "Packed.ZIP", {{"mod.toml", "version = \"1.1\"\n"}});
+    warnings.clear();
+    const std::vector<assets::ModPackage> again = assets::load_mod_packages(mods, warnings);
+    REQUIRE(ids(again) == "Packed addon folder twice");
+    CHECK(again[0].version == "1.1");
+    CHECK(again[0].folder != before);
+    CHECK(!std::filesystem::exists(before));
+    CHECK(std::filesystem::exists(again[1].folder));
+
+    // Gone: so is what it was unpacked into.
+    std::filesystem::remove(mods / "addon.zip");
+    warnings.clear();
+    CHECK(ids(assets::load_mod_packages(mods, warnings)) == "Packed folder twice");
+    CHECK(!std::filesystem::exists(again[1].folder));
+}
+
+TEST_CASE("game content: an archive that is damaged or reaches outside its package is not loaded") {
+    Folder root("o1602_package_bad_archives_test");
+    const std::filesystem::path mods = root.root / "mods";
+    std::filesystem::create_directories(mods);
+    write_zip(mods / "escape.zip", {{"mod.toml", ""}, {"../evil.txt", "x"}});
+    write_zip(mods / "doubled.zip", {{"mod.toml", ""}, {"mod.toml", "version = \"2\""}});
+    root.write("mods/damaged.zip", "PK not really");
+    write_zip(mods / "fine.zip", {{"readme.txt", "a package without a manifest"}});
+    std::vector<std::string> warnings;
+    std::vector<assets::PackageProblem> problems;
+    CHECK(ids(assets::load_mod_packages(mods, warnings, {}, &problems)) == "fine");
+    REQUIRE(warnings.size() == 3);
+    CHECK(warnings[0].find("damaged.zip: ") == 0);
+    CHECK(warnings[1].find("doubled.zip: mod.toml is in the archive twice") == 0);
+    CHECK(warnings[2].find("escape.zip: \"../evil.txt\" is no path inside the package") == 0);
+    REQUIRE(problems.size() == 3);
+    CHECK(problems[0].kind == assets::PackageProblem::Kind::Unreadable);
+    CHECK(!std::filesystem::exists(root.root / "evil.txt"));
+    CHECK(!std::filesystem::exists(root.root / "mods-unpacked" / "evil.txt"));
 }
