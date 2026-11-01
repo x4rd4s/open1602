@@ -28,6 +28,7 @@
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/world.hpp"
+#include "o1602/sim/world_plan.hpp"
 
 namespace o1602::tool {
 
@@ -249,6 +250,23 @@ int cmd_new_world(const Args& args) {
         w.shapes = it->second == "own"     ? sim::WorldSettings::Shapes::Own
                    : it->second == "mixed" ? sim::WorldSettings::Shapes::Mixed
                                            : sim::WorldSettings::Shapes::Templates;
+    }
+    if (const auto it = args.options.find("--island-preset"); it != args.options.end()) {
+        const auto preset = std::ranges::find(sim::kLandscapePresets, it->second, &sim::LandscapePreset::name);
+        if (preset == sim::kLandscapePresets.end()) {
+            std::fprintf(stderr, "--island-preset: no preset %s\n", std::string(it->second).c_str());
+            return usage();
+        }
+        w.shapes = sim::WorldSettings::Shapes::Own;
+        w.landscape = preset->landscape;
+    }
+    for (const std::string_view key : sim::landscape_names::kKeys) {
+        const std::string option = "--island-" + std::string(key);
+        if (const auto it = args.options.find(option);
+            it != args.options.end() && !sim::set_landscape(w.landscape, key, it->second)) {
+            std::fprintf(stderr, "%s: bad value %s\n", option.c_str(), std::string(it->second).c_str());
+            return usage();
+        }
     }
     if (const auto gold = args.number("--gold-islands")) {
         w.gold_islands = static_cast<std::uint8_t>(std::min<std::size_t>(*gold, sim::WorldSettings::kMaxGoldIslands));

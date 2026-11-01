@@ -93,6 +93,24 @@ TEST_CASE("command line: a new game with its own world, and the player's name") 
     CHECK(error_of({"--new-game", "0", "--island-shapes", "round"}) == "bad value for --island-shapes: round");
 }
 
+TEST_CASE("command line: the landscape of islands of their own shape, by preset and one by one") {
+    const auto c = parse({"--new-game", "0", "--island-preset", "archipelago", "--island-max", "80", "--island-coast",
+                          "smooth", "--island-forest", "much"});
+    REQUIRE(static_cast<bool>(c));
+    REQUIRE(c->new_game.has_value());
+    REQUIRE(c->new_game->custom.has_value());
+    const sim::WorldSettings& w = *c->new_game->custom;
+    CHECK(w.shapes == sim::WorldSettings::Shapes::Own);  // a preset is one of islands of their own shape
+    CHECK(w.landscape.land == 20);
+    CHECK(w.landscape.min_side == 16);
+    CHECK(w.landscape.max_side == 80);
+    CHECK(w.landscape.coast == sim::shapes::Roughness::Smooth);
+    CHECK(w.landscape.forest == sim::shapes::Share::Much);
+    CHECK(error_of({"--new-game", "0", "--island-preset", "atlantis"}) == "bad value for --island-preset: atlantis");
+    CHECK(error_of({"--new-game", "0", "--island-land", "60"}) == "bad value for --island-land: 60");
+    CHECK(error_of({"--new-game", "0", "--island-gap", "huge"}) == "bad value for --island-gap: huge");
+}
+
 TEST_CASE("command line: wrong values are named, not taken in part") {
     // --video used to read "abc" as 0 and wrap 70000 (BT-2).
     CHECK(error_of({"--video", "abc"}) == "bad value for --video: abc");

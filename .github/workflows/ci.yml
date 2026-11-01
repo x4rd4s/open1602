@@ -42,10 +42,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install dependencies (Linux)
+        timeout-minutes: 35
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev
+        run: .github/scripts/apt-install.sh ninja-build zlib1g-dev
 
       - name: Install dependencies (macOS)
+        timeout-minutes: 35
         if: runner.os == 'macOS'
         run: brew install ninja
 
@@ -102,13 +104,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install dependencies (Linux)
+        timeout-minutes: 35
         if: runner.os == 'Linux'
         run: >
-          sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libx11-dev libxext-dev
+          .github/scripts/apt-install.sh ninja-build zlib1g-dev libx11-dev libxext-dev
           libxrandr-dev libxcursor-dev libxi-dev libxss-dev libwayland-dev libxkbcommon-dev wayland-protocols
           libegl1-mesa-dev libgl1-mesa-dev
 
       - name: Install dependencies (macOS)
+        timeout-minutes: 35
         if: runner.os == 'macOS'
         run: brew install ninja
 
@@ -230,10 +234,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install dependencies
+        timeout-minutes: 35
         # gcovr from PyPI at a fixed version: the report looks the same on every runner image.
         run: |
-          sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev
-          pipx install gcovr==8.3
+          .github/scripts/apt-install.sh ninja-build zlib1g-dev
+          timeout 300 pipx install gcovr==8.3 || timeout 300 pipx install gcovr==8.3
 
       - name: Configure
         run: cmake --preset coverage -DCMAKE_CXX_COMPILER=g++
@@ -292,8 +297,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install dependencies
+        timeout-minutes: 35
         run: >
-          sudo apt-get update && sudo apt-get install -y clang-18 clang-tidy-18 ninja-build zlib1g-dev
+          .github/scripts/apt-install.sh clang-18 clang-tidy-18 ninja-build zlib1g-dev
           libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libwayland-dev
           libxkbcommon-dev wayland-protocols libegl1-mesa-dev libgl1-mesa-dev
 
@@ -332,7 +338,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Install clang-format 18
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+        timeout-minutes: 35
+        run: .github/scripts/apt-install.sh clang-format-18
       - name: Check formatting
         # Called by its versioned name so that a runner image with another default version cannot
         # reformat the code (CONTRIBUTING.md names version 18).

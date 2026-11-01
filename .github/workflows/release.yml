@@ -102,14 +102,16 @@ jobs:
       # sound (PipeWire, PulseAudio, ALSA), controllers (udev), Wayland title bars (libdecor) and
       # D-Bus (screensaver, IME) are missing from the package without these headers.
       - name: Install dependencies (Linux)
+        timeout-minutes: 35
         if: runner.os == 'Linux'
         run: >
-          sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libx11-dev libxext-dev
+          .github/scripts/apt-install.sh ninja-build zlib1g-dev libx11-dev libxext-dev
           libxrandr-dev libxcursor-dev libxi-dev libxss-dev libwayland-dev libxkbcommon-dev wayland-protocols
           libegl1-mesa-dev libgl1-mesa-dev libasound2-dev libpulse-dev libpipewire-0.3-dev libudev-dev
           libdecor-0-dev libdbus-1-dev
 
       - name: Install dependencies (macOS)
+        timeout-minutes: 35
         if: runner.os == 'macOS'
         run: brew install ninja
 

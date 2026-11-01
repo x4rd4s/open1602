@@ -215,6 +215,19 @@ Value ship_table(const sim::Ship& ship) {
     });
 }
 
+/// A land unit as game.units() gives it.
+Value unit_table(const sim::Soldier& unit) {
+    return make_table({
+        {"id", std::int64_t{unit.id}},
+        {"player", player_or_nil(unit.owner)},
+        {"figure", std::int64_t{unit.figure}},
+        {"x", std::int64_t{unit.cell_x() / 2}},
+        {"y", std::int64_t{unit.cell_y() / 2}},
+        {"island", unit.island != 0xFFFF ? Value{std::int64_t{unit.island}} : Value{}},
+        {"health", std::int64_t{unit.health / 32}},
+    });
+}
+
 /// A city as game.city() gives it: the fields of city_table and its inhabitants, in all and per class.
 Value city_details(const sim::City& city) {
     std::vector<Value> classes;
@@ -685,6 +698,73 @@ void GameScripts::add_api(Package& package) {
             order.target = sim::Target::position(static_cast<std::uint32_t>(*x), static_cast<std::uint32_t>(*y));
         }
         return Value{m_simulation->execute(order).accepted};
+    });
+    add("units", [this](std::span<const Value> args) -> core::Result<Value> {
+        const bool all = args.empty() || std::holds_alternative<std::monostate>(args[0]);
+        const auto player = integer(args, 0);
+        if (!all && !player) {
+            return script_error("game.units: the player must be a number");
+        }
+        std::vector<Value> units;
+        for (const sim::Soldier& unit : m_world->soldiers()) {
+            if (!unit.dying() && (all || unit.owner == *player)) {
+                units.push_back(unit_table(unit));
+            }
+        }
+        return make_table({}, std::move(units));
+    });
+    // A land unit's order as its owner would give it: to a world tile (or stop), or an attack on a unit.
+    const auto unit_order = [this](std::int64_t id, sim::Target target, bool attack, bool attack_move) -> Value {
+        const sim::Soldier* unit =
+            id >= 0 && id <= 0xFFFFFFFF ? m_world->soldier(static_cast<std::uint32_t>(id)) : nullptr;
+        if (unit == nullptr || unit->owner == sim::kNoPlayer || unit->away()) {
+            return Value{false};
+        }
+        sim::SoldierOrder order;
+        order.player = unit->owner;
+        order.soldiers = {unit->id};
+        order.target = target;
+        order.attack = attack;
+        order.attack_move = attack_move;
+        return Value{m_simulation->execute(order).accepted};
+    };
+    add("move_unit", [this, unit_order](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.move_unit: only while the game runs, not at the top level");
+        }
+        const auto id = integer(args, 0);
+        const bool stop = args.size() < 2 || std::holds_alternative<std::monostate>(args[1]);
+        const auto x = integer(args, 1);
+        const auto y = integer(args, 2);
+        const auto* fight = args.size() > 3 ? std::get_if<bool>(&args[3]) : nullptr;
+        if (!id || (!stop && (!x || !y)) ||
+            (args.size() > 3 && fight == nullptr && !std::holds_alternative<std::monostate>(args[3]))) {
+            return script_error(
+                "game.move_unit: the unit's id, a world tile x, y (or nil to stop) and true or false are needed");
+        }
+        if (!stop && (*x < 0 || *y < 0 || *x >= m_world->width() || *y >= m_world->height())) {
+            return Value{false};
+        }
+        const sim::Target target =
+            stop ? sim::Target{}
+                 : sim::Target::tile_spot(static_cast<std::uint32_t>(*x), static_cast<std::uint32_t>(*y));
+        return unit_order(*id, target, false, fight != nullptr && *fight);
+    });
+    add("attack_unit", [this, unit_order](std::span<const Value> args) -> core::Result<Value> {
+        if (m_simulation == nullptr) {
+            return script_error("game.attack_unit: only while the game runs, not at the top level");
+        }
+        const auto id = integer(args, 0);
+        const auto other = integer(args, 1);
+        if (!id || !other) {
+            return script_error("game.attack_unit: the ids of the unit and of the one it attacks are needed");
+        }
+        const sim::Soldier* target =
+            *other >= 0 && *other <= 0xFFFFFFFF ? m_world->soldier(static_cast<std::uint32_t>(*other)) : nullptr;
+        if (target == nullptr || *other == *id) {
+            return Value{false};
+        }
+        return unit_order(*id, sim::Target::soldier(target->id), true, false);
     });
     add("add_money", [this](std::span<const Value> args) -> core::Result<Value> {
         const auto player = integer(args, 0);

@@ -157,11 +157,11 @@ constexpr std::array<std::string_view, 3> kSizeNames = {"small", "mixed", "large
 constexpr std::array<std::string_view, 2> kStartNames = {"spread", "together"};
 constexpr std::array<std::string_view, 3> kShapeNames = {"templates", "mixed", "own"};
 constexpr std::array<std::string_view, 4> kMonumentNames = {"none", "castle", "cathedral", "both"};
-constexpr std::array<std::string_view, 3> kSpreadNames = {"even", "mixed", "giants"};
-constexpr std::array<std::string_view, 3> kGapNames = {"narrow", "normal", "wide"};
-constexpr std::array<std::string_view, 3> kCoastNames = {"smooth", "natural", "rugged"};
-constexpr std::array<std::string_view, 3> kOutlineNames = {"round", "long", "branched"};
-constexpr std::array<std::string_view, 3> kShareNames = {"little", "normal", "much"};
+constexpr const auto& kSpreadNames = sim::landscape_names::kSpread;
+constexpr const auto& kGapNames = sim::landscape_names::kGap;
+constexpr const auto& kCoastNames = sim::landscape_names::kCoast;
+constexpr const auto& kOutlineNames = sim::landscape_names::kOutline;
+constexpr const auto& kShareNames = sim::landscape_names::kShare;
 
 // The page of the islands: percent of the map that is land, the sides of the smallest and the
 // largest island in tiles.
@@ -171,37 +171,8 @@ constexpr std::array<std::uint32_t, 14> kLargest = {40, 50, 60, 80, 100, 120, 15
 static_assert(kLandShares.front() >= Landscape::kMinLand && kLandShares.back() <= Landscape::kMaxLand);
 static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= sim::shapes::kMaxSide);
 
-/// The kinds of world of the page's first item, after the original's islands: the islands of their
-/// own shape as they come (Landscape's defaults), many small ones, a few large bodies of land, a few
-/// giants among small ones, and islands all of about one size.
-struct IslandPreset {
-    std::string_view name;  ///< "setup.island_preset.<name>"
-    Landscape landscape;
-};
-constexpr Landscape landscape(std::uint8_t land, std::uint16_t min_side, std::uint16_t max_side,
-                              Landscape::Spread spread, Landscape::Gap gap, Roughness coast,
-                              Landscape::Outline outline) {
-    Landscape l;
-    l.land = land;
-    l.min_side = min_side;
-    l.max_side = max_side;
-    l.spread = spread;
-    l.gap = gap;
-    l.coast = coast;
-    l.outline = outline;
-    return l;
-}
-constexpr std::array<IslandPreset, 5> kIslandPresets = {{
-    {"varied", Landscape{}},
-    {"archipelago", landscape(20, 16, 60, Landscape::Spread::Even, Landscape::Gap::Narrow, Roughness::Rugged,
-                              Landscape::Outline::Round)},
-    {"continents", landscape(35, 150, 400, Landscape::Spread::Even, Landscape::Gap::Normal, Roughness::Natural,
-                             Landscape::Outline::Round)},
-    {"giants", landscape(30, 25, 500, Landscape::Spread::FewGiants, Landscape::Gap::Wide, Roughness::Natural,
-                         Landscape::Outline::Round)},
-    {"even", landscape(20, 50, 60, Landscape::Spread::Even, Landscape::Gap::Normal, Roughness::Smooth,
-                       Landscape::Outline::Round)},
-}};
+/// The kinds of world of the page's first item, after the original's islands (setup.island_preset.<name>).
+constexpr const auto& kIslandPresets = sim::kLandscapePresets;
 
 /// The preset choice the setup is (0 the original's islands), or nothing.
 std::optional<std::size_t> island_preset(const sim::WorldSettings& w) {
@@ -1559,39 +1530,9 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (const auto i = name_index(kShapeNames, value)) {
             w.shapes = static_cast<Shapes>(*i);
         }
-    } else if (key == "island_land") {
-        if (n && *n >= Landscape::kMinLand && *n <= Landscape::kMaxLand) {
-            w.landscape.land = static_cast<std::uint8_t>(*n);
-        }
-    } else if (key == "island_min" || key == "island_max") {
-        if (n && *n >= sim::shapes::kMinSide && *n <= sim::shapes::kMaxSide) {
-            Landscape& l = w.landscape;
-            (key == "island_min" ? l.min_side : l.max_side) = static_cast<std::uint16_t>(*n);
-            // The other one follows: the smallest island is never larger than the largest.
-            if (l.min_side > l.max_side) {
-                (key == "island_min" ? l.max_side : l.min_side) = static_cast<std::uint16_t>(*n);
-            }
-        }
-    } else if (key == "island_spread") {
-        if (const auto i = name_index(kSpreadNames, value)) {
-            w.landscape.spread = static_cast<Landscape::Spread>(*i);
-        }
-    } else if (key == "island_gap") {
-        if (const auto i = name_index(kGapNames, value)) {
-            w.landscape.gap = static_cast<Landscape::Gap>(*i);
-        }
-    } else if (key == "island_coast") {
-        if (const auto i = name_index(kCoastNames, value)) {
-            w.landscape.coast = static_cast<Roughness>(*i);
-        }
-    } else if (key == "island_outline") {
-        if (const auto i = name_index(kOutlineNames, value)) {
-            w.landscape.outline = static_cast<Landscape::Outline>(*i);
-        }
-    } else if (key == "island_forest" || key == "island_mountains") {
-        if (const auto i = name_index(kShareNames, value)) {
-            (key == "island_forest" ? w.landscape.forest : w.landscape.mountains) = static_cast<Share>(*i);
-        }
+    } else if (key.starts_with("island_") &&
+               std::ranges::find(sim::landscape_names::kKeys, key.substr(7)) != sim::landscape_names::kKeys.end()) {
+        (void)sim::set_landscape(w.landscape, key.substr(7), value);
     } else if (key == "starts") {
         if (const auto i = name_index(kStartNames, value)) {
             w.starts = *i == 1 ? Starts::Together : Starts::Spread;

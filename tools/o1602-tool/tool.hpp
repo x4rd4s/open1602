@@ -135,6 +135,9 @@ int cmd_export(const Args& args);
 int cmd_render_island(const Args& args);
 int cmd_render_world(const Args& args);
 
+// templates.cpp
+int cmd_template_stats(const Args& args);
+
 // video.cpp
 int cmd_smk(const Args& args);
 int cmd_bk2(const Args& args);

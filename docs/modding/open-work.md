@@ -192,7 +192,10 @@ build tool), destroy a building to ruins (`game.destroy`) and send ships (`game.
 
 Part 6 done on 2026-10-31 ([scripts.md](scripts.md#what-a-script-changes)): scripts read a player's
 mission (`game.mission`) and give a player new goals or none (`game.set_mission`), by the keys of a
-scenario's goals. Still open: moving land units.
+scenario's goals.
+
+Part 7 done on 2026-10-31: scripts list land units (`game.units`) and send them as their owners
+would (`game.move_unit`, `game.attack_unit`). The scripts' part of item 6 is done.
 
 ### 7. Scenarios and campaigns (section 6)
 
@@ -254,10 +257,14 @@ the surf, middle, then the dark open sea from about five tiles out, with the ban
 lighter side. The sizes are drawn first and placed from the largest; as many islands as the villages
 and volcanoes need become templates. The start dialog has a page of its own for it, "Island world",
 with presets (Original, Varied, Archipelago, Continents, Few giants, Even) and a preview of the world
-the game gets (`sim::preview_world`, "Reroll" draws another world number). Still open: rivers and
-river mouths, ground of more than one kind, rocks around the mountains, villages and volcanoes on
-islands of their own shape, the settings on the command line and in `o1602-tool`, and the rules as
-data.
+the game gets (`sim::preview_world`, "Reroll" draws another world number).
+
+Part 3 done on 2026-10-31: the landscape on the command line of the game and of `o1602-tool
+new-world`, with the same names as the setup files (`--island-preset varied|archipelago|continents|
+giants|even`, `--island-land`, `--island-min`, `--island-max`, `--island-spread`, `--island-gap`,
+`--island-coast`, `--island-outline`, `--island-forest`, `--island-mountains`; `sim::set_landscape`,
+`sim::kLandscapePresets`). Still open: rivers and river mouths, ground of more than one kind, rocks
+around the mountains, villages and volcanoes on islands of their own shape, and the rules as data.
 
 ## Order of work
 

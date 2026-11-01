@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "command_line.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <string_view>
 #include <system_error>
 
 #include "o1602/core/file.hpp"
 #include "o1602/core/text.hpp"
+#include "o1602/sim/world_plan.hpp"
 
 namespace o1602::app {
 
@@ -459,6 +461,21 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
             } else if (mode == "own") {
                 custom.shapes = sim::WorldSettings::Shapes::Own;
             } else {
+                return bad(i);
+            }
+            custom_world = true;
+        } else if (arg == "--island-preset" && has_value) {
+            const std::string_view name = argv[++i];
+            const auto preset = std::ranges::find(sim::kLandscapePresets, name, &sim::LandscapePreset::name);
+            if (preset == sim::kLandscapePresets.end()) {
+                return bad(i);
+            }
+            custom.shapes = sim::WorldSettings::Shapes::Own;
+            custom.landscape = preset->landscape;
+            custom_world = true;
+        } else if (arg.starts_with("--island-") && has_value &&
+                   std::ranges::find(sim::landscape_names::kKeys, arg.substr(9)) != sim::landscape_names::kKeys.end()) {
+            if (!sim::set_landscape(custom.landscape, arg.substr(9), argv[++i])) {
                 return bad(i);
             }
             custom_world = true;
