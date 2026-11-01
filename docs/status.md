@@ -41,9 +41,11 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
   their attitude done) · M6 🟡 (lockstep, desync detection with resync,
   reconnecting, lobby, LAN search, Open1602's own multiplayer menu, 4 to 12 players, host migration; open: see
   Multiplayer in 1.2) · M7 🟡 (freely assignable keys, mouse-wheel zoom, pixel scaling, screenshot,
-  bug fixes, any window size and full screen, free zoom and the interface's size done; open: editor) · M8 🟡 (banners with
-  tinted flags, the mods' own messages, build menu, factions and balance as data, and packages with a
-  manifest, load order and the packages of each game done; open: see 2.2).
+  bug fixes, any window size and full screen, free zoom and the interface's size done; open: editor) · M8 🟡 (packages with
+  manifest and zip archives, values, buildings, figures, goods, classes and levels of their own,
+  graphics and sound, Lua scripts, scenarios and campaigns, factions, computer players partly from
+  data and the island generator stage 2 done; open: see 2.2 and
+  [open-work.md](modding/open-work.md#summary)).
 - **Savegames**: since 2026-10-18 Open1602 saves in its own format `.o1602`
   ([o1602-save.md](formats/o1602-save.md), [ADR 0009](architecture/0009-own-save-format.md)): without
   the limits of the original (7 players, 150 ships, 400 soldiers, 350 towers), with a checksum, compressed,
@@ -182,10 +184,7 @@ are listed in 2.1.
 | What | Dependency | Source |
 |---|---|---|
 | Flag menu with free RGB colour as in Anno 1503 | Interface | [ADR 0007](architecture/0007-extensibility-and-modding.md) |
-| A behaviour of a package's faction wholly of its own (factions of packages act as one of the base game's four, with scripts) | M8 | [factions.md](modding/factions.md) |
-| Content registry with identifiers, free goods list, PNG and OGG import (also icons, sounds and videos of the mods' messages) | M8 | ADR 0007, [open-work.md](modding/open-work.md) |
-| Computer players from data (MD-4): since 2026-10-31 they build the chains of a package's goods that a class needs, derived from the building table (part 1); their cheat amounts are values of `balance.toml` (part 2); the stage orders and their public buildings are lists of `computers.toml` (part 3); still compiled in are the original's Needs and when a stage moves on (`engine/sim/src/ai/ai_tables.hpp`, `ai_planner.cpp`) | M8 | [computer-players.md](modding/computer-players.md) |
-| World generator stage 2: islands of their own shape (part 1) and of their own size with the page "Island world" and its preview (part 2, 2026-10-31), the landscape on the command line (part 3), slopes, rivers and ground of many kinds (part 4) volcanoes (part 5), native villages on islands of their own shape (part 6), the rules as data (part 7) and rivers with bends (part 8, 2026-11-01) are done; still open are the climates as data | M8 | [open-work.md](modding/open-work.md#9-island-generator-stage-2-section-5) |
+| Mod support: soldiers and ships of a package's own, videos in a modern format, the computers' core tables (needs, slots, producers, first crop, unit families) and climates of a package's own; smaller adjustments and recommendations in the summary of open-work.md | M8 | [open-work.md](modding/open-work.md#summary) |
 | Replays from the session's frames | M6 | [ADR 0011](architecture/0011-multiplayer-lockstep.md) |
 | Ideas: full refund shortly after building; own road pathfinding alongside that of the original; pirate distance of the difficulty level as a setting (S-068) | open, decision needed | – |
 
