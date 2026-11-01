@@ -513,9 +513,11 @@ void Generator::place_village(Slot& slot) {
     // The village part of a native template of the island's climate (NordNat, SuedNat), moved
     // onto inland that is only ground and forest, with a tile of room around it; its records move
     // with it (village_records). The templates are tried in a random order of their own.
+    // Only the village itself is moved (roads, ruins, squares, buildings): the layer of a native
+    // template holds the beach, surf, forest and ground around it too, and often a whole island,
+    // which would never find room on another.
     constexpr std::uint64_t kVillageStream = 0x1602'D0F0ULL;
-    constexpr std::uint32_t kPlaces = 300;   // random places tried for each template
-    constexpr std::size_t kTemplates = 12;   // templates tried before the island stays without
+    constexpr std::size_t kTemplates = 24;   // templates tried before the island stays without
     constexpr std::uint32_t kMaxSide = 255;  // tile coordinates of the original's records are bytes
     const IslandMap& map = *slot.map;
     if (map.width() > kMaxSide || map.height() > kMaxSide) {
@@ -535,14 +537,25 @@ void Generator::place_village(Slot& slot) {
     for (std::size_t i = paths.size(); i > 1; --i) {
         std::swap(paths[i - 1], paths[random.below(static_cast<std::uint32_t>(i))]);
     }
-    const auto free = [&](std::int32_t x, std::int32_t y) {
-        if (x < 0 || y < 0 || std::cmp_greater_equal(x, map.width()) || std::cmp_greater_equal(y, map.height())) {
-            return false;
+    const auto width = static_cast<std::int32_t>(map.width());
+    const auto height = static_cast<std::int32_t>(map.height());
+    // Tiles of only ground and forest, summed from the top left, to count the free ones in a box.
+    std::vector<std::int32_t> sums(static_cast<std::size_t>(width + 1) * static_cast<std::size_t>(height + 1), 0);
+    const auto sum_at = [&](std::int32_t x, std::int32_t y) -> std::int32_t& {
+        return sums[static_cast<std::size_t>(y) * static_cast<std::size_t>(width + 1) + static_cast<std::size_t>(x)];
+    };
+    for (std::int32_t y = 0; y < height; ++y) {
+        for (std::int32_t x = 0; x < width; ++x) {
+            const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
+            const bool free = b != nullptr && b->size_x == 1 && b->size_y == 1 &&
+                              (b->kind == assets::kind::kGround || b->kind == assets::kind::kForest);
+            sum_at(x + 1, y + 1) = sum_at(x, y + 1) + sum_at(x + 1, y) - sum_at(x, y) + (free ? 1 : 0);
         }
-        const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
-        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
-        return b != nullptr && b->size_x == 1 && b->size_y == 1 &&
-               (b->kind == assets::kind::kGround || b->kind == assets::kind::kForest);
+    }
+    // Whether the box of w x h tiles from (x, y) is all free.
+    const auto room_for = [&](std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h) {
+        return sum_at(x + w, y + h) - sum_at(x, y + h) - sum_at(x + w, y) + sum_at(x, y) == w * h;
     };
     for (std::size_t k = 0; k < std::min(paths.size(), kTemplates); ++k) {
         auto file = open(m_game, paths[k]);
@@ -555,6 +568,15 @@ void Generator::place_village(Slot& slot) {
         }
         assets::Island village = std::move(loaded->front());
         std::vector<assets::IslandTile>& tiles = village.layers.front();
+        std::erase_if(tiles, [&](const assets::IslandTile& t) {
+            const assets::BuildingType* b = m_buildings.by_id(t.cod_id());
+            return b != nullptr && b->kind != assets::kind::kRoad && b->kind != assets::kind::kRuin &&
+                   b->kind != assets::kind::kSquare && b->kind != assets::kind::kBuilding &&
+                   b->kind != assets::kind::kHq;
+        });
+        if (tiles.empty()) {
+            continue;
+        }
         // The tiles each building of the village covers, and the box around them.
         std::vector<std::pair<std::int32_t, std::int32_t>> covered;
         bool known = true;
@@ -588,23 +610,17 @@ void Generator::place_village(Slot& slot) {
         }
         const std::int32_t w = x1 - x0 + 1;
         const std::int32_t h = y1 - y0 + 1;
-        const auto span_x = static_cast<std::int32_t>(map.width()) - w - 1;  // room on both sides
-        const auto span_y = static_cast<std::int32_t>(map.height()) - h - 1;
-        if (span_x < 2 || span_y < 2) {
-            continue;
-        }
-        for (std::uint32_t t = 0; t < kPlaces; ++t) {
-            const std::int32_t ox = 1 + static_cast<std::int32_t>(random.below(static_cast<std::uint32_t>(span_x - 1)));
-            const std::int32_t oy = 1 + static_cast<std::int32_t>(random.below(static_cast<std::uint32_t>(span_y - 1)));
-            bool room = true;
-            for (std::int32_t y = oy - 1; y <= oy + h && room; ++y) {
-                for (std::int32_t x = ox - 1; x <= ox + w && room; ++x) {
-                    room = free(x, y);
+        // Every place with a tile of room around the box, one of them by chance.
+        std::vector<std::pair<std::int32_t, std::int32_t>> places;
+        for (std::int32_t oy = 1; oy + h + 1 <= height; ++oy) {
+            for (std::int32_t ox = 1; ox + w + 1 <= width; ++ox) {
+                if (room_for(ox - 1, oy - 1, w + 2, h + 2)) {
+                    places.emplace_back(ox, oy);
                 }
             }
-            if (!room) {
-                continue;
-            }
+        }
+        if (!places.empty()) {
+            const auto [ox, oy] = places[random.below(static_cast<std::uint32_t>(places.size()))];
             const std::int32_t dx = ox - x0;
             const std::int32_t dy = oy - y0;
             for (assets::IslandTile& v : tiles) {

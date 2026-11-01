@@ -327,6 +327,16 @@ tile between two bends. Rivers of islands of their own shape now plan their way 
 a bend at one of three steps (none right after another), never touching themselves, up to ten times
 over, and are laid only when the way ends on a beach that faces it.
 
+Part 9 done on 2026-11-01: the native villages of islands of their own shape find room now. The layer
+of a native template holds the beach, surf, forest and ground around the village, often a whole
+island; only its roads, ruins, squares and buildings are moved now (checked on the original's data:
+the box of the village is 5 to 19 tiles on its longer side, that of the whole layer up to 70), the
+free places are found with sums over the free tiles instead of 300 random tries, and 24 templates
+are tried. `o1602-tool new-world` makes room for the largest island of its own size
+(`fit_landscape`), prints the islands with a volcano, and, before the world is made, refuses more
+than four players for a .gam (seven slots less the natives and pirates); an output ending in `.o1602`
+takes any number of players.
+
 Still open: the climates of the islands as data.
 
 ## Order of work
