@@ -83,6 +83,7 @@ add_executable(o1602_tests
     unit/test_own_buildings.cpp
     unit/test_own_figures.cpp
     unit/test_game_content.cpp
+    unit/test_zip_archive.cpp
     unit/test_package_scenarios.cpp
     unit/test_tutorial.cpp
     unit/test_localization.cpp

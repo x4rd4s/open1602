@@ -7,9 +7,9 @@ how a package describes itself, in which order packages are loaded and which pac
 **Status:** Done are the manifest `mod.toml` with name, version, description, dependencies and
 load order, the hash of a package's files, the list of packages every game keeps in its savegame,
 multiplayer games that let in only computers with the game's packages, a host that sends its
-packages to a computer that lacks them and agrees, and the main menu's screen "Mods". Still open,
-with milestone M8: packages as archives and adding content of a package's own
-([open-work.md](open-work.md)).
+packages to a computer that lacks them and agrees, the main menu's screen "Mods" and packages as
+zip archives ([below](#a-package-as-a-zip-archive)). What is still open of adding content of a
+package's own is in [open-work.md](open-work.md).
 
 ## The folder
 
@@ -38,6 +38,33 @@ with milestone M8: packages as archives and adding content of a package's own
 
 The folder's name is the package's id, for example `lighthouse`. The ids of a package's entries
 start with it (`lighthouse:beacon`), and other packages refer to it by it. It has at most 64 bytes.
+
+## A package as a zip archive
+
+A package can also be a zip archive in the `mods` folder: `<user data folder>/mods/lighthouse.zip`
+is the package `lighthouse`, with the same files as the folder. Its id is the archive's name
+without `.zip`. When the archive's files all lie in one folder, as a zip tool packs a folder
+(`lighthouse/mod.toml`), they are the files of that folder; the folder `__MACOSX` that macOS adds
+is left out.
+
+When the packages are loaded, Open1602 unpacks the archive into
+`<user data folder>/mods-unpacked/<id>-<hash>` and loads it from there. An archive unpacked before
+is not unpacked again; what an archive that changed or was removed left there is removed. The
+package has the hash of its files, the same as the folder with these files: a game started with
+the folder can be loaded with the archive, and a multiplayer game lets in a computer that has the
+other.
+
+| Archive | What happens |
+|---|---|
+| a folder and an archive of the same id | the folder is the package, the archive is passed over |
+| files stored or packed with deflate | read |
+| other methods, encrypted files, zip64, archives in several files | not loaded, with a warning |
+| a damaged file (checksum) or a cut off archive | not loaded, with a warning |
+| a path outside the package (`../`, `C:`, `\`) or a path given twice | not loaded, with a warning |
+| more than 16384 files or more than 1 GiB unpacked | not loaded, with a warning |
+
+A package that is not loaded is shown in the screen "Mods" with the reason, as a folder whose
+manifest cannot be read.
 
 ## The manifest
 

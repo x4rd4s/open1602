@@ -45,14 +45,17 @@ struct PackageDependency {
     std::string versions;  ///< a version requirement (valid_version_requirement); empty: any version
 };
 
-/// A folder of <data folder>/mods: its id is the folder's name. The rest comes from its manifest
-/// (read_manifest); a folder without one is a package with no version, no name of its own and no
-/// dependencies.
+/// A folder of <data folder>/mods, or a zip archive there (<id>.zip): its id is the folder's name,
+/// or the archive's without ".zip". The rest comes from its manifest (read_manifest); a package
+/// without one has no version, no name of its own and no dependencies.
 struct ModPackage {
     std::string id;  ///< UTF-8
+    /// Where its files are: the folder, or where its archive is unpacked (unpack_package); empty
+    /// for an archive not unpacked yet.
     std::filesystem::path folder;
-    std::string name;     ///< for lists and messages; the id if the manifest names none
-    std::string version;  ///< empty without a manifest
+    std::filesystem::path archive;  ///< the zip archive it comes from; empty for a folder
+    std::string name;               ///< for lists and messages; the id if the manifest names none
+    std::string version;            ///< empty without a manifest
     std::string description;
     std::vector<PackageDependency> depends;
     std::vector<std::string> after;  ///< loads after these when they are there, without needing them
@@ -61,10 +64,25 @@ struct ModPackage {
     [[nodiscard]] ContentPackage content() const { return ContentPackage{id, version, hash}; }
 };
 
-/// The folders in `mods`, ordered by the bytes of their UTF-8 names, the same on every system
-/// (std::filesystem::path compares wchar_t on Windows); none if the folder does not exist. Their
-/// manifests are not read yet.
+/// The extension of a package that is a zip archive.
+inline constexpr std::string_view kPackageArchiveExtension = ".zip";
+
+/// The folders and zip archives in `mods`, ordered by the bytes of their UTF-8 ids, the same on
+/// every system (std::filesystem::path compares wchar_t on Windows); none if the folder does not
+/// exist. An archive with the id of a folder is left out: the folder is the package. Their
+/// manifests are not read and their archives not unpacked yet.
 [[nodiscard]] std::vector<ModPackage> mod_packages(const std::filesystem::path& mods);
+
+/// Where the archives of `mods` are unpacked: the folder "mods-unpacked" next to it.
+[[nodiscard]] std::filesystem::path unpacked_packages_folder(const std::filesystem::path& mods);
+
+/// Unpacks the archive of `package` into <unpacked>/<id>-<hash as 16 hex digits> and makes that its
+/// folder; an archive unpacked before is not unpacked again. An archive whose files all lie in one
+/// folder is unpacked without it ("lighthouse/mod.toml" is "mod.toml"); "__MACOSX/" is left out.
+/// The unpacked package has the hash its files have as a folder (package_hash). Refused, and the
+/// folder is not set, for a damaged archive, a path outside the package (safe_package_path) or a
+/// path given twice.
+core::Status unpack_package(ModPackage& package, const std::filesystem::path& unpacked);
 
 /// Whether `version` is one a manifest may give: one to four numbers of at most nine digits,
 /// separated by dots ("1", "1.2", "0.10.3").
@@ -110,9 +128,11 @@ struct PackageProblem {
     friend bool operator==(const PackageProblem&, const PackageProblem&) = default;
 };
 
-/// The folders of `mods` with their manifests read, in the order of mod_packages(); those whose
-/// manifest cannot be read, or whose id is too long, are left out with a warning and, if
-/// `problems` is given, a PackageProblem::Unreadable there. No hashes yet.
+/// The packages of `mods` with their manifests read, in the order of mod_packages(), their archives
+/// unpacked (unpack_package, into unpacked_packages_folder(mods), where what no archive needs any
+/// more is removed); those whose manifest cannot be read, whose archive cannot be unpacked, or
+/// whose id is too long, are left out with a warning and, if `problems` is given, a
+/// PackageProblem::Unreadable there. No hashes yet.
 [[nodiscard]] std::vector<ModPackage> read_mod_packages(const std::filesystem::path& mods,
                                                         std::vector<std::string>& warnings,
                                                         std::vector<PackageProblem>* problems = nullptr);
@@ -198,7 +218,8 @@ inline constexpr std::size_t kMaxPackagePathLength = 255;
 [[nodiscard]] std::vector<ModPackage> cached_packages(const std::filesystem::path& cache,
                                                       std::vector<std::string>& warnings);
 /// Copies a received package from the cache into `mods`, as <mods>/<id>, where it is a package of
-/// this computer's own from then on: refused when `mods` has a package with that id already.
+/// this computer's own from then on: refused when `mods` has a package with that id already, as a
+/// folder or an archive.
 [[nodiscard]] core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods,
                                                                 const ModPackage& cached);
 
