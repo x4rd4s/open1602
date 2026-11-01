@@ -232,6 +232,18 @@ int cmd_new_world(const Args& args) {
     }
     w.players =
         static_cast<std::uint8_t>(std::clamp<std::size_t>(args.number("--players").value_or(4), 1, sim::kMaxPlayers));
+    // A .o1602 holds any number of players; a .gam the original's seven slots, of which the natives
+    // (two climates) and the pirates take three: told before the world is made.
+    const fs::path out_path{std::string(args.positional[0])};
+    const bool own_format = out_path.extension() == sim::kSaveExtension;
+    constexpr std::size_t kGamPlayers = assets::kOriginalPlayerSlots - 3;
+    if (!own_format && w.players > kGamPlayers) {
+        std::fprintf(stderr,
+                     "error: a .gam holds at most %zu players (with the natives and pirates); use %zu or fewer, "
+                     "or write a %s\n",
+                     kGamPlayers, kGamPlayers, std::string(sim::kSaveExtension).c_str());
+        return 1;
+    }
     const auto islands = amount(args, "--island-count");
     const auto villages = amount(args, "--villages");
     const auto volcanoes = amount(args, "--volcano-islands");
@@ -296,20 +308,11 @@ int cmd_new_world(const Args& args) {
         volcano_islands += island.craters.empty() ? 0U : 1U;
     }
     std::printf("islands with a volcano %zu\n", volcano_islands);
-    // The original's file holds seven players with the natives and the pirates: told here, not
-    // only when writing fails.
-    if (world->players().size() > assets::kOriginalPlayerSlots) {
-        const std::size_t others = world->players().size() - w.players;
-        std::fprintf(stderr, "error: %zu players with the natives and pirates; a .gam holds %u: use at most %zu\n",
-                     world->players().size(), static_cast<unsigned>(assets::kOriginalPlayerSlots),
-                     assets::kOriginalPlayerSlots > others ? assets::kOriginalPlayerSlots - others : 0U);
-        return 1;
-    }
-    auto bytes = sim::write_savegame(*world, *buildings);
+    auto bytes = own_format ? sim::write_game(*world, *buildings) : sim::write_savegame(*world, *buildings);
     if (!bytes) {
         return fail(bytes.error());
     }
-    if (auto status = core::write_file(std::filesystem::path(args.positional[0]), *bytes); !status) {
+    if (auto status = core::write_file(out_path, *bytes); !status) {
         return fail(status.error());
     }
     std::printf("-> %s\n", std::string(args.positional[0]).c_str());

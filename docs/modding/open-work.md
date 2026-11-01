@@ -333,8 +333,9 @@ island; only its roads, ruins, squares and buildings are moved now (checked on t
 the box of the village is 5 to 19 tiles on its longer side, that of the whole layer up to 70), the
 free places are found with sums over the free tiles instead of 300 random tries, and 24 templates
 are tried. `o1602-tool new-world` makes room for the largest island of its own size
-(`fit_landscape`), prints the islands with a volcano, and tells at once when the natives and pirates
-leave fewer than the players asked for in a .gam (seven slots).
+(`fit_landscape`), prints the islands with a volcano, and, before the world is made, refuses more
+than four players for a .gam (seven slots less the natives and pirates); an output ending in `.o1602`
+takes any number of players.
 
 Still open: the climates of the islands as data.
 
