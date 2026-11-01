@@ -54,17 +54,27 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
     std::size_t added = 0;
     for (const core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
-        if (!is_name(t.name)) {
+        // ["<package>:<name>"]: the building of an earlier package, replaced by this one's.
+        const bool replacing = t.name.find(':') != std::string::npos;
+        const OwnBuilding* replaced = nullptr;
+        if (replacing) {
+            replaced = find_own_building(own, t.name);
+            if (replaced == nullptr || t.name.starts_with(std::string(package) + ":")) {
+                warnings.push_back(at + "[" + t.name +
+                                   "]: names no building of an earlier package to replace (<package>:<name>)");
+                continue;
+            }
+        } else if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name +
                                "]: a building's name holds only lower case letters, digits and '_'");
             continue;
         }
-        const std::string id = std::string(package) + ":" + t.name;
-        if (find_own_building(own, id) != nullptr) {
+        const std::string id = replacing ? t.name : std::string(package) + ":" + t.name;
+        if (!replacing && find_own_building(own, id) != nullptr) {
             warnings.push_back(at + id + " is declared twice; the second is passed over");
             continue;
         }
-        if (added >= kMaxOwnBuildings) {
+        if (!replacing && added >= kMaxOwnBuildings) {
             warnings.push_back(at + "a package declares at most " + std::to_string(kMaxOwnBuildings) +
                                " buildings; the rest are passed over");
             return;
@@ -174,6 +184,10 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         if (!ok) {
             continue;
         }
+        // A replacement starts from the building it replaces, unless it names another.
+        if (like == nullptr && replaced != nullptr) {
+            like = table.by_id(replaced->number);
+        }
         if (like == nullptr) {
             warnings.push_back(at + id + " names no building to copy ('like')");
             continue;
@@ -223,6 +237,12 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
                                    " sprites, the building draws " + std::to_string(needed));
                 continue;
             }
+        }
+        if (replaced != nullptr) {
+            if (auto status = table.replace(replaced->number, b); !status) {
+                warnings.push_back(at + id + ": " + status.error().message);
+            }
+            continue;
         }
         const auto number = table.add(b);
         if (!number) {

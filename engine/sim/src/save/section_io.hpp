@@ -300,6 +300,10 @@ inline constexpr std::uint16_t kWideDiscovered = 4;
 /// (Ship::plundered). The writer takes it only when a ship under the white flag has it.
 inline constexpr std::uint16_t kPlunderedFlag = 5;
 
+/// FACT version 2: every faction also says whether scripts steer it (Faction::scripted). The writer
+/// takes it only when one is; the section is required then.
+inline constexpr std::uint16_t kScriptedFactions = 2;
+
 /// An island coordinate of ISLE and VOLC: 8 bit up to version 1, 16 bit from kWideCoordinates.
 template <class A, class T>
 void io_coordinate(A& a, T& v, std::uint16_t version) {
@@ -350,8 +354,10 @@ void write_players(Writer& out, const World& w);
 [[nodiscard]] std::vector<Player> read_players(Reader& in);
 /// Whether the world has other factions than the base game's (only then FACT is written).
 [[nodiscard]] bool has_own_factions(const World& w);
-void write_factions(Writer& out, const World& w);
-[[nodiscard]] Decoded::FactionPart read_factions(Reader& in);
+/// The version of FACT the factions need: kScriptedFactions when one is scripted, else 1.
+[[nodiscard]] std::uint16_t factions_version(const World& w);
+void write_factions(Writer& out, const World& w, std::uint16_t version);
+[[nodiscard]] Decoded::FactionPart read_factions(Reader& in, std::uint16_t version);
 [[nodiscard]] std::uint16_t player_state_version(const World& w);
 void write_player_state(Writer& out, const World& w, std::uint16_t version);
 [[nodiscard]] std::vector<Player> read_player_state(Reader& in, std::uint16_t version);

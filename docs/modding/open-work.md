@@ -83,8 +83,8 @@ Part b done on 2026-10-26 ([own-buildings.md](own-buildings.md)): a package adds
 own in `own_buildings.toml`, each copying a building of the original (`like`) with its own sprites
 and footprint; they are named `<package>:<name>` in `buildings.toml`, in `build_menu.toml` and in
 the savegame (section `OWNB`), and the engine gives them the highest free `haeuser.cod` Ids in the
-packages' load order. Still open: pictures of a package's own (with the import of content), figures
-of a package's own, and a package that replaces another's building.
+packages' load order. Pictures, figures of a package's own and a package that replaces another's
+building (`["<package>:<name>"]` in `own_buildings.toml`, 2026-11-01) are done.
 
 Figures of a package's own done on 2026-11-01 ([own-figures.md](own-figures.md)): `own_figures.toml`
 declares figures that copy one of the original (`like`), with an image of a package (`image`) and
@@ -142,8 +142,9 @@ Part 4 done on 2026-10-27 ([graphics.md](graphics.md#figures-and-ships)): `figur
 draws the original's figures and ships with a package's images (the image is checked to hold every
 sprite the figure draws). Part 5 done on 2026-11-01 ([sounds.md](sounds.md#sounds-of-buildings-and-figures)):
 `sounds.toml` numbers a package's sounds from 1000, and its buildings (`build_sound`) and figures
-(`sound`, `shot_sound`, `hit_sound`) name them. Still open: videos of a mod's own (figures of a
-package's own are done, item 2).
+(`sound`, `shot_sound`, `hit_sound`) name them. Part 6 done on 2026-11-01
+([messages.md](messages.md#sound-and-video)): a message of a package plays a Smacker or Bink 2
+video of the package's own (`video = "<path>"`). Still open: videos in a modern format.
 
 ### 5. Computer players from data (section 3; MD-4)
 
@@ -167,7 +168,11 @@ the cheat amounts are values of `balance.toml`'s table `[computers]` (savegame `
 
 Part 3 done on 2026-10-31 ([computer-players.md](computer-players.md#in-which-order)): the stage
 orders, with the public buildings, are lists of `computers.toml` (savegame `AIOR`); an entry may
-name a package's good. Still open: the original's Needs, slots and when a stage moves on as data.
+name a package's good.
+
+Part 4 done on 2026-11-01 ([computer-players.md](computer-players.md#when-a-city-moves-on)): when a
+city moves on to its next stage is `balance.toml`'s table `[computer_stages]` (savegame `BALA`
+version 3). Still open: the original's Needs (`kNeeds`) and the 55 slots as data.
 
 ### 6. Lua scripts (section 6)
 
@@ -243,8 +248,9 @@ Depends on items 2 and 6.
 Done on 2026-10-31 ([factions.md](factions.md#factions-of-a-packages-own)): `factions.toml` adds
 factions of the package that act as one of the base game's four; `replaces` gives them its slots in
 new games, `slot.<n>` of a package's scenario the slots of its map; scripts read
-`game.player(n).faction`. Still open: a behaviour of a faction wholly of its own, beyond what
-scripts do with the base behaviours.
+`game.player(n).faction`. A behaviour of its own done on 2026-11-01
+([factions.md](factions.md#a-behaviour-of-its-own)): `scripted = true` leaves a faction of settlers
+or pirates to the scripts; the game no longer steers it.
 
 ### 9. Island generator, stage 2 (section 5)
 

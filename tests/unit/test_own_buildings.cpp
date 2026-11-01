@@ -149,6 +149,55 @@ TEST_CASE("own buildings: a second package declares the same name again, and cha
     CHECK(buildings.by_id(own[0].number)->max_health == 50 * assets::kStockUnitsPerTon);
 }
 
+TEST_CASE("own buildings: a later package replaces the building of an earlier one") {
+    auto buildings = make_buildings();
+    std::vector<assets::OwnBuilding> own;
+    std::vector<std::string> warnings;
+    assets::apply_own_buildings_file(buildings, own, "lights",
+                                     "[lighthouse]\nlike = \"anno1602:watchtower\"\ngfx = 500\n"
+                                     "[beacon]\nlike = \"anno1602:watchtower\"\ngfx = 600\n",
+                                     warnings);
+    REQUIRE(own.size() == 2);
+    const std::uint32_t number = own[0].number;
+    const std::uint32_t record = buildings.by_id(number)->record;
+    assets::apply_own_buildings_file(buildings, own, "better_lights",
+                                     // Starts from the building it replaces: only the picture changes.
+                                     "[\"lights:lighthouse\"]\n"
+                                     "gfx = 700\n"
+                                     "size_x = 2\n"
+                                     // Starts from another building of the original.
+                                     "[\"lights:beacon\"]\n"
+                                     "like = \"anno1602:bakery\"\n"
+                                     // Line 6: no building of an earlier package.
+                                     "[\"lights:nothing\"]\n"
+                                     "gfx = 1\n"
+                                     "[\"anno1602:bakery\"]\n"
+                                     "gfx = 1\n",
+                                     warnings);
+    REQUIRE(warnings.size() == 2);
+    CHECK(warnings[0].starts_with(
+        "better_lights/own_buildings.toml line 6: [lights:nothing]: names no building of an earlier package"));
+    CHECK(warnings[1].starts_with("better_lights/own_buildings.toml line 8: [anno1602:bakery]"));
+    // No new buildings: the replaced ones keep their ids, Ids and record numbers.
+    REQUIRE(own.size() == 2);
+    const assets::BuildingType* lighthouse = buildings.by_id(number);
+    REQUIRE(lighthouse != nullptr);
+    CHECK(lighthouse->record == record);
+    CHECK(lighthouse->gfx == 700);
+    CHECK(lighthouse->size_x == 2);
+    CHECK(lighthouse->kind == buildings.by_id(20305)->kind);
+    CHECK(buildings.by_sprite(700) == lighthouse);
+    CHECK(buildings.by_sprite(500) == nullptr);  // the old picture is no building's any more
+    const assets::BuildingType* beacon = buildings.by_id(own[1].number);
+    CHECK(beacon->produce_amount == buildings.by_id(20503)->produce_amount);
+    CHECK(beacon->gfx == buildings.by_id(20503)->gfx);
+    // A package does not replace its own buildings: it declares them as it wants them.
+    warnings.clear();
+    assets::apply_own_buildings_file(buildings, own, "lights", "[\"lights:lighthouse\"]\ngfx = 1\n", warnings);
+    REQUIRE(warnings.size() == 1);
+    CHECK(buildings.by_id(number)->gfx == 700);
+}
+
 TEST_CASE("own buildings: the build menu names a building by its id") {
     auto buildings = make_buildings();
     std::vector<assets::OwnBuilding> own;

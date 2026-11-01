@@ -223,6 +223,10 @@ public:
     /// everywhere. Fails when no Id or record number is free or its sprites lie beyond the sheet;
     /// the table stays as it was then.
     core::Result<std::uint32_t> add(const BuildingType& like);
+    /// Puts `by` in the place of the building `id` a package added (a later package replaces it,
+    /// own_buildings.hpp): it keeps that building's Id and record number. Fails when there is no
+    /// such building or its sprites lie beyond the sheet; the table stays as it was then.
+    core::Status replace(std::uint32_t id, const BuildingType& by);
 
     /// The first record of id::kRequired the table lacks.
     [[nodiscard]] std::optional<std::uint32_t> missing() const noexcept;

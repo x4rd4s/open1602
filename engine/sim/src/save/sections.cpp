@@ -193,7 +193,10 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
         return kScriptsWithCampaign;
     }
     if (id == kBalance) {
-        return kBalanceWithComputers;
+        return kBalanceWithStages;
+    }
+    if (id == kFactions) {
+        return kScriptedFactions;
     }
     return id == kIslands || id == kVolcanoes ? kWideCoordinates : 1;
 }
@@ -325,8 +328,12 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
     }
     section(out, kPlayers, [&](Writer& o) { write_players(o, world); });
     if (has_own_factions(world)) {
-        // Optional: a reader without it plays the base game's factions the role bytes give.
-        section(out, kFactions, [&](Writer& o) { write_factions(o, world); }, Need::Optional);
+        // Optional: a reader without it plays the base game's factions the role bytes give;
+        // required when scripts steer a faction, which such a reader would steer itself.
+        const std::uint16_t factions_at = factions_version(world);
+        section(
+            out, kFactions, [&](Writer& o) { write_factions(o, world, factions_at); },
+            factions_at >= kScriptedFactions ? Need::Required : Need::Optional, factions_at);
     }
     if (!original_numbers(world.balance())) {
         // Required: a reader without it would compute another game.
@@ -737,7 +744,7 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                 d.players = read_players(in);
                 break;
             case kFactions:
-                d.factions = read_factions(in);
+                d.factions = read_factions(in, version);
                 break;
             case kBalance: {
                 Balance b;

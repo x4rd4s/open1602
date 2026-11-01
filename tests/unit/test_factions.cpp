@@ -167,3 +167,29 @@ TEST_CASE("factions: a package adds factions of its own that act as a base game'
     CHECK(world.players()[2].faction == sim::faction::kNatives);
     CHECK(world.first_of(sim::FactionBehaviour::Pirates) == 1);
 }
+
+TEST_CASE("factions: 'scripted' gives settlers or pirates a behaviour of their scripts") {
+    std::vector<sim::Faction> factions = sim::base_factions();
+    std::vector<std::string> warnings;
+    sim::apply_faction_file(factions, "seas",
+                            "[corsairs]\n"
+                            "behaviour = \"pirates\"\n"
+                            "scripted = true\n"
+                            "[colonists]\n"
+                            "behaviour = \"settlers\"\n"
+                            "scripted = true\n"
+                            "[\"anno1602:trader\"]\n"
+                            "scripted = true\n"  // line 8: the game steers the trader
+                            "[\"anno1602:natives\"]\n"
+                            "scripted = 1\n",  // line 10: no true or false
+                            warnings);
+    REQUIRE(warnings.size() == 2);
+    CHECK(warnings[0].starts_with("seas/factions.toml line 8: 'scripted' is for factions of settlers or pirates"));
+    CHECK(warnings[1].starts_with("seas/factions.toml line 10: 'scripted' must be true or false"));
+    REQUIRE(factions.size() == 6);
+    CHECK(factions[4].id == "seas:corsairs");
+    CHECK(factions[4].scripted);
+    CHECK(factions[5].scripted);
+    CHECK(!factions[sim::faction::kTrader].scripted);
+    CHECK(!factions[sim::faction::kPirates].scripted);
+}

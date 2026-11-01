@@ -180,6 +180,59 @@ TEST_CASE("messages: a mod adds a message with text, icon, sound and video") {
     CHECK(t.text(*id, "en", {{"player", "A"}}) == "A's lighthouse shines over {island}.");
 }
 
+TEST_CASE("messages: a package's message plays a video of the package's own") {
+    TempPackage pkg("films");
+    std::filesystem::create_directories(pkg.path / "videos");
+    pkg.write("videos/beacon.smk", std::string("SMK2") + std::string(60, '\0'));
+    pkg.write("videos/storm.BK2", std::string("KB2j") + std::string(60, '\0'));
+    pkg.write("videos/fake.smk", "not a video");
+    pkg.write("videos/clip.mp4", std::string("SMK2") + std::string(60, '\0'));
+    app::MessageTable t;
+    std::vector<std::string> warnings;
+    REQUIRE(t.load_package("films",
+                           "[beacon]\n"
+                           "text = \"The beacon is lit.\"\n"
+                           "video = \"videos/beacon.smk\"\n"
+                           "[storm]\n"
+                           "text = \"A storm.\"\n"
+                           "video = \"videos/storm.BK2\"\n"
+                           "[again]\n"
+                           "text = \"Lit again.\"\n"
+                           "video = \"videos/../videos/beacon.smk\"\n"
+                           "[fake]\n"
+                           "text = \"x\"\n"
+                           "video = \"videos/fake.smk\"\n"
+                           "[mp4]\n"
+                           "text = \"x\"\n"
+                           "video = \"videos/clip.mp4\"\n"
+                           "[missing]\n"
+                           "text = \"x\"\n"
+                           "video = \"videos/none.smk\"\n"
+                           "[outside]\n"
+                           "text = \"x\"\n"
+                           "video = \"../other/beacon.smk\"\n",
+                           pkg.path, warnings)
+                .ok());
+    // The files get numbers from kFirstPackageVideo on; the same file keeps its number.
+    const auto playback = [&t](std::string_view id) { return t.get(*t.find(id))->playback; };
+    CHECK(playback("films:beacon").video_base == app::kFirstPackageVideo);
+    CHECK(playback("films:beacon").videos == 1);
+    CHECK(playback("films:storm").video_base == app::kFirstPackageVideo + 1);
+    CHECK(playback("films:again").video_base == app::kFirstPackageVideo);
+    REQUIRE(t.package_videos().size() == 2);
+    CHECK(t.package_videos()[0] == (pkg.path / "videos" / "beacon.smk").lexically_normal());
+    CHECK(t.package_videos()[1].filename() == "storm.BK2");
+    // No Smacker or Bink 2 file, missing, or outside the package: no video, with a warning.
+    for (const char* id : {"films:fake", "films:mp4", "films:missing", "films:outside"}) {
+        CHECK(playback(id).videos == 0);
+    }
+    REQUIRE(warnings.size() == 4);
+    CHECK(warnings[0].starts_with("films/messages.toml line 12: videos/fake.smk: missing or no Smacker"));
+    CHECK(warnings[1].starts_with("films/messages.toml line 15: videos/clip.mp4"));
+    CHECK(warnings[2].starts_with("films/messages.toml line 18: videos/none.smk"));
+    CHECK(warnings[3].starts_with("films/messages.toml line 21: 'video' must be"));
+}
+
 TEST_CASE("messages: 'like' borrows an original's icon, text, voice and video; fields change it") {
     TempPackage pkg("m");
     app::MessageTable t;
@@ -269,7 +322,7 @@ TEST_CASE("messages: what is wrong in a field is passed over with a warning that
     CHECK(warnings[0].starts_with("bad/messages.toml line 3: 'icon'"));
     CHECK(warnings[1].starts_with("bad/messages.toml line 4: 'kind'"));
     CHECK(warnings[2].starts_with("bad/messages.toml line 5: 'sound'"));
-    CHECK(warnings[3].starts_with("bad/messages.toml line 6: 'video'"));
+    CHECK(warnings[3].starts_with("bad/messages.toml line 6: intro.mp4: missing or no Smacker"));
     CHECK(warnings[4].starts_with("bad/messages.toml line 7: unknown field 'colour'"));
     CHECK(warnings[5].starts_with("bad/messages.toml line 9: noise.txt"));
     CHECK(warnings[6].starts_with("bad/messages.toml line 8: bad:b has no text"));

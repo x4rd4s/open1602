@@ -321,6 +321,29 @@ TEST_CASE("factions: the pirates' faction says how their nests grow, and the gam
     CHECK(sim::pirate_nests(*back, w.rules) == 4);
 }
 
+TEST_CASE("factions: scripted pirates get no ships from the game, and the savegame keeps them scripted") {
+    World w;
+    w.world.set_game_settings(sim::World::GameSettings{2, 0, 1500});
+    std::vector<sim::Faction> factions = sim::base_factions();
+    factions[sim::faction::kPirates].scripted = true;
+    w.world.set_factions(factions);
+    w.start();
+    w.world.player(0)->infra_mask |= 1U << 24;  // citizens: the pirates would come now
+    w.run(60'000);
+    CHECK(w.pirate_ships() == 0);
+    CHECK(w.count(sim::ShipEvent::Kind::PirateAppeared) == 0);
+    // Their relations stay the pirates': at war with the settlers.
+    CHECK(w.world.acts_as(2, sim::FactionBehaviour::Pirates));
+    CHECK(w.world.diplomacy().relation(0, 2).peace == sim::Treaty::None);
+
+    auto bytes = sim::write_game(w.world, w.buildings);
+    REQUIRE(bytes.ok());
+    auto back = sim::read_game(*bytes, w.buildings);
+    REQUIRE(back.ok());
+    CHECK(back->factions() == factions);
+    CHECK(back->factions()[sim::faction::kPirates].scripted);
+}
+
 TEST_CASE("free trader: the reach of the rule stays with the savegame") {
     World w;
     for (const sim::TraderReach choice : {sim::TraderReach::Original, sim::TraderReach::Scaled}) {

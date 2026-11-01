@@ -9,8 +9,9 @@ faction grows with when more people play are values a mod can change.
 **Status:** Done are the base game's four factions as data in every world, the numbers below, saving
 them with the game, the file `factions.toml` that changes them and, since 2026-10-31, factions of a
 package's own: they act as one of the base game's four, take its slots in new games or the slots a
-package's scenario gives them, and scripts see them. Still open: a behaviour wholly of their own
-beyond what scripts do with the base behaviours.
+package's scenario gives them, and scripts see them, and since 2026-11-01 a behaviour of their
+own: with `scripted` the game no longer steers a faction, its package's script does
+([below](#a-behaviour-of-its-own)).
 
 ## The base game's factions
 
@@ -97,3 +98,47 @@ The faction of a slot goes into the game with it (section `FACT`). Scripts read 
 ([scripts.md](scripts.md)): money and goods, victory and defeat, messages. The pirates', trader's
 and natives' behaviours look for the first slot of their behaviour, so a second slot of the same
 behaviour beside it does little; to change them, a faction replaces theirs.
+
+## A behaviour of its own
+
+`scripted = true` gives a faction of settlers or of pirates a behaviour of its own: the game no
+longer steers its players, and scripts do ([scripts.md](scripts.md)). How it stands to the others
+stays that of its `behaviour`: scripted pirates are at war with everyone but the trader, scripted
+settlers make treaties.
+
+| Behaviour | What the game no longer does |
+|---|---|
+| settlers | the computer player: it does not found, build, trade or fight for the faction's slots |
+| pirates | no ships come for them, their ships do not sail, hunt or plunder on their own, and their nests make no offers |
+
+The faction's units and ships still defend themselves and fight what they meet, as every unit
+does. The script finds its players by `game.player(n).faction` and acts for them each second
+(`on_second`) with `game.build`, `game.move_ship`, `game.move_unit`, `game.attack_unit`,
+`game.set_peace` and the rest of [what a script changes](scripts.md#what-a-script-changes). The
+cities and ships it starts with come from the map, for example a package's scenario that gives
+the faction its slot (`slot.<n>`, [scenarios.md](scenarios.md)).
+
+```toml
+# mods/seas/factions.toml
+[corsairs]
+behaviour = "pirates"
+replaces = "anno1602:pirates"
+scripted = true
+```
+
+```lua
+-- mods/seas/script.lua: the corsairs' ships sail to the middle of the map.
+function on_second(seconds)
+  if seconds % 30 ~= 0 then return end
+  for _, n in ipairs(game.players()) do
+    if game.player(n).faction == "seas:corsairs" then
+      for _, ship in ipairs(game.ships(n)) do
+        game.move_ship(ship.id, 60, 40)
+      end
+    end
+  end
+end
+```
+
+The free trader and the natives are always steered by the game; `scripted` is passed over for
+them with a warning. A game keeps the field with its factions (section `FACT`).

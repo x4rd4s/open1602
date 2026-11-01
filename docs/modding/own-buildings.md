@@ -9,7 +9,8 @@ needs: its own id, its own values, its own place in the build menu.
 ([values.md](values.md)), its place in the build menu, its id in savegames, its class and unlock
 level, pictures of the package's own ([graphics.md](graphics.md)) and its carriers or workers, also
 figures of a package's own ([own-figures.md](own-figures.md)). What such a building makes and uses
-may be a good of a package ([goods.md](goods.md)).
+may be a good of a package ([goods.md](goods.md)). A later package may
+[replace](#replacing-the-building-of-another-package) such a building.
 
 ## The file
 
@@ -67,6 +68,27 @@ icon = 90
 name = "Leuchtturm"
 ```
 
+## Replacing the building of another package
+
+A table named with the string id of a building an earlier package added, `["<package>:<name>"]`,
+replaces that building: it takes the earlier one's place with the same string id, `Id` and record
+number, so the build menu, the scripts, `buildings.toml` and savegames name it as before, and only
+what it is changes. It starts from the building it replaces, or from `like` when given, and takes
+the same fields as a new building:
+
+```toml
+# mods/better_lights/own_buildings.toml, loaded after "lights"
+["lights:lighthouse"]
+gfx = "better_lights:lighthouse"   # a new picture, everything else as "lights" made it
+size_x = 3
+size_y = 3
+```
+
+Only a building of a package loaded before is replaced; a package does not replace its own
+buildings, nor the original's, whose values [`buildings.toml`](values.md) changes. A table that names
+none of them is passed over with a warning. Replacements do not count towards the 256 buildings a
+package declares.
+
 ## Ids and savegames
 
 The engine gives every building of a package an `Id` of the building table, the highest free one
@@ -84,4 +106,4 @@ showing other buildings. Savegames of the original (`.gam`) have none of them.
 
 `engine/assets/include/o1602/assets/own_buildings.hpp`: `OwnBuilding` (string id and number),
 `apply_own_buildings_file`; `BuildingTable::add` appends a record and gives it its Id and record
-number. `sim::World::own_buildings()` carries them through a game and its savegame.
+number, `BuildingTable::replace` puts a replacement in its place. `sim::World::own_buildings()` carries them through a game and its savegame.

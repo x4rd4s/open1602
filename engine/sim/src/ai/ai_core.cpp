@@ -72,8 +72,9 @@ void Engine::reset() {
     m_state.players.clear();
     for (std::size_t i = 0; i < m_world.players().size(); ++i) {
         const Player& pl = m_world.players()[i];
-        if (pl.role != PlayerRole::Computer && m_world.behaviour(pl) != FactionBehaviour::Pirates) {
-            continue;
+        if ((pl.role != PlayerRole::Computer && m_world.behaviour(pl) != FactionBehaviour::Pirates) ||
+            m_world.faction(pl).scripted) {
+            continue;  // a scripted faction's players are its scripts' (Faction::scripted)
         }
         AiPlayer p;
         p.player = static_cast<PlayerId>(i);

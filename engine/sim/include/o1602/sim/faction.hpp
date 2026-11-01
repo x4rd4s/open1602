@@ -25,8 +25,8 @@ using FactionId = std::uint8_t;
 /// Factions a world holds at most.
 inline constexpr std::size_t kMaxFactions = std::numeric_limits<FactionId>::max();
 
-/// What the simulation does for a faction's players. Until scripts can give a faction behaviour
-/// of its own (M8), every faction acts as one of the original's.
+/// What the simulation does for a faction's players: how it stands to the others (treaties, war)
+/// and, unless the faction is `scripted`, how the game steers it.
 enum class FactionBehaviour : std::uint8_t {
     Settlers,  ///< found cities, trade and take part in diplomacy (people and computer players)
     Trader,    ///< the free trader: sails from Kontor to Kontor and buys and sells
@@ -67,6 +67,10 @@ struct Faction {
     /// The free trader: with more settler players than this he keeps to as many Kontors as a game
     /// of this many players would have (Rules::trader_reach); 0 never.
     std::uint16_t reach_players = 4;
+    /// A behaviour of its own (factions.toml `scripted`): the game does not steer the faction's
+    /// players (no computer player, no pirates' ships and raids); scripts do. Its relations stay
+    /// those of `behaviour`. Settlers and pirates only.
+    bool scripted = false;
 
     friend bool operator==(const Faction&, const Faction&) = default;
 };

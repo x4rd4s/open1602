@@ -23,7 +23,10 @@ constexpr std::uint32_t kPlunderAmount = 50 * 32;
 }  // namespace
 
 PlayerId Fleet::pirates() const {
-    return m_world->first_of(FactionBehaviour::Pirates);
+    // The pirates the game steers: a scripted faction's ships sail and plunder as its scripts say.
+    const PlayerId p = m_world->first_of(FactionBehaviour::Pirates);
+    const Player* player = m_world->player(p);
+    return player != nullptr && m_world->faction(*player).scripted ? kNoPlayer : p;
 }
 
 std::uint32_t pirate_max_ships(const World& world) noexcept {

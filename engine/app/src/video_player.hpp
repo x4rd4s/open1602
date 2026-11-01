@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -39,6 +40,9 @@ public:
     /// Whether `VideoSmk/<number>.smk` or `.bk2` exists (the installation may miss some, the
     /// original names two that GOG does not have).
     [[nodiscard]] bool available(std::uint16_t number) const;
+    /// The packages' video files (MessageTable::package_videos): index i is the video number
+    /// kFirstPackageVideo + i.
+    void set_package_videos(std::vector<std::filesystem::path> files);
 
     /// Begins to load a video in the background, with the sound of its tracks (bit i of `tracks`
     /// = track i, 0 = all); a running one stops. False if the file is missing. Until poll() says
@@ -85,12 +89,15 @@ public:
     using Clip = std::variant<video::Smacker, video::Bink>;
 
 private:
+    /// The file of a video number: the installation's, or a package's.
+    [[nodiscard]] std::optional<std::filesystem::path> find(std::uint16_t number) const;
     struct Loading;
     /// A texture of the video's size; the one before goes.
     void make_texture(std::int32_t w, std::int32_t h);
     SDL_Renderer* m_renderer;
     const assets::GameDirectory* m_game;
     mutable std::map<std::uint16_t, bool> m_available;
+    std::vector<std::filesystem::path> m_package_videos;
     std::optional<Clip> m_video;
     /// The load under way; shared with its thread, which may outlive a stop().
     std::shared_ptr<Loading> m_loading;

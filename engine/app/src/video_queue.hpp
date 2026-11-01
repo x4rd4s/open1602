@@ -5,6 +5,7 @@
 // VideoController plays what it decides.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <optional>
@@ -17,6 +18,12 @@ inline constexpr std::uint16_t kPauseVideo = 6;
 /// The first video of a fulfilled mission (0x5F: 2000); every later number ends a game.
 inline constexpr std::uint16_t kFirstMissionVideo = 2000;
 
+/// The video number of the packages' first video (a message's `video = "<file>"`,
+/// docs/modding/messages.md): far after the original's. A package's video plays as a message's.
+inline constexpr std::uint16_t kFirstPackageVideo = 60000;
+/// The videos of all packages' messages together.
+inline constexpr std::size_t kMaxPackageVideos = 1024;
+
 /// Whether a video plays in the minimap's window. Messages play there; the logos and the intro,
 /// the credits (10), the pause (6, looping) and the ends of the game (defeat 998, 1010, 2020;
 /// missions fulfilled 2000–2120 and from 2500, the end of the campaigns 2990) fill the screen and
@@ -25,7 +32,8 @@ inline constexpr std::uint16_t kFirstMissionVideo = 2000;
 /// else its sound would play without a picture.
 [[nodiscard]] constexpr bool video_plays_in_minimap(std::uint16_t number, bool loop, bool intro,
                                                     bool minimap_shown) noexcept {
-    const bool full = intro || loop || number == 10 || number == 998 || number == 1010 || number >= kFirstMissionVideo;
+    const bool full = intro || loop || number == 10 || number == 998 || number == 1010 ||
+                      (number >= kFirstMissionVideo && number < kFirstPackageVideo);
     return !full && minimap_shown;
 }
 

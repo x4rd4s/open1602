@@ -526,6 +526,9 @@ TEST_CASE("videos: messages in the minimap, the rest and messages without a mini
     }
     CHECK(!video_plays_in_minimap(6, true, false, true));   // the pause loops
     CHECK(!video_plays_in_minimap(58, false, true, true));  // the intro
+    // A package's message videos play as the original's messages do.
+    CHECK(video_plays_in_minimap(app::kFirstPackageVideo, false, false, true));
+    CHECK(video_plays_in_minimap(app::kFirstPackageVideo + 1023, false, false, true));
 }
 
 namespace {
