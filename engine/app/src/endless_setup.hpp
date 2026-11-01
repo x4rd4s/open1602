@@ -11,7 +11,9 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "o1602/sim/package_landscapes.hpp"
 #include "o1602/sim/rules.hpp"
 #include "o1602/sim/world_plan.hpp"
 
@@ -210,5 +212,9 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
 /// Reads "<prefix><key> = value" lines, as write_setup writes them, into `setup`; other lines are
 /// left out. For the lobby, which passes the host's setup on as such text.
 void read_setup(EndlessSetup& setup, std::string_view text, std::string_view prefix = "endless.");
+
+/// The kinds of island world of the packages (landscapes.toml), offered after Open1602's presets
+/// on the page of the islands. Main thread only.
+void set_package_island_presets(std::vector<sim::PackageLandscape> presets);
 
 }  // namespace o1602::app

@@ -34,6 +34,7 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `classes.toml` | classes of inhabitants: the original's changed, new ones after them, needs of any good | [classes.md](classes.md) |
 | `music.toml` | music tracks of the package's own (WAV, Ogg Vorbis, FLAC), normal or battle music | [sounds.md](sounds.md) |
 | `sounds.toml` | sounds of the package's own (WAV, Ogg Vorbis, FLAC) for its buildings and figures | [sounds.md](sounds.md#sounds-of-buildings-and-figures) |
+| `landscapes.toml` | kinds of island world the start dialog offers for new games | [landscapes.md](landscapes.md) |
 | `graphics.toml` | PNG images of the package's own, drawn by its buildings at all three zoom levels | [graphics.md](graphics.md) |
 | `icons.toml` | PNG icons of the package's own for the build menu, goods and messages | [graphics.md](graphics.md#icons) |
 | `figure_images.toml` | the original's figures and ships drawn with a package's images | [graphics.md](graphics.md#figures-and-ships) |
@@ -310,7 +311,13 @@ the island's climate (NordNat, SuedNat, in a random order of their own) onto inl
 ground and forest, with a tile of room around it. The island's ground stays under the village as
 under a template's; the village's tiles follow the island's in its INSELHAUS, and its records
 (production, growth, houses, huts, store) move with it. An island where no village finds room after
-twelve templates stays without, with a warning. Still open: rivers with bends and the rules as data.
+twelve templates stays without, with a warning.
+
+Part 7 done on 2026-11-01 ([landscapes.md](landscapes.md)): the rules of a world of islands of their
+own shape as data, a package's `landscapes.toml` names kinds of island world (land, sizes and their
+spread, gaps, coast, outline, forest, mountains) that the start dialog offers after Open1602's
+presets. Still open: rivers with bends (they wait for the templates' statistics of river tiles), and
+the climates of the islands as data.
 
 ## Order of work
 
