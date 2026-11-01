@@ -28,7 +28,7 @@ size memory and refuse or cut what lies outside. These are the limits.
 | `build_menu.toml` | `row`, `position` of a building | 6 rows a pop-up, 4 buildings a row; `id` a record of `haeuser.cod` | the table is passed over, with a warning |
 | `classes.toml` | classes of inhabitants | 8 in a game, the original's five among them ([classes.md](classes.md)) | the table is passed over, with a warning |
 | `levels.toml` | unlock levels | 255 in a game, the original's 32 among them; `min_inhabitants` 0 to 10,000,000 ([levels.md](levels.md)) | the table is passed over, with a warning |
-| `music.toml`, sounds | sound files of the packages | WAV, Ogg Vorbis, FLAC; up to 192,000 Hz, 20 minutes, the first two channels; a title of 64 bytes ([sounds.md](sounds.md)) | the track is passed over, with a warning; a longer file is cut |
+| `music.toml`, `sounds.toml`, sounds | sound files of the packages; at most 1024 in `sounds.toml` of all packages | WAV, Ogg Vorbis, FLAC; up to 192,000 Hz, 20 minutes, the first two channels; a title of 64 bytes ([sounds.md](sounds.md)) | the track is passed over, with a warning; a longer file is cut |
 | `graphics.toml` | images of the packages | 25,535 sprites in all, sprite numbers 40000 to 65534; a sprite at most 1024 x 1024 ([graphics.md](graphics.md)) | the table is passed over, with a warning |
 | `icons.toml` | icons of the packages | 4096 in all, sprite numbers from 100000; an icon at most 256 x 256 ([graphics.md](graphics.md#icons)) | the table is passed over, with a warning |
 | PNG images | width and height | 16384 a side, 64 megapixels; no interlacing ([graphics.md](graphics.md)) | the image is passed over, with a warning |

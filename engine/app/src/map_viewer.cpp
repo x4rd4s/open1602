@@ -30,6 +30,7 @@
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/high_scores.hpp"
 #include "o1602/assets/package_graphics.hpp"
+#include "o1602/assets/package_sounds.hpp"
 #include "o1602/assets/resident_classes.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
 #include "o1602/assets/text_table.hpp"
@@ -180,6 +181,8 @@ struct ModRules {
     std::vector<assets::FigureLook> looks;
     /// The music of the packages (music.toml).
     std::vector<audio::MusicTrack> music;
+    /// The sounds of the packages with their sound numbers (sounds.toml).
+    std::vector<assets::PackageSound> sounds;
 };
 
 /// The icons of `packages` (icons.toml), numbered in their load order.
@@ -251,19 +254,24 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             audio::apply_music_file(rules.music, package.id, package.folder, text, problems);
         }
+        if (const auto bytes = core::read_file(package.folder / assets::kSoundsFile)) {
+            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+            assets::apply_sounds_file(rules.sounds, package.id, package.folder, text, problems);
+        }
     }
     // Then the figures, with the images they draw, which the buildings may name as their workers.
     for (const assets::ModPackage& package : packages) {
         if (const auto bytes = core::read_file(package.folder / assets::kOwnFiguresFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_own_figures_file(figures, rules.own_figures, package.id, text, problems, rules.images);
+            assets::apply_own_figures_file(figures, rules.own_figures, package.id, text, problems, rules.images,
+                                           rules.sounds);
         }
     }
     for (const assets::ModPackage& package : packages) {
         if (const auto bytes = core::read_file(package.folder / assets::kOwnBuildingsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_own_buildings_file(buildings, rules.own, package.id, text, problems, rules.goods, classes,
-                                             levels, rules.images, &figures, rules.own_figures);
+                                             levels, rules.images, &figures, rules.own_figures, rules.sounds);
         }
     }
     for (const assets::ModPackage& package : packages) {
@@ -490,6 +498,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->use_game_packages();
     viewer->m_sound->set_messages(&viewer->m_messages);
     viewer->m_sound->set_package_music(std::move(rules.music));
+    viewer->m_sound->set_package_sounds(rules.sounds);
     viewer->m_video = std::make_unique<VideoController>(
         options.videos ? std::make_unique<VideoPlayer>(viewer->m_window->sdl_renderer(), viewer->m_game) : nullptr,
         *viewer->m_sound);
@@ -660,6 +669,7 @@ MapViewer::MapViewer(assets::GameDirectory game, assets::BuildingTable buildings
       m_tool(m_buildings) {
     m_command_sink.set_simulation(&m_state->simulation);
     m_events.set_banners(&m_banners);
+    m_events.set_messages(&m_messages);
     warn_if_state_damaged();
 }
 
@@ -3175,6 +3185,7 @@ void MapViewer::reload_mods() {
     m_classes = std::move(rules.classes);
     m_levels = std::move(rules.levels);
     m_sound->set_package_music(std::move(rules.music));
+    m_sound->set_package_sounds(rules.sounds);
     // The game's table takes the figures the packages give now, as the buildings below.
     m_figure_looks = std::move(rules.looks);
     m_figures = m_original_figures;

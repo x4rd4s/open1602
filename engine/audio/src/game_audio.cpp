@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "o1602/assets/data_fixes.hpp"
+#include "o1602/assets/package_sounds.hpp"
 #include "o1602/core/file.hpp"
 
 namespace o1602::audio {
@@ -192,7 +193,7 @@ AudioSettings parse_audio_settings(std::string_view text) {
 // ---- Effects -------------------------------------------------------------------------------------
 
 void Effects::request(SampleId id, float x, float y) {
-    if (m_queue.size() < m_limit && sample_file(id)) {
+    if (m_queue.size() < m_limit && (id >= assets::kFirstPackageSound || sample_file(id))) {
         m_queue.push_back(Request{id, x, y});
     }
 }
@@ -213,14 +214,23 @@ void Effects::flush() {
     if (m_enabled) {
         for (const Request& r : m_queue) {
             const auto place = placement(r.x, r.y);
-            const auto file = sample_file(r.id);
-            if (!place || !file) {
+            if (!place) {
+                continue;
+            }
+            std::shared_ptr<const Pcm> sound;
+            if (r.id >= assets::kFirstPackageSound) {
+                const std::size_t slot = r.id - assets::kFirstPackageSound;
+                sound = slot < m_package.size() ? m_package[slot] : nullptr;
+            } else if (const auto file = sample_file(r.id)) {
+                sound = m_bank->get(*file);
+            }
+            if (!sound) {
                 continue;
             }
             PlayOptions o;
             o.volume = place->first * m_gain;
             o.pan = place->second;
-            m_mixer->play(m_bank->get(*file), o);
+            m_mixer->play(sound, o);
         }
     }
     m_queue.clear();

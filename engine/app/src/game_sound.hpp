@@ -10,14 +10,17 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "message_table.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
+#include "o1602/assets/package_sounds.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/audio/package_music.hpp"
 #include "o1602/platform/audio_output.hpp"
@@ -59,6 +62,9 @@ public:
     /// The music of the content packages, after MUSIC8's tracks (docs/modding/sounds.md); the music
     /// starts anew with them.
     void set_package_music(std::vector<audio::MusicTrack> tracks);
+    /// The sounds of the packages (sounds.toml), decoded here once; buildings and figures play them
+    /// by their numbers. A file that cannot be decoded stays silent, with a line in the log.
+    void set_package_sounds(std::span<const assets::PackageSound> sounds);
     /// Titles of the music (empty without device) and the one playing now.
     [[nodiscard]] std::vector<std::string> tracks() const;
     [[nodiscard]] std::string playing() const;
@@ -139,6 +145,7 @@ private:
     audio::Voices m_voices;
     std::unique_ptr<audio::Music> m_music;
     std::vector<audio::MusicTrack> m_package_music;
+    std::vector<assets::PackageSound> m_package_sounds;
     audio::AudioSettings m_settings;
     bool m_allow_effects = true;  ///< false with --no-sound
     bool m_allow_music = true;    ///< false with --no-music

@@ -87,7 +87,10 @@ public:
 
     void set_enabled(bool on) noexcept { m_enabled = on; }
     void set_volume(std::int32_t centibel) noexcept { m_gain = gain_of(centibel); }
-    /// Queues a sound at (x, y) of the view.
+    /// The sounds of the packages by their numbers from assets::kFirstPackageSound
+    /// (package_sounds.hpp); nullptr for one that could not be decoded.
+    void set_package_sounds(std::vector<std::shared_ptr<const Pcm>> sounds) { m_package = std::move(sounds); }
+    /// Queues a sound at (x, y) of the view: one of the original's, or of a package.
     void request(SampleId id, float x, float y);
     /// Plays what was queued since the last call.
     void flush();
@@ -107,6 +110,7 @@ private:
     bool m_enabled = true;
     float m_gain = 1.0F;
     std::vector<Request> m_queue;
+    std::vector<std::shared_ptr<const Pcm>> m_package;
 };
 
 /// The widest view the original hears its scenery in (birds and surf): its game view at 1024 x 768

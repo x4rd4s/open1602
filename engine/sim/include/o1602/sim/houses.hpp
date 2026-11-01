@@ -76,7 +76,8 @@ struct HouseEvent {
 /// school; merchants a church and a bath house; aristocrats a college and a theatre. A class a
 /// package added needs what the original's class it looks like needs (ResidentClass::look).
 [[nodiscard]] bool has_services(const House& house, std::uint8_t resident_class) noexcept;
-/// has_services for class `resident_class` of `buildings`, also one a package added.
+/// has_services for class `resident_class` of `buildings`, also one a package added: the public
+/// buildings classes.toml gave the class (ResidentClass::public_needs), else those of its look.
 [[nodiscard]] bool has_services(const House& house, const assets::BuildingTable& buildings,
                                 std::uint8_t resident_class) noexcept;
 /// The class of the original whose public buildings class `resident_class` needs.
@@ -90,6 +91,9 @@ struct HouseEvent {
 /// (Class_RequiredServices 0x0047F320), from the same table as has_services: of each choice the
 /// market, else the lesser building (a chapel for a chapel or church). 0 beyond the table.
 [[nodiscard]] std::uint32_t required_panel_services(std::uint8_t resident_class) noexcept;
+/// required_panel_services for class `resident_class` of `buildings`, as has_services reads it.
+[[nodiscard]] std::uint32_t required_panel_services(const assets::BuildingTable& buildings,
+                                                    std::uint8_t resident_class) noexcept;
 
 /// Recomputes which markets, Kontors and public buildings reach each house of island `island`
 /// (0x00482120): buildings of the same city whose Radius covers the house from their centre.

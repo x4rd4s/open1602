@@ -191,3 +191,44 @@ TEST_CASE("own figures: a game keeps the numbers of the figures its packages add
     const auto plain = make_figures();
     CHECK(!sim::read_game(*bytes, buildings, nullptr, &plain).ok());
 }
+
+TEST_CASE("own figures: a figure and a building of a package sound sounds of a package") {
+    assets::FigureTable figures = make_figures();
+    assets::BuildingTable buildings = make_buildings();
+    std::vector<assets::PackageSound> sounds(2);
+    sounds[0].id = "mill:grind";
+    sounds[0].number = assets::kFirstPackageSound;
+    sounds[1].id = "mill:thud";
+    sounds[1].number = assets::kFirstPackageSound + 1;
+    std::vector<assets::OwnFigure> own;
+    std::vector<std::string> warnings;
+    assets::apply_own_figures_file(figures, own, "mill",
+                                   "[miller]\nlike = \"anno1602:80\"\nsound = \"mill:grind\"\n"
+                                   "shot_sound = \"mill:thud\"\nhit_sound = \"mill:grind\"\n"
+                                   "[mute]\nlike = \"anno1602:80\"\nsound = \"mill:none\"\n",
+                                   warnings, {}, sounds);
+    REQUIRE(own.size() == 1);
+    REQUIRE(warnings.size() == 1);
+    CHECK(warnings[0].find("'sound' names no sound of a package") != std::string::npos);
+    const assets::FigureType* miller = figures.get(own[0].number);
+    REQUIRE(miller != nullptr);
+    CHECK(miller->shot_sound.sample == assets::kFirstPackageSound + 1);
+    CHECK(miller->shot_sound.variants == 1);
+    CHECK(miller->hit_sound.sample == assets::kFirstPackageSound);
+    for (const assets::FigureAnim& a : miller->anims) {
+        CHECK(a.sound == assets::kFirstPackageSound);
+    }
+
+    std::vector<assets::OwnBuilding> own_buildings;
+    warnings.clear();
+    assets::apply_own_buildings_file(buildings, own_buildings, "mill",
+                                     "[mill]\nlike = \"anno1602:20503\"\nbuild_sound = \"mill:thud\"\n"
+                                     "[quiet]\nlike = \"anno1602:20503\"\nbuild_sound = \"mill:none\"\n",
+                                     warnings, {}, {}, {}, {}, &figures, own, sounds);
+    REQUIRE(own_buildings.size() == 1);
+    REQUIRE(warnings.size() == 1);
+    CHECK(warnings[0].find("'build_sound' names no sound of a package") != std::string::npos);
+    const assets::BuildingType* mill = buildings.by_id(own_buildings[0].number);
+    REQUIRE(mill != nullptr);
+    CHECK(mill->build_sound == assets::kFirstPackageSound + 1);
+}

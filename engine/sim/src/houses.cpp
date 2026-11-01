@@ -5,7 +5,9 @@
 #include <array>
 #include <bit>
 #include <set>
+#include <span>
 
+#include "o1602/assets/resident_classes.hpp"
 #include "o1602/sim/disasters.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/pathfinding.hpp"
@@ -77,7 +79,7 @@ const Tables& tables() {
 
 /// What a class of inhabitants needs to live in a house (0x0047BFA0): one of the services of
 /// every entry. The market is no service bit of House::services; kMarketNeed stands for it.
-constexpr std::uint16_t kMarketNeed = 1U << 15;
+constexpr std::uint16_t kMarketNeed = assets::public_building::kMarket;
 using ServiceNeeds = std::array<std::uint16_t, 6>;
 constexpr std::array<ServiceNeeds, 5> kServiceNeeds = {{
     {kMarketNeed | hs::kKontor},                                                               // pioneers
@@ -87,6 +89,16 @@ constexpr std::array<ServiceNeeds, 5> kServiceNeeds = {{
     {kMarketNeed, hs::kWirtshaus, hs::kKirche, hs::kHochschule, hs::kBadehaus, hs::kTheater},  // aristocrats
 }};
 static_assert(kServiceNeeds.size() == kResidentClasses, "a row of needs for each class haeuser.cod may have");
+// classes.toml names these bits (resident_classes.hpp).
+static_assert(assets::public_building::kChapel == hs::kKapelle && assets::public_building::kChurch == hs::kKirche &&
+                  assets::public_building::kTavern == hs::kWirtshaus &&
+                  assets::public_building::kSchool == hs::kSchule &&
+                  assets::public_building::kBathhouse == hs::kBadehaus &&
+                  assets::public_building::kTheatre == hs::kTheater &&
+                  assets::public_building::kCollege == hs::kHochschule &&
+                  assets::public_building::kDoctor == hs::kKlinik && assets::public_building::kKontor == hs::kKontor &&
+                  assets::public_building::kGallows == hs::kGalgen,
+              "the public buildings of classes.toml are the bits of House::services");
 static_assert((kMarketNeed &
                (hs::kDisasterMask | hs::kKapelle | hs::kKirche | hs::kWirtshaus | hs::kSchule | hs::kBadehaus |
                 hs::kTheater | hs::kHochschule | hs::kKlinik | hs::kKontor | hs::kGalgen | hs::kBrunnen)) == 0,
@@ -493,11 +505,52 @@ private:
 
 }  // namespace
 
-bool has_services(const House& house, std::uint8_t resident_class) noexcept {
-    // The needs of 0x0047BFA0 by class; classes beyond the table need what the last one needs.
+namespace {
+
+/// The needs of 0x0047BFA0 of a class of the original; classes beyond the table need what the last
+/// one needs.
+std::span<const std::uint16_t> original_needs(std::uint8_t resident_class) noexcept {
+    return kServiceNeeds[std::min<std::size_t>(resident_class, kServiceNeeds.size() - 1)];
+}
+
+/// What class `resident_class` of `buildings` needs: its own public buildings, else those of the
+/// original's class it looks like.
+std::span<const std::uint16_t> needs_of(const assets::BuildingTable& buildings, std::uint8_t resident_class) noexcept {
+    const auto& classes = buildings.resident_classes();
+    if (resident_class < classes.size() && classes[resident_class].public_needs) {
+        return *classes[resident_class].public_needs;
+    }
+    return original_needs(service_class(buildings, resident_class));
+}
+
+bool has_needs(const House& house, std::span<const std::uint16_t> needs) noexcept {
     const auto s = static_cast<std::uint16_t>(house.services | (house.market ? kMarketNeed : 0U));
-    const ServiceNeeds& needs = kServiceNeeds[std::min<std::size_t>(resident_class, kServiceNeeds.size() - 1)];
     return std::all_of(needs.begin(), needs.end(), [s](std::uint16_t any) { return any == 0 || (s & any) != 0; });
+}
+
+std::uint32_t panel_needs(std::span<const std::uint16_t> needs) noexcept {
+    std::uint32_t panel = 0;
+    for (const std::uint16_t any : needs) {
+        if (any == 0) {
+            continue;
+        }
+        if ((any & kMarketNeed) != 0) {
+            panel |= panel_service::kMarkt;
+            continue;
+        }
+        // The lowest bit is the lesser building; of what it shows (a church also as a chapel), its
+        // own icon is the highest bit.
+        House one;
+        one.services = static_cast<std::uint16_t>(any & (0U - any));
+        panel |= std::bit_floor(panel_services(one));
+    }
+    return panel;
+}
+
+}  // namespace
+
+bool has_services(const House& house, std::uint8_t resident_class) noexcept {
+    return has_needs(house, original_needs(resident_class));
 }
 
 std::uint8_t service_class(const assets::BuildingTable& buildings, std::uint8_t resident_class) noexcept {
@@ -506,7 +559,7 @@ std::uint8_t service_class(const assets::BuildingTable& buildings, std::uint8_t 
 }
 
 bool has_services(const House& house, const assets::BuildingTable& buildings, std::uint8_t resident_class) noexcept {
-    return has_services(house, service_class(buildings, resident_class));
+    return has_needs(house, needs_of(buildings, resident_class));
 }
 
 std::uint32_t panel_services(const House& house) noexcept {
@@ -537,25 +590,11 @@ std::uint32_t panel_services(const House& house) noexcept {
 }
 
 std::uint32_t required_panel_services(std::uint8_t resident_class) noexcept {
-    if (resident_class >= kServiceNeeds.size()) {
-        return 0;
-    }
-    std::uint32_t panel = 0;
-    for (const std::uint16_t any : kServiceNeeds[resident_class]) {
-        if (any == 0) {
-            continue;
-        }
-        if ((any & kMarketNeed) != 0) {
-            panel |= panel_service::kMarkt;
-            continue;
-        }
-        // The lowest bit is the lesser building; of what it shows (a church also as a chapel), its
-        // own icon is the highest bit.
-        House one;
-        one.services = static_cast<std::uint16_t>(any & (0U - any));
-        panel |= std::bit_floor(panel_services(one));
-    }
-    return panel;
+    return resident_class < kServiceNeeds.size() ? panel_needs(kServiceNeeds[resident_class]) : 0;
+}
+
+std::uint32_t required_panel_services(const assets::BuildingTable& buildings, std::uint8_t resident_class) noexcept {
+    return panel_needs(needs_of(buildings, resident_class));
 }
 
 namespace {

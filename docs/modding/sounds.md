@@ -5,9 +5,9 @@ FLAC files ([ADR 0007](../architecture/0007-extensibility-and-modding.md) sectio
 [open-work.md](open-work.md)).
 
 **Status:** Done are the file `music.toml` (tracks of a package beside the original's `MUSIC8`, as
-normal or as battle music) and sounds of messages in all three formats
-([messages.md](messages.md)). Still open: sounds of a package's buildings and figures (they sound
-like the building or figure they copy).
+normal or as battle music), sounds of messages in all three formats ([messages.md](messages.md))
+and `sounds.toml`, the sounds a package's buildings and figures make
+([own-buildings.md](own-buildings.md), [own-figures.md](own-figures.md)).
 
 ## The formats
 
@@ -57,9 +57,55 @@ game, as the original's are.
 A message of a package names its sound with `sound = "<path>"` ([messages.md](messages.md)); the
 file may be WAV, Ogg Vorbis or FLAC. It is decoded once, when the game starts.
 
+## Sounds of buildings and figures
+
+```
+<user data folder>/mods/<package>/sounds.toml
+```
+
+Each table names one sound; its id is `<package>:<name>`:
+
+```toml
+# mods/lighthouse/sounds.toml
+[horn]
+file = "sounds/horn.ogg"
+
+[splash]
+file = "sounds/splash.wav"
+```
+
+| Field | Limits | Meaning |
+|---|---|---|
+| `file` | a path in the package, folders split by `/` | the sound file (required) |
+
+The sounds get numbers from 1000 on, in the packages' load order and the order of each file, at
+most 1024 for all packages; the game decodes them once when the packages are loaded. A sound
+whose file is missing or is no sound file is passed over with a warning that names the line.
+
+A building or figure of the package's own names them:
+
+| File | Field | When it sounds |
+|---|---|---|
+| `own_buildings.toml` | `build_sound` | when the building is built, instead of the sound of the building it copies |
+| `own_figures.toml` | `sound` | every animation of the figure, at the end of its cycle, instead of the copied figure's sounds |
+| `own_figures.toml` | `shot_sound` | when the unit or ship shoots |
+| `own_figures.toml` | `hit_sound` | when its shot hits |
+
+```toml
+# mods/lighthouse/own_buildings.toml
+[beacon]
+like = "anno1602:watchtower"
+build_sound = "lighthouse:horn"
+```
+
+The original's buildings and figures keep their sounds; a package changes those only by copying
+them into a building or figure of its own.
+
 ## In the code
 
 `engine/audio/include/o1602/audio/sound_file.hpp`: `decode_sound` (the decoders are stb_vorbis and
 dr_flac in `third_party`). `engine/audio/include/o1602/audio/package_music.hpp`: `apply_music_file`
 and `MusicTrack`, which `audio::Music` plays beside `MUSIC8`'s tracks
-(`app::GameSound::set_package_music`).
+(`app::GameSound::set_package_music`). `engine/assets/include/o1602/assets/package_sounds.hpp`:
+`apply_sounds_file` and `PackageSound`; `audio::Effects::set_package_sounds` plays them by their
+numbers beside the original's (`app::GameSound::set_package_sounds`).

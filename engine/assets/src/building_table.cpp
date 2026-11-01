@@ -323,7 +323,8 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             table.m_infra[static_cast<std::size_t>(nummer)] =
                 InfraLevel{static_cast<std::uint8_t>(non_negative(level.integer("BGruppe"))),
                            non_negative(level.integer("Minwohn")),
-                           {}};
+                           {},
+                           std::nullopt};
         }
     }
     std::size_t max_infra = table.m_infra.size();

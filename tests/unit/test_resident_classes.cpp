@@ -234,8 +234,10 @@ TEST_CASE("classes: a game keeps its classes") {
     std::vector<std::string> warnings;
     assets::apply_classes_file(classes, "spice",
                                "[governors]\nname.en = \"Governors\"\nname.de = \"Statthalter\"\n"
+                               "public = \"market, doctor\"\n"
                                "[\"anno1602:merchants\"]\ntax = 300\n",
                                warnings);
+    REQUIRE(classes[5].public_needs.has_value());
     sim::World world(60, 40);
     world.set_resident_classes(classes);
     const auto bytes = sim::write_game(world, buildings);
@@ -253,4 +255,55 @@ TEST_CASE("classes: a game keeps its classes") {
 
     // The original's savegame has no room for a sixth class.
     CHECK(!sim::savegame_chunks(world, buildings).ok());
+}
+
+TEST_CASE("classes: a class names the public buildings it needs") {
+    namespace pb = assets::public_building;
+    std::string error;
+    const auto needs = assets::public_needs_of(" market , chapel|church,tavern ,school | college", error);
+    REQUIRE(needs.has_value());
+    const std::vector<std::uint16_t> expected{pb::kMarket, pb::kChapel | pb::kChurch, pb::kTavern,
+                                              pb::kSchool | pb::kCollege};
+    CHECK(*needs == expected);
+    CHECK(assets::public_needs_of("", error)->empty());
+    CHECK(!assets::public_needs_of("market, castle", error));
+    CHECK(error == "names no public building: \"castle\"");
+    CHECK(!assets::public_needs_of("market,,chapel", error));
+    CHECK(!assets::public_needs_of("market | ", error));
+    CHECK(
+        !assets::public_needs_of("market, chapel, church, tavern, school, college, bathhouse, theatre, doctor", error));
+
+    const auto buildings_cod = make_buildings();
+    std::vector<assets::ResidentClass> classes = buildings_cod.resident_classes();
+    std::vector<std::string> warnings;
+    assets::apply_classes_file(classes, "spice",
+                               "[governors]\nname.en = \"Governors\"\npublic = \"market, doctor | gallows\"\n"
+                               "[\"anno1602:settlers\"]\npublic = \"\"\n"
+                               "[\"anno1602:citizens\"]\npublic = \"market, castle\"\n"
+                               "[\"anno1602:merchants\"]\npublic = 3\n",
+                               warnings);
+    REQUIRE(warnings.size() == 2);
+    CHECK(warnings[0].find("'public' names no public building") != std::string::npos);
+    CHECK(warnings[1].find("'public' is a text") != std::string::npos);
+    REQUIRE(classes.size() == 6);
+    CHECK(!classes[2].public_needs);  // the table with the wrong field changes nothing
+    REQUIRE(classes[1].public_needs.has_value());
+    CHECK(classes[1].public_needs->empty());
+
+    assets::BuildingTable buildings = buildings_cod;
+    buildings.set_resident_classes(classes);
+    sim::House house;
+    house.market = true;
+    // The governors need a market and a doctor or gallows, not the aristocrats' college and theatre.
+    CHECK(!sim::has_services(house, buildings, 5));
+    house.services = sim::house_service::kGalgen;
+    CHECK(sim::has_services(house, buildings, 5));
+    CHECK(!sim::has_services(house, buildings, 4));
+    CHECK(sim::required_panel_services(buildings, 5) == (sim::panel_service::kMarkt | sim::panel_service::kKlinik));
+    // Settlers need nothing now, pioneers still a market or Kontor.
+    sim::House empty;
+    CHECK(sim::has_services(empty, buildings, 1));
+    CHECK(!sim::has_services(empty, buildings, 0));
+    CHECK(sim::required_panel_services(buildings, 1) == 0);
+    CHECK(sim::required_panel_services(buildings, 3) == sim::required_panel_services(3));
 }

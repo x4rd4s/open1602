@@ -13,6 +13,7 @@
 
 #include "../test_framework.hpp"
 
+#include "o1602/assets/package_sounds.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/audio/mixer.hpp"
 #include "o1602/audio/package_music.hpp"
@@ -575,4 +576,60 @@ TEST_CASE("audio: music.toml adds a package's tracks after MUSIC8's") {
     music.play("Sea Shanty");
     music.finish_loading();
     CHECK(music.playing() == "Sea Shanty");
+}
+
+TEST_CASE("audio: a package's sound plays by its number among the original's") {
+    FakeGame fake;
+    auto game = assets::GameDirectory::open(fake.root);
+    REQUIRE(game.ok());
+    audio::SoundBank bank(*game);
+    audio::Mixer mixer(22050, 64);
+    audio::Effects effects(mixer, bank);
+    auto pcm = std::make_shared<audio::Pcm>();
+    pcm->samples.assign(2205, 1000);
+    effects.set_package_sounds({pcm, nullptr});
+    effects.request(assets::kFirstPackageSound, 0.0F, 0.0F);
+    effects.flush();
+    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    // One that could not be decoded, and one beyond the packages', stay silent.
+    effects.request(static_cast<audio::SampleId>(assets::kFirstPackageSound + 1), 0.0F, 0.0F);
+    effects.request(static_cast<audio::SampleId>(assets::kFirstPackageSound + 7), 0.0F, 0.0F);
+    effects.flush();
+    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    effects.request(audio::kWavEvent, 0.0F, 0.0F);  // the original's still
+    effects.flush();
+    CHECK(mixer.playing_count(audio::Group::Effects) == 2);
+}
+
+TEST_CASE("audio: sounds.toml numbers a package's sounds after the original's") {
+    FakeGame fake;
+    std::filesystem::create_directories(fake.root / "mod" / "sounds");
+    fake.write("mod/sounds/mill.wav", wave(1, 1, 22050, 8, std::vector<std::uint8_t>(100, 128)));
+    fake.write("mod/sounds/fake.ogg", std::vector<std::uint8_t>{'n', 'o', 'p', 'e', 0});
+    std::vector<assets::PackageSound> sounds;
+    std::vector<std::string> warnings;
+    assets::apply_sounds_file(sounds, "mill", fake.root / "mod",
+                              "[grind]\nfile = \"sounds/mill.wav\"\n"
+                              "[Loud]\nfile = \"sounds/mill.wav\"\n"  // line 3: upper case
+                              "[fake]\nfile = \"sounds/fake.ogg\"\n"  // line 5: no sound file
+                              "[away]\nfile = \"../mill.wav\"\n"      // line 8: outside the package
+                              "[none]\nvolume = 3\n"                  // line 9, 10
+                              "[again]\nfile = \"sounds/mill.wav\"\n",
+                              warnings);
+    REQUIRE(sounds.size() == 2);
+    CHECK(sounds[0].id == "mill:grind");
+    CHECK(sounds[0].number == assets::kFirstPackageSound);
+    CHECK(sounds[0].file == fake.root / "mod" / "sounds" / "mill.wav");
+    CHECK(sounds[1].id == "mill:again");
+    CHECK(sounds[1].number == assets::kFirstPackageSound + 1);
+    CHECK(assets::find_package_sound(sounds, "mill:again") == &sounds[1]);
+    CHECK(assets::find_package_sound(sounds, "mill:fake") == nullptr);
+    REQUIRE(warnings.size() == 5);
+    CHECK(warnings[0].find("line 3: [Loud]") != std::string::npos);
+    CHECK(warnings[1].find("sounds/fake.ogg is missing or no WAV") != std::string::npos);
+    CHECK(warnings[2].find("'file' is the path of a sound file") != std::string::npos);
+    CHECK(warnings[3].find("'volume' is no field of a sound") != std::string::npos);
+    CHECK(warnings[4].find("mill:none needs a 'file'") != std::string::npos);
+    const auto decoded = audio::SoundBank::decode_file(sounds[0].file);
+    CHECK(decoded.ok());
 }

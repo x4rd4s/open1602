@@ -60,7 +60,7 @@ std::optional<std::uint32_t> figure_number(std::span<const OwnFigure> own, const
 
 void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std::string_view package,
                             std::string_view utf8, std::vector<std::string>& warnings,
-                            std::span<const PackageImage> images) {
+                            std::span<const PackageImage> images, std::span<const PackageSound> sounds) {
     const std::string where = std::string(package) + "/" + std::string(kOwnFiguresFile);
     auto tables = core::parse_data_file(utf8);
     if (!tables) {
@@ -87,6 +87,9 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
         const FigureType* like = nullptr;
         const PackageImage* image = nullptr;
         std::optional<bool> shadow;
+        const PackageSound* sound = nullptr;
+        const PackageSound* shot_sound = nullptr;
+        const PackageSound* hit_sound = nullptr;
         bool ok = true;
         for (const core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
@@ -105,6 +108,14 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                 image = s != nullptr ? find_package_image(images, *s) : nullptr;
                 if (image == nullptr) {
                     warnings.push_back(field + "names no image of a package (graphics.toml, <package>:<name>)");
+                    ok = false;
+                }
+            } else if (e.key == "sound" || e.key == "shot_sound" || e.key == "hit_sound") {
+                const std::string* s = e.value.string();
+                const PackageSound*& which = e.key == "sound" ? sound : e.key == "shot_sound" ? shot_sound : hit_sound;
+                which = s != nullptr ? find_package_sound(sounds, *s) : nullptr;
+                if (which == nullptr) {
+                    warnings.push_back(field + "names no sound of a package (sounds.toml, <package>:<name>)");
                     ok = false;
                 }
             } else if (e.key == "shadow") {
@@ -139,6 +150,20 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
         }
         if (shadow && !*shadow) {
             f.shadow = 0;
+        }
+        if (sound != nullptr) {
+            // At the end of every cycle of each of its animations (AnimSmp).
+            for (FigureAnim& a : f.anims) {
+                a.sound = sound->number;
+                a.sound_range = 1;
+                a.sound_chance = 1;
+            }
+        }
+        if (shot_sound != nullptr) {
+            f.shot_sound = FigureSound{shot_sound->number, 1};
+        }
+        if (hit_sound != nullptr) {
+            f.hit_sound = FigureSound{hit_sound->number, 1};
         }
         const auto number = table.add(f);
         if (!number) {

@@ -179,6 +179,10 @@ struct ResidentClass {
     /// The class of the original whose faces and public buildings this one has: its own number for
     /// the original's.
     std::uint8_t look = 0;
+    /// Open1602's own (resident_classes.hpp, public_building): the public buildings the class
+    /// needs, each entry a choice of buildings any one of which will do; none: those of the
+    /// original's class `look`.
+    std::optional<std::vector<std::uint16_t>> public_needs;
     /// The names a package gave the class by language code, Windows-1252; empty for the original's,
     /// which Text.cod names.
     LocalizedNames names;
@@ -194,6 +198,9 @@ struct InfraLevel {
     /// Open1602's own (unlock_levels.hpp): the string id of a level a package added, empty for those
     /// of haeuser.cod.
     std::string id;
+    /// Open1602's own (levels.toml `message`): the string id of the message (messages.toml) a
+    /// player gets on reaching the level; "" none; nothing: the original's for its levels.
+    std::optional<std::string> message;
     friend bool operator==(const InfraLevel&, const InfraLevel&) = default;
 };
 

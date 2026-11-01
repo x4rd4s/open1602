@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // What the local player is told of the game's events (engine/app/src/event_presenter.hpp).
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -469,4 +470,45 @@ TEST_CASE("event presenter: the seller of a ship is told who bought it") {
     CHECK(a->text == "Blue player has bought your ship Aurora for 2500 gold");
     // The buyer and everyone else hear nothing of it.
     CHECK(g.presenter.ship_events(g.world, kRival, {sold}).empty());
+}
+
+TEST_CASE("event presenter: a level levels.toml gives a message tells it, or nothing") {
+    Game g;
+    app::MessageTable messages;
+    std::vector<std::string> warnings;
+    REQUIRE(messages
+                .load_package("spice", "[harbour_open]\nlike = 0x3C\ntext = \"{city} has a harbour.\"\n",
+                              std::filesystem::path{}, warnings)
+                .ok());
+    REQUIRE(warnings.empty());
+    std::vector<assets::InfraLevel> levels(34);
+    levels[33].message = "spice:harbour_open";
+    levels[4].message = "";               // the tavern: told nothing
+    levels[5].message = "spice:no_such";  // the church: the original's wish
+    g.world.set_infra_levels(levels);
+    g.presenter.set_messages(&messages);
+
+    sim::CityEvent reached;
+    reached.kind = sim::CityEvent::Kind::Unlocked;
+    reached.owner = kMe;
+    reached.infra = 33;
+    sim::CityEvent tavern = reached;
+    tavern.infra = 4;
+    sim::CityEvent church = reached;
+    church.infra = 5;
+    sim::CityEvent theatre = reached;
+    theatre.infra = 7;
+    const auto told = g.presenter.city_events(g.world, kMe, {reached, tavern, church, theatre});
+    REQUIRE(told.size() == 3);
+    CHECK(announcement(told[0])->message == *messages.find("spice:harbour_open"));
+    CHECK(announcement(told[0])->text == "Mine has a harbour.");
+    CHECK((announcement(told[0])->tile == std::make_pair(110.0, 55.0)));
+    CHECK(announcement(told[1])->message == 0x3D);  // "Euer Volk wünscht eine Kirche"
+    CHECK(announcement(told[2])->message == 0x42);  // the theatre: no message of its own
+
+    // Without the table the original's wishes, and a level of a package none.
+    g.presenter.set_messages(nullptr);
+    const auto plain = g.presenter.city_events(g.world, kMe, {reached, church});
+    REQUIRE(plain.size() == 1);
+    CHECK(announcement(plain[0])->message == 0x3D);
 }

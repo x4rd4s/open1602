@@ -33,6 +33,8 @@ shadow = false
 | `like` | one figure: of the original, `anno1602:<name or number>` ([names](values.md#names)), or of a package, `<package>:<name>` | every value, animation and sound of that figure, as the copy's starting point. A unit's name stands for its four colours and is no single figure: name one of them by its number |
 | `image` | an image of a package, `<package>:<name>` ([graphics.md](graphics.md)) | the sprites the figure draws, in the order the original's sheet has them from the figure's `Gfx` ([graphics.md](graphics.md#figures-and-ships)); without it the picture of the figure it copies |
 | `shadow` | `true` or `false` | whether it keeps the shadow of the figure it copies; `true` if not given |
+| `sound` | a sound of a package, `<package>:<name>` ([sounds.md](sounds.md#sounds-of-buildings-and-figures)) | the sound of each of its animations, at the end of the cycle |
+| `shot_sound`, `hit_sound` | a sound of a package, `<package>:<name>` | the sound when it shoots, and when its shot hits |
 
 A table without `like`, with a field that is no field of a figure, with a value outside its limits
 or with an image of fewer sprites than the figure draws is passed over with a warning that names

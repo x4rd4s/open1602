@@ -331,9 +331,16 @@ Hud::Hud(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets
         goods.red = ui::nearest_colour(palette, 170, 20, 10);
         goods.stock = ui::nearest_colour(palette, 150, 115, 70);
         goods.shadow = ui::nearest_colour(palette, 0, 0, 0);
-        // The lines of the charts: taxes or the first class green, then red, blue, ochre, purple, grey.
-        constexpr std::array<std::array<std::uint8_t, 3>, 6> kSeries = {
-            {{0, 120, 30}, {170, 20, 10}, {30, 60, 160}, {190, 130, 20}, {120, 40, 130}, {90, 90, 90}}};
+        // The lines of the charts: taxes or the first class green, then red, blue, ochre, purple, grey,
+        // and teal and brown for the classes of packages.
+        constexpr std::array<std::array<std::uint8_t, 3>, 8> kSeries = {{{0, 120, 30},
+                                                                         {170, 20, 10},
+                                                                         {30, 60, 160},
+                                                                         {190, 130, 20},
+                                                                         {120, 40, 130},
+                                                                         {90, 90, 90},
+                                                                         {0, 130, 130},
+                                                                         {120, 70, 20}}};
         for (std::size_t i = 0; i < kSeries.size(); ++i) {
             goods.series[i] = ui::nearest_colour(palette, kSeries[i][0], kSeries[i][1], kSeries[i][2]);
         }
