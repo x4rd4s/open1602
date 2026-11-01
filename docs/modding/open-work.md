@@ -1,13 +1,68 @@
 # Modding: what is done and what is still open
 
 This page compares the requirements of [ADR 0007](../architecture/0007-extensibility-and-modding.md)
-with what the engine does today (state of 2026-10-26, after PR #224). It is the list to work from
+with what the engine does today (state of 2026-11-01, after PR #379). It is the list to work from
 for milestone M8 ([plan](../00-plan.md#6-milestones)). The table of fixed limits at the end of
 ADR 0007 tracks the same items from the code's side.
 
+## Summary
+
+State on 2026-11-01. The details of each item follow under [Open items](#open-items).
+
+### Done
+
+| Item | What a package can do |
+|---|---|
+| 1. Packages | a manifest with version, dependencies (version ranges) and load order; packages as folders or zip archives; the packages a game uses are kept in its savegame and checked in multiplayer, where the host sends missing ones; the main menu's screen "Mods" |
+| 2. Content | change 16 values of the original's buildings and 10 of its figures; add buildings and figures of its own, each copying one of the original, and replace another package's building |
+| 3. Goods, classes, levels | add trade goods, change the original's classes and add up to eight in all with their needs and public buildings, change and add unlock levels with messages of their own |
+| 4. Graphics and sound | PNG images for buildings, figures, ships and icons; music and sounds as WAV, Ogg Vorbis or FLAC for messages, buildings and figures; Smacker and Bink 2 videos for messages |
+| 5. Computer players | they build the chains of a package's goods; their stage orders, public buildings, cheat amounts and when a city moves on are data |
+| 6. Lua scripts | a sandboxed Lua 5.4 script per package that hears what happens and reads and changes the game (money, goods, missions, buildings, ships, land units, diplomacy, who wins) |
+| 7. Scenarios and campaigns | scenarios with maps, briefings, goals and scripts; campaigns of up to five parts that carry money and a script table on |
+| 8. Factions | factions of a package's own that take the base game's slots, and settlers or pirates left wholly to a script |
+| 9. Island generator | islands of their own shape and size with slopes, rivers with bends, volcanoes and native villages; kinds of island world as data (`landscapes.toml`) |
+
+### Still open
+
+| Item | What is missing | Size |
+|---|---|---|
+| 2 | soldiers and ships of a package's own that castles and shipyards make (today a package's figures are carriers and workers) | large: military, shipyard, AI and savegame |
+| 4 | videos in a modern format (today only Smacker and Bink 2) | medium: a decoder in `third_party` (e.g. a royalty-free format such as AV1 or VP9 in WebM) |
+| 5 | the original's 32 rows of needs (`kNeeds`), its 55 fixed building slots of a city, which building of the original produces what (`producer_slot`), the first colony's crop by the computer's slot (`first_crop`) and the four unit families and ship types the computers build, all still compiled in | large: the AI's core tables |
+| 9 | climates of a package's own, with their ground, forest and crops (today north and south) | large: climate tables, the generator, fertility and the start dialog |
+
+### Smaller adjustments
+
+Things found while testing on 2026-11-01 that are not wrong but worth doing:
+
+- `o1602-tool state` and `o1602-tool islands` read only the original's files, not `.o1602`, so a
+  world with more than four players can be looked at only in the game. Both could read Open1602's
+  own format (`sim::is_open1602_save`, `sim::read_game`).
+- `place_village` (world generator) skips islands wider or higher than 255 tiles, because the
+  village's records hold tile coordinates in bytes; giant islands never get a native village. The
+  village could be placed within the island's first 255 tiles.
+- The table of package files above and the table of fixed limits at the end of ADR 0007 must be
+  kept up to date with each new file and each limit removed.
+
+### Recommendations
+
+- An **example package** in the repository (for instance `data/mods/example`) that uses every file
+  of the table above once, loaded by a test with and without the original's data. It shows a modder
+  how the files fit together and catches a format change that breaks packages.
+- A **first page for modders** (`docs/modding/README.md`): how to make a package step by step, with
+  links to the guides, instead of starting from this list.
+- A **package check** in `o1602-tool` (e.g. `o1602-tool check-mod <folder>`) that reads a package
+  as the game does and lists every warning, without starting the game.
+- Next item to work on: soldiers and ships of a package's own (item 2), because players see it
+  most; then the computers' core tables (item 5), so that computers play a package's content as well
+  as the original's.
+
 ## What a mod can do today
 
-A mod is a folder `mods/<package>/`. The folder's name is the package's id. Its manifest
+A mod is a folder `mods/<package>/` or a zip archive `mods/<package>.zip`
+([packages.md](packages.md#a-package-as-a-zip-archive)). The folder's or archive's name is the
+package's id. Its manifest
 `mod.toml` gives a name, a version, the packages it depends on and the ones it loads after; the
 packages are read in that order, otherwise in the order of their ids' bytes, the same on every
 system ([packages.md](packages.md)).
@@ -42,6 +97,8 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `mod.toml` | the package's name, version, dependencies and load order | [packages.md](packages.md) |
 | `scenarios.toml` | scenarios of the package's own: map, names, briefing, stars, money, goals, script | [scenarios.md](scenarios.md) |
 | `campaigns.toml` | campaigns of the package's scenarios, with money and a script table carried from part to part | [scenarios.md](scenarios.md#campaigns) |
+| `computers.toml` | the order in which computer players build in each stage, with their public buildings | [computer-players.md](computer-players.md#in-which-order) |
+| `script.lua` | a Lua script of the package, run in a sandbox every tick | [scripts.md](scripts.md) |
 
 Without a mod file the engine already has banners with tinted flags for any number of players
 ([flags.md](flags.md)), up to 12 players, worlds and islands beyond the original's sizes
@@ -173,7 +230,8 @@ name a package's good.
 
 Part 4 done on 2026-11-01 ([computer-players.md](computer-players.md#when-a-city-moves-on)): when a
 city moves on to its next stage is `balance.toml`'s table `[computer_stages]` (savegame `BALA`
-version 3). Still open: the original's Needs (`kNeeds`) and the 55 slots as data.
+version 3). Still open: the original's Needs (`kNeeds`), the 55 slots, `producer_slot`, the first
+colony's crop and the unit families and ship types as data.
 
 ### 6. Lua scripts (section 6)
 
