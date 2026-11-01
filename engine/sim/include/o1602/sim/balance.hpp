@@ -123,20 +123,20 @@ struct Balance {
     std::uint32_t ai_grown_money = 8001;         ///< grown, they go on with this much gold (or good incomes)
     std::uint32_t ai_main2_settlers = 170;       ///< the main city goes on with this many settlers and above ...
     std::uint32_t ai_main2_money = 8001;         ///< ... and this much gold
-    std::uint32_t ai_main2_rich_money = 15'001;   ///< ... or this much gold alone
+    std::uint32_t ai_main2_rich_money = 15'001;  ///< ... or this much gold alone
     std::uint32_t ai_citizens_money = 8001;      ///< on to the citizens with this much gold
     std::uint32_t ai_citizens2_citizens = 250;   ///< the citizens' second stage: citizens and above ...
     std::uint32_t ai_citizens2_money = 6001;     ///< ... and gold
     std::uint32_t ai_citizens2_rich_money = 20'001;  ///< ... or gold alone
-    std::uint32_t ai_merchants_citizens = 340;      ///< on to the merchants: citizens and above ...
-    std::uint32_t ai_merchants_money = 6001;        ///< ... and gold
+    std::uint32_t ai_merchants_citizens = 340;       ///< on to the merchants: citizens and above ...
+    std::uint32_t ai_merchants_money = 6001;         ///< ... and gold
     std::uint32_t ai_merchants_rich_money = 25'001;  ///< ... or gold alone
-    std::uint32_t ai_merchants_land = 951;          ///< with less free land the city stays small
-    std::uint32_t ai_merchants2_merchants = 400;    ///< the merchants' second stage: merchants and above
-    std::uint32_t ai_aristocrats_merchants = 500;   ///< on to the aristocrats: merchants and above ...
+    std::uint32_t ai_merchants_land = 951;           ///< with less free land the city stays small
+    std::uint32_t ai_merchants2_merchants = 400;     ///< the merchants' second stage: merchants and above
+    std::uint32_t ai_aristocrats_merchants = 500;    ///< on to the aristocrats: merchants and above ...
     std::uint32_t ai_aristocrats_money = 15'001;     ///< ... and gold
-    std::uint32_t ai_aristocrats_land = 1101;       ///< with less free land the city stays small
-    std::uint32_t ai_aristocrats2_money = 8001;     ///< the aristocrats' second stage, with their luxury goods in stock
+    std::uint32_t ai_aristocrats_land = 1101;        ///< with less free land the city stays small
+    std::uint32_t ai_aristocrats2_money = 8001;  ///< the aristocrats' second stage, with their luxury goods in stock
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
