@@ -35,6 +35,7 @@ package's own is in [open-work.md](open-work.md).
     figure_images.toml figures and ships drawn with the package's images (graphics.md)
     music.toml         music of the package's own (sounds.md)
     sounds.toml        sounds of the package's buildings and figures (sounds.md)
+    landscapes.toml    kinds of island world for new games (landscapes.md)
 ```
 
 The folder's name is the package's id, for example `lighthouse`. The ids of a package's entries

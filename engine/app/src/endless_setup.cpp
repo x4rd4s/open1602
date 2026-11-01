@@ -10,6 +10,7 @@
 #include <optional>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "o1602/sim/player.hpp"
 #include "o1602/sim/victory.hpp"
@@ -171,8 +172,25 @@ constexpr std::array<std::uint32_t, 14> kLargest = {40, 50, 60, 80, 100, 120, 15
 static_assert(kLandShares.front() >= Landscape::kMinLand && kLandShares.back() <= Landscape::kMaxLand);
 static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= sim::shapes::kMaxSide);
 
-/// The kinds of world of the page's first item, after the original's islands (setup.island_preset.<name>).
+/// The kinds of world of the page's first item, after the original's islands: Open1602's
+/// (setup.island_preset.<name>), then the packages' (landscapes.toml).
 constexpr const auto& kIslandPresets = sim::kLandscapePresets;
+
+std::vector<sim::PackageLandscape>& package_presets() {
+    static std::vector<sim::PackageLandscape> presets;
+    return presets;
+}
+
+/// The presets of the first item after the original's islands.
+std::size_t island_preset_count() {
+    return kIslandPresets.size() + package_presets().size();
+}
+
+/// The landscape of preset `i` (0: Open1602's first).
+const sim::WorldSettings::Landscape& island_preset_landscape(std::size_t i) {
+    return i < kIslandPresets.size() ? kIslandPresets[i].landscape
+                                     : package_presets()[i - kIslandPresets.size()].landscape;
+}
 
 /// The preset choice the setup is (0 the original's islands), or nothing.
 std::optional<std::size_t> island_preset(const sim::WorldSettings& w) {
@@ -182,8 +200,8 @@ std::optional<std::size_t> island_preset(const sim::WorldSettings& w) {
     if (w.shapes != Shapes::Own) {
         return std::nullopt;
     }
-    for (std::size_t i = 0; i < kIslandPresets.size(); ++i) {
-        if (kIslandPresets[i].landscape == w.landscape) {
+    for (std::size_t i = 0; i < island_preset_count(); ++i) {
+        if (island_preset_landscape(i) == w.landscape) {
             return i + 1;
         }
     }
@@ -384,7 +402,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::IslandSizes:
             return kSizeNames.size();
         case SetupItem::IslandPreset:
-            return kIslandPresets.size() + 1;
+            return island_preset_count() + 1;
         case SetupItem::IslandShapes:
             return kShapeNames.size();
         case SetupItem::LandShare:
@@ -687,7 +705,7 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
                 w.shapes = Shapes::Templates;
             } else {
                 w.shapes = Shapes::Own;
-                w.landscape = kIslandPresets[choice - 1].landscape;
+                w.landscape = island_preset_landscape(std::min(choice, island_preset_count()) - 1);
             }
             break;
         case SetupItem::IslandShapes:
@@ -1181,6 +1199,9 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr(kKeys[std::min<std::size_t>(choice, kKeys.size() - 1)]);
         }
         case SetupItem::IslandPreset:
+            if (choice > kIslandPresets.size() && choice <= island_preset_count()) {
+                return package_presets()[choice - 1 - kIslandPresets.size()].title(ui::current_language());
+            }
             return ui::tr(choice == 0 ? std::string("setup.island_preset.original")
                                       : "setup.island_preset." + std::string(kIslandPresets[choice - 1].name));
         case SetupItem::LandShare:
@@ -1636,6 +1657,10 @@ void read_setup(EndlessSetup& setup, std::string_view text, std::string_view pre
             (void)read_setup_line(setup, key.substr(prefix.size()), trim(line.substr(eq + 1)));
         }
     }
+}
+
+void set_package_island_presets(std::vector<sim::PackageLandscape> presets) {
+    package_presets() = std::move(presets);
 }
 
 }  // namespace o1602::app

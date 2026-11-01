@@ -54,6 +54,7 @@ add_library(o1602_sim
     src/island_templates.cpp
     src/world_generator.cpp
     src/world_plan.cpp
+    src/package_landscapes.cpp
     src/new_game.cpp
     src/sea_paths.cpp
     src/ship_orders.cpp

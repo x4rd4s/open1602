@@ -21,6 +21,7 @@
 #include <utility>
 
 #include "diagnostics.hpp"
+#include "endless_setup.hpp"
 #include "fertility_view.hpp"
 #include "tile_status.hpp"
 
@@ -43,6 +44,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/growth.hpp"
+#include "o1602/sim/package_landscapes.hpp"
 #include "o1602/ui/build_menu.hpp"
 #include "o1602/ui/localization.hpp"
 #include "o1602/ui/package_icons.hpp"
@@ -196,6 +198,22 @@ std::vector<assets::PackageIcon> load_package_icons(std::span<const assets::ModP
         }
     }
     return icons;
+}
+
+/// The kinds of island world of `packages` (landscapes.toml), in their load order.
+std::vector<sim::PackageLandscape> load_package_landscapes(std::span<const assets::ModPackage> packages) {
+    std::vector<sim::PackageLandscape> presets;
+    std::vector<std::string> problems;
+    for (const assets::ModPackage& package : packages) {
+        if (const auto bytes = core::read_file(package.folder / sim::kLandscapesFile)) {
+            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+            sim::apply_landscapes_file(presets, package.id, text, problems);
+        }
+    }
+    for (const std::string& p : problems) {
+        std::fprintf(stderr, "mods: %s\n", p.c_str());
+    }
+    return presets;
 }
 
 /// The base game's factions and numbers as the mods change them (<package folder>/factions.toml and
@@ -447,6 +465,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     assets::apply_figure_looks(viewer->m_figures, viewer->m_original_figures, viewer->m_figure_looks);
     viewer->m_packages = std::move(packages);
     viewer->load_package_scenarios();
+    set_package_island_presets(load_package_landscapes(viewer->m_packages));
     {
         std::vector<std::string> problems;
         viewer->m_cached_packages = assets::cached_packages(data_folder() / "mods-cache", problems);
@@ -3159,6 +3178,7 @@ void MapViewer::reload_mods() {
         std::fprintf(stderr, "mods: %s\n", p.c_str());
     }
     load_package_scenarios();
+    set_package_island_presets(load_package_landscapes(m_packages));
     if (m_hud) {
         if (MainMenu* menu = m_hud->menu()) {
             menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);

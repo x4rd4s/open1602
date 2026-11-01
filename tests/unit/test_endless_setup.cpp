@@ -1115,3 +1115,65 @@ TEST_CASE("game setup: the islands' page ends above its hint, in English and Ger
     }
     ui::set_language(ui::kFallbackLanguage);
 }
+
+TEST_CASE("endless setup: kinds of island world of a package (landscapes.toml) come after Open1602's") {
+    std::vector<sim::PackageLandscape> presets;
+    std::vector<std::string> warnings;
+    sim::apply_landscapes_file(presets, "seas",
+                               "[atolls]\n"
+                               "like = \"archipelago\"\n"
+                               "title = \"Atolls\"\n"
+                               "title.de = \"Atolle\"\n"
+                               "land = 10\n"
+                               "max = 40\n"
+                               "[pangaea]\n"
+                               "like = \"seas:atolls\"\n"
+                               "land = 45\n"
+                               "min = 400\n"
+                               "spread = \"even\"\n"
+                               "[bad]\n"
+                               "like = \"nothing\"\n"  // line 13
+                               "land = 90\n"           // line 14: out of range
+                               "coast = \"wavy\"\n"    // line 15
+                               "colour = 3\n"          // line 16
+                               "[Bad]\n",              // line 17
+                               warnings);
+    REQUIRE(warnings.size() == 5);
+    CHECK(warnings[0].starts_with("seas/landscapes.toml line 13: 'like' names no preset"));
+    CHECK(warnings[1].starts_with("seas/landscapes.toml line 14: 'land' has a value out of its range"));
+    CHECK(warnings[2].starts_with("seas/landscapes.toml line 15: 'coast'"));
+    CHECK(warnings[3].starts_with("seas/landscapes.toml line 16: 'colour' is no field"));
+    CHECK(warnings[4].starts_with("seas/landscapes.toml line 17: [Bad]"));
+    REQUIRE(presets.size() == 3);
+    const sim::PackageLandscape& atolls = presets[0];
+    CHECK(atolls.id == "seas:atolls");
+    CHECK(atolls.title("de") == "Atolle");
+    CHECK(atolls.title("fr") == "Atolls");
+    CHECK(atolls.landscape.land == 10);
+    CHECK(atolls.landscape.max_side == 40);
+    CHECK(atolls.landscape.min_side == sim::kLandscapePresets[1].landscape.min_side);  // as the archipelago
+    CHECK(atolls.landscape.gap == sim::kLandscapePresets[1].landscape.gap);
+    const sim::PackageLandscape& pangaea = presets[1];
+    CHECK(pangaea.landscape.land == 45);
+    CHECK(pangaea.landscape.min_side == 400);
+    CHECK(pangaea.landscape.max_side == 400);  // the largest follows the smallest
+    CHECK(pangaea.landscape.coast == atolls.landscape.coast);
+    CHECK(pangaea.title("en") == "seas:pangaea");  // without a title: its id
+    CHECK(sim::find_package_landscape(presets, "seas:bad") == &presets[2]);
+    CHECK(presets[2].landscape == sim::WorldSettings::Landscape{});
+
+    // In the start dialog after Open1602's presets, with their titles.
+    const std::size_t before = app::setup_choices(SetupItem::IslandPreset);
+    app::set_package_island_presets({atolls, pangaea});
+    REQUIRE(app::setup_choices(SetupItem::IslandPreset) == before + 2);
+    EndlessSetup s;
+    s.own_world = true;
+    app::choose(s, SetupItem::IslandPreset, before);
+    CHECK(s.world.shapes == sim::WorldSettings::Shapes::Own);
+    CHECK(s.world.landscape == atolls.landscape);
+    CHECK(app::setup_choice(s, SetupItem::IslandPreset) == before);
+    CHECK(app::setup_value(SetupItem::IslandPreset, before + 1) == "seas:pangaea");
+    CHECK(app::islands_summary(s) == atolls.title(ui::current_language()));
+    app::set_package_island_presets({});
+    CHECK(app::setup_choices(SetupItem::IslandPreset) == before);
+}
