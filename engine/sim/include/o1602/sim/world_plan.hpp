@@ -41,8 +41,8 @@ struct WorldSettings {
     enum class Shapes : std::uint8_t {
         Templates,  ///< the original's island templates, as in the original
         Mixed,      ///< about half the islands of their own shape, in the templates' sizes
-        /// Every island of its own shape and size as `landscape` says, but those with a native
-        /// village or a volcano (templates); `islands` and `sizes` do not count then.
+        /// Every island of its own shape and size as `landscape` says, native villages and
+        /// volcanoes on them; `islands` and `sizes` do not count then.
         Own,
     };
     /// The islands of a world of islands of their own shape (Shapes::Own).
@@ -214,6 +214,7 @@ struct WorldPlan {
         std::uint16_t width = 0;
         std::uint16_t height = 0;
         bool volcano = false;  ///< the island has a volcano
+        bool village = false;  ///< the island has a native village (of a native template)
     };
     std::vector<OwnIsland> own_islands;
     WorldSettings::Landscape landscape;

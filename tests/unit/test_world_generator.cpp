@@ -205,6 +205,31 @@ std::vector<std::uint8_t> template_file(std::uint8_t climate, std::uint8_t size,
     return file;
 }
 
+/// Where the native templates' growth record lies, within their village.
+struct TilePos {
+    std::uint8_t x;
+    std::uint8_t y;
+};
+constexpr TilePos kVillageRecord{6, 5};
+
+/// A native template: as large as its template, only the village part (as NordNat and SuedNat
+/// are): a block of 6 x 5 tiles of ground, and a growth record (ROHWACHS2) on its tile (6, 5).
+std::vector<std::uint8_t> village_file(std::uint8_t climate, std::uint8_t size, std::uint16_t number) {
+    std::vector<std::uint8_t> file = template_file(climate, size, number, false);
+    std::vector<std::uint8_t> header(file.begin() + 20, file.begin() + 20 + 116);
+    std::vector<std::uint8_t> tiles;
+    for (std::uint32_t y = 4; y < 9; ++y) {
+        for (std::uint32_t x = 5; x < 11; ++x) {
+            add_tile(tiles, kGroundTile, x, y);
+        }
+    }
+    std::vector<std::uint8_t> out;
+    o1602::test::put_chunk(out, "INSEL5", header);
+    o1602::test::put_chunk(out, "INSELHAUS", tiles);
+    o1602::test::put_chunk(out, "ROHWACHS2", {0, kVillageRecord.x, kVillageRecord.y, 0, 0, 0, 0, 0});
+    return out;
+}
+
 /// What a synthetic game directory holds.
 struct Contents {
     /// Template classes written (climate, size); all if empty.
@@ -238,7 +263,7 @@ struct FakeGame {
                     const auto bytes = template_file(climate, size, n, contents.mountains);
                     write(template_path(climate, size, n, false), bytes);
                     if (contents.natives_every != 0 && n % contents.natives_every == 0) {
-                        write(template_path(climate, size, n, true), bytes);
+                        write(template_path(climate, size, n, true), village_file(climate, size, n));
                     }
                 }
             }
@@ -975,7 +1000,7 @@ TEST_CASE("world generator: an own world gives every start home iron, all crops 
     }
 }
 
-TEST_CASE("world generator: islands of their own shape instead of templates, but those with a village") {
+TEST_CASE("world generator: islands of their own shape instead of templates, with villages of the native templates") {
     const auto& fake = full_game();
     const auto templates = sim::island_templates(fake.game, buildings());
     REQUIRE(!templates.empty());
@@ -983,6 +1008,7 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
         std::size_t own = 0;
         std::size_t kept = 0;
         std::size_t volcanoes = 0;
+        std::size_t villages = 0;
         for (std::uint64_t seed = 1; seed <= 3; ++seed) {
             sim::WorldSettings settings;
             settings.seed = seed;
@@ -1001,14 +1027,21 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
             check_islands(*w, plan->plan, true);
             for (const auto& g : w->islands) {
                 const bool shaped = g.template_number == assets::IslandHeader::kNoTemplate;
-                CHECK(!(shaped && g.natives));  // a village keeps its template
+                if (shapes == sim::WorldSettings::Shapes::Mixed) {
+                    CHECK(!(shaped && g.natives));  // a village keeps its template
+                }
                 if (shapes == sim::WorldSettings::Shapes::Own) {
-                    // Free sizes: the plan decides which islands keep a template (for a village or
-                    // a volcano).
+                    // Free sizes: every island of its own shape; the villages the plan asked for
+                    // are moved onto them from native templates.
                     const auto planned =
                         std::find_if(plan->plan.islands.begin(), plan->plan.islands.end(),
                                      [&](const assets::ScenarioPlan::Island& p) { return p.number == g.number; });
                     REQUIRE(planned != plan->plan.islands.end());
+                    const auto own_island = std::find_if(plan->own_islands.begin(), plan->own_islands.end(),
+                                                         [&](const auto& o) { return o.number == g.number; });
+                    REQUIRE(own_island != plan->own_islands.end());
+                    CHECK(g.natives == own_island->village);
+                    villages += g.natives ? 1U : 0U;
                     CHECK(shaped == ((planned->flags & sim::kPlanOwnShape) != 0));
                 }
                 own += shaped ? 1U : 0U;
@@ -1043,6 +1076,36 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
                         CHECK(island.craters.size() == (own_island->volcano ? 1U : 0U));
                     }
                     volcanoes += island.craters.size();
+                    if (own_island != plan->own_islands.end() && own_island->village) {
+                        // The village's block of 6 x 5 tiles moved onto the island, on land; its
+                        // record moved with it.
+                        std::uint32_t x0 = island.map.width();
+                        std::uint32_t y0 = island.map.height();
+                        std::size_t count = 0;
+                        for (std::uint32_t y = 0; y < island.map.height(); ++y) {
+                            for (std::uint32_t x = 0; x < island.map.width(); ++x) {
+                                const assets::BuildingType* b = buildings().by_sprite(island.map.top(x, y).sprite);
+                                if (b != nullptr && b->id == 20101) {
+                                    x0 = std::min(x0, x);
+                                    y0 = std::min(y0, y);
+                                    ++count;
+                                }
+                            }
+                        }
+                        CHECK(count == 30);
+                        bool moved = false;
+                        for (const assets::Chunk& c : w->file.chunks()) {
+                            if (c.name != "ROHWACHS2") {
+                                continue;
+                            }
+                            const auto data = w->file.payload(c);
+                            for (std::size_t o = 0; o + 8 <= data.size(); o += 8) {
+                                moved = moved || (data[o] == island.header.number && data[o + 1] == x0 + 1 &&
+                                                  data[o + 2] == y0 + 1);
+                            }
+                        }
+                        CHECK(moved);
+                    }
                     std::size_t sea = 0;
                     for (std::uint32_t y = 0; y < island.map.height(); ++y) {
                         for (std::uint32_t x = 0; x < island.map.width(); ++x) {
@@ -1061,6 +1124,7 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
             CHECK(kept > 0);
         } else {
             CHECK(volcanoes > 0);  // the plan's islands of their own shape have volcanoes
+            CHECK(villages > 0);   // and native villages
         }
     }
 }
