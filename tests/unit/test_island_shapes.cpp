@@ -28,7 +28,7 @@ std::optional<Coast> coast_of(std::uint32_t id) {
     if (one_of(id, ids::kOpenSea)) {
         return Coast::OpenSea;
     }
-    if (one_of(id, ids::kSurf)) {
+    if (one_of(id, ids::kSurf) || id == ids::kMouthSurf) {
         return Coast::Surf;
     }
     if (one_of(id, ids::kSurfCorner)) {
@@ -37,7 +37,7 @@ std::optional<Coast> coast_of(std::uint32_t id) {
     if (one_of(id, ids::kSurfBay)) {
         return Coast::SurfBay;
     }
-    if (one_of(id, ids::kBeach)) {
+    if (one_of(id, ids::kBeach) || id == ids::kRiverMouth) {
         return Coast::Beach;
     }
     if (one_of(id, ids::kOuterCorner)) {
@@ -96,7 +96,9 @@ Checked check_island(const assets::Island& island, const sim::shapes::ShapeReque
                 const auto i = static_cast<std::size_t>(y * w + x);
                 ++laid[i];
                 coast[i] = coast_of(t.cod_id());
-                rotation[i] = t.rotation();
+                // The surf before a river mouth is turned as the mouth's beach, one less than surf.
+                rotation[i] =
+                    t.cod_id() == ids::kMouthSurf ? static_cast<std::uint8_t>((t.rotation() + 1) % 4) : t.rotation();
             }
         }
     }
@@ -414,4 +416,116 @@ TEST_CASE("island shapes: a giant does not run straight along its rectangle") {
             CHECK(total * 100 >= std::size_t{r.width} * r.height * (land == 0 ? 50 : land / 10 - 5));
         }
     }
+}
+
+TEST_CASE("island shapes: mountains in a ring of slopes turned to them, ground of many kinds") {
+    sim::shapes::ShapeRequest r;
+    r.width = 100;
+    r.height = 90;
+    r.size = 4;
+    r.number = 7;
+    r.big_mountains = 2;
+    r.small_mountains = 3;
+    r.seed = 11;
+    const assets::Island island = sim::shapes::make_island(r);
+    (void)check_island(island, r);
+    const int w = island.header.width;
+    std::vector<std::uint32_t> id(static_cast<std::size_t>(w * island.header.height), 0);
+    std::vector<std::uint8_t> rotation(id.size(), 0);
+    std::vector<const assets::IslandTile*> mountains;
+    std::array<std::size_t, 2> grounds{};  // the main ground, the others
+    for (const assets::IslandTile& t : island.layers[0]) {
+        id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
+        rotation[static_cast<std::size_t>(t.y * w + t.x)] = t.rotation();
+        if (footprint(t.cod_id()) > 1) {
+            mountains.push_back(&t);
+        }
+        const bool ground = std::any_of(ids::kGroundMix.begin(), ids::kGroundMix.end(),
+                                        [&](const auto& g) { return g.id == t.cod_id(); });
+        if (ground) {
+            ++grounds[t.cod_id() == ids::kGround ? 0 : 1];
+        }
+    }
+    REQUIRE(mountains.size() == 5);
+    for (const assets::IslandTile* m : mountains) {
+        const int size = footprint(m->cod_id());
+        const int x0 = m->x - 1;
+        const int y0 = m->y - 1;
+        const int x1 = m->x + size;
+        const int y1 = m->y + size;
+        const auto at = [&](int x, int y) { return static_cast<std::size_t>(y * w + x); };
+        // Corners: the mountain on their diagonal (rotation 2 north-west, 3 north-east, 0
+        // south-east, 1 south-west).
+        CHECK(id[at(x0, y0)] == ids::kSlopeCorner);
+        CHECK(rotation[at(x0, y0)] == 2);
+        CHECK(rotation[at(x1, y0)] == 3);
+        CHECK(rotation[at(x1, y1)] == 0);
+        CHECK(rotation[at(x0, y1)] == 1);
+        for (int i = 0; i < size; ++i) {
+            // A spring of a river is a slope too, turned the same.
+            CHECK((one_of(id[at(m->x + i, y0)], ids::kSlope) || id[at(m->x + i, y0)] == ids::kSpring));
+            CHECK(rotation[at(m->x + i, y0)] == 3);  // the mountain south of it
+            CHECK(rotation[at(x1, m->y + i)] == 0);  // west
+            CHECK(rotation[at(m->x + i, y1)] == 1);  // north
+            CHECK(rotation[at(x0, m->y + i)] == 2);  // east
+        }
+    }
+    // The templates' main ground is about a quarter of their ground; the rest are other kinds.
+    CHECK(grounds[0] > 0);
+    CHECK(grounds[1] > grounds[0]);
+}
+
+TEST_CASE("island shapes: rivers from a spring on a mountain's slopes straight to a river mouth") {
+    std::size_t rivers = 0;
+    for (std::uint64_t seed = 0; seed < 30; ++seed) {
+        sim::shapes::ShapeRequest r;
+        r.width = 100;
+        r.height = 90;
+        r.size = 4;
+        r.number = 9;
+        r.big_mountains = 2;
+        r.small_mountains = 3;
+        r.seed = seed;
+        const assets::Island island = sim::shapes::make_island(r);
+        (void)check_island(island, r);  // the mouth is beach, its surf surf, as the coast asks
+        const int w = island.header.width;
+        const int h = island.header.height;
+        std::vector<std::uint32_t> id(static_cast<std::size_t>(w * h), 0);
+        std::vector<std::uint8_t> rotation(id.size(), 0);
+        std::vector<std::pair<int, int>> springs;
+        for (const assets::IslandTile& t : island.layers[0]) {
+            id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
+            rotation[static_cast<std::size_t>(t.y * w + t.x)] = t.rotation();
+            if (t.cod_id() == ids::kSpring) {
+                springs.emplace_back(t.x, t.y);
+            }
+        }
+        const auto at = [&](int x, int y) { return static_cast<std::size_t>(y * w + x); };
+        for (const auto& [sx, sy] : springs) {
+            // The river leaves the spring on its east side at rotation 0 (north at 3, south at 1,
+            // west at 2), runs straight, turned across its way, and ends in a mouth turned as the
+            // beach, with its surf beyond.
+            constexpr std::array<int, 4> kDx = {0, 1, 0, -1};
+            constexpr std::array<int, 4> kDy = {-1, 0, 1, 0};
+            const int way = (rotation[at(sx, sy)] + 1) % 4;
+            int x = sx + kDx[static_cast<std::size_t>(way)];
+            int y = sy + kDy[static_cast<std::size_t>(way)];
+            int length = 0;
+            while (one_of(id[at(x, y)], ids::kRiver)) {
+                CHECK(rotation[at(x, y)] % 2 == (way % 2 == 0 ? 1 : 0));
+                ++length;
+                x += kDx[static_cast<std::size_t>(way)];
+                y += kDy[static_cast<std::size_t>(way)];
+            }
+            CHECK(length >= 3);
+            REQUIRE(id[at(x, y)] == ids::kRiverMouth);
+            CHECK((rotation[at(x, y)] + 2) % 4 == way);  // the beach's sea lies the river's way
+            const int sea_x = x + kDx[static_cast<std::size_t>(way)];
+            const int sea_y = y + kDy[static_cast<std::size_t>(way)];
+            CHECK(id[at(sea_x, sea_y)] == ids::kMouthSurf);
+            CHECK(rotation[at(sea_x, sea_y)] == rotation[at(x, y)]);
+            ++rivers;
+        }
+    }
+    CHECK(rivers >= 20);  // most islands with mountains get one or more
 }

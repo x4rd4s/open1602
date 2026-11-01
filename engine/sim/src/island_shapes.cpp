@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <utility>
@@ -578,7 +579,9 @@ assets::Island make_island(const ShapeRequest& request) {
     };
     std::vector<assets::IslandTile> tiles;
     tiles.reserve(taken.size());
+    std::vector<std::int32_t> tile_index(taken.size(), -1);  // the tile laid on a tile, for rivers
     const auto lay = [&](std::uint32_t id, int x, int y, std::uint8_t rotation, std::uint8_t anim) {
+        tile_index[at(x, y)] = static_cast<std::int32_t>(tiles.size());
         assets::IslandTile t;
         t.id = static_cast<std::uint16_t>(id - assets::IslandTile::kCodIdOffset);
         t.x = static_cast<std::uint16_t>(x);
@@ -660,16 +663,68 @@ assets::Island make_island(const ShapeRequest& request) {
         }
     }
 
-    // Ore mountains on inland, with a tile of room around them so that roads and mines reach them.
+    // A river from the ring of the mountain at (x0, y0): its spring on one side of the ring
+    // (rotation 3 north, 0 east, 1 south, 2 west, as the slope it replaces), straight pieces out to
+    // a beach whose sea lies the river's way, the beach a river mouth and its surf the mouth's surf
+    // (both turned as the beach). Rivers of the templates run 3 tiles and more.
+    const auto river = [&](int x0, int y0, int size) {
+        constexpr std::array<int, 4> kDx = {0, 1, 0, -1};  // the way out: north, east, south, west
+        constexpr std::array<int, 4> kDy = {-1, 0, 1, 0};
+        constexpr int kMinLength = 3;
+        const auto way = static_cast<int>(random.below(4));
+        const int along = 1 + static_cast<int>(random.below(static_cast<std::uint32_t>(std::max(1, size - 2))));
+        const int sx = way == 1 ? x0 + size : way == 3 ? x0 - 1 : x0 + along;
+        const int sy = way == 0 ? y0 - 1 : way == 2 ? y0 + size : y0 + along;
+        int x = sx + kDx[static_cast<std::size_t>(way)];
+        int y = sy + kDy[static_cast<std::size_t>(way)];
+        std::vector<std::pair<int, int>> path;
+        while (map.land(x, y) && taken[at(x, y)] == 0) {
+            path.emplace_back(x, y);
+            x += kDx[static_cast<std::size_t>(way)];
+            y += kDy[static_cast<std::size_t>(way)];
+        }
+        if (static_cast<int>(path.size()) < kMinLength || !map.land(x, y)) {
+            return;
+        }
+        // The beach must face the river's way (its rotation is the side of its sea: 0 south,
+        // 1 west, 2 north, 3 east) and the sea before it be plain surf.
+        const auto beach = coast_tile(true, map.neighbours(x, y));
+        const int sea_side = beach ? (beach->rotation + 2) % 4 : -1;  // north 0, east 1, south 2, west 3
+        const int sea_x = x + kDx[static_cast<std::size_t>(way)];
+        const int sea_y = y + kDy[static_cast<std::size_t>(way)];
+        const auto surf = coast_tile(false, map.neighbours(sea_x, sea_y));
+        if (!beach || beach->coast != Coast::Beach || sea_side != way || !surf || surf->coast != Coast::Surf ||
+            tile_index[at(x, y)] < 0 || sea_x < 0 || sea_y < 0 || sea_x >= width || sea_y >= height ||
+            tile_index[at(sea_x, sea_y)] < 0) {
+            return;
+        }
+        const auto relay = [&](int tx, int ty, std::uint32_t id, std::uint8_t rotation) {
+            assets::IslandTile& t = tiles[static_cast<std::size_t>(tile_index[at(tx, ty)])];
+            t.id = static_cast<std::uint16_t>(id - assets::IslandTile::kCodIdOffset);
+            t.bits = tile_bits(rotation, t.anim_phase(), request.number, static_cast<std::uint8_t>(random.below(32)));
+        };
+        relay(sx, sy, ids::kSpring, static_cast<std::uint8_t>((way + 3) % 4));
+        const auto straight = static_cast<std::uint8_t>(way % 2 == 0 ? 1 + 2 * random.below(2) : 2 * random.below(2));
+        for (const auto& [rx, ry] : path) {
+            lay(pick(random, ids::kRiver), rx, ry, straight, 0);
+            taken[at(rx, ry)] = 1;
+        }
+        relay(x, y, ids::kRiverMouth, beach->rotation);
+        relay(sea_x, sea_y, ids::kMouthSurf, beach->rotation);
+    };
+
+    // Ore mountains on inland, in rock ringed by slopes as in the templates (the mines stand on
+    // the slopes), with a tile of room around the ring so that roads reach them.
     const auto place_mountains = [&](std::uint8_t count, std::uint8_t size, std::span<const std::uint32_t> kinds) {
         const std::uint32_t tries = 400 + 40 * std::uint32_t{count};  // many on a large island
+        const int outer = size + 4;                                   // room, slope, mountain, slope, room
         std::uint8_t placed = 0;
-        for (std::uint32_t t = 0; t < tries && placed < count; ++t) {
-            const int x0 = static_cast<int>(random.below(static_cast<std::uint32_t>(width - size)));
-            const int y0 = static_cast<int>(random.below(static_cast<std::uint32_t>(height - size)));
+        for (std::uint32_t t = 0; t < tries && placed < count && width > outer && height > outer; ++t) {
+            const int x0 = 2 + static_cast<int>(random.below(static_cast<std::uint32_t>(width - outer)));
+            const int y0 = 2 + static_cast<int>(random.below(static_cast<std::uint32_t>(height - outer)));
             bool free = true;
-            for (int y = y0 - 1; y <= y0 + size && free; ++y) {
-                for (int x = x0 - 1; x <= x0 + size && free; ++x) {
+            for (int y = y0 - 2; y <= y0 + size + 1 && free; ++y) {
+                for (int x = x0 - 2; x <= x0 + size + 1 && free; ++x) {
                     free = map.land(x, y) && taken[at(x, y)] == 0;
                 }
             }
@@ -678,10 +733,32 @@ assets::Island make_island(const ShapeRequest& request) {
             }
             const std::uint32_t id = kinds[random.below(static_cast<std::uint32_t>(kinds.size()))];
             lay(id, x0, y0, static_cast<std::uint8_t>(random.below(4)), 0);
-            for (int y = y0; y < y0 + size; ++y) {
-                for (int x = x0; x < x0 + size; ++x) {
+            // The ring: slopes turned to the mountain (rotation 3 north of it, 0 east, 1 south,
+            // 2 west), corners with the mountain on their diagonal.
+            const int x1 = x0 + size;  // the ring's east and south column and row
+            const int y1 = y0 + size;
+            for (int y = y0 - 1; y <= y1; ++y) {
+                for (int x = x0 - 1; x <= x1; ++x) {
+                    const bool west = x == x0 - 1;
+                    const bool east = x == x1;
+                    const bool north = y == y0 - 1;
+                    const bool south = y == y1;
+                    if (west || east || north || south) {
+                        if ((west || east) && (north || south)) {
+                            const std::uint8_t r = north ? (west ? 2 : 3) : (east ? 0 : 1);
+                            lay(ids::kSlopeCorner, x, y, r, 0);
+                        } else {
+                            const std::uint8_t r = north ? 3 : east ? 0 : south ? 1 : 2;
+                            lay(pick(random, ids::kSlope), x, y, r, 0);
+                        }
+                    }
                     taken[at(x, y)] = 1;
                 }
+            }
+            // A river from a spring on the ring straight out to the beach, as most templates
+            // have one; none where it would meet anything but a beach facing its way.
+            if (random.below(3) != 0) {
+                river(x0, y0, size);
             }
             ++placed;
         }
@@ -698,6 +775,19 @@ assets::Island make_island(const ShapeRequest& request) {
     constexpr std::array<int, 3> kForestShift = {130, 0, -130};  // Little, Normal, Much
     const int forest_line = (request.climate == 0 ? 470 : 580) + kForestShift[static_cast<std::size_t>(request.forest)];
     const auto& trees = request.climate == 0 ? ids::kForestNorth : ids::kForestSouth;
+    // The ground of many kinds, as the templates mix it tile by tile.
+    const std::uint32_t ground_total = std::accumulate(ids::kGroundMix.begin(), ids::kGroundMix.end(), std::uint32_t{0},
+                                                       [](std::uint32_t sum, const auto& g) { return sum + g.weight; });
+    const auto ground = [&]() {
+        std::uint32_t roll = random.below(ground_total);
+        for (const auto& g : ids::kGroundMix) {
+            if (roll < g.weight) {
+                return g.id;
+            }
+            roll -= g.weight;
+        }
+        return ids::kGround;
+    };
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             if (taken[at(x, y)] != 0 || !map.land(x, y)) {
@@ -706,7 +796,7 @@ assets::Island make_island(const ShapeRequest& request) {
             if ((2 * forest.at(x, y) + fray.at(x, y)) / 3 >= forest_line) {
                 lay(pick(random, trees), x, y, 0, 0);
             } else {
-                lay(ids::kGround, x, y, 0, 0);
+                lay(ground(), x, y, static_cast<std::uint8_t>(random.below(4)), 0);
             }
         }
     }

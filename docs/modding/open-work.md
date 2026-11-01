@@ -263,8 +263,15 @@ Part 3 done on 2026-10-31: the landscape on the command line of the game and of 
 new-world`, with the same names as the setup files (`--island-preset varied|archipelago|continents|
 giants|even`, `--island-land`, `--island-min`, `--island-max`, `--island-spread`, `--island-gap`,
 `--island-coast`, `--island-outline`, `--island-forest`, `--island-mountains`; `sim::set_landscape`,
-`sim::kLandscapePresets`). Still open: rivers and river mouths, ground of more than one kind, rocks
-around the mountains, villages and volcanoes on islands of their own shape, and the rules as data.
+`sim::kLandscapePresets`).
+
+Part 4 done on 2026-11-01 ([worldgen.md](../re/worldgen.md#what-the-templates-are-made-of)), from
+`o1602-tool template-stats` over all 662 templates: the ore mountains of islands of their own shape
+lie in a ring of slopes turned to them, as every mountain of the templates (the mines stand on the
+slopes), the ground mixes the templates' fifteen most common kinds of ground tile by tile, and two
+of three mountains send a river from a spring on their slopes straight out to a river mouth on a
+beach that faces its way. Still open: rivers with bends, villages and volcanoes on islands of their
+own shape, and the rules as data.
 
 ## Order of work
 

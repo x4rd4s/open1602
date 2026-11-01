@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "../test_framework.hpp"
 #include "test_support.hpp"
@@ -102,7 +103,20 @@ assets::BuildingTable make_buildings() {
     add(ids::kBeach, 27, 1, -1);
     add(ids::kOuterCorner, 25, 1, -1);
     add(ids::kInnerCorner, 26, 1, -1);
-    add(std::array<std::uint32_t, 1>{ids::kGround}, 11, 1, -1);
+    std::vector<std::uint32_t> grounds;
+    for (const auto& g : ids::kGroundMix) {
+        grounds.push_back(g.id);
+    }
+    if (std::find(grounds.begin(), grounds.end(), ids::kGround) == grounds.end()) {
+        grounds.push_back(ids::kGround);
+    }
+    add(grounds, 11, 1, -1);
+    add(ids::kSlope, 31, 1, -1);
+    add(std::array<std::uint32_t, 1>{ids::kSlopeCorner}, 32, 1, -1);
+    add(std::array<std::uint32_t, 1>{ids::kSpring}, 33, 1, -1);
+    add(ids::kRiver, 16, 1, -1);
+    add(std::array<std::uint32_t, 1>{ids::kRiverMouth}, 24, 1, -1);
+    add(std::array<std::uint32_t, 1>{ids::kMouthSurf}, 22, 1, -1);
     add(ids::kForestNorth, 10, 1, -1);
     add(ids::kForestSouth, 10, 1, -1);
     add(ids::kBigMountain, 15, ids::kBigMountainSize, 0);

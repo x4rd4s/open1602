@@ -501,6 +501,41 @@ inline constexpr std::array<std::uint32_t, 2> kBigMountain{kBigOreMountain, 2110
 inline constexpr std::array<std::uint32_t, 2> kSmallMountain{21103, 21107};
 inline constexpr std::uint8_t kBigMountainSize = 4;
 inline constexpr std::uint8_t kSmallMountainSize = 3;
+/// The slope around a mountain (kind 31, Hang), its rock on the tile's west side at rotation 0
+/// (north 1, east 2, south 3 as the rotation turns it), and its outer corner (kind 32), the rock
+/// on the diagonal between its north and west side at rotation 0. Every ore mountain of the
+/// templates lies in rock ringed by them.
+inline constexpr std::array<std::uint32_t, 8> kSlope{22302, 22303, 22304, 22305, 22306, 22307, 22308, 22310};
+inline constexpr std::uint32_t kSlopeCorner = 22322;
+/// A river: from a spring (kind 33, a slope with the river on its east side at rotation 0) in
+/// straight pieces (kind 16, the river running east and west at rotation 0) to a river mouth on the
+/// beach (kind 24, the river on its north side, the sea on its south at rotation 0) with the surf
+/// before a river mouth (kind 22, the mouth on its north side at rotation 0).
+inline constexpr std::uint32_t kSpring = 22311;
+inline constexpr std::array<std::uint32_t, 2> kRiver{20901, 20902};
+inline constexpr std::uint32_t kRiverMouth = 21071;
+inline constexpr std::uint32_t kMouthSurf = 21208;
+/// The kinds of ground the templates mix, tile by tile (patches of one or two tiles), with how
+/// often they lay them, in thousands of tiles over all templates; any rotation.
+struct WeightedId {
+    std::uint32_t id = 0;
+    std::uint32_t weight = 0;
+};
+inline constexpr std::array<WeightedId, 15> kGroundMix{{{22722, 51},
+                                                        {22728, 47},
+                                                        {22736, 29},
+                                                        {22738, 11},
+                                                        {22724, 10},
+                                                        {22734, 9},
+                                                        {22730, 6},
+                                                        {22748, 6},
+                                                        {22726, 6},
+                                                        {22732, 5},
+                                                        {22744, 4},
+                                                        {22752, 3},
+                                                        {22740, 3},
+                                                        {22746, 2},
+                                                        {22742, 2}}};
 }  // namespace island_shape
 /// The list the original keeps after the build menu's (0x00498610), named from Text.cod
 /// [LANDSCHAFT]: the natives' and pirates' buildings and a few others.
