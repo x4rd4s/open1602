@@ -274,7 +274,7 @@ int cmd_new_world(const Args& args) {
     if (args.flag("--together")) {
         w.starts = sim::WorldSettings::Starts::Together;
     }
-    options.custom = w;
+    options.custom = sim::fit_landscape(w);  // room for the largest island of its own size
     std::vector<std::string> warnings;
     auto world = sim::start_new_game(*game, *buildings, *texts, options, &warnings);
     if (!world) {
@@ -291,6 +291,20 @@ int cmd_new_world(const Args& args) {
         villages_made += p != nullptr && world->behaviour(*p) == sim::FactionBehaviour::Natives ? 1U : 0U;
     }
     std::printf("native villages %zu\n", villages_made);
+    std::size_t volcano_islands = 0;
+    for (const sim::WorldIsland& island : world->islands()) {
+        volcano_islands += island.craters.empty() ? 0U : 1U;
+    }
+    std::printf("islands with a volcano %zu\n", volcano_islands);
+    // The original's file holds seven players with the natives and the pirates: told here, not
+    // only when writing fails.
+    if (world->players().size() > assets::kOriginalPlayerSlots) {
+        const std::size_t others = world->players().size() - w.players;
+        std::fprintf(stderr, "error: %zu players with the natives and pirates; a .gam holds %u: use at most %zu\n",
+                     world->players().size(), static_cast<unsigned>(assets::kOriginalPlayerSlots),
+                     assets::kOriginalPlayerSlots > others ? assets::kOriginalPlayerSlots - others : 0U);
+        return 1;
+    }
     auto bytes = sim::write_savegame(*world, *buildings);
     if (!bytes) {
         return fail(bytes.error());

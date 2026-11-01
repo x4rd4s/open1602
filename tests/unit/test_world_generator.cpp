@@ -49,6 +49,7 @@ constexpr std::uint32_t kBaseFertility = 0x1181;  // grain, grass, trees, fish o
 
 // Island tiles (haeuser.cod id - 20000).
 constexpr std::uint16_t kGroundTile = 101;
+constexpr std::uint16_t kVillageTile = 533;  // 20533, a building of the fake table
 constexpr std::uint16_t kBigMountainTile = 1101;
 constexpr std::uint16_t kSmallMountainTile = 1102;
 
@@ -214,14 +215,14 @@ struct TilePos {
 constexpr TilePos kVillageRecord{6, 5};
 
 /// A native template: as large as its template, only the village part (as NordNat and SuedNat
-/// are): a block of 6 x 5 tiles of ground, and a growth record (ROHWACHS2) on its tile (6, 5).
+/// are): a block of 6 x 5 tiles of buildings, and a growth record (ROHWACHS2) on its tile (6, 5).
 std::vector<std::uint8_t> village_file(std::uint8_t climate, std::uint8_t size, std::uint16_t number) {
     std::vector<std::uint8_t> file = template_file(climate, size, number, false);
     std::vector<std::uint8_t> header(file.begin() + 20, file.begin() + 20 + 116);
     std::vector<std::uint8_t> tiles;
     for (std::uint32_t y = 4; y < 9; ++y) {
         for (std::uint32_t x = 5; x < 11; ++x) {
-            add_tile(tiles, kGroundTile, x, y);
+            add_tile(tiles, kVillageTile, x, y);
         }
     }
     std::vector<std::uint8_t> out;
@@ -1086,7 +1087,7 @@ TEST_CASE("world generator: islands of their own shape instead of templates, wit
                         for (std::uint32_t y = 0; y < island.map.height(); ++y) {
                             for (std::uint32_t x = 0; x < island.map.width(); ++x) {
                                 const assets::BuildingType* b = buildings().by_sprite(island.map.top(x, y).sprite);
-                                if (b != nullptr && b->id == 20101) {
+                                if (b != nullptr && b->id == 20533) {
                                     x0 = std::min(x0, x);
                                     y0 = std::min(y0, y);
                                     ++count;
