@@ -278,8 +278,17 @@ always 21109, and a volcano is laid only where it is asked for (`ShapeRequest::v
 its ring of slopes and without a river. With "Own" island shapes the plan gives the volcanoes of the
 setting to islands of their own shape (not a home, at least 24 tiles on the shorter side;
 `WorldPlan::OwnIsland::volcano`), so only villages still need a template; with "Mixed" a template
-island with a volcano gets its own shape with the volcano in it. Still open: rivers with bends,
-villages on islands of their own shape, and the rules as data.
+island with a volcano gets its own shape with the volcano in it.
+
+Part 6 done on 2026-11-01: native villages on islands of their own shape. With "Own" island shapes
+no island keeps a template any more: the plan gives the villages (four per 18 islands) to islands
+of their own shape that are no home and 40 to 255 tiles on their sides
+(`WorldPlan::OwnIsland::village`), and the generator moves the village part of a native template of
+the island's climate (NordNat, SuedNat, in a random order of their own) onto inland that is only
+ground and forest, with a tile of room around it. The island's ground stays under the village as
+under a template's; the village's tiles follow the island's in its INSELHAUS, and its records
+(production, growth, houses, huts, store) move with it. An island where no village finds room after
+twelve templates stays without, with a warning. Still open: rivers with bends and the rules as data.
 
 ## Order of work
 

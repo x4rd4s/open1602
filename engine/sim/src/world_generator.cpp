@@ -7,6 +7,9 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/island.hpp"
@@ -137,6 +140,10 @@ struct Slot {
     bool treasure = false;
     std::array<std::uint32_t, 2> mountains{};  ///< big (Erzbergnr 0) and small ones among the first 40
     bool own_shape = false;                    ///< `base` is an island of its own shape, no template
+    /// An island of its own shape with a village: how far its native template's tiles and
+    /// records were moved onto it.
+    std::int32_t village_dx = 0;
+    std::int32_t village_dy = 0;
 
     [[nodiscard]] bool has(std::uint8_t ware) const {
         for (std::size_t i = 0; i < deposits.count; ++i) {
@@ -225,7 +232,8 @@ private:
     [[nodiscard]] bool wants_own_shape(const ScenarioPlan::Island& e);
     bool load(Slot& slot);
     void count_mountains(Slot& slot) const;
-    void give_own_shape(Slot& slot) const;
+    void give_own_shape(Slot& slot);
+    void place_village(Slot& slot);
     void hand_out_crops();
     void place_ores();
     void place_treasures();
@@ -449,7 +457,7 @@ void Generator::count_mountains(Slot& slot) const {
     }
 }
 
-void Generator::give_own_shape(Slot& slot) const {
+void Generator::give_own_shape(Slot& slot) {
     shapes::ShapeRequest r;
     r.climate = slot.plan.climate;
     r.size = slot.plan.size;
@@ -491,11 +499,133 @@ void Generator::give_own_shape(Slot& slot) const {
     }
     slot.base = shapes::make_island(r);
     slot.map = IslandMap::from_island(slot.base, m_buildings, m_warnings, nullptr);
+    if ((slot.plan.flags & kPlanOwnShape) != 0 && own != m_own_islands.end() && own->village) {
+        place_village(slot);
+    }
     // Nothing of the template's header survives: no deposits, no treasure flag.
     slot.loaded_header.clear();
     slot.deposits = DepositSlots{};
     slot.treasure = false;
     count_mountains(slot);
+}
+
+void Generator::place_village(Slot& slot) {
+    // The village part of a native template of the island's climate (NordNat, SuedNat), moved
+    // onto inland that is only ground and forest, with a tile of room around it; its records move
+    // with it (village_records). The templates are tried in a random order of their own.
+    constexpr std::uint64_t kVillageStream = 0x1602'D0F0ULL;
+    constexpr std::uint32_t kPlaces = 300;   // random places tried for each template
+    constexpr std::size_t kTemplates = 12;   // templates tried before the island stays without
+    constexpr std::uint32_t kMaxSide = 255;  // tile coordinates of the original's records are bytes
+    const IslandMap& map = *slot.map;
+    if (map.width() > kMaxSide || map.height() > kMaxSide) {
+        return;
+    }
+    Random random(m_shape_seed, kVillageStream + slot.plan.number);
+    const std::uint8_t climate = slot.plan.climate & 1U;
+    std::vector<std::string> paths;
+    for (std::uint8_t size = 0; size < kTemplateCount[climate].size(); ++size) {
+        for (std::uint16_t n = 0; n < kTemplateCount[climate][size]; ++n) {
+            std::string path = template_path(climate, size, n, true);
+            if (m_game.resolve(path).has_value()) {
+                paths.push_back(std::move(path));
+            }
+        }
+    }
+    for (std::size_t i = paths.size(); i > 1; --i) {
+        std::swap(paths[i - 1], paths[random.below(static_cast<std::uint32_t>(i))]);
+    }
+    const auto free = [&](std::int32_t x, std::int32_t y) {
+        if (x < 0 || y < 0 || std::cmp_greater_equal(x, map.width()) || std::cmp_greater_equal(y, map.height())) {
+            return false;
+        }
+        const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
+        return b != nullptr && b->size_x == 1 && b->size_y == 1 &&
+               (b->kind == assets::kind::kGround || b->kind == assets::kind::kForest);
+    };
+    for (std::size_t k = 0; k < std::min(paths.size(), kTemplates); ++k) {
+        auto file = open(m_game, paths[k]);
+        if (!file) {
+            continue;
+        }
+        auto loaded = assets::load_islands(*file);
+        if (!loaded || loaded->empty() || loaded->front().layers.empty() || loaded->front().layers.front().empty()) {
+            continue;
+        }
+        assets::Island village = std::move(loaded->front());
+        std::vector<assets::IslandTile>& tiles = village.layers.front();
+        // The tiles each building of the village covers, and the box around them.
+        std::vector<std::pair<std::int32_t, std::int32_t>> covered;
+        bool known = true;
+        for (const assets::IslandTile& t : tiles) {
+            const assets::BuildingType* b = m_buildings.by_id(t.cod_id());
+            if (b == nullptr) {
+                known = false;
+                break;
+            }
+            const bool turned = (t.rotation() & 1U) != 0;
+            const auto sx = static_cast<std::int32_t>(turned ? b->size_y : b->size_x);
+            const auto sy = static_cast<std::int32_t>(turned ? b->size_x : b->size_y);
+            for (std::int32_t y = 0; y < sy; ++y) {
+                for (std::int32_t x = 0; x < sx; ++x) {
+                    covered.emplace_back(t.x + x, t.y + y);
+                }
+            }
+        }
+        if (!known) {
+            continue;
+        }
+        std::int32_t x0 = std::numeric_limits<std::int32_t>::max();
+        std::int32_t y0 = x0;
+        std::int32_t x1 = std::numeric_limits<std::int32_t>::min();
+        std::int32_t y1 = x1;
+        for (const auto& [x, y] : covered) {
+            x0 = std::min(x0, x);
+            y0 = std::min(y0, y);
+            x1 = std::max(x1, x);
+            y1 = std::max(y1, y);
+        }
+        const std::int32_t w = x1 - x0 + 1;
+        const std::int32_t h = y1 - y0 + 1;
+        const auto span_x = static_cast<std::int32_t>(map.width()) - w - 1;  // room on both sides
+        const auto span_y = static_cast<std::int32_t>(map.height()) - h - 1;
+        if (span_x < 2 || span_y < 2) {
+            continue;
+        }
+        for (std::uint32_t t = 0; t < kPlaces; ++t) {
+            const std::int32_t ox = 1 + static_cast<std::int32_t>(random.below(static_cast<std::uint32_t>(span_x - 1)));
+            const std::int32_t oy = 1 + static_cast<std::int32_t>(random.below(static_cast<std::uint32_t>(span_y - 1)));
+            bool room = true;
+            for (std::int32_t y = oy - 1; y <= oy + h && room; ++y) {
+                for (std::int32_t x = ox - 1; x <= ox + w && room; ++x) {
+                    room = free(x, y);
+                }
+            }
+            if (!room) {
+                continue;
+            }
+            const std::int32_t dx = ox - x0;
+            const std::int32_t dy = oy - y0;
+            for (assets::IslandTile& v : tiles) {
+                v.x = static_cast<std::uint16_t>(v.x + dx);
+                v.y = static_cast<std::uint16_t>(v.y + dy);
+            }
+            // The island's ground and forest stay under the village, as a template's do: the
+            // loader lays every tile on top (IslandMap::from_island), and the village's tiles come
+            // after the island's in its INSELHAUS.
+            village.header.number = slot.plan.number;
+            village.header.width = slot.base.header.width;  // now a layer of the island
+            village.header.height = slot.base.header.height;
+            slot.village = std::move(village);
+            slot.village_file = std::move(file);
+            slot.village_dx = dx;
+            slot.village_dy = dy;
+            slot.map = IslandMap::from_island(*slot.village, m_buildings, m_warnings, &slot.base);
+            return;
+        }
+    }
+    warn("no room for a native village on island " + std::to_string(slot.plan.number));
 }
 
 std::vector<Mountain> Generator::mountains(const Slot& slot, int type, bool free_only) const {
@@ -1269,6 +1399,12 @@ std::vector<std::uint8_t> Generator::village_records(const Slot& slot, const Sta
             return;
         }
         record[0] = slot.plan.number;  // the handlers take the island being made (0x0060912C)
+        if (!city && std::strcmp(chunk.name, "MARKT2") != 0) {
+            // Every other record has its building's x and y in bytes 1 and 2 (gam.md); a village
+            // on an island of its own shape moved them.
+            record[1] = static_cast<std::uint8_t>(record[1] + slot.village_dx);
+            record[2] = static_cast<std::uint8_t>(record[2] + slot.village_dy);
+        }
         if (city && record[1] < natives.size() && natives[record[1]]) {
             record[2] = kNatives;
             // 0x0046A220: goodwill 200 towards the four player slots; the loader turns zero
@@ -1424,7 +1560,11 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
             out.add(std::string(assets::kLargeIslandChunk), large_island(*s));
             out.add(std::string(assets::kLargeTilesChunk), assets::large_tile_bytes(s->base.layers.front()));
         } else {
-            out.add("INSELHAUS", s->own_shape ? tile_bytes(s->base.layers.front()) : village_tiles(*s, natives));
+            std::vector<std::uint8_t> tiles =
+                s->own_shape ? tile_bytes(s->base.layers.front()) : std::vector<std::uint8_t>{};
+            const std::vector<std::uint8_t> village = village_tiles(*s, natives);
+            tiles.insert(tiles.end(), village.begin(), village.end());
+            out.add("INSELHAUS", tiles);
         }
         out.add("HIRSCH2", {});
         for (const StateChunk& c : kStateChunks) {

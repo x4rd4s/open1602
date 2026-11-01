@@ -411,8 +411,6 @@ TEST_CASE("world plan: islands of their own size cover the land asked for, withi
                     ++own;
                     CHECK(std::max(ra.w, ra.h) <= s.landscape.max_side);
                     CHECK(std::min(ra.w, ra.h) >= sim::shapes::kMinSide);
-                } else {
-                    CHECK(islands[a].size <= 3);  // a template for a village
                 }
                 for (std::size_t b = a + 1; b < islands.size(); ++b) {
                     const Box rb = own_box(*plan, islands[b]);
@@ -421,16 +419,21 @@ TEST_CASE("world plan: islands of their own size cover the land asked for, withi
                 }
             }
             CHECK(own == plan->own_islands.size());
-            CHECK(own * 2 > islands.size());
+            CHECK(own == islands.size());  // villages and volcanoes too are on islands of their own shape
             // Volcanoes on islands of their own shape, at most one per player (Normal; fewer where
             // few islands have room for one), none at home.
             std::size_t volcanoes = 0;
+            std::size_t villages = 0;
             for (const auto& o : plan->own_islands) {
                 volcanoes += o.volcano ? 1U : 0U;
+                villages += o.village ? 1U : 0U;
+                CHECK(!(o.volcano && o.village));
+                CHECK((!o.village || std::min(o.width, o.height) >= 40));
                 for (const sim::StartArea& st : plan->starts) {
-                    CHECK(!(o.volcano && o.number == st.home_island));
+                    CHECK(!((o.volcano || o.village) && o.number == st.home_island));
                 }
             }
+            CHECK(villages > 0);
             CHECK(volcanoes > 0);
             CHECK(volcanoes <= s.players);
             CHECK(volcanoes == s.players || land == 10);
