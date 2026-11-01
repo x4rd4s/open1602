@@ -1286,12 +1286,12 @@ core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world, const 
         std::any_of(world.players().begin(), world.players().end(), [](const Player& p) {
             return std::any_of(p.infra_more.begin(), p.infra_more.end(), [](std::uint32_t w) { return w != 0; });
         });
-    if (!world.goods().own_goods().empty() || !world.own_buildings().empty() ||
+    if (!world.goods().own_goods().empty() || !world.own_buildings().empty() || !world.own_figures().empty() ||
         world.resident_classes().size() > assets::kResidentClasses || more_levels) {
         // The original's records have no room for them (docs/modding/goods.md, own-buildings.md,
-        // classes.md, levels.md).
+        // own-figures.md, classes.md, levels.md).
         return core::make_error(core::ErrorCode::Unsupported,
-                                "a game with goods, buildings, classes or levels of "
+                                "a game with goods, buildings, figures, classes or levels of "
                                 "packages cannot be saved for the original");
     }
     return Writer(world, buildings).run();

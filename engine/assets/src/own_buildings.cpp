@@ -43,7 +43,8 @@ const OwnBuilding* find_own_building(std::span<const OwnBuilding> own, std::stri
 void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& own, std::string_view package,
                               std::string_view utf8, std::vector<std::string>& warnings, const Goods& goods,
                               std::span<const ResidentClass> classes, std::span<const InfraLevel> levels,
-                              std::span<const PackageImage> images) {
+                              std::span<const PackageImage> images, const FigureTable* figures,
+                              std::span<const OwnFigure> own_figures) {
     const std::string where = std::string(package) + "/" + std::string(kOwnBuildingsFile);
     auto tables = core::parse_data_file(utf8);
     if (!tables) {
@@ -78,6 +79,7 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         std::optional<std::uint8_t> raw2;
         std::optional<std::uint8_t> resident_class;
         std::optional<std::uint8_t> level;
+        std::optional<std::uint32_t> figure;
         const PackageImage* image = nullptr;
         bool ok = true;
         for (const core::DataEntry& e : t.entries) {
@@ -146,6 +148,17 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
                                        "for always)");
                     ok = false;
                 }
+            } else if (e.key == "figure") {
+                // Its carriers or workers: a figure of the original's or one a package added.
+                const std::string* s = e.value.string();
+                if (s != nullptr && figures != nullptr) {
+                    figure = figure_number(own_figures, *figures, *s);
+                }
+                if (!figure) {
+                    warnings.push_back(field +
+                                       "names no single figure (anno1602:<name or number> or <package>:<name>)");
+                    ok = false;
+                }
             } else {
                 warnings.push_back(field + "is no field of a building of a package and is passed over");
             }
@@ -185,6 +198,9 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         }
         if (raw2) {
             b.raw2_ware = *raw2;
+        }
+        if (figure) {
+            b.worker_figure = static_cast<std::uint16_t>(*figure);
         }
         // The image holds every sprite the building draws: its tiles, turned four ways, in every
         // frame of its animation (render::building_sprite).

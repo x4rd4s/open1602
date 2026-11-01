@@ -499,6 +499,11 @@ public:
     /// where its packages give the same buildings the same Ids again.
     [[nodiscard]] const std::vector<assets::OwnBuilding>& own_buildings() const noexcept { return m_own_buildings; }
     void set_own_buildings(std::vector<assets::OwnBuilding> own) { m_own_buildings = std::move(own); }
+    /// The figures the packages added and the numbers this game gave them (own_figures.hpp), kept
+    /// in the savegame (section OWNF): the buildings' carriers and workers name those numbers, so a
+    /// game only loads where its packages give the same figures the same numbers again.
+    [[nodiscard]] const std::vector<assets::OwnFigure>& own_figures() const noexcept { return m_own_figures; }
+    void set_own_figures(std::vector<assets::OwnFigure> own) { m_own_figures = std::move(own); }
     /// The goods this game trades: the original's and those its packages added (goods.hpp), kept
     /// in the savegame (section GOOD).
     [[nodiscard]] const assets::Goods& goods() const noexcept { return m_goods; }
@@ -767,6 +772,7 @@ private:
     Balance m_balance;
     std::optional<std::vector<assets::ContentPackage>> m_packages;
     std::vector<assets::OwnBuilding> m_own_buildings;
+    std::vector<assets::OwnFigure> m_own_figures;
     assets::Goods m_goods;
     std::vector<assets::ResidentClass> m_classes;
     std::vector<assets::InfraLevel> m_levels;

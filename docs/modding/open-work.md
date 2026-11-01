@@ -29,6 +29,7 @@ the game besides (sections `FACT` and `BALA`), so every computer plays the host'
 | `buildings.toml` | values of the original's buildings: production, costs, reach, workers, hit points | [values.md](values.md) |
 | `figures.toml` | values of the original's figures: speed, carrying, hit points, damage, range, cannons, price | [values.md](values.md) |
 | `own_buildings.toml` | buildings of the package's own, each copying one of the original | [own-buildings.md](own-buildings.md) |
+| `own_figures.toml` | figures of the package's own, each copying one of the original, with their own pictures | [own-figures.md](own-figures.md) |
 | `goods.toml` | trade goods of the package's own: price, icon, names | [goods.md](goods.md) |
 | `classes.toml` | classes of inhabitants: the original's changed, new ones after them, needs of any good | [classes.md](classes.md) |
 | `music.toml` | music tracks of the package's own (WAV, Ogg Vorbis, FLAC), normal or battle music | [sounds.md](sounds.md) |
@@ -82,6 +83,12 @@ the savegame (section `OWNB`), and the engine gives them the highest free `haeus
 packages' load order. Still open: pictures of a package's own (with the import of content), figures
 of a package's own, and a package that replaces another's building.
 
+Figures of a package's own done on 2026-11-01 ([own-figures.md](own-figures.md)): `own_figures.toml`
+declares figures that copy one of the original (`like`), with an image of a package (`image`) and
+the highest free figure numbers from 1023 down; `figures.toml` changes their values, a building of a
+package names them as its carriers or workers (`figure`), and a game keeps them (section `OWNF`).
+Still open: soldiers and ships of a package's own for castles and shipyards.
+
 ### 3. Free goods list, resident classes and unlock levels (section 2; MD-2, MD-3, MD-8)
 
 PR #137 moved the ware groups, unlock levels and the panels' required buildings into one place
@@ -126,8 +133,8 @@ sprite numbers from 100000, which every sheet of the interface draws; the build 
 
 Part 4 done on 2026-10-27 ([graphics.md](graphics.md#figures-and-ships)): `figure_images.toml`
 draws the original's figures and ships with a package's images (the image is checked to hold every
-sprite the figure draws). Still open: figures of a package's own (new figure numbers, with the
-content registry), sounds of a package's buildings and figures, and videos of a mod's own.
+sprite the figure draws). Still open: sounds of a package's buildings and figures, and videos of a
+mod's own (figures of a package's own are done, item 2).
 
 ### 5. Computer players from data (section 3; MD-4)
 

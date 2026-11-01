@@ -187,6 +187,11 @@ public:
     /// The same for corrections of the data after loading (data_fixes.hpp).
     [[nodiscard]] std::vector<std::vector<FormationSlot>>& formations() noexcept { return m_formations; }
 
+    /// Adds a copy of `like` under the highest free number below kMaxFigures (figures of a
+    /// package's own, own_figures.hpp): from the top down, so that a modded figuren.cod keeps the
+    /// numbers after the original's. The number, or an error when every one is taken.
+    core::Result<std::uint32_t> add(const FigureType& like);
+
     [[nodiscard]] const FigureType* get(std::uint32_t number) const noexcept {
         return number < m_types.size() && m_types[number].defined ? &m_types[number] : nullptr;
     }

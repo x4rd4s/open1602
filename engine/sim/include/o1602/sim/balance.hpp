@@ -23,6 +23,7 @@ namespace o1602::assets {
 class BuildingTable;
 class FigureTable;
 struct OwnBuilding;
+struct OwnFigure;
 struct ResidentClass;
 struct InfraLevel;
 }  // namespace o1602::assets
@@ -250,9 +251,10 @@ inline constexpr std::string_view kFiguresFile = "figures.toml";
 /// table may also name a building a package added (`own`, docs/modding/own-buildings.md).
 void apply_buildings_file(Balance& balance, std::string_view package, std::string_view utf8,
                           std::vector<std::string>& warnings, std::span<const assets::OwnBuilding> own = {});
-/// Changes values of figures as the figures.toml of `package` says, as apply_balance_file.
+/// Changes values of figures as the figures.toml of `package` says, as apply_balance_file. A
+/// table may also name a figure a package added (`own`, docs/modding/own-figures.md).
 void apply_figures_file(Balance& balance, std::string_view package, std::string_view utf8,
-                        std::vector<std::string>& warnings);
+                        std::vector<std::string>& warnings, std::span<const assets::OwnFigure> own = {});
 /// Drops the values of buildings `buildings` does not have, with a warning each.
 void drop_unknown_buildings(Balance& balance, const assets::BuildingTable& buildings,
                             std::vector<std::string>& warnings);

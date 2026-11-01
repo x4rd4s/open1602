@@ -99,6 +99,9 @@ constexpr std::uint32_t kPackages = tag("PACK");
 /// The buildings the packages added and their Ids (World::own_buildings()), only written when there
 /// are any. Required: the islands' tiles name those Ids.
 constexpr std::uint32_t kOwnBuildings = tag("OWNB");
+/// The figures the packages added and their numbers (World::own_figures()), only written when there
+/// are any. Required: the buildings' carriers and workers name those numbers.
+constexpr std::uint32_t kOwnFigures = tag("OWNF");
 /// The goods the packages added (World::goods(), goods.hpp), only written when there are any.
 /// Required: stocks, holds and buildings name their ware numbers.
 constexpr std::uint32_t kGoods = tag("GOOD");
@@ -134,16 +137,20 @@ constexpr std::uint16_t kScriptsWithCampaign = 2;
 constexpr std::size_t kMaxScenarioIdLength = 2 * assets::kMaxPackageIdLength + 1;
 
 /// Every section this version reads; others are of a later version.
-constexpr std::array kKnownSections = {
-    kRules,       kWorld,          kIslands,         kTiles,         kPlayers,      kCities,
-    kProductions, kHouses,         kGrowth,          kCosts,         kShips,        kSoldiers,
-    kAnimals,     kDisasters,      kVolcanoes,       kSimulation,    kFleet,        kEpochs,
-    kArmy,        kDiplomacy,      kExplored,        kMap,           kWorld2,       kMeta,
-    kMissions,    kPlayerState,    kCityState,       kOrigin,        kQueues,       kStances,
-    kScores,      kMaterialClocks, kPopulationMarks, kTutorial,      kGiveUps,      kFactions,
-    kLedgers,     kBalance,        kBuildingValues,  kPackages,      kFigureValues, kOwnBuildings,
-    kGoods,       kClasses,        kLevels,          kUnlocked,      kGoodPictures, kScripts,
-    kUnitGroups,  kScenario,       kCampaign,        kComputerOrders};
+constexpr std::array kKnownSections = {kRules,           kWorld,        kIslands,        kTiles,
+                                       kPlayers,         kCities,       kProductions,    kHouses,
+                                       kGrowth,          kCosts,        kShips,          kSoldiers,
+                                       kAnimals,         kDisasters,    kVolcanoes,      kSimulation,
+                                       kFleet,           kEpochs,       kArmy,           kDiplomacy,
+                                       kExplored,        kMap,          kWorld2,         kMeta,
+                                       kMissions,        kPlayerState,  kCityState,      kOrigin,
+                                       kQueues,          kStances,      kScores,         kMaterialClocks,
+                                       kPopulationMarks, kTutorial,     kGiveUps,        kFactions,
+                                       kLedgers,         kBalance,      kBuildingValues, kPackages,
+                                       kFigureValues,    kOwnBuildings, kGoods,          kClasses,
+                                       kLevels,          kUnlocked,     kGoodPictures,   kScripts,
+                                       kUnitGroups,      kScenario,     kCampaign,       kComputerOrders,
+                                       kOwnFigures};
 
 /// Section flag (the u16 after the version): the section holds state the game cannot do without, so
 /// a reader that cannot read it (unknown identifier or later version) must not load the file. Other
@@ -449,6 +456,15 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
             o.list(world.own_buildings(), 8, [&](const assets::OwnBuilding& b) {
                 o.string(b.id);
                 o.u32(b.number);
+            });
+        });
+    }
+    if (!world.own_figures().empty()) {
+        // Required: without the figures the packages added, the buildings' carriers name nothing.
+        section(out, kOwnFigures, [&](Writer& o) {
+            o.list(world.own_figures(), 8, [&](const assets::OwnFigure& f) {
+                o.string(f.id);
+                o.u32(f.number);
             });
         });
     }
@@ -876,6 +892,19 @@ core::Status apply_sections(World& world, const assets::BuildingTable& buildings
                     }
                 });
                 d.own_buildings = std::move(own);
+                break;
+            }
+            case kOwnFigures: {
+                std::vector<assets::OwnFigure> own;
+                in.list(own, 8, [&](assets::OwnFigure& f) {
+                    in.string(f.id);
+                    in.u32(f.number);
+                    if (f.id.size() < 3 || f.id.size() > 2 * assets::kMaxPackageIdLength + 1 ||
+                        f.number >= assets::kMaxFigures) {
+                        in.fail();
+                    }
+                });
+                d.own_figures = std::move(own);
                 break;
             }
             case kScripts: {
