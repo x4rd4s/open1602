@@ -7,8 +7,9 @@ needs: its own id, its own values, its own place in the build menu.
 
 **Status:** Done are the file `own_buildings.toml`, the values of such a building
 ([values.md](values.md)), its place in the build menu, its id in savegames, its class and unlock
-level, and pictures of the package's own ([graphics.md](graphics.md)). Still open: figures of a
-package's own. What such a building makes and uses may be a good of a package ([goods.md](goods.md)).
+level, pictures of the package's own ([graphics.md](graphics.md)) and its carriers or workers, also
+figures of a package's own ([own-figures.md](own-figures.md)). What such a building makes and uses
+may be a good of a package ([goods.md](goods.md)).
 
 ## The file
 
@@ -36,6 +37,7 @@ size_y = 2
 | `size_x`, `size_y` | 1 to 255 | the footprint in tiles |
 | `level` | an unlock level, `anno1602:<name or number>` or `<package>:<name>` ([levels.md](levels.md)), `""` for always | what the player must have reached to build it |
 | `class` | a class of inhabitants, `anno1602:<name or number>` or `<package>:<name>` ([classes.md](classes.md)), for a house only | whose house it is |
+| `figure` | one figure: `anno1602:<name or number>` ([names](values.md#names)) or `<package>:<name>` ([own-figures.md](own-figures.md)) | its carriers or workers (`Figurnr`) |
 | `ware`, `raw`, `raw2` | a good by string id: `anno1602:<name or number>` or `<package>:<name>` ([goods.md](goods.md)), `""` for none | what it makes, and the first and second good it uses |
 
 A field that is not given keeps what `like` has. A table without `like`, with a field that is no

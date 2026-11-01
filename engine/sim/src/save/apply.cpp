@@ -259,6 +259,9 @@ core::Status apply_decoded(World& world, Decoded& d) {
     if (d.own_buildings) {
         world.set_own_buildings(std::move(*d.own_buildings));
     }
+    if (d.own_figures) {
+        world.set_own_figures(std::move(*d.own_figures));
+    }
     if (d.missions) {
         world.set_missions(std::move(d.missions->missions));
         world.set_game_end(d.missions->end);

@@ -226,14 +226,20 @@ void apply_buildings_file(Balance& balance, std::string_view package, std::strin
 }
 
 void apply_figures_file(Balance& balance, std::string_view package, std::string_view utf8,
-                        std::vector<std::string>& warnings) {
-    apply_table_file(package, kFiguresFile, utf8, warnings,
-                     [&](const core::DataTable& table, const std::string& where) {
-                         apply_value_table(table, where, "figures", assets::original_figure_names(), {}, kFigureFields,
-                                           warnings, [&](std::uint32_t number, FigureField field, std::uint32_t value) {
-                                               set_figure_value(balance, FigureValue{number, field, value});
-                                           });
-                     });
+                        std::vector<std::string>& warnings, std::span<const assets::OwnFigure> own) {
+    // The packages' figures by their string ids, as the packages' buildings are named.
+    std::vector<assets::OwnBuilding> named;
+    named.reserve(own.size());
+    for (const assets::OwnFigure& f : own) {
+        named.push_back(assets::OwnBuilding{f.id, f.number});
+    }
+    apply_table_file(
+        package, kFiguresFile, utf8, warnings, [&](const core::DataTable& table, const std::string& where) {
+            apply_value_table(table, where, "figures", assets::original_figure_names(), named, kFigureFields, warnings,
+                              [&](std::uint32_t number, FigureField field, std::uint32_t value) {
+                                  set_figure_value(balance, FigureValue{number, field, value});
+                              });
+        });
 }
 
 void apply_balance_file(Balance& balance, std::string_view package, std::string_view utf8,

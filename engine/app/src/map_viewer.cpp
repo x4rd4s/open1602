@@ -165,6 +165,8 @@ struct ModRules {
     sim::Balance balance;
     /// The buildings the packages added, with the Ids `buildings` gave them.
     std::vector<assets::OwnBuilding> own;
+    /// The figures the packages added, with the numbers `figures` gave them.
+    std::vector<assets::OwnFigure> own_figures;
     /// The original's goods and those the packages added (goods.toml).
     assets::Goods goods;
     /// The classes of inhabitants as the packages change and add them (classes.toml); empty when
@@ -197,7 +199,7 @@ std::vector<assets::PackageIcon> load_package_icons(std::span<const assets::ModP
 /// balance.toml), the packages in their load order; the buildings they add go into `buildings`
 /// first (own_buildings.toml), so that a package can change another package's building too.
 ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::BuildingTable& buildings,
-                        const assets::FigureTable& figures) {
+                        assets::FigureTable& figures) {
     ModRules rules;
     std::vector<std::string> problems;
     // Goods first (with the icons they may show), then the classes and buildings that use them,
@@ -250,11 +252,18 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
             audio::apply_music_file(rules.music, package.id, package.folder, text, problems);
         }
     }
+    // Then the figures, with the images they draw, which the buildings may name as their workers.
+    for (const assets::ModPackage& package : packages) {
+        if (const auto bytes = core::read_file(package.folder / assets::kOwnFiguresFile)) {
+            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+            assets::apply_own_figures_file(figures, rules.own_figures, package.id, text, problems, rules.images);
+        }
+    }
     for (const assets::ModPackage& package : packages) {
         if (const auto bytes = core::read_file(package.folder / assets::kOwnBuildingsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_own_buildings_file(buildings, rules.own, package.id, text, problems, rules.goods, classes,
-                                             levels, rules.images);
+                                             levels, rules.images, &figures, rules.own_figures);
         }
     }
     for (const assets::ModPackage& package : packages) {
@@ -272,7 +281,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
         }
         if (const auto bytes = core::read_file(package.folder / sim::kFiguresFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_figures_file(rules.balance, package.id, text, problems);
+            sim::apply_figures_file(rules.balance, package.id, text, problems, rules.own_figures);
         }
         if (const auto bytes = core::read_file(package.folder / sim::kComputersFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
@@ -341,6 +350,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         world = sim::World(500, 350);  // the sea behind the menu until a game is chosen or comes from the host
         world->set_packages(assets::content_of(packages));
         world->set_own_buildings(rules.own);
+        world->set_own_figures(rules.own_figures);
         world->set_goods(rules.goods);
         world->set_resident_classes(rules.classes);
         world->set_infra_levels(rules.levels);
@@ -356,6 +366,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
             world->set_balance(rules.balance);
             world->set_packages(assets::content_of(packages));
             world->set_own_buildings(rules.own);
+            world->set_own_figures(rules.own_figures);
             world->set_goods(rules.goods);
             world->set_resident_classes(rules.classes);
             world->set_infra_levels(rules.levels);
@@ -379,6 +390,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
                 world->set_balance(rules.balance);
                 world->set_packages(assets::content_of(packages));
                 world->set_own_buildings(rules.own);
+                world->set_own_figures(rules.own_figures);
                 world->set_goods(rules.goods);
                 world->set_resident_classes(rules.classes);
                 world->set_infra_levels(rules.levels);
@@ -418,6 +430,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_faction_replacements = std::move(rules.faction_replacements);
     viewer->m_balance = rules.balance;
     viewer->m_own_buildings = std::move(rules.own);
+    viewer->m_own_figures = std::move(rules.own_figures);
     viewer->m_goods = std::move(rules.goods);
     viewer->m_classes = std::move(rules.classes);
     viewer->m_levels = std::move(rules.levels);
@@ -3018,6 +3031,7 @@ void MapViewer::give_mod_content(sim::World& world) const {
     world.set_balance(m_balance);
     world.set_packages(assets::content_of(m_packages));
     world.set_own_buildings(m_own_buildings);
+    world.set_own_figures(m_own_figures);
     world.set_goods(m_goods);
     world.set_resident_classes(m_classes);
     world.set_infra_levels(m_levels);
@@ -3143,19 +3157,28 @@ void MapViewer::reload_mods() {
         }
         m_original_buildings = std::move(base).value();
     }
+    // The same for the figures (docs/modding/own-figures.md).
+    if (auto base = assets::FigureTable::load(m_game)) {
+        if (m_app_settings.data_fixes && !m_options.original_data) {
+            assets::fixes::fix_figures(*base);
+        }
+        m_original_figures = std::move(base).value();
+    }
     ModRules rules = load_mod_rules(m_packages, m_original_buildings, m_original_figures);
     m_factions = std::move(rules.factions);
     m_faction_replacements = std::move(rules.faction_replacements);
     m_balance = rules.balance;
     m_own_buildings = std::move(rules.own);
+    m_own_figures = std::move(rules.own_figures);
     m_goods = std::move(rules.goods);
     m_classes = std::move(rules.classes);
     m_levels = std::move(rules.levels);
     m_sound->set_package_music(std::move(rules.music));
-    if (rules.looks != m_figure_looks) {
-        m_figure_looks = std::move(rules.looks);
-        assets::apply_figure_looks(m_figures, m_original_figures, m_figure_looks);
-    }
+    // The game's table takes the figures the packages give now, as the buildings below.
+    m_figure_looks = std::move(rules.looks);
+    m_figures = m_original_figures;
+    sim::apply_figure_values(m_figures, m_original_figures, m_state->world.balance());
+    assets::apply_figure_looks(m_figures, m_original_figures, m_figure_looks);
     if (rules.images != m_package_images) {
         // Other pictures: the zoom levels are made again with them.
         m_package_images = std::move(rules.images);

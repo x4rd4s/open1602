@@ -2,6 +2,7 @@
 #include "o1602/assets/figure_table.hpp"
 
 #include <algorithm>
+#include <string>
 
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/cod_predefined.hpp"
@@ -172,6 +173,23 @@ std::uint32_t figure_sprite(const FigureType& type, std::size_t anim, std::uint3
         return type.gfx + a->offset + a->add * frame + dir * a->rotate;
     }
     return type.gfx + dir * type.rotate;
+}
+
+core::Result<std::uint32_t> FigureTable::add(const FigureType& like) {
+    for (std::uint32_t number = kMaxFigures; number-- > 0;) {
+        if (number >= m_types.size() || !m_types[number].defined) {
+            if (number >= m_types.size()) {
+                m_types.resize(std::size_t{number} + 1);
+            }
+            FigureType f = like;
+            f.number = number;
+            f.defined = true;
+            m_types[number] = std::move(f);
+            return number;
+        }
+    }
+    return make_error(ErrorCode::Unsupported,
+                      "figuren.cod has no number free below " + std::to_string(kMaxFigures) + " for another figure");
 }
 
 core::Result<FigureTable> FigureTable::load(const GameDirectory& game) {

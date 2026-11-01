@@ -98,6 +98,8 @@ struct Decoded {
     std::optional<std::vector<UnlockedMore>> unlocked_more;
     /// The buildings the packages added and their Ids (OWNB).
     std::optional<std::vector<assets::OwnBuilding>> own_buildings;
+    /// The figures the packages added and their numbers (OWNF).
+    std::optional<std::vector<assets::OwnFigure>> own_figures;
     /// The changed values of buildings (BLDV).
     std::optional<std::vector<BuildingValue>> building_values;
     /// The changed values of figures (FIGV).

@@ -208,6 +208,15 @@ core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets:
         return status.error();
     }
     if (figures != nullptr) {
+        // The packages of this computer must give the game's figures the same numbers again
+        // (docs/modding/own-figures.md).
+        for (const assets::OwnFigure& f : world->own_figures()) {
+            if (figures->get(f.number) == nullptr) {
+                return make_error(ErrorCode::NotFound, "savegame: the figure " + f.id + " (number " +
+                                                           std::to_string(f.number) +
+                                                           ") is not there; its package is missing");
+            }
+        }
         if (auto status = Simulation::state_readable(*world, buildings, *figures); !status) {
             return make_error(status.error().code,
                               "savegame: the state of the running game is damaged (" + status.error().message + ")");

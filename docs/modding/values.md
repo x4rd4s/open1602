@@ -8,8 +8,8 @@ figures (`figuren.cod`: carriers, soldiers, ships) without shipping changed `.co
 **Status:** Done are the fields below, the files `buildings.toml` and `figures.toml` and saving
 the values with the game, and [names](#names) for the original's buildings and figures. A table of
 `buildings.toml` may also name a building a package added
-([own-buildings.md](own-buildings.md)). Figures of a package's own follow with the next steps of
-the content registry.
+([own-buildings.md](own-buildings.md)), a table of `figures.toml` a figure a package added
+([own-figures.md](own-figures.md)).
 
 ## The files
 
