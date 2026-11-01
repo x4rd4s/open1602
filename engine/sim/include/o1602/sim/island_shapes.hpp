@@ -48,6 +48,7 @@ struct ShapeRequest {
     std::uint8_t number = 0;           ///< island number, kept in every tile
     std::uint8_t big_mountains = 0;    ///< ore mountains for big veins (4 x 4)
     std::uint8_t small_mountains = 0;  ///< ore mountains for small veins (3 x 3)
+    bool volcano = false;              ///< a volcano (the big ore mountain 21108), placed first
     Roughness roughness = Roughness::Natural;
     Form form = Form::Compact;
     Share forest = Share::Normal;
@@ -58,7 +59,8 @@ struct ShapeRequest {
 };
 
 /// The island: an INSEL5 header without a template (all tiles stored) and one layer of tiles.
-/// The same request gives the same island. Mountains that find no room are left out.
+/// The same request gives the same island. Mountains (and the volcano) that find no room are
+/// left out.
 [[nodiscard]] assets::Island make_island(const ShapeRequest& request);
 
 // The tiles the coast is made of, by the land around a tile. Neighbour bits: N 1, NE 2, E 4,

@@ -91,7 +91,7 @@ struct Planned {
     std::uint16_t template_number = ScenarioPlan::kRandomTemplate;
     bool own = false;      ///< Shapes::Own: an island of its own shape, `rect` its size
     bool village = false;  ///< Shapes::Own: a template island meant for a native village
-    bool volcano = false;  ///< Shapes::Own: a template island meant for a volcano
+    bool volcano = false;  ///< Shapes::Own: an island of its own shape with a volcano
 };
 
 /// The sides of an island to place and its size class.
@@ -156,6 +156,10 @@ std::uint32_t village_count(const WorldSettings& s, std::uint32_t islands) {
     return (islands * per18 + kPlanIslands / 2) / kPlanIslands;
 }
 
+/// The shortest side of an island of its own shape with a volcano: the mountain, its ring of slopes
+/// and a tile of room around it, a beach and the surf on both sides.
+constexpr std::int32_t kVolcanoSide = 24;
+
 /// Islands with a volcano at most: one per player (none/few/many: 0, half, double), at most 10
 /// (20 craters in a world).
 std::uint32_t volcano_limit(const WorldSettings& s) {
@@ -207,6 +211,7 @@ private:
     void place_rest(std::uint32_t total);
     void place_land(bool warn_full);
     void keep_templates();
+    void choose_volcanoes();
     bool place_near(const Point& start, Dims dims, std::uint32_t min_r, std::uint32_t max_r, bool home);
     void decide_climates();
     bool place_for_climate(std::size_t start, std::uint8_t climate);
@@ -667,10 +672,9 @@ void Planner::place_land(bool warn_full) {
 }
 
 void Planner::keep_templates() {
-    // Native villages and volcanoes come with the original's templates: as many islands as the
-    // world has of them become one, the largest class that fits in their place, in its middle.
+    // Native villages come with the original's templates: as many islands as the world has of them
+    // become one, the largest class that fits in their place, in its middle.
     const std::uint32_t villages = village_count(m_s, static_cast<std::uint32_t>(m_islands.size()));
-    const std::uint32_t volcanoes = volcano_limit(m_s);
     // Islands of about a template's size first, so that the giants stay.
     std::vector<std::size_t> candidates;
     std::vector<std::size_t> larger;
@@ -682,16 +686,15 @@ void Planner::keep_templates() {
             (fitting ? candidates : larger).push_back(i);
         }
     }
-    const auto wanted = static_cast<std::size_t>(villages + volcanoes);
-    if (candidates.size() < wanted) {
+    if (candidates.size() < villages) {
         candidates.insert(candidates.end(), larger.begin(), larger.end());
     }
-    for (std::uint32_t k = 0; k < villages + volcanoes && !candidates.empty(); ++k) {
+    for (std::uint32_t k = 0; k < villages && !candidates.empty(); ++k) {
         const std::size_t pick = m_random.below(static_cast<std::uint32_t>(candidates.size()));
         Planned& p = m_islands[candidates[pick]];
         candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(pick));
         std::uint8_t size = 0;
-        for (std::uint8_t c = 1; c <= 3; ++c) {  // villages and volcanoes are on lit .. big
+        for (std::uint8_t c = 1; c <= 3; ++c) {  // villages are on lit .. big
             if (p.rect.w >= static_cast<std::int32_t>(kClassWidth[c]) &&
                 p.rect.h >= static_cast<std::int32_t>(kClassHeight[c])) {
                 size = c;
@@ -701,8 +704,25 @@ void Planner::keep_templates() {
         p.rect = Rect{p.rect.cx() - d.w / 2, p.rect.cy() - d.h / 2, d.w, d.h};
         p.size = size;
         p.own = false;
-        p.village = k < villages;
-        p.volcano = !p.village;
+        p.village = true;
+    }
+}
+
+void Planner::choose_volcanoes() {
+    // Volcanoes are laid on islands of their own shape, as many as the setting allows: not on a
+    // home, and only where there is room for the mountain in its ring of slopes.
+    const std::uint32_t volcanoes = volcano_limit(m_s);
+    std::vector<std::size_t> volcano_islands;
+    for (std::size_t i = 0; i < m_islands.size(); ++i) {
+        const Rect& r = m_islands[i].rect;
+        if (m_islands[i].own && !m_islands[i].home && std::min(r.w, r.h) >= kVolcanoSide) {
+            volcano_islands.push_back(i);
+        }
+    }
+    for (std::uint32_t k = 0; k < volcanoes && !volcano_islands.empty(); ++k) {
+        const std::size_t pick = m_random.below(static_cast<std::uint32_t>(volcano_islands.size()));
+        m_islands[volcano_islands[pick]].volcano = true;
+        volcano_islands.erase(volcano_islands.begin() + static_cast<std::ptrdiff_t>(pick));
     }
 }
 
@@ -843,7 +863,8 @@ void Planner::choose_templates() {
     // A template of the island's climate and class that no other island has; homes take one
     // without a volcano and with ore mountains; volcano islands up to the setting.
     const std::uint32_t limit = volcano_limit(m_s);
-    std::uint32_t volcanoes = 0;
+    auto volcanoes = static_cast<std::uint32_t>(
+        std::count_if(m_islands.begin(), m_islands.end(), [](const Planned& p) { return p.own && p.volcano; }));
     std::vector<const TemplateInfo*> used;
     // Homes first: they have the strictest wishes.
     std::vector<std::size_t> order(m_islands.size());
@@ -880,11 +901,9 @@ void Planner::choose_templates() {
         };
         const bool volcano_allowed = volcanoes < limit;
         const TemplateInfo* chosen = nullptr;
-        // Shapes::Own: the islands kept as templates are there for a village or a volcano.
+        // Shapes::Own: the islands kept as templates are there for a village.
         if (p.village) {
             chosen = pick([&](const TemplateInfo* t) { return !is_used(t) && t->village && !t->volcano; });
-        } else if (p.volcano && volcano_allowed) {
-            chosen = pick([&](const TemplateInfo* t) { return !is_used(t) && t->volcano; });
         }
         if (p.home) {
             chosen = pick([&](const TemplateInfo* t) {
@@ -952,7 +971,7 @@ WorldPlan Planner::finish() {
         per_climate[p.climate & 1U] += p.home || p.own ? 0U : 1U;
         if (p.own) {
             out.own_islands.push_back(WorldPlan::OwnIsland{e.number, static_cast<std::uint16_t>(p.rect.w),
-                                                           static_cast<std::uint16_t>(p.rect.h)});
+                                                           static_cast<std::uint16_t>(p.rect.h), p.volcano});
         }
     }
 
@@ -1068,6 +1087,7 @@ core::Result<WorldPlan> Planner::run() {
         place_land(false);
         keep_templates();
         place_land(true);  // the land the templates took less
+        choose_volcanoes();
     } else {
         place_rest(total);
     }

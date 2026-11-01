@@ -213,6 +213,7 @@ struct WorldPlan {
         std::uint8_t number = 0;
         std::uint16_t width = 0;
         std::uint16_t height = 0;
+        bool volcano = false;  ///< the island has a volcano
     };
     std::vector<OwnIsland> own_islands;
     WorldSettings::Landscape landscape;

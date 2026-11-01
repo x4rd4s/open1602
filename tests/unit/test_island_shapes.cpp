@@ -50,7 +50,7 @@ std::optional<Coast> coast_of(std::uint32_t id) {
 }
 
 int footprint(std::uint32_t id) {
-    if (one_of(id, ids::kBigMountain)) {
+    if (one_of(id, ids::kBigMountain) || id == ids::kVolcanoMountain) {
         return ids::kBigMountainSize;
     }
     if (one_of(id, ids::kSmallMountain)) {
@@ -67,6 +67,7 @@ struct Checked {
     std::size_t land = 0;
     std::size_t big = 0;
     std::size_t small = 0;
+    std::size_t volcanoes = 0;
 };
 
 /// Every tile is laid once, every coast tile is the one its neighbours ask for.
@@ -87,7 +88,9 @@ Checked check_island(const assets::Island& island, const sim::shapes::ShapeReque
         CHECK(t.island_number() == r.number);
         CHECK(t.city() == assets::IslandTile::kNoCity);
         const int size = footprint(t.cod_id());
-        out.big += size == ids::kBigMountainSize ? 1U : 0U;
+        const bool volcano = t.cod_id() == ids::kVolcanoMountain;
+        out.volcanoes += volcano ? 1U : 0U;
+        out.big += size == ids::kBigMountainSize && !volcano ? 1U : 0U;
         out.small += size == ids::kSmallMountainSize ? 1U : 0U;
         for (int y = t.y; y < t.y + size; ++y) {
             for (int x = t.x; x < t.x + size; ++x) {
@@ -473,6 +476,50 @@ TEST_CASE("island shapes: mountains in a ring of slopes turned to them, ground o
     // The templates' main ground is about a quarter of their ground; the rest are other kinds.
     CHECK(grounds[0] > 0);
     CHECK(grounds[1] > grounds[0]);
+}
+
+TEST_CASE("island shapes: a volcano only where one is asked for, in its ring of slopes") {
+    for (std::uint64_t seed = 0; seed < 10; ++seed) {
+        sim::shapes::ShapeRequest r;
+        r.width = 60;
+        r.height = 50;
+        r.size = 3;
+        r.number = 4;
+        r.big_mountains = 2;
+        r.small_mountains = 1;
+        r.seed = seed;
+        const Checked without = check_island(sim::shapes::make_island(r), r);
+        CHECK(without.volcanoes == 0);  // a big ore mountain is never the volcano 21108
+        CHECK(without.big == 2);
+        r.volcano = true;
+        const assets::Island island = sim::shapes::make_island(r);
+        const Checked with = check_island(island, r);
+        CHECK(with.volcanoes == 1);
+        CHECK(with.big == 2);
+        const int w = island.header.width;
+        std::vector<std::uint32_t> id(static_cast<std::size_t>(w * island.header.height), 0);
+        const assets::IslandTile* volcano = nullptr;
+        for (const assets::IslandTile& t : island.layers[0]) {
+            id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
+            if (t.cod_id() == ids::kVolcanoMountain) {
+                volcano = &t;
+            }
+        }
+        REQUIRE(volcano != nullptr);
+        // Slopes all around, no spring: lava, not water, comes from a volcano.
+        const int x0 = volcano->x - 1;
+        const int y0 = volcano->y - 1;
+        const int x1 = volcano->x + ids::kBigMountainSize;
+        const int y1 = volcano->y + ids::kBigMountainSize;
+        for (int y = y0; y <= y1; ++y) {
+            for (int x = x0; x <= x1; ++x) {
+                if (x == x0 || x == x1 || y == y0 || y == y1) {
+                    const std::uint32_t ring = id[static_cast<std::size_t>(y * w + x)];
+                    CHECK((one_of(ring, ids::kSlope) || ring == ids::kSlopeCorner));
+                }
+            }
+        }
+    }
 }
 
 TEST_CASE("island shapes: rivers from a spring on a mountain's slopes straight to a river mouth") {
