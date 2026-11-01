@@ -686,6 +686,9 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
+    // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
+    const Balance& at = m_world.balance();
+    const auto has = [money](std::uint32_t gold) { return std::int64_t{money} >= std::int64_t{gold}; };
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
     const auto needs = [&](ComputerList list) {
         return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
@@ -695,7 +698,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         case stage::kFounded: {
             unload_ship(p, c);
             r.land = free_land(c.island, c.index, &r.land_percent);
-            if (population(c) >= 2) {
+            if (population(c) >= at.ai_pioneers_inhabitants) {
                 set_stage(p, r, stage::kPioneers);
                 return;
             }
@@ -707,7 +710,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                     large = large || population(o) >= 1200;
                 }
             }
-            if (r.land < 600 || building_count(c) > 7 || big_cities > 1 || large) {
+            if (r.land < at.ai_colony_below_land || building_count(c) > 7 || big_cities > 1 || large) {
                 set_stage(p, r, stage::kColony);
                 return;
             }
@@ -739,7 +742,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kPioneers: {
             unload_ship(p, c);
-            if (population(c) >= 22) {
+            if (population(c) >= at.ai_settlers_inhabitants) {
                 set_stage(p, r, stage::kSettlers);
                 return;
             }
@@ -753,7 +756,8 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kSettlers: {
             const bool grown =
-                (r.slots[kSlotHouses].count > 23 && population(c, 1) >= 95) || now_ms() - r.stage_ms > 3'000'000;
+                (r.slots[kSlotHouses].count >= at.ai_grown_houses && population(c, 1) >= at.ai_grown_settlers) ||
+                now_ms() - r.stage_ms > std::uint64_t{at.ai_grown_seconds} * 1000;
             if (grown) {
                 // A first colony before the city grows on (the original waits for it forever if no
                 // island is found, S-097; Open1602 goes on once the search has failed). Not if the
@@ -761,7 +765,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 if (kontor_level(c) == 1 && p.cities < 2 && (!p.colony_failed || classic()) &&
                     !player(p).scenario.has(scenario_flag::kNoColonies)) {
                     want_colony(p, 1, true, true);
-                } else if (money > 8000 || incomes_ok(p, 11)) {
+                } else if (has(at.ai_grown_money) || incomes_ok(p, 11)) {
                     const std::int32_t rank = land_rank(p);
                     if (rank == 0) {
                         set_stage(p, r, stage::kSecond);
@@ -803,7 +807,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMain: {
-            if ((population(c, 1) >= 170 && money >= 8001) || money >= 15001) {
+            if ((population(c, 1) >= at.ai_main2_settlers && has(at.ai_main2_money)) || has(at.ai_main2_rich_money)) {
                 if (kontor_level(c) < 3 && p.cities < 3 && want_colony(p, 2, false, true)) {
                     return;
                 }
@@ -819,7 +823,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMain2: {
-            if (money > 8000 && !want_colony(p, 2, false, true) &&
+            if (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
                 (luxury_in_stock(p, c, r, 2) > 1 || kontor_level(c) > 2)) {
                 set_stage(p, r, stage::kCitizens);
                 return;
@@ -831,7 +835,8 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kCitizens: {
-            if ((population(c, 2) >= 250 && money >= 6001) || money >= 20001) {
+            if ((population(c, 2) >= at.ai_citizens2_citizens && has(at.ai_citizens2_money)) ||
+                has(at.ai_citizens2_rich_money)) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
             }
@@ -842,8 +847,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kCitizens2: {
-            if ((population(c, 2) >= 340 && money >= 6001) || money >= 25001) {
-                set_stage(p, r, r.land < 951 ? stage::kCitizensSmall : stage::kMerchants);
+            if ((population(c, 2) >= at.ai_merchants_citizens && has(at.ai_merchants_money)) ||
+                has(at.ai_merchants_rich_money)) {
+                set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
             if (needs(ComputerList::Citizens2)) {
@@ -860,7 +866,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMerchants: {
-            if (population(c, 3) >= 400 || kontor_level(c) >= 4) {
+            if (population(c, 3) >= at.ai_merchants2_merchants || kontor_level(c) >= 4) {
                 set_stage(p, r, stage::kMerchants2);
                 return;
             }
@@ -879,8 +885,8 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         case stage::kMerchants2:
         case stage::kMerchantsSmall: {
             const bool small = r.stage == stage::kMerchantsSmall;
-            if (!small && money > 15000 && population(c, 3) >= 500) {
-                set_stage(p, r, r.land < 1101 ? stage::kMerchantsSmall : stage::kAristocrats);
+            if (!small && has(at.ai_aristocrats_money) && population(c, 3) >= at.ai_aristocrats_merchants) {
+                set_stage(p, r, r.land < at.ai_aristocrats_land ? stage::kMerchantsSmall : stage::kAristocrats);
                 return;
             }
             if (small ? needs(ComputerList::MerchantsSmall) || needs(ComputerList::MerchantsSmallTail)
@@ -894,7 +900,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (want_colony(p, 4, false, false)) {
                 return;
             }
-            if (luxury_in_stock(p, c, r, 4) > 3 && money > 8000) {
+            if (luxury_in_stock(p, c, r, 4) > 3 && has(at.ai_aristocrats2_money)) {
                 set_stage(p, r, stage::kAristocrats2);
                 return;
             }

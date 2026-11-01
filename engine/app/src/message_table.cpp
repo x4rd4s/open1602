@@ -3,7 +3,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
+#include <fstream>
+#include <optional>
 #include <system_error>
 
 #include "o1602/assets/game_content.hpp"
@@ -77,6 +80,33 @@ bool valid_package(std::string_view package) {
     return !package.empty() && std::all_of(package.begin(), package.end(), [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
     });
+}
+
+/// A file of the package, never outside its folder; nullopt for a path that leaves it.
+std::optional<std::filesystem::path> package_path(std::string_view utf8) {
+    std::filesystem::path relative = std::filesystem::path(core::path_from_utf8(utf8)).lexically_normal();
+    if (relative.empty() || relative.is_absolute() || relative.has_root_name() || *relative.begin() == "..") {
+        return std::nullopt;
+    }
+    return relative;
+}
+
+/// Whether the file is a Smacker (.smk: "SMK2", "SMK4") or Bink 2 file (.bk2: "KB2"), by its name
+/// and its first bytes: the player picks the decoder by the name.
+bool is_video_file(const std::filesystem::path& file) {
+    std::string extension = file.extension().string();
+    std::ranges::transform(extension, extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::array<char, 4> magic{};
+    std::ifstream in(file, std::ios::binary);
+    if (!in.read(magic.data(), magic.size())) {
+        return false;
+    }
+    const std::string_view head(magic.data(), magic.size());
+    if (extension == ".smk") {
+        return head == "SMK2" || head == "SMK4";
+    }
+    return extension == ".bk2" && head.starts_with("KB2");
 }
 
 std::string line_of(const std::string& where, std::size_t line) {
@@ -153,7 +183,7 @@ std::string MessageTable::text(MessageId id, std::string_view language, const Me
 }
 
 void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, const std::filesystem::path& folder,
-                         const std::string& where, std::vector<std::string>& warnings) const {
+                         const std::string& where, std::vector<std::string>& warnings) {
     // `like` first, wherever it stands: the other fields change what it brings.
     if (const core::DataValue* like = table.find("like")) {
         std::optional<MessageId> from;
@@ -220,15 +250,12 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
                 m.playback.voices = 1;
                 m.playback.sound = nullptr;
             } else if (s != nullptr) {
-                // A file of the package, never outside its folder.
-                const std::filesystem::path relative =
-                    std::filesystem::path(core::path_from_utf8(*s)).lexically_normal();
-                if (relative.empty() || relative.is_absolute() || relative.has_root_name() ||
-                    *relative.begin() == "..") {
+                const auto relative = package_path(*s);
+                if (!relative) {
                     warnings.push_back(at + "'sound' must be a file in the package's folder");
                     continue;
                 }
-                const auto bytes = core::read_file(folder / relative);
+                const auto bytes = core::read_file(folder / *relative);
                 if (!bytes) {
                     warnings.push_back(at + *s + ": " + bytes.error().message);
                     continue;
@@ -251,12 +278,16 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
             } else if (n != nullptr && *n >= 0 && *n < 0x10000) {
                 m.playback.video_base = static_cast<std::uint16_t>(*n);
                 m.playback.videos = 1;
-            } else if (s != nullptr) {
-                warnings.push_back(at +
-                                   "'video': videos of a package's own are not supported yet; give the number of "
-                                   "one of the original's (VideoSmk/<number>.smk)");
+            } else if (const auto relative = s != nullptr ? package_path(*s) : std::nullopt; relative) {
+                // A Smacker or Bink 2 file of the package, as the original's videos are.
+                if (const auto number = package_video(folder / *relative, at + *s + ": ", warnings)) {
+                    m.playback.video_base = *number;
+                    m.playback.videos = 1;
+                }
             } else {
-                warnings.push_back(at + "'video' must be a number of VideoSmk or false");
+                warnings.push_back(at +
+                                   "'video' must be a number of VideoSmk, a video file in the package's folder "
+                                   "(.smk, .bk2) or false");
             }
         } else if (e.key == "video_always" || e.key == "normal_speed") {
             const std::uint16_t flag =
@@ -317,6 +348,24 @@ core::Status MessageTable::load_package(std::string_view package, std::string_vi
         m_messages.push_back(std::move(m));
     }
     return core::Ok{};
+}
+
+std::optional<std::uint16_t> MessageTable::package_video(const std::filesystem::path& file, const std::string& at,
+                                                         std::vector<std::string>& warnings) {
+    const std::filesystem::path normal = file.lexically_normal();
+    if (const auto it = std::ranges::find(m_videos, normal); it != m_videos.end()) {
+        return static_cast<std::uint16_t>(kFirstPackageVideo + (it - m_videos.begin()));
+    }
+    if (!is_video_file(normal)) {
+        warnings.push_back(at + "missing or no Smacker (.smk) or Bink 2 (.bk2) video");
+        return std::nullopt;
+    }
+    if (m_videos.size() >= kMaxPackageVideos) {
+        warnings.push_back(at + "the packages have at most " + std::to_string(kMaxPackageVideos) + " videos");
+        return std::nullopt;
+    }
+    m_videos.push_back(normal);
+    return static_cast<std::uint16_t>(kFirstPackageVideo + m_videos.size() - 1);
 }
 
 void MessageTable::load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings) {

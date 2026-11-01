@@ -14,6 +14,8 @@
 #include <type_traits>
 #include <utility>
 
+#include "video_queue.hpp"
+
 namespace o1602::app {
 
 namespace {
@@ -112,19 +114,35 @@ VideoPlayer::~VideoPlayer() {
     }
 }
 
+void VideoPlayer::set_package_videos(std::vector<std::filesystem::path> files) {
+    m_package_videos = std::move(files);
+    m_available.clear();
+}
+
+std::optional<std::filesystem::path> VideoPlayer::find(std::uint16_t number) const {
+    if (number >= kFirstPackageVideo) {
+        const std::size_t i = number - kFirstPackageVideo;
+        if (i < m_package_videos.size()) {
+            return m_package_videos[i];
+        }
+        return std::nullopt;
+    }
+    return find_video(*m_game, number);
+}
+
 bool VideoPlayer::available(std::uint16_t number) const {
     const auto it = m_available.find(number);
     if (it != m_available.end()) {
         return it->second;
     }
-    const bool found = find_video(*m_game, number).has_value();
+    const bool found = find(number).has_value();
     m_available.emplace(number, found);
     return found;
 }
 
 bool VideoPlayer::start(std::uint16_t number, bool loop, std::uint8_t tracks) {
     stop();
-    const auto path = find_video(*m_game, number);
+    const auto path = find(number);
     if (!path) {
         m_available[number] = false;
         return false;

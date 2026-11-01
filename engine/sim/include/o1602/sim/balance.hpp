@@ -112,6 +112,31 @@ struct Balance {
     std::uint32_t ai_colony_food = 9;
     std::uint32_t ai_colony_bricks_below = 19;
     std::uint32_t ai_colony_bricks = 9;
+    /// When a computer's city moves on to its next stage ([computer_stages], docs/re/ai.md task 5):
+    /// inhabitants of a class and the classes above it, gold, tiles of free land, houses, seconds.
+    std::uint32_t ai_pioneers_inhabitants = 2;   ///< a city founded moves on to the pioneers with this many inhabitants
+    std::uint32_t ai_colony_below_land = 600;    ///< ... or becomes a colony with less free land than this (tiles)
+    std::uint32_t ai_settlers_inhabitants = 22;  ///< the pioneers move on to the settlers
+    std::uint32_t ai_grown_houses = 24;          ///< the settlers have grown with this many houses ...
+    std::uint32_t ai_grown_settlers = 95;        ///< ... and this many settlers and above
+    std::uint32_t ai_grown_seconds = 3000;       ///< ... or after this long in the stage
+    std::uint32_t ai_grown_money = 8001;         ///< grown, they go on with this much gold (or good incomes)
+    std::uint32_t ai_main2_settlers = 170;       ///< the main city goes on with this many settlers and above ...
+    std::uint32_t ai_main2_money = 8001;         ///< ... and this much gold
+    std::uint32_t ai_main2_rich_money = 15'001;   ///< ... or this much gold alone
+    std::uint32_t ai_citizens_money = 8001;      ///< on to the citizens with this much gold
+    std::uint32_t ai_citizens2_citizens = 250;   ///< the citizens' second stage: citizens and above ...
+    std::uint32_t ai_citizens2_money = 6001;     ///< ... and gold
+    std::uint32_t ai_citizens2_rich_money = 20'001;  ///< ... or gold alone
+    std::uint32_t ai_merchants_citizens = 340;      ///< on to the merchants: citizens and above ...
+    std::uint32_t ai_merchants_money = 6001;        ///< ... and gold
+    std::uint32_t ai_merchants_rich_money = 25'001;  ///< ... or gold alone
+    std::uint32_t ai_merchants_land = 951;          ///< with less free land the city stays small
+    std::uint32_t ai_merchants2_merchants = 400;    ///< the merchants' second stage: merchants and above
+    std::uint32_t ai_aristocrats_merchants = 500;   ///< on to the aristocrats: merchants and above ...
+    std::uint32_t ai_aristocrats_money = 15'001;     ///< ... and gold
+    std::uint32_t ai_aristocrats_land = 1101;       ///< with less free land the city stays small
+    std::uint32_t ai_aristocrats2_money = 8001;     ///< the aristocrats' second stage, with their luxury goods in stock
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -134,9 +159,11 @@ struct BalanceField {
 
 /// The version of the section BALA with the computers' values.
 inline constexpr std::uint16_t kBalanceWithComputers = 2;
+/// The version of the section BALA with the computers' stages.
+inline constexpr std::uint16_t kBalanceWithStages = 3;
 
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 26> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 49> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -163,10 +190,33 @@ inline constexpr std::array<BalanceField, 26> kBalanceFields = {{
     {"computers", "colony_food", &Balance::ai_colony_food, 0, 100, kBalanceWithComputers},
     {"computers", "colony_bricks_below", &Balance::ai_colony_bricks_below, 0, 100, kBalanceWithComputers},
     {"computers", "colony_bricks", &Balance::ai_colony_bricks, 0, 100, kBalanceWithComputers},
+    {"computer_stages", "pioneers_inhabitants", &Balance::ai_pioneers_inhabitants, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "colony_below_land", &Balance::ai_colony_below_land, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "settlers_inhabitants", &Balance::ai_settlers_inhabitants, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "grown_houses", &Balance::ai_grown_houses, 0, 100'000, kBalanceWithStages},
+    {"computer_stages", "grown_settlers", &Balance::ai_grown_settlers, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "grown_seconds", &Balance::ai_grown_seconds, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "grown_money", &Balance::ai_grown_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "main2_settlers", &Balance::ai_main2_settlers, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "main2_money", &Balance::ai_main2_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "main2_rich_money", &Balance::ai_main2_rich_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "citizens_money", &Balance::ai_citizens_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "citizens2_citizens", &Balance::ai_citizens2_citizens, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "citizens2_money", &Balance::ai_citizens2_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "citizens2_rich_money", &Balance::ai_citizens2_rich_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "merchants_citizens", &Balance::ai_merchants_citizens, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "merchants_money", &Balance::ai_merchants_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "merchants_rich_money", &Balance::ai_merchants_rich_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "merchants_land", &Balance::ai_merchants_land, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "merchants2_merchants", &Balance::ai_merchants2_merchants, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "aristocrats_merchants", &Balance::ai_aristocrats_merchants, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "aristocrats_money", &Balance::ai_aristocrats_money, 0, 10'000'000, kBalanceWithStages},
+    {"computer_stages", "aristocrats_land", &Balance::ai_aristocrats_land, 0, 1'000'000, kBalanceWithStages},
+    {"computer_stages", "aristocrats2_money", &Balance::ai_aristocrats2_money, 0, 10'000'000, kBalanceWithStages},
 }};
 
-/// The version of the section BALA that `balance` needs: 1 while the computers' values are the
-/// original's, so that an older Open1602 still reads it.
+/// The version of the section BALA that `balance` needs: the first that holds every value that is
+/// not the original's, 1 while the computers' values are, so that an older Open1602 still reads it.
 [[nodiscard]] std::uint16_t balance_version(const Balance& balance) noexcept;
 
 /// A field of a building as balance.toml names it and its limits there.

@@ -176,10 +176,13 @@ bool valid(const Balance& balance) noexcept {
 
 std::uint16_t balance_version(const Balance& balance) noexcept {
     const Balance original;
-    const bool computers = std::all_of(kBalanceFields.begin(), kBalanceFields.end(), [&](const BalanceField& f) {
-        return f.version < kBalanceWithComputers || balance.*f.value == original.*f.value;
-    });
-    return computers ? 1 : kBalanceWithComputers;
+    std::uint16_t version = 1;
+    for (const BalanceField& f : kBalanceFields) {
+        if (balance.*f.value != original.*f.value) {
+            version = std::max(version, f.version);
+        }
+    }
+    return version;
 }
 
 bool original_numbers(const Balance& balance) noexcept {

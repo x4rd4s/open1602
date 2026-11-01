@@ -179,6 +179,42 @@ TEST_CASE("balance: the computers' cheats are values of [computers], saved in BA
     CHECK(old_loaded->balance() == old);
 }
 
+TEST_CASE("balance: when the computers' cities move on is [computer_stages], saved in BALA version 3") {
+    sim::Balance balance;
+    // The original's numbers (0x004265A0..0x00428150).
+    CHECK(balance.ai_pioneers_inhabitants == 2);
+    CHECK(balance.ai_settlers_inhabitants == 22);
+    CHECK(balance.ai_grown_houses == 24);
+    CHECK(balance.ai_merchants_land == 951);
+    CHECK(balance.ai_aristocrats_money == 15'001);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "eager",
+                            "[computer_stages]\n"
+                            "settlers_inhabitants = 10\n"
+                            "merchants_rich_money = 12000\n"
+                            "grown_seconds = -1\n",
+                            warnings);
+    CHECK(balance.ai_settlers_inhabitants == 10);
+    CHECK(balance.ai_merchants_rich_money == 12'000);
+    CHECK(balance.ai_grown_seconds == 3000);
+    REQUIRE(warnings.size() == 1);
+    CHECK(warnings[0].starts_with("eager/balance.toml line 4: 'grown_seconds' must be a number from 0 to"));
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithStages);
+
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+    // A cheat changed alone still needs only version 2.
+    sim::Balance cheats;
+    cheats.ai_steady_money = 0;
+    CHECK(sim::balance_version(cheats) == sim::kBalanceWithComputers);
+}
+
 TEST_CASE("balance: a package changes values of the original's buildings") {
     sim::Balance balance;
     std::vector<std::string> warnings;

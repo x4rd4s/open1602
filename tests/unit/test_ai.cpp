@@ -1671,3 +1671,32 @@ TEST_CASE("ai: a stage's build order from the game's balance (computers.toml) is
     CHECK(mills_built(false) == 1);
     CHECK(mills_built(true) == 2);
 }
+
+TEST_CASE("ai: when a city moves on to the next stage comes from the game's balance ([computer_stages])") {
+    // A city founded moves on to the pioneers with two inhabitants, by default; a package may ask
+    // for more.
+    const auto max_stage = [](std::uint32_t pioneers_at) {
+        Game g;
+        sim::Balance balance;
+        balance.ai_pioneers_inhabitants = pioneers_at;
+        g.world.set_balance(balance);
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s);
+        sim::City* city = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                city = g.world.city(c.island, c.index);
+            }
+        }
+        REQUIRE(city != nullptr);
+        for (std::uint32_t t = 0; t < 120'000; t += 10'000) {
+            city->inhabitants.assign(1, 10);
+            run(s, 10'000);
+        }
+        const auto view = s.computers().view();
+        REQUIRE(!view.empty());
+        return view.front().max_stage;
+    };
+    CHECK(max_stage(2) >= 0x14);  // the pioneers (stage 0x14) or later
+    CHECK(max_stage(11) == 0);    // ten inhabitants are not enough: still a city just founded
+}

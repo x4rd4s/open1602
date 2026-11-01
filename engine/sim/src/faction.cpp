@@ -174,6 +174,19 @@ void apply_faction_file(std::vector<Faction>& factions, std::string_view package
                 }
                 continue;
             }
+            if (e.key == "scripted") {
+                const bool* on = e.value.boolean();
+                if (on == nullptr) {
+                    warnings.push_back(at + "'scripted' must be true or false");
+                } else if (*on && faction.behaviour != FactionBehaviour::Settlers &&
+                           faction.behaviour != FactionBehaviour::Pirates) {
+                    warnings.push_back(at + "'scripted' is for factions of settlers or pirates; the game steers " +
+                                       behaviour_name(faction.behaviour));
+                } else {
+                    faction.scripted = *on;
+                }
+                continue;
+            }
             std::uint16_t* field = number_field(faction, e.key);
             const std::int64_t* n = e.value.integer();
             if (field == nullptr) {

@@ -54,6 +54,22 @@ The computers count the producers of a package's goods in slots after the origin
 `AIST` of the savegame, version 5); a game of the original has no such slots, and its computers
 play as before.
 
+## When a city moves on
+
+A computer's city goes through its stages ([in which order](#in-which-order)) by its inhabitants,
+the computer's gold and the free land of its island: a city just founded becomes the pioneers' with
+two inhabitants, the settlers' with 22, and so on. These numbers are values of `balance.toml`'s
+table `[computer_stages]` ([balance.md](balance.md#the-values)), with the original's as defaults:
+
+```toml
+# mods/eager/balance.toml: computers that hurry on to the merchants.
+[computer_stages]
+merchants_citizens = 200
+merchants_rich_money = 15000
+```
+
+A game keeps them (savegame `BALA` version 3).
+
 ## In which order
 
 Each stage of a city ([ai.md](../re/ai.md), task 5) goes through its lists of what it needs, in

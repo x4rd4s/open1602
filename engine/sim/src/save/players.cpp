@@ -87,12 +87,15 @@ void io_scaling(A& a, S& s) {
 }
 
 template <class A, class F>
-void io_faction(A& a, F& f) {
+void io_faction(A& a, F& f, std::uint16_t version) {
     a.string(f.id);
     a.enum8(f.behaviour, kLastBehaviour);
     io_scaling(a, f.nests);
     io_scaling(a, f.ships);
     a.u16(f.reach_players);
+    if (version >= kScriptedFactions) {
+        a.boolean(f.scripted);
+    }
 }
 
 template <class A, class G>
@@ -256,14 +259,20 @@ bool has_own_factions(const World& w) {
     return w.factions() != base_factions();
 }
 
-void write_factions(Writer& out, const World& w) {
-    out.list(w.factions(), 23, [&](const Faction& f) { io_faction(out, f); });
+std::uint16_t factions_version(const World& w) {
+    return std::any_of(w.factions().begin(), w.factions().end(), [](const Faction& f) { return f.scripted; })
+               ? kScriptedFactions
+               : 1;
+}
+
+void write_factions(Writer& out, const World& w, std::uint16_t version) {
+    out.list(w.factions(), 23, [&](const Faction& f) { io_faction(out, f, version); });
     out.list(w.players(), 1, [&](const Player& p) { out.u8(p.faction); });
 }
 
-Decoded::FactionPart read_factions(Reader& in) {
+Decoded::FactionPart read_factions(Reader& in, std::uint16_t version) {
     Decoded::FactionPart part;
-    in.list(part.factions, 23, [&](Faction& f) { io_faction(in, f); });
+    in.list(part.factions, 23, [&](Faction& f) { io_faction(in, f, version); });
     in.list(part.players, 1, [&](FactionId& f) { in.u8(f); });
     if (part.factions.empty() || part.factions.size() > kMaxFactions ||
         std::any_of(part.players.begin(), part.players.end(), [&](FactionId f) { return f >= part.factions.size(); })) {

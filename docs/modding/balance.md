@@ -30,14 +30,31 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computers` | `colony_tools_below`, `colony_tools` | 15, 9 | 0–100 | the same with tools, when it has the wood |
 | `computers` | `colony_food_below`, `colony_food` | 19, 9 | 0–100 | the same with food, before the computer's second inhabited city |
 | `computers` | `colony_bricks_below`, `colony_bricks` | 19, 9 | 0–100 | the same with bricks, from its second inhabited city on |
+| `computer_stages` | `pioneers_inhabitants` | 2 | 0–1000000 | a city just founded moves on to the pioneers with this many inhabitants |
+| `computer_stages` | `colony_below_land` | 600 | 0–1000000 | ... or becomes a colony when its island has less free land than this (tiles) |
+| `computer_stages` | `settlers_inhabitants` | 22 | 0–1000000 | the pioneers move on to the settlers |
+| `computer_stages` | `grown_houses`, `grown_settlers`, `grown_seconds` | 24, 95, 3000 | 0–100000, 0–1000000, 0–1000000 | the settlers have grown with this many houses and settlers and above, or after this many seconds in the stage |
+| `computer_stages` | `grown_money` | 8001 | 0–10000000 | grown, the city moves on with this much gold (or good incomes), to a second city or the main city |
+| `computer_stages` | `main2_settlers`, `main2_money`, `main2_rich_money` | 170, 8001, 15001 | 0–1000000, 0–10000000 | the main city goes on with settlers and above and gold, or with the third value of gold alone |
+| `computer_stages` | `citizens_money` | 8001 | 0–10000000 | on to the citizens |
+| `computer_stages` | `citizens2_citizens`, `citizens2_money`, `citizens2_rich_money` | 250, 6001, 20001 | as above | the citizens' second stage: citizens and above and gold, or gold alone |
+| `computer_stages` | `merchants_citizens`, `merchants_money`, `merchants_rich_money` | 340, 6001, 25001 | as above | on to the merchants the same way |
+| `computer_stages` | `merchants_land` | 951 | 0–1000000 | with less free land than this the city stays small instead |
+| `computer_stages` | `merchants2_merchants` | 400 | 0–1000000 | the merchants' second stage, with merchants and above (or a Kontor of level 4) |
+| `computer_stages` | `aristocrats_merchants`, `aristocrats_money` | 500, 15001 | 0–1000000, 0–10000000 | on to the aristocrats with merchants and above and gold |
+| `computer_stages` | `aristocrats_land` | 1101 | 0–1000000 | with less free land than this the city stays small instead |
+| `computer_stages` | `aristocrats2_money` | 8001 | 0–10000000 | the aristocrats' second stage, with their luxury goods in stock |
 
 The `computers` values are the original's cheats: what the computer players get from nowhere, on
 every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of
-0 take a gift away.
+0 take a gift away. The `computer_stages` values say when a computer's city moves on to its next
+stage ([computer-players.md](computer-players.md#when-a-city-moves-on)); inhabitants are counted
+of the class named and the classes above it, gold is what the computer has.
 
 A game keeps the values it started with: they are saved with it (section `BALA` of
 [o1602-save.md](../formats/o1602-save.md), written only when they differ from the original's; version
-2 holds the `computers` values and is written only when one of them differs), so a
+2 holds the `computers` values and is written only when one of them differs, version 3 the
+`computer_stages` values the same way), so a
 mod installed or removed later does not change a running game, and every computer of a multiplayer
 game plays with the host's.
 

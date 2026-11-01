@@ -409,6 +409,42 @@ core::Result<BuildingTable> BuildingTable::load(const GameDirectory& game) {
     return table;
 }
 
+core::Status BuildingTable::replace(std::uint32_t id, const BuildingType& by) {
+    BuildingType* old = by_id(id);
+    if (old == nullptr) {
+        return make_error(ErrorCode::NotFound, "there is no building " + std::to_string(id));
+    }
+    if (std::uint64_t{by.gfx} + by.tile_count() > kMaxSprite) {
+        return make_error(ErrorCode::InvalidFormat, "building " + std::to_string(id) + ": sprites " +
+                                                        std::to_string(by.gfx) + " + " +
+                                                        std::to_string(by.tile_count()) + " reach beyond sprite 65534");
+    }
+    const std::int32_t index = m_by_id[id - kIdOffset];
+    // The sprites the old one drew are free again, unless another building draws them too.
+    for (std::uint32_t k = 0; k < old->tile_count(); ++k) {
+        if (old->gfx + k < m_by_sprite.size() && m_by_sprite[old->gfx + k] == index) {
+            m_by_sprite[old->gfx + k] = -1;
+        }
+    }
+    BuildingType b = by;
+    b.id = id;
+    b.record = old->record;
+    b.rand_count = 0;
+    b.land_record = BuildingType::kNoRecord;
+    b.beach_offset = 0;
+    b.mouth_offset = 0;
+    if (b.gfx + b.tile_count() > m_by_sprite.size()) {
+        m_by_sprite.resize(b.gfx + b.tile_count(), -1);
+    }
+    for (std::uint32_t k = 0; k < b.tile_count(); ++k) {
+        if (m_by_sprite[b.gfx + k] < 0) {
+            m_by_sprite[b.gfx + k] = index;
+        }
+    }
+    *old = b;
+    return core::Ok{};
+}
+
 core::Result<std::uint32_t> BuildingTable::add(const BuildingType& like) {
     // From the top down, so that a modded haeuser.cod of its own keeps the Ids after the
     // original's and a package's buildings do not take them.

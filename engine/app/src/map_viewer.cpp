@@ -502,6 +502,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_video = std::make_unique<VideoController>(
         options.videos ? std::make_unique<VideoPlayer>(viewer->m_window->sdl_renderer(), viewer->m_game) : nullptr,
         *viewer->m_sound);
+    viewer->m_video->set_package_videos(viewer->m_messages.package_videos());
     if (options.videos) {
         viewer->m_sound->set_video_check(
             [self = viewer.get()](std::uint16_t n) { return self->m_video->available(n); });
@@ -3059,6 +3060,9 @@ void MapViewer::use_game_packages() {
     }
     m_messages = MessageTable();
     m_messages.load_mods(used, problems);
+    if (m_video) {
+        m_video->set_package_videos(m_messages.package_videos());
+    }
     ui::set_build_menu(
         ui::load_build_menu_mods(ui::original_build_menu(), used, m_buildings, problems, m_own_buildings));
     try {

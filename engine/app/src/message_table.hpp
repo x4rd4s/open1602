@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include "video_queue.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/core/data_file.hpp"
@@ -92,12 +94,21 @@ public:
     /// order given (their load order, assets::load_mod_packages).
     void load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings);
 
+    /// The video files of the packages' messages (`video = "<path>"`): the one at index i plays as
+    /// video number kFirstPackageVideo + i (VideoPlayer::set_package_videos).
+    [[nodiscard]] const std::vector<std::filesystem::path>& package_videos() const noexcept { return m_videos; }
+
 private:
     /// Applies the fields of `table` to `m`.
     void apply(const core::DataTable& table, MessageDefinition& m, const std::filesystem::path& folder,
-               const std::string& where, std::vector<std::string>& warnings) const;
+               const std::string& where, std::vector<std::string>& warnings);
+    /// The video number of a package's video file, given one the first time; nullopt (with a
+    /// warning) when it is no Smacker or Bink 2 file or there are too many.
+    std::optional<std::uint16_t> package_video(const std::filesystem::path& file, const std::string& at,
+                                               std::vector<std::string>& warnings);
 
     std::vector<MessageDefinition> m_messages;
+    std::vector<std::filesystem::path> m_videos;
     std::unordered_map<std::string, MessageId> m_ids;
 };
 
