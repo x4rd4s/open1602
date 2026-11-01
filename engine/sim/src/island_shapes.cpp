@@ -664,53 +664,139 @@ assets::Island make_island(const ShapeRequest& request) {
     }
 
     // A river from the ring of the mountain at (x0, y0): its spring on one side of the ring
-    // (rotation 3 north, 0 east, 1 south, 2 west, as the slope it replaces), straight pieces out to
-    // a beach whose sea lies the river's way, the beach a river mouth and its surf the mouth's surf
-    // (both turned as the beach). Rivers of the templates run 3 tiles and more.
+    // (rotation 3 north, 0 east, 1 south, 2 west, as the slope it replaces), straight pieces and
+    // bends out to a beach whose sea lies the river's last way, the beach a river mouth and its surf
+    // the mouth's surf (both turned as the beach). As in the templates a river runs 3 tiles and
+    // more, bends now and then (a bend right after the spring, else after a straight piece) and
+    // never touches itself. The way is planned first, a few times over; only a way that reaches a
+    // fitting beach is laid.
     const auto river = [&](int x0, int y0, int size) {
         constexpr std::array<int, 4> kDx = {0, 1, 0, -1};  // the way out: north, east, south, west
         constexpr std::array<int, 4> kDy = {-1, 0, 1, 0};
         constexpr int kMinLength = 3;
-        const auto way = static_cast<int>(random.below(4));
-        const int along = 1 + static_cast<int>(random.below(static_cast<std::uint32_t>(std::max(1, size - 2))));
-        const int sx = way == 1 ? x0 + size : way == 3 ? x0 - 1 : x0 + along;
-        const int sy = way == 0 ? y0 - 1 : way == 2 ? y0 + size : y0 + along;
-        int x = sx + kDx[static_cast<std::size_t>(way)];
-        int y = sy + kDy[static_cast<std::size_t>(way)];
-        std::vector<std::pair<int, int>> path;
-        while (map.land(x, y) && taken[at(x, y)] == 0) {
-            path.emplace_back(x, y);
-            x += kDx[static_cast<std::size_t>(way)];
-            y += kDy[static_cast<std::size_t>(way)];
-        }
-        if (static_cast<int>(path.size()) < kMinLength || !map.land(x, y)) {
-            return;
-        }
-        // The beach must face the river's way (its rotation is the side of its sea: 0 south,
-        // 1 west, 2 north, 3 east) and the sea before it be plain surf.
-        const auto beach = coast_tile(true, map.neighbours(x, y));
-        const int sea_side = beach ? (beach->rotation + 2) % 4 : -1;  // north 0, east 1, south 2, west 3
-        const int sea_x = x + kDx[static_cast<std::size_t>(way)];
-        const int sea_y = y + kDy[static_cast<std::size_t>(way)];
-        const auto surf = coast_tile(false, map.neighbours(sea_x, sea_y));
-        if (!beach || beach->coast != Coast::Beach || sea_side != way || !surf || surf->coast != Coast::Surf ||
-            tile_index[at(x, y)] < 0 || sea_x < 0 || sea_y < 0 || sea_x >= width || sea_y >= height ||
-            tile_index[at(sea_x, sea_y)] < 0) {
-            return;
-        }
-        const auto relay = [&](int tx, int ty, std::uint32_t id, std::uint8_t rotation) {
-            assets::IslandTile& t = tiles[static_cast<std::size_t>(tile_index[at(tx, ty)])];
-            t.id = static_cast<std::uint16_t>(id - assets::IslandTile::kCodIdOffset);
-            t.bits = tile_bits(rotation, t.anim_phase(), request.number, static_cast<std::uint8_t>(random.below(32)));
+        constexpr int kRiverAttempts = 10;
+        const auto dir = [](int d) { return static_cast<std::size_t>(d); };
+        const auto inside = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height; };
+        const auto free = [&](int x, int y) { return map.land(x, y) && taken[at(x, y)] == 0; };
+        struct Piece {
+            int x = 0;  // the straight tile, or the bend's north-west tile
+            int y = 0;
+            std::uint8_t rotation = 0;
+            bool bend = false;
         };
-        relay(sx, sy, ids::kSpring, static_cast<std::uint8_t>((way + 3) % 4));
-        const auto straight = static_cast<std::uint8_t>(way % 2 == 0 ? 1 + 2 * random.below(2) : 2 * random.below(2));
-        for (const auto& [rx, ry] : path) {
-            lay(pick(random, ids::kRiver), rx, ry, straight, 0);
-            taken[at(rx, ry)] = 1;
+        // The tiles of the planned way, by the number of their piece (from 1); 0 elsewhere.
+        std::vector<std::int32_t> owner(taken.size(), 0);
+        std::vector<std::size_t> marked;
+        for (int attempt = 0; attempt < kRiverAttempts; ++attempt) {
+            for (const std::size_t i : marked) {
+                owner[i] = 0;
+            }
+            marked.clear();
+            const auto way = static_cast<int>(random.below(4));
+            const int along = 1 + static_cast<int>(random.below(static_cast<std::uint32_t>(std::max(1, size - 2))));
+            const int sx = way == 1 ? x0 + size : way == 3 ? x0 - 1 : x0 + along;
+            const int sy = way == 0 ? y0 - 1 : way == 2 ? y0 + size : y0 + along;
+            std::vector<Piece> pieces;
+            // A new piece may touch only the piece before it (pieces are numbered from 1).
+            const auto apart = [&](int x, int y) {
+                for (int side = 0; side < 4; ++side) {
+                    const int nx = x + kDx[dir(side)];
+                    const int ny = y + kDy[dir(side)];
+                    if (inside(nx, ny) && owner[at(nx, ny)] != 0 &&
+                        owner[at(nx, ny)] < static_cast<std::int32_t>(pieces.size())) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            const auto mark = [&](int x, int y) {
+                owner[at(x, y)] = static_cast<std::int32_t>(pieces.size());
+                marked.push_back(at(x, y));
+            };
+            int d = way;
+            int x = sx + kDx[dir(way)];
+            int y = sy + kDy[dir(way)];
+            int length = 0;
+            const int longest = width + height;
+            bool bend_allowed = true;  // right after the spring, else after a straight piece
+            while (free(x, y) && length < longest) {
+                if (bend_allowed && random.below(3) == 0) {
+                    const int turn = (d + (random.below(2) == 0 ? 1 : 3)) % 4;
+                    const int ex = x + kDx[dir(d)] + kDx[dir(turn)];  // the tile the river leaves by
+                    const int ey = y + kDy[dir(d)] + kDy[dir(turn)];
+                    const int bx = std::min(x, ex);
+                    const int by = std::min(y, ey);
+                    bool fits = true;
+                    for (int ty = by; ty <= by + 1 && fits; ++ty) {
+                        for (int tx = bx; tx <= bx + 1 && fits; ++tx) {
+                            fits = free(tx, ty) && owner[at(tx, ty)] == 0 && apart(tx, ty);
+                        }
+                    }
+                    if (fits) {
+                        // A bend at rotation r joins its sides r and r + 1 (north 0, east 1, south 2,
+                        // west 3): here the side the river comes in by and the side it leaves by.
+                        const int in = (d + 2) % 4;
+                        pieces.push_back({bx, by, static_cast<std::uint8_t>((in + 1) % 4 == turn ? in : turn), true});
+                        for (int ty = by; ty <= by + 1; ++ty) {
+                            for (int tx = bx; tx <= bx + 1; ++tx) {
+                                mark(tx, ty);
+                            }
+                        }
+                        d = turn;
+                        x = ex + kDx[dir(d)];
+                        y = ey + kDy[dir(d)];
+                        length += 2;
+                        bend_allowed = false;
+                        continue;
+                    }
+                }
+                if (owner[at(x, y)] != 0 || !apart(x, y)) {
+                    pieces.clear();
+                    break;
+                }
+                pieces.push_back({x, y, 0, false});
+                pieces.back().rotation =
+                    static_cast<std::uint8_t>(d % 2 == 0 ? 1 + 2 * random.below(2) : 2 * random.below(2));
+                mark(x, y);
+                x += kDx[dir(d)];
+                y += kDy[dir(d)];
+                ++length;
+                bend_allowed = true;
+            }
+            if (pieces.empty() || length < kMinLength || !inside(x, y) || !map.land(x, y) || !apart(x, y)) {
+                continue;
+            }
+            // The beach must face the river's way (its rotation is the side of its sea: 0 south,
+            // 1 west, 2 north, 3 east) and the sea before it be plain surf.
+            const auto beach = coast_tile(true, map.neighbours(x, y));
+            const int sea_side = beach ? (beach->rotation + 2) % 4 : -1;  // north 0, east 1, south 2, west 3
+            const int sea_x = x + kDx[dir(d)];
+            const int sea_y = y + kDy[dir(d)];
+            const auto surf = coast_tile(false, map.neighbours(sea_x, sea_y));
+            if (!beach || beach->coast != Coast::Beach || sea_side != d || !surf || surf->coast != Coast::Surf ||
+                tile_index[at(x, y)] < 0 || !inside(sea_x, sea_y) || tile_index[at(sea_x, sea_y)] < 0) {
+                continue;
+            }
+            const auto relay = [&](int tx, int ty, std::uint32_t id, std::uint8_t rotation) {
+                assets::IslandTile& t = tiles[static_cast<std::size_t>(tile_index[at(tx, ty)])];
+                t.id = static_cast<std::uint16_t>(id - assets::IslandTile::kCodIdOffset);
+                t.bits =
+                    tile_bits(rotation, t.anim_phase(), request.number, static_cast<std::uint8_t>(random.below(32)));
+            };
+            relay(sx, sy, ids::kSpring, static_cast<std::uint8_t>((way + 3) % 4));
+            for (const Piece& p : pieces) {
+                lay(pick(random, p.bend ? ids::kRiverBend : ids::kRiver), p.x, p.y, p.rotation, 0);
+                const int span = p.bend ? int{ids::kRiverBendSize} : 1;
+                for (int ty = p.y; ty < p.y + span; ++ty) {
+                    for (int tx = p.x; tx < p.x + span; ++tx) {
+                        taken[at(tx, ty)] = 1;
+                    }
+                }
+            }
+            relay(x, y, ids::kRiverMouth, beach->rotation);
+            relay(sea_x, sea_y, ids::kMouthSurf, beach->rotation);
+            return;
         }
-        relay(x, y, ids::kRiverMouth, beach->rotation);
-        relay(sea_x, sea_y, ids::kMouthSurf, beach->rotation);
     };
 
     // Ore mountains on inland, in rock ringed by slopes as in the templates (the mines stand on
@@ -756,8 +842,8 @@ assets::Island make_island(const ShapeRequest& request) {
                     taken[at(x, y)] = 1;
                 }
             }
-            // A river from a spring on the ring straight out to the beach, as most templates
-            // have one; none where it would meet anything but a beach facing its way.
+            // A river from a spring on the ring out to the beach, as most templates have one;
+            // none where no way meets a beach facing it.
             if (rivers && random.below(3) != 0) {
                 river(x0, y0, size);
             }

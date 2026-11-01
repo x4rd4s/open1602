@@ -115,6 +115,7 @@ assets::BuildingTable make_buildings() {
     add(std::array<std::uint32_t, 1>{ids::kSlopeCorner}, 32, 1, -1);
     add(std::array<std::uint32_t, 1>{ids::kSpring}, 33, 1, -1);
     add(ids::kRiver, 16, 1, -1);
+    add(ids::kRiverBend, 17, ids::kRiverBendSize, -1);
     add(std::array<std::uint32_t, 1>{ids::kRiverMouth}, 24, 1, -1);
     add(std::array<std::uint32_t, 1>{ids::kMouthSurf}, 22, 1, -1);
     add(ids::kForestNorth, 10, 1, -1);

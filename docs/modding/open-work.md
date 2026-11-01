@@ -316,8 +316,18 @@ twelve templates stays without, with a warning.
 Part 7 done on 2026-11-01 ([landscapes.md](landscapes.md)): the rules of a world of islands of their
 own shape as data, a package's `landscapes.toml` names kinds of island world (land, sizes and their
 spread, gaps, coast, outline, forest, mountains) that the start dialog offers after Open1602's
-presets. Still open: rivers with bends (they wait for the templates' statistics of river tiles), and
-the climates of the islands as data.
+presets.
+
+Part 8 done on 2026-11-01: rivers with bends. `o1602-tool template-stats` over the templates (its maps
+now show straight river tiles and bends by their rotation) gives 3.6 bends and 8.6 straight river
+tiles to a template. A bend (20904, 20905, kind 17) is a block of 2 x 2 tiles that joins its sides r
+and r + 1 at rotation r (north 0, east 1, south 2, west 3), the river coming in and going out by the
+two tiles on its diagonal; the templates have a bend right after a spring, and at least one straight
+tile between two bends. Rivers of islands of their own shape now plan their way from the spring with
+a bend at one of three steps (none right after another), never touching themselves, up to ten times
+over, and are laid only when the way ends on a beach that faces it.
+
+Still open: the climates of the islands as data.
 
 ## Order of work
 
