@@ -715,7 +715,8 @@ assets::Island make_island(const ShapeRequest& request) {
 
     // Ore mountains on inland, in rock ringed by slopes as in the templates (the mines stand on
     // the slopes), with a tile of room around the ring so that roads reach them.
-    const auto place_mountains = [&](std::uint8_t count, std::uint8_t size, std::span<const std::uint32_t> kinds) {
+    const auto place_mountains = [&](std::uint8_t count, std::uint8_t size, std::span<const std::uint32_t> kinds,
+                                     bool rivers) {
         const std::uint32_t tries = 400 + 40 * std::uint32_t{count};  // many on a large island
         const int outer = size + 4;                                   // room, slope, mountain, slope, room
         std::uint8_t placed = 0;
@@ -757,14 +758,20 @@ assets::Island make_island(const ShapeRequest& request) {
             }
             // A river from a spring on the ring straight out to the beach, as most templates
             // have one; none where it would meet anything but a beach facing its way.
-            if (random.below(3) != 0) {
+            if (rivers && random.below(3) != 0) {
                 river(x0, y0, size);
             }
             ++placed;
         }
     };
-    place_mountains(request.big_mountains, ids::kBigMountainSize, ids::kBigMountain);
-    place_mountains(request.small_mountains, ids::kSmallMountainSize, ids::kSmallMountain);
+    // The volcano first, so that it finds room: a big ore mountain in its ring of slopes, without
+    // a river.
+    if (request.volcano) {
+        const std::array<std::uint32_t, 1> volcano{ids::kVolcanoMountain};
+        place_mountains(1, ids::kBigMountainSize, volcano, false);
+    }
+    place_mountains(request.big_mountains, ids::kBigMountainSize, ids::kBigMountain, true);
+    place_mountains(request.small_mountains, ids::kSmallMountainSize, ids::kSmallMountain, true);
 
     // Forest in patches (the north has more of it, as its templates), ground elsewhere.
     // Patches of about a template's (a fifth of a big template's side, at most 24 tiles across on

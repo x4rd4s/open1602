@@ -412,7 +412,7 @@ TEST_CASE("world plan: islands of their own size cover the land asked for, withi
                     CHECK(std::max(ra.w, ra.h) <= s.landscape.max_side);
                     CHECK(std::min(ra.w, ra.h) >= sim::shapes::kMinSide);
                 } else {
-                    CHECK(islands[a].size <= 3);  // a template for a village or a volcano
+                    CHECK(islands[a].size <= 3);  // a template for a village
                 }
                 for (std::size_t b = a + 1; b < islands.size(); ++b) {
                     const Box rb = own_box(*plan, islands[b]);
@@ -422,6 +422,18 @@ TEST_CASE("world plan: islands of their own size cover the land asked for, withi
             }
             CHECK(own == plan->own_islands.size());
             CHECK(own * 2 > islands.size());
+            // Volcanoes on islands of their own shape, at most one per player (Normal; fewer where
+            // few islands have room for one), none at home.
+            std::size_t volcanoes = 0;
+            for (const auto& o : plan->own_islands) {
+                volcanoes += o.volcano ? 1U : 0U;
+                for (const sim::StartArea& st : plan->starts) {
+                    CHECK(!(o.volcano && o.number == st.home_island));
+                }
+            }
+            CHECK(volcanoes > 0);
+            CHECK(volcanoes <= s.players);
+            CHECK(volcanoes == s.players || land == 10);
             // The land the rectangles hold: about what was asked; with much land and many small
             // islands, the water between them leaves less room.
             const std::uint64_t map = std::uint64_t{s.width} * s.height;

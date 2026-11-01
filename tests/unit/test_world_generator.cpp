@@ -120,6 +120,7 @@ assets::BuildingTable make_buildings() {
     add(ids::kForestNorth, 10, 1, -1);
     add(ids::kForestSouth, 10, 1, -1);
     add(ids::kBigMountain, 15, ids::kBigMountainSize, 0);
+    add(std::array<std::uint32_t, 1>{ids::kVolcanoMountain}, 15, ids::kBigMountainSize, 0);
     add(ids::kSmallMountain, 15, ids::kSmallMountainSize, 1);
     text += "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
@@ -981,6 +982,7 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
     for (const auto shapes : {sim::WorldSettings::Shapes::Own, sim::WorldSettings::Shapes::Mixed}) {
         std::size_t own = 0;
         std::size_t kept = 0;
+        std::size_t volcanoes = 0;
         for (std::uint64_t seed = 1; seed <= 3; ++seed) {
             sim::WorldSettings settings;
             settings.seed = seed;
@@ -1033,6 +1035,14 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
             for (const sim::WorldIsland& island : world->islands()) {
                 if (island.header.template_number == assets::IslandHeader::kNoTemplate) {
                     CHECK(island.header.stored_complete);
+                    // A volcano where the plan asked for one (or the template had one), else none.
+                    const auto own_island =
+                        std::find_if(plan->own_islands.begin(), plan->own_islands.end(),
+                                     [&](const auto& o) { return o.number == island.header.number; });
+                    if (own_island != plan->own_islands.end()) {
+                        CHECK(island.craters.size() == (own_island->volcano ? 1U : 0U));
+                    }
+                    volcanoes += island.craters.size();
                     std::size_t sea = 0;
                     for (std::uint32_t y = 0; y < island.map.height(); ++y) {
                         for (std::uint32_t x = 0; x < island.map.width(); ++x) {
@@ -1049,6 +1059,8 @@ TEST_CASE("world generator: islands of their own shape instead of templates, but
         CHECK(own > 0);
         if (shapes == sim::WorldSettings::Shapes::Mixed) {
             CHECK(kept > 0);
+        } else {
+            CHECK(volcanoes > 0);  // the plan's islands of their own shape have volcanoes
         }
     }
 }

@@ -497,7 +497,10 @@ inline constexpr std::array<std::uint32_t, 10> kForestNorth{21304, 21306, 21308,
                                                             21314, 21316, 21318, 21322, 21324};
 inline constexpr std::array<std::uint32_t, 10> kForestSouth{22802, 22804, 22806, 22808, 22810,
                                                             22812, 22814, 22816, 22820, 22822};
-inline constexpr std::array<std::uint32_t, 2> kBigMountain{kBigOreMountain, 21109};
+/// The big ore mountain that never erupts: 21108 (IDFELS+7) is the volcano (docs/re/volcanoes.md),
+/// laid only where the world asks for one.
+inline constexpr std::array<std::uint32_t, 1> kBigMountain{21109};
+inline constexpr std::uint32_t kVolcanoMountain = kBigOreMountain;
 inline constexpr std::array<std::uint32_t, 2> kSmallMountain{21103, 21107};
 inline constexpr std::uint8_t kBigMountainSize = 4;
 inline constexpr std::uint8_t kSmallMountainSize = 3;

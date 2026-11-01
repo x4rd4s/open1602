@@ -412,10 +412,10 @@ bool Generator::load(Slot& slot) {
         slot.treasure = slot.loaded_header[0x18] != 0;
     }
     count_mountains(slot);
-    // An island of its own shape instead of the template: of its size and with as many ore
-    // mountains. Islands with a village or a volcano keep their template.
+    // An island of its own shape instead of the template: of its size, with as many ore mountains
+    // and its volcano. Islands with a village keep their template.
     if (slot.own_shape) {
-        if (!slot.village && sim::find_craters(*slot.map, m_buildings).empty()) {
+        if (!slot.village) {
             give_own_shape(slot);
         } else {
             slot.own_shape = false;
@@ -478,11 +478,15 @@ void Generator::give_own_shape(Slot& slot) const {
         }
         r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 255));
         r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(small, 255));
+        r.volcano = own->volcano;
     } else {
-        // In the place of its template: as large, with as many ore mountains.
+        // In the place of its template: as large, with as many ore mountains, the volcano one of
+        // the big ones.
         r.width = slot.base.header.width;
         r.height = slot.base.header.height;
-        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[0], 255));
+        r.volcano = !sim::find_craters(*slot.map, m_buildings).empty();
+        const std::uint32_t big = slot.mountains[0] - (r.volcano && slot.mountains[0] > 0 ? 1U : 0U);
+        r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 255));
         r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(slot.mountains[1], 255));
     }
     slot.base = shapes::make_island(r);

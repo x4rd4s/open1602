@@ -243,7 +243,7 @@ placed, with its coast from the templates' tiles (beach, its corners and surf by
 all 114 templates), forest of the climate and as many ore mountains as the template. A world's
 setting "island shapes" (`WorldSettings::shapes`, start dialog, `--island-shapes`) chooses the
 original's templates (default), islands of their own shape, or both mixed; islands with a native
-village or a volcano keep their template.
+village or a volcano keep their template (volcanoes no longer since part 5).
 
 Part 2 done on 2026-10-31 ([worldgen.md](../re/worldgen.md#islands-of-their-own-size)): with
 "Own" island shapes the plan draws every island's size itself (`WorldSettings::Landscape`): the
@@ -255,7 +255,7 @@ islands, the coast (smooth, natural, rugged), the outline (compact, long, branch
 mountains. The sea around an island of its own shape has the templates' depths: light water past
 the surf, middle, then the dark open sea from about five tiles out, with the band edges turned to the
 lighter side. The sizes are drawn first and placed from the largest; as many islands as the villages
-and volcanoes need become templates. The start dialog has a page of its own for it, "Island world",
+and volcanoes need become templates (since part 5 only the villages). The start dialog has a page of its own for it, "Island world",
 with presets (Original, Varied, Archipelago, Continents, Few giants, Even) and a preview of the world
 the game gets (`sim::preview_world`, "Reroll" draws another world number).
 
@@ -270,8 +270,16 @@ Part 4 done on 2026-11-01 ([worldgen.md](../re/worldgen.md#what-the-templates-ar
 lie in a ring of slopes turned to them, as every mountain of the templates (the mines stand on the
 slopes), the ground mixes the templates' fifteen most common kinds of ground tile by tile, and two
 of three mountains send a river from a spring on their slopes straight out to a river mouth on a
-beach that faces its way. Still open: rivers with bends, villages and volcanoes on islands of their
-own shape, and the rules as data.
+beach that faces its way.
+
+Part 5 done on 2026-11-01: volcanoes on islands of their own shape. A volcano is the big ore mountain
+21108 ([volcanoes.md](../re/volcanoes.md)); the big mountains of islands of their own shape are now
+always 21109, and a volcano is laid only where it is asked for (`ShapeRequest::volcano`), first, in
+its ring of slopes and without a river. With "Own" island shapes the plan gives the volcanoes of the
+setting to islands of their own shape (not a home, at least 24 tiles on the shorter side;
+`WorldPlan::OwnIsland::volcano`), so only villages still need a template; with "Mixed" a template
+island with a volcano gets its own shape with the volcano in it. Still open: rivers with bends,
+villages on islands of their own shape, and the rules as data.
 
 ## Order of work
 
