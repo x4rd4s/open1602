@@ -146,4 +146,7 @@ int cmd_template_stats(const Args& args);
 int cmd_smk(const Args& args);
 int cmd_bk2(const Args& args);
 
+// mods.cpp
+int cmd_check_mod(const Args& args);
+
 }  // namespace o1602::tool

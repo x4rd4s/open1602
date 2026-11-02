@@ -18,12 +18,12 @@
 //   o1602-tool render-world <file.szs|.gam> <out.png> [--zoom 0|1|2] [--rotation 0-3] [--time MS]
 //                           [--tile X,Y] [--size WxH] [--owners]
 //                                                        render the world map or a part of it
-//   o1602-tool export, new-world, bench, scenario, smk, bk2, state see usage()
+//   o1602-tool export, new-world, bench, scenario, smk, bk2, state, check-mod see usage()
 //
 // The palette defaults to $ANNO1602_DIR/TOOLGFX/STADTFLD.COL.
 //
-// The commands live in formats.cpp, savegames.cpp, render.cpp, scenario.cpp, templates.cpp and
-// video.cpp (declared in tool.hpp).
+// The commands live in formats.cpp, mods.cpp, savegames.cpp, render.cpp, scenario.cpp, templates.cpp
+// and video.cpp (declared in tool.hpp).
 
 #include <cstdio>
 #include <string>
@@ -89,7 +89,9 @@ int usage() {
         "--original-sheets: no figures where the\n"
         "                          original has no graphics for them; --original-flags: the original flag\n"
         "                          images instead of the tinted generic flag; --original-data: without the\n"
-        "                          corrections of the original's data, D-001 ...)\n",
+        "                          corrections of the original's data, D-001 ...)\n"
+        "  o1602-tool check-mod <mods folder>  (reads its packages as the game does and lists every\n"
+        "                       problem; exit code 1 if there is one; needs ANNO1602_DIR)\n",
         stderr);
     return 2;
 }
@@ -174,6 +176,9 @@ int main(int argc, char** argv) {
     }
     if (command == "scenario") {
         return cmd_scenario(args);
+    }
+    if (command == "check-mod") {
+        return cmd_check_mod(args);
     }
     return usage();
 }
