@@ -216,6 +216,8 @@ private:
     /// The end screen of a decided game, when it is due (EventPresenter::end_screen_due). Called
     /// every frame the game runs.
     void check_end_screen(std::uint64_t now);
+    /// The window of a blueprint: what it shows, and its clicks as commands.
+    void update_blueprint_window();
     /// The score sheets: the final screen of a decided game, or the "Bewertung" of a running one.
     void show_end_screen(sim::GameOutcome outcome, bool view_only);
     /// HighScore_UpdateAllHumans (0x00475990): every human still playing, and `defeated` (who is
