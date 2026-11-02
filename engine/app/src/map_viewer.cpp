@@ -133,8 +133,8 @@ bool touches_own_land(const sim::IslandMap& map, const sim::PlannedBuild& item, 
 constexpr std::uint64_t kShortOfMeansBlinkMs = 300;
 /// The tint over what the copy tool's drag would take into the hand.
 constexpr assets::Rgba kCopyMark{96, 160, 232, 110};
-/// The tint of the local player's blueprints: a deeper blue than the copy tool's selection.
-constexpr assets::Rgba kBlueprintMark{40, 96, 220, 130};
+/// The colour the local player's blueprints are drawn in, as a multiplier of the sprites' colours.
+constexpr assets::Rgba kBlueprintTint{110, 150, 255, 255};
 /// Real time a frame may spend on ticks; the rest of the frame draws.
 constexpr int kTickBudgetMs = 25;
 /// The status line under a still mouse is worked out again this often (FB-1).
@@ -1445,6 +1445,14 @@ void MapViewer::render() {
         m_pending_bill.reset();
         m_tile_marks.clear();
         layers.tile_marks = &m_tile_marks;
+        m_sprite_tints.colour = kBlueprintTint;
+        m_sprite_tints.tiles.clear();
+        layers.sprite_tints = &m_sprite_tints;
+        // A tile of an island whose building is drawn in the blueprints' colour.
+        const auto tint = [&](std::uint16_t island, std::uint32_t x, std::uint32_t y) {
+            const sim::WorldIsland& isl = m_state->world.islands()[island];
+            m_sprite_tints.tiles.emplace_back(isl.x + x, isl.y + y);
+        };
         // First, so that the build preview's marks lie over it.
         add_fertility_marks();
         m_lighting = tile_lighting();
@@ -1534,6 +1542,9 @@ void MapViewer::render() {
                                 const auto tx = static_cast<std::uint32_t>(item.x) + i;
                                 const auto ty = static_cast<std::uint32_t>(item.y) + j;
                                 saved.push_back(Saved{order->island, tx, ty, map.top(tx, ty)});
+                                if (blueprint) {
+                                    tint(order->island, tx, ty);  // what becomes a blueprint, in its colour
+                                }
                             }
                         }
                         const sim::MapCell& at =
@@ -1686,11 +1697,14 @@ void MapViewer::render() {
                         const auto tx = static_cast<std::uint32_t>(b.x) + i;
                         const auto ty = static_cast<std::uint32_t>(b.y) + j;
                         saved.push_back(Saved{b.island, tx, ty, map.top(tx, ty)});
-                        render::TileMark mark{b.island, static_cast<std::uint16_t>(tx), static_cast<std::uint16_t>(ty),
-                                              doomed ? render::kDragHatch : kBlueprintMark};
-                        mark.hatched = doomed;
-                        mark.on_top = true;
-                        m_tile_marks.push_back(mark);
+                        tint(b.island, tx, ty);
+                        if (doomed) {
+                            render::TileMark mark{b.island, static_cast<std::uint16_t>(tx),
+                                                  static_cast<std::uint16_t>(ty), render::kDragHatch};
+                            mark.hatched = true;
+                            mark.on_top = true;
+                            m_tile_marks.push_back(mark);
+                        }
                     }
                 }
                 const sim::MapCell& at = map.top(static_cast<std::uint32_t>(b.x), static_cast<std::uint32_t>(b.y));
@@ -1708,6 +1722,7 @@ void MapViewer::render() {
                 sim::fit_connection(m_state->world, m_buildings, island, t.x, t.y);
             }
         }
+        std::sort(m_sprite_tints.tiles.begin(), m_sprite_tints.tiles.end());
         render::build_world_draw_list(m_state->world, m_buildings, m_clock, m_camera.view(), m_camera.viewport(),
                                       layers, m_commands, m_draw_scratch);
         preview.restore();

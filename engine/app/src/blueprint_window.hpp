@@ -33,7 +33,7 @@ class BlueprintWindow {
 public:
     enum class Result : std::uint8_t { None, Close, Build, BuildCity, Automatic, Remove };
     static constexpr std::int32_t kWidth = 420;
-    static constexpr std::int32_t kHeight = 334;
+    static constexpr std::int32_t kHeight = 370;
 
     explicit BlueprintWindow(ui::FormStyle style = {}) : m_form(style) {}
 

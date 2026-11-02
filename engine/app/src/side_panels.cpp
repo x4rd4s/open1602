@@ -202,7 +202,16 @@ std::optional<BuildPanel::Action> BuildPanel::mouse(std::int32_t x, std::int32_t
                         // A switch: the menu goes back to what is in hand, the copy tool or the
                         // building shown last.
                         action = Action{Action::Kind::Blueprint, 0, 0};
-                        if (m_tool != Tool::Copy && m_menu->category(m_building_category) != nullptr) {
+                        if (m_tool != Tool::Copy) {
+                            // No building shown yet in this game: the menu's first category.
+                            if (m_menu->category(m_building_category) == nullptr) {
+                                for (const ui::BuildCategory& other : m_menu->categories) {
+                                    if (!other.demolish) {
+                                        m_building_category = other.button;
+                                        break;
+                                    }
+                                }
+                            }
                             m_bau.set_selected(m_category, false);
                             m_category = m_building_category;
                             m_bau.set_selected(m_category, true);

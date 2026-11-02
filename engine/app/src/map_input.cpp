@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <span>
 #include <string_view>
 #include <tuple>
@@ -1531,6 +1532,21 @@ void MapInput::build_blueprints() {
     order.kind = sim::BlueprintOrder::Kind::Build;
     order.island = spot->island;
     order.city = map.top(static_cast<std::uint32_t>(spot->x), static_cast<std::uint32_t>(spot->y)).city;
+    if (order.city == sim::MapCell::kNoCity) {
+        // Beside the city's land: the city of the player's nearest blueprint on the island.
+        std::int64_t best = std::numeric_limits<std::int64_t>::max();
+        for (const sim::Blueprint& b : world().blueprints()) {
+            if (b.player != local() || b.island != spot->island) {
+                continue;
+            }
+            const std::int64_t dx = b.x - spot->x;
+            const std::int64_t dy = b.y - spot->y;
+            if (dx * dx + dy * dy < best) {
+                best = dx * dx + dy * dy;
+                order.city = sim::blueprint_city(world(), b);
+            }
+        }
+    }
     if (order.city != sim::MapCell::kNoCity) {
         submit({std::move(order)}, true, false);
     }

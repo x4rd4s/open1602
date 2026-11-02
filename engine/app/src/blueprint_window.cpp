@@ -48,10 +48,11 @@ void BlueprintWindow::layout(const BlueprintModel& model) {
     f.label(Rect{16, 48, kInner, 28}, model.name);
     f.entry(Rect{16, 78, kInner, 28}, ui::tr("blueprint.cost"), bill_text(model.cost), Tone::Dim);
     f.button(kBuild, Rect{16, 110, kInner, 34}, ui::tr("blueprint.build"));
-    f.entry(Rect{16, 156, kInner, 28}, ui::tr("blueprint.city", {std::to_string(model.city_count), model.city}),
-            bill_text(model.city_cost), Tone::Dim);
-    f.button(kBuildCity, Rect{16, 188, kInner, 34}, ui::tr("blueprint.build_city"));
-    f.check(kAutomatic, Rect{16, 230, kInner, 34}, ui::tr("blueprint.automatic"), model.automatic);
+    // The city's line and its costs apart: with many blueprints the costs grow long.
+    f.label(Rect{16, 156, kInner, 28}, ui::tr("blueprint.city", {std::to_string(model.city_count), model.city}));
+    f.paragraph(Rect{16, 182, kInner, 44}, bill_text(model.city_cost), Tone::Dim);
+    f.button(kBuildCity, Rect{16, 230, kInner, 34}, ui::tr("blueprint.build_city"));
+    f.check(kAutomatic, Rect{16, 272, kInner, 34}, ui::tr("blueprint.automatic"), model.automatic);
     f.button(kRemove, Rect{16, kH - 50, kInner, 34}, ui::tr("blueprint.remove"));
 }
 
