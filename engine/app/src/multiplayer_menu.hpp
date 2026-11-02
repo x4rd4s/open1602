@@ -70,9 +70,13 @@ struct HostSetup {
 
 /// The host's settings as the lobby passes them on (net::Lobby::setup, which the session does not
 /// read): what is played and its settings, as "key = value" text.
-[[nodiscard]] std::vector<std::uint8_t> lobby_setup(const EndlessSetup& settings, SetupScope scope);
+/// A new endless game's also its world number (`settings.world_seed`) and `level`.
+[[nodiscard]] std::vector<std::uint8_t> lobby_setup(const EndlessSetup& settings, SetupScope scope,
+                                                    std::uint8_t level = 1);
 /// The settings of a lobby's setup; nothing if it has none or not in this form.
 [[nodiscard]] std::optional<std::pair<EndlessSetup, SetupScope>> read_lobby_setup(std::span<const std::uint8_t> bytes);
+/// The level of a new endless game in a lobby's setup (1 if it names none).
+[[nodiscard]] std::uint8_t read_lobby_level(std::span<const std::uint8_t> bytes);
 /// Whether the host may block a slot of `lobby` (nobody plays it, the world is still made for all
 /// the slots): only in a new endless game before it starts. A scenario's or savegame's players
 /// are in its world already.
@@ -131,6 +135,7 @@ struct MultiplayerEvent {
         Name,        ///< the player's name changed to `text`
         SetBanner,   ///< slot `seat` gets `banner` (the own slot; the host also the computer's and open ones)
         Settings,    ///< (host, in the lobby) the game's settings are now `setup.settings`
+        StartNow,    ///< (host) stop waiting for the players still loading the game at the start
     };
     Kind kind = Kind::Close;
     std::string address{};
@@ -187,9 +192,18 @@ public:
     void show_connecting(std::string address);
     void show_lobby();
     void set_scale(double scale) {
+        m_scale = scale > 0.0 ? scale : 1.0;
         m_form.set_scale(scale);
         m_settings.set_scale(scale);
     }
+    /// What makes the preview of the islands of a new endless game, and its colours
+    /// (GameSettingsMenu).
+    void set_preview_maker(GameSettingsMenu::PreviewMaker maker) { m_settings.set_preview_maker(std::move(maker)); }
+    void set_preview_colours(const GameSettingsMenu::PreviewColours& colours) {
+        m_settings.set_preview_colours(colours);
+    }
+    /// The start dialog over the screens (for the tests: its preview).
+    [[nodiscard]] GameSettingsMenu& settings_dialog() noexcept { return m_settings; }
     /// The banners by id (render::BannerTable): a slot shows the colour of its banner
     /// (net::LobbySeat::banner); `other` for a banner beyond them.
     void set_banners(std::vector<MenuBanner> banners, std::uint8_t other) {
@@ -226,11 +240,19 @@ private:
     void layout_browse(const MultiplayerModel& model);
     void layout_create(const MultiplayerModel& model);
     void layout_lobby(const MultiplayerModel& model);
+    /// The lobby's slots and who watches, from the top of the left column. Returns where they end.
+    std::int32_t layout_seats(const MultiplayerModel& model);
+    /// While the game starts (net::Session::starting()): everyone in the game with how far they are
+    /// with it, in place of the slots, from row m_start_first on. Returns where the rows end.
+    std::int32_t layout_start_list(const MultiplayerModel& model);
     void layout_connecting();
     /// The game from the host on its way (MultiplayerModel::join), in `box` of the lobby.
     void layout_join_progress(const MultiplayerModel& model, ui::Rect box);
     /// The start dialog over the screen: the host's settings to choose, or to look at.
-    void open_settings(const EndlessSetup& setup, SetupScope scope, GameSettingsMenu::Mode mode);
+    /// `level` the difficulty of a new endless game (its preview); `reroll` whether its world
+    /// number may change there (only while the host creates the game).
+    void open_settings(const EndlessSetup& setup, SetupScope scope, GameSettingsMenu::Mode mode, std::uint8_t level,
+                       bool reroll);
     /// Back from the start dialog to the screen it was opened from.
     void close_settings();
     /// The settings button and the summary of the rules below `y` in the right column.
@@ -307,6 +329,13 @@ private:
     std::vector<sim::BannerId> m_banner_choices;  ///< the banners of the buttons shown, in order
     /// (Host) The roster entries and names of the spectators shown with a kick button.
     std::vector<std::pair<std::size_t, std::string>> m_watchers;
+    // While the game starts: the list of who is in it and how far they are with it.
+    std::size_t m_start_first = 0;  ///< the first row shown
+    std::size_t m_start_rows = 0;   ///< rows shown at the last layout (0: no list)
+    ui::Rect m_start_box{};         ///< where the list is, for the mouse wheel
+    std::int32_t m_mouse_x = 0;     ///< where the mouse last was, in design units
+    std::int32_t m_mouse_y = 0;
+    double m_scale = 1.0;  ///< of the design units (set_scale())
 };
 
 }  // namespace o1602::app

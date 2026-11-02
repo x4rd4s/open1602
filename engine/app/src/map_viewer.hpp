@@ -230,7 +230,7 @@ private:
     /// How the game stands for the local player now.
     [[nodiscard]] sim::GameOutcome local_outcome() const;
     /// Makes the start dialog's preview of a new world (its page of the islands).
-    [[nodiscard]] GameSettingsMenu::PreviewMaker preview_maker() const;
+    [[nodiscard]] GameSettingsMenu::PreviewMaker preview_maker(bool multiplayer) const;
     /// A new endless game of `level` (from the menu): name and banner of the human (one of the
     /// original's four or a further one), with the settings of the start dialog (rules, an own world).
     core::Status start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
@@ -247,6 +247,11 @@ private:
     void announce_take_overs();
     /// The game a host sent: replaces the world (also after a desync); nullptr if it cannot be read.
     sim::Simulation* load_from_host(std::span<const std::uint8_t> save);
+    /// The same in two steps (net::ClientSession::load_in_background()): reads the game on a worker
+    /// thread and returns what starts it on the game thread.
+    [[nodiscard]] net::ClientSession::Finish prepare_host_game(std::vector<std::uint8_t> save);
+    /// Starts the game a host sent, read as `world` (with the `warnings` of reading it).
+    sim::Simulation* start_host_game(core::Result<sim::World> world, const std::vector<std::string>& warnings);
     /// Fingerprint of the game data the simulation depends on: computers of a multiplayer game
     /// must have the same.
     [[nodiscard]] std::uint64_t content_fingerprint() const;
@@ -325,6 +330,8 @@ private:
     void session_line(MpText id, std::string_view value = {}, sim::PlayerId seat = sim::kNoPlayer);
     [[nodiscard]] net::HostSession* host_session() const noexcept;
     [[nodiscard]] net::ClientSession* client_session() const noexcept;
+    /// Closes the lobby for the game: it runs now on this computer.
+    void close_lobby();
 
     /// Tells the sound where the view is (every frame, before events are heard).
     void place_listener();

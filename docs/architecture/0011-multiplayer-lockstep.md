@@ -125,7 +125,10 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     While the game comes in, the joining computer's lobby shows a progress bar
     (`ClientSession::join_stage()`: the host still writes it, its parts come in with the bytes so far,
     it is loaded); the whole message is read one update after its last part, so that a frame can
-    show the loading first. At most 4 connections
+    show the loading first. The game reads and unpacks it on a worker thread
+    (`ClientSession::load_in_background()`) and only starts it on the game thread: meanwhile the
+    computer keeps hearing the host, so that a large world on a slow computer does not outlast the
+    connection's timeout, and the messages that came meanwhile are read once the game is there. At most 4 connections
     come from one address, the host takes at most 8 spectators (`max_spectators`), and a computer it
     kicked does not come back in the same session unless it returns to a slot with its token (MS-12).
 11. **Lobby.** A host may start without a game: it holds a `Lobby` with the title, a description of
@@ -138,6 +141,15 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
     natives are reserved and not shown. Every game has all its players: a slot nobody takes is played by
     the computer, and the host hands it to whoever comes into the running game (the command
     `PlayerControl`) and back to the computer when that player leaves.
+    **All begin together** (protocol version 25): a game started from the lobby does not run on the
+    host while the others still receive it. The host holds its first frame (`HostSession::starting()`,
+    `Roster::starting`) until every player of the lobby has the game loaded; each computer tells the
+    host how much of the game on its way it has (`LoadProgress`, a few times a second), and the roster
+    carries it to everyone (`Member::loaded`). Meanwhile the lobby lists everyone in the game with a
+    progress bar (scrolled when there are more than ten), and the others' games stand at frame 0, as
+    there are no frames yet. A player whose game makes no progress for 60 s (`start_wait_ms`) is no
+    longer waited for, and the host may stop waiting at any time (`start_now()`); such a player
+    catches up like one who joins the running game. Spectators are not waited for.
 12. **Players.** A new endless game has four to twelve players. Four play on the original's maps;
     more get a world of their own (ADR 0008), as much sea and land per player as the original's
     500 × 350 for four. Players five on sit behind the original's seven slots (slot 7 on) with

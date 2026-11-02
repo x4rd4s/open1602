@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -875,6 +876,109 @@ TEST_CASE("multiplayer menu: the host's settings travel in the lobby") {
     CHECK(!app::read_lobby_setup({}));
 }
 
+namespace {
+
+/// What the preview of a multiplayer game was asked for: the world's number and the level.
+struct PreviewAsked {
+    std::mutex mutex;
+    std::vector<std::pair<std::uint64_t, std::uint8_t>> worlds;
+};
+
+app::GameSettingsMenu::PreviewMaker recording_maker(const std::shared_ptr<PreviewAsked>& asked) {
+    return [asked](const app::EndlessSetup& setup, std::uint8_t level) -> core::Result<sim::WorldPreview> {
+        {
+            const std::lock_guard lock(asked->mutex);
+            asked->worlds.emplace_back(setup.world_seed, level);
+        }
+        sim::WorldPreview p;
+        p.width = 20;
+        p.height = 20;
+        p.tiles.assign(400, sim::WorldPreview::Tile::Sea);
+        return p;
+    };
+}
+
+std::pair<std::uint64_t, std::uint8_t> last_asked(const std::shared_ptr<PreviewAsked>& asked) {
+    const std::lock_guard lock(asked->mutex);
+    REQUIRE(!asked->worlds.empty());
+    return asked->worlds.back();
+}
+
+}  // namespace
+
+TEST_CASE("multiplayer menu: the preview of the islands shows the world of the host's number") {
+    MultiplayerMenu menu(ui::FormStyle{});
+    const auto asked = std::make_shared<PreviewAsked>();
+    menu.set_preview_maker(recording_maker(asked));
+    app::MultiplayerModel model;
+    model.name = "Bernd";
+    model.level_names = {"Easy", "Normal", "Hard", "Very hard"};
+    menu.open();
+    (void)click(menu, model, "Create game");
+    (void)click(menu, model, "Hard");
+    (void)click(menu, model, "Game settings ...");
+    REQUIRE(menu.screen() == MultiplayerMenu::Screen::Settings);
+    (void)click(menu, model, ui::tr("setup.island_page.open", {ui::tr("setup.island_preset.original")}));
+    REQUIRE(menu.settings_dialog().islands_page());
+    menu.settings_dialog().wait_preview();
+    REQUIRE(menu.settings_dialog().preview().has_value());
+    const auto [typed, level] = last_asked(asked);
+    CHECK(level == 2);
+    CHECK(typed < app::kMultiplayerSeeds);
+    CHECK(find_text(menu, model, ui::tr("setup.preview.seed", {std::to_string(typed)})).has_value());
+
+    // Another world: a number the host could have typed, which the game then gets.
+    std::uint64_t other = typed;
+    for (int i = 0; i < 8 && other == typed; ++i) {
+        (void)click(menu, model, ui::tr("setup.preview.reroll"));
+        other = menu.settings_dialog().setup().world_seed;
+    }
+    CHECK(other != typed);
+    CHECK(other < app::kMultiplayerSeeds);
+    menu.settings_dialog().wait_preview();
+    CHECK(last_asked(asked).first == other);
+    (void)click(menu, model, "Apply");
+    REQUIRE(menu.screen() == MultiplayerMenu::Screen::Create);
+    const auto events = click(menu, model, "Open lobby");
+    REQUIRE(events.size() == 1);
+    CHECK(events[0].setup.seed == other);
+    CHECK(events[0].setup.level == 2);
+}
+
+TEST_CASE("multiplayer menu: in the lobby everyone's preview shows the host's world, which stays") {
+    app::EndlessSetup settings = app::EndlessSetup::defaults(app::SetupScope::MultiplayerEndless);
+    settings.world_seed = 4711;
+    const std::vector<std::uint8_t> bytes = app::lobby_setup(settings, app::SetupScope::MultiplayerEndless, 3);
+    const auto back = app::read_lobby_setup(bytes);
+    REQUIRE(back.has_value());
+    CHECK(back->first.world_seed == 4711);
+    CHECK(app::read_lobby_level(bytes) == 3);
+    CHECK(app::read_lobby_level({}) == 1);
+
+    net::LoopbackNetwork network;
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.game = "Endless game";
+    lobby.seats.resize(4);
+    lobby.setup = bytes;
+    net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
+    host.update(0);
+    MultiplayerMenu menu(ui::FormStyle{});
+    const auto asked = std::make_shared<PreviewAsked>();
+    menu.set_preview_maker(recording_maker(asked));
+    app::MultiplayerModel model;
+    model.name = "Bernd";
+    model.session = &host;
+    menu.show_lobby();
+    (void)click(menu, model, "Show game settings");
+    (void)click(menu, model, ui::tr("setup.island_page.open", {ui::tr("setup.island_preset.original")}));
+    REQUIRE(menu.settings_dialog().islands_page());
+    menu.settings_dialog().wait_preview();
+    CHECK((last_asked(asked) == std::pair<std::uint64_t, std::uint8_t>{4711, 3}));
+    (void)click(menu, model, ui::tr("setup.preview.reroll"));
+    CHECK(menu.settings_dialog().setup().world_seed == 4711);
+}
+
 TEST_CASE("multiplayer menu: the host chooses the settings of the game") {
     MultiplayerMenu menu(ui::FormStyle{});
     app::MultiplayerModel model;
@@ -944,4 +1048,93 @@ TEST_CASE("multiplayer menu: in the lobby the host changes the settings, the oth
     CHECK(!find_text(menu, model, "Apply").has_value());
     CHECK(click(menu, model, ui::tr("setup.back")).empty());
     CHECK(menu.screen() == MultiplayerMenu::Screen::Lobby);
+}
+
+TEST_CASE("multiplayer menu: while the game starts, everyone in it with how far they are, scrolled when many") {
+    // A computer in a started lobby of twelve players and two spectators, whose host still waits
+    // for some of them (net::Roster::starting).
+    net::LoopbackNetwork network(5, 0);
+    auto host = network.listen();
+    net::Hello hello;
+    hello.name = "P1";
+    hello.content = 1;
+    net::ClientSession client(network.connect(), hello, [](std::span<const std::uint8_t>) { return nullptr; });
+    net::Lobby lobby;
+    lobby.title = "Abend";
+    lobby.started = true;
+    lobby.seats.resize(12);
+    net::Roster roster;
+    roster.starting = true;
+    for (std::size_t s = 0; s < 12; ++s) {
+        const std::string name = "P" + std::to_string(s);
+        lobby.seats[s].kind = net::LobbySeat::Kind::Human;
+        lobby.seats[s].name = name;
+        lobby.seats[s].banner = static_cast<sim::BannerId>(s);
+        // The host ready, then waiting, receiving, loading and ready in turn.
+        const auto state = s % 4 == 0 ? net::Member::State::Playing : net::Member::State::Loading;
+        const std::uint8_t loaded = s % 4 == 1 ? 0 : s % 4 == 2 ? 45 : 100;
+        roster.members.push_back(net::Member{static_cast<sim::PlayerId>(s), name, state, s == 0, loaded});
+    }
+    roster.members.push_back(net::Member{sim::kNoPlayer, "W1", net::Member::State::Loading, false, 10});
+    roster.members.push_back(net::Member{sim::kNoPlayer, "W2", net::Member::State::Playing, false, 100});
+    std::optional<net::LinkId> link;
+    for (int i = 0; i < 20; ++i) {
+        network.advance(16);
+        std::vector<net::TransportEvent> events;
+        host->poll(events);
+        for (const auto& e : events) {
+            if (e.kind == net::TransportEvent::Kind::Received && !link) {
+                link = e.link;
+                host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 7}));
+                host->send(e.link, net::encode(lobby));
+                host->send(e.link, net::encode(roster));
+            }
+        }
+        client.update(16);
+    }
+    REQUIRE(client.starting());
+    REQUIRE(client.roster().size() == 14);
+
+    MultiplayerMenu menu(ui::FormStyle{});
+    app::MultiplayerModel model;
+    model.session = &client;
+    menu.show_lobby();
+    CHECK(find_text(menu, model, "P0 (host)").has_value());
+    CHECK(find_text(menu, model, "P1 (you)").has_value());
+    CHECK(find_text(menu, model, "Waiting").has_value());
+    CHECK(find_text(menu, model, "45%").has_value());
+    CHECK(find_text(menu, model, "Loading").has_value());
+    CHECK(find_text(menu, model, "Ready").has_value());
+    CHECK(find_text(menu, model, "3 of 12 players ready").has_value());  // P0, P4 and P8
+    CHECK(find_text(menu, model, "The game is starting").has_value());
+    // No slots to take, no ready button and no start: the game has started.
+    CHECK(!find_text(menu, model, "Take").has_value());
+    CHECK(!find_text(menu, model, "Stop waiting").has_value());
+    // Ten rows: the rest by the button, or the wheel over the list.
+    CHECK(!find_text(menu, model, "W2 (spectator)").has_value());
+    CHECK(!find_text(menu, model, "-").has_value());
+    (void)click(menu, model, "+");
+    CHECK(find_text(menu, model, "W1 (spectator)").has_value());
+    CHECK(find_text(menu, model, "W2 (spectator)").has_value());
+    CHECK(!find_text(menu, model, "P0 (host)").has_value());
+    CHECK(!find_text(menu, model, "+").has_value());
+    (void)click(menu, model, "-");
+    CHECK(find_text(menu, model, "P0 (host)").has_value());
+    (void)menu.mouse(model, 200, 150, false);  // the mouse over the list
+    CHECK(menu.wheel(model, -2));
+    CHECK(!find_text(menu, model, "P1 (you)").has_value());
+    CHECK(find_text(menu, model, "P2").has_value());
+
+    // The host may stop waiting.
+    model.hosting = true;
+    const auto events = click(menu, model, "Stop waiting");
+    REQUIRE(events.size() == 1);
+    CHECK(events[0].kind == MultiplayerEvent::Kind::StartNow);
+
+    // In German.
+    const LanguageGuard german("de");
+    CHECK(find_text(menu, model, "Das Spiel startet").has_value());
+    CHECK(find_text(menu, model, "3 von 12 Spielern bereit").has_value());
+    CHECK(find_text(menu, model, "45 %").has_value());
+    CHECK(find_text(menu, model, "Nicht mehr warten").has_value());
 }

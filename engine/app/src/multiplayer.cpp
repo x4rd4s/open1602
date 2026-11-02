@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <memory>
 #include <random>
 
 #include "map_viewer.hpp"
@@ -25,6 +26,10 @@ constexpr std::uint64_t kSearchEveryMs = 3000;
 /// A game for a computer that joins packs on a worker while the game goes on, this long at most
 /// before the host waits for it (SessionConfig::pack_wait_ms, TB-26).
 constexpr std::uint32_t kPackWaitMs = 5'000;
+/// A game started from a lobby begins for everyone at once: its first frame waits until every
+/// player has it, but no longer than this for one whose game makes no progress
+/// (SessionConfig::start_wait_ms).
+constexpr std::uint32_t kStartWaitMs = 60'000;
 
 /// What this computer remembers for the menu: the last name typed and the last settings a host chose.
 void remembered_to_model(MultiplayerModel& model, const AppSettings& settings) {
@@ -44,6 +49,15 @@ net::HostSession* MapViewer::host_session() const noexcept {
 
 net::ClientSession* MapViewer::client_session() const noexcept {
     return dynamic_cast<net::ClientSession*>(m_session.get());
+}
+
+void MapViewer::close_lobby() {
+    if (m_hud && m_hud->multiplayer_open()) {
+        m_hud->close_menu();
+        if (const auto a = m_hud->set_mode(Hud::kModeInfo)) {
+            apply_hud(*a);
+        }
+    }
 }
 
 core::Status MapViewer::start_multiplayer() {
@@ -80,6 +94,22 @@ core::Status MapViewer::start_multiplayer() {
 sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     std::vector<std::string> warnings;
     auto world = sim::read_game(save, m_buildings, &warnings, &m_figures);
+    return start_host_game(std::move(world), warnings);
+}
+
+net::ClientSession::Finish MapViewer::prepare_host_game(std::vector<std::uint8_t> save) {
+    // On a worker thread: reading and unpacking the game, the long part of a large world, while
+    // the program goes on and keeps the connection. It only reads the game's tables, which change
+    // only when a game starts on the game thread (make_state), not before this one is finished.
+    auto warnings = std::make_shared<std::vector<std::string>>();
+    auto world =
+        std::make_shared<core::Result<sim::World>>(sim::read_game(save, m_buildings, warnings.get(), &m_figures));
+    save = {};  // the bytes are no longer needed: freed here, not on the game thread
+    // The rest on the game thread, where the game starts.
+    return [this, world, warnings] { return start_host_game(std::move(*world), *warnings); };
+}
+
+sim::Simulation* MapViewer::start_host_game(core::Result<sim::World> world, const std::vector<std::string>& warnings) {
     if (!world) {
         std::fprintf(stderr, "multiplayer: the host's game cannot be loaded: %s\n", world.error().message.c_str());
         return nullptr;
@@ -220,11 +250,14 @@ void MapViewer::apply_session_events() {
                 }
                 std::fprintf(stderr, "multiplayer: game from the host loaded at frame %llu\n",
                              static_cast<unsigned long long>(e.frame));
-                if (m_hud && m_hud->multiplayer_open()) {
-                    m_hud->close_menu();
-                    if (const auto a = m_hud->set_mode(Hud::kModeInfo)) {
-                        apply_hud(*a);
-                    }
+                if (!m_session->starting()) {
+                    close_lobby();  // else the lobby shows who is still loading until all begin (Started)
+                }
+                break;
+            case net::SessionEvent::Kind::Started:
+                std::fprintf(stderr, "multiplayer: everyone has the game, it begins\n");
+                if (m_host_game_loaded || host_session() != nullptr) {
+                    close_lobby();
                 }
                 break;
             case net::SessionEvent::Kind::Joined:
@@ -495,7 +528,7 @@ void MapViewer::handle_multiplayer(const MultiplayerEvent& e) {
                 m_hosted->settings = e.setup.settings;
                 const net::Lobby& lobby = host->lobby();
                 host->set_lobby_info(lobby.title, lobby.game,
-                                     lobby_setup(m_hosted->game_settings(), m_hosted->scope()));
+                                     lobby_setup(m_hosted->game_settings(), m_hosted->scope(), m_hosted->level));
                 if (!(e.setup.settings == m_app_settings.multiplayer)) {
                     m_app_settings.multiplayer = e.setup.settings;
                     save_settings();
@@ -508,6 +541,11 @@ void MapViewer::handle_multiplayer(const MultiplayerEvent& e) {
         case MultiplayerEvent::Kind::Start:
             if (auto status = start_hosted_game(); !status) {
                 session_line(MpText::StartFailed, status.error().message);
+            }
+            break;
+        case MultiplayerEvent::Kind::StartNow:
+            if (host != nullptr) {
+                host->start_now();
             }
             break;
         case MultiplayerEvent::Kind::TakeSeat:
@@ -644,7 +682,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
         saved.rules = world->saved_rules().value_or(m_options.rules);
         lobby.setup = lobby_setup(saved, SetupScope::Savegame);
     } else {
-        lobby.setup = lobby_setup(setup.game_settings(), setup.scope());
+        lobby.setup = lobby_setup(setup.game_settings(), setup.scope(), setup.level);
     }
     // The host plays the first open slot (the first slot if all are computers), unless it only hosts.
     // A savegame's host plays the slot it played before, if the game knows it.
@@ -667,6 +705,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     }
     net::SessionConfig config;
     config.pack_wait_ms = kPackWaitMs;
+    config.start_wait_ms = kStartWaitMs;
     config.password = setup.password;
     config.player = m_app_settings.player_id;
     config.join_running = setup.join_running;
@@ -817,11 +856,8 @@ core::Status MapViewer::start_hosted_game() {
         m_command_sink.submit(sim::PlayerRename{own, lobby.seats[own].name});
     }
     std::fprintf(stderr, "multiplayer: the game starts\n");
-    if (m_hud) {
-        m_hud->close_menu();
-        if (const auto a = m_hud->set_mode(Hud::kModeInfo)) {
-            apply_hud(*a);
-        }
+    if (!host->starting()) {
+        close_lobby();  // else once every player has the game (Started)
     }
     return core::Ok{};
 }
@@ -876,6 +912,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     auto client = std::make_unique<net::ClientSession>(
         std::move(transport).value(), hello,
         [this](std::span<const std::uint8_t> save) { return load_from_host(save); }, config);
+    client->load_in_background([this](std::vector<std::uint8_t> save) { return prepare_host_game(std::move(save)); });
     // A broken connection: back to this host first; only if it cannot be reached, on to the
     // successor (MS-2).
     client->reconnect_with([address, port]() -> std::unique_ptr<net::Transport> {
