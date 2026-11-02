@@ -603,6 +603,9 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             }
             m_tool.set_mode(m_tool.mode() == BuildTool::Mode::Demolish ? BuildTool::Mode::Off
                                                                        : BuildTool::Mode::Demolish);
+            if (m_hud && m_tool.mode() == BuildTool::Mode::Demolish) {
+                m_hud->show_tool_in_build_menu(BuildPanel::Tool::Demolish);
+            }
             if (m_tool.active()) {
                 drop_units();
             }
@@ -613,6 +616,9 @@ void MapInput::run_action(const ui::KeyBinding& b) {
                 set_mode(Hud::kModeBuild);
             }
             m_tool.set_mode(m_tool.mode() == BuildTool::Mode::Copy ? BuildTool::Mode::Off : BuildTool::Mode::Copy);
+            if (m_hud && m_tool.mode() == BuildTool::Mode::Copy) {
+                m_hud->show_tool_in_build_menu(BuildPanel::Tool::Copy);
+            }
             if (m_tool.active()) {
                 drop_units();
             }

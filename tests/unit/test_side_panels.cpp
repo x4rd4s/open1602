@@ -249,6 +249,13 @@ TEST_CASE("side panel build menu: demolish, rotate and orient to the road") {
     CHECK(a->kind == BuildPanel::Action::Kind::Demolish);
     CHECK(b.panel.demolish());
     CHECK(!b.panel.copy());
+    // A key starts a tool: the menu shows it.
+    (void)b.press(kWorkshops);
+    b.panel.show_tool(BuildPanel::Tool::Copy);
+    CHECK(!b.panel.popup_open());
+    CHECK(b.panel.copy());
+    b.panel.show_tool(BuildPanel::Tool::Demolish);
+    CHECK(b.panel.demolish());
     CHECK(!b.panel.current(b.available).has_value());
     bool consumed = false;
     (void)b.panel.mouse(0, 0, false, b.available, consumed);

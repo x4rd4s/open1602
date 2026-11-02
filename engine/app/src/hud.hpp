@@ -178,6 +178,12 @@ public:
     /// The build menu opens next with this building picked in its category (a farm's field after
     /// looking at the farm, 0x004331B0). False if the menu has no such building.
     bool show_in_build_menu(std::uint32_t id) { return m_build && m_build->show(id); }
+    /// The build menu shows a tool a key started (its title names it).
+    void show_tool_in_build_menu(BuildPanel::Tool tool) {
+        if (m_build) {
+            m_build->show_tool(tool);
+        }
+    }
     /// Opens the ship or city list or the diplomacy window in the info mode (the buttons of the
     /// player status, L, Shift+L, V), or closes it if it is open; returns what the tool should do.
     std::optional<Action> toggle_window(Selection::Kind kind);

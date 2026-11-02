@@ -64,6 +64,8 @@ public:
     /// The tools under the demolish button (Open1602): its pop-up offers them instead of starting
     /// the demolish tool at once, as later Anno games do.
     enum class Tool : std::uint8_t { Demolish, Copy };
+    /// Shows the tools' category with `tool` picked: a key started the tool (Delete, Ctrl+C).
+    void show_tool(Tool tool);
     /// The tools' pop-up as a category of the menu: icons "open1602:<tool>", names in the
     /// language of the game (Windows-1252, as the original's; demolish by its own text).
     [[nodiscard]] ui::BuildCategory tools_category(std::int32_t button) const;

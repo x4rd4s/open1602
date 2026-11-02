@@ -96,6 +96,19 @@ bool BuildPanel::copy() const noexcept {
     return c != nullptr && c->demolish && m_tool == Tool::Copy;
 }
 
+void BuildPanel::show_tool(Tool tool) {
+    for (const ui::BuildCategory& c : m_menu->categories) {
+        if (c.demolish) {
+            m_popup.reset();
+            m_bau.set_selected(m_category, false);
+            m_category = c.button;
+            m_bau.set_selected(m_category, true);
+            m_tool = tool;
+            return;
+        }
+    }
+}
+
 ui::BuildCategory BuildPanel::tools_category(std::int32_t button) const {
     ui::BuildCategory tools;
     tools.button = button;
