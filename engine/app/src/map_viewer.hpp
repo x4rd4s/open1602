@@ -581,9 +581,12 @@ private:
     std::size_t m_batches_drawn = 0;  ///< draw calls of the map's sprites in the last frame (FB-7)
     BuildTool m_tool;
     std::optional<TemplateStore> m_templates;  ///< made on first use (template_store)
-    std::string m_tool_status;                 ///< what the build tool would do at the mouse
-    bool m_tool_short_of_wood = false;         ///< ... and that it lacks wood for it (the tutorial's bubble)
-    std::size_t m_load_problems = 0;           ///< of the game loaded last (report_load_problems)
+    /// Until then a note in the status line goes before what the build tool would do (a template saved).
+    std::uint64_t m_notice_over_tool_until = 0;
+    static constexpr std::uint64_t kNoticeOverToolMs = 3000;
+    std::string m_tool_status;          ///< what the build tool would do at the mouse
+    bool m_tool_short_of_wood = false;  ///< ... and that it lacks wood for it (the tutorial's bubble)
+    std::size_t m_load_problems = 0;    ///< of the game loaded last (report_load_problems)
     struct ScreenshotRequest {
         std::filesystem::path path;
         bool notify = false;  ///< say in the status line how it went (F12)

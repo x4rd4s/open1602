@@ -1794,7 +1794,8 @@ void MapViewer::render() {
             corners[i] = m_camera.point_at_screen(screen[i].first, screen[i].second);
         }
         const std::uint64_t now = platform::ticks_ms();
-        if (const std::string* notice = m_events.notice(now); notice != nullptr && !m_tool.active()) {
+        if (const std::string* notice = m_events.notice(now);
+            notice != nullptr && (!m_tool.active() || now < m_notice_over_tool_until)) {
             m_hud->set_status(*notice);
         } else {
             if (m_tool_status.empty() && !m_tool.active()) {
@@ -4245,10 +4246,7 @@ void MapViewer::save_template() {
 }
 
 void MapViewer::update_template_window() {
-    if (!m_hud->templates_open()) {
-        (void)m_hud->take_template_requests();
-        return;
-    }
+    // Saving closes the window before its request comes here: what was asked counts all the same.
     bool changed = false;
     for (const TemplateRequest& r : m_hud->take_template_requests()) {
         TemplateStore& store = template_store();
@@ -4257,6 +4255,8 @@ void MapViewer::update_template_window() {
                 if (const auto& layout = m_tool.layout(); layout && m_tool.mode() == BuildTool::Mode::Copy) {
                     if (store.add(r.name, *layout)) {
                         notify(ui::tr("template.saved", {r.name}), "template saved");
+                        // Said over the copy tool's costs, which the status line shows meanwhile.
+                        m_notice_over_tool_until = platform::ticks_ms() + kNoticeOverToolMs;
                     } else {
                         notify(ui::tr("template.failed"), "template not saved");
                     }

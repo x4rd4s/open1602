@@ -282,6 +282,13 @@ TEST_CASE("side panel build menu: the templates are the fifth tool and take the 
     Build b;
     (void)b.press(kDemolishButton);
     REQUIRE(b.panel.popup_open());
+    // The row of one icon has the middle of its picture covered; the full row needs no patch.
+    CHECK(!b.panel.popup()->position(ui::kPopupPatch).has_value());
+    REQUIRE(b.panel.popup()->position(ui::kPopupPatch + 1).has_value());
+    const std::vector<ui::DrawItem> drawn = b.panel.popup()->draw(kNoFonts);
+    CHECK(std::any_of(drawn.begin(), drawn.end(), [](const ui::DrawItem& d) {
+        return d.first_col == ui::kPopupPatchFrom && d.cols == ui::kPopupPatchWidth;
+    }));
     const auto a = b.release_on(4);
     REQUIRE(a.has_value());
     CHECK(a->kind == BuildPanel::Action::Kind::Templates);

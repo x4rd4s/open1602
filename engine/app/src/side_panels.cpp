@@ -183,6 +183,7 @@ void BuildPanel::open_popup(const ui::BuildCategory& category, const Available& 
         return;
     }
     m_popup.emplace(ui::build_popup(category, ok, *button, m_gfx_bauhaus, m_menu->locked_icon_offset), m_bau.scale());
+    ui::show_popup_patches(*m_popup);
     m_popup_category = category.button;
     // The button is still held: the pop-up takes over this press, so that dragging onto an icon
     // and letting go there picks it.
