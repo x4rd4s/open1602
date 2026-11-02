@@ -620,8 +620,10 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             if (m_hud && m_hud->mode() != Hud::kModeBuild) {
                 set_mode(Hud::kModeBuild);
             }
-            m_tool.set_mode(m_tool.mode() == BuildTool::Mode::Copy ? BuildTool::Mode::Off : BuildTool::Mode::Copy);
-            if (m_hud && m_tool.mode() == BuildTool::Mode::Copy) {
+            // Always starts it afresh (the piece in hand goes), so that the menu's title, which names
+            // the copy tool, never names a tool put away; Escape puts it away.
+            m_tool.set_mode(BuildTool::Mode::Copy);
+            if (m_hud) {
                 m_hud->show_tool_in_build_menu(BuildPanel::Tool::Copy);
             }
             if (m_tool.active()) {
