@@ -332,8 +332,10 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
             continue;
         }
         if (ship_type >= 0) {
-            // The ship and, after it, its wreck as the ship it copies has it.
-            const FigureType* wreck = table.get(like->number + 1);
+            // The ship and, after it, its wreck as the ship it copies has it. Adding moves the
+            // table's figures, `like` among them.
+            const std::uint32_t like_number = like->number;
+            const FigureType* wreck = table.get(like_number + 1);
             if (wreck == nullptr) {
                 warnings.push_back(at + id + ": the ship it copies has no wreck after it");
                 continue;
@@ -346,7 +348,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
             }
             own.push_back(OwnFigure{id, *number});
             if (ships != nullptr) {
-                const OwnShip* base = find_own_ship(*ships, like->number);
+                const OwnShip* base = find_own_ship(*ships, like_number);
                 const bool template_image = tint || (image == nullptr && base != nullptr && base->tint);
                 ships->push_back(
                     OwnShip{id, *number, static_cast<std::uint8_t>(ship_type), icon, std::move(names), template_image});
