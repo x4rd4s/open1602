@@ -180,6 +180,8 @@ inline const PublicTask* public_task(std::uint8_t task) {
 /// houses however large the island is.
 inline constexpr std::uint32_t kGrowLand = 1000;
 inline constexpr std::uint32_t kGrowMax = 8;
+/// ... and only while it has this much gold, so that growing does not spend what its next stage asks for.
+inline constexpr std::int32_t kGrowReserve = 10'000;
 
 /// `n` of an order grown for a city with `land` tiles of free land (kGrowLand), in sixteenths so
 /// that a little more land already adds a little; rounded up, at most kMaxOrderCount.
