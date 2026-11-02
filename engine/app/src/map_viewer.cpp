@@ -25,6 +25,7 @@
 #include "diagnostics.hpp"
 #include "endless_setup.hpp"
 #include "fertility_view.hpp"
+#include "mod_rules.hpp"
 #include "tile_status.hpp"
 
 #include "o1602/assets/chunk_file.hpp"
@@ -46,6 +47,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/growth.hpp"
+#include "o1602/sim/new_game.hpp"
 #include "o1602/sim/package_landscapes.hpp"
 #include "o1602/ui/build_menu.hpp"
 #include "o1602/ui/localization.hpp"
@@ -188,166 +190,26 @@ std::string player_label(const sim::Player& p, sim::PlayerId slot, const render:
 
 namespace {
 
-/// What a new game starts with as the mods change it.
-struct ModRules {
-    std::vector<sim::Faction> factions = sim::base_factions();
-    /// Factions of packages that take the slots of others in new games (factions.toml `replaces`).
-    std::vector<sim::FactionReplacement> faction_replacements;
-    sim::Balance balance;
-    /// The buildings the packages added, with the Ids `buildings` gave them.
-    std::vector<assets::OwnBuilding> own;
-    /// The figures the packages added, with the numbers `figures` gave them.
-    std::vector<assets::OwnFigure> own_figures;
-    /// The original's goods and those the packages added (goods.toml).
-    assets::Goods goods;
-    /// The classes of inhabitants as the packages change and add them (classes.toml); empty when
-    /// none does.
-    std::vector<assets::ResidentClass> classes;
-    /// The unlock levels as the packages change and add them (levels.toml); empty when none does.
-    std::vector<assets::InfraLevel> levels;
-    /// The images of the packages with their sprite numbers (graphics.toml).
-    std::vector<assets::PackageImage> images;
-    /// The figures the packages draw with their images (figure_images.toml).
-    std::vector<assets::FigureLook> looks;
-    /// The music of the packages (music.toml).
-    std::vector<audio::MusicTrack> music;
-    /// The sounds of the packages with their sound numbers (sounds.toml).
-    std::vector<assets::PackageSound> sounds;
-};
-
-/// The icons of `packages` (icons.toml), numbered in their load order.
-std::vector<assets::PackageIcon> load_package_icons(std::span<const assets::ModPackage> packages,
-                                                    std::vector<std::string>& problems) {
-    std::vector<assets::PackageIcon> icons = ui::builtin_icons();  // Open1602's own first
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kIconsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_icons_file(icons, package.id, package.folder, text, problems);
-        }
-    }
-    return icons;
-}
-
-/// The kinds of island world of `packages` (landscapes.toml), in their load order.
-std::vector<sim::PackageLandscape> load_package_landscapes(std::span<const assets::ModPackage> packages) {
-    std::vector<sim::PackageLandscape> presets;
-    std::vector<std::string> problems;
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kLandscapesFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_landscapes_file(presets, package.id, text, problems);
-        }
-    }
+/// What the mods' files say is wrong, in the log.
+void log_mod_problems(const std::vector<std::string>& problems) {
     for (const std::string& p : problems) {
         std::fprintf(stderr, "mods: %s\n", p.c_str());
     }
-    return presets;
 }
 
-/// The base game's factions and numbers as the mods change them (<package folder>/factions.toml and
-/// balance.toml), the packages in their load order; the buildings they add go into `buildings`
-/// first (own_buildings.toml), so that a package can change another package's building too.
-ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::BuildingTable& buildings,
-                        assets::FigureTable& figures) {
-    ModRules rules;
+ModRules logged_mod_rules(std::span<const assets::ModPackage> packages, assets::BuildingTable& buildings,
+                          assets::FigureTable& figures) {
     std::vector<std::string> problems;
-    // Goods first (with the icons they may show), then the classes and buildings that use them,
-    // then the values that may name both. The icons' warnings come when the game takes them
-    // (MapViewer::use_game_packages).
-    std::vector<std::string> ignored;
-    const std::vector<assets::PackageIcon> icons = load_package_icons(packages, ignored);
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kGoodsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_goods_file(rules.goods, package.id, text, problems, icons);
-        }
-    }
-    // Then the classes that need them, then the buildings, among them houses of those classes.
-    std::vector<assets::ResidentClass> classes = buildings.resident_classes();
-    bool classes_changed = false;
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kClassesFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            classes_changed |= assets::apply_classes_file(classes, package.id, text, problems, rules.goods);
-        }
-    }
-    if (classes_changed) {
-        rules.classes = classes;
-    }
-    // Then the levels that count inhabitants of those classes, which the buildings may need.
-    std::vector<assets::InfraLevel> levels = buildings.infra_levels();
-    bool levels_changed = false;
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kLevelsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            levels_changed |= assets::apply_levels_file(levels, package.id, text, problems, classes);
-        }
-    }
-    if (levels_changed) {
-        rules.levels = levels;
-    }
-    // Then the images the buildings draw.
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kGraphicsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_graphics_file(rules.images, package.id, package.folder, text, problems);
-        }
-        if (const auto bytes = core::read_file(package.folder / assets::kFigureImagesFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_figure_images_file(rules.looks, package.id, text, rules.images, figures, problems);
-        }
-        if (const auto bytes = core::read_file(package.folder / audio::kMusicFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            audio::apply_music_file(rules.music, package.id, package.folder, text, problems);
-        }
-        if (const auto bytes = core::read_file(package.folder / assets::kSoundsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_sounds_file(rules.sounds, package.id, package.folder, text, problems);
-        }
-    }
-    // Then the figures, with the images they draw, which the buildings may name as their workers.
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kOwnFiguresFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_own_figures_file(figures, rules.own_figures, package.id, text, problems, rules.images,
-                                           rules.sounds);
-        }
-    }
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kOwnBuildingsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            assets::apply_own_buildings_file(buildings, rules.own, package.id, text, problems, rules.goods, classes,
-                                             levels, rules.images, &figures, rules.own_figures, rules.sounds);
-        }
-    }
-    for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kFactionFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_faction_file(rules.factions, package.id, text, problems, &rules.faction_replacements);
-        }
-        if (const auto bytes = core::read_file(package.folder / sim::kBalanceFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_balance_file(rules.balance, package.id, text, problems);
-        }
-        if (const auto bytes = core::read_file(package.folder / sim::kBuildingsFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_buildings_file(rules.balance, package.id, text, problems, rules.own);
-        }
-        if (const auto bytes = core::read_file(package.folder / sim::kFiguresFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_figures_file(rules.balance, package.id, text, problems, rules.own_figures);
-        }
-        if (const auto bytes = core::read_file(package.folder / sim::kComputersFile)) {
-            const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-            sim::apply_computers_file(rules.balance.computer_orders, package.id, text, problems, rules.goods);
-        }
-    }
-    sim::drop_unknown_buildings(rules.balance, buildings, problems);
-    sim::drop_unknown_figures(rules.balance, figures, problems);
-    for (const std::string& p : problems) {
-        std::fprintf(stderr, "mods: %s\n", p.c_str());
-    }
+    ModRules rules = load_mod_rules(packages, buildings, figures, problems);
+    log_mod_problems(problems);
     return rules;
+}
+
+std::vector<sim::PackageLandscape> logged_landscapes(std::span<const assets::ModPackage> packages) {
+    std::vector<std::string> problems;
+    std::vector<sim::PackageLandscape> presets = load_package_landscapes(packages, problems);
+    log_mod_problems(problems);
+    return presets;
 }
 
 }  // namespace
@@ -397,7 +259,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
             std::fprintf(stderr, "mods: package %s\n", assets::package_label(p.content()).c_str());
         }
     }
-    ModRules rules = load_mod_rules(packages, *buildings, *figures);
+    ModRules rules = logged_mod_rules(packages, *buildings, *figures);
     core::Result<sim::World> world = core::make_error(core::ErrorCode::NotFound, "no game");
     const bool joining = options.multiplayer && options.multiplayer->role == ViewerOptions::Multiplayer::Role::Join;
     if (options.menu || joining) {
@@ -432,6 +294,10 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         }
         if (sim::is_open1602_save(*bytes)) {
             world = sim::read_game(*bytes, *buildings, &warnings, &*figures);
+            if (world && world->planned_islands()) {
+                // A scenario that makes its islands when the game starts (ADR 0013).
+                world = sim::roll_planned_islands(*world, game, *buildings, options.world, &warnings);
+            }
         } else {
             auto file = assets::ChunkFile::from_bytes(std::move(bytes).value());
             if (!file) {
@@ -493,7 +359,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     assets::apply_figure_looks(viewer->m_figures, viewer->m_original_figures, viewer->m_figure_looks);
     viewer->m_packages = std::move(packages);
     viewer->load_package_scenarios();
-    set_package_island_presets(load_package_landscapes(viewer->m_packages));
+    set_package_island_presets(logged_landscapes(viewer->m_packages));
     {
         std::vector<std::string> problems;
         viewer->m_cached_packages = assets::cached_packages(data_folder() / "mods-cache", problems);
@@ -772,13 +638,13 @@ core::Status MapViewer::ensure_graphics(render::Zoom zoom) {
     }
     // Wanted before the background has it: the frames stand still until it is there, the sound
     // goes on.
-    const std::uint64_t start = platform::ticks_ms();
+    const std::uint64_t start = platform::real_ticks_ms();
     auto prepared = m_preloader->take(zoom, [this] {
         if (m_sound) {
             m_sound->prefill();
         }
     });
-    if (const std::uint64_t waited = platform::ticks_ms() - start; waited > 0) {
+    if (const std::uint64_t waited = platform::real_ticks_ms() - start; waited > 0) {
         std::fprintf(stderr, "%s: waited %llu ms for it\n", zoom_name(zoom), static_cast<unsigned long long>(waited));
     }
     if (!prepared) {
@@ -813,7 +679,7 @@ void MapViewer::adopt_preloaded_graphics() {
 core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGraphics prepared) {
     auto& slot = m_graphics[static_cast<std::size_t>(zoom)];
     const std::uint32_t made_ms = prepared.ms;
-    const std::uint64_t start = platform::ticks_ms();
+    const std::uint64_t start = platform::real_ticks_ms();
     slot.emplace(ZoomGraphics{std::move(prepared.graphics), nullptr, std::move(prepared.hit_mask)});
     slot->renderer = std::make_unique<render::SdlSpriteRenderer>(m_window->sdl_renderer());
     if (auto status = slot->renderer->upload(slot->graphics.atlas); !status) {
@@ -825,7 +691,7 @@ core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGrap
                  "%s: %zu sprites in %zu page(s) of %u px, figure masks %zu KB, made in %u ms, upload %llu ms\n",
                  zoom_name(zoom), slot->graphics.atlas.sprite_count(), slot->graphics.atlas.pages().size(),
                  slot->graphics.atlas.page_size(), slot->hit_mask.bytes() / 1024, made_ms,
-                 static_cast<unsigned long long>(platform::ticks_ms() - start));
+                 static_cast<unsigned long long>(platform::real_ticks_ms() - start));
     return core::Ok{};
 }
 
@@ -836,7 +702,7 @@ void MapViewer::quit() {
 
 int MapViewer::run() {
     std::uint64_t last = platform::ticks_ms();
-    const std::uint64_t run_start = last;
+    const std::uint64_t run_start = platform::real_ticks_ms();
     std::uint64_t fps_start = last;
     std::uint32_t fps_frames = 0;
     std::uint32_t frames = 0;
@@ -918,6 +784,7 @@ int MapViewer::run() {
                     break;
             }
         }
+        platform::advance_fixed_clock();  // a run of N frames: the same step every frame
         const std::uint64_t now = platform::ticks_ms();
         const auto delta = static_cast<std::uint32_t>(std::min<std::uint64_t>(now - last, 1000));
         last = now;
@@ -992,7 +859,7 @@ int MapViewer::run() {
     }
     finish_autosave();
     if (m_options.max_frames != 0) {
-        const std::uint64_t elapsed = std::max<std::uint64_t>(platform::ticks_ms() - run_start, 1);
+        const std::uint64_t elapsed = std::max<std::uint64_t>(platform::real_ticks_ms() - run_start, 1);
         std::fprintf(stderr, "%u frames in %llu ms (%.1f fps), %zu sprites in %zu batches in the last frame\n", frames,
                      static_cast<unsigned long long>(elapsed), frames * 1000.0 / static_cast<double>(elapsed),
                      m_sprites_drawn, m_batches_drawn);
@@ -1143,11 +1010,13 @@ void MapViewer::update(std::uint32_t delta_ms) {
     // While the game is paused this only carries out the commands (building is possible then).
     // Ticks run while the frame has time (at least one); before each, the positions of the ships,
     // soldiers and walkers are kept so that they move smoothly between ticks. A computer too slow
-    // for the speed runs the game slower instead of stalling (review point 20).
+    // for the speed runs the game slower instead of stalling (review point 20). Under a fixed clock
+    // (--frames N) every tick owed runs, however long it takes: the frames do not hang on the computer.
+    const bool budget = !platform::fixed_clock();
     const auto frame_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(kTickBudgetMs);
     bool first = true;
     const auto before_tick = [&] {
-        if (!first && std::chrono::steady_clock::now() >= frame_end) {
+        if (!first && budget && std::chrono::steady_clock::now() >= frame_end) {
             return false;
         }
         first = false;
@@ -3531,7 +3400,7 @@ void MapViewer::reload_mods() {
         std::fprintf(stderr, "mods: %s\n", p.c_str());
     }
     load_package_scenarios();
-    set_package_island_presets(load_package_landscapes(m_packages));
+    set_package_island_presets(logged_landscapes(m_packages));
     if (m_hud) {
         if (MainMenu* menu = m_hud->menu()) {
             menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);
@@ -3552,7 +3421,7 @@ void MapViewer::reload_mods() {
         }
         m_original_figures = std::move(base).value();
     }
-    ModRules rules = load_mod_rules(m_packages, m_original_buildings, m_original_figures);
+    ModRules rules = logged_mod_rules(m_packages, m_original_buildings, m_original_figures);
     m_factions = std::move(rules.factions);
     m_faction_replacements = std::move(rules.faction_replacements);
     m_balance = rules.balance;
@@ -3665,6 +3534,10 @@ core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path
     core::Result<sim::World> world = core::make_error(core::ErrorCode::NotFound, "no game");
     if (sim::is_open1602_save(*bytes)) {
         world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
+        if (world && world->planned_islands()) {
+            // A scenario that makes its islands when the game starts (ADR 0013).
+            world = sim::roll_planned_islands(*world, m_game, m_buildings, m_options.world, &warnings);
+        }
     } else {
         auto file = assets::ChunkFile::from_bytes(std::move(bytes).value());
         if (!file) {
