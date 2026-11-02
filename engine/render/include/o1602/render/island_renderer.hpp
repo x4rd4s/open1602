@@ -91,6 +91,9 @@ struct DrawCommand {
         /// tiles the player cannot build on through a shading table of its palette (tables 1 and 2
         /// of 0x005B6360, docs/re/rendering.md#shading-tables).
         Dimmed,
+        /// The sprite's colours times `tint` (r, g, b / 255), drawn with opacity `tint.a`, so
+        /// that the ground shows through: Open1602's blueprints.
+        Tinted,
     };
 
     std::uint32_t sprite = 0;

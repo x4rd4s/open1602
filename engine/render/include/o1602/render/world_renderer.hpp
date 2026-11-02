@@ -215,7 +215,8 @@ struct TileMark {
 };
 
 /// Tiles whose buildings are drawn in a colour (Open1602's blueprints): each sprite of such a tile
-/// has its colours multiplied by `colour`, the whole building, roof included.
+/// has its colours multiplied by `colour` and is drawn with its opacity (DrawCommand::Mode::Tinted),
+/// the whole building, roof included.
 struct SpriteTints {
     assets::Rgba colour{255, 255, 255, 255};
     std::vector<std::pair<std::uint32_t, std::uint32_t>> tiles;  ///< world tiles, sorted

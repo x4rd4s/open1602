@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "blueprint_window.hpp"
 
+#include <algorithm>
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -25,11 +27,16 @@ constexpr std::int32_t kInner = kW - 32;
 }  // namespace
 
 std::string BlueprintWindow::bill_text(const sim::BuildBill& bill) {
-    std::string text = ui::tr("blueprint.cost.gold", {std::to_string(bill.money)});
+    // An amount and its unit stay on one line: no-break spaces between them.
+    const auto unbroken = [](std::string part) {
+        std::replace(part.begin(), part.end(), ' ', '\xA0');
+        return part;
+    };
+    std::string text = unbroken(ui::tr("blueprint.cost.gold", {std::to_string(bill.money)}));
     const auto goods = [&](std::uint32_t amount, const char* key) {
         if (amount != 0) {
             // Whole tons, rounded up: what is needed, not less.
-            text += ", " + ui::tr(key, {std::to_string((amount + 31) / 32)});
+            text += ", " + unbroken(ui::tr(key, {std::to_string((amount + 31) / 32)}));
         }
     };
     goods(bill.tools, "blueprint.cost.tools");
@@ -46,13 +53,13 @@ void BlueprintWindow::layout(const BlueprintModel& model) {
     f.label(Rect{16, 8, kInner - 140, 34}, ui::tr("blueprint.title"), Align::Left, Tone::Heading);
     f.button(kClose, Rect{kW - 146, 8, 130, 34}, ui::tr("blueprint.close"));
     f.label(Rect{16, 48, kInner, 28}, model.name);
-    f.entry(Rect{16, 78, kInner, 28}, ui::tr("blueprint.cost"), bill_text(model.cost), Tone::Dim);
-    f.button(kBuild, Rect{16, 110, kInner, 34}, ui::tr("blueprint.build"));
-    // The city's line and its costs apart: with many blueprints the costs grow long.
-    f.label(Rect{16, 156, kInner, 28}, ui::tr("blueprint.city", {std::to_string(model.city_count), model.city}));
-    f.paragraph(Rect{16, 182, kInner, 44}, bill_text(model.city_cost), Tone::Dim);
-    f.button(kBuildCity, Rect{16, 230, kInner, 34}, ui::tr("blueprint.build_city"));
-    f.check(kAutomatic, Rect{16, 272, kInner, 34}, ui::tr("blueprint.automatic"), model.automatic);
+    // Costs wrap: with many goods they grow long.
+    f.paragraph(Rect{16, 78, kInner, 44}, ui::tr("blueprint.cost") + ": " + bill_text(model.cost), Tone::Dim);
+    f.button(kBuild, Rect{16, 126, kInner, 34}, ui::tr("blueprint.build"));
+    f.label(Rect{16, 172, kInner, 28}, ui::tr("blueprint.city", {std::to_string(model.city_count), model.city}));
+    f.paragraph(Rect{16, 198, kInner, 44}, bill_text(model.city_cost), Tone::Dim);
+    f.button(kBuildCity, Rect{16, 246, kInner, 34}, ui::tr("blueprint.build_city"));
+    f.check(kAutomatic, Rect{16, 288, kInner, 34}, ui::tr("blueprint.automatic"), model.automatic);
     f.button(kRemove, Rect{16, kH - 50, kInner, 34}, ui::tr("blueprint.remove"));
 }
 

@@ -133,8 +133,9 @@ bool touches_own_land(const sim::IslandMap& map, const sim::PlannedBuild& item, 
 constexpr std::uint64_t kShortOfMeansBlinkMs = 300;
 /// The tint over what the copy tool's drag would take into the hand.
 constexpr assets::Rgba kCopyMark{96, 160, 232, 110};
-/// The colour the local player's blueprints are drawn in, as a multiplier of the sprites' colours.
-constexpr assets::Rgba kBlueprintTint{110, 150, 255, 255};
+/// How the local player's blueprints are drawn: their colours times a light blue, the ground
+/// showing through, as planned buildings look in later Anno games.
+constexpr assets::Rgba kBlueprintTint{185, 215, 255, 165};
 /// Real time a frame may spend on ticks; the rest of the frame draws.
 constexpr int kTickBudgetMs = 25;
 /// The status line under a still mouse is worked out again this often (FB-1).
@@ -1683,10 +1684,28 @@ void MapViewer::render() {
                     b.y <= std::max(demolish->from.y, demolish->to.y) &&
                     b.x + static_cast<std::int32_t>(w) - 1 >= std::min(demolish->from.x, demolish->to.x) &&
                     b.y + static_cast<std::int32_t>(h) - 1 >= std::min(demolish->from.y, demolish->to.y);
+                bool covered = false;  // what the tool would place lies over it: it gives way
                 for (std::uint32_t j = 0; free && j < h; ++j) {
                     for (std::uint32_t i = 0; free && i < w; ++i) {
-                        free =
-                            !is_taken(b.island, b.x + static_cast<std::int32_t>(i), b.y + static_cast<std::int32_t>(j));
+                        covered =
+                            is_taken(b.island, b.x + static_cast<std::int32_t>(i), b.y + static_cast<std::int32_t>(j));
+                        free = !covered;
+                    }
+                }
+                if (covered) {
+                    // Hatched where the new building leaves it in sight, as what the demolish tool takes.
+                    for (std::uint32_t j = 0; j < h; ++j) {
+                        for (std::uint32_t i = 0; i < w; ++i) {
+                            const std::int32_t tx = b.x + static_cast<std::int32_t>(i);
+                            const std::int32_t ty = b.y + static_cast<std::int32_t>(j);
+                            if (!is_taken(b.island, tx, ty)) {
+                                render::TileMark mark{b.island, static_cast<std::uint16_t>(tx),
+                                                      static_cast<std::uint16_t>(ty), render::kDragHatch};
+                                mark.hatched = true;
+                                mark.on_top = true;
+                                m_tile_marks.push_back(mark);
+                            }
+                        }
                     }
                 }
                 if (!free) {
