@@ -171,7 +171,7 @@ std::atomic<std::uint64_t> g_fixed_now_ms{0};
 
 std::uint64_t ticks_ms() {
     return g_fixed_step_ms.load(std::memory_order_relaxed) != 0 ? g_fixed_now_ms.load(std::memory_order_relaxed)
-                                                                 : SDL_GetTicks();
+                                                                : SDL_GetTicks();
 }
 
 std::uint64_t real_ticks_ms() {
