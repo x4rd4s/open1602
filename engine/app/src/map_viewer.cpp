@@ -630,6 +630,7 @@ void MapViewer::start_preloading() {
     options.derive_missing_sheets = m_options.derive_small_figures;
     options.dither = m_app_settings.display.classic_graphics;
     options.package_images = m_package_images;
+    options.template_sprites = assets::tint_template_sprites(m_own_units, m_figures);
     // The thread works on its own copies: nothing it reads changes under it.
     m_preloader = std::make_unique<render::GraphicsPreloader>(
         [game = m_game, palette = m_palette, banners = m_banners, figures = m_figures, options](
@@ -1335,6 +1336,8 @@ render::WorldLayers MapViewer::world_layers(const ZoomGraphics& graphics) const 
     // The deer walk as figures of the simulation (m_walkers).
     layers.land_figures = {&m_soldiers.instances(), &m_walkers.instances(), &m_carts.instances(), &m_ambient.walkers()};
     layers.unit_tint = &graphics.graphics.unit_tint;
+    layers.package_unit_tint = &graphics.graphics.package_unit_tint;
+    layers.template_tint = &graphics.graphics.template_tint;
     layers.banners = &m_banners;
     layers.banner_flags = &graphics.graphics.banner_flags;
     layers.owner_tint = m_show_owners;

@@ -57,6 +57,24 @@ std::string OwnUnit::name(std::string_view language) const {
     return name_in(names, language, id);
 }
 
+std::vector<std::pair<std::uint32_t, std::uint32_t>> tint_template_sprites(std::span<const OwnUnit> units,
+                                                                           const FigureTable& table) {
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> sprites;
+    for (const OwnUnit& unit : units) {
+        for (std::uint32_t k = 0; k < FigureTable::kUnitVariants && unit.tint; ++k) {
+            const FigureType* f = table.get(unit.family + k);
+            if (f == nullptr || !draws_package_image(*f)) {
+                continue;
+            }
+            const std::pair<std::uint32_t, std::uint32_t> range{f->gfx, figure_sprite_count(*f)};
+            if (std::find(sprites.begin(), sprites.end(), range) == sprites.end()) {
+                sprites.push_back(range);
+            }
+        }
+    }
+    return sprites;
+}
+
 const OwnUnit* find_own_unit(std::span<const OwnUnit> units, std::uint32_t family) noexcept {
     const auto it = std::find_if(units.begin(), units.end(), [&](const OwnUnit& u) { return u.family == family; });
     return it == units.end() ? nullptr : &*it;
@@ -128,6 +146,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
         std::vector<const core::DataEntry*> unit_fields;
         const PackageImage* image = nullptr;
         std::optional<bool> shadow;
+        bool tint = false;
         const PackageSound* sound = nullptr;
         const PackageSound* shot_sound = nullptr;
         const PackageSound* hit_sound = nullptr;
@@ -177,6 +196,14 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                     warnings.push_back(field + "names no sound of a package (sounds.toml, <package>:<name>)");
                     ok = false;
                 }
+            } else if (e.key == "tint") {
+                if (e.value.boolean() == nullptr) {
+                    warnings.push_back(field + "is true or false");
+                    ok = false;
+                } else {
+                    tint = *e.value.boolean();
+                    unit_fields.push_back(&e);
+                }
             } else if (e.key == "shadow") {
                 if (e.value.boolean() == nullptr) {
                     warnings.push_back(field + "is true or false");
@@ -202,13 +229,18 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                     "' is a field of a unit only (a figure whose 'like' names a unit) and is passed over");
             }
         }
+        if (family && tint && image == nullptr) {
+            warnings.push_back(at + id + ": 'tint' needs the unit's own 'image', the template; it is passed over");
+            tint = false;
+        }
         const auto dressed = [&](FigureType f, std::uint32_t colour) -> std::optional<FigureType> {
             if (image != nullptr) {
                 // The image holds every sprite the figure draws, in the original's order from its Gfx
                 // (figure_looks.hpp); it is drawn from the terrain sheet, where the packages' images
                 // are. A unit's image holds them once for all colours or once per colour, red first.
                 const std::uint32_t needed = figure_sprite_count(f);
-                const bool per_colour = family && image->count >= needed * FigureTable::kUnitVariants;
+                // A tint template is one image for every colour.
+                const bool per_colour = family && !tint && image->count >= needed * FigureTable::kUnitVariants;
                 if (needed > image->count) {
                     warnings.push_back(at + id + ": its image " + image->id + " holds " + std::to_string(image->count) +
                                        " sprites, the figure draws " + std::to_string(needed));
@@ -256,7 +288,10 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
             own.push_back(OwnFigure{id, *red});
             if (units != nullptr) {
                 const OwnUnit* base = find_own_unit(*units, *family);
-                units->push_back(OwnUnit{id, *red, base != nullptr ? base->like : *family, icon, std::move(names)});
+                // Without an image of its own a unit draws its base's, a template too if that is one.
+                const bool template_image = tint || (image == nullptr && base != nullptr && base->tint);
+                units->push_back(
+                    OwnUnit{id, *red, base != nullptr ? base->like : *family, icon, std::move(names), template_image});
             }
             ++added;
             continue;

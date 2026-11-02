@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "o1602/assets/figure_table.hpp"
@@ -43,6 +44,9 @@ struct OwnUnit {
     std::uint32_t like = 0;    ///< the red figure of the original's family it stands beside
     std::string icon;          ///< an icon of a package (icons.toml) for the castle, empty: the original's
     LocalizedNames names;      ///< Windows-1252
+    /// Its image is a tint template (`tint = true`): every pure grey pixel takes on the colour of
+    /// the owner's banner, for every banner (docs/modding/flags.md).
+    bool tint = false;
 
     /// The name in `language`, else in English, else the first, else the id.
     [[nodiscard]] std::string name(std::string_view language) const;
@@ -67,6 +71,10 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                             std::string_view utf8, std::vector<std::string>& warnings,
                             std::span<const PackageImage> images = {}, std::span<const PackageSound> sounds = {},
                             std::vector<OwnUnit>* units = nullptr);
+
+/// The sprites (first, count) of the terrain sheet that units of `units` draw as tint templates.
+[[nodiscard]] std::vector<std::pair<std::uint32_t, std::uint32_t>> tint_template_sprites(std::span<const OwnUnit> units,
+                                                                                         const FigureTable& table);
 
 /// The unit family of `units` whose red figure is `family`, nullptr for the original's.
 [[nodiscard]] const OwnUnit* find_own_unit(std::span<const OwnUnit> units, std::uint32_t family) noexcept;

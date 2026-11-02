@@ -192,6 +192,41 @@ TEST_CASE("own figures: a figure like a unit is a unit family of four colours") 
     CHECK(assets::find_own_unit(units, 1) == nullptr);
 }
 
+TEST_CASE("own figures: a unit with tint = true draws one template in every colour") {
+    auto figures = make_figures();
+    std::vector<assets::OwnFigure> own;
+    std::vector<assets::OwnUnit> units;
+    std::vector<std::string> warnings;
+    const std::vector<assets::PackageImage> images = {image("guards:grey", 40000, 4)};
+    assets::apply_own_figures_file(figures, own, "guards",
+                                   "[pikeman]\n"
+                                   "like = \"anno1602:swordsman\"\n"
+                                   "image = \"guards:grey\"\n"
+                                   "tint = true\n"
+                                   "[halberdier]\n"
+                                   "like = \"guards:pikeman\"\n"
+                                   "[archer]\n"
+                                   "like = \"anno1602:swordsman\"\n"
+                                   "tint = true\n"
+                                   "[monk]\n"
+                                   "like = \"anno1602:carrier\"\n"
+                                   "tint = true\n",
+                                   warnings, images, {}, &units);
+    // The archer's tint needs an image, the monk is no unit.
+    CHECK(warnings.size() == 2);
+    REQUIRE(units.size() == 3);
+    CHECK(units[0].tint);
+    CHECK(units[1].tint);  // draws the pikeman's template
+    CHECK(!units[2].tint);
+    for (std::uint32_t k = 0; k < 4; ++k) {
+        CHECK(figures.get(units[0].family + k)->gfx == 40000);  // one image, not one per colour
+    }
+    const auto sprites = assets::tint_template_sprites(units, figures);
+    REQUIRE(sprites.size() == 1);
+    CHECK(sprites[0].first == 40000);
+    CHECK(sprites[0].second == 1);
+}
+
 TEST_CASE("own figures: a package's building names its workers, figures.toml their values") {
     auto figures = make_figures();
     auto buildings = make_buildings();

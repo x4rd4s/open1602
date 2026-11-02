@@ -75,6 +75,7 @@ after the last the original's again. Its values come from `figures.toml` as ever
 [pikeman]
 like = "anno1602:swordsman"
 image = "guards:pikeman"    # once for every colour, or four times: red, blue, yellow, white
+tint = true                 # the image is a template: pure grey takes on the player's colour
 icon = "guards:pike"        # icons.toml: the castle's button and places
 name.en = "Pikeman"
 name.de = "Pikenier"
@@ -85,8 +86,13 @@ name.de = "Pikenier"
 | `image` | an image of a package | the sprites the soldier draws, as for every figure; when the image holds them four times, the colours red, blue, yellow and white one after the other, each colour draws its own, otherwise all four draw the same |
 | `icon` | an icon of a package, `<package>:<name>` ([graphics.md](graphics.md)) | the castle's button of the unit while the soldier is picked, and its places in training; without it the icon of the original's unit it copies |
 | `name.<language>` | a text | its name, in the help of the castle's button |
+| `tint` | `true` or `false` (default) | the image is a template in player colour: once for every colour, its pure grey pixels take on the colour of the owner's banner, for every banner ([flags.md](flags.md#graphics-of-packages-in-player-colour)); needs `image`. A soldier that copies it without an image of its own is drawn so too |
 
-`icon` and `name` are fields of a soldier only; another figure passes them over with a warning.
+Without `tint`, an image that holds the sprites four times is drawn as is for the first four
+banners and gives the template for the others, as the original's units do; an image that holds
+them once looks the same for every player.
+
+`icon`, `name` and `tint` are fields of a soldier only; another figure passes them over with a warning.
 A soldier takes four figure numbers in a row, from the top down as every figure of a package. On
 board a ship a soldier of a package fills a hold as the original's units do; the hold shows the
 original's unit of its kind (`Kind`) and keeps which soldier it holds (version 6 of `FLEE`,
