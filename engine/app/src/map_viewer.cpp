@@ -2009,7 +2009,8 @@ void MapViewer::show_notices(const std::vector<Notice>& notices) {
     }
 }
 
-bool MapViewer::announce(std::string_view id, const MessageArgs& args, std::optional<std::pair<double, double>> tile) {
+bool MapViewer::announce(std::string_view id, const MessageArgs& args, std::optional<std::pair<double, double>> tile,
+                         std::optional<sim::PlayerId> about) {
     const auto message = m_messages.find(id);
     if (!message) {
         return false;
@@ -2017,6 +2018,7 @@ bool MapViewer::announce(std::string_view id, const MessageArgs& args, std::opti
     Announcement a;
     a.message = *message;
     a.tile = tile;
+    a.about = about;
     a.text = m_messages.text(*message, ui::current_language(), args);
     show_notices({a});
     return true;
@@ -2672,7 +2674,8 @@ void MapViewer::apply_script_output() {
         for (const auto& [name, value] : values) {
             args.emplace_back(name, value);
         }
-        if (!announce(message.id, args)) {
+        if (!announce(message.id, args, std::nullopt,
+                      message.about != sim::kNoPlayer ? std::optional<sim::PlayerId>(message.about) : std::nullopt)) {
             std::fprintf(stderr, "script: no message \"%s\" (messages.toml)\n", message.id.c_str());
         }
     }
