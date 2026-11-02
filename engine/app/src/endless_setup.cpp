@@ -379,6 +379,8 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kUnits.size();
         case SetupItem::GameSpeed:
             return kSpeeds.size();
+        case SetupItem::Cheats:
+            return 3;
         case SetupItem::Droughts:
             return kDroughtNames.size();
         case SetupItem::Volcanoes:
@@ -527,6 +529,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return nearest(kUnits, r.max_army);
         case SetupItem::GameSpeed:
             return nearest(kSpeeds, r.max_game_speed);
+        case SetupItem::Cheats:
+            return std::min<std::size_t>(static_cast<std::size_t>(r.cheats), 2);
         case SetupItem::Droughts:
             return std::min<std::size_t>(static_cast<std::size_t>(r.droughts), kDroughtNames.size() - 1);
         case SetupItem::Volcanoes:
@@ -692,6 +696,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::GameSpeed:
             r.max_game_speed = kSpeeds[choice];
+            break;
+        case SetupItem::Cheats:
+            r.cheats = static_cast<sim::Cheats>(std::min<std::size_t>(choice, 2));
             break;
         case SetupItem::Droughts:
             r.droughts = static_cast<sim::Droughts>(choice);
@@ -1017,6 +1024,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::Ships:
         case SetupItem::Units:
         case SetupItem::GameSpeed:
+        case SetupItem::Cheats:
         case SetupItem::Droughts:
         case SetupItem::Volcanoes:
         case SetupItem::ComputerPlayers:
@@ -1110,6 +1118,7 @@ std::string setup_label(SetupItem item) {
         "setup.pirates",
         "setup.pirate_nests",
         "setup.reveal",
+        "setup.cheats",
         "setup.island_preset",
         "setup.island_shapes",
         "setup.coast",
@@ -1194,6 +1203,11 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return number_text(kUnits[choice]);
         case SetupItem::GameSpeed:
             return ui::tr("setup.speed.value", {std::to_string(kSpeeds[choice])});
+        case SetupItem::Cheats: {
+            static constexpr std::array<std::string_view, 3> kKeys = {"setup.cheats.code", "setup.cheats.start",
+                                                                      "setup.off"};
+            return ui::tr(kKeys[std::min<std::size_t>(choice, 2)]);
+        }
         case SetupItem::Droughts: {
             static constexpr std::array<std::string_view, 5> kKeys = {"setup.droughts.game", "setup.off",
                                                                       "setup.droughts.rare", "setup.droughts.normal",
@@ -1488,6 +1502,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (value == "all" || value == "original") {
             r.fertile_fields = value == "all";
         }
+    } else if (key == "cheats") {
+        if (value == "code" || value == "start" || value == "off") {
+            r.cheats = value == "code" ? sim::Cheats::Code : value == "start" ? sim::Cheats::Start : sim::Cheats::Off;
+        }
     } else if (key == "hunting") {
         if (value == "wider" || value == "original") {
             r.wider_hunting = value == "wider";
@@ -1622,6 +1640,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("bread", r.revised_bread ? "revised" : "original");
     line("trade_carts", r.more_carts ? "more" : "one");
     line("hunting", r.wider_hunting ? "wider" : "original");
+    line("cheats", r.cheats == sim::Cheats::Code ? "code" : r.cheats == sim::Cheats::Start ? "start" : "off");
     line("fertile_fields", r.fertile_fields ? "all" : "original");
     line("all_crops", r.all_crops ? "all" : "original");
     line("big_ore_veins", r.big_ore_veins ? "all" : "original");

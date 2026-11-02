@@ -460,6 +460,9 @@ setup.victory.part = {1}: {2}
 setup.speed = Highest game speed
 # {1}: the factor
 setup.speed.value = {1} ×
+setup.cheats = Cheats
+setup.cheats.code = With the code (original)
+setup.cheats.start = On from the start
 setup.droughts = Droughts
 setup.droughts.game = As the level
 setup.droughts.rare = Rare
@@ -553,6 +556,7 @@ setup.starts.spread = Apart
 setup.starts.together = Together
 setup.resources = Every raw material
 setup.group.opponents = Opponents
+setup.group.cheats = Cheats
 setup.computers = Computers active
 setup.computers.game = As in the game file
 setup.ship_purchases = Computers buy ships
@@ -854,6 +858,7 @@ stats.routes.next = Sailing to
 stats.routes.goods = Goods
 stats.routes.empty = None of your ships sails a trade route.
 stats.routes.hint = {1} ships on trade routes, {2} of them with trouble (red: a transfer could not be made). Click a ship to go to it; click a heading to order the list ("Goods": trouble first).
+stats.routes.hint.one = 1 ship on a trade route, {2} with trouble (red: a transfer could not be made). Click a ship to go to it; click a heading to order the list ("Goods": trouble first).
 # The tab "Finances": gold per minute as in the city window
 stats.fin.now = Now
 # {1}: the minutes chosen

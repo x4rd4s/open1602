@@ -86,6 +86,8 @@ constexpr Group kBugGroups[] = {
     {"setup.group.construction", SetupItem::BugGoldsheep, SetupItem::BugInfertileFields, kLeft},
     {"setup.group.ships", SetupItem::BugRemoteTrade, SetupItem::BugSmallYardWarships, kRight},
     {"setup.group.opponents", SetupItem::BugNativeLand, SetupItem::BugNativeLand, kRight},
+    // Not a bug, but a trick of the original: its cheats (with the code, from the start, or never).
+    {"setup.group.cheats", SetupItem::Cheats, SetupItem::Cheats, kRight},
 };
 
 // The islands: what kind of world, the land and its sizes, and what is on the islands; the

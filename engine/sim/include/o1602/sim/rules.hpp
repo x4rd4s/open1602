@@ -38,6 +38,15 @@ enum class Volcanoes : std::uint8_t {
     On,    ///< always, whatever the game says
 };
 
+/// The cheats (CheatOrder): as in the original, a code typed in the number line unlocks them, and
+/// in a game of more than one person only the code that also lifts that block. Open1602 can have
+/// them on from the start or off for good.
+enum class Cheats : std::uint8_t {
+    Code,   ///< unlocked with the code, as in the original
+    Start,  ///< on from the start for every player, also in a multiplayer game
+    Off,    ///< never, not even with the code
+};
+
 /// Whether pirates come (docs/re/pirates.md). The original has a game setting for it, which the
 /// endless games of the two easy levels set: there they never come.
 enum class Pirates : std::uint8_t {
@@ -316,6 +325,9 @@ struct Rules {
     /// Open1602: every iron vein of a new endless game is a big one. Off by default and with the
     /// original's settings.
     bool big_ore_veins = false;
+
+    /// The cheats: unlocked with the code by default, as in the original.
+    Cheats cheats = Cheats::Code;
 
     /// Bugs of the original brought back; none by default, also in savegames of the original.
     OriginalBugs bugs{};

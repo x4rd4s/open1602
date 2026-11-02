@@ -83,6 +83,7 @@ std::vector<sim::Command> every_kind() {
     all.emplace_back(sim::PlayerControl{1, true, 0xFEDC'BA98'7654'3210ULL});
     all.emplace_back(sim::GateOrder{1, true});
     all.emplace_back(sim::CartRequest{1, 2, 3, 40, 50, 41, 52});
+    all.emplace_back(sim::CheatOrder{1, sim::CheatOrder::Op::Goods, 2061, 23, 7U, 40, 50});
     return all;
 }
 
@@ -127,7 +128,7 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     REQUIRE(build.items.size() == 2);
     CHECK(build.items[0].y == -2);
     CHECK(build.orient_to_road);
-    const sim::Command& named = all[all.size() - 4];
+    const sim::Command& named = all[all.size() - 5];
     const auto rename = std::get<sim::PlayerRename>(*sim::decode_command(sim::encode_command(named)));
     CHECK(rename.name == "Merlin");
     sim::ShipCommand mount;
@@ -140,14 +141,14 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     const auto sent = std::get<sim::CastleOrder>(*sim::decode_command(sim::encode_command(all_out)));
     CHECK(sent.op == sim::CastleOrder::Op::ReleaseAll);
     CHECK(sent.spot == sim::Target::spot(9, 8));
-    const auto gates = std::get<sim::GateOrder>(*sim::decode_command(sim::encode_command(all[all.size() - 2])));
+    const auto gates = std::get<sim::GateOrder>(*sim::decode_command(sim::encode_command(all[all.size() - 3])));
     CHECK(gates.player == 1);
     CHECK(gates.closed);
-    const auto control = std::get<sim::PlayerControl>(*sim::decode_command(sim::encode_command(all[all.size() - 3])));
+    const auto control = std::get<sim::PlayerControl>(*sim::decode_command(sim::encode_command(all[all.size() - 4])));
     CHECK(control.player == 1);
     CHECK(control.computer);
     CHECK(control.owner == 0xFEDC'BA98'7654'3210ULL);
-    const auto cart = std::get<sim::CartRequest>(*sim::decode_command(sim::encode_command(all.back())));
+    const auto cart = std::get<sim::CartRequest>(*sim::decode_command(sim::encode_command(all[all.size() - 2])));
     CHECK(cart.island == 2);
     CHECK(cart.city == 3);
     CHECK(cart.x == 40);
@@ -478,4 +479,86 @@ TEST_CASE("simulation: events nobody takes are dropped beyond the bound, the old
     buffer.sink()->resize(sim::EventBuffer<std::uint32_t>::kMaxPending + 10);
     buffer.trim();
     CHECK(buffer.size() == sim::EventBuffer<std::uint32_t>::kMaxPending / 2);
+}
+
+namespace {
+sim::CheatOrder code_order(sim::PlayerId player, std::uint32_t code) {
+    sim::CheatOrder order;
+    order.player = player;
+    order.code = code;
+    return order;
+}
+}  // namespace
+
+TEST_CASE("commands: the cheats, unlocked with the original's codes, give gold and goods to a city") {
+    Game g;
+    // An island with a city of player 0 on all of it.
+    sim::WorldIsland island{assets::IslandHeader{}, sim::IslandMap(8, 8), 10, 10};
+    for (std::uint32_t y = 0; y < 8; ++y) {
+        for (std::uint32_t x = 0; x < 8; ++x) {
+            island.map.set_city(x, y, 0, 0);
+        }
+    }
+    REQUIRE(g.world.add_island(std::move(island)).ok());
+    sim::City city;
+    city.owner = 0;
+    city.capacity = 30 * 32;
+    g.world.add_city(city);
+    const std::int32_t money = g.world.players()[0].money;
+    std::uint64_t tick = 0;
+    const auto run = [&](sim::CheatOrder order) {
+        g.simulation.schedule(tick++, order);
+        g.simulation.tick();
+        const auto results = g.simulation.take_command_results();
+        REQUIRE(results.size() == 1);
+        return results[0].accepted;
+    };
+    using Op = sim::CheatOrder::Op;
+    const sim::CheatOrder gold{1, Op::Gold, 0, 0, std::nullopt, 12, 12};
+    sim::CheatOrder wood = gold;
+    wood.op = Op::Goods;
+    wood.ware = 23;
+    CHECK(!run(gold));  // locked
+    CHECK(!run(code_order(1, 1234)));
+    CHECK(run(code_order(1, 2061)));
+    CHECK(g.world.players()[1].cheats == sim::Player::kCheatsOn);
+    CHECK(!run(gold));  // two people in the game: 2061 is not enough
+    CHECK(run(code_order(1, 512)));
+    CHECK(run(gold));  // into the city under the mouse: the money of its owner, player 0
+    CHECK(g.world.players()[0].money == money + 500);
+    CHECK(run(wood));
+    CHECK(run(wood));
+    CHECK(g.world.city(0, 0)->goods[23] == 10 * 32U);
+    CHECK(!run(sim::CheatOrder{1, Op::Gold, 0, 0, std::nullopt, 40, 40}));  // the sea: nobody's
+    sim::CheatOrder grain = wood;
+    grain.ware = 45;  // no trade good
+    CHECK(!run(grain));
+
+    // Alone in the game 2061 is enough; again it switches them off.
+    g.world.player(0)->status = sim::PlayerStatus::Absent;
+    g.world.player(1)->cheats = sim::Player::kCheatsOff;
+    CHECK(run(code_order(1, 2061)));
+    CHECK(run(wood));
+    CHECK(run(code_order(1, 2061)));
+    CHECK(!run(wood));
+}
+
+TEST_CASE("commands: the cheats on from the start, or off even with the code") {
+    sim::Rules start;
+    start.cheats = sim::Cheats::Start;
+    sim::World world{64, 64};
+    assets::BuildingTable buildings;
+    assets::FigureTable figures;
+    sim::Simulation on(Game::make(world), buildings, figures, start);
+    CHECK(on.cheats_allowed(0));
+    CHECK(on.cheats_allowed(1));
+
+    sim::Rules off;
+    off.cheats = sim::Cheats::Off;
+    sim::World world2{64, 64};
+    sim::Simulation never(Game::make(world2), buildings, figures, off);
+    never.schedule(0, code_order(0, 512));
+    never.tick();
+    CHECK(world2.players()[0].cheats == sim::Player::kCheatsOff);
+    CHECK(!never.cheats_allowed(0));
 }

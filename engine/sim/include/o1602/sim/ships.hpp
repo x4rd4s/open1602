@@ -337,6 +337,10 @@ class Combat;
 
 class Fleet {
 public:
+    /// Cheats (CheatOrder): goods into the holds of the ship with `id` as far as they hold them
+    /// (what went in, 1/32 t), a cannon more up to its type's (whether one came).
+    std::uint32_t cheat_cargo(std::uint32_t id, std::uint8_t ware, std::uint32_t amount);
+    bool cheat_cannon(std::uint32_t id);
     /// Course searches of all ships in one tick (TB-1). A search costs up to a few ms; ships over
     /// the budget wait for the next tick, in the order of the ship list, so every peer does the same.
     static constexpr std::uint32_t kPlansPerTick = 8;

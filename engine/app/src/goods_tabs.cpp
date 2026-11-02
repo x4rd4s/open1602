@@ -711,7 +711,7 @@ void GoodsWindow::layout_routes(const sim::World& world, sim::PlayerId player, P
     layout_scroll_bar(below);
     below.fill(Rect{kMargin, kFooterY - 4, kWidth - 2 * kMargin, 1}, s.shade);
     above.paragraph(Rect{kMargin + 2, kFooterY, kWidth - 2 * kMargin, 34},
-                    ui::tr("stats.routes.hint", {std::to_string(lines.size()), std::to_string(troubled)}), st.dim,
+                    ui::tr(lines.size() == 1 ? "stats.routes.hint.one" : "stats.routes.hint", {std::to_string(lines.size()), std::to_string(troubled)}), st.dim,
                     kFontSmall, 17);
 }
 

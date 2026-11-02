@@ -87,6 +87,7 @@ enum class SetupItem : std::uint8_t {
     Pirates,
     PirateNests,
     Reveal,
+    Cheats,  ///< Rules::cheats
     // Islands (a page of their own with a preview of the world, endless games only;
     // sim::WorldSettings::shapes and ::landscape)
     IslandPreset,  ///< sets the items below at once: the original's islands or a kind of world
