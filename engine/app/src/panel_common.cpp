@@ -176,12 +176,30 @@ bool StockList::turn_page(std::int32_t id) {
     return true;
 }
 
+void set_city_plate(ui::Panel& panel, const sim::City& city, const PanelContext& c) {
+    constexpr std::int32_t kHut = 4;  // GFXOVERHEAD + 4
+    const auto plate = panel.layout().constant("GFXOVERHEAD");
+    if (!plate) {
+        return;
+    }
+    const std::int32_t gfx = *plate + (natives_city(city, c) ? kHut : 0);
+    const std::vector<assets::Gadget>& gadgets = panel.layout().gadgets;
+    for (std::size_t i = 0; i < gadgets.size(); ++i) {
+        const assets::Gadget& g = gadgets[i];
+        // Only a plate with an Id of its own: one sharing it with an earlier gadget is not reached by Id.
+        if (g.kind == assets::GadgetKind::Graphic && g.gfx == *plate && panel.layout().index_of(g.id) == i) {
+            panel.set_graphic(g.id, gfx, g.press_offset);
+        }
+    }
+}
+
 TradeLists::TradeLists(assets::GadgetLayout layout) : m_panel(std::move(layout), 1.0) {
     m_gfx_ware = m_panel.layout().constant("GFXWARE").value_or(192);
     m_gfx_empty = m_panel.layout().constant("GFXWARELEER").value_or(188) + kEmptyHold;
 }
 
 void TradeLists::refresh(const sim::City& city, const PanelContext& c) {
+    set_city_plate(m_panel, city, c);
     m_panel.set_text(53002, city_name(city));
     m_panel.set_text(53003, c.text("GAME", 36));
     m_panel.set_text(53004, c.text("GAME", 35));

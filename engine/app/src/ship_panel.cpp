@@ -1303,6 +1303,7 @@ private:
             return;
         }
         const bool natives = is_natives(*city, c);
+        set_city_plate(m_trade, *city, c);
         m_trade.set_text(33122, ship_name(ship));
         m_trade.set_text(33124, city_name(*city));
         const assets::BuildingType* kontor = sim::kontor_of(c.world(), c.buildings, *city);
