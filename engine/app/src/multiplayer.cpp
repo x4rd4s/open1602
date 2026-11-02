@@ -97,7 +97,7 @@ sim::Simulation* MapViewer::load_from_host(std::span<const std::uint8_t> save) {
     return start_host_game(std::move(world), warnings);
 }
 
-net::ClientSession::Finish MapViewer::prepare_host_game(std::vector<std::uint8_t> save) const {
+net::ClientSession::Finish MapViewer::prepare_host_game(std::vector<std::uint8_t> save) {
     // On a worker thread: reading and unpacking the game, the long part of a large world, while
     // the program goes on and keeps the connection. It only reads the game's tables, which change
     // only when a game starts on the game thread (make_state), not before this one is finished.

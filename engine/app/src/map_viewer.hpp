@@ -249,7 +249,7 @@ private:
     sim::Simulation* load_from_host(std::span<const std::uint8_t> save);
     /// The same in two steps (net::ClientSession::load_in_background()): reads the game on a worker
     /// thread and returns what starts it on the game thread.
-    [[nodiscard]] net::ClientSession::Finish prepare_host_game(std::vector<std::uint8_t> save) const;
+    [[nodiscard]] net::ClientSession::Finish prepare_host_game(std::vector<std::uint8_t> save);
     /// Starts the game a host sent, read as `world` (with the `warnings` of reading it).
     sim::Simulation* start_host_game(core::Result<sim::World> world, const std::vector<std::string>& warnings);
     /// Fingerprint of the game data the simulation depends on: computers of a multiplayer game
