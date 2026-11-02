@@ -335,12 +335,15 @@ bool ship_sprites(const sim::Ship& ship, const sim::World& world, const WorldVie
         return false;
     }
     const assets::FigureType* fig = layers.figures->get(ship.figure);
-    if (fig == nullptr || fig->sheet != assets::FigureSheet::Ship) {
+    // From SHIP.BSH, or a ship of a package drawn with its own image (own_figures.hpp).
+    if (fig == nullptr || (fig->sheet != assets::FigureSheet::Ship && !assets::draws_package_image(*fig))) {
         return false;
     }
-    // Below half health the next record (HANDELD1 ..., Gfx + 8) every frame.
+    // Below half health the next record (HANDELD1 ..., Gfx + 8) every frame; a ship of a package
+    // with its own image keeps it, as the record after it shows the original's.
     const std::uint32_t max_health = fig->ship.max_health;
-    if (ship.health != 0 && max_health != 0 && ship.health * 128U / max_health < 64U) {
+    if (ship.health != 0 && max_health != 0 && ship.health * 128U / max_health < 64U &&
+        !assets::draws_package_image(*fig)) {
         const assets::FigureType* damaged = layers.figures->get(ship.figure + 1U);
         if (damaged != nullptr && damaged->sheet == assets::FigureSheet::Ship) {
             fig = damaged;
