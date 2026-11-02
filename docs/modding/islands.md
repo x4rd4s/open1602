@@ -37,6 +37,9 @@ name.de = "Lagune"
 | `climate` | `"north"` or `"south"` | the climate whose islands it stands among; the file's (`INSEL5` +0x64) if not given |
 | `name.<language>` | a text | its name, for lists such as the editor's; the id if there is none |
 
+The file's name may end in anything; the game reads its chunks. The example package names its
+island `lagoon.island`, since the repository keeps no `.scp` files, the original's ending.
+
 The island's size decides its size class: the smallest class whose box it fits. The boxes are
 30 x 30 (lit), 40 x 40 (mit), 50 x 52 (med), 70 x 60 (big) and 100 x 90 (lar). A larger island,
 a file that holds no island, a path outside the package or a field that is wrong is passed over
