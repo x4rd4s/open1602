@@ -894,8 +894,10 @@ list.heading.ordered = {3}
 list.order.name = By name
 list.order.idle = Idle first
 list.order.damaged = Damaged first
+list.order.own = Own first
+list.order.largest = Largest first
 list.order.help.ships = Click: order the ships by name, idle or damaged first, or as the original
-list.order.help.cities = Click: order the cities by name or as the original
+list.order.help.cities = Click: order the cities by name, own first, largest first, or as the original
 
 # The screen "Mods" of the main menu (mods_menu.cpp)
 menu.mods = Mods
