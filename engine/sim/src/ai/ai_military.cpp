@@ -1472,6 +1472,9 @@ bool Engine::defend(AiPlayer& a, std::uint16_t island, const std::vector<PlayerI
                 best_d = d;
             }
         }
+        if (best == nullptr) {
+            break;  // not reached: there is an intruder
+        }
         const Target target = Target::soldier(best->id);
         auto it = std::find_if(orders.begin(), orders.end(), [&](const SoldierOrder& o) { return o.target == target; });
         if (it == orders.end()) {
