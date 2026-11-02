@@ -44,7 +44,7 @@ _TERMS = json.loads(base64.b64decode(
 WORDS = re.compile("|".join(_TERMS["words"]), re.IGNORECASE)
 CASE_WORDS = re.compile("|".join(_TERMS["case_words"]))
 
-# Paths git ignores on purpose for local working folders; a tracked file there is a mistake.
+# Local working folders (each clone lists them in .git/info/exclude); a tracked file there is a mistake.
 LOCAL_ONLY = re.compile(r"^(?:re|docs/re)(?:/|$)")
 
 
@@ -89,8 +89,6 @@ def main() -> int:
             continue  # binary (images, icons)
         text = data.decode("utf-8", errors="replace")
         for number, line in enumerate(text.splitlines(), 1):
-            if path == ".gitignore" and LOCAL_ONLY.match(line.lstrip("/")):
-                continue  # keeps the local working folders out of commits
             for reason in check_line(line):
                 problems.append(f"{path}:{number}: {reason}")
     for problem in problems:

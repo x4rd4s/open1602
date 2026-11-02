@@ -70,7 +70,3 @@ __pycache__/
 # Local inputs and outputs (savegames, videos, screenshots), see docs/requests.md
 /inputs/
 /outputs/
-
-# Local working folders
-/docs/re
-/re/
