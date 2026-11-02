@@ -51,10 +51,11 @@ enum RuleKey : std::uint16_t {
     kBugNativeLand = 43,
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
-    kClimateCrops = 46,   // 1: every island grew its climate's crops fully (Rules::climate_crops)
-    kBigOreVeins = 47,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
-    kWiderHunting = 48,   // 1: the hunter's hut reaches further (Rules::wider_hunting)
-    kCheats = 49,         // Rules::cheats (Code when missing)
+    kMoving = 46,         // Rules::moving other than Moving::Free
+    kClimateCrops = 47,   // 1: every island grew its climate's crops fully (Rules::climate_crops)
+    kBigOreVeins = 48,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
+    kWiderHunting = 49,   // 1: the hunter's hut reaches further (Rules::wider_hunting)
+    kCheats = 50,         // Rules::cheats (Code when missing)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -208,6 +209,10 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.fertile_fields) {
         values.emplace_back(kFertileFields, 1U);
     }
+    // Moving buildings only when not free, which is Open1602's way.
+    if (r.moving != Moving::Free) {
+        values.emplace_back(kMoving, static_cast<std::uint32_t>(r.moving));
+    }
     if (r.climate_crops) {
         values.emplace_back(kClimateCrops, 1U);
     }
@@ -352,6 +357,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kFertileFields:
                 r.fertile_fields = v != 0;
+                break;
+            case kMoving:
+                r.moving = static_cast<Moving>(std::min<std::uint32_t>(v, static_cast<std::uint32_t>(Moving::Off)));
                 break;
             case kClimateCrops:
                 r.climate_crops = v != 0;

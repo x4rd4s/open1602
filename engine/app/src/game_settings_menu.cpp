@@ -63,7 +63,7 @@ constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 
 // Economy, limits and disasters on the left, the world and the opponents on the right.
 constexpr Group kGroups[] = {
-    {"setup.group.economy", SetupItem::Refund, SetupItem::Hunting, kLeft},
+    {"setup.group.economy", SetupItem::Refund, SetupItem::TradeCarts, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
     {"setup.group.nature", SetupItem::FertileFields, SetupItem::Volcanoes, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},
@@ -88,6 +88,8 @@ constexpr Group kBugGroups[] = {
     {"setup.group.opponents", SetupItem::BugNativeLand, SetupItem::BugNativeLand, kRight},
     // Not a bug, but a trick of the original: its cheats (with the code, from the start, or never).
     {"setup.group.cheats", SetupItem::Cheats, SetupItem::Cheats, kRight},
+    // Not a bug either: the hunter's hut reaches further in Open1602, the original's reach is a choice.
+    {"setup.group.economy", SetupItem::Hunting, SetupItem::Hunting, kLeft},
 };
 
 // The islands: what kind of world, the land and its sizes, and what is on the islands; the
