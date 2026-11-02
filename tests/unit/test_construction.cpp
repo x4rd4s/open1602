@@ -1273,8 +1273,8 @@ TEST_CASE("moving: Kontors and markets stay, nothing leaves its city, the world 
           sim::BuildRefusal::Immovable);
     CHECK(island.at(8, 16)->id == kHouse);
     CHECK(island.world.house(0, 8, 16) != nullptr);
-    CHECK(!sim::execute_move(island.world, island.buildings, move_order({8, 16}, 8, 14), false, 0, &island.events)
-               .moved);
+    CHECK(
+        !sim::execute_move(island.world, island.buildings, move_order({8, 16}, 8, 14), false, 0, &island.events).moved);
     CHECK(island.at(8, 16)->id == kHouse);
 }
 

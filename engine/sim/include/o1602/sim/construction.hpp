@@ -231,8 +231,8 @@ DemolishResult execute_demolish(World& world, const assets::BuildingTable& build
 struct MoveOrder {
     PlayerId player = kNoPlayer;
     std::uint16_t island = 0;
-    TilePos from;              ///< any tile of the building
-    std::int32_t x = 0;        ///< the new footprint origin
+    TilePos from;        ///< any tile of the building
+    std::int32_t x = 0;  ///< the new footprint origin
     std::int32_t y = 0;
     std::uint8_t rotation = 0;
     bool orient_to_road = true;  ///< as BuildOrder::orient_to_road
@@ -276,7 +276,8 @@ struct MovablePiece {
 /// already) and without upgrading a building there; with `pay` false gold and goods do not count.
 /// The world is changed while planning and put back exactly as it was. One item; refused
 /// (Territory) if the building would leave its city.
-[[nodiscard]] BuildPlan plan_move(World& world, const assets::BuildingTable& buildings, const MoveOrder& order, bool pay);
+[[nodiscard]] BuildPlan plan_move(World& world, const assets::BuildingTable& buildings, const MoveOrder& order,
+                                  bool pay);
 
 struct MoveResult {
     bool moved = false;

@@ -2396,9 +2396,8 @@ MovablePiece movable_at(const World& world, const assets::BuildingTable& buildin
         piece.refusal = MoveRefusal::Holds;
     } else if (std::find(kMovable.begin(), kMovable.end(), t.kind) == kMovable.end()) {
         piece.refusal = MoveRefusal::NoBuilding;
-    } else if (std::any_of(world.disasters().begin(), world.disasters().end(), [&](const Disaster& d) {
-                   return d.island == island && d.x == ox && d.y == oy;
-               })) {
+    } else if (std::any_of(world.disasters().begin(), world.disasters().end(),
+                           [&](const Disaster& d) { return d.island == island && d.x == ox && d.y == oy; })) {
         piece.refusal = MoveRefusal::Disaster;
     } else if (std::any_of(world.cost_buildings().begin(), world.cost_buildings().end(), [&](const CostBuilding& c) {
                    return c.island == island && c.x == ox && c.y == oy && c.kind == CostBuilding::Kind::Shipyard &&
@@ -2511,7 +2510,8 @@ MoveResult execute_move(World& world, const assets::BuildingTable& buildings, co
             moved.y = ny;
             moved.city = city;
             *h = moved;
-            if (City* c = world.city(order.island, city); c != nullptr && moved.resident_class < c->inhabitants.size()) {
+            if (City* c = world.city(order.island, city);
+                c != nullptr && moved.resident_class < c->inhabitants.size()) {
                 std::uint32_t& count = c->inhabitants[moved.resident_class];
                 count = count - std::min(count, added) + moved.inhabitants();
             }
