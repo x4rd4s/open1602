@@ -391,7 +391,7 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
     struct Found {
         const assets::BuildingType* order = nullptr;
         sim::BuildingAt at;
-        int group = 0;  // 0 buildings, 1 roads and walls, 2 fields and trees
+        int group = 0;  // 0 roads and walls, 1 buildings, 2 fields and trees
     };
     std::vector<Found> found;
     std::vector<sim::TilePos> seen;
@@ -417,11 +417,11 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
             if (order == nullptr) {
                 continue;
             }
-            int group = 0;
+            int group = 1;
             if (order->prod_kind == sim::prod::kGrowing) {
                 group = 2;
             } else if (order->kind == sim::kind::kRoad || order->kind == sim::kind::kWall) {
-                group = 1;
+                group = 0;
             }
             found.push_back(Found{order, *at, group});
         }
@@ -430,11 +430,11 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
     const auto harvested = [&](const assets::BuildingType& crop) {
         const std::uint8_t ware = sim::crop_ware(*m_buildings, crop);
         return ware != 0 &&
-               std::ranges::any_of(found, [&](const Found& f) { return f.group == 0 && f.at.type->raw_ware == ware; });
+               std::ranges::any_of(found, [&](const Found& f) { return f.group == 1 && f.at.type->raw_ware == ware; });
     };
     std::erase_if(found, [&](const Found& f) { return f.group == 2 && !harvested(*f.order); });
-    // Buildings first, then the roads and walls between them, then the fields: what the money
-    // does not reach is the end of the order.
+    // Roads and walls first (gold only, so a lack of goods does not leave the buildings without
+    // them), then the buildings, then the fields: what the means do not reach is the end of the order.
     std::stable_sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.group < b.group; });
     if (found.size() > sim::kMaxCommandItems) {
         found.resize(sim::kMaxCommandItems);

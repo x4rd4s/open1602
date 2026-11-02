@@ -586,6 +586,9 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             if (const auto spot = spot_at_mouse()) {
                 const auto at = sim::building_at(world(), m_buildings, spot->island, {spot->x, spot->y});
                 if (const assets::BuildingType* pick = at ? m_tool.orderable(*at->type) : nullptr) {
+                    if (m_hud) {
+                        (void)m_hud->show_in_build_menu(pick->id);  // the panel shows what is in hand
+                    }
                     set_mode(Hud::kModeBuild);
                     if (m_tool.select(pick->id)) {
                         m_tool.set_mode(BuildTool::Mode::Build);
@@ -908,6 +911,9 @@ void MapInput::handle_event(const SDL_Event& event) {
                     !(m_hud && (m_hud->modal() || m_hud->menu_active()))) {
                     if (m_original_mouse) {
                         cancel_action();
+                    } else if (m_tool.mode() == BuildTool::Mode::Copy && m_tool.layout()) {
+                        // The copied piece goes away; the copy tool and the build menu stay.
+                        m_tool.drop_layout();
                     } else if (m_hud && m_hud->picking() && m_hud->step_back()) {
                         // Choosing a route stop on the map: the right click ends the choice, the
                         // ship does not sail off.

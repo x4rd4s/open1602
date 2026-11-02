@@ -308,9 +308,9 @@ TEST_CASE("build tool: the copy tool takes a piece of the own city and builds it
     for (const auto& item : layout.items) {
         items.emplace_back(item.building, item.x, item.y);
     }
-    // Buildings first, then roads, then fields; the house as the first one; no tree, nothing foreign.
+    // Roads first, then buildings, then fields; the house as the first one; no tree, nothing foreign.
     const std::vector<std::tuple<std::uint32_t, std::int32_t, std::int32_t>> expected{
-        {kFarm, 0, 0}, {kDwelling, 4, 4}, {kRoad, 0, 2}, {kRoad, 1, 2}, {kGrain, 2, 0}, {kGrain, 2, 1}};
+        {kRoad, 0, 2}, {kRoad, 1, 2}, {kFarm, 0, 0}, {kDwelling, 4, 4}, {kGrain, 2, 0}, {kGrain, 2, 1}};
     CHECK(items == expected);
 
     // Hung at the mouse by its middle.
@@ -318,22 +318,22 @@ TEST_CASE("build tool: the copy tool takes a piece of the own city and builds it
     REQUIRE(order.has_value());
     REQUIRE(order->items.size() == 6);
     CHECK(!order->orient_to_road);
-    CHECK(order->items[0].building == kFarm);
-    CHECK(order->items[0].x == 10);
-    CHECK(order->items[0].y == 1);
+    CHECK(order->items[2].building == kFarm);
+    CHECK(order->items[2].x == 10);
+    CHECK(order->items[2].y == 1);
 
     // A quarter turn takes east to south: the farm's corner (0, 0) goes to the far side.
     tool.rotate(1);
     const app::BuildTool::Layout& turned = *tool.layout();
     CHECK(turned.width == 6);
-    CHECK(turned.items[0].x == 4);
-    CHECK(turned.items[0].y == 0);
-    CHECK(turned.items[0].rotation == 1);
+    CHECK(turned.items[2].x == 4);
+    CHECK(turned.items[2].y == 0);
+    CHECK(turned.items[2].rotation == 1);
     CHECK(turned.items[4].x == 5);  // the field (2, 0) goes to (6 - 1 - 0, 2)
     CHECK(turned.items[4].y == 2);
     tool.rotate(3);
-    CHECK(tool.layout()->items[0].x == 0);
-    CHECK(tool.layout()->items[0].rotation == 0);
+    CHECK(tool.layout()->items[2].x == 0);
+    CHECK(tool.layout()->items[2].rotation == 0);
 
     // Putting the piece away keeps the tool; a drag over nothing of the own leaves the hand empty.
     tool.drop_layout();

@@ -382,6 +382,8 @@ title.multiplayer_waiting = waiting for players
 
 # Status line while building. {1}: the cost in gold
 build.cost = {1} gold
+build.tool.demolish = Demolish
+build.tool.copy = Copy an area
 build.copy.select = Drag over a piece of your city or click a building
 build.copy.cost = {1} of {2} pieces will be built, {3} gold
 # Why a building cannot be placed

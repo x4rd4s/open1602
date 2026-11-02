@@ -356,6 +356,8 @@ title.multiplayer_waiting = warte auf Mitspieler
 
 # Status line while building
 build.cost = {1} Gold
+build.tool.demolish = Abreißen
+build.tool.copy = Bereich kopieren
 build.copy.select = Bereich über die eigene Stadt ziehen oder ein Gebäude anklicken
 build.copy.cost = {1} von {2} Teilen werden gebaut, {3} Gold
 build.refusal.ok = kann gebaut werden

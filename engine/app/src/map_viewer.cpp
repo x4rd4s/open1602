@@ -192,7 +192,7 @@ struct ModRules {
 /// The icons of `packages` (icons.toml), numbered in their load order.
 std::vector<assets::PackageIcon> load_package_icons(std::span<const assets::ModPackage> packages,
                                                     std::vector<std::string>& problems) {
-    std::vector<assets::PackageIcon> icons;
+    std::vector<assets::PackageIcon> icons = ui::builtin_icons();  // Open1602's own first
     for (const assets::ModPackage& package : packages) {
         if (const auto bytes = core::read_file(package.folder / assets::kIconsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
@@ -1560,10 +1560,19 @@ void MapViewer::render() {
                         }
                     }
                     if (m_tool.mode() == BuildTool::Mode::Copy) {
-                        // A copied piece rarely fits whole: how much of it would be built, and its price.
+                        // A copied piece rarely fits whole: how much of it would be built, its price
+                        // and, where the means run out, what is missing.
                         m_tool_status =
                             ui::tr("build.copy.cost", {std::to_string(plan.placed), std::to_string(order->items.size()),
                                                        std::to_string(plan.bill.money)});
+                        for (const sim::PlannedBuild& item : plan.items) {
+                            if (item.refusal == sim::BuildRefusal::Money || item.refusal == sim::BuildRefusal::Tools ||
+                                item.refusal == sim::BuildRefusal::Wood || item.refusal == sim::BuildRefusal::Bricks ||
+                                item.refusal == sim::BuildRefusal::Cannons) {
+                                m_tool_status += " - " + refusal_text(item.refusal);
+                                break;
+                            }
+                        }
                     } else if (m_tool_status.empty()) {
                         m_tool_status = ui::tr("build.cost", {std::to_string(plan.bill.money)});
                     }
@@ -2317,6 +2326,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
             break;
         case Hud::Action::Kind::Demolish:
             m_tool.set_mode(BuildTool::Mode::Demolish);
+            m_input->drop_units();
+            break;
+        case Hud::Action::Kind::Copy:
+            m_tool.set_mode(BuildTool::Mode::Copy);
             m_input->drop_units();
             break;
         case Hud::Action::Kind::TurnBuilding:

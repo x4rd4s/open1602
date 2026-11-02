@@ -59,6 +59,7 @@ public:
             Message,
             Build,         ///< build mode with `building`
             Demolish,      ///< build mode, the demolish tool
+            Copy,          ///< build mode, the copy tool (Open1602)
             TurnBuilding,  ///< the building to place by `step` quarters
             ToolOff,       ///< another mode: no building tool
             OrientToRoad,  ///< buildings with a door turn to the road (`step` 1) or not (0)
