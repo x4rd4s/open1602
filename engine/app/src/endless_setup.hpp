@@ -99,6 +99,8 @@ enum class SetupItem : std::uint8_t {
     IslandGap,
     Forest,
     OreMountains,
+    AllCrops,     ///< Rules::all_crops
+    BigOreVeins,  ///< Rules::big_ore_veins
     // Victory conditions (a page of their own, endless games only; sim::VictoryConditions)
     WinInhabitants,
     WinClass,

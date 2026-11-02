@@ -50,6 +50,12 @@ inline constexpr std::int32_t kTextBrightRed = 15;
 /// enough to reach it (a dark blue becomes a lighter one of the same hue).
 [[nodiscard]] assets::Rgba legible_on(const assets::Rgba& colour, const assets::Rgba& ground,
                                       double min_contrast) noexcept;
+/// The palette colour for text in `colour` on `ground`: one that reaches `min_contrast` and keeps
+/// the colour's hue. The nearest palette colour to legible_on() can lose it where the palette
+/// has no light shade of that hue (a light violet became grey); then the nearest of the palette's
+/// colours of a hue close to it that reach the contrast. Grey, white and black take the nearest.
+[[nodiscard]] std::uint8_t legible_palette_colour(const assets::Palette& palette, const assets::Rgba& colour,
+                                                  const assets::Rgba& ground, double min_contrast) noexcept;
 /// The recolouring of text colour `index` (out of range: 0) for a palette.
 [[nodiscard]] Recolour text_recolour(const assets::Palette& palette, std::size_t index);
 /// The same with the letters in palette colour `body` (a player's banner colour), the shadow kept.

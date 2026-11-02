@@ -228,6 +228,30 @@ core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endle
     return assets::ChunkFile::from_bytes(out.take());
 }
 
+namespace {
+
+/// Rules::all_crops and Rules::big_ore_veins on the islands of a new endless game.
+void enrich_islands(World& world, const WorldStart& start) {
+    constexpr std::uint32_t kAllCrops = (1U << (ware::kCocoaField - ware::kCornField + 1)) - 1U;
+    constexpr std::uint16_t kBigIron = 0x1E00;  // 240 t, as the world plan gives a big vein
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        assets::IslandHeader& header = world.island(static_cast<std::uint16_t>(i)).header;
+        if (start.all_crops) {
+            header.fertility |= kAllCrops;
+        }
+        if (start.big_ore_veins) {
+            for (assets::IslandHeader::Deposit& d : header.deposits) {
+                if (d.ware == ware::kOre && d.kind != 0) {
+                    d.kind = 0;
+                    d.amount = std::max(d.amount, kBigIron);
+                }
+            }
+        }
+    }
+}
+
+}  // namespace
+
 core::Result<World> start_new_game(const assets::GameDirectory& game, const assets::BuildingTable& buildings,
                                    const assets::TextTable& text, const NewGameOptions& options,
                                    std::vector<std::string>* warnings) {
@@ -247,7 +271,11 @@ core::Result<World> start_new_game(const assets::GameDirectory& game, const asse
         return scenario.error();
     }
     if (!options.custom) {
-        return load_world(*scenario, buildings, game, warnings, options.world);
+        auto world = load_world(*scenario, buildings, game, warnings, options.world);
+        if (world) {
+            enrich_islands(*world, options.world);
+        }
+        return world;
     }
     // An own world: plan it, put the players' ships at their starts, make the islands.
     WorldSettings settings = *options.custom;
@@ -275,6 +303,7 @@ core::Result<World> start_new_game(const assets::GameDirectory& game, const asse
     if (auto status = add_players(*world, *plan, settings.players); !status) {
         return status.error();
     }
+    enrich_islands(*world, start);
     return world;
 }
 

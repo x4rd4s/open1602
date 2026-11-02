@@ -51,6 +51,8 @@ enum RuleKey : std::uint16_t {
     kBugNativeLand = 43,
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
+    kAllCrops = 46,       // 1: every island grew every crop at the start (Rules::all_crops)
+    kBigOreVeins = 47,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -204,6 +206,12 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.fertile_fields) {
         values.emplace_back(kFertileFields, 1U);
     }
+    if (r.all_crops) {
+        values.emplace_back(kAllCrops, 1U);
+    }
+    if (r.big_ore_veins) {
+        values.emplace_back(kBigOreVeins, 1U);
+    }
     // The towns shown from the start only when there are any: the original's way keeps the bytes.
     if (r.reveal == Reveal::All) {
         values.emplace_back(kReveal, 2U);
@@ -335,6 +343,12 @@ Rules read_rules(Reader& in) {
                 break;
             case kFertileFields:
                 r.fertile_fields = v != 0;
+                break;
+            case kAllCrops:
+                r.all_crops = v != 0;
+                break;
+            case kBigOreVeins:
+                r.big_ore_veins = v != 0;
                 break;
             case kWinInhabitants:
                 r.victory.inhabitants = v;

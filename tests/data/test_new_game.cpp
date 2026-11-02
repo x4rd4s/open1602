@@ -18,6 +18,7 @@
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/text_table.hpp"
+#include "o1602/sim/construction.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_extension.hpp"
@@ -589,5 +590,36 @@ TEST_CASE("data: an own world with six players, all ships at one place, nobody o
         REQUIRE(again.ok());
         CHECK(again->players().size() == 9);
         CHECK(again->players()[8].banner == sim::kFirstExtraBanner + 1);
+    }
+}
+
+TEST_CASE("data: a new endless game with every crop and every iron vein big") {
+    const auto game = game_or_skip();
+    auto buildings = assets::BuildingTable::load(game);
+    auto text = assets::TextTable::load(game);
+    REQUIRE(buildings.ok());
+    REQUIRE(text.ok());
+    sim::NewGameOptions options;
+    options.difficulty = 2;
+    options.world.seed = 7;
+    auto plain = sim::start_new_game(game, *buildings, *text, options);
+    REQUIRE(plain.ok());
+    options.world.all_crops = true;
+    options.world.big_ore_veins = true;
+    auto rich = sim::start_new_game(game, *buildings, *text, options);
+    REQUIRE(rich.ok());
+    REQUIRE(rich->islands().size() == plain->islands().size());
+    for (std::size_t i = 0; i < rich->islands().size(); ++i) {
+        const auto& h = rich->islands()[i].header;
+        for (std::uint8_t ware = sim::ware::kCornField; ware <= sim::ware::kCocoaField; ++ware) {
+            CHECK(sim::island_fertility(rich->islands()[i], ware) == 128);
+        }
+        REQUIRE(h.deposits.size() == plain->islands()[i].header.deposits.size());
+        for (const auto& d : h.deposits) {
+            if (d.ware == sim::ware::kOre) {
+                CHECK(d.kind == 0);
+                CHECK(d.amount >= 0x1E00);
+            }
+        }
     }
 }

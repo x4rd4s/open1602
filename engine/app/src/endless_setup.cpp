@@ -432,6 +432,8 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::BreadChain:
         case SetupItem::TradeCarts:
         case SetupItem::FertileFields:
+        case SetupItem::AllCrops:
+        case SetupItem::BigOreVeins:
         case SetupItem::ShipPurchases:
         case SetupItem::Map:
         case SetupItem::Starts:
@@ -510,6 +512,10 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return r.more_carts ? 1 : 0;
         case SetupItem::FertileFields:
             return r.fertile_fields ? 1 : 0;
+        case SetupItem::AllCrops:
+            return r.all_crops ? 1 : 0;
+        case SetupItem::BigOreVeins:
+            return r.big_ore_veins ? 1 : 0;
         case SetupItem::ShipPurchases:
             return r.computers_buy_ships ? 1 : 0;
         case SetupItem::Ships:
@@ -662,6 +668,12 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::FertileFields:
             r.fertile_fields = choice == 1;
+            break;
+        case SetupItem::AllCrops:
+            r.all_crops = choice == 1;
+            break;
+        case SetupItem::BigOreVeins:
+            r.big_ore_veins = choice == 1;
             break;
         case SetupItem::ShipPurchases:
             r.computers_buy_ships = choice == 1;
@@ -1101,6 +1113,8 @@ std::string setup_label(SetupItem item) {
         "setup.island_gap",
         "setup.forest",
         "setup.ore_mountains",
+        "setup.all_crops",
+        "setup.big_ore_veins",
         "setup.win.inhabitants",
         "setup.win.class",
         "setup.win.class_inhabitants",
@@ -1158,6 +1172,10 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr(choice == 1 ? "setup.trade_carts.more" : "setup.trade_carts.one");
         case SetupItem::FertileFields:
             return ui::tr(choice == 1 ? "setup.fertile_fields.all" : "setup.fertile_fields.original");
+        case SetupItem::AllCrops:
+            return ui::tr(choice == 1 ? "setup.all_crops.all" : "setup.all_crops.original");
+        case SetupItem::BigOreVeins:
+            return ui::tr(choice == 1 ? "setup.big_ore_veins.all" : "setup.big_ore_veins.original");
         case SetupItem::ShipPurchases:
             return ui::tr(choice == 1 ? "setup.on" : "setup.off");
         case SetupItem::Ships:
@@ -1460,6 +1478,14 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (value == "all" || value == "original") {
             r.fertile_fields = value == "all";
         }
+    } else if (key == "all_crops") {
+        if (value == "all" || value == "original") {
+            r.all_crops = value == "all";
+        }
+    } else if (key == "big_ore_veins") {
+        if (value == "all" || value == "original") {
+            r.big_ore_veins = value == "all";
+        }
     } else if (key == "ship_purchases") {
         if (value == "on" || value == "off") {
             r.computers_buy_ships = value == "on";
@@ -1582,6 +1608,8 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("bread", r.revised_bread ? "revised" : "original");
     line("trade_carts", r.more_carts ? "more" : "one");
     line("fertile_fields", r.fertile_fields ? "all" : "original");
+    line("all_crops", r.all_crops ? "all" : "original");
+    line("big_ore_veins", r.big_ore_veins ? "all" : "original");
     line("ships", std::to_string(r.max_ships_per_player));
     line("units", std::to_string(r.max_army));
     line("game_speed", std::to_string(r.max_game_speed));

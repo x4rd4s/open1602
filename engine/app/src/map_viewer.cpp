@@ -3438,6 +3438,8 @@ void endless_world(sim::NewGameOptions& o, const sim::WorldStart& base, const En
     o.world.seed = seed;
     o.layout = sim::layout_for_seed(o.world.seed);
     o.world.guarantee_resources = setup.rules.guarantee_resources;
+    o.world.all_crops = setup.rules.all_crops;
+    o.world.big_ore_veins = setup.rules.big_ore_veins;
     if (setup.own_world) {
         sim::WorldSettings custom = setup.world_settings();
         custom.players = static_cast<std::uint8_t>(std::min<std::size_t>(custom.players, sim::kMaxPlayers));

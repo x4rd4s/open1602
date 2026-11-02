@@ -107,6 +107,70 @@ assets::Rgba legible_on(const assets::Rgba& colour, const assets::Rgba& ground, 
     return assets::Rgba{255, 255, 255, colour.a};
 }
 
+namespace {
+
+/// Hue in degrees (0..360) and saturation (0..1) of a colour, as HSV.
+std::pair<double, double> hue_saturation(const assets::Rgba& c) noexcept {
+    const double r = c.r / 255.0;
+    const double g = c.g / 255.0;
+    const double b = c.b / 255.0;
+    const double hi = std::max({r, g, b});
+    const double lo = std::min({r, g, b});
+    const double d = hi - lo;
+    if (d <= 0.0) {
+        return {0.0, 0.0};
+    }
+    double h = 0.0;
+    if (hi == r) {
+        h = 60.0 * std::fmod((g - b) / d + 6.0, 6.0);
+    } else if (hi == g) {
+        h = 60.0 * ((b - r) / d + 2.0);
+    } else {
+        h = 60.0 * ((r - g) / d + 4.0);
+    }
+    return {h, d / hi};
+}
+
+double hue_distance(double a, double b) noexcept {
+    const double d = std::fabs(a - b);
+    return std::min(d, 360.0 - d);
+}
+
+}  // namespace
+
+std::uint8_t legible_palette_colour(const assets::Palette& palette, const assets::Rgba& colour,
+                                    const assets::Rgba& ground, double min_contrast) noexcept {
+    const assets::Rgba target = legible_on(colour, ground, min_contrast);
+    const std::uint8_t nearest = nearest_colour(palette, target.r, target.g, target.b);
+    const auto [hue, saturation] = hue_saturation(colour);
+    constexpr double kGrey = 0.2;      // below this saturation a colour has no hue worth keeping
+    constexpr double kCloseHue = 25.0;  // degrees
+    const auto keeps_hue = [&](const assets::Rgba& c) {
+        const auto [h, s] = hue_saturation(c);
+        return s >= kGrey && hue_distance(h, hue) <= kCloseHue;
+    };
+    if (saturation < kGrey || (keeps_hue(palette[nearest]) && contrast(palette[nearest], ground) >= min_contrast)) {
+        return nearest;
+    }
+    std::uint8_t best = nearest;
+    std::int32_t best_d = std::numeric_limits<std::int32_t>::max();
+    for (std::size_t i = 0; i < assets::Palette::kSize; ++i) {
+        const assets::Rgba& c = palette[static_cast<std::uint8_t>(i)];
+        if (!keeps_hue(c) || contrast(c, ground) < min_contrast) {
+            continue;
+        }
+        const std::int32_t dr = c.r - target.r;
+        const std::int32_t dg = c.g - target.g;
+        const std::int32_t db = c.b - target.b;
+        const std::int32_t d = dr * dr + dg * dg + db * db;
+        if (d < best_d) {
+            best_d = d;
+            best = static_cast<std::uint8_t>(i);
+        }
+    }
+    return best;
+}
+
 Recolour text_recolour(const assets::Palette& palette, std::size_t index) {
     Recolour r{};
     for (std::size_t i = 0; i < r.size(); ++i) {

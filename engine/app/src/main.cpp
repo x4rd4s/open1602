@@ -218,6 +218,8 @@ int run_program(int argc, char** argv) {
     std::random_device device;
     options.world.seed = command.seed.value_or((std::uint64_t{device()} << 32) | device());
     options.world.guarantee_resources = options.rules.guarantee_resources;
+    options.world.all_crops = options.rules.all_crops;
+    options.world.big_ore_veins = options.rules.big_ore_veins;
     if (command.new_game) {
         sim::NewGameOptions& new_game_options = *command.new_game;
         new_game_options.layout = command.layout.value_or(sim::layout_for_seed(options.world.seed));
