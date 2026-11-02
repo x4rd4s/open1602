@@ -39,10 +39,10 @@ constexpr std::uint32_t kShipClear = 5;          // from a start to the nearest 
 constexpr std::uint32_t kTilesPerIsland = 9500;  // the original: 17-20 islands on 500 x 350
 constexpr std::uint32_t kPlanIslands = 18;       // islands the original's resource counts are made for
 constexpr std::uint32_t kPlanPlayers = 4;
-constexpr std::uint64_t kPlanLand = 22750;                   // land of the original's plans: about 13 % of 500 x 350
-constexpr std::uint64_t kMaxOreScale = 20000;                // percent: veins of the level at most 200 times
-constexpr std::uint64_t kPlanStream = 0x5701'D0A1ULL;        // the islands
-constexpr std::uint64_t kStartOrderStream = 0x5701'D0A2ULL;  // which player gets which start area
+constexpr std::uint64_t kPlanLand = 500ULL * 350 * 13 / 100;  // land of the original's plans: about 13 %
+constexpr std::uint64_t kMaxOreScale = 20000;                 // percent: veins of the level at most 200 times
+constexpr std::uint64_t kPlanStream = 0x5701'D0A1ULL;         // the islands
+constexpr std::uint64_t kStartOrderStream = 0x5701'D0A2ULL;   // which player gets which start area
 
 // Ore, crop and treasure entries of the original's plans per level (Endlosspiel<D><V>.szs).
 constexpr auto kCropBuildings = id::kPlanCrops;
