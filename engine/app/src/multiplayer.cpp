@@ -31,9 +31,12 @@ constexpr std::uint32_t kPackWaitMs = 5'000;
 /// (SessionConfig::start_wait_ms).
 constexpr std::uint32_t kStartWaitMs = 60'000;
 
-/// What this computer remembers for the menu: the last name typed and the last settings a host chose.
-void remembered_to_model(MultiplayerModel& model, const AppSettings& settings) {
-    model.name = settings.player_name.empty() ? ui::tr("menu.default_name") : settings.player_name;
+/// What this computer remembers for the menu: the last name typed (or the one given on the command
+/// line for this run) and the last settings a host chose.
+void remembered_to_model(MultiplayerModel& model, const AppSettings& settings, const std::string& name_given) {
+    model.name = !name_given.empty()            ? name_given
+                 : settings.player_name.empty() ? ui::tr("menu.default_name")
+                                                : settings.player_name;
     model.settings = settings.multiplayer;
 }
 
@@ -406,11 +409,15 @@ void MapViewer::open_multiplayer_menu() {
         if (const auto folder = m_game.resolve("Szenes")) {
             model.scenarios = scenario_list(*folder, headings, &m_game);
         }
+        std::vector<MenuScenario> own =
+            own_scenario_list(own_scenario_folder(), ui::tr("menu.own_scenarios"), model.scenarios);
+        model.scenarios.insert(model.scenarios.end(), std::make_move_iterator(own.begin()),
+                               std::make_move_iterator(own.end()));
     }
     // Before the menu first draws and takes them: the click that opened it ends the frame's menu
     // work, so apply_multiplayer_menu() would only fill them after that first drawing, and the
     // name would be empty after each start.
-    remembered_to_model(model, m_app_settings);
+    remembered_to_model(model, m_app_settings, m_options.player_name);
     m_hud->open_multiplayer();
     m_lan_search_ms = 0;  // search at once
 }
@@ -448,7 +455,7 @@ void MapViewer::apply_multiplayer_menu() {
     }
 
     MultiplayerModel& model = m_hud->multiplayer_model();
-    remembered_to_model(model, m_app_settings);
+    remembered_to_model(model, m_app_settings, m_options.player_name);
     model.found = m_lan_browser ? m_lan_browser->games() : std::vector<net::FoundGame>{};
     model.savegames.clear();
     for (std::size_t slot = 0; slot < m_slots.size(); ++slot) {
@@ -489,6 +496,10 @@ void MapViewer::handle_multiplayer(const MultiplayerEvent& e) {
     MultiplayerMenu* menu = m_hud->multiplayer();
     const auto keep_name = [&] {
         const std::string& name = menu->name();
+        if (name == m_options.player_name) {
+            return;  // the name given on the command line holds for this run only
+        }
+        m_options.player_name.clear();  // another name typed: it holds from now on
         if (!name.empty() && name != m_app_settings.player_name) {
             m_app_settings.player_name = name;
             save_settings();

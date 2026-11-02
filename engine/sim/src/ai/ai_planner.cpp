@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The city planner of the computer players (docs/re/ai.md, "Building sites and roads"): task 5 refreshes the
+// The city planner of the computer players: task 5 refreshes the
 // current city (Kontor settings, production switches, money) or runs the handler of its stage,
 // which asks a fixed list of Needs and queues the first building that is missing.
 #include <algorithm>
@@ -16,7 +16,7 @@ namespace o1602::sim::ai {
 
 namespace {
 
-constexpr std::uint64_t kRefreshMs = 5100;  // C+0x10: a refresh every 5.1 s
+constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
 constexpr std::uint64_t kStage0AbandonMs = 480'000;
 constexpr std::uint64_t kStage14AbandonMs = 1'200'000;
 
@@ -27,7 +27,7 @@ std::uint32_t ceil_half(std::uint32_t n) {
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
-// Task 5 (0x00428E70)
+// Task 5
 
 void Engine::task_develop(AiPlayer& p) {
     if (now_ms() - p.refresh_ms >= kRefreshMs) {
@@ -54,7 +54,7 @@ Cheats Engine::cheats() const {
 }
 
 void Engine::tutorial_money(AiPlayer& p) {
-    // 0x00428E30: at most once a second (P+0x10), money below 3791 gets 379.
+    // At most once a second, money below 3791 gets 379.
     if (now_ms() - p.refresh_ms <= 1000) {
         return;
     }
@@ -66,7 +66,7 @@ void Engine::tutorial_money(AiPlayer& p) {
 }
 
 bool Engine::peaceful(AiPlayer& p) {
-    // 0x0040EEF0: a computer a scenario keeps quiet (player +0x70 bit 3) builds nothing while every
+    // A computer a scenario keeps quiet builds nothing while every
     // human holds a peace treaty with it and it likes each of them at least -30. Once one does not,
     // the switch goes for good (op 0x3A).
     Player& self = player(p);
@@ -109,7 +109,7 @@ void Engine::refresh_city(AiPlayer& p) {
 }
 
 void Engine::subsidy(AiPlayer& p, std::int32_t m) {
-    // 0x00428370: money and goods into the current city while the computer is behind.
+    // Money and goods into the current city while the computer is behind.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -129,7 +129,7 @@ void Engine::subsidy(AiPlayer& p, std::int32_t m) {
     if (p.score >= 2 && c->stock(mat.tools) < cheats().subsidy_tools * kStockUnitsPerTon) {
         add_goods(*c, mat.tools, cheats().subsidy_tools * kStockUnitsPerTon * u);
     }
-    // The bricks of the original need a score of 20, which never comes (docs/re/ai.md).
+    // The bricks of the original need a score of 20, which never comes.
     if (population(*c, 2) >= 50) {
         for (const SubsidyRaw& raw : kSubsidyRaws) {
             if (r->slots[raw.slot].count > 3 && c->stock(raw.ware) < 3 * kTon) {
@@ -146,7 +146,7 @@ void Engine::subsidy(AiPlayer& p, std::int32_t m) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Kontor settings and production switches (0x0041D450, 0x0041D990, 0x0041EAC0)
+// Kontor settings and production switches
 
 void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
     const std::uint32_t level = kontor_level(c);
@@ -324,10 +324,10 @@ void Engine::sell_settings(AiPlayer& p, City& c, CityPlan& r) {
 }
 
 void Engine::production_switches(AiPlayer& p, City& c) {
-    // 0x0041EAC0: every producer of the current city, by the ware it makes. Each check looks at the
-    // building's switch first: one that is on can only go off, one that is off only on (0x0041E8F0,
-    // 0x0041E980, 0x0041EA10). An off building is not ticked, so its count of cycles without raw
-    // material stays until it is switched on again (0x0047CFA0) and must not keep it off.
+    // Every producer of the current city, by the ware it makes. Each check looks at the
+    // building's switch first: one that is on can only go off, one that is off only on.
+    // An off building is not ticked, so its count of cycles without raw
+    // material stays until it is switched on again and must not keep it off.
     const IslandMap& map = island_of(c.island).map;
     const std::uint32_t cap = c.capacity;
     const auto& m = m_buildings.materials();
@@ -352,7 +352,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
             changes.emplace_back(index, on);
             enabled = on;
         };
-        // NoRawGoods (0x0047CEC0): a Maxnorohst of 0 counts as starved at once.
+        // NoRawGoods: a Maxnorohst of 0 counts as starved at once.
         const bool starved = pr.idle_cycles >= b->max_idle_cycles;
         const std::uint8_t w = b->ware;
         const auto raw = [&] {
@@ -416,7 +416,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Stages (0x00426530 and the handlers 0x004265A0..0x00428150)
+// Stages and their handlers
 
 void Engine::set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s) {
     log(p, "city %u/%u: stage 0x%x -> 0x%x", r.island, r.city, r.stage, s);
@@ -439,7 +439,7 @@ void Engine::set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s) {
 }
 
 void Engine::nothing_to_do(AiPlayer& p) {
-    // 0x0041DEE0: with several cities the visit ends.
+    // With several cities the visit ends.
     if (p.cities > 1) {
         p.budget = 0;
     }
@@ -458,7 +458,7 @@ std::int32_t Engine::net_income(const AiPlayer& p) const {
 }
 
 bool Engine::incomes_ok(const AiPlayer& p, std::int32_t minimum) const {
-    // 0x00425D40: every inhabited city of the computer earns at least `minimum` per minute.
+    // Every inhabited city of the computer earns at least `minimum` per minute.
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
         const City& c = m_world.cities()[i];
@@ -470,7 +470,7 @@ bool Engine::incomes_ok(const AiPlayer& p, std::int32_t minimum) const {
 }
 
 std::int32_t Engine::land_rank(const AiPlayer& p) const {
-    // 0x00425DC0: -1 another own city has no land measured, 0 another has more, 1 the largest.
+    // -1 another own city has no land measured, 0 another has more, 1 the largest.
     const CityPlan* here = nullptr;
     for (const CityPlan& r : p.plans) {
         if (r.island == p.island && r.city == p.city) {
@@ -500,7 +500,7 @@ std::int32_t Engine::land_rank(const AiPlayer& p) const {
 }
 
 std::uint32_t Engine::luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t level) const {
-    // 0x00426400: luxury goods the city has enough of (4 t with an own producer, else 20 t).
+    // Luxury goods the city has enough of (4 t with an own producer, else 20 t).
     const auto t = [](bool own) { return (own ? 4U : 20U) * kTon; };
     std::uint32_t n = 0;
     if (level >= 2) {
@@ -519,14 +519,41 @@ std::uint32_t Engine::luxury_in_stock(const AiPlayer& p, const City& c, const Ci
 }
 
 // ---------------------------------------------------------------------------------------------
-// Build orders of the stages (task 5, docs/re/ai.md)
+// Build orders of the stages (task 5)
 //
 // Each stage of a city tries what it needs in a fixed order and stops at the first entry that
 // finds something to do. The orders are data (computer_orders.hpp): the original's, or a package's
 // from its computers.toml.
 
+std::uint32_t Engine::grown(const CityPlan& r, std::uint32_t n, bool any_stage) const {
+    if (classic() || (r.stage < stage::kSecond && !any_stage)) {
+        return n;
+    }
+    return grown_count(r.land, n, any_stage || m_grow_from == 0 ? kGrowFrom : m_grow_from);
+}
+
+std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const {
+    const std::uint32_t wanted = grown(r, n);
+    if (wanted <= n) {
+        return n;
+    }
+    // Houses beyond the original's number only while the city's houses move up: a new house starts
+    // with the pioneers, and a city that keeps building them grows wide instead of tall, its
+    // goods spread over houses that never reach the next class.
+    std::uint32_t houses = 0;
+    std::uint32_t pioneers = 0;
+    for (const House& h : m_world.houses()) {
+        if (h.island == c.island && h.city == c.index) {
+            ++houses;
+            pioneers += h.resident_class == 0 ? 1U : 0U;
+        }
+    }
+    return pioneers * 8 <= houses ? wanted : n;
+}
+
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
-                        std::span<const StageNeed> needs) {
+                        std::span<const StageNeed> needs, bool grow) {
+    const auto count = [&](std::uint32_t n) { return grow ? grown(r, n) : n; };
     const auto holds = [money](StageNeed::When w) {
         switch (w) {
             case StageNeed::When::Never:
@@ -549,16 +576,16 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
         bool found = false;
         switch (n.kind) {
             case StageNeed::Kind::Building:
-                found = need(p, n.slot, n.n);
+                found = need(p, n.slot, count(n.n));
                 break;
             case StageNeed::Kind::Market:
                 found = need_market(p, n.n);
                 break;
             case StageNeed::Kind::Houses:
-                found = need_houses(p, n.n);
+                found = need_houses(p, grow ? houses_wanted(c, r, n.n) : n.n);
                 break;
             case StageNeed::Kind::Public:
-                found = need_public(p, n.slot, n.n, holds(n.flag));
+                found = need_public(p, n.slot, count(n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::Kontor:
                 found = need_kontor(p, n.n);
@@ -582,13 +609,13 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = weapons(p);
                 break;
             case StageNeed::Kind::Luxury:
-                found = luxury(p, n.n, holds(n.flag));
+                found = luxury(p, count(n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::ColonyLuxury:
                 found = colony_luxury(p, c, r, n.n);
                 break;
             case StageNeed::Kind::Tower:
-                found = need_tower(p, 1, n.n);
+                found = need_tower(p, 1, count(n.n));
                 break;
             case StageNeed::Kind::RoadsIfMason:
                 found = roads_if_mason(p);
@@ -597,7 +624,7 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = want_colony(p, static_cast<std::uint8_t>(n.n), false, false);
                 break;
             case StageNeed::Kind::Package:
-                found = package_order(p, c, r, n.slot, n.n);
+                found = package_order(p, c, r, n.slot, count(n.n));
                 break;
         }
         if (found) {
@@ -630,11 +657,11 @@ bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::u
         case stage::kSettlers:
         case stage::kMain:
         case stage::kMain2:
-            return luxury(p, std::min(n, 4U), true);
+            return luxury(p, std::min(n, grown(r, 4, true)), true);
         case stage::kCitizens:
-            return luxury(p, std::min(n, 6U), true);
+            return luxury(p, std::min(n, grown(r, 6, true)), true);
         case stage::kCitizens2:
-            return luxury(p, std::min(n, 4U), false);
+            return luxury(p, std::min(n, grown(r, 4, true)), false);
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kMerchants:
@@ -645,7 +672,7 @@ bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::u
                                       : (p.max_stage == stage::kAristocrats || p.max_stage == stage::kAristocrats2)
                                           ? 10U
                                           : 8U;
-            const std::uint32_t k = std::min(n, cap);
+            const std::uint32_t k = std::min(n, grown(r, cap, true));
             if (q == 1) {
                 if (luxury(p, k, false)) {
                     return true;
@@ -666,19 +693,22 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
     switch (p.max_stage) {
         case stage::kMain:
         case stage::kMain2:
-            return need(p, kSlotSheep, std::min(n, 4U));
+            return need(p, kSlotSheep, std::min(n, grown(r, 4U, true)));
         case stage::kCitizens:
-            return need(p, kSlotSheep, std::min(n, 6U));
+            return need(p, kSlotSheep, std::min(n, grown(r, 6U, true)));
         case stage::kCitizens2:
-            return need(p, kSlotCattle, std::min(n, 4U)) || need(p, kSlotSheep, std::min(n, 4U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 4U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 4U, true)));
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kAristocrats:
         case stage::kAristocrats2:
-            return need(p, kSlotCattle, std::min(n, 8U)) || need(p, kSlotSheep, std::min(n, 8U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 8U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 8U, true)));
         case stage::kMerchants:
         case stage::kMerchants2:
-            return need(p, kSlotCattle, std::min(n, 6U)) || need(p, kSlotSheep, std::min(n, 6U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 6U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 6U, true)));
         default:
             return false;
     }
@@ -690,8 +720,28 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const Balance& at = m_world.balance();
     const auto has = [money](std::uint32_t gold) { return std::int64_t{money} >= std::int64_t{gold}; };
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
+    // The lists this visit went through; once there is nothing to do, Open1602 goes through them
+    // again with their numbers grown by the city's land, so that a large island fills up without
+    // holding up the way to the next stage.
+    std::vector<ComputerList> asked;
     const auto needs = [&](ComputerList list) {
+        asked.push_back(list);
         return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
+    };
+    const auto idle = [&] {
+        if (!classic()) {
+            // A city at its last stage that earns well grows on the original's large islands too
+            // (from kGrowLand tiles); before, it would spend what its next stage needs.
+            m_grow_from = r.stage == stage::kAristocrats2 && net_income(p) >= kGrowIncome ? kGrowLand : kGrowFrom;
+            for (const ComputerList list : asked) {
+                if (first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list), true)) {
+                    m_grow_from = 0;
+                    return;
+                }
+            }
+            m_grow_from = 0;
+        }
+        nothing_to_do(p);
     };
 
     switch (r.stage) {
@@ -727,7 +777,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 return;
             }
             if (full_crops(c.island) == 0) {
-                const std::uint32_t n = std::min(r.land / 120, 6U);
+                const std::uint32_t n = std::min(r.land / 120, grown(r, 6, true));
                 if (need(p, kSlotSheep, n) || need(p, kSlotCattle, n)) {
                     return;
                 }
@@ -737,7 +787,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::ColonyMaterials)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kPioneers: {
@@ -761,7 +811,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (grown) {
                 // A first colony before the city grows on (the original waits for it forever if no
                 // island is found, S-097; Open1602 goes on once the search has failed). Not if the
-                // scenario forbids colonies (0x00426A7B).
+                // scenario forbids colonies.
                 if (kontor_level(c) == 1 && p.cities < 2 && (!p.colony_failed || classic()) &&
                     !player(p).scenario.has(scenario_flag::kNoColonies)) {
                     want_colony(p, 1, true, true);
@@ -796,14 +846,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::SecondLuxury)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kSecondFarming: {
             if (needs(ComputerList::SecondFarming) || farm_animals(p, r) || need_tower(p, 1, 6)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMain: {
@@ -818,7 +868,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 return;
             }
             if (money >= 4000) {
-                nothing_to_do(p);
+                idle();
             }
             return;
         }
@@ -831,7 +881,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Main2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizens: {
@@ -843,7 +893,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Citizens)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizens2: {
@@ -855,14 +905,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Citizens2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizensSmall: {
             if (needs(ComputerList::CitizensSmall)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMerchants: {
@@ -879,7 +929,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::MerchantsTail)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMerchants2:
@@ -893,7 +943,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                       : needs(ComputerList::Merchants2) || needs(ComputerList::Merchants2Tail)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kAristocrats: {
@@ -907,14 +957,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Aristocrats)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kAristocrats2: {
             if (needs(ComputerList::Aristocrats2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         default:
@@ -924,7 +974,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Needs (0x0041FE60..0x00422610)
+// Needs
 
 bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::BuildingType& b, std::uint8_t slot, bool force,
                            bool from_start) {
@@ -936,7 +986,7 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
 }
 
 void Engine::reserve(AiPlayer& p, const assets::BuildingType& b, std::int64_t extra_money) {
-    // 0x0041D3A0: the costs leave the player and the city while the site is searched. The
+    // The costs leave the player and the city while the site is searched. The
     // original overwrites the building's gold with the fields' gold for farms (S-096); Open1602
     // keeps both.
     refund(p);
@@ -957,7 +1007,6 @@ void Engine::reserve(AiPlayer& p, const assets::BuildingType& b, std::int64_t ex
 }
 
 void Engine::refund(AiPlayer& p) {
-    // 0x00418030
     Reservation& r = p.reserved;
     if (r.empty()) {
         return;
@@ -987,10 +1036,10 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     const assets::BuildingType* weberei = by_id(id::kWeberei);
     const bool weberei_ok = weberei != nullptr && unlocked(p, *weberei);
     if (which == kSlotSheep && cotton_island && weberei_ok) {
-        which = kSlotCotton;  // 0x00421AF0: wool from cotton where it grows fully
+        which = kSlotCotton;  // wool from cotton where it grows fully
     }
     if (which == kSlotWebstube && cotton_island && weberei_ok) {
-        which = kSlotWeberei;  // 0x00421360
+        which = kSlotWeberei;
     }
     if (which == kSlotIronMine) {
         return need_iron_mine(p, n);
@@ -1005,7 +1054,7 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     SlotState& s = r->slots[which];
     std::uint32_t wanted = n;
     if (which == kSlotSmelter) {
-        // 0x00420340: more than one smelter only with ore in stock and three iron workshops.
+        // More than one smelter only with ore in stock and three iron workshops.
         std::uint32_t users = 0;
         for (const std::uint8_t k : {kSlotToolsmith, kSlotSwords, kSlotMuskets, kSlotCannons}) {
             users += r->slots[k].count != 0 ? 1U : 0U;
@@ -1177,7 +1226,6 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
 }
 
 bool Engine::need_iron_mine(AiPlayer& p, std::uint32_t n) {
-    // 0x004201D0
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1222,7 +1270,6 @@ bool Engine::need_iron_mine(AiPlayer& p, std::uint32_t n) {
 }
 
 bool Engine::need_gold_mine(AiPlayer& p) {
-    // 0x004202A0
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1307,7 +1354,7 @@ bool Engine::claim_land(AiPlayer& p, std::uint8_t slot, std::int32_t x, std::int
 }
 
 bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
-    // 0x004209C0: houses while affordable, with half a ton of food and more than 1000 gold.
+    // Houses while affordable, with half a ton of food and more than 1000 gold.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1329,7 +1376,7 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
 }
 
 bool Engine::need_market(AiPlayer& p, std::uint32_t n) {
-    // 0x00420A70: a market while fewer than n stand or the market flag is clear; no unlock test,
+    // A market while fewer than n stand or the market flag is clear; no unlock test,
     // pushed even without budget.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
@@ -1345,7 +1392,10 @@ bool Engine::need_market(AiPlayer& p, std::uint32_t n) {
         return false;
     }
     if (!affordable(p, *c, *b)) {
-        return true;
+        // The original waits for the market, even in a city without a woodcutter that lacks the wood
+        // for it: the woodcutter comes later in the order, so the city waits for good. Open1602 goes
+        // on with the order then.
+        return classic() || r->slots[kSlotWoodcutter].count != 0;
     }
     if (plan_building(p, kMarket, *b, kSlotMarket, true)) {
         reserve(p, *b);
@@ -1354,7 +1404,7 @@ bool Engine::need_market(AiPlayer& p, std::uint32_t n) {
 }
 
 bool Engine::need_kontor(AiPlayer& p, std::uint32_t level) {
-    // 0x004219A0: the next Kontor up to `level`.
+    // The next Kontor up to `level`.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr || level > 4) {
@@ -1379,7 +1429,7 @@ bool Engine::need_kontor(AiPlayer& p, std::uint32_t level) {
 }
 
 bool Engine::need_stone_roads(AiPlayer& p) {
-    // 0x00421A20: paving with three quarters of the warehouse in bricks and money to spare.
+    // Paving with three quarters of the warehouse in bricks and money to spare.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     const assets::BuildingType* road = by_id(id::kRoadStone);
@@ -1401,7 +1451,7 @@ bool Engine::roads_if_mason(AiPlayer& p) {
 }
 
 bool Engine::need_shipyard(AiPlayer& p) {
-    // 0x00421D30: a yard in the home city once the computer has ships and a weaving mill.
+    // A yard in the home city once the computer has ships and a weaving mill.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1448,7 +1498,7 @@ bool Engine::need_shipyard(AiPlayer& p) {
 }
 
 bool Engine::need_tower(AiPlayer& p, std::uint8_t type, std::uint32_t n) {
-    // 0x00421E60: 0 wooden, 1 stone, 2 pirate tower.
+    // 0 wooden, 1 stone, 2 pirate tower.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1475,7 +1525,7 @@ bool Engine::need_tower(AiPlayer& p, std::uint8_t type, std::uint32_t n) {
 }
 
 bool Engine::need_denkmal(AiPlayer& p) {
-    // 0x00420E30: while the player has monuments allowed.
+    // While the player has monuments allowed.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     const Player& pl = player(p);
@@ -1494,7 +1544,7 @@ bool Engine::need_denkmal(AiPlayer& p) {
 }
 
 bool Engine::need_castle(AiPlayer& p) {
-    // 0x00420720: a castle in the home city while the computer trails the leading human.
+    // A castle in the home city while the computer trails the leading human.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr || (m_world.game_settings().flags & World::GameSettings::kNoMilitary) != 0) {
@@ -1543,7 +1593,7 @@ bool Engine::need_castle(AiPlayer& p) {
 }
 
 bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
-    // 0x00420AE0..0x00421150: a public building while fewer than n stand or houses lack it.
+    // A public building while fewer than n stand or houses lack it.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr) {
@@ -1598,7 +1648,7 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
 }
 
 bool Engine::processing(AiPlayer& p) {
-    // 0x00425B10: workshops for the raw materials the city has.
+    // Workshops for the raw materials the city has.
     const CityPlan* r = current_plan(p);
     if (r == nullptr) {
         return false;
@@ -1632,7 +1682,6 @@ bool Engine::processing(AiPlayer& p) {
 }
 
 bool Engine::iron_tools(AiPlayer& p) {
-    // 0x004225D0
     const City* c = current_city(p);
     if (c == nullptr || c->stock(ware::kOre) <= kTon) {
         return false;
@@ -1641,7 +1690,7 @@ bool Engine::iron_tools(AiPlayer& p) {
 }
 
 bool Engine::weapons(AiPlayer& p) {
-    // 0x00422610: the weapon workshops in the home city.
+    // The weapon workshops in the home city.
     if ((m_world.game_settings().flags & World::GameSettings::kNoMilitary) != 0 ||
         !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
         return false;
@@ -1653,7 +1702,7 @@ bool Engine::weapons(AiPlayer& p) {
 }
 
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
-    // 0x00425E30: luxury raw materials by the island's fertility, what the home city lacks and
+    // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);

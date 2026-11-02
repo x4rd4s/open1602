@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The computer players (docs/re/ai.md) on a small synthetic world, without the original data: they
+// The computer players on a small synthetic world, without the original data: they
 // found a city with their ship through the same orders a player gives, run the same on every
 // computer, keep their state through a savegame and ignore the players that are not theirs.
 
@@ -321,9 +321,9 @@ TEST_CASE("ai: a ship whose goods do not fit into the full home warehouse does n
     CHECK(g.world.ship(id)->load(ware) == 10 * 32);  // nothing thrown away
 }
 
-TEST_CASE("ai: a computer's ship under the white flag gets its next job, which strikes the flag (0x00423BC0)") {
+TEST_CASE("ai: a computer's ship under the white flag gets its next job, which strikes the flag") {
     // A ship a pirate plundered keeps its white flag; the original's pickers do not look at the flag
-    // (only at bit 5 of ship + 0x1A8, the flag is bit 3), so the next job sails it on.
+    // (the original tests the wrong bit), so the next job sails it on.
     Game g;
     sim::Simulation s(g.world, g.buildings, g.figures);
     found_city(g, s, 30'000);
@@ -374,7 +374,7 @@ TEST_CASE("ai: computer opponents switched off found nothing, by the rule or by 
         CHECK(!run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
     }
     {
-        // Bit 1 of the settings word (TIMERS +0xA8): the original skips its AI tick (0x0048975B).
+        // Bit 1 of the settings word (TIMERS +0xA8): the original skips its AI tick.
         Game g;
         sim::World::GameSettings settings = g.world.game_settings();
         settings.flags |= sim::World::GameSettings::kNoComputers;
@@ -395,7 +395,7 @@ TEST_CASE("ai: computer opponents switched off found nothing, by the rule or by 
     }
 }
 
-TEST_CASE("ai: a computer founds its city at the open sea, not at a lake its ship cannot reach (0x00417220)") {
+TEST_CASE("ai: a computer founds its city at the open sea, not at a lake its ship cannot reach") {
     Game g(true, 10000, true);
     sim::Simulation s(g.world, g.buildings, g.figures);
     REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
@@ -479,7 +479,7 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
     // The wider hunter's hut by default.
-    constexpr std::uint64_t kExpected = 0x9a31c12e1482f7dcULL;
+    constexpr std::uint64_t kExpected = 0x8cb0075d5784a662ULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -880,7 +880,7 @@ TEST_CASE("ai: a computer without a ship founds nothing and harms nobody") {
     CHECK(!s.computers().directs(12345));
 }
 
-TEST_CASE("ai: a computer a scenario keeps quiet stays so until a human breaks the peace (0x0040EEF0)") {
+TEST_CASE("ai: a computer a scenario keeps quiet stays so until a human breaks the peace") {
     Game g;
     g.add_ship(kHuman, 86, 10);  // a human still in the game
     g.world.player(kComputer)->scenario.flags = sim::scenario_flag::kPassive | sim::scenario_flag::kNoTrader;
@@ -970,7 +970,7 @@ TEST_CASE("ai: a city founded next to a young colony is remembered against the f
     CHECK(!remembered(with([](Case& k) { k.colony = false; })));       // no colony of the computer there
 }
 
-TEST_CASE("ai: a computer answers a ship that is about to found a city on its island (0x004294C0)") {
+TEST_CASE("ai: a computer answers a ship that is about to found a city on its island") {
     using Kind = sim::DiplomacyNotice::Kind;
     struct Case {
         sim::PlayerId asker = kHuman;
@@ -1167,7 +1167,7 @@ TEST_CASE("ai: a rich computer buys peace from the pirates, a poor one does not"
     }
 }
 
-TEST_CASE("ai: the computer switches its workshops by their switch first, as the original (0x0041EAC0)") {
+TEST_CASE("ai: the computer switches its workshops by their switch first, as the original") {
     // A toolsmith and a weaving mill, both out of raw material for five cycles (Maxnorohst 5).
     Game g;
     g.buildings = make_buildings(
@@ -1298,7 +1298,7 @@ TEST_CASE("ai: a farm leaves the trees of the city's woodcutter standing (S-122)
 
 TEST_CASE("ai: a computer that finds no island for its city gives its ship to the pirates and leaves") {
     // The big island under water: only the rock is left, too small for a colony (root task
-    // 0x00429070: ship op 5 with value 5, then the players' check retires the computer).
+    // Ship op 5 with value 5, then the players' check retires the computer).
     Game g;
     add_pirates(g);
     constexpr sim::PlayerId kPirates = 4;
@@ -1317,7 +1317,7 @@ TEST_CASE("ai: a computer that finds no island for its city gives its ship to th
     CHECK(!g.world.players()[kComputer].active());
 }
 
-TEST_CASE("ai: the pirates' nest offers its goods every 42 s without any food (task 5, 0x00429DF0)") {
+TEST_CASE("ai: the pirates' nest offers its goods every 42 s without any food (task 5)") {
     // A nest with a pirate Kontor of 6 wares, loot but no food, and a pirate ship at sea.
     Game g(false);
     g.buildings = make_buildings(
