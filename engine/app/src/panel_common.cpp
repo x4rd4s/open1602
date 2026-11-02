@@ -118,10 +118,13 @@ void StockList::refresh(const sim::City& city, const assets::Goods& goods, bool 
         m_panel.set_visible(kLTrendUp + place, up);
         m_panel.set_visible(kLTrendDown + place, !rate.empty() && !up);
         m_panel.set_text(up ? kLTrendUp + place : kLTrendDown + place, rate);
-        for (const std::int32_t id : {kLIcon, kLFrame, kLBar}) {
+        // A free place (on a later page) shows the empty slot (water), without a frame or a bar.
+        m_panel.set_visible(kLIcon + place, true);
+        for (const std::int32_t id : {kLFrame, kLBar}) {
             m_panel.set_visible(id + place, w != 0);
         }
         if (w == 0) {
+            m_panel.set_graphic(kLIcon + place, m_gfx_empty, 0);
             m_panel.set_visible(kLMarker + place, false);
             m_panel.set_visible(kLCorner + place, false);
             continue;
