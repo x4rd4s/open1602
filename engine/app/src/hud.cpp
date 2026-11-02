@@ -377,8 +377,9 @@ Hud::Hud(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets
         // Names in a banner's colour stay readable on the menus' dark ground (4.5:1, as for text).
         const assets::Rgba ground = palette[ui::FormStyle{}.ground];
         for (const render::Banner& b : banners.banners()) {
+            // In exactly that colour: the palette has no light shade of some banners (no violet).
             menu_banners.push_back(MenuBanner{ui::nearest_colour(palette, b.colour.r, b.colour.g, b.colour.b), b.id,
-                                              ui::legible_palette_colour(palette, b.colour, ground, 4.5)});
+                                              ui::rgb_ink(ui::legible_on(b.colour, ground, 4.5))});
             banner_colours.push_back(menu_banners.back().colour);
         }
         const std::uint8_t grey = ui::nearest_colour(palette, 128, 128, 128);

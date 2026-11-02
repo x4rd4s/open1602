@@ -63,7 +63,7 @@ constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 
 // Economy, limits and disasters on the left, the world and the opponents on the right.
 constexpr Group kGroups[] = {
-    {"setup.group.economy", SetupItem::Refund, SetupItem::TradeCarts, kLeft},
+    {"setup.group.economy", SetupItem::Refund, SetupItem::Hunting, kLeft},
     {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
     {"setup.group.nature", SetupItem::FertileFields, SetupItem::Volcanoes, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},

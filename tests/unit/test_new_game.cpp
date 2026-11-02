@@ -725,7 +725,7 @@ TEST_CASE("new game: an own world with six players: the plan's size and starts, 
     CHECK(!a.state_damaged());
     // And the same on every platform (golden hash, DS-2): a planned world, five computers.
     // The computers' state version 5 (the slots counted); the revised bread chain by default.
-    test::check_golden("six players after 60 s", a.state_hash(), 0x7dd02f74ddb9e393ULL);
+    test::check_golden("six players after 60 s", a.state_hash(), 0x944b14e279784503ULL);
 }
 
 TEST_CASE("new game: a colour the level's file does not have is swapped with the player who had it") {

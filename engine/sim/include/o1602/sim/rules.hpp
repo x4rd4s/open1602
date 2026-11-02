@@ -293,6 +293,11 @@ struct Rules {
     /// player and island. Off with the original's settings.
     bool more_carts = true;
 
+    /// Open1602: the hunter's hut reaches 12 tiles instead of the original's 8
+    /// (data/balance/wider_hunting.toml), so that it finds enough deer. On by default; the
+    /// original's settings keep the original's reach.
+    bool wider_hunting = true;
+
     /// Which towns are discovered from the start (players, natives, pirates) or only by ship.
     Reveal reveal = Reveal::Original;
 
@@ -341,6 +346,7 @@ struct Rules {
         r.revised_bread = false;
         r.computers_buy_ships = false;
         r.more_carts = false;
+        r.wider_hunting = false;
         r.reveal = Reveal::Original;
         r.fertile_fields = false;
         r.all_crops = false;

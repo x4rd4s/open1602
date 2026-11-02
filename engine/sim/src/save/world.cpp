@@ -53,6 +53,7 @@ enum RuleKey : std::uint16_t {
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
     kAllCrops = 46,       // 1: every island grew every crop at the start (Rules::all_crops)
     kBigOreVeins = 47,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
+    kWiderHunting = 48,   // 1: the hunter's hut reaches further (Rules::wider_hunting)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -212,6 +213,9 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.big_ore_veins) {
         values.emplace_back(kBigOreVeins, 1U);
     }
+    if (r.wider_hunting) {
+        values.emplace_back(kWiderHunting, 1U);
+    }
     // The towns shown from the start only when there are any: the original's way keeps the bytes.
     if (r.reveal == Reveal::All) {
         values.emplace_back(kReveal, 2U);
@@ -254,6 +258,7 @@ Rules read_rules(Reader& in) {
     Rules r;
     // Without its key a game plays the original's bread chain, as the versions before the key did.
     r.revised_bread = false;
+    r.wider_hunting = false;  // the same for the hunter's hut
     const std::uint32_t n = in.in().count(6);
     for (std::uint32_t i = 0; i < n; ++i) {
         const std::uint16_t key = in.in().u16();
@@ -349,6 +354,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kBigOreVeins:
                 r.big_ore_veins = v != 0;
+                break;
+            case kWiderHunting:
+                r.wider_hunting = v != 0;
                 break;
             case kWinInhabitants:
                 r.victory.inhabitants = v;

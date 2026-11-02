@@ -613,29 +613,15 @@ TEST_CASE("ui: a banner's colour made legible as text on a dark ground") {
     CHECK(b.r < 200);  // not washed out to white
 }
 
-TEST_CASE("ui: a banner's text colour from the palette keeps its hue where the nearest would be grey") {
-    // Greys from black to white, a dark and a middle violet, and a light grey-blue: the nearest
-    // colour to a lightened violet is the grey, which loses the banner.
-    std::array<assets::Rgba, assets::Palette::kSize> colours{};
-    for (std::size_t i = 0; i < 200; ++i) {
-        const auto v = static_cast<std::uint8_t>(i * 255 / 199);
-        colours[i] = {v, v, v, 255};
-    }
-    for (std::size_t i = 200; i < colours.size(); ++i) {
-        colours[i] = {0, 0, 0, 255};
-    }
-    colours[200] = {130, 40, 190, 255};   // the banner
-    colours[201] = {175, 110, 225, 255};  // a lighter violet
-    colours[202] = {185, 180, 205, 255};  // pale grey-blue
-    const auto palette = test::make_palette(colours);
-    const assets::Rgba ground{36, 26, 14, 255};
-    const assets::Rgba violet{130, 40, 190, 255};
-    const std::uint8_t text = ui::legible_palette_colour(palette, violet, ground, 4.5);
-    CHECK(text == 201);
-    CHECK(ui::contrast(palette[text], ground) >= 4.5);
-    // White stays the nearest white.
-    const std::uint8_t white = ui::legible_palette_colour(palette, assets::Rgba{255, 255, 255, 255}, ground, 4.5);
-    CHECK(palette[white].r == 255);
+TEST_CASE("ui: an ink in a colour of its own carries its colour, a palette ink does not") {
+    const assets::Rgba violet{168, 105, 210, 255};
+    const std::int32_t ink = ui::rgb_ink(violet);
+    CHECK(ui::is_rgb_ink(ink));
+    const assets::Rgba back = ui::ink_rgb(ink);
+    CHECK((back.r == 168 && back.g == 105 && back.b == 210));
+    CHECK(!ui::is_rgb_ink(-1));
+    CHECK(!ui::is_rgb_ink(255));
+    CHECK(ui::is_rgb_ink(ui::rgb_ink(assets::Rgba{0, 0, 0, 255})));
 }
 
 TEST_CASE("ui: a form's chat line: the speaker's name in its ink, the rest behind it, cut as one") {

@@ -432,6 +432,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::BreadChain:
         case SetupItem::TradeCarts:
         case SetupItem::FertileFields:
+        case SetupItem::Hunting:
         case SetupItem::AllCrops:
         case SetupItem::BigOreVeins:
         case SetupItem::ShipPurchases:
@@ -510,6 +511,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return r.revised_bread ? 1 : 0;
         case SetupItem::TradeCarts:
             return r.more_carts ? 1 : 0;
+        case SetupItem::Hunting:
+            return r.wider_hunting ? 1 : 0;
         case SetupItem::FertileFields:
             return r.fertile_fields ? 1 : 0;
         case SetupItem::AllCrops:
@@ -665,6 +668,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::TradeCarts:
             r.more_carts = choice == 1;
+            break;
+        case SetupItem::Hunting:
+            r.wider_hunting = choice == 1;
             break;
         case SetupItem::FertileFields:
             r.fertile_fields = choice == 1;
@@ -1005,6 +1011,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::OreVeins:
         case SetupItem::BreadChain:
         case SetupItem::TradeCarts:
+        case SetupItem::Hunting:
         case SetupItem::FertileFields:
         case SetupItem::ShipPurchases:
         case SetupItem::Ships:
@@ -1080,6 +1087,7 @@ std::string setup_label(SetupItem item) {
         "setup.ore_veins",
         "setup.bread",
         "setup.trade_carts",
+        "setup.hunting",
         "setup.ships",
         "setup.units",
         "setup.speed",
@@ -1170,6 +1178,8 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr(choice == 1 ? "setup.bread.revised" : "setup.bread.original");
         case SetupItem::TradeCarts:
             return ui::tr(choice == 1 ? "setup.trade_carts.more" : "setup.trade_carts.one");
+        case SetupItem::Hunting:
+            return ui::tr(choice == 1 ? "setup.hunting.wider" : "setup.hunting.original");
         case SetupItem::FertileFields:
             return ui::tr(choice == 1 ? "setup.fertile_fields.all" : "setup.fertile_fields.original");
         case SetupItem::AllCrops:
@@ -1478,6 +1488,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (value == "all" || value == "original") {
             r.fertile_fields = value == "all";
         }
+    } else if (key == "hunting") {
+        if (value == "wider" || value == "original") {
+            r.wider_hunting = value == "wider";
+        }
     } else if (key == "all_crops") {
         if (value == "all" || value == "original") {
             r.all_crops = value == "all";
@@ -1607,6 +1621,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("ore_veins", kOreVeinNames[std::min<std::size_t>(static_cast<std::size_t>(r.ore_veins), 2)]);
     line("bread", r.revised_bread ? "revised" : "original");
     line("trade_carts", r.more_carts ? "more" : "one");
+    line("hunting", r.wider_hunting ? "wider" : "original");
     line("fertile_fields", r.fertile_fields ? "all" : "original");
     line("all_crops", r.all_crops ? "all" : "original");
     line("big_ore_veins", r.big_ore_veins ? "all" : "original");
