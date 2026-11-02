@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The panels below the head of the side panel (docs/re/ui.md#modi): the build menu (BAU.GAD and
+// The panels below the head of the side panel: the build menu (BAU.GAD and
 // its pop-up of building icons) and the player status of the info mode (INFO.GAD). They only
 // show and ask; what a click means for the game goes back to the caller as an action. Like the
 // selection windows they fill their panels, which the side panel draws; no SDL here.
@@ -26,7 +26,7 @@
 
 namespace o1602::app {
 
-/// The build menu (BuildMenu_OnCategoryPress 0x00432A70, BuildMenu_Refresh 0x00433520).
+/// The build menu.
 class BuildPanel {
 public:
     /// What a click asks for.
@@ -73,7 +73,7 @@ public:
     [[nodiscard]] ui::BuildCategory tools_category(std::int32_t button) const;
     /// Blueprint mode is on: the title says that what is placed becomes a blueprint.
     void set_blueprint(bool on) noexcept { m_blueprint = on; }
-    /// Shows a building's category with it picked (a plantation's field, 0x004331B0).
+    /// Shows a building's category with it picked (a plantation's field).
     /// False if the menu has no such building.
     bool show(std::uint32_t id);
 
@@ -109,7 +109,7 @@ private:
     std::int32_t m_popup_category = 0;
 };
 
-/// "Spielerstatus" of the info mode without a selection (INFO.GAD, InfoPanel_Refresh 0x00434420).
+/// "Spielerstatus" of the info mode without a selection (INFO.GAD).
 class InfoPanel {
 public:
     InfoPanel(assets::GadgetLayout info, const assets::TextTable* texts);
@@ -120,7 +120,7 @@ public:
     [[nodiscard]] bool take_rating() noexcept { return std::exchange(m_rating_clicked, false); }
     /// Whether "Warenbilanz" (Open1602's own line) was clicked since the last call.
     [[nodiscard]] bool take_goods() noexcept { return std::exchange(m_goods_clicked, false); }
-    /// "Punkte" (57027, Player_ComputeScore's total) and whether "Bewertung" can be pressed.
+    /// "Punkte" (57027, the score's total) and whether "Bewertung" can be pressed.
     void set_points(std::int64_t points, bool rating);
     [[nodiscard]] std::optional<std::string> help(const std::vector<std::string>& leiste) const;
     /// The figures of the local player, its coat of arms in `banner`'s colour.

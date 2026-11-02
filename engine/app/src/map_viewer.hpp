@@ -89,6 +89,9 @@ public:
 
     /// The user's data folder of Open1602 (settings; the savegames in "saves" below it).
     [[nodiscard]] static std::filesystem::path data_folder();
+    /// The player's own scenarios (<data folder>/scenarios), listed after the game folder's;
+    /// made if it is missing.
+    [[nodiscard]] static std::filesystem::path own_scenario_folder();
 
 private:
     MapViewer(assets::GameDirectory game, assets::BuildingTable buildings, sim::World world, assets::Palette palette,
@@ -220,10 +223,10 @@ private:
     void update_blueprint_window();
     /// The score sheets: the final screen of a decided game, or the "Bewertung" of a running one.
     void show_end_screen(sim::GameOutcome outcome, bool view_only);
-    /// HighScore_UpdateAllHumans (0x00475990): every human still playing, and `defeated` (who is
+    /// The high score list takes every human still playing, and `defeated` (who is
     /// out at this moment), enters the scenario's high score list.
     void update_high_scores(sim::PlayerId defeated);
-    /// A won single player game opens the next mission (GameDat_Write 0x00487FB0).
+    /// A won single player game opens the next mission.
     void record_progress();
     /// The game's identity, with the campaign and part of a scenario as the menu has them.
     [[nodiscard]] sim::GameIdentity game_identity() const;
@@ -396,7 +399,7 @@ private:
     /// Kontor's harbour); clicked again, inside the circles of all the player's buildings of its type
     /// on the island. None for other buildings and those without a circle.
     [[nodiscard]] std::optional<render::TileLighting> building_lighting(const Selection& clicked) const;
-    /// The status line over the map under the mouse: the unit or what stands on the tile (0x0040A3D0).
+    /// The status line over the map under the mouse: the unit or what stands on the tile.
     [[nodiscard]] std::string tile_status() const;
     /// Results of building and demolishing (messages, flags of new buildings).
     void apply_construction();

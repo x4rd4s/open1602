@@ -8,6 +8,7 @@
 // counted without a change here.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -15,6 +16,7 @@
 #include "ai_engine.hpp"
 
 #include "o1602/sim/balance.hpp"
+#include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/houses.hpp"
 
 namespace o1602::sim::ai {
@@ -72,7 +74,7 @@ inline std::optional<std::uint8_t> producer_slot(std::uint8_t w, std::uint8_t ra
     return std::nullopt;
 }
 
-/// A Need of the production table (docs/re/ai.md, table of the Needs).
+/// A Need of the production table (table of the Needs).
 struct NeedDef {
     std::uint8_t slot;
     std::uint8_t task;
@@ -172,7 +174,30 @@ inline const PublicTask* public_task(std::uint8_t task) {
     return nullptr;
 }
 
-/// Crop the first colony of a computer must grow fully (0x00429070), by its slot.
+/// Open1602: once its stage's orders are done, a city past the settlers with more than kGrowFrom
+/// tiles of free land builds its stage's houses, producers, public buildings, luxury fields and
+/// towers again, as many times more as it has kGrowLand tiles, up to kGrowMax times. The original's
+/// orders were made for its islands (none of its cities has 2000 free tiles) and stop at about 44
+/// houses however large the island is.
+inline constexpr std::uint32_t kGrowFrom = 2000;
+inline constexpr std::uint32_t kGrowLand = 1000;
+inline constexpr std::uint32_t kGrowMax = 8;
+/// A city at the aristocrats' last stage grows from kGrowLand tiles of free land (the original's
+/// large islands) while the computer earns at least this much gold a minute more than it pays.
+inline constexpr std::int32_t kGrowIncome = 50;
+
+/// `n` of an order grown for a city with more than `from` tiles of free land (else `n`), in
+/// sixteenths so that a little more land already adds a little; rounded up, at most kMaxOrderCount.
+inline constexpr std::uint32_t grown_count(std::uint32_t land, std::uint32_t n,
+                                           std::uint32_t from = kGrowFrom) noexcept {
+    if (land <= from || n == 0) {
+        return n;
+    }
+    const std::uint64_t f = std::min<std::uint64_t>(std::uint64_t{land} * 16 / kGrowLand, 16 * kGrowMax);
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>((n * f + 15) / 16, kMaxOrderCount));
+}
+
+/// Crop the first colony of a computer must grow fully, by its slot.
 inline std::uint8_t first_crop(PlayerId player) {
     switch (player % 4) {
         case 1:
@@ -194,7 +219,7 @@ struct Cheats {
     std::int32_t founding_below = 500;  ///< a founding with less money than this ...
     std::int32_t founding_money = 799;  ///< ... gets this much
     std::uint32_t founding_bricks = 8;  ///< tons into a new city
-    /// Task 5's subsidy of a computer that is behind (0x00428370), per step: money below the
+    /// Task 5's subsidy of a computer that is behind, per step: money below the
     /// first number gets the second, below the third (from settlers on) the fourth.
     std::int32_t subsidy_poor_below = 4733, subsidy_poor = 797;
     std::int32_t subsidy_below = 9376, subsidy = 1793;

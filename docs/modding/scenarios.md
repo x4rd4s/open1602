@@ -50,8 +50,8 @@ read, is left out; the game's log names the file, the line and the key.
 ## Goals
 
 The goals become the mission of every human player; the computers keep the missions the map gives
-them. All goals given must hold at the same time, as in the original's missions
-([missions.md](../re/missions.md)). Without any goal the map's own missions stay.
+them. All goals given must hold at the same time, as in the original's missions.
+Without any goal the map's own missions stay.
 
 | Key | Goal |
 |---|---|
@@ -79,6 +79,25 @@ again after loading, as long as the package is installed and turned on.
 A map saved by Open1602 (`.o1602`) keeps the packages it was saved with
 ([packages.md](packages.md#which-packages-a-game-uses)): save it with the package turned on, so its
 buildings and goods are part of the map.
+
+## Own scenarios
+
+Scenarios that come without a package, such as maps made with the original's editor or shared by
+other players, go into the folder `scenarios` of the user data folder, beside `mods` (Linux
+`~/.local/share/Open1602/scenarios/`, macOS `~/Library/Application Support/Open1602/scenarios/`,
+Windows `%APPDATA%\Open1602\scenarios\`). The game makes the folder when it shows its menu. Scenarios
+in the installation's `Szenes` folder keep working as well.
+
+The folder takes scenarios of the original's format (`.szs`) and games saved by Open1602
+(`.o1602`, later also maps of Open1602's own editor). Files whose names differ only in their last
+digits make one entry with a choice per digit, as in `Szenes`. The scenario list of the main menu
+and of the multiplayer menu shows them under the heading `----Own scenarios----` (German
+`----Eigene Szenarien----`), after the game's own and before the packages', in name order with
+their stars.
+
+A scenario whose name the list has already is left out and the log says so: the game folder's
+scenario wins over an own one of the same name, and an `.szs` over an `.o1602` of the same name.
+Two entries of one name would share their high score list. Rename the file to list both.
 
 ## Campaigns
 
