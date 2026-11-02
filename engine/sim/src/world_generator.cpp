@@ -517,7 +517,8 @@ bool Generator::load_package_island(Slot& slot, const PackageIsland& island) {
     slot.base = std::move(islands->front());
     slot.base.layers.resize(1);  // the ground; what lies on it in other layers stays out
     slot.package = true;
-    slot.plan.flags &= ~1U;  // no native village: a package has no native version of its island
+    slot.plan.flags = static_cast<std::uint8_t>(
+        slot.plan.flags & ~1U);  // no native village: a package has no native version of its island
     slot.map = IslandMap::from_island(slot.base, m_buildings, m_warnings, nullptr);
     slot.loaded_header = slot.base.header.raw;
     if (slot.loaded_header.size() == kHeaderSize) {
