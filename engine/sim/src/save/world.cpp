@@ -51,10 +51,11 @@ enum RuleKey : std::uint16_t {
     kBugNativeLand = 43,
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
-    kPlagues = 46,        // Rules::plagues, when not the original's
-    kFires = 47,          // Rules::fires, when not the original's
-    kRareEruptions = 48,  // 1: Volcanoes::Rare, under its own key so older versions read the game's way
-    kEventSpeed = 49,     // Rules::event_speed, when not the original's
+    kMoving = 46,         // Rules::moving other than Moving::Free
+    kPlagues = 51,        // Rules::plagues, when not the original's
+    kFires = 52,          // Rules::fires, when not the original's
+    kRareEruptions = 53,  // 1: Volcanoes::Rare, under its own key so older versions read the game's way
+    kEventSpeed = 54,     // Rules::event_speed, when not the original's
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -208,6 +209,10 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.fertile_fields) {
         values.emplace_back(kFertileFields, 1U);
     }
+    // Moving buildings only when not free, which is Open1602's way.
+    if (r.moving != Moving::Free) {
+        values.emplace_back(kMoving, static_cast<std::uint32_t>(r.moving));
+    }
     // Rarer eruptions, outbreaks and the speed at events only when not the original's: the
     // original's way keeps the bytes.
     if (r.volcanoes == Volcanoes::Rare) {
@@ -354,6 +359,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kFertileFields:
                 r.fertile_fields = v != 0;
+                break;
+            case kMoving:
+                r.moving = static_cast<Moving>(std::min<std::uint32_t>(v, static_cast<std::uint32_t>(Moving::Off)));
                 break;
             case kRareEruptions:
                 rare_eruptions = v != 0;
