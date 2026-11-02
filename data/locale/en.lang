@@ -461,6 +461,9 @@ setup.refund.none = None
 # {1}: the share of the costs in percent
 setup.refund.partial = {1} %
 setup.refund.full = Full costs
+setup.moving = Moving buildings
+setup.moving.free = Free
+setup.moving.rebuild = Like building anew
 setup.trader = Trader's prices
 setup.trader.original = As usual
 setup.trader.market = By the market

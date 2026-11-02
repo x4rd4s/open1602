@@ -104,6 +104,8 @@ std::string refusal_text(sim::BuildRefusal refusal) {
                 return "build.refusal.cannons";
             case sim::BuildRefusal::ShipTooFar:
                 return "build.refusal.ship_too_far";
+            case sim::BuildRefusal::Immovable:
+                return "build.refusal.immovable";
         }
         return "build.refusal.unknown";
     }();
