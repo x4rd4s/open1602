@@ -360,6 +360,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     viewer->m_balance = rules.balance;
     viewer->m_own_buildings = std::move(rules.own);
     viewer->m_own_figures = std::move(rules.own_figures);
+    viewer->m_own_units = std::move(rules.own_units);
     viewer->m_goods = std::move(rules.goods);
     viewer->m_classes = std::move(rules.classes);
     viewer->m_levels = std::move(rules.levels);
@@ -454,6 +455,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
                                     viewer->m_local_player);
             viewer->m_hud->set_banners(&viewer->m_banners);
             viewer->m_hud->set_messages(&viewer->m_messages);
+            viewer->m_hud->set_own_units(viewer->m_own_units);
             viewer->m_hud->set_available([self = viewer.get()](std::uint32_t id) {
                 const sim::Player* p = self->m_state->world.player(self->m_local_player);
                 const assets::BuildingType* b = self->m_buildings.by_id(id);
@@ -3438,6 +3440,10 @@ void MapViewer::reload_mods() {
     m_balance = rules.balance;
     m_own_buildings = std::move(rules.own);
     m_own_figures = std::move(rules.own_figures);
+    m_own_units = std::move(rules.own_units);
+    if (m_hud) {
+        m_hud->set_own_units(m_own_units);
+    }
     m_goods = std::move(rules.goods);
     m_classes = std::move(rules.classes);
     m_levels = std::move(rules.levels);

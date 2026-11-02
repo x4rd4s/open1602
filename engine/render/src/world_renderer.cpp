@@ -891,7 +891,7 @@ bool land_figure_sprites(const FigureInstance& figure, const sim::World& world, 
     // Units drawn per player colour: the variant of the owner's banner, or its tinted template.
     const assets::FigureType* body_type = type;
     std::optional<std::uint32_t> tinted_body;
-    if (const auto variant = assets::FigureTable::unit_variant(figure.figure)) {
+    if (const auto variant = layers.figures->unit_of(figure.figure)) {
         const sim::Player* owner = world.player(figure.owner);
         const Banner* banner =
             owner != nullptr && layers.banners != nullptr ? layers.banners->get(owner->banner) : nullptr;
