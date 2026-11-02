@@ -13,6 +13,14 @@
 
 namespace o1602::app {
 
+/// Which messages set the game back to normal speed. In the original those of disasters and
+/// attacks do.
+enum class EventSpeed : std::uint8_t {
+    Normal,   ///< every one of them (original)
+    Attacks,  ///< attacks only: fires, plagues, droughts and eruptions let the game run on at its speed
+    Keep,     ///< none: the game keeps its speed
+};
+
 struct DisplaySettings {
     bool fullscreen = false;  ///< the whole screen at the desktop's resolution (no mode change)
     /// The window's size in window coordinates when it was last left; 0: the default (1280 x 800).
@@ -43,6 +51,9 @@ struct DisplaySettings {
     /// The status bar tells when two other players go to war or make peace (the original tells
     /// only the player concerned).
     bool rival_wars = true;
+    /// Which messages set the game back to normal speed. In a multiplayer game only the host's
+    /// computer changes the speed, so the host's choice counts for everyone.
+    EventSpeed event_speed = EventSpeed::Normal;
     /// A farm, plantation, pasture or forester the player builds plants its fields on the open
     /// ground of its catchment at once, as key F does (the original plants none by itself).
     bool plant_fields = false;
