@@ -502,7 +502,9 @@ void Hud::draw_resources() {
                 items.back().tint = ui::ColourTint{*sprite.tint, art.stride, art.variants, art.base, sprite.pattern};
             }
         } else if (const auto native = r.natives ? ui::package_icon_sprite("open1602:native") : std::nullopt) {
-            icon(*native, 646);  // a native village: the native figure, as in the History Edition
+            // A native village: the native figure next to the number like the coat of arms, as in the
+            // History Edition.
+            icon(*native, 666);
         } else {
             icon(m_gfx_baumat + 15, 646);
         }
