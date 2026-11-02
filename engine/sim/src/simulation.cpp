@@ -165,6 +165,7 @@ void Simulation::offer_names(std::vector<std::string> cities, std::vector<std::s
     if (m_city_names.empty() && m_fleet.ship_names().empty()) {
         m_city_names = std::move(cities);
         m_fleet.set_ship_names(std::move(ships));
+        m_fleet.name_unnamed_ships();
     }
 }
 

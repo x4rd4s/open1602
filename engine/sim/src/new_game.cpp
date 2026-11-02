@@ -390,6 +390,7 @@ core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t playe
         Ship s = ship;
         s.id = 0;
         s.owner = player_slot(n);
+        s.name.clear();  // not the copied ship's name: Simulation::offer_names gives it one of its own
         s.place(plan.starts[n].x, plan.starts[n].y);
         world.add_ship(std::move(s));
     }
