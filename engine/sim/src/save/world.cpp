@@ -52,6 +52,10 @@ enum RuleKey : std::uint16_t {
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
     kMoving = 46,         // Rules::moving other than Moving::Free
+    kClimateCrops = 47,   // 1: every island grew its climate's crops fully (Rules::climate_crops)
+    kBigOreVeins = 48,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
+    kWiderHunting = 49,   // 1: the hunter's hut reaches further (Rules::wider_hunting)
+    kCheats = 50,         // Rules::cheats (Code when missing)
     kPlagues = 51,        // Rules::plagues, when not the original's
     kFires = 52,          // Rules::fires, when not the original's
     kRareEruptions = 53,  // 1: Volcanoes::Rare, under its own key so older versions read the game's way
@@ -213,6 +217,18 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.moving != Moving::Free) {
         values.emplace_back(kMoving, static_cast<std::uint32_t>(r.moving));
     }
+    if (r.climate_crops) {
+        values.emplace_back(kClimateCrops, 1U);
+    }
+    if (r.big_ore_veins) {
+        values.emplace_back(kBigOreVeins, 1U);
+    }
+    if (r.cheats != Cheats::Code) {
+        values.emplace_back(kCheats, static_cast<std::uint32_t>(r.cheats));
+    }
+    if (r.wider_hunting) {
+        values.emplace_back(kWiderHunting, 1U);
+    }
     // Rarer eruptions, outbreaks and the speed at events only when not the original's: the
     // original's way keeps the bytes.
     if (r.volcanoes == Volcanoes::Rare) {
@@ -270,6 +286,7 @@ Rules read_rules(Reader& in) {
     // Without its key a game plays the original's bread chain, as the versions before the key did.
     r.revised_bread = false;
     bool rare_eruptions = false;  // applies to the game's way only, whichever key comes first
+    r.wider_hunting = false;      // the same for the hunter's hut
     const std::uint32_t n = in.in().count(6);
     for (std::uint32_t i = 0; i < n; ++i) {
         const std::uint16_t key = in.in().u16();
@@ -362,6 +379,18 @@ Rules read_rules(Reader& in) {
                 break;
             case kMoving:
                 r.moving = static_cast<Moving>(std::min<std::uint32_t>(v, static_cast<std::uint32_t>(Moving::Off)));
+                break;
+            case kClimateCrops:
+                r.climate_crops = v != 0;
+                break;
+            case kBigOreVeins:
+                r.big_ore_veins = v != 0;
+                break;
+            case kCheats:
+                r.cheats = v <= static_cast<std::uint32_t>(Cheats::Off) ? static_cast<Cheats>(v) : Cheats::Code;
+                break;
+            case kWiderHunting:
+                r.wider_hunting = v != 0;
                 break;
             case kRareEruptions:
                 rare_eruptions = v != 0;
