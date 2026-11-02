@@ -71,6 +71,5 @@ __pycache__/
 /inputs/
 /outputs/
 
-# The example package's sounds and map are Open1602's own (docs/modding/README.md)
-!/data/mods/example/**/*.wav
+# The example package's map is Open1602's own (docs/modding/README.md)
 !/data/mods/example/**/*.o1602

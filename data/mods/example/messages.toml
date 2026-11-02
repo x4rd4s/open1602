@@ -12,7 +12,7 @@ text = "{name} has placed {count} buildings and gets 1000 gold."
 text.de = "{name} hat {count} Gebäude errichtet und erhält 1000 Gold."
 icon = "example:pepper"
 kind = "events"
-sound = "sounds/horn.wav"
+sound = "sounds/horn.flac"
 
 # Sent by harbour.lua when the scenario starts.
 [welcome]
