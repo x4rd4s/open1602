@@ -278,6 +278,22 @@ TEST_CASE("side panel build menu: the move tool is the fourth tool, offered wher
     CHECK(b.panel.copy());
 }
 
+TEST_CASE("side panel build menu: the templates are the fifth tool and take the copy tool") {
+    Build b;
+    (void)b.press(kDemolishButton);
+    REQUIRE(b.panel.popup_open());
+    const auto a = b.release_on(4);
+    REQUIRE(a.has_value());
+    CHECK(a->kind == BuildPanel::Action::Kind::Templates);
+    CHECK(!b.panel.popup_open());
+    CHECK(b.panel.copy());
+    const ui::BuildCategory tools = b.panel.tools_category(0);
+    REQUIRE(tools.rows.size() == 2);  // four icons a row
+    REQUIRE(tools.rows[1].size() == 1);
+    CHECK(tools.rows[1][0].picture == "open1602:templates");
+    CHECK(tools.rows[1][0].name == "Templates");
+}
+
 TEST_CASE("side panel build menu: demolish, rotate and orient to the road") {
     Build b;
     // The demolish button opens the tools' pop-up (Open1602): demolish and copy.
