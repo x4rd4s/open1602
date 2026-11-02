@@ -43,8 +43,8 @@ void SeaMap::rebuild(const World& world, const assets::BuildingTable& buildings)
         }
     }
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
-        set_island_cells(world, buildings, static_cast<std::uint16_t>(i), 0, 0, std::numeric_limits<std::int32_t>::max(),
-                         std::numeric_limits<std::int32_t>::max());
+        set_island_cells(world, buildings, static_cast<std::uint16_t>(i), 0, 0,
+                         std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max());
     }
     m_blocks_x = (m_width + kBlock - 1) / kBlock;
     m_blocks_y = (m_height + kBlock - 1) / kBlock;

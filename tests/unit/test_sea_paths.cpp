@@ -707,8 +707,8 @@ TEST_CASE("sea paths: water regions of a block are the parts a ship can sail bet
     CHECK(sea.blocks_x() == 5);  // 70 tiles: four blocks and one of 6 tiles
     CHECK(sea.blocks_y() == 2);
     CHECK(sea.region(5, 5) != sim::SeaMap::kNoRegion);
-    CHECK(sea.region(5, 11) == sim::SeaMap::kNoRegion);   // land
-    CHECK(sea.region(-1, 0) == sim::SeaMap::kNoRegion);   // outside
+    CHECK(sea.region(5, 11) == sim::SeaMap::kNoRegion);  // land
+    CHECK(sea.region(-1, 0) == sim::SeaMap::kNoRegion);  // outside
     CHECK(sea.region(70, 29) == sim::SeaMap::kNoRegion);
     CHECK(sea.region(5, 5) != sea.region(5, 14));         // first block: the wall splits it
     CHECK(sea.region(20, 5) == sea.region(20, 14));       // second block: joined by the gap
