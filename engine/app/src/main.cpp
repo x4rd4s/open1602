@@ -38,7 +38,7 @@
 
 using namespace o1602;
 
-static_assert(app::kModCtrl == SDL_KMOD_LCTRL && app::kModShift == SDL_KMOD_LSHIFT);
+static_assert(app::kModCtrl == SDL_KMOD_LCTRL && app::kModShift == SDL_KMOD_LSHIFT && app::kModAlt == SDL_KMOD_LALT);
 
 namespace {
 

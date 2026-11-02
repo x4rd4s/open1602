@@ -461,7 +461,7 @@ setup.speed = Highest game speed
 # {1}: the factor
 setup.speed.value = {1} ×
 setup.cheats = Cheats
-setup.cheats.code = With the code (original)
+setup.cheats.code = With the code
 setup.cheats.start = On from the start
 setup.droughts = Droughts
 setup.droughts.game = As the level
