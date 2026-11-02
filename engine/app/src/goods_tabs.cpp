@@ -25,9 +25,9 @@ namespace {
 using namespace goods_parts;
 using sim::CityFigure;
 
-constexpr std::array<std::string_view, GoodsWindow::kTabs> kTabLabels = {
-    "stats.tab.goods", "stats.tab.producers", "stats.tab.population", "stats.tab.trade", "stats.tab.routes",
-    "stats.tab.finances"};
+constexpr std::array<std::string_view, GoodsWindow::kTabs> kTabLabels = {"stats.tab.goods",      "stats.tab.producers",
+                                                                         "stats.tab.population", "stats.tab.trade",
+                                                                         "stats.tab.routes",     "stats.tab.finances"};
 
 /// Where a good stands in the table of goods (its group, then its place), for sorting.
 std::size_t ware_order(std::uint8_t ware) {
@@ -594,8 +594,8 @@ void GoodsWindow::layout_routes(const sim::World& world, sim::PlayerId player, P
     struct Line {
         const sim::Ship* ship = nullptr;
         std::string name;
-        std::vector<std::string> stops;  ///< the cities called at, in the route's order
-        std::size_t next = 0;            ///< index into stops: where the ship sails to
+        std::vector<std::string> stops;   ///< the cities called at, in the route's order
+        std::size_t next = 0;             ///< index into stops: where the ship sails to
         std::vector<std::uint8_t> wares;  ///< loaded or unloaded somewhere, first seen first
         bool problem = false;
     };
@@ -641,8 +641,7 @@ void GoodsWindow::layout_routes(const sim::World& world, sim::PlayerId player, P
             std::ranges::stable_sort(lines, [](const Line& a, const Line& b) { return a.stops < b.stops; });
             break;
         case RouteOrder::Next:
-            std::ranges::stable_sort(lines,
-                                     [&](const Line& a, const Line& b) { return next_name(a) < next_name(b); });
+            std::ranges::stable_sort(lines, [&](const Line& a, const Line& b) { return next_name(a) < next_name(b); });
             break;
         case RouteOrder::Problems:
             std::ranges::stable_sort(lines, [](const Line& a, const Line& b) { return a.problem > b.problem; });
@@ -673,8 +672,8 @@ void GoodsWindow::layout_routes(const sim::World& world, sim::PlayerId player, P
     for (const auto& [order, x, w, key] : heads) {
         const Rect r{x - 2, kHeaderY - 2, w - 4, 22};
         m_form.row(kRouteSort + static_cast<Id>(order), r, m_route_order == order);
-        above.text(Rect{x, kHeaderY, w - 8, 20}, ui::tr(key),
-                   Align::Left, m_route_order == order ? st.text : st.dim, kFontSmall);
+        above.text(Rect{x, kHeaderY, w - 8, 20}, ui::tr(key), Align::Left, m_route_order == order ? st.text : st.dim,
+                   kFontSmall);
     }
     below.fill(Rect{kMargin, kTableY - 4, kWidth - 2 * kMargin, 1}, s.shade);
     if (lines.empty()) {
@@ -711,8 +710,9 @@ void GoodsWindow::layout_routes(const sim::World& world, sim::PlayerId player, P
     layout_scroll_bar(below);
     below.fill(Rect{kMargin, kFooterY - 4, kWidth - 2 * kMargin, 1}, s.shade);
     above.paragraph(Rect{kMargin + 2, kFooterY, kWidth - 2 * kMargin, 34},
-                    ui::tr(lines.size() == 1 ? "stats.routes.hint.one" : "stats.routes.hint", {std::to_string(lines.size()), std::to_string(troubled)}), st.dim,
-                    kFontSmall, 17);
+                    ui::tr(lines.size() == 1 ? "stats.routes.hint.one" : "stats.routes.hint",
+                           {std::to_string(lines.size()), std::to_string(troubled)}),
+                    st.dim, kFontSmall, 17);
 }
 
 void GoodsWindow::layout_finances(const sim::World& world, const assets::BuildingTable& buildings,

@@ -25,19 +25,19 @@ public:
 
     /// The keys the console knows; the input translates the platform's.
     enum class Key : std::uint8_t {
-        Open,       ///< Ctrl+Shift+Alt+W
-        Digit,      ///< 0..9, `digit`
+        Open,   ///< Ctrl+Shift+Alt+W
+        Digit,  ///< 0..9, `digit`
         Backspace,
         Enter,
         Escape,
-        A,          ///< "a" without Shift, Ctrl or Alt
-        V,          ///< "v" without Shift, Ctrl or Alt
+        A,  ///< "a" without Shift, Ctrl or Alt
+        V,  ///< "v" without Shift, Ctrl or Alt
         ShiftM,
         ShiftZ,
         ShiftT,
         ShiftH,
         ShiftK,
-        Other,      ///< any other key
+        Other,  ///< any other key
     };
 
     /// Where the cheats go: the selected ship, else the city of the tile under the mouse.

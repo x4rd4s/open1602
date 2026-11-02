@@ -5,9 +5,10 @@
 // in and went out per minute over a chosen time (1, 5, 15 or 60 game minutes) and how long the
 // stock lasts at that balance. A click on a good shows where it came from and went to, and its
 // last hour (or twelve hours) as a chart. Further tabs show the production buildings, the
-// inhabitants, the trade at the Kontor, the player's trade routes and the finances (goods_tabs.cpp). Only the local player's cities: allies and
-// trading partners never see each other's figures. The window only reads the world; the game goes on behind it. It is
-// drawn as a parchment in the original's style: the owner lays the parchment (parchment.hpp) under what draw() returns.
+// inhabitants, the trade at the Kontor, the player's trade routes and the finances (goods_tabs.cpp). Only the local
+// player's cities: allies and trading partners never see each other's figures. The window only reads the world; the
+// game goes on behind it. It is drawn as a parchment in the original's style: the owner lays the parchment
+// (parchment.hpp) under what draw() returns.
 #pragma once
 
 #include <array>

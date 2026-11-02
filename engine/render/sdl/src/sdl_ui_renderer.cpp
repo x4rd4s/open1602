@@ -397,9 +397,9 @@ SdlUiRenderer::Texture SdlUiRenderer::text(const std::string& s, std::int32_t sl
         canvas.height = f->height() + f->above();  // the accents above the cell (D-012)
         canvas.indices.assign(std::size_t{canvas.width} * canvas.height, 0);
         canvas.opaque.assign(canvas.indices.size(), 0);
-        ui::Recolour recolour =
-            ink < 0 || rgb ? m_colours[static_cast<std::size_t>(colour)]
-                    : ui::text_recolour(m_palette, static_cast<std::size_t>(colour), static_cast<std::uint8_t>(ink));
+        ui::Recolour recolour = ink < 0 || rgb ? m_colours[static_cast<std::size_t>(colour)]
+                                               : ui::text_recolour(m_palette, static_cast<std::size_t>(colour),
+                                                                   static_cast<std::uint8_t>(ink));
         if (rgb) {
             // The letters in a colour of their own: drawn in a spare index of a copy of the palette
             // that holds that colour (any index but the shadow's and the transparent 0).

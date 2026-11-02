@@ -388,8 +388,7 @@ bool MapInput::cheat_key(int pressed, int scancode, std::uint16_t mod) {
     using Key = CheatConsole::Key;
     // The key without the modifiers in the keyboard's layout: Shift+M is "m" here, as the
     // original's letters are.
-    const auto key = static_cast<int>(
-        SDL_GetKeyFromScancode(static_cast<SDL_Scancode>(scancode), SDL_KMOD_NONE, true));
+    const auto key = static_cast<int>(SDL_GetKeyFromScancode(static_cast<SDL_Scancode>(scancode), SDL_KMOD_NONE, true));
     const bool shift = (mod & SDL_KMOD_SHIFT) != 0;
     const bool ctrl = (mod & SDL_KMOD_CTRL) != 0;
     const bool alt = (mod & SDL_KMOD_ALT) != 0;

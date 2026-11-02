@@ -141,10 +141,10 @@ struct CheatOrder {
 };
 
 /// A player's action (ADR 0004): applied at the start of a tick, the same on every computer.
-using Command =
-    std::variant<BuildOrder, DemolishOrder, ShipOrder, CargoTransfer, RouteEdit, TradeSetting, ShipyardOrder,
-                 ExploreOrder, DiplomacyOrder, SoldierOrder, SoldierCommand, CastleOrder, UnloadOrder, ProductionSwitch,
-                 CityOrder, ShipCommand, GameSpeedOrder, PlayerRename, PlayerControl, GateOrder, CartRequest, CheatOrder>;
+using Command = std::variant<BuildOrder, DemolishOrder, ShipOrder, CargoTransfer, RouteEdit, TradeSetting,
+                             ShipyardOrder, ExploreOrder, DiplomacyOrder, SoldierOrder, SoldierCommand, CastleOrder,
+                             UnloadOrder, ProductionSwitch, CityOrder, ShipCommand, GameSpeedOrder, PlayerRename,
+                             PlayerControl, GateOrder, CartRequest, CheatOrder>;
 
 /// What became of a command.
 struct CommandResult {

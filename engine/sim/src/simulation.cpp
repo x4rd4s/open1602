@@ -768,7 +768,8 @@ bool Simulation::cheats_allowed(PlayerId player) const {
             break;
     }
     // As in the original: with more than one person in the game only the code 512.
-    return p->cheats == Player::kCheatsAlways || (p->cheats == Player::kCheatsOn && human_players(*m_world).size() <= 1);
+    return p->cheats == Player::kCheatsAlways ||
+           (p->cheats == Player::kCheatsOn && human_players(*m_world).size() <= 1);
 }
 
 bool Simulation::cheat(const CheatOrder& order) {
@@ -812,9 +813,8 @@ bool Simulation::cheat(const CheatOrder& order) {
             if (owner == nullptr) {
                 return false;
             }
-            owner->money = static_cast<std::int32_t>(
-                std::min<std::int64_t>(std::int64_t{owner->money} + CheatOrder::kGold,
-                                       std::numeric_limits<std::int32_t>::max()));
+            owner->money = static_cast<std::int32_t>(std::min<std::int64_t>(
+                std::int64_t{owner->money} + CheatOrder::kGold, std::numeric_limits<std::int32_t>::max()));
             return true;
         }
         case CheatOrder::Op::Goods:
@@ -859,8 +859,7 @@ bool Simulation::cheat(const CheatOrder& order) {
                     best_d = d;
                 }
             }
-            const auto seed =
-                static_cast<std::uint16_t>(m_world->random(RandomStream::Islands).below(0x8000));
+            const auto seed = static_cast<std::uint16_t>(m_world->random(RandomStream::Islands).below(0x8000));
             return erupt(*m_world, CraterRef{cell.island, best->x, best->y}, seed, true, m_volcano_events.sink());
         }
     }

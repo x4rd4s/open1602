@@ -4,8 +4,8 @@
 // CityList_Refresh 0x00434200; docs/re/ui.md): opened from the player status or with L and
 // Shift+L, 13 rows a page; a click on a name goes there (a ship is also selected). Open1602 (FB-6):
 // the mouse wheel scrolls row by row, a click on the heading orders the list (ships by name, idle
-// first or damaged first; cities by name, own first or largest first), the city list also shows the pirates' nests the player
-// has discovered, and the list is gathered a few times a second rather than every frame.
+// first or damaged first; cities by name, own first or largest first), the city list also shows the pirates' nests the
+// player has discovered, and the list is gathered a few times a second rather than every frame.
 #include <algorithm>
 #include <array>
 #include <optional>
