@@ -285,8 +285,8 @@ Rules read_rules(Reader& in) {
     Rules r;
     // Without its key a game plays the original's bread chain, as the versions before the key did.
     r.revised_bread = false;
-    bool rare_eruptions = false;  // applies to the game's way only, whichever key comes first
     r.wider_hunting = false;      // the same for the hunter's hut
+    bool rare_eruptions = false;  // applies to the game's way only, whichever key comes first
     const std::uint32_t n = in.in().count(6);
     for (std::uint32_t i = 0; i < n; ++i) {
         const std::uint16_t key = in.in().u16();
