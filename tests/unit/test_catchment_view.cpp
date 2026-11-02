@@ -194,7 +194,7 @@ TEST_CASE("catchment view: another owner's Kontor with a trade treaty lights the
 
     // Lit: only the water within the ships' reach of the Kontor (the island at world tiles (10, 10)).
     render::TileLighting l = render::TileLighting::harbours_only(0);
-    l.harbour(world, buildings, 0, kontor->x, kontor->y);
+    l.harbour(world, buildings, 0, static_cast<std::uint32_t>(kontor->x), static_cast<std::uint32_t>(kontor->y));
     CHECK(!l.dimmed(44, 9, nullptr));  // the sea just north of the Kontor
     CHECK(l.dimmed(20, 9, nullptr));   // the sea far from it
     sim::MapCell own;
