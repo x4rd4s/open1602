@@ -174,19 +174,19 @@ inline const PublicTask* public_task(std::uint8_t task) {
     return nullptr;
 }
 
-/// Open1602: a city past the settlers with more free land than this (tiles) builds its stage's
-/// houses, producers, public buildings, luxury fields and towers in proportion to its land, up to
-/// kGrowMax times as many. The original's orders were made for its islands and stop at about 44
+/// Open1602: once its stage's orders are done, a city past the settlers with more than kGrowFrom
+/// tiles of free land builds its stage's houses, producers, public buildings, luxury fields and
+/// towers again, as many times more as it has kGrowLand tiles, up to kGrowMax times. The original's
+/// orders were made for its islands (none of its cities has 2000 free tiles) and stop at about 44
 /// houses however large the island is.
+inline constexpr std::uint32_t kGrowFrom = 2000;
 inline constexpr std::uint32_t kGrowLand = 1000;
 inline constexpr std::uint32_t kGrowMax = 8;
-/// ... and only while it has this much gold, so that growing does not spend what its next stage asks for.
-inline constexpr std::int32_t kGrowReserve = 10'000;
 
-/// `n` of an order grown for a city with `land` tiles of free land (kGrowLand), in sixteenths so
-/// that a little more land already adds a little; rounded up, at most kMaxOrderCount.
+/// `n` of an order grown for a city with `land` tiles of free land, in sixteenths so that a little
+/// more land already adds a little; rounded up, at most kMaxOrderCount.
 inline constexpr std::uint32_t grown_count(std::uint32_t land, std::uint32_t n) noexcept {
-    if (land <= kGrowLand || n == 0) {
+    if (land <= kGrowFrom || n == 0) {
         return n;
     }
     const std::uint64_t f = std::min<std::uint64_t>(std::uint64_t{land} * 16 / kGrowLand, 16 * kGrowMax);

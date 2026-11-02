@@ -729,8 +729,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
     };
     const auto idle = [&] {
-        // Only with gold to spare: the way to the next stage needs about 8000 of it.
-        if (!classic() && money >= kGrowReserve) {
+        if (!classic()) {
             for (const ComputerList list : asked) {
                 if (first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list), true)) {
                     return;
