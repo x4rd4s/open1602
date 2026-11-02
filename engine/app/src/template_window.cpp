@@ -57,7 +57,7 @@ void TemplateWindow::open_list() {
     m_form.set_focus(std::nullopt);
 }
 
-void TemplateWindow::open_save(std::string name) {
+void TemplateWindow::open_save(std::string_view name) {
     m_mode = Mode::Save;
     m_text = clean_template_name(name);
     m_renaming.reset();

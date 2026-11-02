@@ -225,9 +225,9 @@ public:
             m_templates->open_list();
         }
     }
-    void open_template_save(std::string name) {
+    void open_template_save(std::string_view name) {
         if (m_templates) {
-            m_templates->open_save(std::move(name));
+            m_templates->open_save(name);
         }
     }
     void close_templates() noexcept {

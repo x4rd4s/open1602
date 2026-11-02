@@ -53,7 +53,7 @@ public:
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return m_folder; }
 
     /// Saves a new template; false if the file could not be written.
-    bool add(std::string name, BuildTool::Layout layout);
+    bool add(std::string_view name, BuildTool::Layout layout);
     /// Gives the template at `index` another name; false if there is none or it could not be written.
     bool rename(std::size_t index, std::string name);
     /// Deletes the template at `index` and its file.

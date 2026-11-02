@@ -77,7 +77,7 @@ public:
     /// Opens the list.
     void open_list();
     /// Asks for the name of a new template, `name` typed in already.
-    void open_save(std::string name);
+    void open_save(std::string_view name);
     void close() noexcept;
     [[nodiscard]] bool is_open() const noexcept { return m_mode != Mode::Closed; }
     [[nodiscard]] bool saving() const noexcept { return m_mode == Mode::Save; }

@@ -195,7 +195,7 @@ bool TemplateStore::write(const BuildTemplate& t) const {
         .ok();
 }
 
-bool TemplateStore::add(std::string name, BuildTool::Layout layout) {
+bool TemplateStore::add(std::string_view name, BuildTool::Layout layout) {
     if (layout.items.empty()) {
         return false;
     }
