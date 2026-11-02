@@ -808,6 +808,7 @@ stats.tab.goods = Goods
 stats.tab.producers = Producers
 stats.tab.population = Population
 stats.tab.trade = Trade
+stats.tab.routes = Routes
 stats.tab.finances = Finances
 # {1}: a whole number of percent
 stats.percent = {1} %
@@ -847,6 +848,12 @@ stats.trade.total = Total
 stats.trade.empty = No trade at your Kontors in this time.
 # {1}: the minutes chosen
 stats.trade.hint = Tons and gold of the last {1} game minutes at your Kontors. Click a good for its details.
+stats.routes.ship = Ship
+stats.routes.stops = Route
+stats.routes.next = Sailing to
+stats.routes.goods = Goods
+stats.routes.empty = None of your ships sails a trade route.
+stats.routes.hint = {1} ships on trade routes, {2} of them with trouble (red: a transfer could not be made). Click a ship to go to it; click a heading to order the list ("Goods": trouble first).
 # The tab "Finances": gold per minute as in the city window
 stats.fin.now = Now
 # {1}: the minutes chosen

@@ -1394,8 +1394,21 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down,
     }
     if (m_goods_open && !m_menu_active && !m_question && !m_help) {
         const ui::Rect r = goods_rect();
-        if (m_goods->mouse(x - r.x, y - r.y, down, button) == GoodsWindow::Result::Close) {
-            m_goods_open = false;
+        switch (m_goods->mouse(x - r.x, y - r.y, down, button)) {
+            case GoodsWindow::Result::Close:
+                m_goods_open = false;
+                break;
+            case GoodsWindow::Result::Ship:
+                // A ship of the tab "Routes": the window closes and the ship is selected and looked at.
+                if (const auto ship = m_goods->take_ship()) {
+                    m_goods_open = false;
+                    Action a{Action::Kind::SelectShip, ship->x, ship->y};
+                    a.ship = ship->id;
+                    return a;
+                }
+                break;
+            case GoodsWindow::Result::None:
+                break;
         }
         return std::nullopt;
     }
