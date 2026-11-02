@@ -552,7 +552,8 @@ std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint3
 }
 
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
-                        std::span<const StageNeed> needs) {
+                        std::span<const StageNeed> needs, bool grow) {
+    const auto count = [&](std::uint32_t n) { return grow ? grown(r, n) : n; };
     const auto holds = [money](StageNeed::When w) {
         switch (w) {
             case StageNeed::When::Never:
@@ -575,16 +576,16 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
         bool found = false;
         switch (n.kind) {
             case StageNeed::Kind::Building:
-                found = need(p, n.slot, grown(r, n.n));
+                found = need(p, n.slot, count(n.n));
                 break;
             case StageNeed::Kind::Market:
                 found = need_market(p, n.n);
                 break;
             case StageNeed::Kind::Houses:
-                found = need_houses(p, houses_wanted(c, r, n.n));
+                found = need_houses(p, grow ? houses_wanted(c, r, n.n) : n.n);
                 break;
             case StageNeed::Kind::Public:
-                found = need_public(p, n.slot, grown(r, n.n), holds(n.flag));
+                found = need_public(p, n.slot, count(n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::Kontor:
                 found = need_kontor(p, n.n);
@@ -608,13 +609,13 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = weapons(p);
                 break;
             case StageNeed::Kind::Luxury:
-                found = luxury(p, grown(r, n.n), holds(n.flag));
+                found = luxury(p, count(n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::ColonyLuxury:
                 found = colony_luxury(p, c, r, n.n);
                 break;
             case StageNeed::Kind::Tower:
-                found = need_tower(p, 1, grown(r, n.n));
+                found = need_tower(p, 1, count(n.n));
                 break;
             case StageNeed::Kind::RoadsIfMason:
                 found = roads_if_mason(p);
@@ -623,7 +624,7 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = want_colony(p, static_cast<std::uint8_t>(n.n), false, false);
                 break;
             case StageNeed::Kind::Package:
-                found = package_order(p, c, r, n.slot, grown(r, n.n));
+                found = package_order(p, c, r, n.slot, count(n.n));
                 break;
         }
         if (found) {
@@ -719,8 +720,23 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const Balance& at = m_world.balance();
     const auto has = [money](std::uint32_t gold) { return std::int64_t{money} >= std::int64_t{gold}; };
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
+    // The lists this visit went through; once there is nothing to do, Open1602 goes through them
+    // again with their numbers grown by the city's land, so that a large island fills up without
+    // holding up the way to the next stage.
+    std::vector<ComputerList> asked;
     const auto needs = [&](ComputerList list) {
+        asked.push_back(list);
         return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
+    };
+    const auto idle = [&] {
+        if (!classic()) {
+            for (const ComputerList list : asked) {
+                if (first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list), true)) {
+                    return;
+                }
+            }
+        }
+        nothing_to_do(p);
     };
 
     switch (r.stage) {
@@ -766,7 +782,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::ColonyMaterials)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kPioneers: {
@@ -825,14 +841,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::SecondLuxury)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kSecondFarming: {
             if (needs(ComputerList::SecondFarming) || farm_animals(p, r) || need_tower(p, 1, 6)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMain: {
@@ -847,7 +863,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 return;
             }
             if (money >= 4000) {
-                nothing_to_do(p);
+                idle();
             }
             return;
         }
@@ -860,7 +876,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Main2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizens: {
@@ -872,7 +888,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Citizens)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizens2: {
@@ -884,14 +900,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Citizens2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kCitizensSmall: {
             if (needs(ComputerList::CitizensSmall)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMerchants: {
@@ -908,7 +924,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::MerchantsTail)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kMerchants2:
@@ -922,7 +938,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                       : needs(ComputerList::Merchants2) || needs(ComputerList::Merchants2Tail)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kAristocrats: {
@@ -936,14 +952,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Aristocrats)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         case stage::kAristocrats2: {
             if (needs(ComputerList::Aristocrats2)) {
                 return;
             }
-            nothing_to_do(p);
+            idle();
             return;
         }
         default:

@@ -316,8 +316,9 @@ private:
     /// Open1602: the houses of an order, `grown` only while at most an eighth of the city's houses
     /// hold pioneers, so that a city grows tall before it grows wide.
     [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const;
-    bool first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
-                    std::span<const StageNeed> needs);
+    /// `grow`: with the numbers `grown` by the city's land (houses: `houses_wanted`).
+    bool first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money, std::span<const StageNeed> needs,
+                    bool grow = false);
     void unload_ship(AiPlayer& p, City& c);
     bool colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field);
     bool farm_animals(AiPlayer& p, const CityPlan& r);

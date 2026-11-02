@@ -130,8 +130,8 @@ line, the rest of the order is kept.
 A game keeps the orders that differ from the original's (section `AIOR` of the savegame), so it
 plays with them whatever the packages installed later say.
 
-**Large islands.** The numbers of an order were made for the original's islands. A city past the
-settlers (the lists from `second` and `main` on) with more than 1000 tiles of free land on its island
+**Large islands.** The numbers of an order were made for the original's islands. Once a stage's
+orders have nothing more to do, a city past the settlers (the lists from `second` and `main` on) with more than 1000 tiles of free land on its island
 multiplies the numbers of its `houses`, producers, public buildings, `luxury`, `tower` and package
 entries by its land / 1000, up to eight times, rounded up (houses beyond the order's number only while at most an eighth of the city's houses hold pioneers, so that the city moves up before it spreads); a colony does the same with its caps on
 luxury fields and farms. So a computer fills an island of 3000 tiles with three times as many houses
