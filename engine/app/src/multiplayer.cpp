@@ -729,7 +729,7 @@ core::Status MapViewer::start_hosted_game() {
         o.world = m_options.world;
         o.world.seed = setup.seed;
         o.world.guarantee_resources = settings.rules.guarantee_resources;
-        o.world.all_crops = settings.rules.all_crops;
+        o.world.climate_crops = settings.rules.climate_crops;
         o.world.big_ore_veins = settings.rules.big_ore_veins;
         o.multiplayer = true;  // the .szm level: every player starts with the small trading cog
         if (settings.own_world) {

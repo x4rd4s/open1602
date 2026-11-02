@@ -13,6 +13,7 @@
 #include "o1602/assets/scenario.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/core/text.hpp"
+#include "o1602/sim/game_data.hpp"
 #include "o1602/sim/savegame_extension.hpp"
 
 namespace o1602::sim {
@@ -230,14 +231,21 @@ core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endle
 
 namespace {
 
-/// Rules::all_crops and Rules::big_ore_veins on the islands of a new endless game.
+/// Rules::climate_crops and Rules::big_ore_veins on the islands of a new endless game.
 void enrich_islands(World& world, const WorldStart& start) {
-    constexpr std::uint32_t kAllCrops = (1U << (ware::kCocoaField - ware::kCornField + 1)) - 1U;
+    const auto bit = [](std::uint8_t crop) { return 1U << (crop - ware::kCornField); };
+    const std::uint32_t north = bit(ware::kTobaccoField) | bit(ware::kSugarField) | bit(ware::kWineField);
+    const std::uint32_t south = bit(ware::kSpiceField) | bit(ware::kCottonField) | bit(ware::kCocoaField);
     constexpr std::uint16_t kBigIron = 0x1E00;  // 240 t, as the world plan gives a big vein
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
         assets::IslandHeader& header = world.island(static_cast<std::uint16_t>(i)).header;
-        if (start.all_crops) {
-            header.fertility |= kAllCrops;
+        if (start.climate_crops) {
+            // The crops a climate grows at least half (see island_fertility) now grow fully.
+            if (header.climate == climate::kNorth) {
+                header.fertility |= north;
+            } else if (header.climate == climate::kSouth) {
+                header.fertility |= south;
+            }
         }
         if (start.big_ore_veins) {
             for (assets::IslandHeader::Deposit& d : header.deposits) {

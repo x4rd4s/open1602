@@ -51,7 +51,7 @@ enum RuleKey : std::uint16_t {
     kBugNativeLand = 43,
     kOneCart = 44,        // 1: one trade cart per player and island (Rules::more_carts off)
     kFertileFields = 45,  // 1: poor ground takes nothing from a field (Rules::fertile_fields)
-    kAllCrops = 46,       // 1: every island grew every crop at the start (Rules::all_crops)
+    kClimateCrops = 46,   // 1: every island grew its climate's crops fully (Rules::climate_crops)
     kBigOreVeins = 47,    // 1: every iron vein was a big one at the start (Rules::big_ore_veins)
     kWiderHunting = 48,   // 1: the hunter's hut reaches further (Rules::wider_hunting)
     kCheats = 49,         // Rules::cheats (Code when missing)
@@ -208,8 +208,8 @@ void write_rules(Writer& out, const Rules& r) {
     if (r.fertile_fields) {
         values.emplace_back(kFertileFields, 1U);
     }
-    if (r.all_crops) {
-        values.emplace_back(kAllCrops, 1U);
+    if (r.climate_crops) {
+        values.emplace_back(kClimateCrops, 1U);
     }
     if (r.big_ore_veins) {
         values.emplace_back(kBigOreVeins, 1U);
@@ -353,8 +353,8 @@ Rules read_rules(Reader& in) {
             case kFertileFields:
                 r.fertile_fields = v != 0;
                 break;
-            case kAllCrops:
-                r.all_crops = v != 0;
+            case kClimateCrops:
+                r.climate_crops = v != 0;
                 break;
             case kBigOreVeins:
                 r.big_ore_veins = v != 0;

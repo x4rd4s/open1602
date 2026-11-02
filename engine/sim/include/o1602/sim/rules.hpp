@@ -318,10 +318,11 @@ struct Rules {
     /// original's settings.
     bool fertile_fields = false;
 
-    /// Open1602: every island of a new endless game grows every crop fully (corn, tobacco, spices,
-    /// sugar cane, cotton, wine and cocoa), whatever its climate. Off by default and with the
-    /// original's settings.
-    bool all_crops = false;
+    /// Open1602: every island of a new endless game grows the three crops of its climate fully
+    /// (tobacco, sugar cane and wine in the north, spices, cotton and cocoa in the south), where the
+    /// original gives some of them only half. The other climate's crops still do not grow. Off by
+    /// default and with the original's settings.
+    bool climate_crops = false;
     /// Open1602: every iron vein of a new endless game is a big one. Off by default and with the
     /// original's settings.
     bool big_ore_veins = false;
@@ -361,7 +362,7 @@ struct Rules {
         r.wider_hunting = false;
         r.reveal = Reveal::Original;
         r.fertile_fields = false;
-        r.all_crops = false;
+        r.climate_crops = false;
         r.big_ore_veins = false;
         r.bugs = OriginalBugs::all();
         return r;
