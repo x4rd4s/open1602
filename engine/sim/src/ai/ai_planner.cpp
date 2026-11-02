@@ -525,6 +525,13 @@ std::uint32_t Engine::luxury_in_stock(const AiPlayer& p, const City& c, const Ci
 // finds something to do. The orders are data (computer_orders.hpp): the original's, or a package's
 // from its computers.toml.
 
+std::uint32_t Engine::grown(const CityPlan& r, std::uint32_t n, bool any_stage) const {
+    if (classic() || (r.stage < stage::kSecond && !any_stage)) {
+        return n;
+    }
+    return grown_count(r.land, n);
+}
+
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
                         std::span<const StageNeed> needs) {
     const auto holds = [money](StageNeed::When w) {
@@ -549,16 +556,16 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
         bool found = false;
         switch (n.kind) {
             case StageNeed::Kind::Building:
-                found = need(p, n.slot, n.n);
+                found = need(p, n.slot, grown(r, n.n));
                 break;
             case StageNeed::Kind::Market:
                 found = need_market(p, n.n);
                 break;
             case StageNeed::Kind::Houses:
-                found = need_houses(p, n.n);
+                found = need_houses(p, grown(r, n.n));
                 break;
             case StageNeed::Kind::Public:
-                found = need_public(p, n.slot, n.n, holds(n.flag));
+                found = need_public(p, n.slot, grown(r, n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::Kontor:
                 found = need_kontor(p, n.n);
@@ -582,13 +589,13 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = weapons(p);
                 break;
             case StageNeed::Kind::Luxury:
-                found = luxury(p, n.n, holds(n.flag));
+                found = luxury(p, grown(r, n.n), holds(n.flag));
                 break;
             case StageNeed::Kind::ColonyLuxury:
                 found = colony_luxury(p, c, r, n.n);
                 break;
             case StageNeed::Kind::Tower:
-                found = need_tower(p, 1, n.n);
+                found = need_tower(p, 1, grown(r, n.n));
                 break;
             case StageNeed::Kind::RoadsIfMason:
                 found = roads_if_mason(p);
@@ -597,7 +604,7 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = want_colony(p, static_cast<std::uint8_t>(n.n), false, false);
                 break;
             case StageNeed::Kind::Package:
-                found = package_order(p, c, r, n.slot, n.n);
+                found = package_order(p, c, r, n.slot, grown(r, n.n));
                 break;
         }
         if (found) {
@@ -630,11 +637,11 @@ bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::u
         case stage::kSettlers:
         case stage::kMain:
         case stage::kMain2:
-            return luxury(p, std::min(n, 4U), true);
+            return luxury(p, std::min(n, grown(r, 4, true)), true);
         case stage::kCitizens:
-            return luxury(p, std::min(n, 6U), true);
+            return luxury(p, std::min(n, grown(r, 6, true)), true);
         case stage::kCitizens2:
-            return luxury(p, std::min(n, 4U), false);
+            return luxury(p, std::min(n, grown(r, 4, true)), false);
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kMerchants:
@@ -645,7 +652,7 @@ bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::u
                                       : (p.max_stage == stage::kAristocrats || p.max_stage == stage::kAristocrats2)
                                           ? 10U
                                           : 8U;
-            const std::uint32_t k = std::min(n, cap);
+            const std::uint32_t k = std::min(n, grown(r, cap, true));
             if (q == 1) {
                 if (luxury(p, k, false)) {
                     return true;
@@ -666,19 +673,22 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
     switch (p.max_stage) {
         case stage::kMain:
         case stage::kMain2:
-            return need(p, kSlotSheep, std::min(n, 4U));
+            return need(p, kSlotSheep, std::min(n, grown(r, 4U, true)));
         case stage::kCitizens:
-            return need(p, kSlotSheep, std::min(n, 6U));
+            return need(p, kSlotSheep, std::min(n, grown(r, 6U, true)));
         case stage::kCitizens2:
-            return need(p, kSlotCattle, std::min(n, 4U)) || need(p, kSlotSheep, std::min(n, 4U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 4U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 4U, true)));
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kAristocrats:
         case stage::kAristocrats2:
-            return need(p, kSlotCattle, std::min(n, 8U)) || need(p, kSlotSheep, std::min(n, 8U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 8U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 8U, true)));
         case stage::kMerchants:
         case stage::kMerchants2:
-            return need(p, kSlotCattle, std::min(n, 6U)) || need(p, kSlotSheep, std::min(n, 6U));
+            return need(p, kSlotCattle, std::min(n, grown(r, 6U, true))) ||
+                   need(p, kSlotSheep, std::min(n, grown(r, 6U, true)));
         default:
             return false;
     }
@@ -727,7 +737,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 return;
             }
             if (full_crops(c.island) == 0) {
-                const std::uint32_t n = std::min(r.land / 120, 6U);
+                const std::uint32_t n = std::min(r.land / 120, grown(r, 6, true));
                 if (need(p, kSlotSheep, n) || need(p, kSlotCattle, n)) {
                     return;
                 }
