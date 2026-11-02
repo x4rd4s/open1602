@@ -133,9 +133,11 @@ bool touches_own_land(const sim::IslandMap& map, const sim::PlannedBuild& item, 
 constexpr std::uint64_t kShortOfMeansBlinkMs = 300;
 /// The tint over what the copy tool's drag would take into the hand.
 constexpr assets::Rgba kCopyMark{96, 160, 232, 110};
-/// How the local player's blueprints are drawn: their colours times a light blue, the ground
-/// showing through, as planned buildings look in later Anno games.
-constexpr assets::Rgba kBlueprintTint{185, 215, 255, 165};
+/// How the local player's blueprints are drawn: translucent, the ground showing through, as
+/// planned buildings look in later Anno games.
+constexpr assets::Rgba kBlueprintTint{255, 255, 255, 150};
+/// And a light blue over their ground, which tells them apart from what stands there.
+constexpr assets::Rgba kBlueprintMark{90, 150, 255, 100};
 /// Real time a frame may spend on ticks; the rest of the frame draws.
 constexpr int kTickBudgetMs = 25;
 /// The status line under a still mouse is worked out again this often (FB-1).
@@ -1449,10 +1451,13 @@ void MapViewer::render() {
         m_sprite_tints.colour = kBlueprintTint;
         m_sprite_tints.tiles.clear();
         layers.sprite_tints = &m_sprite_tints;
-        // A tile of an island whose building is drawn in the blueprints' colour.
+        // A tile of an island whose building is drawn as a blueprint: translucent, on blue ground.
         const auto tint = [&](std::uint16_t island, std::uint32_t x, std::uint32_t y) {
             const sim::WorldIsland& isl = m_state->world.islands()[island];
             m_sprite_tints.tiles.emplace_back(isl.x + x, isl.y + y);
+            render::TileMark mark{island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y), kBlueprintMark};
+            mark.on_top = true;
+            m_tile_marks.push_back(mark);
         };
         // First, so that the build preview's marks lie over it.
         add_fertility_marks();
@@ -1693,18 +1698,15 @@ void MapViewer::render() {
                     }
                 }
                 if (covered) {
-                    // Hatched where the new building leaves it in sight, as what the demolish tool takes.
+                    // Its whole ground hatched, as what the demolish tool takes.
                     for (std::uint32_t j = 0; j < h; ++j) {
                         for (std::uint32_t i = 0; i < w; ++i) {
-                            const std::int32_t tx = b.x + static_cast<std::int32_t>(i);
-                            const std::int32_t ty = b.y + static_cast<std::int32_t>(j);
-                            if (!is_taken(b.island, tx, ty)) {
-                                render::TileMark mark{b.island, static_cast<std::uint16_t>(tx),
-                                                      static_cast<std::uint16_t>(ty), render::kDragHatch};
-                                mark.hatched = true;
-                                mark.on_top = true;
-                                m_tile_marks.push_back(mark);
-                            }
+                            render::TileMark mark{
+                                b.island, static_cast<std::uint16_t>(b.x + static_cast<std::int32_t>(i)),
+                                static_cast<std::uint16_t>(b.y + static_cast<std::int32_t>(j)), render::kDragHatch};
+                            mark.hatched = true;
+                            mark.on_top = true;
+                            m_tile_marks.push_back(mark);
                         }
                     }
                 }
