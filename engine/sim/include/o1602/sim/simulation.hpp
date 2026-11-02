@@ -19,6 +19,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/sim/ai.hpp"
+#include "o1602/sim/blueprints.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/disasters.hpp"
@@ -144,7 +145,7 @@ struct CheatOrder {
 using Command = std::variant<BuildOrder, DemolishOrder, ShipOrder, CargoTransfer, RouteEdit, TradeSetting,
                              ShipyardOrder, ExploreOrder, DiplomacyOrder, SoldierOrder, SoldierCommand, CastleOrder,
                              UnloadOrder, ProductionSwitch, CityOrder, ShipCommand, GameSpeedOrder, PlayerRename,
-                             PlayerControl, GateOrder, CartRequest, CheatOrder>;
+                             PlayerControl, GateOrder, CartRequest, BlueprintOrder, CheatOrder>;
 
 /// What became of a command.
 struct CommandResult {
@@ -391,6 +392,7 @@ private:
     void ships_step();
     void soldiers_step();
     void logistics_step();
+    void blueprints_step();
     void statistics_step();
     /// Sends a carrier with `ware` to the shipyard or castle at (x, y); false if it cannot go.
     bool send_yard_carrier(std::uint16_t island, std::uint16_t x, std::uint16_t y, std::uint8_t ware);
