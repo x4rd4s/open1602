@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
+#include <future>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -731,6 +732,7 @@ void MapViewer::warn_if_state_damaged() const {
 }
 
 MapViewer::~MapViewer() {
+    finish_autosave();  // the file it writes is complete before the program ends
     // GPU resources must go before the renderer/window, which go before SDL_Quit: the textures of
     // the video and the HUD as well as the world's sprites.
     m_preloader.reset();  // cancels the zoom level being loaded
@@ -988,6 +990,7 @@ int MapViewer::run() {
         }
         save_settings();  // the window's size for the next start
     }
+    finish_autosave();
     if (m_options.max_frames != 0) {
         const std::uint64_t elapsed = std::max<std::uint64_t>(platform::ticks_ms() - run_start, 1);
         std::fprintf(stderr, "%u frames in %llu ms (%.1f fps), %zu sprites in %zu batches in the last frame\n", frames,
@@ -1193,6 +1196,89 @@ void MapViewer::update(std::uint32_t delta_ms) {
                          m_state->world.time_ms(), m_state->simulation.speed(), m_drawn_tiles);
     }
     apply_construction();
+    autosave_if_due();
+}
+
+namespace {
+
+/// Writes a packed savegame; a failed write (a full disk) never leaves half a file in place of
+/// the last good one. Touches nothing but the file: any thread may call it.
+core::Status write_save_file(const std::filesystem::path& target, std::span<const std::uint8_t> bytes) {
+    if (target.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(target.parent_path(), ec);
+    }
+    return core::write_file_atomic(target, bytes);
+}
+
+}  // namespace
+
+void MapViewer::autosave_if_due() {
+    finish_autosave(false);
+    if (m_autosave_job) {
+        return;  // the last one is still on its way to the disk: the next waits for it
+    }
+    // Not the world behind the menus, nor a multiplayer game that stands. Every computer of a
+    // multiplayer game keeps its own copy (the same game, as on "Ende"): whoever hosts the next
+    // one can go on from it.
+    const bool playing = m_hud && !m_hud->menu_active() && !m_pending_load &&
+                         !(m_session && (m_session->ended() || m_session->waiting()));
+    if (!playing || !m_autosave.due(m_state->simulation.game_time_ms(), m_app_settings.display.autosave_minutes)) {
+        return;
+    }
+    // In the frame only what has to see the game as it is now: its sections, unpacked. Packing
+    // and writing the file read nothing of the game and run on a thread of their own.
+    const auto started = std::chrono::steady_clock::now();
+    const auto target = prepare_save(slot_file(save_folder(), kLastGameSlot));
+    auto sections = target ? sim::encode_game(m_state->world, m_buildings, &m_state->simulation)
+                           : core::Result<core::Bytes>(target.error());
+    if (!sections) {
+        std::fprintf(stderr, "autosave: %s\n", sections.error().message.c_str());
+        return;
+    }
+    AutosaveJob job;
+    job.humans = human_players();
+    job.minutes = m_app_settings.display.autosave_minutes;
+    job.started = started;
+    job.capture_us = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count());
+    job.written =
+        std::async(std::launch::async, [file = *target, bytes = std::move(sections).value()]() -> core::Status {
+            auto packed = sim::pack_game(bytes, sim::SaveOptions{.compress = true, .fast = true});
+            if (!packed) {
+                return packed.error();
+            }
+            return write_save_file(file, *packed);
+        });
+    m_autosave_job = std::move(job);
+}
+
+void MapViewer::finish_autosave(bool wait) {
+    if (!m_autosave_job) {
+        return;
+    }
+    if (!wait && m_autosave_job->written.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        return;
+    }
+    AutosaveJob job = std::move(*m_autosave_job);
+    m_autosave_job.reset();
+    core::Status status = core::Ok{};
+    try {
+        status = job.written.get();
+    } catch (const std::exception& e) {
+        status = core::make_error(core::ErrorCode::PlatformError,
+                                  std::string("the savegame could not be written: ") + e.what());
+    }
+    if (!status) {
+        std::fprintf(stderr, "autosave: %s\n", status.error().message.c_str());
+        return;
+    }
+    remember_slot(kLastGameSlot, std::string(kLastGameName), job.humans);
+    const auto total =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - job.started).count();
+    std::fprintf(stderr, "autosave: kept as %s after %d minutes of game time (%.1f ms in the frame, %lld ms in all)\n",
+                 kLastGameName.data(), job.minutes, static_cast<double>(job.capture_us) / 1000.0,
+                 static_cast<long long>(total));
 }
 
 std::string MapViewer::tile_status() const {
@@ -1284,6 +1370,15 @@ render::TileLighting MapViewer::tile_lighting() const {
     if (clicked != nullptr && m_hud->mode() == Hud::kModeInfo) {
         if (auto l = building_lighting(*clicked)) {
             return *l;
+        }
+        // Another owner's Kontor with a trade treaty, a native village's too: the water where the
+        // player's ships trade with it, as in the original.
+        if (const auto kontor = foreign_trade_kontor(m_state->world, m_buildings, m_local_player, clicked->island,
+                                                     clicked->x, clicked->y)) {
+            render::TileLighting l = render::TileLighting::harbours_only(m_local_player);
+            l.harbour(m_state->world, m_buildings, clicked->island, static_cast<std::uint32_t>(kontor->x),
+                      static_cast<std::uint32_t>(kontor->y));
+            return l;
         }
     }
     return {};
@@ -2889,7 +2984,7 @@ std::filesystem::path MapViewer::save_folder() {
     return data_folder() / "saves";
 }
 
-core::Status MapViewer::save_game(const std::filesystem::path& path) {
+core::Result<std::filesystem::path> MapViewer::prepare_save(const std::filesystem::path& path) {
     // The installation stays as it is: no savegame goes into it (nor into Game.dat). A path that
     // cannot be resolved is not written either.
     std::error_code ec;
@@ -2906,36 +3001,50 @@ core::Status MapViewer::save_game(const std::filesystem::path& path) {
         return core::make_error(core::ErrorCode::Unsupported,
                                 "will not write into the game's installation: " + core::path_to_utf8(target));
     }
-    // Open1602's own savegame, or with the ending .gam one the original loads (as long as the game
-    // fits its limits; without the file the game came from, the fields Open1602 does not keep are 0).
-    std::string ending = core::path_to_utf8(target.extension());
-    std::transform(ending.begin(), ending.end(), ending.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     // The groups of this computer's player go with the game (the original forgets them).
     if (m_local_player != sim::kNoPlayer && m_input) {
         m_state->world.set_unit_groups(m_local_player, m_input->saved_groups());
     }
+    return target;
+}
+
+core::Status MapViewer::save_game(const std::filesystem::path& path) {
+    finish_autosave();  // its file must not land after this one
+    const auto target = prepare_save(path);
+    if (!target) {
+        return target.error();
+    }
+    // Open1602's own savegame, or with the ending .gam one the original loads (as long as the game
+    // fits its limits; without the file the game came from, the fields Open1602 does not keep are 0).
+    std::string ending = core::path_to_utf8(target->extension());
+    std::transform(ending.begin(), ending.end(), ending.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     auto bytes = ending == ".gam" ? sim::write_savegame(m_state->world, m_buildings, &m_state->simulation)
                                   : sim::write_game(m_state->world, m_buildings, &m_state->simulation,
                                                     sim::SaveOptions{.compress = true, .fast = true});
     if (!bytes) {
         return bytes.error();
     }
-    if (target.has_parent_path()) {
-        std::filesystem::create_directories(target.parent_path(), ec);
+    return write_save_file(*target, *bytes);
+}
+
+std::uint8_t MapViewer::human_players() const {
+    std::uint8_t humans = 0;
+    for (const sim::Player& p : m_state->world.players()) {
+        humans = static_cast<std::uint8_t>(humans + (p.role == sim::PlayerRole::Human ? 1 : 0));
     }
-    // A failed write (a full disk) never leaves half a file in place of the last good one.
-    return core::write_file_atomic(target, *bytes);
+    return humans;
 }
 
 core::Status MapViewer::save_slot(std::size_t slot, std::string name) {
     if (auto status = save_game(slot_file(save_folder(), slot)); !status) {
         return status;
     }
-    std::uint8_t humans = 0;
-    for (const sim::Player& p : m_state->world.players()) {
-        humans = static_cast<std::uint8_t>(humans + (p.role == sim::PlayerRole::Human ? 1 : 0));
-    }
+    remember_slot(slot, std::move(name), human_players());
+    return core::Ok{};
+}
+
+void MapViewer::remember_slot(std::size_t slot, std::string name, std::uint8_t humans) {
     m_slots.set(slot, std::move(name), humans);
     read_slot_meta(m_slots, save_folder(), slot);
     ++m_slots_revision;
@@ -2952,7 +3061,6 @@ core::Status MapViewer::save_slot(std::size_t slot, std::string name) {
         !written) {
         std::fprintf(stderr, "slots: %s\n", written.error().message.c_str());
     }
-    return core::Ok{};
 }
 
 void MapViewer::load_options() {
@@ -3151,6 +3259,7 @@ void MapViewer::apply_options() {
 }
 
 core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::Rules* rules) {
+    finish_autosave();  // "continue" right after an autosave loads the file it wrote
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
@@ -3633,6 +3742,7 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
     m_command_sink.set_simulation(&m_state->simulation);
     m_options.scenario = source;
     m_title_real_ms = 0;  // loading took real time the game did not run: no "too slow" for it
+    m_autosave.restart(m_state->simulation.game_time_ms());
     warn_if_state_damaged();
     m_state->simulation.offer_names(m_city_names, m_ship_names);  // a saved game keeps its own
     m_state->simulation.set_tick_observer(
