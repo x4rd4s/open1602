@@ -532,6 +532,25 @@ std::uint32_t Engine::grown(const CityPlan& r, std::uint32_t n, bool any_stage) 
     return grown_count(r.land, n);
 }
 
+std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const {
+    const std::uint32_t wanted = grown(r, n);
+    if (wanted <= n) {
+        return n;
+    }
+    // Houses beyond the original's number only while the city's houses move up: a new house starts
+    // with the pioneers, and a city that keeps building them grows wide instead of tall, its
+    // goods spread over houses that never reach the next class.
+    std::uint32_t houses = 0;
+    std::uint32_t pioneers = 0;
+    for (const House& h : m_world.houses()) {
+        if (h.island == c.island && h.city == c.index) {
+            ++houses;
+            pioneers += h.resident_class == 0 ? 1U : 0U;
+        }
+    }
+    return pioneers * 8 <= houses ? wanted : n;
+}
+
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
                         std::span<const StageNeed> needs) {
     const auto holds = [money](StageNeed::When w) {
@@ -562,7 +581,7 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = need_market(p, n.n);
                 break;
             case StageNeed::Kind::Houses:
-                found = need_houses(p, grown(r, n.n));
+                found = need_houses(p, houses_wanted(c, r, n.n));
                 break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, grown(r, n.n), holds(n.flag));

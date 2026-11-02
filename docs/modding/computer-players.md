@@ -133,7 +133,7 @@ plays with them whatever the packages installed later say.
 **Large islands.** The numbers of an order were made for the original's islands. A city past the
 settlers (the lists from `second` and `main` on) with more than 1000 tiles of free land on its island
 multiplies the numbers of its `houses`, producers, public buildings, `luxury`, `tower` and package
-entries by its land / 1000, up to eight times, rounded up; a colony does the same with its caps on
+entries by its land / 1000, up to eight times, rounded up (houses beyond the order's number only while at most an eighth of the city's houses hold pioneers, so that the city moves up before it spreads); a colony does the same with its caps on
 luxury fields and farms. So a computer fills an island of 3000 tiles with three times as many houses
 and the farms and workshops to feed them. The original's computer players (`Rules::bugs.classic_ai`, `--ai classic`) keep the plain numbers.
 

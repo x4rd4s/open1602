@@ -313,6 +313,9 @@ private:
     /// computer fills a large island; `n` itself for the original's computers and smaller cities.
     /// `any_stage`: for a colony too (its caps on fields and farms).
     [[nodiscard]] std::uint32_t grown(const CityPlan& r, std::uint32_t n, bool any_stage = false) const;
+    /// Open1602: the houses of an order, `grown` only while at most an eighth of the city's houses
+    /// hold pioneers, so that a city grows tall before it grows wide.
+    [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const;
     bool first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
                     std::span<const StageNeed> needs);
     void unload_ship(AiPlayer& p, City& c);
