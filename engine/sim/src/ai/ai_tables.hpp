@@ -178,7 +178,7 @@ inline const PublicTask* public_task(std::uint8_t task) {
 /// houses, producers, public buildings, luxury fields and towers in proportion to its land, up to
 /// kGrowMax times as many. The original's orders were made for its islands and stop at about 44
 /// houses however large the island is.
-inline constexpr std::uint32_t kGrowLand = 2000;
+inline constexpr std::uint32_t kGrowLand = 1000;
 inline constexpr std::uint32_t kGrowMax = 8;
 
 /// `n` of an order grown for a city with `land` tiles of free land (kGrowLand), in sixteenths so
