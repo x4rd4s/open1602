@@ -427,6 +427,7 @@ EditorModel MapViewer::editor_model() const {
         }
     }
     editor_object_model(m);
+    editor_city_model(m);
     m.terrain_selected = m_editor->selection.has_value();
     m.clip_width = m_editor->clip.width;
     m.clip_height = m_editor->clip.height;
@@ -547,6 +548,11 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             break;
         case Kind::Objects:
             editor_objects_request(request);
+            break;
+        case Kind::RenameCity:
+        case Kind::CityGoods:
+        case Kind::CityOwner:
+            editor_city_request(request);
             break;
         case Kind::TerrainCopy: {
             const auto& sel = m_editor->selection;
