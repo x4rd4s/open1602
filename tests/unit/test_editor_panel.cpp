@@ -780,7 +780,7 @@ TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they
     // None saved: where they come from.
     m.object_pieces = 0;
     (void)panel.draw(m, kNoFonts);
-    CHECK(says(panel, "No templates saved"));
+    CHECK(says(panel, "No templates. In a game"));
 }
 
 TEST_CASE("editor panel: the kind of islands of a new map and the packages' climates") {
