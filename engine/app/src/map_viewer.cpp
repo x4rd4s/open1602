@@ -1816,9 +1816,13 @@ void MapViewer::render() {
                     m_editor->paste_refused = true;
                     if (c.island != sim::World::kSea) {
                         const editor::TerrainClip& clip = m_editor->clip;
-                        m_editor->paste_refused = !terrain_preview->paste(
-                            c.island, std::int64_t{c.local_x} - (std::int64_t{clip.width} - 1) / 2,
-                            std::int64_t{c.local_y} - (std::int64_t{clip.height} - 1) / 2, clip, m_editor->strokes + 1);
+                        // A paste that changes nothing (the same copy laid again) is no refusal.
+                        m_editor->paste_refused =
+                            !terrain_preview->paste(c.island,
+                                                    std::int64_t{c.local_x} - (std::int64_t{clip.width} - 1) / 2,
+                                                    std::int64_t{c.local_y} - (std::int64_t{clip.height} - 1) / 2, clip,
+                                                    m_editor->strokes + 1) &&
+                            terrain_preview->first_refusal() != editor::TerrainStroke::Refusal::Free;
                     }
                 } else {
                     editor_paint(*terrain_preview, tile->x, tile->y, false);

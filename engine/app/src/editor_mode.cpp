@@ -1424,7 +1424,7 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
         editor::TerrainStroke& into = live ? *m_editor->stroke : stroke;
         // Land close to another island's land: the two were not joined (one has cities or
         // buildings), so the brush stops short of it and open sea stays between them.
-        constexpr std::int64_t kApart = 3;
+        constexpr std::int64_t kApart = 4;  // dark sea between the two surfs
         const auto by_other = [&](std::uint32_t tx, std::uint32_t ty, std::uint16_t own) {
             const std::int64_t W = world.width();
             const std::int64_t H = world.height();
@@ -1434,8 +1434,10 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
                      nx <= std::min<std::int64_t>(W - 1, std::int64_t{tx} + kApart); ++nx) {
                     const sim::World::Cell& at =
                         world.cell(static_cast<std::uint32_t>(nx), static_cast<std::uint32_t>(ny));
-                    if (at.island == sim::World::kSea || at.island == own) {
-                        continue;
+                    if (at.island == sim::World::kSea || at.island == own ||
+                        (world.island_use(at.island) == sim::World::IslandUse::None &&
+                         world.island_use(own) == sim::World::IslandUse::None)) {
+                        continue;  // two islands without cities are joined instead
                     }
                     const sim::MapCell& top = world.islands()[at.island].map.top(at.local_x, at.local_y);
                     const assets::BuildingType* b = top.empty() ? nullptr : m_buildings.by_sprite(top.sprite);

@@ -90,7 +90,7 @@ game has no tiles for (a strip one tile wide, land touching land only at a corne
 widen it on the tiles next to the brush, or refuse where they cannot. Land keeps a tile of water to its
 island's edge; an island with a city does not grow. Land painted within three tiles of another island's
 land joins both islands into one, so that the coast between them is one. If one of them has a city or
-buildings, they are not joined: the brush stops three tiles short of the other island, and a notice says why.
+buildings, they are not joined: the brush stops four tiles short of the other island, and a notice says why.
 
 A tile gets the piece on top and as the ground below. A mountain or river bend that a piece covers in
 part becomes meadow where it is not covered, and its ore deposit or volcano goes with it. The terrain
