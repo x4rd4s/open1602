@@ -20,6 +20,7 @@
 #include "o1602/core/file.hpp"
 #include "o1602/core/text.hpp"
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/objects.hpp"
 #include "o1602/editor/original_check.hpp"
 #include "o1602/editor/resources.hpp"
 #include "o1602/editor/units.hpp"
@@ -1308,7 +1309,8 @@ void MapViewer::draw_editor_marks() {
                 // A template: each of its buildings where a click puts it, green where it can stand,
                 // red where not.
                 if (const auto order = editor_template_order(tile->x, tile->y)) {
-                    const sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    (void)editor::refuse_second_city(world, *order, plan);
                     const sim::WorldIsland& isl = world.islands()[order->island];
                     for (std::size_t i = 0; i < order->items.size() && i < plan.items.size(); ++i) {
                         const sim::BuildItem& item = order->items[i];
@@ -1351,7 +1353,8 @@ void MapViewer::draw_editor_marks() {
                 bool fits = false;
                 if (const auto order = editor_object_order(tile->x, tile->y)) {
                     // Where a click would put it: a Kontor finds its coast near the mouse.
-                    const sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    (void)editor::refuse_second_city(world, *order, plan);
                     fits = plan.placed > 0;
                     const sim::PlannedBuild& p = plan.items.front();
                     if (fits && p.type != nullptr) {

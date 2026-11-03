@@ -38,6 +38,10 @@ struct PlacedBuildings {
                                               sim::BuildOrder order, const std::vector<std::string>& city_names,
                                               std::string_view own_name = {});
 
+/// A plan that founds a city for an owner who has one on the island already (the natives and
+/// pirates, whom the game does not hold to one): its items refused (CityLimit). True if so.
+bool refuse_second_city(const sim::World& world, const sim::BuildOrder& order, sim::BuildPlan& plan);
+
 /// `name`, or with the first number from 2 on that no city of the world has yet: "Piratennest 2".
 [[nodiscard]] std::string numbered_name(const sim::World& world, std::string_view name);
 

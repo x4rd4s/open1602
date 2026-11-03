@@ -39,6 +39,25 @@ bool clear_to_ground(sim::IslandMap& map, const sim::BuildingAt& at) {
 
 }  // namespace
 
+bool refuse_second_city(const sim::World& world, const sim::BuildOrder& order, sim::BuildPlan& plan) {
+    if (plan.placed == 0 || plan.city != sim::MapCell::kNoCity) {
+        return false;
+    }
+    const bool second = std::any_of(world.cities().begin(), world.cities().end(), [&](const sim::City& c) {
+        return c.island == order.island && c.owner == order.player;
+    });
+    if (!second) {
+        return false;
+    }
+    for (sim::PlannedBuild& p : plan.items) {
+        if (p.ok()) {
+            p.refusal = sim::BuildRefusal::CityLimit;
+        }
+    }
+    plan.placed = 0;
+    return true;
+}
+
 PlacedBuildings place_buildings(const sim::World& world, const assets::BuildingTable& buildings, sim::BuildOrder order,
                                 const std::vector<std::string>& city_names, std::string_view own_name) {
     order.free = true;
@@ -50,20 +69,8 @@ PlacedBuildings place_buildings(const sim::World& world, const assets::BuildingT
     const auto has_city = [&](const sim::World& w, std::uint16_t island, std::uint8_t index) {
         return w.city(island, index) != nullptr;
     };
-    if (result.plan.city == sim::MapCell::kNoCity) {
-        // It founds a city: one to an owner on an island, the natives and pirates as well.
-        const bool second = std::any_of(world.cities().begin(), world.cities().end(), [&](const sim::City& c) {
-            return c.island == order.island && c.owner == order.player;
-        });
-        if (second) {
-            for (sim::PlannedBuild& p : result.plan.items) {
-                if (p.ok()) {
-                    p.refusal = sim::BuildRefusal::CityLimit;
-                }
-            }
-            result.plan.placed = 0;
-            return result;
-        }
+    if (refuse_second_city(world, order, result.plan)) {
+        return result;
     }
     sim::World after = world;
     result.plan = sim::execute_build(after, buildings, order, city_names, nullptr);
