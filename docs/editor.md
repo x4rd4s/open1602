@@ -19,7 +19,7 @@ The editor has a frame of its own around the map instead of the game's panel:
 
 - **The menu bar** above the map: **File** (new map, open, save, save as, leave the editor), **Edit**
   (undo, redo), **View** (the overlays), **Map** (islands, map size, random elements, dice preview),
-  **Players**, **Scenario** (rules, goals), **Check** and **Help** (the keys). The menus name each command's key. At
+  **Players**, **Scenario** (description, rules, goals), **Check** and **Help** (the keys). The menus name each command's key. At
   its right end it shows the map's name, with `*` while it has changes that are not saved.
 - **The tool bar** down the map's left edge: a symbol for each tool, in groups: select; island and
   placeholder; land, water and tidy coast; the terrain pieces' brush, random fill, fill, replace,
@@ -216,6 +216,18 @@ from war to peace to peace with a trade treaty and back to war; the right button
 way. A change applies to both sides, and clears what
 the two remember of each other (tribute, trade, damage). A trade treaty needs peace; war ends it.
 Adding a player keeps the relations of the others; the new one starts at peace with everyone.
+
+## Description
+
+**Description** (menu Scenario) sets what the scenario list shows of the scenario: its name and
+introduction in German and English, the difficulty in stars (0 to 5), the author and a version.
+A click on a text opens a field to type it; an empty text takes that language away. Without a
+name the list shows the file's name, which still finds the scenario. Texts in other languages,
+written by other tools, are kept. **The original's limits** switches the check of the original's
+size, islands, players and buildings on or off.
+
+The introduction is the page shown before the scenario starts; the missions' own texts are set
+under Goals.
 
 ## Rules
 

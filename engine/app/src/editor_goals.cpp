@@ -3,6 +3,7 @@
 // The editor's dialog "Goals" (ADR 0013): the scenario's missions with all the original's goals and
 // loss conditions, who holds which, and their texts; editor::goals has the rules.
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -13,7 +14,9 @@
 #include "names.hpp"
 
 #include "o1602/assets/game_data.hpp"
+#include "o1602/core/text.hpp"
 #include "o1602/editor/goals.hpp"
+#include "o1602/editor/operations.hpp"
 #include "o1602/editor/players.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -199,6 +202,115 @@ void MapViewer::editor_goals_request(const EditorRequest& request) {
     m_editor->document.perform(std::move(op).value());
     m_editor->notice.clear();
     std::fprintf(stderr, "editor: missions changed (%zu)\n", m_editor->document.world().missions().size());
+}
+
+namespace {
+
+/// The text of `texts` in `language` exactly (no other one in its place), UTF-8.
+std::string text_in(const std::vector<sim::ScenarioText>& texts, std::string_view language) {
+    for (const sim::ScenarioText& t : texts) {
+        if (t.language == language) {
+            return t.text;
+        }
+    }
+    return {};
+}
+
+/// `texts` with `text` in `language`; an empty text takes the language away.
+void set_text(std::vector<sim::ScenarioText>& texts, std::string_view language, std::string text) {
+    const auto it =
+        std::find_if(texts.begin(), texts.end(), [&](const sim::ScenarioText& t) { return t.language == language; });
+    if (text.empty()) {
+        if (it != texts.end()) {
+            texts.erase(it);
+        }
+    } else if (it != texts.end()) {
+        it->text = std::move(text);
+    } else {
+        texts.push_back(sim::ScenarioText{std::string(language), std::move(text)});
+    }
+}
+
+}  // namespace
+
+void MapViewer::editor_scenario_model(EditorModel& m) const {
+    const sim::ScenarioInfo info = m_editor->document.world().scenario_info().value_or(sim::ScenarioInfo{});
+    using Row = EditorScenarioRow;
+    m.scenario_rows.resize(kEditorScenarioRows);
+    m.scenario_texts.resize(kEditorScenarioRows);
+    const auto text = [&](Row row, const char* label, std::string utf8) {
+        const auto i = static_cast<std::size_t>(row);
+        std::string shown = core::utf8_to_cp1252(utf8);
+        m.scenario_texts[i] = shown;
+        std::replace(shown.begin(), shown.end(), '\n', ' ');
+        m.scenario_rows[i] = EditorRule{ui::tr(label), shown.empty() ? ui::tr("editor.scenario.empty") : shown, true};
+    };
+    text(Row::NameDe, "editor.scenario.name_de", text_in(info.names, "de"));
+    text(Row::NameEn, "editor.scenario.name_en", text_in(info.names, "en"));
+    text(Row::BriefingDe, "editor.scenario.briefing_de", text_in(info.briefings, "de"));
+    text(Row::BriefingEn, "editor.scenario.briefing_en", text_in(info.briefings, "en"));
+    text(Row::Author, "editor.scenario.author", info.author);
+    text(Row::Version, "editor.scenario.version", info.version);
+    m.scenario_rows[static_cast<std::size_t>(Row::Stars)] =
+        EditorRule{ui::tr("editor.scenario.stars"),
+                   ui::tr("editor.scenario.stars_value",
+                          {std::to_string(info.stars), std::to_string(sim::ScenarioInfo::kMaxStars)}),
+                   true};
+    m.scenario_rows[static_cast<std::size_t>(Row::OriginalLimits)] = EditorRule{
+        ui::tr("editor.scenario.limits"), ui::tr(info.original_limits ? "editor.goals.yes" : "editor.goals.no"), true};
+}
+
+void MapViewer::editor_scenario_request(const EditorRequest& request) {
+    const sim::World& world = m_editor->document.world();
+    const std::optional<sim::ScenarioInfo> before = world.scenario_info();
+    sim::ScenarioInfo info = before.value_or(sim::ScenarioInfo{});
+    using Row = EditorScenarioRow;
+    const auto row = static_cast<Row>(request.index);
+    if (request.kind == EditorRequest::Kind::ScenarioStep) {
+        if (row == Row::Stars) {
+            constexpr auto kMax = sim::ScenarioInfo::kMaxStars;
+            info.stars = static_cast<std::uint8_t>(request.amount != 0 ? (info.stars + 1) % (kMax + 1)
+                                                                       : (info.stars + kMax) % (kMax + 1));
+        } else if (row == Row::OriginalLimits) {
+            info.original_limits = !info.original_limits;
+        } else {
+            return;
+        }
+    } else {
+        std::string text = core::cp1252_to_utf8(request.name);
+        switch (row) {
+            case Row::NameDe:
+                set_text(info.names, "de", std::move(text));
+                break;
+            case Row::NameEn:
+                set_text(info.names, "en", std::move(text));
+                break;
+            case Row::BriefingDe:
+                set_text(info.briefings, "de", std::move(text));
+                break;
+            case Row::BriefingEn:
+                set_text(info.briefings, "en", std::move(text));
+                break;
+            case Row::Author:
+                info.author = std::move(text);
+                break;
+            case Row::Version:
+                info.version = std::move(text);
+                break;
+            default:
+                return;
+        }
+    }
+    if (!sim::check_scenario_info(info).empty()) {
+        editor_notice(ui::tr("editor.goals.refused"), true, sim::check_scenario_info(info).front());
+        return;
+    }
+    if (before && *before == info) {
+        return;
+    }
+    m_editor->document.perform(std::make_unique<editor::ScenarioInfoEdit>(before, std::move(info)));
+    m_editor->notice.clear();
+    std::fprintf(stderr, "editor: scenario description changed\n");
 }
 
 }  // namespace o1602::app

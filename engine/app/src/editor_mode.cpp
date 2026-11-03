@@ -448,6 +448,7 @@ EditorModel MapViewer::editor_model() const {
     editor_players_model(m);
     editor_rules_model(m);
     editor_goals_model(m);
+    editor_scenario_model(m);
     m.terrain_selected = m_editor->selection.has_value();
     m.clip_width = m_editor->clip.width;
     m.clip_height = m_editor->clip.height;
@@ -611,6 +612,10 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::GoalStep:
         case Kind::MissionText:
             editor_goals_request(request);
+            break;
+        case Kind::ScenarioStep:
+        case Kind::ScenarioText:
+            editor_scenario_request(request);
             break;
         case Kind::TerrainCopy: {
             const auto& sel = m_editor->selection;

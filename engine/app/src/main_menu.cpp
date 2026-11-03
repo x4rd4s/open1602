@@ -361,6 +361,25 @@ std::vector<MenuScenario> own_scenario_list(const std::filesystem::path& folder,
     if (out.empty()) {
         return out;
     }
+    // A scenario of the editor shows the name, stars and introduction of its description (SCNI) in
+    // the player's language, where it has them; it is still found by its file's name.
+    for (MenuScenario& s : out) {
+        if (s.files.size() != 1 || lower(core::path_to_utf8(s.files.front().second.extension())) != ".o1602") {
+            continue;
+        }
+        const auto head = core::read_file_head(s.files.front().second, sim::kSaveInfoHead);
+        const auto info = head ? sim::save_info(head->bytes, head->size) : core::Result<sim::SaveInfo>(head.error());
+        if (!info || !info->meta || !info->meta->scenario) {
+            continue;
+        }
+        const sim::ScenarioInfo& scenario = *info->meta->scenario;
+        s.header.ranking = scenario.stars;
+        const std::string_view language = ui::current_language();
+        if (const std::string_view name = sim::scenario_text(scenario.names, language); !name.empty()) {
+            s.name = utf8_to_cp1252(name);
+        }
+        s.briefing = utf8_to_cp1252(sim::scenario_text(scenario.briefings, language));
+    }
     std::stable_sort(out.begin(), out.end(),
                      [](const MenuScenario& a, const MenuScenario& b) { return lower(a.name) < lower(b.name); });
     MenuScenario head;
@@ -616,7 +635,8 @@ bool MainMenu::open_mission(std::string_view name) {
     }
     load_scenarios();
     for (std::size_t i = 0; i < m_scenarios.size(); ++i) {
-        if (!m_scenarios[i].separator && lower(m_scenarios[i].name) == lower(name)) {
+        const MenuScenario& s = m_scenarios[i];
+        if (!s.separator && (lower(s.name) == lower(name) || lower(core::path_to_utf8(s.base)) == lower(name))) {
             select_scenario(i);
             m_screen = Screen::Mission;
             return true;
@@ -648,8 +668,17 @@ void MainMenu::load_details() {
         part < s.package_parts.size() && !s.package_parts[part].briefing.empty()) {
         m_briefing = s.package_parts[part].briefing;
     }
+    // A scenario of the editor: the introduction of its description, read whole (the list read
+    // only the head of the file).
+    if (m_briefing.empty() && lower(core::path_to_utf8(chosen_file().extension())) == ".o1602") {
+        if (const auto head = core::read_file_head(chosen_file(), sim::kScenarioHead)) {
+            if (const auto info = sim::scenario_info_of(head->bytes, head->size)) {
+                m_briefing = utf8_to_cp1252(sim::scenario_text(info->briefings, ui::current_language()));
+            }
+        }
+    }
     std::optional<core::Bytes> map_bytes;
-    if (m_briefing.empty()) {
+    if (m_briefing.empty() && lower(core::path_to_utf8(chosen_file().extension())) != ".o1602") {
         if (auto read = core::read_file(chosen_file())) {
             map_bytes = std::move(read).value();
         }

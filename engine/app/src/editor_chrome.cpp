@@ -195,6 +195,8 @@ const char* EditorChrome::command_text(EditorCommand command) noexcept {
             return "editor.rules.edit";
         case EditorCommand::Goals:
             return "editor.goals.edit";
+        case EditorCommand::Scenario:
+            return "editor.scenario.edit";
         case EditorCommand::Check:
             return "editor.check";
         case EditorCommand::Keys:
@@ -232,7 +234,7 @@ std::vector<EditorChrome::MenuEntry> EditorChrome::entries(std::size_t menu, con
         case 4:
             return {{EditorCommand::Players, true}};
         case 5:
-            return {{EditorCommand::Rules, true}, {EditorCommand::Goals, true}};
+            return {{EditorCommand::Scenario, true}, {EditorCommand::Rules, true}, {EditorCommand::Goals, true}};
         case 6:
             return {{EditorCommand::Check, true}};
         default:
