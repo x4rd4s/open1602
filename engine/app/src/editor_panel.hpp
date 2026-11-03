@@ -581,6 +581,7 @@ private:
     std::int32_t m_screen_h = 0;
     std::int32_t m_column_x = 0;        ///< where the column begins in the window
     Page m_laid_page = Page::Document;  ///< the page laid out last
+    std::int32_t m_check_h = 580;       ///< the height the check list's dialog wants
     bool m_previewing = false;          ///< the dice preview, as laid out last (its page is the column's)
 };
 

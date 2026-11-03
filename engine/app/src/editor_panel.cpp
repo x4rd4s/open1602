@@ -460,7 +460,11 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
     constexpr std::int32_t kBars = 26 + 24;
     const std::int32_t room_w = m_screen_w - kToolBar - 16;
     const std::int32_t room_h = m_screen_h - kBars - 16;
-    const std::int32_t want = m_page == P::PlayerName ? 230 : m_page == P::WorldSize ? 440 : wide ? 620 : 580;
+    const std::int32_t want = m_page == P::PlayerName  ? 230
+                              : m_page == P::WorldSize ? 440
+                              : m_page == P::Check     ? m_check_h
+                              : wide                   ? 620
+                                                       : 580;
     const std::int32_t w = std::max(kWidth, std::min(room_w, wide ? kWideDialog : kNarrowDialog));
     const std::int32_t h = std::max(200, std::min(room_h, want));
     return Rect{kToolBar + 8 + (room_w - w) / 2 - m_column_x, 26 + 8 + (room_h - h) / 2, w, h};
@@ -479,6 +483,14 @@ void EditorPanel::layout(const EditorModel& model) {
         m_form.panel(Rect{m_x - 6, m_top, kWidth - 2 * (m_x - 6), m_height});
         layout_preview(model);
         return;
+    }
+    if (m_page == Page::Check) {
+        // The check list's dialog as tall as its lines (up to its room; then it has pages).
+        std::int32_t h = 16 + 6 + 32 + 4 + 2 * (kButtonH + kGap);
+        for (const EditorCheckLine& line : model.check) {
+            h += line.kind == EditorCheckLine::Kind::Heading ? 2 * 20 + 2 : 3 * 20;
+        }
+        m_check_h = h;
     }
     if (dialog()) {
         // A page of the whole map: a dialog in the window's middle, laid out inside its frame.
@@ -1394,8 +1406,10 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const std::size_t a = m_first + row;
         const EditorPlayer& p = model.player_slots[a];
-        f.label(Rect{m_x, y, 30, kButtonH}, count(a + 1), Align::Right, Tone::Dim);
-        f.label(Rect{m_x + 32, y, kNames - 32 - kGap, kButtonH}, p.name, Align::Left, Tone::Normal);
+        // The number, and the player's own name or else its colour (the colour's name is shorter).
+        f.label(Rect{m_x, y, 40, kButtonH}, count(a + 1), Align::Right, Tone::Dim);
+        f.label(Rect{m_x + 42, y, kNames - 42 - kGap, kButtonH}, p.own_name.empty() ? p.colour : p.own_name,
+                Align::Left, Tone::Normal);
         for (std::size_t c = 0; c < shown; ++c) {
             const std::size_t b = m_first_column + c;
             const Rect r{m_x + kNames + static_cast<std::int32_t>(c) * (cell + 2), y, cell, kButtonH};
