@@ -1532,23 +1532,32 @@ void MapViewer::editor_make_room(std::int64_t x0, std::int64_t y0, std::int64_t 
         editor_islands_changed();
         m_editor->stroke = std::make_unique<editor::TerrainStroke>(m_state->world, m_buildings);
     };
-    if (island && world.island_use(*island) == sim::World::IslandUse::None) {
+    // Set when land of another island lies close to the brush but one of the two has cities or
+    // buildings: such islands keep their shape, so they are not joined, and the notice says so.
+    std::optional<std::size_t> unjoined;
+    if (island) {
         // Land of another island close to the brush: both become one island first, so that the
         // coast between them is laid as one.
         constexpr std::int64_t kJoin = 3;
+        const bool free = world.island_use(*island) == sim::World::IslandUse::None;
         std::optional<std::size_t> other;
         for (std::int64_t y = std::max<std::int64_t>(0, y0 - kJoin); y <= std::min(H - 1, y1 + kJoin) && !other; ++y) {
             for (std::int64_t x = std::max<std::int64_t>(0, x0 - kJoin); x <= std::min(W - 1, x1 + kJoin); ++x) {
                 const sim::World::Cell& at = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
-                if (at.island == sim::World::kSea || at.island == *island ||
-                    world.island_use(at.island) != sim::World::IslandUse::None) {
+                if (at.island == sim::World::kSea || at.island == *island) {
                     continue;
                 }
                 const sim::MapCell& top = world.islands()[at.island].map.top(at.local_x, at.local_y);
                 const assets::BuildingType* b = top.empty() ? nullptr : m_buildings.by_sprite(top.sprite);
-                if (b != nullptr && editor::terrain_level(*b) > 0) {
+                if (b == nullptr || editor::terrain_level(*b) == 0) {
+                    continue;
+                }
+                if (free && world.island_use(at.island) == sim::World::IslandUse::None) {
                     other = at.island;
                     break;
+                }
+                if (!unjoined) {
+                    unjoined = at.island;
                 }
             }
         }
@@ -1573,10 +1582,22 @@ void MapViewer::editor_make_room(std::int64_t x0, std::int64_t y0, std::int64_t 
         const std::int64_t iy0 = isl.y;
         const std::int64_t ix1 = ix0 + isl.map.width() - 1;
         const std::int64_t iy1 = iy0 + isl.map.height() - 1;
+        const auto refuse_join = [&] {
+            if (unjoined) {
+                const std::size_t built =
+                    world.island_use(*island) != sim::World::IslandUse::None ? *island : *unjoined;
+                std::string text = ui::tr("editor.terrain.refused.join", {number(built + 1)});
+                if (m_editor->notice != text) {  // a stroke asks again at every step
+                    editor_notice(std::move(text), true, "islands not joined");
+                }
+            }
+        };
         if (nx0 >= ix0 && ny0 >= iy0 && nx1 <= ix1 && ny1 <= iy1) {
+            refuse_join();
             return;  // room enough
         }
         if (world.island_use(*island) != sim::World::IslandUse::None) {
+            refuse_join();
             return;  // an island with cities keeps its size; the brush stops at its edge
         }
         const auto grow = [&](std::int64_t more) {
@@ -1598,7 +1619,11 @@ void MapViewer::editor_make_room(std::int64_t x0, std::int64_t y0, std::int64_t 
             return;
         }
         restart(std::move(op).value());
-        editor_notice(ui::tr("editor.terrain.grown", {number(*island + 1)}), false, "island grown");
+        if (unjoined) {
+            refuse_join();
+        } else {
+            editor_notice(ui::tr("editor.terrain.grown", {number(*island + 1)}), false, "island grown");
+        }
         return;
     }
     // Open sea: a new island about the brush, as large as the smallest the editor makes.

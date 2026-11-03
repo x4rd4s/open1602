@@ -599,6 +599,20 @@ TEST_CASE("editor terrain: copy, turn, mirror and paste terrain; the coast clean
         }
     }
 
+    // A piece on the copy's shore is not laid: the coast keeps its own pieces there. A mountain
+    // has no mirrored picture and is left out of a mirrored copy.
+    op->revert(world);
+    editor::TerrainClip hill = clip;
+    hill.pieces.push_back({kMountain, 0, 4, 4});
+    CHECK(editor::mirrored(hill, buildings).pieces.size() == clip.pieces.size());
+    editor::TerrainClip shore = clip;
+    shore.pieces.push_back({kGrass, 0, 3, 3});
+    editor::TerrainStroke edge(world, buildings);
+    CHECK(edge.paste(2, 8, 8, shore, 9));
+    (void)edge.finish("terrain_paste");
+    CHECK(id_at(2, 11, 11) != kGrass);
+    CHECK(id_at(2, 14, 13) == kGrass);
+
     // A stray beach tile inland: the clean-up lays meadow there.
     REQUIRE(world.island(1).map.place(*buildings.by_id(kBeach), 14, 16, 0, 0).ok());
     editor::TerrainStroke tidy(world, buildings);

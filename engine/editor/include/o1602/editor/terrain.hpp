@@ -236,7 +236,8 @@ struct SeaTile {
 /// The copy turned a quarter clockwise, as World::rotate_island turns an island.
 [[nodiscard]] TerrainClip turned(const TerrainClip& clip, const assets::BuildingTable& buildings);
 /// The copy mirrored left to right. A piece that turns is mirrored by its turn; one that cannot
-/// turn keeps its picture.
+/// turn keeps its picture. Rivers, slopes and pieces of several tiles have no mirrored pictures and
+/// are left out (meadow where they were).
 [[nodiscard]] TerrainClip mirrored(const TerrainClip& clip, const assets::BuildingTable& buildings);
 
 /// The sides of the square brushes, in tiles.

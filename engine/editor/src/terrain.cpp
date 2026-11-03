@@ -945,6 +945,22 @@ bool TerrainStroke::paste(std::uint16_t island, std::int64_t x, std::int64_t y, 
         if (!water(*m_buildings, now) && record_of(*m_buildings, now) == b && (now.rotation & 3U) == p.rotation) {
             continue;
         }
+        // Only on the land inland as the coast was laid here: not on beach, surf or water (a tile
+        // beyond the island or refused, where the copy's land did not go).
+        std::uint32_t fw = 1;
+        std::uint32_t fh = 1;
+        sim::rotated_size(*b, p.rotation, fw, fh);
+        bool inland = px + fw <= w && py + fh <= h;
+        for (std::uint32_t dy = 0; inland && dy < fh; ++dy) {
+            for (std::uint32_t dx = 0; inland && dx < fw; ++dx) {
+                const assets::BuildingType* there = record_of(
+                    *m_buildings, map.top(static_cast<std::uint32_t>(px) + dx, static_cast<std::uint32_t>(py) + dy));
+                inland = there != nullptr && terrain_level(*there) == 2;
+            }
+        }
+        if (!inland) {
+            continue;
+        }
         changed = stamp(island, px, py, *b, p.rotation) || changed;
     }
     m_shaping = false;
@@ -1038,6 +1054,12 @@ TerrainClip mirrored(const TerrainClip& clip, const assets::BuildingTable& build
         std::uint32_t fw = 1;
         std::uint32_t fh = 1;
         sim::rotated_size(*b, p.rotation, fw, fh);
+        // Rivers, slopes and pieces of several tiles (mountains) have no mirrored pictures: their
+        // tiles stay land without a piece, which paste() lays as meadow.
+        const auto group = terrain_group(buildings, *b);
+        if (fw != 1 || fh != 1 || group == TerrainGroup::River || group == TerrainGroup::Slope) {
+            continue;
+        }
         // Mirrored left to right a picture facing east faces west: the turns 1 and 3 change places.
         const auto rotation =
             b->rotate > 0 ? static_cast<std::uint8_t>((4U - p.rotation) & 3U) : static_cast<std::uint8_t>(p.rotation);
