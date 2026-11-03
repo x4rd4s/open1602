@@ -1,16 +1,62 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/core/result.hpp"
 
 namespace o1602::assets {
+
+/// A set of player slots, bit p = slot p, with no upper limit: as many 32-bit words as the highest
+/// slot needs. The original keeps such sets in one byte (8 slots); Open1602 is not bound to its
+/// number of players (ADR 0007). Trailing zero words are never kept, so equal sets compare equal.
+class SlotSet {
+public:
+    SlotSet() = default;
+    /// Slots 0..31 from the bits of `low`, as in the original's byte or Open1602's first word.
+    SlotSet(std::uint32_t low) {  // NOLINT(google-explicit-constructor): a byte of the files
+        if (low != 0) {
+            m_words.push_back(low);
+        }
+    }
+    /// From the words of word(0), word(1), ...
+    [[nodiscard]] static SlotSet from_words(std::vector<std::uint32_t> words) {
+        while (!words.empty() && words.back() == 0) {
+            words.pop_back();
+        }
+        SlotSet set;
+        set.m_words = std::move(words);
+        return set;
+    }
+
+    [[nodiscard]] bool contains(std::size_t slot) const noexcept {
+        const std::size_t w = slot / 32;
+        return w < m_words.size() && (m_words[w] >> (slot % 32) & 1U) != 0;
+    }
+    void insert(std::size_t slot) {
+        const std::size_t w = slot / 32;
+        if (w >= m_words.size()) {
+            m_words.resize(w + 1, 0);
+        }
+        m_words[w] |= 1U << (slot % 32);
+    }
+    [[nodiscard]] bool empty() const noexcept { return m_words.empty(); }
+    /// The bits of slots 32 i .. 32 i + 31; 0 beyond the last word.
+    [[nodiscard]] std::uint32_t word(std::size_t i) const noexcept { return i < m_words.size() ? m_words[i] : 0; }
+    [[nodiscard]] const std::vector<std::uint32_t>& words() const noexcept { return m_words; }
+
+    friend bool operator==(const SlotSet&, const SlotSet&) = default;
+
+private:
+    std::vector<std::uint32_t> m_words;
+};
 
 /// Fields of the INSEL3 / INSEL4 / INSEL5 chunk that are verified so far. See docs/formats/scp.md.
 struct IslandHeader {
@@ -39,8 +85,8 @@ struct IslandHeader {
         std::uint16_t x = 0;    ///< origin tile of the mountain it lies in (one byte in the original's)
         std::uint16_t y = 0;
         /// Byte 3: bit p = player slot p knows the deposit (explored it, or a computer bound it to
-        /// a mountain of its own. 32 bits in Open1602.
-        std::uint32_t mask = 0;
+        /// a mountain of its own). Any number of slots in Open1602.
+        SlotSet mask;
         std::uint8_t kind = 0;     ///< 0 big vein, 1 small vein
         std::uint16_t amount = 0;  ///< left, 1/32 t
     };
