@@ -359,6 +359,8 @@ std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const E
             return press(kScenarioPage, model, true);
         case EditorCommand::Check:
             return press(kCheck, model, true);
+        case EditorCommand::TestPlay:
+            return EditorRequest{EditorRequest::Kind::TestPlay};
         case EditorCommand::Keys:
             return EditorRequest{EditorRequest::Kind::ShowKeys};
     }

@@ -224,6 +224,8 @@ public:
     /// The first key of `action` in the editor's context, as the overview names it ("Ctrl+S");
     /// empty: none.
     [[nodiscard]] std::string editor_keys(ui::KeyAction action) const;
+    /// The first key of `action` in the game's general context, as the overview names it; empty: none.
+    [[nodiscard]] std::string key_of(ui::KeyAction action) const;
 
 private:
     /// The keys of ADR 0010.

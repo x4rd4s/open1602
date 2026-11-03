@@ -17,7 +17,7 @@ passes. Only the pictures go on as they do (water, flags).
 
 The editor has a frame of its own around the map instead of the game's panel:
 
-- **The menu bar** above the map: **File** (new map, open, save, save as, leave the editor), **Edit**
+- **The menu bar** above the map: **File** (new map, open, save, save as, test play, leave the editor), **Edit**
   (undo, redo), **View** (the overlays), **Map** (islands, map size, random elements, dice preview),
   **Players**, **Scenario** (description, rules, goals), **Check** and **Help** (the keys). The menus name each command's key. At
   its right end it shows the map's name, with `*` while it has changes that are not saved.
@@ -322,12 +322,28 @@ there are, a target player who starts without the cities the loss conditions ask
 | Right button dragged | Land, Water, the brush and Random fill draw the other way (water for land) |
 | Right click | Puts back what is in hand (an island being placed, an object) |
 | Shift and Build dragged | Places along a straight row |
+| F5 | Test play; in the test game F5 leads back |
 | F1 | The keys |
 | Escape | Closes a menu, or goes back from a page of the column |
 
 The view's keys are those of the game (WASD and the arrows, Q and E, Page Up and Page Down, F12 for a
 screenshot, F11 for the full screen). F1 shows the keys the editor knows. All of them can be changed
 in `keys.cfg`; the editor's are in the context `editor`.
+
+## Test play
+
+**Test play** (menu File, F5) starts a game of the map as it is now, as the scenario list would
+start it from its file: with the scenario's rules, its random elements rolled, the missions held
+as set. Nothing has to be saved first. In the test game F5 (the quick save's key) leads back to
+the editor as it was: the same map, its undo and the same view. The main menu's **Editor** leads
+back too, also after another game was loaded meanwhile. The test game is not saved automatically.
+
+## Recovery
+
+A minute after a change, and before every test game, the editor keeps a copy of the map in the
+user's data folder (`editor-recovery.o1602`). It goes once the map is saved or its changes are
+discarded. If the editor ended without either (a crash, a power cut), the next time the editor is
+opened from the main menu it offers the copy. A recovered map counts as not saved until it is.
 
 ## Files
 

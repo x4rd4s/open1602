@@ -149,6 +149,7 @@ enum class EditorCommand : std::uint8_t {
     Rules,
     Goals,
     Check,
+    TestPlay,
     Keys,
 };
 
@@ -465,6 +466,8 @@ struct EditorRequest {
         /// or the one before (0): the stars, keeping to the original's limits.
         ScenarioStep,
         ScenarioText,  ///< the row `index` (EditorScenarioRow) of the description as `name`
+        TestPlay,      ///< a game of the map as it is now; F5 in it leads back
+        Recover,       ///< the map kept by the editor's recovery, opened instead of the new one
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;

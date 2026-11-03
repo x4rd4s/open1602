@@ -168,6 +168,7 @@ bool MapInput::editor_key(ui::KeyAction action) noexcept {
         case KeyAction::EditorRotate:
         case KeyAction::EditorBrushBigger:
         case KeyAction::EditorBrushSmaller:
+        case KeyAction::EditorTestPlay:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:
@@ -298,6 +299,7 @@ void MapInput::setup_keys() {
     editor(chord(SDLK_KP_PLUS), KeyAction::EditorBrushBigger);
     editor(chord(SDLK_MINUS), KeyAction::EditorBrushSmaller);
     editor(chord(SDLK_KP_MINUS), KeyAction::EditorBrushSmaller);
+    editor(chord(SDLK_F5), KeyAction::EditorTestPlay);
     // The tools: keys that the view's (W A S D, Q, E by their place) leave free.
     editor(chord(SDLK_V), KeyAction::EditorToolSelect);
     editor(chord(SDLK_I), KeyAction::EditorToolIsland);
@@ -400,6 +402,15 @@ void MapInput::show_key_help() {
 std::string MapInput::editor_keys(ui::KeyAction action) const {
     for (const ui::KeyBinding& b : m_keys.all()) {
         if (b.action == action && b.context == ui::KeyContext::Editor) {
+            return key_label(b.chord);
+        }
+    }
+    return {};
+}
+
+std::string MapInput::key_of(ui::KeyAction action) const {
+    for (const ui::KeyBinding& b : m_keys.all()) {
+        if (b.action == action && b.context == ui::KeyContext::General) {
             return key_label(b.chord);
         }
     }
@@ -734,6 +745,7 @@ void MapInput::run_action(const ui::KeyBinding& b) {
         case KeyAction::EditorRotate:
         case KeyAction::EditorBrushBigger:
         case KeyAction::EditorBrushSmaller:
+        case KeyAction::EditorTestPlay:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:

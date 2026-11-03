@@ -91,6 +91,7 @@ constexpr std::pair<KeyAction, std::string_view> kNames[] = {
     {KeyAction::EditorRotate, "editor_rotate"},
     {KeyAction::EditorBrushBigger, "editor_brush_bigger"},
     {KeyAction::EditorBrushSmaller, "editor_brush_smaller"},
+    {KeyAction::EditorTestPlay, "editor_test_play"},
     {KeyAction::EditorToolSelect, "editor_tool_select"},
     {KeyAction::EditorToolIsland, "editor_tool_island"},
     {KeyAction::EditorToolPlaceholder, "editor_tool_placeholder"},

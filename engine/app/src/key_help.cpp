@@ -81,6 +81,7 @@ KeyHelpPlace key_help_place(KeyAction action) noexcept {
         case KeyAction::EditorRotate:
         case KeyAction::EditorBrushBigger:
         case KeyAction::EditorBrushSmaller:
+        case KeyAction::EditorTestPlay:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:

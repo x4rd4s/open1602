@@ -28,6 +28,7 @@ dialog.demolish_land = Demolish it?\n{1} houses and {2} other buildings lose the
 # Notes in the status line
 # {1}: the file's name
 notice.game_saved = Game saved: {1}
+notice.test_play = Test game of the map: {1} leads back to the editor.
 notice.game_loaded = Game loaded: {1}
 notice.screenshot_saved = Screenshot saved: {1}
 # {1}: what went wrong
@@ -183,6 +184,7 @@ keys.action.editor_save_as = Editor: save as
 keys.action.editor_rotate = Editor: turn the piece or object
 keys.action.editor_brush_bigger = Editor: larger brush
 keys.action.editor_brush_smaller = Editor: smaller brush
+keys.action.editor_test_play = Editor: test play and back
 keys.action.editor_tool_select = Editor: Select
 keys.action.editor_tool_island = Editor: Island from a template or of its own shape
 keys.action.editor_tool_placeholder = Editor: Placeholder island
@@ -1101,6 +1103,12 @@ editor.new = New map
 editor.open = Open
 editor.save = Save
 editor.save_as = Save as
+editor.test_play = Test play
+editor.test_play.failed = The test game could not start: {1}
+editor.test_play.back = Back from the test game.
+editor.recover.ask = The editor last ended without saving "{1}". Recover the changes?
+editor.recover.new_map = the new map
+editor.recover.done = Recovered. Not saved yet.
 editor.undo = Undo
 editor.redo = Redo
 editor.close = Leave the editor

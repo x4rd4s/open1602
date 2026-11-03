@@ -102,6 +102,7 @@ enum class KeyAction : std::uint16_t {
     EditorRotate,        ///< the piece or object in hand a quarter on
     EditorBrushBigger,   ///< the terrain brush one size larger
     EditorBrushSmaller,  ///< and smaller
+    EditorTestPlay,      ///< a game of the map as it is, and back (ADR 0013)
     /// The tools of the tool bar, in its order (app::EditorTool): EditorToolSelect + the tool.
     EditorToolSelect,
     EditorToolIsland,
