@@ -608,10 +608,11 @@ void EditorPanel::note_and_back(const EditorModel& model, std::int32_t y, const 
     const std::int32_t foot = std::max(y, m_top + m_height - 4 - kButtonH);
     const std::int32_t lines = std::clamp((foot - 4 - y) / 20, 0, 4);
     if (lines > 0) {
-        // Three lines take the whole note, fewer its first sentence alone: none is cut off.
-        const std::string note = !model.notice.empty() ? model.notice : ui::tr(lines >= 3 ? note_key : short_key);
-        f.paragraph(Rect{kX, y, kW, lines * 20}, note,
-                    !model.notice.empty() && model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
+        // Where the whole note does not fit, its first sentence alone: none is cut off.
+        const bool notice = !model.notice.empty();
+        const std::string note = notice ? model.notice : ui::tr(note_key);
+        f.paragraph(Rect{kX, y, kW, lines * 20}, note, notice && model.notice_is_error ? Tone::Warning : Tone::Dim, 20,
+                    notice ? std::string() : ui::tr(short_key));
     }
     f.button(back, Rect{kX, foot, kW, kButtonH}, ui::tr(back_key));
 }

@@ -429,7 +429,7 @@ private:
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
     void layout_relations(const EditorModel& model);
-    /// The notice (or the note `note_key`, `short_key` where fewer than three lines fit) from `y`
+    /// The notice (or the note `note_key`, `short_key` where it does not fit whole) from `y`
     /// down and the button `back` labelled `back_key` at the panel's foot.
     void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,
                        ui::Form::Id back, const char* back_key);
