@@ -274,6 +274,55 @@ TEST_CASE("side panel build menu: another category puts its building in hand whe
     CHECK(a->kind == BuildPanel::Action::Kind::Off);
 }
 
+TEST_CASE("side panel build menu: with a pop-up open, one press opens another category") {
+    Build b;
+    // A press and release on the workshops' button, the mouse not moving in between: the pop-up
+    // takes the release, the button is let go of all the same.
+    const auto [wx, wy] = centre(b.panel.panel(), kWorkshops);
+    bool consumed = false;
+    (void)b.panel.mouse(wx, wy, true, b.available, consumed);
+    (void)b.panel.mouse(wx, wy, false, b.available, consumed);
+    REQUIRE(b.panel.popup_open());
+    REQUIRE(b.panel.popup_category() == kWorkshops);
+    // The next press on the roads (no move first, the pop-up had the mouse) opens them at once.
+    const auto [rx, ry] = centre(b.panel.panel(), kRoads);
+    const auto a = b.panel.mouse(rx, ry, true, b.available, consumed);
+    CHECK(consumed);
+    REQUIRE(a.has_value());
+    CHECK(a->kind == BuildPanel::Action::Kind::Pick);
+    CHECK(a->building == kDirtRoad);
+    CHECK(b.panel.popup_open());
+    CHECK(b.panel.popup_category() == kRoads);
+}
+
+TEST_CASE("side panel build menu: a right click deselects the category, the menu picks it up again") {
+    Build b;
+    (void)b.press(kWorkshops);
+    REQUIRE(b.release_on(1).has_value());  // the smith in hand
+    (void)b.press(kWorkshops);
+    REQUIRE(b.panel.popup_open());
+    // Deselected: the pop-up closes, nothing is in hand, the panel shows no building.
+    CHECK(b.panel.deselect());
+    CHECK(b.panel.deselected());
+    CHECK(!b.panel.popup_open());
+    CHECK(!b.panel.panel().selected(kWorkshops));
+    CHECK(!b.panel.current(b.available).has_value());
+    CHECK(!b.panel.demolish());
+    b.refresh();
+    CHECK(!shows(b.panel.panel(), "Schmied"));
+    CHECK(!b.panel.deselect());  // nothing more to deselect: the next right click leaves the menu
+    // A category pressed now puts its building in hand.
+    auto a = b.press(kRoads);
+    REQUIRE(a.has_value());
+    CHECK(a->building == kDirtRoad);
+    CHECK(b.panel.deselect());
+    // The build menu opened again picks up the category deselected last, with its building.
+    b.panel.reselect();
+    CHECK(!b.panel.deselected());
+    CHECK(b.panel.panel().selected(kRoads));
+    CHECK(b.panel.current(b.available) == kDirtRoad);
+}
+
 TEST_CASE("side panel build menu: the blueprint switch goes back to the building in hand and names it") {
     Build b;
     (void)b.press(kWorkshops);
