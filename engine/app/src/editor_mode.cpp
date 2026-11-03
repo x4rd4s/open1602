@@ -43,7 +43,7 @@ std::pair<std::uint8_t, std::uint8_t> new_island_climate(const sim::World& world
     if (choice >= 2 && choice - 2U < climates.size()) {
         return {static_cast<std::uint8_t>(climates[choice - 2U].like & 1U), static_cast<std::uint8_t>(choice - 1U)};
     }
-    return {static_cast<std::uint8_t>(choice & 1U), 0};
+    return {static_cast<std::uint8_t>(choice & 1U), std::uint8_t{0}};
 }
 
 constexpr std::string_view kScenarioEnding = ".o1602";
