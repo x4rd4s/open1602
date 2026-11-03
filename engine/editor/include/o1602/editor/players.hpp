@@ -56,8 +56,8 @@ struct PlayerValues {
 
 /// A new computer player in the next slot (sim::player_slot), with the first free banner, the money
 /// of the first computer and nothing else: without a city or a ship it is out of the game (defeated)
-/// as soon as it starts, unless the scenario gives it one; at peace with everyone. The relations of the others stay. Fails (LimitExceeded) with
-/// sim::kMaxPlayers players.
+/// as soon as it starts, unless the scenario gives it one; at peace with everyone. The relations
+/// of the others stay. Fails (LimitExceeded) with sim::kMaxPlayers players.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world);
 
 /// Takes the last player slot away (the highest of player_slots()), and the empty slots before it
