@@ -619,7 +619,7 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     m.object_group = "Farms";
     m.object_name = "Cattle farm";
     m.object_owner = "Merchant";
-    CHECK(!click(panel, m, "Edit buildings").has_value());
+    CHECK(!click(panel, m, "Buildings, ships, units").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Objects);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Cattle farm (1/4)"));
@@ -631,6 +631,9 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     auto r = click(panel, m, "Build");
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::Objects);
+    CHECK(r->objects.tool == app::EditorObjects::Tool::Ship);
+    r = click(panel, m, "Build", ui::MouseButton::Right);
+    REQUIRE(r.has_value());
     CHECK(r->objects.tool == app::EditorObjects::Tool::Remove);
 
     m.objects.piece = 2;
@@ -676,6 +679,57 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     CHECK(says(panel, "no players to build for"));
     CHECK(!click(panel, m, "Back to the map").has_value());
     CHECK(panel.page() == EditorPanel::Page::Document);
+}
+
+TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they face and the owner") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.object_groups = 7;
+    m.object_group = "Farms";
+    m.object_owner = "Merchant";
+    m.objects.tool = app::EditorObjects::Tool::Ship;
+    m.objects.piece = 2;
+    m.objects.ship = 1;
+    m.object_pieces = 5;
+    m.object_name = "Large trading ship";
+    m.object_turns = true;
+    CHECK(!click(panel, m, "Buildings, ships, units").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Objects);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Large trading ship (2/5)"));
+    CHECK(says(panel, "new, empty ship"));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "Farms") {
+            CHECK(!w.enabled);  // no groups for ships
+        }
+        CHECK(w.rect.y + w.rect.h <= 760);
+    }
+    // The type steps the ship, not the building, and keeps the way it faces.
+    m.objects.rotation = 2;
+    auto r = click(panel, m, "Large trading ship (2/5)");
+    REQUIRE(r.has_value());
+    CHECK(r->objects.ship == 2);
+    CHECK(r->objects.piece == 2);
+    CHECK(r->objects.rotation == 2);
+    r = click(panel, m, "180\xB0");
+    REQUIRE(r.has_value());
+    CHECK(r->objects.rotation == 3);
+    r = click(panel, m, "Merchant");
+    REQUIRE(r.has_value());
+    CHECK(r->objects.owner == 1);
+
+    m.objects.tool = app::EditorObjects::Tool::Unit;
+    m.objects.unit = 0;
+    m.object_pieces = 4;
+    m.object_name = "Musketeer";
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "land unit of the owner"));
+    r = click(panel, m, "Musketeer (1/4)", ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->objects.unit == 3);
+    CHECK(r->objects.ship == 1);
 }
 
 TEST_CASE("editor panel: the kind of islands of a new map and the packages' climates") {
