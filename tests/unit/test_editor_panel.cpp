@@ -771,7 +771,7 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
     CHECK(r->index == 0);
 
     // The name, typed over the old one; Enter renames, back on the selection.
-    CHECK(!click(panel, m, "Rename").has_value());
+    CHECK(!click(panel, m, "Name").has_value());
     CHECK(panel.page() == EditorPanel::Page::CityName);
     CHECK(panel.typing());
     CHECK(!panel.show_selection());  // a click on the map keeps the name being typed

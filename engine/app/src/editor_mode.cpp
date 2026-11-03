@@ -623,7 +623,8 @@ namespace {
 
 /// Whether the panel's page is about what is picked: the selection, or a selected island's fertility.
 bool shows_pick(EditorPanel::Page page) {
-    return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility;
+    return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
+           page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.
