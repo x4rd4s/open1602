@@ -90,6 +90,18 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world) {
     return owners;
 }
 
+/// The name of a city the natives or pirates found in the editor; empty for the others, whose
+/// cities take the next of the list of cities.
+std::string own_city_name(const sim::World& world, sim::PlayerId owner) {
+    if (world.acts_as(owner, sim::FactionBehaviour::Natives)) {
+        return ui::tr("editor.city.natives");
+    }
+    if (world.acts_as(owner, sim::FactionBehaviour::Pirates)) {
+        return ui::tr("editor.city.pirates");
+    }
+    return {};
+}
+
 /// Why a building is not placed, in the player's language.
 std::string build_refusal(sim::BuildRefusal refusal) {
     using R = sim::BuildRefusal;
@@ -364,7 +376,8 @@ void MapViewer::editor_place_template(std::int64_t x, std::int64_t y) {
     }
     const std::size_t items = order->items.size();
     editor::PlacedBuildings placed =
-        editor::place_buildings(m_editor->document.world(), m_buildings, *order, m_city_names);
+        editor::place_buildings(m_editor->document.world(), m_buildings, *order, m_city_names,
+                                own_city_name(m_editor->document.world(), order->player));
     if (!placed.step) {
         if (!placed.plan.items.empty()) {
             editor_notice(build_refusal(placed.plan.items.front().refusal), true, "template refused");
@@ -447,7 +460,8 @@ bool MapViewer::editor_place_object(std::int64_t x, std::int64_t y, bool tell) {
         }
         return false;
     }
-    editor::PlacedBuildings placed = editor::place_buildings(m_state->world, m_buildings, *order, m_city_names);
+    editor::PlacedBuildings placed = editor::place_buildings(m_state->world, m_buildings, *order, m_city_names,
+                                                             own_city_name(m_state->world, order->player));
     if (!placed.step) {
         if (tell && !placed.plan.items.empty()) {
             editor_notice(build_refusal(placed.plan.items.front().refusal), true, "building refused");

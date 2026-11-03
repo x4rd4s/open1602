@@ -119,6 +119,10 @@ stand and red where not; a Kontor, shipyard, mill or mine finds the coast, river
 the mouse and turns to it. A refused click says why. A Kontor goes only once its city has nothing
 else, and its piers go with it.
 
+Each owner founds one city on an island, the natives and the pirates as well. Their cities are named
+after what they are ("Native village", "Pirates' nest", with a number from the second on); the
+others take the next name of the game's list of cities.
+
 A template is built as one step, each of its buildings as above; it hangs at the mouse by its
 middle, and the outline shows each of its buildings green where it can stand and red where not.
 
