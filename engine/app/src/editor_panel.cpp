@@ -86,7 +86,18 @@ constexpr Id kLandscape = 85;
 constexpr Id kCityNamePage = 86;
 constexpr Id kCityGoodsPage = 87;
 constexpr Id kCityOwner = 88;
-constexpr Id kCitySelection = 89;      ///< back from a city's page to the selection
+constexpr Id kCitySelection = 89;  ///< back from a city's page to the selection
+constexpr Id kPlayersPage = 90;
+constexpr Id kPlayerSlot = 91;
+constexpr Id kPlayerRole = 92;
+constexpr Id kPlayerColour = 93;
+constexpr Id kPlayerMoney = 94;
+constexpr Id kPlayerMonuments = 95;
+constexpr Id kPlayerArches = 96;
+constexpr Id kPlayerNamePage = 97;
+constexpr Id kPlayerAdd = 98;
+constexpr Id kPlayerRemove = 99;
+constexpr Id kPlayersBack = 160;       ///< back from a player's name to the page "Players"
 constexpr Id kFirstGoodLess = 120;     ///< + the row on the page "Stock"
 constexpr Id kFirstGoodMore = 140;     ///< + the row on the page "Stock"
 constexpr std::size_t kGoodRows = 20;  ///< rows of the page "Stock" at most
@@ -234,7 +245,8 @@ void EditorPanel::ask_name(std::string_view name) {
 }
 
 bool EditorPanel::show_selection() noexcept {
-    if (m_page == Page::New || m_page == Page::Open || m_page == Page::SaveAs || m_page == Page::CityName) {
+    if (m_page == Page::New || m_page == Page::Open || m_page == Page::SaveAs || m_page == Page::CityName ||
+        m_page == Page::PlayerName) {
         return false;
     }
     m_page = Page::Selection;
@@ -306,6 +318,12 @@ void EditorPanel::layout(const EditorModel& model) {
         case Page::CityGoods:
             layout_city_goods(model);
             break;
+        case Page::Players:
+            layout_players(model);
+            break;
+        case Page::PlayerName:
+            layout_player_name(model);
+            break;
     }
 }
 
@@ -361,7 +379,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
     full(kTerrainPage, "editor.terrain.edit");
     full(kObjectsPage, "editor.objects.edit");
     full(kWorldSizePage, "editor.world_size.edit");
-    full(kView, "editor.view");
+    pair(kPlayersPage, "editor.players.edit", true, kView, "editor.view", true);
     full(kClose, "editor.close");
     // The notice where two lines fit: in a small window the buttons take the room, and the status
     // bar shows it.
@@ -525,6 +543,73 @@ void EditorPanel::layout_city_name(const EditorModel& model) {
     const std::int32_t half = (kW - kGap) / 2;
     f.button(kStore, Rect{kX, y, half, kButtonH}, ui::tr("editor.city.rename_ok"), valid);
     f.button(kCitySelection, Rect{kX + half + kGap, y, half, kButtonH}, ui::tr("editor.cancel"));
+}
+
+void EditorPanel::layout_players(const EditorModel& model) {
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{kX, y, kW, 28}, ui::tr("editor.players.title"), Align::Left, Tone::Heading);
+    y += 28;
+    const std::size_t n = model.player_slots.size();
+    const EditorPlayer* p = n > 0 ? &model.player_slots[std::min(m_player, n - 1)] : nullptr;
+    const auto value = [&](Id id, const std::string& label, std::string text, bool enabled) {
+        f.label(Rect{kX, y, kW, 18}, label, Align::Left, enabled ? Tone::Normal : Tone::Dim);
+        y += 18;
+        f.cycle_button(id, Rect{kX, y, kW, kButtonH}, std::move(text), enabled);
+        y += kButtonH + 2;
+    };
+    const bool on = p != nullptr;
+    value(kPlayerSlot,
+          on ? ui::tr("editor.players.slot", {count(std::min(m_player, n - 1) + 1), count(n)})
+             : ui::tr("editor.players.slot", {"-", "-"}),
+          on ? p->name : ui::tr("editor.objects.no_owner"), on);
+    value(kPlayerRole, ui::tr("editor.players.role"),
+          ui::tr(on && p->human ? "editor.players.human" : "editor.players.computer"), on);
+    value(kPlayerColour, ui::tr("editor.players.colour"), on ? p->colour : std::string("-"), on);
+    value(kPlayerMoney, ui::tr("editor.players.money"),
+          on ? ui::tr("editor.players.money_value", {std::to_string(p->money)}) : std::string("-"), on);
+    const std::int32_t half = (kW - kGap) / 2;
+    f.label(Rect{kX, y, kW, 18}, ui::tr("editor.players.allowed"), Align::Left, on ? Tone::Normal : Tone::Dim);
+    y += 18;
+    f.cycle_button(kPlayerMonuments, Rect{kX, y, half, kButtonH},
+                   ui::tr("editor.players.monuments", {on ? count(p->monuments_allowed) : "-"}), on);
+    f.cycle_button(kPlayerArches, Rect{kX + half + kGap, y, kW - half - kGap, kButtonH},
+                   ui::tr("editor.players.arches", {on ? count(p->arches_allowed) : "-"}), on);
+    y += kButtonH + kGap;
+    f.button(kPlayerNamePage, Rect{kX, y, kW, kButtonH}, ui::tr("editor.players.rename"), on);
+    y += kButtonH + kGap;
+    f.button(kPlayerAdd, Rect{kX, y, half, kButtonH}, ui::tr("editor.players.add"), model.can_add_player);
+    f.button(kPlayerRemove, Rect{kX + half + kGap, y, kW - half - kGap, kButtonH}, ui::tr("editor.players.remove"),
+             model.can_remove_player);
+    y += kButtonH + kGap;
+    constexpr std::int32_t kPlayersNote = 3 * 20;
+    const std::string& note = !model.notice.empty() ? model.notice : ui::tr("editor.players.note");
+    f.paragraph(Rect{kX, y, kW, kPlayersNote}, note,
+                !model.notice.empty() && model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
+    y += kPlayersNote + 4;
+    f.button(kBack, Rect{kX, y, kW, kButtonH}, ui::tr("editor.back"));
+}
+
+void EditorPanel::layout_player_name(const EditorModel& model) {
+    if (model.player_slots.empty()) {
+        m_page = Page::Players;
+        layout_players(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{kX, y, kW, 28}, ui::tr("editor.players.rename_title"), Align::Left, Tone::Heading);
+    y += 34;
+    f.label(Rect{kX, y, kW, kLine}, ui::tr("editor.players.name"));
+    y += kLine;
+    f.field(kField, Rect{kX, y, kW, 32}, m_text);
+    y += 38;
+    f.paragraph(Rect{kX, y, kW, 2 * 20}, ui::tr("editor.players.name_note"), Tone::Dim, 20);
+    y += 2 * 20 + 4;
+    const bool valid = m_text.empty() || sim::valid_name(m_text, sim::CityOrder::kMaxNameLength);
+    const std::int32_t half = (kW - kGap) / 2;
+    f.button(kStore, Rect{kX, y, half, kButtonH}, ui::tr("editor.city.rename_ok"), valid);
+    f.button(kPlayersBack, Rect{kX + half + kGap, y, half, kButtonH}, ui::tr("editor.cancel"));
 }
 
 void EditorPanel::layout_city_goods(const EditorModel& model) {
@@ -910,6 +995,17 @@ std::vector<ui::DrawItem> EditorPanel::draw(const EditorModel& model,
 }
 
 std::optional<EditorRequest> EditorPanel::commit_name() {
+    if (m_page == Page::PlayerName) {
+        if (!m_text.empty() && !sim::valid_name(m_text, sim::CityOrder::kMaxNameLength)) {
+            return std::nullopt;
+        }
+        m_page = Page::Players;
+        m_form.set_focus(std::nullopt);
+        EditorRequest r{EditorRequest::Kind::SetPlayer};
+        r.index = 3;  // the name alone: the viewer takes the slot's other values
+        r.name = m_text;
+        return r;
+    }
     if (m_page == Page::CityName) {
         if (!sim::valid_name(m_text, sim::CityOrder::kMaxNameLength)) {
             return std::nullopt;
@@ -1171,6 +1267,59 @@ std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, 
         }
         case kStore:
             return commit_name();
+        case kPlayersPage:
+            m_page = Page::Players;
+            return std::nullopt;
+        case kPlayerSlot:
+            if (!model.player_slots.empty()) {
+                m_player = step(std::min(m_player, model.player_slots.size() - 1), model.player_slots.size(), forward);
+            }
+            return std::nullopt;
+        case kPlayerNamePage:
+            if (!model.player_slots.empty()) {
+                m_page = Page::PlayerName;
+                m_text = model.player_slots[std::min(m_player, model.player_slots.size() - 1)].own_name;
+                m_form.set_focus(kField);
+                m_form.select_all();
+            }
+            return std::nullopt;
+        case kPlayersBack:
+            m_page = Page::Players;
+            m_form.set_focus(std::nullopt);
+            return std::nullopt;
+        case kPlayerAdd:
+            m_player = model.player_slots.size();  // the new one
+            return EditorRequest{EditorRequest::Kind::AddPlayer};
+        case kPlayerRemove:
+            m_player = model.player_slots.size() > 1 ? model.player_slots.size() - 2 : 0;
+            return EditorRequest{EditorRequest::Kind::RemovePlayer};
+        case kPlayerRole:
+        case kPlayerColour:
+        case kPlayerMoney:
+        case kPlayerMonuments:
+        case kPlayerArches: {
+            if (model.player_slots.empty()) {
+                return std::nullopt;
+            }
+            EditorRequest r{EditorRequest::Kind::SetPlayer};
+            r.player = model.player_slots[std::min(m_player, model.player_slots.size() - 1)];
+            r.name = r.player.own_name;
+            EditorPlayer& p = r.player;
+            if (*id == kPlayerRole) {
+                p.human = !p.human;
+            } else if (*id == kPlayerColour) {
+                r.index = forward ? 1 : 2;  // the viewer steps the banner among the free ones
+            } else if (*id == kPlayerMoney) {
+                // 1000 a click, 10 000 above 50 000.
+                const std::int32_t stepped = p.money >= 50'000 || (!forward && p.money > 50'000) ? 10'000 : 1'000;
+                p.money = forward ? p.money + stepped : p.money - stepped;
+            } else if (*id == kPlayerMonuments) {
+                p.monuments_allowed = static_cast<std::uint16_t>(step(p.monuments_allowed, 10, forward));
+            } else {
+                p.arches_allowed = static_cast<std::uint16_t>(step(p.arches_allowed, 10, forward));
+            }
+            return r;
+        }
         case kCityNamePage:
             if (model.city) {
                 m_page = Page::CityName;
@@ -1295,6 +1444,9 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
         case 27:
             if (m_page == Page::CityName) {
                 m_page = Page::Selection;
+                m_form.set_focus(std::nullopt);
+            } else if (m_page == Page::PlayerName) {
+                m_page = Page::Players;
                 m_form.set_focus(std::nullopt);
             } else {
                 show_document();

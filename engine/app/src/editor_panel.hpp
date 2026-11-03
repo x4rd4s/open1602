@@ -154,6 +154,19 @@ struct EditorCity {
     std::vector<EditorGood> goods;  ///< the world's trade goods in the order panels list them
 };
 
+/// A human's or computer's slot as the page "Players" shows it.
+struct EditorPlayer {
+    std::uint8_t slot = 0;  ///< sim::PlayerId
+    std::string name;       ///< as the game shows it, Windows-1252
+    std::string own_name;   ///< its own, empty: the name of its colour
+    bool human = false;
+    std::uint16_t banner = 0;
+    std::int32_t money = 0;
+    std::uint16_t monuments_allowed = 0;
+    std::uint16_t arches_allowed = 0;
+    std::string colour;  ///< the banner's colour, Windows-1252
+};
+
 /// What the panel shows; the viewer fills it every frame.
 struct EditorModel {
     std::string file;  ///< the document's name (Windows-1252), empty: a new map not saved yet
@@ -238,6 +251,11 @@ struct EditorModel {
     std::string object_owner;
     /// The city of the building selected (the page "Selection"), its stock and owner.
     std::optional<EditorCity> city;
+    /// The humans' and computers' slots (the page "Players"), in the order of the slots; whether
+    /// another can be added and the last taken away.
+    std::vector<EditorPlayer> player_slots;
+    bool can_add_player = false;
+    bool can_remove_player = false;
 };
 
 /// What a click or a key asked for.
@@ -277,6 +295,12 @@ struct EditorRequest {
         RenameCity,         ///< the selected building's city named `name`
         CityGoods,          ///< the city's stock of ware `index` set to `amount` (1/32 t)
         CityOwner,          ///< the city to the next owner (`index` 1) or the one before (0)
+        /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
+        /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
+        /// `name`, the rest as it is.
+        SetPlayer,
+        AddPlayer,     ///< a computer player in the next slot
+        RemovePlayer,  ///< the last slot taken away
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
@@ -288,6 +312,7 @@ struct EditorRequest {
     std::uint32_t fertility = 0;  ///< SetFertility
     EditorTerrain terrain{};      ///< Terrain
     EditorObjects objects{};      ///< Objects
+    EditorPlayer player{};        ///< SetPlayer
     std::uint32_t amount = 0;     ///< CityGoods
 };
 
@@ -315,7 +340,9 @@ public:
         Terrain,
         Objects,
         CityName,
-        CityGoods
+        CityGoods,
+        Players,
+        PlayerName
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -341,7 +368,11 @@ public:
     /// The page "New map" with `map` offered.
     void ask_new(const EditorNewMap& map);
     /// A name is being typed: the keys go here.
-    [[nodiscard]] bool typing() const noexcept { return m_page == Page::SaveAs || m_page == Page::CityName; }
+    [[nodiscard]] bool typing() const noexcept {
+        return m_page == Page::SaveAs || m_page == Page::CityName || m_page == Page::PlayerName;
+    }
+    /// The slot the page "Players" shows (index into EditorModel::player_slots).
+    [[nodiscard]] std::size_t chosen_player() const noexcept { return m_player; }
     [[nodiscard]] const std::string& text() const noexcept { return m_text; }
     [[nodiscard]] const EditorNewMap& new_map() const noexcept { return m_new; }
     [[nodiscard]] const EditorNewIsland& new_island() const noexcept { return m_island; }
@@ -385,6 +416,8 @@ private:
     void layout_objects(const EditorModel& model);
     void layout_city_name(const EditorModel& model);
     void layout_city_goods(const EditorModel& model);
+    void layout_players(const EditorModel& model);
+    void layout_player_name(const EditorModel& model);
     void layout_placeholder_actions(const EditorModel& model, std::int32_t& y);
     /// The buttons of an island selected: move, turn, copy, take out; or a note while placing.
     void layout_island_actions(const EditorModel& model, std::int32_t& y);
@@ -402,6 +435,7 @@ private:
     std::uint32_t m_size_height = 0;
     std::size_t m_first = 0;      ///< the first file shown on the page "Open", the first line on "Check"
     std::size_t m_page_rows = 1;  ///< lines of the check list on its page as laid out last
+    std::size_t m_player = 0;     ///< the slot the page "Players" shows
 };
 
 }  // namespace o1602::app

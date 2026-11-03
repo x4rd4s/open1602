@@ -924,3 +924,73 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
     CHECK(!click(panel, m, "Back to the selection").has_value());
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }
+
+TEST_CASE("editor panel: the page Players goes through the slots and changes what each is") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    for (std::uint8_t i = 0; i < 4; ++i) {
+        app::EditorPlayer p;
+        p.slot = i;
+        p.name = i == 0 ? "Merlin" : "Computer " + std::to_string(i);
+        p.own_name = i == 0 ? "Merlin" : "";
+        p.human = i == 0;
+        p.banner = i;
+        p.money = 20000;
+        p.colour = "Blue";
+        m.player_slots.push_back(p);
+    }
+    m.can_add_player = true;
+    CHECK(!click_id(panel, m, ui::Form::Id{90}).has_value());  // the button "Players" (the line above says it too)
+    REQUIRE(panel.page() == EditorPanel::Page::Players);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Player (1/4)"));
+    CHECK(says(panel, "Merlin"));
+    CHECK(says(panel, "Human"));
+    CHECK(says(panel, "20000 gold"));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+        if (w.text == "Remove last") {
+            CHECK(!w.enabled);  // the first four stay
+        }
+    }
+    // The slot steps on the page alone.
+    CHECK(!click(panel, m, "Merlin").has_value());
+    CHECK(panel.chosen_player() == 1);
+    auto r = click(panel, m, "Computer");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetPlayer);
+    CHECK(r->player.slot == 1);
+    CHECK(r->player.human);
+    r = click(panel, m, "20000 gold");
+    REQUIRE(r.has_value());
+    CHECK(r->player.money == 21000);
+    r = click(panel, m, "20000 gold", ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->player.money == 19000);
+    r = click(panel, m, "Monuments 0");
+    REQUIRE(r.has_value());
+    CHECK(r->player.monuments_allowed == 1);
+    r = click(panel, m, "Blue");
+    REQUIRE(r.has_value());
+    CHECK(r->index == 1);  // the next colour
+    r = click(panel, m, "Add");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::AddPlayer);
+
+    // A name typed: the slot the page shows; empty is the colour's name.
+    panel.layout(m);
+    CHECK(!click(panel, m, "Rename").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::PlayerName);
+    CHECK(panel.typing());
+    panel.type("Ada");
+    r = panel.key(13);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetPlayer);
+    CHECK(r->index == 3);
+    CHECK(r->name == "Ada");
+    CHECK(panel.page() == EditorPanel::Page::Players);
+    CHECK(!click(panel, m, "Back to the map").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Document);
+}

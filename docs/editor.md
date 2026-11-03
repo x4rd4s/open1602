@@ -156,6 +156,24 @@ buttons on the Selection page, each change one step of undo:
 | Stock | The city's trade goods with the tons in its warehouses: + and - change them by 10 t, with the right button by 1 t, up to the room its Kontor, markets and warehouses give (the game would lose what is above). |
 | Owner | Gives the city with all its land and buildings to the next human or computer (the right button: the one before), as when a player takes a city over; a player with a city on the island already is passed over. |
 
+## Players
+
+**Players** lists the slots of the humans and computers, up to twelve (the free trader, the pirates
+and the natives keep theirs and are not listed). Each change is one step of undo.
+
+| Setting | What it does |
+|---|---|
+| Player | The slot shown, by name. |
+| Kind | Human or computer. |
+| Colour | The player's colour; one another player has goes to it in exchange. |
+| Starting money | The gold the player starts with: 1000 a click, 10 000 above 50 000; the right button takes it off again. |
+| Allowed | How many monuments and triumphal arches the player may build (0 to 9). |
+| Rename | The player's name; left empty, the game calls the player after its colour. |
+| Add, Remove last | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
+
+A player without a city and a ship sits the game out: give a new player a ship or a Kontor on the
+page **Place objects**.
+
 ## Keys
 
 | Key | What it does |
