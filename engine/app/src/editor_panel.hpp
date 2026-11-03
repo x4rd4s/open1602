@@ -429,8 +429,10 @@ private:
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
     void layout_relations(const EditorModel& model);
-    /// The notice (or the note `note_key`) from `y` down and the button `back` at the panel's foot.
-    void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, ui::Form::Id back);
+    /// The notice (or the note `note_key`, `short_key` where fewer than three lines fit) from `y`
+    /// down and the button `back` labelled `back_key` at the panel's foot.
+    void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,
+                       ui::Form::Id back, const char* back_key);
     void layout_placeholder_actions(const EditorModel& model, std::int32_t& y);
     /// The buttons of an island selected: move, turn, copy, take out; or a note while placing.
     void layout_island_actions(const EditorModel& model, std::int32_t& y);

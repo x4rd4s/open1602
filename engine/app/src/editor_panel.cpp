@@ -598,20 +598,22 @@ void EditorPanel::layout_players(const EditorModel& model) {
     f.button(kPlayerAdd, Rect{kX, y, half, kButtonH}, ui::tr("editor.players.add"), model.can_add_player);
     f.button(kPlayerRemove, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.remove"), model.can_remove_player);
     y += kButtonH + kGap;
-    note_and_back(model, y, "editor.players.note", kBack);
+    note_and_back(model, y, "editor.players.note", "editor.players.note_short", kBack, "editor.back");
 }
 
-void EditorPanel::note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, Id back) {
+void EditorPanel::note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,
+                                Id back, const char* back_key) {
     // The way back stays at the foot of the panel; the note takes the lines that fit above it.
     ui::Form& f = m_form;
     const std::int32_t foot = std::max(y, m_top + m_height - 4 - kButtonH);
     const std::int32_t lines = std::clamp((foot - 4 - y) / 20, 0, 4);
     if (lines > 0) {
-        const std::string& note = !model.notice.empty() ? model.notice : ui::tr(note_key);
+        // Three lines take the whole note, fewer its first sentence alone: none is cut off.
+        const std::string note = !model.notice.empty() ? model.notice : ui::tr(lines >= 3 ? note_key : short_key);
         f.paragraph(Rect{kX, y, kW, lines * 20}, note,
                     !model.notice.empty() && model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
     }
-    f.button(back, Rect{kX, foot, kW, kButtonH}, ui::tr("editor.back"));
+    f.button(back, Rect{kX, foot, kW, kButtonH}, ui::tr(back_key));
 }
 
 void EditorPanel::layout_player_name(const EditorModel& model) {
@@ -670,7 +672,7 @@ void EditorPanel::layout_relations(const EditorModel& model) {
     value(kRelationTrade, ui::tr("editor.relations.trade"),
           ui::tr(s.trade ? "editor.relations.trade_yes" : "editor.relations.trade_no"), s.peace);
     y += kGap;
-    note_and_back(model, y, "editor.relations.note", kPlayersBack);
+    note_and_back(model, y, "editor.relations.note", "editor.relations.note", kPlayersBack, "editor.relations.back");
 }
 
 void EditorPanel::layout_city_goods(const EditorModel& model) {

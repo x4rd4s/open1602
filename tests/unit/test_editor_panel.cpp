@@ -982,7 +982,7 @@ TEST_CASE("editor panel: the page Players goes through the slots and changes wha
 
     // A name typed: the slot the page shows; empty is the colour's name.
     panel.layout(m);
-    CHECK(!click(panel, m, "Rename").has_value());
+    CHECK(!click(panel, m, "Name").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::PlayerName);
     CHECK(panel.typing());
     panel.type("Ada");
