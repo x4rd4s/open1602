@@ -1122,7 +1122,7 @@ TEST_CASE("editor panel: the page Random elements counts the plan's entries up a
         }
     }
     m.has_plan = true;
-    m.randoms = {{"Native villages in the north", 2, 1}, {"Gold", 0, 3}};
+    m.randoms = {{"Villages in the north", 2, 1}, {"Gold", 0, 3}};
     CHECK(!click(panel, m, "Random elements").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Random);
     auto r = click(panel, m, "0 at random, 3 fixed");
