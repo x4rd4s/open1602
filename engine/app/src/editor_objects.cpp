@@ -146,9 +146,39 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
     order.island = c.island;
     order.free = true;
     // The footprint about the mouse, as the build tool lays it.
-    order.items.push_back(sim::BuildItem{
-        b->id, static_cast<std::int32_t>(c.local_x) - static_cast<std::int32_t>((fw - 1) / 2),
-        static_cast<std::int32_t>(c.local_y) - static_cast<std::int32_t>((fh - 1) / 2), m_editor->objects.rotation, 0});
+    const auto item = [&](std::uint8_t rotation, std::int32_t dx, std::int32_t dy) {
+        std::uint32_t w = 0;
+        std::uint32_t h = 0;
+        sim::rotated_size(*b, rotation, w, h);
+        return sim::BuildItem{b->id, static_cast<std::int32_t>(c.local_x) - static_cast<std::int32_t>((w - 1) / 2) + dx,
+                              static_cast<std::int32_t>(c.local_y) - static_cast<std::int32_t>((h - 1) / 2) + dy,
+                              rotation, 0};
+    };
+    order.items.push_back(item(m_editor->objects.rotation, 0, 0));
+    // A building that needs a coast, river or rock face where it stands exactly (a Kontor, a
+    // shipyard, a mill, a mine): the nearest place and turn under the mouse where it fits.
+    const sim::BuildRefusal refused = sim::plan_build(world, m_buildings, order).items.front().refusal;
+    if (refused == sim::BuildRefusal::NoCoast || refused == sim::BuildRefusal::NoRiver ||
+        refused == sim::BuildRefusal::NoRock) {
+        const auto half = static_cast<std::int32_t>(std::max(fw, fh) / 2);
+        for (std::int32_t d = 0; d <= half; ++d) {
+            for (std::int32_t dy = -d; dy <= d; ++dy) {
+                for (std::int32_t dx = -d; dx <= d; ++dx) {
+                    if (std::max(std::abs(dx), std::abs(dy)) != d) {
+                        continue;
+                    }
+                    for (std::uint8_t r = 0; r < 4; ++r) {
+                        sim::BuildOrder tried = order;
+                        tried.items.front() =
+                            item(static_cast<std::uint8_t>((m_editor->objects.rotation + r) & 3U), dx, dy);
+                        if (sim::plan_build(world, m_buildings, tried).placed > 0) {
+                            return tried;
+                        }
+                    }
+                }
+            }
+        }
+    }
     return order;
 }
 

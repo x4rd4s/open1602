@@ -1248,12 +1248,22 @@ void MapViewer::draw_editor_marks() {
                 std::uint32_t w = 1;
                 std::uint32_t h = 1;
                 sim::rotated_size(*b, m_editor->objects.rotation, w, h);
+                std::int64_t x0 = std::int64_t{tile->x} - (std::int64_t{w} - 1) / 2;
+                std::int64_t y0 = std::int64_t{tile->y} - (std::int64_t{h} - 1) / 2;
                 bool fits = false;
                 if (const auto order = editor_object_order(tile->x, tile->y)) {
-                    fits = sim::plan_build(world, m_buildings, *order).placed > 0;
+                    // Where a click would put it: a Kontor finds its coast near the mouse.
+                    const sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    fits = plan.placed > 0;
+                    const sim::PlannedBuild& p = plan.items.front();
+                    if (fits && p.type != nullptr) {
+                        const sim::WorldIsland& isl = world.islands()[order->island];
+                        sim::rotated_size(*p.type, p.rotation, w, h);
+                        x0 = std::int64_t{isl.x} + p.x;
+                        y0 = std::int64_t{isl.y} + p.y;
+                    }
                 }
-                outline(std::int64_t{tile->x} - (std::int64_t{w} - 1) / 2,
-                        std::int64_t{tile->y} - (std::int64_t{h} - 1) / 2, w, h,
+                outline(x0, y0, w, h,
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             }
         }

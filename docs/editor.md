@@ -115,8 +115,9 @@ A building is placed as the game builds it, only without gold, goods, unlocked l
 (castle, cathedral, monuments): it needs its ground, the owner's land (a Kontor at the coast founds a
 city and claims its land), a coast, river or rock face where the game asks for one. A building on a
 buried treasure leaves it in the ground. The outline under the mouse is green where the building can
-stand and red where not, and a refused click says why. A Kontor goes only once its city has nothing
-else.
+stand and red where not; a Kontor, shipyard, mill or mine finds the coast, river or rock face near
+the mouse and turns to it. A refused click says why. A Kontor goes only once its city has nothing
+else, and its piers go with it.
 
 ## Keys
 

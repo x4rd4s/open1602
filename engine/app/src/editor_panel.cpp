@@ -311,7 +311,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
     y += kLine + 4;
     // The buttons share what is left above two lines of the notice: as high as the game's in a
     // large window, lower in a small one, so that the last stays in the panel.
-    constexpr std::int32_t kButtons = 13;
+    constexpr std::int32_t kButtons = 11;                        // rows
     constexpr std::int32_t kNoticeRoom = 2 * 20 + 6 + kButtons;  // and what rounding the pitch down loses
     const std::int32_t bottom = m_top + m_height - 4;
     const std::int32_t pitch = std::clamp((bottom - kNoticeRoom - y) / kButtons, 22, kButtonH + kGap);
@@ -322,10 +322,16 @@ void EditorPanel::layout_document(const EditorModel& model) {
     };
     full(kNew, "editor.new");
     full(kOpen, "editor.open");
-    full(kSave, "editor.save");
-    full(kSaveAs, "editor.save_as");
-    full(kUndo, "editor.undo", model.can_undo);
-    full(kRedo, "editor.redo", model.can_redo);
+    // Two buttons side by side in one row: save and save as, undo and redo.
+    const auto pair = [&](Id left, const char* left_text, bool left_on, Id right, const char* right_text,
+                          bool right_on) {
+        const std::int32_t half = (kW - kGap) / 2;
+        f.button(left, Rect{kX, y, half, pitch - gap}, ui::tr(left_text), left_on);
+        f.button(right, Rect{kX + half + kGap, y, kW - half - kGap, pitch - gap}, ui::tr(right_text), right_on);
+        y += pitch;
+    };
+    pair(kSave, "editor.save", true, kSaveAs, "editor.save_as", true);
+    pair(kUndo, "editor.undo", model.can_undo, kRedo, "editor.redo", model.can_redo);
     full(kIslandPage, "editor.islands.edit");
     full(kTerrainPage, "editor.terrain.edit");
     full(kObjectsPage, "editor.objects.edit");

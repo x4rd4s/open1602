@@ -457,6 +457,15 @@ TEST_CASE("construction: the editor places and takes away buildings, each a step
     REQUIRE(gone.ok());
     (*gone)->apply(island.world);
     CHECK(island.world.house(0, 8, 13) == nullptr);
+    // The Kontor last, its piers with it.
+    REQUIRE(island.at(4, 11)->id == 21073);
+    auto kontor_gone = editor::remove_building(island.world, island.buildings, 0, {5, 10});
+    REQUIRE(kontor_gone.ok());
+    (*kontor_gone)->apply(island.world);
+    CHECK(island.world.cities().empty());
+    CHECK(island.at(4, 11)->id == kBeach);
+    CHECK(!editor::remove_building(island.world, island.buildings, 0, {4, 11}).ok());  // beach, not built
+    (*kontor_gone)->revert(island.world);
     (*gone)->revert(island.world);
     CHECK(island.world.house(0, 8, 13) != nullptr);
     house.step->revert(island.world);
