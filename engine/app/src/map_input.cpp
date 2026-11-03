@@ -1068,13 +1068,15 @@ void MapInput::handle_event(const SDL_Event& event) {
                     m_host.apply_hud(*a);
                 }
             }
-            if (m_left_down) {
-                m_press.move(static_cast<double>(event.motion.x), static_cast<double>(event.motion.y));
+            if (m_left_down || m_right_stroke) {
+                if (m_left_down) {
+                    m_press.move(static_cast<double>(event.motion.x), static_cast<double>(event.motion.y));
+                }
                 // A stroke of the editor's terrain tools goes on where the mouse is over the map.
                 if (m_editor && !(m_hud && m_hud->covers(static_cast<std::int32_t>(event.motion.x),
                                                          static_cast<std::int32_t>(event.motion.y)))) {
                     if (const auto tile = tile_at_mouse(); tile.has_value()) {
-                        (void)m_host.editor_stroke(tile, Host::Stroke::Continue);
+                        (void)m_host.editor_stroke(tile, Host::Stroke::Continue, m_right_stroke);
                     }
                 }
             }
@@ -1130,7 +1132,15 @@ void MapInput::handle_event(const SDL_Event& event) {
                 }
                 break;
             }
-            if (event.button.button == SDL_BUTTON_RIGHT || event.button.button == SDL_BUTTON_MIDDLE) {
+            if (event.button.button == SDL_BUTTON_RIGHT && m_editor && !m_left_down) {
+                // The editor's right button: the shaping tools draw the other way (land and water
+                // swapped); otherwise it drags the map, and a click puts back what is in hand.
+                const auto tile = tile_at_mouse();
+                m_right_stroke = tile && m_host.editor_stroke(tile, Host::Stroke::Begin, true);
+                if (!m_right_stroke) {
+                    m_drag.press();
+                }
+            } else if (event.button.button == SDL_BUTTON_RIGHT || event.button.button == SDL_BUTTON_MIDDLE) {
                 m_drag.press();
             } else if (m_editor) {
                 // The editor's map: no selection, tool or order of the game (ADR 0013); the left
@@ -1138,7 +1148,7 @@ void MapInput::handle_event(const SDL_Event& event) {
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     const auto tile = tile_at_mouse();
                     if (!tile || !m_host.editor_place(*tile)) {
-                        if (!m_host.editor_stroke(tile, Host::Stroke::Begin)) {
+                        if (!m_host.editor_stroke(tile, Host::Stroke::Begin, false)) {
                             editor_pick_at_mouse();
                         }
                     }
@@ -1155,7 +1165,7 @@ void MapInput::handle_event(const SDL_Event& event) {
             if (event.button.button == SDL_BUTTON_LEFT) {
                 m_left_down = false;
                 if (m_editor) {
-                    (void)m_host.editor_stroke(std::nullopt, Host::Stroke::End);
+                    (void)m_host.editor_stroke(std::nullopt, Host::Stroke::End, false);
                 }
                 if (m_hud) {
                     if (const auto a = m_hud->mouse(static_cast<std::int32_t>(event.button.x),
@@ -1174,7 +1184,10 @@ void MapInput::handle_event(const SDL_Event& event) {
                 (void)m_hud->mouse(static_cast<std::int32_t>(event.button.x), static_cast<std::int32_t>(event.button.y),
                                    false, ui::MouseButton::Right);
             }
-            if (event.button.button == SDL_BUTTON_RIGHT || event.button.button == SDL_BUTTON_MIDDLE) {
+            if (event.button.button == SDL_BUTTON_RIGHT && m_right_stroke) {
+                m_right_stroke = false;
+                (void)m_host.editor_stroke(std::nullopt, Host::Stroke::End, true);
+            } else if (event.button.button == SDL_BUTTON_RIGHT || event.button.button == SDL_BUTTON_MIDDLE) {
                 // A right click (not a drag): an order (ADR 0010), or back with the original's mouse;
                 // in the editor it puts back what is being placed.
                 const bool click = m_drag.release() && event.button.button == SDL_BUTTON_RIGHT;
@@ -1250,6 +1263,19 @@ void MapInput::handle_event(const SDL_Event& event) {
                 const auto notches = static_cast<std::int32_t>(m_wheel_rest);
                 m_wheel_rest -= static_cast<float>(notches);
                 m_hud->goods_wheel(notches);
+                break;
+            }
+            if (m_editor && (SDL_GetModState() & SDL_KMOD_CTRL) != 0) {
+                // Ctrl and the wheel: the editor's brush bigger or smaller, a size a notch.
+                m_wheel_rest += y;
+                auto notches = static_cast<std::int32_t>(m_wheel_rest);
+                m_wheel_rest -= static_cast<float>(notches);
+                for (; notches > 0; --notches) {
+                    m_host.editor_key(ui::KeyAction::EditorBrushBigger);
+                }
+                for (; notches < 0; ++notches) {
+                    m_host.editor_key(ui::KeyAction::EditorBrushSmaller);
+                }
                 break;
             }
             if (m_hud && m_hud->covers(static_cast<std::int32_t>(event.wheel.mouse_x),

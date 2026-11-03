@@ -74,9 +74,9 @@ constexpr std::array<Icon, kEditorTools> kIcons = {{
     // Coast: land over waves
     {"######......", "########....", "#########...", "#######.....", "#####.......", "............", ".##....##...",
      "#..#..#..#..", "....##....##", "............", ".##....##...", "#..#..#..#.."},
-    // Brush
-    {"..........##", ".........###", "........###.", ".......###..", "......###...", ".....###....", "....##......",
-     "..###.......", ".####.......", ".###........", "##..........", "............"},
+    // Brush: a paint brush, its bristles down
+    {"....##......", "....##......", "....##......", "....##......", "...####.....", "...####.....", "..######....",
+     ".########...", ".########...", ".########...", "..#.##.#....", "............"},
     // Random: a die
     {"############", "#..........#", "#.##....##.#", "#.##....##.#", "#..........#", "#....##....#", "#....##....#",
      "#..........#", "#.##....##.#", "#.##....##.#", "#..........#", "############"},
@@ -86,9 +86,9 @@ constexpr std::array<Icon, kEditorTools> kIcons = {{
     // Replace: two arrows
     {"............", "..#.........", ".##.........", "##########..", ".##.......#.", "..#.......#.", ".#.......#..",
      ".#.......##.", "..##########", ".........##.", ".........#..", "............"},
-    // Pipette
-    {"..........##", ".........###", "........####", ".......####.", "......###...", ".....###....", "....###.....",
-     "...###......", "..###.......", ".##.........", "##..........", "#..........."},
+    // Pipette: a dropper, its bulb up, a drop below
+    {".........###", "........####", ".......#####", "......####..", ".....#.##...", "....#.#.....", "...#.#......",
+     "..#.#.......", ".#.#........", ".##.........", "............", "#..........."},
     // Area: the corners of a rectangle
     {"####....####", "#..........#", "#..........#", "#..........#", "............", "............", "............",
      "............", "#..........#", "#..........#", "#..........#", "####....####"},
@@ -107,9 +107,9 @@ constexpr std::array<Icon, kEditorTools> kIcons = {{
     // Unit: a figure
     {".....##.....", "....####....", ".....##.....", "...######...", "..#.####.#..", "..#.####.#..", ".....##.....",
      "....#..#....", "....#..#....", "....#..#....", "...##..##...", "............"},
-    // Resource: a stone with a vein
-    {"............", "....####....", "..##....##..", ".#...##...#.", "#...#..#...#", "#..#....#..#", "#...#..#...#",
-     ".#...##...#.", "..##....##..", "....####....", "............", "............"},
+    // Resource: a gem
+    {"............", "...######...", "..#.#..#.#..", ".#..#..#..#.", "############", ".#...##...#.", "..#..##..#..",
+     "...#.##.#...", "....####....", ".....##.....", "............", "............"},
     // Remove: a cross
     {"##........##", "###......###", ".###....###.", "..###..###..", "...######...", "....####....", "....####....",
      "...######...", "..###..###..", ".###....###.", "###......###", "##........##"},
@@ -150,9 +150,10 @@ void draw_icon(std::vector<ui::DrawItem>& out, const Icon& icon, const Rect& r, 
     }
 }
 
-/// The menu bar's entries' widths: room for their names in the panels' font.
-std::int32_t menu_width(const std::string& text) {
-    return static_cast<std::int32_t>(text.size()) * 9 + 2 * ui::kTextPadding;
+/// The width of `text` in design units in `font` (without one every byte is 9 units wide, more
+/// than any letter of the panels' font).
+std::int32_t text_width(const ui::Font* font, const std::string& text) {
+    return font != nullptr ? static_cast<std::int32_t>(font->width(text)) : static_cast<std::int32_t>(text.size()) * 9;
 }
 
 }  // namespace
@@ -242,8 +243,8 @@ Rect EditorChrome::menu_rect() const noexcept {
     }
     // Below its entry, within the map's width.
     const std::int32_t right = m_width - kColumn;
-    const std::int32_t x = std::min(m_menu_x[*m_open], std::max(0, right - kMenuW));
-    return {x, kMenuH, kMenuW, 0};
+    const std::int32_t x = std::min(m_menu_x[*m_open], std::max(0, right - m_menu_w));
+    return {x, kMenuH, m_menu_w, m_menu_h};
 }
 
 void EditorChrome::layout(const EditorModel& model, const EditorChromeModel& chrome, std::optional<EditorTool> active) {
@@ -256,7 +257,7 @@ void EditorChrome::layout(const EditorModel& model, const EditorChromeModel& chr
     std::int32_t x = 2;
     for (std::size_t m = 0; m < kMenus; ++m) {
         const std::string text = ui::tr(kMenuTexts[m]);
-        const std::int32_t w = menu_width(text);
+        const std::int32_t w = text_width(m_font, text) + 2 * ui::kTextPadding + 6;
         m_menu_x[m] = x;
         f.button(kFirstMenu + static_cast<Id>(m), Rect{x, 2, w, kMenuH - 4}, text, true, m_open == m);
         x += w + 2;
@@ -295,16 +296,29 @@ void EditorChrome::layout(const EditorModel& model, const EditorChromeModel& chr
     }
     // The menu open, over the map.
     if (m_open) {
+        // As wide as its longest command and key, the command on the left, its key on the right.
         const std::vector<MenuEntry> list = entries(*m_open, model);
-        Rect r = menu_rect();
-        r.h = static_cast<std::int32_t>(list.size()) * kEntryH + 8;
+        const auto key_of = [&](EditorCommand command) {
+            const auto c = static_cast<std::size_t>(command);
+            return c < chrome.command_keys.size() ? chrome.command_keys[c] : std::string{};
+        };
+        m_menu_w = kMenuW;
+        for (const MenuEntry& e : list) {
+            const std::string key = key_of(e.command);
+            const std::int32_t w = text_width(m_font, ui::tr(command_text(e.command))) +
+                                   (key.empty() ? 0 : 24 + text_width(m_font, key)) + 2 * ui::kTextPadding + 16;
+            m_menu_w = std::max(m_menu_w, w);
+        }
+        m_menu_h = static_cast<std::int32_t>(list.size()) * kEntryH + 8;
+        const Rect r = menu_rect();
         f.panel(r);
         for (std::size_t i = 0; i < list.size(); ++i) {
             const Rect e{r.x + 4, r.y + 4 + static_cast<std::int32_t>(i) * kEntryH, r.w - 8, kEntryH - 2};
-            f.button(kFirstEntry + static_cast<Id>(i), e, ui::tr(command_text(list[i].command)), list[i].enabled);
-            const auto c = static_cast<std::size_t>(list[i].command);
-            if (c < chrome.command_keys.size() && !chrome.command_keys[c].empty()) {
-                f.label(Rect{e.x, e.y, e.w - 6, e.h}, chrome.command_keys[c], Align::Right, Tone::Dim);
+            const Tone tone = list[i].enabled ? Tone::Normal : Tone::Dim;
+            f.button(kFirstEntry + static_cast<Id>(i), e, {}, list[i].enabled);
+            f.label(e, ui::tr(command_text(list[i].command)), Align::Left, tone);
+            if (const std::string key = key_of(list[i].command); !key.empty()) {
+                f.label(e, key, Align::Right, Tone::Dim);
             }
         }
     }
@@ -328,15 +342,24 @@ std::string EditorChrome::hint(const EditorChromeModel& chrome) const {
     return {};
 }
 
-std::vector<ui::DrawItem> EditorChrome::draw_back(const std::array<const ui::Font*, ui::kFontSlots>& fonts) {
+std::vector<ui::DrawItem> EditorChrome::draw_back(const std::array<const ui::Font*, ui::kFontSlots>& fonts,
+                                                  const ui::Rect& minimap) {
     m_back.clear();
     m_back.panel(Rect{m_width - kColumn, 0, kColumn, m_height});
+    if (minimap.w > 0 && minimap.h > 0) {
+        // The minimap's frame, the column's width less its margins, the map in its middle.
+        constexpr std::int32_t kMargin = 6;
+        const auto top = static_cast<std::int32_t>(std::floor(minimap.y / m_scale));
+        const auto height = static_cast<std::int32_t>(std::ceil((minimap.y + minimap.h) / m_scale)) - top;
+        m_back.panel(Rect{m_width - kColumn + kMargin, top - kMargin, kColumn - 2 * kMargin, height + 2 * kMargin});
+    }
     return m_back.draw(fonts);
 }
 
 std::vector<ui::DrawItem> EditorChrome::draw(const EditorModel& model, const EditorChromeModel& chrome,
                                              std::optional<EditorTool> active,
                                              const std::array<const ui::Font*, ui::kFontSlots>& fonts) {
+    m_font = m_form.font(fonts);
     layout(model, chrome, active);
     std::vector<ui::DrawItem> items = m_form.draw(fonts);
     const ui::FormStyle style{};
@@ -347,7 +370,7 @@ std::vector<ui::DrawItem> EditorChrome::draw(const EditorModel& model, const Edi
         // The menu open lies over the tool bar's top: no symbol through it.
         if (m_open) {
             const Rect m = menu_rect();
-            if (r.x < m.x + m.w && r.x + r.w > m.x && r.y + r.h > m.y) {
+            if (r.x < m.x + m.w && r.x + r.w > m.x && r.y < m.y + m.h && r.y + r.h > m.y) {
                 continue;
             }
         }
@@ -366,8 +389,11 @@ EditorChrome::Result EditorChrome::mouse(std::int32_t x, std::int32_t y, bool do
     const auto id = m_form.mouse(x, y, down);
     taken = over;
     if (!id) {
-        // A press beside an open menu closes it, and does nothing else.
-        if (down && was_open && !over) {
+        // A press beside an open menu closes it, and does nothing else (not on the map, the tool
+        // bar or the panel).
+        const auto dx = static_cast<std::int32_t>(x / m_scale);
+        const auto dy = static_cast<std::int32_t>(y / m_scale);
+        if (down && was_open && dy >= kMenuH && !menu_rect().contains(dx, dy)) {
             m_open.reset();
             taken = true;
         }
@@ -404,19 +430,14 @@ EditorChrome::Result EditorChrome::mouse(std::int32_t x, std::int32_t y, bool do
 bool EditorChrome::covers(std::int32_t x, std::int32_t y) const noexcept {
     const auto dx = static_cast<std::int32_t>(x / m_scale);
     const auto dy = static_cast<std::int32_t>(y / m_scale);
+    if (m_open) {
+        return true;  // a menu open: a click anywhere else only closes it
+    }
     const std::int32_t map_w = m_width - kColumn;
     if (dx >= map_w) {
         return false;  // the column: the panel's
     }
-    if (dy < kMenuH || dy >= m_height - kStatusH || dx < kToolW) {
-        return true;
-    }
-    if (m_open) {
-        Rect r = menu_rect();
-        r.h = 5 * kEntryH + 8;
-        return r.contains(dx, dy);
-    }
-    return false;
+    return dy < kMenuH || dy >= m_height - kStatusH || dx < kToolW;
 }
 
 bool EditorChrome::close_menu() noexcept {

@@ -87,9 +87,43 @@ TEST_CASE("editor chrome: the menus give their commands, players, rules and chec
     REQUIRE(at.has_value());
     (void)click_at(chrome, m, c, (*at)[0], (*at)[1], taken);
     REQUIRE(chrome.menu_open());
+    // Open, it has every click: the map's and the column's.
+    CHECK(chrome.covers(500, 500));
+    CHECK(chrome.covers(1000, 400));
     (void)chrome.mouse(500, 500, true, m, c, std::nullopt, taken);
     CHECK(taken);
     CHECK(!chrome.menu_open());
+}
+
+TEST_CASE("editor chrome: a menu is as wide as its longest command and key") {
+    ui::set_language("en");
+    EditorChrome chrome;
+    chrome.set_screen(1024, 768, 1.0);
+    EditorModel m;
+    EditorChromeModel c;
+    c.command_keys[static_cast<std::size_t>(EditorCommand::SaveAs)] = "Ctrl+Shift+S";
+    chrome.layout(m, c, std::nullopt);
+    const auto at = find(chrome, "File", 1.0);
+    REQUIRE(at.has_value());
+    bool taken = false;
+    (void)click_at(chrome, m, c, (*at)[0], (*at)[1], taken);
+    chrome.layout(m, c, std::nullopt);
+    // Without fonts every byte is 9 units wide: the command and its key side by side.
+    std::optional<ui::Rect> command;
+    std::optional<ui::Rect> key;
+    for (const ui::Form::Widget& w : chrome.form().widgets()) {
+        if (w.text == "Save as") {
+            command = w.rect;
+        }
+        if (w.text == "Ctrl+Shift+S") {
+            key = w.rect;
+        }
+    }
+    REQUIRE(command.has_value());
+    REQUIRE(key.has_value());
+    CHECK(command->w >=
+          static_cast<std::int32_t>(std::string("Save as").size() + std::string("Ctrl+Shift+S").size()) * 9 +
+              2 * ui::kTextPadding);
 }
 
 TEST_CASE("editor chrome: the tool bar chooses tools and names them with their keys") {

@@ -142,7 +142,7 @@ private:
     void editor_pick(const EditorPick& pick) override;
     bool editor_place(const render::TilePos& tile) override;
     bool editor_cancel_place() override;
-    bool editor_stroke(std::optional<render::TilePos> tile, Stroke phase) override;
+    bool editor_stroke(std::optional<render::TilePos> tile, Stroke phase, bool erase) override;
 
     /// The window's events; the rest goes to the input.
     void handle_event(const SDL_Event& event);
@@ -759,6 +759,7 @@ private:
         /// What the stroke did before it made room for its land, and the room made: one step with it.
         std::vector<std::unique_ptr<editor::Operation>> stroke_steps{};
         std::optional<std::pair<std::int64_t, std::int64_t>> stroke_at{};
+        bool stroke_erases = false;  ///< the stroke drawn with the right button: land and water swapped
         std::optional<std::pair<std::int64_t, std::int64_t>> stroke_large{};
         std::uint64_t strokes = 0;  ///< strokes drawn, for the random fill's pieces
         /// The terrain selected (tool Select): the island and its tiles x0..x1, y0..y1; the world

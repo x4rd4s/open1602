@@ -84,11 +84,19 @@ takes back.
 
 ## Terrain
 
-**Edit terrain** paints the islands' terrain from a palette of the game's own: ground, forest, rock
-and ore mountains, slopes, rivers, beach, surf and sea. **Kind** picks a group of the palette,
-**Piece** goes through its pieces (a right click goes back), **Turn** turns a piece that can turn and
-**Size** sets the side of the square brush. A white dotted square on the map shows where the tool
-lays, and the brush shows its piece there before the click. The tools:
+The terrain tools of the tool bar paint the islands' terrain from a palette of the game's own: ground,
+forest, rock and ore mountains, slopes, rivers, beach, surf and sea. The column shows the tool's name
+and only the settings it uses. **Kind** picks a group of the palette, **Piece** goes through its pieces
+(a right click goes back) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
+from 1 to 17 tiles: with the buttons - and +, the slider between them, the keys + and -, or Ctrl and
+the mouse wheel. **Shape** makes the brush round, square or a diamond (Land, Water, Tidy coast, Random
+fill and the brush of a one-tile piece). A white dotted outline on the map shows the tiles the tool
+lays, and the brush shows its piece there before the click.
+
+Land, Water, the brush and Random fill draw the other way with the right button held: water where
+they lay land or pieces, land where Water lays water, so that a mistake is painted over without
+changing the tool; the outline turns orange meanwhile. A right click without dragging still drags
+the map or puts back what is in hand. The tools:
 
 | Tool | What it does |
 |---|---|
@@ -252,7 +260,8 @@ saved and cannot be edited; undo, save and the other pages wait until the plan i
 | Shift+R | Place resources |
 | X | Remove |
 | R | Turn the piece or object in hand |
-| + and - | Larger and smaller brush |
+| + and -, Ctrl and the mouse wheel | Larger and smaller brush |
+| Right button dragged | Land, Water, the brush and Random fill draw the other way (water for land) |
 | F1 | The keys |
 | Escape | Closes a menu, or goes back from a page of the column |
 

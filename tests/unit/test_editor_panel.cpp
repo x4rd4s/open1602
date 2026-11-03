@@ -92,6 +92,17 @@ std::optional<EditorRequest> click_id(EditorPanel& panel, const EditorModel& mod
     return std::nullopt;
 }
 
+/// Whether the page has a button that says `text` and takes clicks.
+bool find_enabled(EditorPanel& panel, const EditorModel& model, const std::string& text) {
+    panel.layout(model);
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == text && w.enabled && w.id != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 EditorModel document() {
     EditorModel m;
     m.width = 500;
@@ -274,7 +285,7 @@ TEST_CASE("editor panel: a pick on the map shows its properties, Back goes to th
     m.properties.clear();
     CHECK(panel.show_selection());
     (void)panel.draw(m, kNoFonts);
-    CHECK(says(panel, "is gone"));
+    CHECK(says(panel, "Click an island"));
     CHECK(panel.back());
     // A click on the map does not leave a page of the files or of a new map.
     panel.ask_new(EditorNewMap{});
@@ -550,13 +561,12 @@ TEST_CASE("editor panel: the terrain tools go through their tools, kinds, pieces
     CHECK(says(panel, "22722 (1/3)"));
     CHECK(says(panel, "The left button paints"));
 
-    auto r = click(panel, m, "Brush");
+    // The tool bar's tool is the page's heading.
+    CHECK(says(panel, "Brush for terrain pieces"));
+    auto r = panel.choose_tool(app::EditorTool::Land, m);
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::Terrain);
     CHECK(r->terrain.tool == app::EditorTerrain::Tool::Land);
-    r = click(panel, m, "Brush", ui::MouseButton::Right);
-    REQUIRE(r.has_value());
-    CHECK(r->terrain.tool == app::EditorTerrain::Tool::Paste);
 
     // Selecting and pasting: the copy's buttons in the place of the settings.
     m.terrain.tool = app::EditorTerrain::Tool::Select;
@@ -609,9 +619,32 @@ TEST_CASE("editor panel: the terrain tools go through their tools, kinds, pieces
     REQUIRE(r.has_value());
     CHECK(r->terrain.rotation == 1);
 
-    r = click(panel, m, "1 \xD7 1");
+    // The brush: a size bigger and smaller, and its shape.
+    r = click(panel, m, "+");
     REQUIRE(r.has_value());
     CHECK(r->terrain.brush == 1);
+    CHECK(!find_enabled(panel, m, "-"));  // the smallest already
+    m.terrain.brush = 7;
+    CHECK(!find_enabled(panel, m, "+"));  // the biggest already
+    r = click(panel, m, "-");
+    REQUIRE(r.has_value());
+    CHECK(r->terrain.brush == 6);
+    m.terrain.brush = 0;
+    r = click(panel, m, "Round");
+    REQUIRE(r.has_value());
+    CHECK(r->terrain.shape == 2);
+    r = click(panel, m, "Round", ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->terrain.shape == 0);
+
+    // Land and water: only the brush, no kind, piece or turn.
+    m.terrain.tool = app::EditorTerrain::Tool::Land;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Draw land"));
+    CHECK(says(panel, "Round"));
+    CHECK(!says(panel, "Ground"));
+    CHECK(!says(panel, "22722 (1/3)"));
+    m.terrain.tool = app::EditorTerrain::Tool::Brush;
 
     // A piece of several tiles: no brush size, a note of its size.
     m.terrain_width = 4;
@@ -620,7 +653,7 @@ TEST_CASE("editor panel: the terrain tools go through their tools, kinds, pieces
     CHECK(says(panel, "A piece of 4 \xD7 4 tiles"));
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
-        if (w.text == "1 \xD7 1") {
+        if (w.text == "+" || w.text == "Round") {
             CHECK(!w.enabled);
         }
     }
@@ -649,13 +682,11 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
         CHECK(w.rect.y + w.rect.h <= 760);
     }
 
-    auto r = click(panel, m, "Build");
+    CHECK(says(panel, "Place buildings"));  // the tool bar's tool is the heading
+    auto r = panel.choose_tool(app::EditorTool::Template, m);
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::Objects);
     CHECK(r->objects.tool == app::EditorObjects::Tool::Template);
-    r = click(panel, m, "Build", ui::MouseButton::Right);
-    REQUIRE(r.has_value());
-    CHECK(r->objects.tool == app::EditorObjects::Tool::Remove);
 
     m.objects.piece = 2;
     m.objects.rotation = 3;

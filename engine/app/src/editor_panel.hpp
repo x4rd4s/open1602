@@ -55,7 +55,7 @@ struct EditorNewIsland {
 };
 
 /// The sides of the terrain brushes, in tiles (editor::kBrushSizes).
-inline constexpr std::array<std::uint8_t, 5> kTerrainBrushes = {1, 2, 3, 5, 9};
+inline constexpr std::array<std::uint8_t, 8> kTerrainBrushes = {1, 2, 3, 5, 7, 9, 13, 17};
 
 /// The settings of the terrain tools (the page "Terrain").
 struct EditorTerrain {
@@ -71,6 +71,7 @@ struct EditorTerrain {
     std::size_t piece = 0;      ///< index into the group's pieces
     std::uint8_t rotation = 0;  ///< 0..3, a quarter clockwise each
     std::uint8_t brush = 0;     ///< index into editor::kBrushSizes
+    std::uint8_t shape = 1;     ///< editor::BrushShape of the shaping tools (Land, Water, Coast, Random)
     friend bool operator==(const EditorTerrain&, const EditorTerrain&) = default;
 };
 

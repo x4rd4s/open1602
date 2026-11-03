@@ -53,8 +53,10 @@ public:
     void set_screen(std::int32_t width, std::int32_t height, double scale) noexcept;
     [[nodiscard]] double scale() const noexcept { return m_scale; }
 
-    /// The column's ground, under the minimap and the panel.
-    [[nodiscard]] std::vector<ui::DrawItem> draw_back(const std::array<const ui::Font*, ui::kFontSlots>& fonts);
+    /// The column's ground, under the minimap and the panel, with a frame about the minimap at
+    /// `minimap` (pixels; none if empty).
+    [[nodiscard]] std::vector<ui::DrawItem> draw_back(const std::array<const ui::Font*, ui::kFontSlots>& fonts,
+                                                      const ui::Rect& minimap = {});
     /// The bars and an open menu, over the map.
     [[nodiscard]] std::vector<ui::DrawItem> draw(const EditorModel& model, const EditorChromeModel& chrome,
                                                  std::optional<EditorTool> active,
@@ -98,7 +100,10 @@ private:
     double m_scale = 1.0;
     std::int32_t m_width = 1024;  ///< design units
     std::int32_t m_height = 768;
-    std::optional<std::size_t> m_open;                     ///< the menu open
+    std::optional<std::size_t> m_open;  ///< the menu open
+    std::int32_t m_menu_w = 0;          ///< the menu open's size, as laid out
+    std::int32_t m_menu_h = 0;
+    const ui::Font* m_font = nullptr;                      ///< the panels' font, as drawn last
     std::array<std::int32_t, kMenus + 1> m_menu_x{};       ///< where the menu bar's entries begin, as laid out
     std::vector<std::pair<ui::Rect, EditorTool>> m_icons;  ///< the tool buttons as laid out, for their icons
 };

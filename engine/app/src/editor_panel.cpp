@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/limits.hpp"
@@ -75,6 +76,10 @@ constexpr Id kTerrainBrush = 74;
 constexpr Id kTerrainCopy = 75;
 constexpr Id kTerrainTurn = 76;
 constexpr Id kTerrainMirror = 77;
+constexpr Id kTerrainSmaller = 78;  ///< the brush a size smaller
+constexpr Id kTerrainBigger = 79;   ///< the brush a size bigger
+constexpr Id kTerrainShape = 173;   ///< the brush's shape
+constexpr Id kTerrainSlider = 174;  ///< the brush's size slid
 constexpr Id kObjectsPage = 59;
 constexpr Id kObjectsTool = 80;
 constexpr Id kObjectsGroup = 81;
@@ -150,11 +155,13 @@ std::uint64_t next_seed(std::uint64_t seed) {
 }
 
 /// The steps of the page "Map size", and the sea it leaves around what the map holds when fitted.
-constexpr std::array<const char*, EditorTerrain::kTools> kTerrainToolTexts = {
-    "editor.terrain.tool.brush",   "editor.terrain.tool.land",    "editor.terrain.tool.water",
-    "editor.terrain.tool.coast",   "editor.terrain.tool.random",  "editor.terrain.tool.fill",
-    "editor.terrain.tool.replace", "editor.terrain.tool.pipette", "editor.terrain.tool.select",
-    "editor.terrain.tool.paste"};
+/// The tools' names in the tool bar, the page's heading.
+constexpr std::array<const char*, EditorTerrain::kTools> kTerrainToolTitles = {
+    "editor.tool.brush", "editor.tool.land",    "editor.tool.water",   "editor.tool.coast", "editor.tool.random",
+    "editor.tool.fill",  "editor.tool.replace", "editor.tool.pipette", "editor.tool.area",  "editor.tool.paste"};
+/// By editor::BrushShape.
+constexpr std::array<const char*, 3> kBrushShapeTexts = {"editor.terrain.shape.square", "editor.terrain.shape.round",
+                                                         "editor.terrain.shape.diamond"};
 constexpr std::array<const char*, EditorTerrain::kTools> kTerrainToolNotes = {
     "editor.terrain.note.brush",   "editor.terrain.note.land",    "editor.terrain.note.water",
     "editor.terrain.note.coast",   "editor.terrain.note.random",  "editor.terrain.note.fill",
@@ -168,9 +175,9 @@ constexpr std::array<const char*, 8> kTerrainGroupTexts = {"editor.terrain.group
 constexpr std::array<const char*, 4> kTerrainRotationTexts = {"editor.terrain.rotation.0", "editor.terrain.rotation.1",
                                                               "editor.terrain.rotation.2", "editor.terrain.rotation.3"};
 
-constexpr std::array<const char*, EditorObjects::kTools> kObjectToolTexts = {
-    "editor.objects.tool.build", "editor.objects.tool.template", "editor.objects.tool.ship",
-    "editor.objects.tool.unit",  "editor.objects.tool.resource", "editor.objects.tool.remove"};
+constexpr std::array<const char*, EditorObjects::kTools> kObjectToolTitles = {
+    "editor.tool.build", "editor.tool.template", "editor.tool.ship",
+    "editor.tool.unit",  "editor.tool.resource", "editor.tool.remove"};
 constexpr std::array<const char*, EditorObjects::kTools> kObjectToolNotes = {
     "editor.objects.note.build", "editor.objects.note.template", "editor.objects.note.ship",
     "editor.objects.note.unit",  "editor.objects.note.resource", "editor.objects.note.remove"};
@@ -1019,10 +1026,13 @@ void EditorPanel::layout_fertility(const EditorModel& model) {
 void EditorPanel::layout_terrain(const EditorModel& model) {
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
-    f.label(Rect{kX, y, kW, 28}, ui::tr("editor.terrain.title"), Align::Left, Tone::Heading);
-    y += 28;
     const EditorTerrain& t = model.terrain;
     using Tool = EditorTerrain::Tool;
+    // The tool chosen in the tool bar is the heading; its settings below it.
+    f.label(Rect{kX, y, kW, 28},
+            ui::tr(kTerrainToolTitles[static_cast<std::size_t>(t.tool) % kTerrainToolTitles.size()]), Align::Left,
+            Tone::Heading);
+    y += 28;
     // Each setting's name above its value, which takes the panel's width.
     const auto value = [&](Id id, const char* label, std::string text, bool enabled) {
         f.label(Rect{kX, y, kW, 18}, ui::tr(label), Align::Left, enabled ? Tone::Normal : Tone::Dim);
@@ -1030,7 +1040,6 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
         f.cycle_button(id, Rect{kX, y, kW, kButtonH}, std::move(text), enabled);
         y += kButtonH + 2;
     };
-    value(kTerrainTool, "editor.terrain.tool", ui::tr(kTerrainToolTexts[static_cast<std::size_t>(t.tool)]), true);
     std::string note = ui::tr(kTerrainToolNotes[static_cast<std::size_t>(t.tool)]);
     if (t.tool == Tool::Select || t.tool == Tool::Paste) {
         // The copy: what it holds, and copying, turning and mirroring it, in the place of the
@@ -1050,21 +1059,44 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
         y += 4 * (18 + kButtonH + 2) - (18 + 3 * (kButtonH + 4));  // as tall as the four settings
     } else {
         const bool shaping = t.tool == Tool::Land || t.tool == Tool::Water || t.tool == Tool::Coast;
-        value(kTerrainGroup, "editor.terrain.group", ui::tr(kTerrainGroupTexts[t.group % kTerrainGroupTexts.size()]),
-              t.tool != Tool::Pipette && !shaping);
-        std::string piece = ui::tr("editor.terrain.no_piece");
-        if (model.terrain_pieces > 0) {
-            piece = ui::tr("editor.terrain.piece_value",
-                           {count(model.terrain_id), count(t.piece + 1), count(model.terrain_pieces)});
-        }
-        const bool pieces = model.terrain_pieces > 0 && t.tool != Tool::Random && t.tool != Tool::Pipette && !shaping;
-        value(kTerrainPiece, "editor.terrain.piece", std::move(piece), pieces);
-        value(kTerrainRotation, "editor.terrain.rotation", ui::tr(kTerrainRotationTexts[t.rotation & 3U]),
-              pieces && model.terrain_turns);
-        const std::uint32_t side = kTerrainBrushes[t.brush % kTerrainBrushes.size()];
         const bool single = model.terrain_width == 1 && model.terrain_height == 1;
-        value(kTerrainBrush, "editor.terrain.brush", ui::tr("editor.size", {count(side), count(side)}),
-              t.tool == Tool::Random || shaping || (t.tool == Tool::Brush && single));
+        const bool pieces = model.terrain_pieces > 0 && t.tool != Tool::Random && t.tool != Tool::Pipette && !shaping;
+        // Only what the tool uses: the kind and piece for the tools that lay pieces.
+        if (!shaping && t.tool != Tool::Pipette) {
+            value(kTerrainGroup, "editor.terrain.group",
+                  ui::tr(kTerrainGroupTexts[t.group % kTerrainGroupTexts.size()]), true);
+        }
+        if (t.tool == Tool::Brush || t.tool == Tool::Fill || t.tool == Tool::Replace) {
+            std::string piece = ui::tr("editor.terrain.no_piece");
+            if (model.terrain_pieces > 0) {
+                piece = ui::tr("editor.terrain.piece_value",
+                               {count(model.terrain_id), count(t.piece + 1), count(model.terrain_pieces)});
+            }
+            value(kTerrainPiece, "editor.terrain.piece", std::move(piece), pieces);
+            value(kTerrainRotation, "editor.terrain.rotation", ui::tr(kTerrainRotationTexts[t.rotation & 3U]),
+                  pieces && model.terrain_turns);
+        }
+        // The brush: its size (smaller, slid, bigger) and its shape.
+        if (t.tool == Tool::Random || shaping || t.tool == Tool::Brush) {
+            const bool brush = t.tool != Tool::Brush || single;
+            const std::size_t at = t.brush % kTerrainBrushes.size();
+            const std::uint32_t side = kTerrainBrushes[at];
+            const Tone tone = brush ? Tone::Normal : Tone::Dim;
+            f.label(Rect{kX, y, kW, 18}, ui::tr("editor.terrain.brush"), Align::Left, tone);
+            f.label(Rect{kX, y, kW, 18}, ui::tr("editor.size", {count(side), count(side)}), Align::Right, tone);
+            y += 18;
+            constexpr std::int32_t kStep = 30;
+            f.button(kTerrainSmaller, Rect{kX, y, kStep, kButtonH}, "-", brush && at > 0);
+            f.slider(kTerrainSlider, Rect{kX + kStep + 6, y, kW - 2 * (kStep + 6), kButtonH},
+                     static_cast<double>(at) / static_cast<double>(kTerrainBrushes.size() - 1), brush);
+            f.button(kTerrainBigger, Rect{kX + kW - kStep, y, kStep, kButtonH}, "+",
+                     brush && at + 1 < kTerrainBrushes.size());
+            y += kButtonH + 2;
+            if (t.tool != Tool::Brush || single) {
+                value(kTerrainShape, "editor.terrain.shape",
+                      ui::tr(kBrushShapeTexts[t.shape % kBrushShapeTexts.size()]), brush);
+            }
+        }
         if (pieces && !single) {
             note = ui::tr("editor.terrain.note.large", {count(model.terrain_width), count(model.terrain_height)});
         }
@@ -1084,9 +1116,11 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
 void EditorPanel::layout_objects(const EditorModel& model) {
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
-    f.label(Rect{kX, y, kW, 28}, ui::tr("editor.objects.title"), Align::Left, Tone::Heading);
-    y += 28;
     const EditorObjects& o = model.objects;
+    // The tool chosen in the tool bar is the heading; its settings below it.
+    f.label(Rect{kX, y, kW, 28}, ui::tr(kObjectToolTitles[static_cast<std::size_t>(o.tool) % kObjectToolTitles.size()]),
+            Align::Left, Tone::Heading);
+    y += 28;
     using Tool = EditorObjects::Tool;
     const bool build = o.tool == Tool::Build;
     // Ships and land units: the piece is their type, the rotation the way they face.
@@ -1105,8 +1139,6 @@ void EditorPanel::layout_objects(const EditorModel& model) {
         f.cycle_button(id, Rect{kX, y, kW, kButtonH}, std::move(text), enabled);
         y += kButtonH + 2;
     };
-    value(kObjectsTool, ui::tr("editor.objects.tool"), ui::tr(kObjectToolTexts[static_cast<std::size_t>(o.tool)]),
-          true);
     value(kObjectsGroup, ui::tr("editor.objects.group"), model.object_group, build && model.object_groups > 0);
     // A name is long: its number goes on the label above it.
     const bool pieces = (build || figure) && model.object_pieces > 0;
@@ -1538,7 +1570,11 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kTerrainGroup:
         case kTerrainPiece:
         case kTerrainRotation:
-        case kTerrainBrush: {
+        case kTerrainBrush:
+        case kTerrainSmaller:
+        case kTerrainBigger:
+        case kTerrainShape:
+        case kTerrainSlider: {
             EditorRequest r{EditorRequest::Kind::Terrain};
             EditorTerrain& t = r.terrain;
             t = model.terrain;
@@ -1554,6 +1590,16 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 t.rotation = 0;
             } else if (*id == kTerrainRotation) {
                 t.rotation = static_cast<std::uint8_t>(step(t.rotation, 4, forward));
+            } else if (*id == kTerrainSmaller) {
+                t.brush = static_cast<std::uint8_t>(t.brush > 0 ? t.brush - 1 : 0);
+            } else if (*id == kTerrainBigger) {
+                t.brush = static_cast<std::uint8_t>(std::min<std::size_t>(t.brush + 1U, kTerrainBrushes.size() - 1));
+            } else if (*id == kTerrainShape) {
+                t.shape = static_cast<std::uint8_t>(step(t.shape, kBrushShapeTexts.size(), forward));
+            } else if (*id == kTerrainSlider) {
+                // Let go: the nearest size.
+                const double last = static_cast<double>(kTerrainBrushes.size() - 1);
+                t.brush = static_cast<std::uint8_t>(std::lround(std::clamp(m_form.slid_to(), 0.0, 1.0) * last));
             } else {
                 t.brush = static_cast<std::uint8_t>(step(t.brush, kTerrainBrushes.size(), forward));
             }

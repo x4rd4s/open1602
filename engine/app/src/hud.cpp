@@ -906,7 +906,7 @@ void Hud::place_editor_panel() {
     const std::int32_t top = map.w > 0 ? static_cast<std::int32_t>((map.y + map.h - m_regions.side_panel.y) / s) : 0;
     const auto height = static_cast<std::int32_t>(m_regions.side_panel.h / std::max(s, 0.01));
     m_editor->set_scale(s);
-    m_editor->set_room(top + 8, std::max(0, height - top - 16));
+    m_editor->set_room(top + 12, std::max(0, height - top - 20));
 }
 
 void Hud::editor_tool(EditorTool tool) {
@@ -943,8 +943,8 @@ ui::Rect Hud::minimap_rect() const {
         // At the top of the editor's column, in its middle.
         const auto w = static_cast<std::int32_t>(g->size[0] * s);
         const auto h = static_cast<std::int32_t>(g->size[1] * s);
-        return {m_regions.side_panel.x + (m_regions.side_panel.w - w) / 2, m_regions.side_panel.y + ui::to_pixels(8, s),
-                w, h};
+        return {m_regions.side_panel.x + (m_regions.side_panel.w - w) / 2,
+                m_regions.side_panel.y + ui::to_pixels(12, s), w, h};
     }
     return {m_regions.side_panel.x + ui::to_pixels(g->pos[0], s), m_regions.side_panel.y + ui::to_pixels(g->pos[1], s),
             static_cast<std::int32_t>(g->size[0] * s), static_cast<std::int32_t>(g->size[1] * s)};
@@ -2093,7 +2093,7 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
     }
     if (m_editing && m_chrome) {
         // The editor's column instead of the game's panel: its own ground under the minimap.
-        m_renderer->draw(m_chrome->draw_back(m_renderer->fonts(s)), 0, 0, s);
+        m_renderer->draw(m_chrome->draw_back(m_renderer->fonts(s), minimap_rect()), 0, 0, s);
     } else {
         m_ctrl.set_graphic(kCompass, kGfxCompass + m_rotation, 0);
         m_renderer->draw(m_ctrl.draw(m_renderer->fonts(s)), m_regions.side_panel.x, m_regions.side_panel.y, s);
