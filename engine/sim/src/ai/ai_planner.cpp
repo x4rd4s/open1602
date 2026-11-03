@@ -1055,7 +1055,8 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
         for (const ComputerSlot& k : original_computer_slots()) {
             users += k.after == which && r->slots[k.number].count != 0 ? 1U : 0U;
         }
-        if (!(c->stock(slot->raw) >= slot->single_below_stock * kStockUnitsPerTon && users >= slot->single_below_users)) {
+        if (!(c->stock(slot->raw) >= slot->single_below_stock * kStockUnitsPerTon &&
+              users >= slot->single_below_users)) {
             wanted = std::min<std::uint32_t>(wanted, 1);
         }
     }
