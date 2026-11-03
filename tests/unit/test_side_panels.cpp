@@ -295,6 +295,39 @@ TEST_CASE("side panel build menu: with a pop-up open, one press opens another ca
     CHECK(b.panel.popup_category() == kRoads);
 }
 
+TEST_CASE("side panel build menu: a pop-up stands above all category buttons") {
+    // Two rows of buttons as in the game: the roads below the workshops.
+    assets::GadgetLayout bau = bau_layout();
+    for (assets::Gadget& g : bau.gadgets) {
+        if (g.id == kRoads) {
+            g.pos[1] = 200;
+        } else if (g.id >= 31001 && g.id <= 31008) {
+            g.pos[1] = 130;
+        }
+    }
+    const assets::TextTable texts = assets::TextTable::parse("[WERK]\nBaecker\nSchmied\n");
+    const ui::BuildMenuDefinition definition = menu();
+    BuildPanel panel{bau, definition, &texts};
+    const BuildPanel::Available all = [](std::uint32_t) { return true; };
+    const auto [x, y] = centre(panel.panel(), kRoads);
+    bool consumed = false;
+    (void)panel.mouse(x, y, true, all, consumed);
+    REQUIRE(panel.popup() != nullptr);
+    // The pop-up of the lower row ends above the upper row's buttons, which stay free to click.
+    const std::vector<ui::DrawItem> drawn = panel.popup()->draw(kNoFonts);
+    for (const ui::DrawItem& d : drawn) {
+        if (d.kind == ui::DrawItem::Kind::Sprite) {
+            CHECK(d.y <= 135);  // the bottom strip and its shadow touch the buttons, as in the original
+        }
+    }
+    (void)panel.mouse(x, y, false, all, consumed);
+    const auto [wx, wy] = centre(panel.panel(), kWorkshops);
+    const auto a = panel.mouse(wx, wy, true, all, consumed);
+    REQUIRE(a.has_value());
+    CHECK(a->building == kBakery);
+    CHECK(panel.popup_category() == kWorkshops);
+}
+
 TEST_CASE("side panel build menu: a right click deselects the category, the menu picks it up again") {
     Build b;
     (void)b.press(kWorkshops);

@@ -217,7 +217,16 @@ void BuildPanel::open_popup(const ui::BuildCategory& category, const Available& 
     if (button == nullptr) {
         return;
     }
-    m_popup.emplace(ui::build_popup(category, ok, *button, m_gfx_bauhaus, m_menu->locked_icon_offset), m_bau.scale());
+    // Open1602: the pop-up stands above all category buttons, not just above the one pressed, so
+    // that it never covers another category (the original puts it right above its button, over
+    // the upper row).
+    assets::Gadget anchor = *button;
+    for (const ui::BuildCategory& c : m_menu->categories) {
+        if (const assets::Gadget* other = m_layout.find(c.button)) {
+            anchor.pos[1] = std::min(anchor.pos[1], other->pos[1]);
+        }
+    }
+    m_popup.emplace(ui::build_popup(category, ok, anchor, m_gfx_bauhaus, m_menu->locked_icon_offset), m_bau.scale());
     ui::show_popup_patches(*m_popup);
     m_popup_category = category.button;
     // The button is still held: the pop-up takes over this press, so that dragging onto an icon
