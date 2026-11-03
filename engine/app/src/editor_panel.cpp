@@ -133,6 +133,7 @@ constexpr Id kMissionTab = 210;                ///< + the mission (the tabs of t
 constexpr Id kMissionHolder = 230;             ///< + the player slot holding the mission shown
 constexpr std::size_t kMissionTabs = 16;       ///< the most missions (editor::kMaxMissions)
 constexpr std::size_t kMaxMissionText = 1000;  ///< the longest text of a mission, as the editor's
+constexpr Id kCheckLine = 800;                 ///< + the line of the check list (a line that leads somewhere)
 constexpr Id kRecent = 190;                    ///< + the object placed lately (the page "Objects")
 constexpr Id kPlayerTable = 300;               ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
@@ -1800,6 +1801,9 @@ void EditorPanel::layout_check(const EditorModel& model) {
             const Tone tone = line.kind == Kind::Error || line.kind == Kind::Warning ? Tone::Warning
                               : line.kind == Kind::Fine                              ? Tone::Normal
                                                                                      : Tone::Dim;
+            if (line.target != EditorCheckLine::Target::None) {
+                f.row(kCheckLine + static_cast<Id>(i), Rect{m_x, y, m_w, kItem - 4}, false);
+            }
             f.paragraph(Rect{m_x + 8, y, m_w - 8, kItem}, line.text, tone, 20);
         }
         y += h;
@@ -2414,6 +2418,28 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         EditorRequest r{EditorRequest::Kind::MissionHolder, m_mission};
         r.amount = static_cast<std::uint32_t>(*id - kMissionHolder);
         return r;
+    }
+    if (*id >= kCheckLine && *id < kCheckLine + static_cast<Id>(model.check.size()) && m_page == Page::Check) {
+        const EditorCheckLine& line = model.check[static_cast<std::size_t>(*id - kCheckLine)];
+        using Target = EditorCheckLine::Target;
+        switch (line.target) {
+            case Target::None:
+                return std::nullopt;
+            case Target::Island:
+                return EditorRequest{EditorRequest::Kind::ShowIsland, line.index};
+            case Target::Goals:
+                m_mission = line.index;
+                m_page = Page::Goals;
+                m_first = 0;
+                return std::nullopt;
+            case Target::Scenario:
+                return press(kScenarioPage, model, true);
+            case Target::Players:
+                return press(kPlayersPage, model, true);
+            case Target::WorldSize:
+                return press(kWorldSizePage, model, true);
+        }
+        return std::nullopt;
     }
     if (*id >= kFirstRow && *id < kFirstRow + static_cast<Id>(kEditorScenarioRows) && m_page == Page::Scenario) {
         const auto row = static_cast<std::size_t>(*id - kFirstRow);

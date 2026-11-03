@@ -861,6 +861,16 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::Recover:
             editor_recover();
             break;
+        case Kind::ShowIsland:
+            if (request.index < m_editor->document.world().islands().size()) {
+                const sim::WorldIsland& island = m_editor->document.world().islands()[request.index];
+                m_camera.center_on(
+                    render::TilePos{island.x + island.map.width() / 2, island.y + island.map.height() / 2});
+                EditorPick pick{EditorPick::Kind::Island, static_cast<std::uint16_t>(request.index), island.x,
+                                island.y};
+                editor_pick(pick);
+            }
+            break;
         case Kind::ListIslandFiles:
             m_editor_files.clear();
             m_editor_file_rows.clear();
@@ -1461,7 +1471,8 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
             Line{ui::tr("editor.check.world", {core::utf8_to_cp1252(valid.error().message)}), Line::Kind::Error});
     }
     for (const std::string& p : doc.check_scenario()) {
-        lines.push_back(Line{ui::tr("editor.check.scenario", {core::utf8_to_cp1252(p)}), Line::Kind::Error});
+        lines.push_back(Line{ui::tr("editor.check.scenario", {core::utf8_to_cp1252(p)}), Line::Kind::Error,
+                             Line::Target::Scenario});
     }
     if (lines.size() == first) {
         lines.push_back(Line{ui::tr("editor.check.fine"), Line::Kind::Fine});
@@ -1470,7 +1481,7 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     lines.push_back(Line{ui::tr("editor.check.goals"), Line::Kind::Heading});
     const auto goal_problems = editor::goal_problems(world);
     for (const editor::GoalProblem& p : goal_problems) {
-        lines.push_back(Line{goal_problem_text(world, p), Line::Kind::Warning});
+        lines.push_back(Line{goal_problem_text(world, p), Line::Kind::Warning, Line::Target::Goals, p.mission});
     }
     if (goal_problems.empty()) {
         lines.push_back(Line{ui::tr(world.missions().empty() ? "editor.check.no_missions" : "editor.check.goals_fine"),
@@ -1482,7 +1493,12 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     lines.push_back(Line{ui::tr(keep ? "editor.check.limits_kept" : "editor.check.limits"), Line::Kind::Heading});
     const auto problems = editor::original_limit_problems(world);
     for (const editor::LimitProblem& p : problems) {
-        lines.push_back(Line{limit_text(p), keep ? Line::Kind::Warning : Line::Kind::Note});
+        using LK = editor::LimitProblem::Kind;
+        const Line::Target target = p.kind == LK::IslandSize || p.kind == LK::Deposits ? Line::Target::Island
+                                    : p.kind == LK::MapSize                            ? Line::Target::WorldSize
+                                    : p.kind == LK::Players                            ? Line::Target::Players
+                                                                                       : Line::Target::None;
+        lines.push_back(Line{limit_text(p), keep ? Line::Kind::Warning : Line::Kind::Note, target, p.island});
     }
     if (problems.empty()) {
         lines.push_back(Line{ui::tr("editor.check.fits"), Line::Kind::Fine});

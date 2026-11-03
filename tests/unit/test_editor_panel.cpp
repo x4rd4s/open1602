@@ -316,7 +316,8 @@ TEST_CASE("editor panel: the overlays go on and off, the check list goes through
     m.check.push_back(Line{"All right.", Line::Kind::Fine});
     m.check.push_back(Line{"The original's limits (not asked for)", Line::Kind::Heading});
     for (int i = 0; i < 10; ++i) {
-        m.check.push_back(Line{"Island " + std::to_string(i + 1) + " has 3 ore deposits", Line::Kind::Note});
+        m.check.push_back(Line{"Island " + std::to_string(i + 1) + " has 3 ore deposits", Line::Kind::Note,
+                               Line::Target::Island, static_cast<std::size_t>(i)});
     }
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "All right."));
@@ -327,6 +328,20 @@ TEST_CASE("editor panel: the overlays go on and off, the check list goes through
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
     }
+    // A line that leads somewhere: the island on the map, the mission in the goals dialog.
+    r = click(panel, m, "Island 10 has 3 ore deposits");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ShowIsland);
+    CHECK(r->index == 9);
+    m.check.push_back(Line{"Mission 2 has no goal", Line::Kind::Warning, Line::Target::Goals, 1});
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "Mission 2 has no goal").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Goals);
+    CHECK(panel.back());
+    (void)click(panel, m, "Check");
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "All right.").has_value());  // leads nowhere
+    CHECK(panel.page() == EditorPanel::Page::Check);
     CHECK(!click(panel, m, "Back to the map").has_value());
     CHECK(panel.page() == EditorPanel::Page::Document);
 }

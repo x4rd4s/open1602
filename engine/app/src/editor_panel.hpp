@@ -188,8 +188,13 @@ struct EditorCheckLine {
         Note,     ///< beyond the original's limits, which the scenario need not keep to
         Fine,     ///< nothing found in the group
     };
+    /// Where a click on the line leads: the island `index` on the map, or the dialog that sets
+    /// what the line is about (Goals: on the mission `index`).
+    enum class Target : std::uint8_t { None, Island, Goals, Scenario, Players, WorldSize };
     std::string text;
     Kind kind = Kind::Note;
+    Target target = Target::None;
+    std::size_t index = 0;
 };
 
 /// What the map shows over the world in the editor (the page "View").
@@ -468,6 +473,7 @@ struct EditorRequest {
         ScenarioText,  ///< the row `index` (EditorScenarioRow) of the description as `name`
         TestPlay,      ///< a game of the map as it is now; F5 in it leads back
         Recover,       ///< the map kept by the editor's recovery, opened instead of the new one
+        ShowIsland,    ///< the island `index` in the view's middle, selected
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
