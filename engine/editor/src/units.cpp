@@ -111,9 +111,11 @@ core::Result<std::unique_ptr<Operation>> place_ship(const sim::World& world, con
     UnitRefusal refused = UnitRefusal::None;
     // The shipyards' ships and the packages', the pirates' ship, and the free trader's for him alone.
     const bool trader = world.acts_as(owner, sim::FactionBehaviour::Trader);
+    if (type != nullptr && trader != (figure == assets::figure::kTrader)) {
+        return make_error(ErrorCode::InvalidFormat, "the trader's ship is the free trader's alone");
+    }
     if (type == nullptr ||
-        (!figures.ship_type_of(figure) && figure != assets::figure::kPirate && figure != assets::figure::kTrader) ||
-        (trader != (figure == assets::figure::kTrader))) {
+        (!figures.ship_type_of(figure) && figure != assets::figure::kPirate && figure != assets::figure::kTrader)) {
         refused = UnitRefusal::NoType;
     } else if (!trader && !owner_ok(world, owner)) {
         refused = UnitRefusal::NoOwner;
