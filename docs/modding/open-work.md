@@ -28,7 +28,7 @@ State on 2026-11-01. The details of each item follow under [Open items](#open-it
 | Item | What is missing | Size |
 |---|---|---|
 | 4 | videos in a modern format (today only Smacker and Bink 2) | medium: a decoder in `third_party` (e.g. a royalty-free format such as AV1 or VP9 in WebM) |
-| 5 | the 55 fixed slots of a city record as data (owner's wish of 2026-11-03, after item 9): public buildings of a package's own kind that the computers plan, goods that count as food or alcohol for the stages, and the rules tied to single slots (weaving, quarries per stonemason, smelters, market, Kontor, towers) | large: slots named, numbered per game, the mapping kept in the savegame |
+| 5 | the 55 fixed slots of a city record as data (owner's wish of 2026-11-03, after item 9): total conversions that carry none of the original's slots, public buildings of a package's own kind that the computers plan, goods that count as food or alcohol for the stages, and the rules tied to single slots (weaving, quarries per stonemason, smelters, market, Kontor, towers) | large: slots named, numbered per game, the mapping kept in the savegame |
 | 9 | a climate's own ground, its share per kind of island world, island templates and the editor's choice of it | medium: the island shapes, landscapes.toml, islands.toml and the editor |
 
 ### Smaller adjustments
