@@ -486,7 +486,7 @@ void EditorPanel::layout(const EditorModel& model) {
     }
     if (m_page == Page::Check) {
         // The check list's dialog as tall as its lines (up to its room; then it has pages).
-        std::int32_t h = 16 + 6 + 32 + 4 + 2 * (kButtonH + kGap);
+        std::int32_t h = 16 + 6 + 32 + (kButtonH + kGap) + 6 + 8;
         for (const EditorCheckLine& line : model.check) {
             h += line.kind == EditorCheckLine::Kind::Heading ? 2 * 20 + 2 : 3 * 20;
         }
@@ -1575,15 +1575,23 @@ void EditorPanel::layout_check(const EditorModel& model) {
     // buttons, the rest on the next pages.
     constexpr std::int32_t kItem = 3 * 20;
     constexpr std::int32_t kHeading = 2 * 20 + 2;
-    const std::int32_t bottom = m_top + m_height - 2 * (kButtonH + kGap) - 6;
     const std::size_t n = model.check.size();
     m_first = std::min(m_first, n == 0 ? 0 : n - 1);
+    using Kind = EditorCheckLine::Kind;
+    // Room for the pages' buttons only where the lines left do not fit without them.
+    std::int32_t rest = 0;
+    for (std::size_t k = m_first; k < n; ++k) {
+        rest += model.check[k].kind == Kind::Heading ? kHeading : kItem;
+    }
+    const std::int32_t one_row = m_top + m_height - (kButtonH + kGap) - 6;
+    const std::int32_t bottom = m_first == 0 && y + rest <= one_row ? one_row : one_row - (kButtonH + kGap);
     std::size_t i = m_first;
     for (; i < n; ++i) {
         const EditorCheckLine& line = model.check[i];
-        using Kind = EditorCheckLine::Kind;
         const std::int32_t h = line.kind == Kind::Heading ? kHeading : kItem;
-        if (y + h > bottom && i > m_first) {
+        // A heading goes to the next page with its first line.
+        const std::int32_t needs = line.kind == Kind::Heading && i + 1 < n ? h + kItem : h;
+        if (y + needs > bottom && i > m_first) {
             break;
         }
         if (line.kind == Kind::Heading) {
