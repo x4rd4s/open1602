@@ -1177,6 +1177,7 @@ editor.objects.piece = Gebäude
 editor.objects.ship = Schiff ({1}/{2})
 editor.objects.template = Vorlage ({1}/{2})
 editor.objects.template_part = Von der Vorlage stehen {1} von {2} Gebäuden; der Rest passte nicht.
+editor.objects.unit_disbanded = Hinweis: Ein Computer löst im Frieden Einheiten auf Inseln ohne eigene Stadt auf.
 editor.city.natives = Eingeborenendorf
 editor.city.pirates = Piratennest
 editor.objects.unit = Einheit ({1}/{2})

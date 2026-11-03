@@ -601,6 +601,18 @@ void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
     m_editor->document.perform(std::move(op).value());
     editor_islands_changed();
     m_editor->notice.clear();
+    // A computer disbands its soldiers on an island without a city of its own in peacetime: say so.
+    const sim::World& placed = m_editor->document.world();
+    const sim::Player* p = placed.player(owner);
+    if (!ship && p != nullptr && p->role == sim::PlayerRole::Computer &&
+        placed.contains(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y))) {
+        const std::uint16_t island = placed.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)).island;
+        const bool city = std::any_of(placed.cities().begin(), placed.cities().end(),
+                                      [&](const sim::City& c) { return c.owner == owner && c.island == island; });
+        if (!city) {
+            editor_notice(ui::tr("editor.objects.unit_disbanded"), false, "computer unit without a city");
+        }
+    }
 }
 
 void MapViewer::editor_place_resource(render::TilePos tile) {

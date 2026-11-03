@@ -129,7 +129,7 @@ middle, and the outline shows each of its buildings green where it can stand and
 A ship goes on water ships sail on, with no other ship on the tiles about it; it is new as a
 shipyard launches it, at full strength with empty holds, and gets its name when a game of the map
 starts. A land unit goes on ground soldiers walk on (open ground, roads, squares, ruins), one to a
-tile, at full health. Orders of other ships and units that name a ship or unit taken away are
+tile, at full health. A computer disbands its units on an island without a city of its own while it is at peace; the editor says so when one is placed there. Orders of other ships and units that name a ship or unit taken away are
 forgotten with it.
 
 Resources lie where a new game puts them, and nobody knows them at first:
