@@ -378,13 +378,17 @@ void EditorPanel::layout_new(const EditorModel& model) {
             islands ? Tone::Normal : Tone::Dim, Tone::Dim);
     y += kLine + 2;
     f.button(kReroll, Rect{kX, y, kW, kButtonH}, ui::tr("editor.new.reroll"), islands);
-    y += kButtonH + kGap;
-    f.paragraph(Rect{kX, y, kW, kNote}, ui::tr(islands ? "editor.new.note_islands" : "editor.new.note_sea"), Tone::Dim,
-                20);
-    y += kNote + 4;
+    y += kButtonH + kGap + 4;
     const std::int32_t half = (kW - kGap) / 2;
     f.button(kCreate, Rect{kX, y, half, kButtonH}, ui::tr("editor.new.create"));
     f.button(kCancel, Rect{kX + half + kGap, y, half, kButtonH}, ui::tr("editor.cancel"));
+    y += kButtonH + kGap;
+    // The note where it fits: in a small window the settings and the buttons take the room.
+    const std::int32_t room = std::min(kNote, m_top + m_height - 4 - y);
+    if (room >= 2 * 20) {
+        f.paragraph(Rect{kX, y, kW, room}, ui::tr(islands ? "editor.new.note_islands" : "editor.new.note_sea"),
+                    Tone::Dim, 20);
+    }
 }
 
 void EditorPanel::layout_open(const EditorModel& model) {
@@ -675,6 +679,10 @@ void EditorPanel::layout_islands(const EditorModel& model) {
     f.button(kOtherIsland, Rect{kX, y, kW, kButtonH}, ui::tr("editor.islands.other"),
              !model.placing && !m_island.placeholder);
     y += kButtonH + kGap;
+    if (!m_island.own_shape && !m_island.placeholder && !model.island_template.empty()) {
+        f.label(Rect{kX, y, kW, kLine}, model.island_template, Align::Left, Tone::Dim);
+        y += kLine + 2;
+    }
     f.button(kPlace, Rect{kX, y, kW, kButtonH}, ui::tr("editor.islands.place"), !model.placing);
     y += kButtonH + kGap;
     f.button(kLoadIsland, Rect{kX, y, kW, kButtonH}, ui::tr("editor.islands.load"), !model.placing);
@@ -875,7 +883,8 @@ std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, 
             m_island.size = static_cast<std::uint8_t>(step(m_island.size, kIslandSizeTexts.size(), forward));
             return std::nullopt;
         case kOtherIsland:
-            m_island.seed = next_seed(m_island.seed);
+            // The next template in turn (EditorModel::island_template says which), or another shape.
+            m_island.seed = m_island.own_shape ? next_seed(m_island.seed) : m_island.seed + 1;
             return std::nullopt;
         case kPlace: {
             EditorRequest r{EditorRequest::Kind::PlaceIsland};

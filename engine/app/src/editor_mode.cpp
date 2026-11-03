@@ -25,6 +25,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/island_shapes.hpp"
+#include "o1602/sim/island_templates.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/validate.hpp"
 #include "o1602/ui/build_menu.hpp"
@@ -389,6 +390,21 @@ EditorModel MapViewer::editor_model() const {
     }
     for (const sim::Climate& c : world.balance().climates) {
         m.climates.push_back(c.name(ui::current_language()));
+    }
+    if (m_hud && m_hud->editor_panel() && m_hud->editor_panel()->page() == EditorPanel::Page::Islands) {
+        const EditorNewIsland& wanted = m_hud->editor_panel()->new_island();
+        const std::uint8_t climate = new_island_climate(world, wanted.climate).first;
+        const std::uint8_t size = std::min<std::uint8_t>(wanted.size, sim::templates::kSizeClasses - 1);
+        const auto& packaged = m_options.world.package_islands;
+        std::uint16_t count = sim::templates::kTemplateCount[climate][size];
+        for (const sim::PackageIsland& p : packaged) {
+            count = static_cast<std::uint16_t>(count + (p.climate == climate && p.size == size ? 1 : 0));
+        }
+        const auto chosen = static_cast<std::uint16_t>(wanted.seed % std::max<std::uint16_t>(count, 1));
+        const sim::PackageIsland* p = sim::package_template(packaged, climate, size, chosen);
+        m.island_template = p != nullptr ? ui::tr("editor.islands.template_package",
+                                                  {p->name(ui::current_language()), number(chosen + 1U), number(count)})
+                                         : ui::tr("editor.islands.template", {number(chosen + 1U), number(count)});
     }
     m.has_plan = world.planned_islands().has_value();
     if (m_editor->pick.kind == EditorPick::Kind::Placeholder &&

@@ -174,6 +174,9 @@ struct EditorModel {
     /// The names of the packages' climates the world knows (Windows-1252), offered for new islands
     /// after north and south.
     std::vector<std::string> climates;
+    /// Which template a new island of a template takes (the page "Islands"), Windows-1252: its
+    /// number among the original's, or a package's island by name.
+    std::string island_template;
     /// An island is being placed (a new one, one moved or copied): the map's next click puts it down.
     bool placing = false;
     /// The smallest map that holds the islands, ships, land units and markers (the page "Map

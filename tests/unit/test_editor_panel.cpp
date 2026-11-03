@@ -688,6 +688,14 @@ TEST_CASE("editor panel: the kind of islands of a new map and the packages' clim
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
     }
+    // In a small window the buttons come before the note, which is left out.
+    panel.set_room(200, 400);
+    (void)panel.draw(m, kNoFonts);
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 600);
+    }
+    CHECK(says(panel, "Create"));
+    panel.set_room(200, 560);
     auto r = click(panel, m, "Create");
     REQUIRE(r.has_value());
     CHECK(r->map.landscape == 2);
@@ -695,7 +703,13 @@ TEST_CASE("editor panel: the kind of islands of a new map and the packages' clim
     // North, south, then the packages' climates; a placeholder only north or south.
     m.climates = {"Tundra"};
     m.has_plan = true;
+    m.island_template = "Template 1 of 51";
     CHECK(!click(panel, m, "Edit islands").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Template 1 of 51"));
+    const auto seed = panel.new_island().seed;
+    CHECK(!click(panel, m, "Another one").has_value());
+    CHECK(panel.new_island().seed == seed + 1);  // the next template in turn
     CHECK(!click(panel, m, "North").has_value());
     CHECK(!click(panel, m, "South").has_value());
     CHECK(panel.new_island().climate == 2);
