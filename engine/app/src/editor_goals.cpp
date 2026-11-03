@@ -238,7 +238,7 @@ void MapViewer::editor_scenario_model(EditorModel& m) const {
     using Row = EditorScenarioRow;
     m.scenario_rows.resize(kEditorScenarioRows);
     m.scenario_texts.resize(kEditorScenarioRows);
-    const auto text = [&](Row row, const char* label, std::string utf8) {
+    const auto text = [&](Row row, const char* label, const std::string& utf8) {
         const auto i = static_cast<std::size_t>(row);
         std::string shown = core::utf8_to_cp1252(utf8);
         m.scenario_texts[i] = shown;
