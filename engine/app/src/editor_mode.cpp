@@ -561,6 +561,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::SetPlayer:
         case Kind::AddPlayer:
         case Kind::RemovePlayer:
+        case Kind::SetRelations:
             editor_players_request(request);
             break;
         case Kind::TerrainCopy: {

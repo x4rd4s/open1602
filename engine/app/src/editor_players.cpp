@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,6 +53,12 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         e.colour = colour_name(p.banner);
         m.player_slots.push_back(std::move(e));
     }
+    for (EditorPlayer& e : m.player_slots) {
+        for (const EditorPlayer& other : m.player_slots) {
+            const editor::Relations r = editor::relations(world, e.slot, other.slot);
+            e.relations.push_back(EditorPlayer::Standing{r.peace, r.trade});
+        }
+    }
     m.can_add_player = m.player_slots.size() < sim::kMaxPlayers;
     m.can_remove_player = !m.player_slots.empty() && m.player_slots.back().slot >= sim::kOriginalPlayers;
 }
@@ -71,6 +78,23 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
         editor_islands_changed();
         editor_notice(ui::tr(request.kind == Kind::AddPlayer ? "editor.players.added" : "editor.players.removed"),
                       false, request.kind == Kind::AddPlayer ? "player added" : "player removed");
+        return;
+    }
+    if (request.kind == Kind::SetRelations) {
+        if (request.player.relations.empty()) {
+            return;
+        }
+        const EditorPlayer::Standing s = request.player.relations.front();
+        auto op = editor::set_relations(world, request.player.slot, static_cast<sim::PlayerId>(request.index),
+                                        editor::Relations{s.peace, s.trade});
+        if (!op) {
+            editor_notice(ui::tr("editor.relations.refused"), true, op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        m_editor->notice.clear();
+        std::fprintf(stderr, "editor: relations of players %u and %u changed\n",
+                     static_cast<unsigned>(request.player.slot), static_cast<unsigned>(request.index));
         return;
     }
     // The slot: the one the request names, or the one the page shows (a name typed).
@@ -109,6 +133,7 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
     }
     m_editor->document.perform(std::move(op).value());
     m_editor->notice.clear();
+    std::fprintf(stderr, "editor: player %u changed\n", static_cast<unsigned>(slot));
 }
 
 }  // namespace o1602::app

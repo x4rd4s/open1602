@@ -112,3 +112,38 @@ TEST_CASE("editor players: a map of four slots gets its fifth player behind thre
     (*gone)->apply(world);
     CHECK(world.players().size() == 4);  // the empty slots go with it
 }
+
+TEST_CASE("editor players: relations at the start are set on both sides and kept when a player comes") {
+    sim::World world(40, 40);
+    std::vector<sim::Player> players(4);
+    for (auto& p : players) {
+        p.role = sim::PlayerRole::Computer;
+    }
+    world.set_players(players);
+    CHECK((editor::relations(world, 0, 1) == editor::Relations{true, false}));
+    world.diplomacy().relation(0, 1).damage = 77;
+    auto war = editor::set_relations(world, 0, 1, editor::Relations{false, false});
+    REQUIRE(war.ok());
+    (*war)->apply(world);
+    CHECK((editor::relations(world, 0, 1) == editor::Relations{false, false}));
+    CHECK((editor::relations(world, 1, 0) == editor::Relations{false, false}));
+    CHECK(world.diplomacy().relation(0, 1).damage == 0);
+    auto trade = editor::set_relations(world, 2, 3, editor::Relations{true, true});
+    REQUIRE(trade.ok());
+    (*trade)->apply(world);
+    CHECK(!editor::set_relations(world, 2, 2, {}).ok());
+    CHECK(!editor::set_relations(world, 2, 5, {}).ok());
+    CHECK(!editor::set_relations(world, 0, 2, editor::Relations{false, true}).ok());
+
+    auto added = editor::add_player(world);
+    REQUIRE(added.ok());
+    (*added)->apply(world);
+    CHECK((editor::relations(world, 1, 0) == editor::Relations{false, false}));
+    CHECK((editor::relations(world, 3, 2) == editor::Relations{true, true}));
+    CHECK((editor::relations(world, 0, 7) == editor::Relations{true, false}));
+    auto gone = editor::remove_last_player(world);
+    REQUIRE(gone.ok());
+    (*gone)->apply(world);
+    CHECK((editor::relations(world, 0, 1) == editor::Relations{false, false}));
+    CHECK((editor::relations(world, 2, 3) == editor::Relations{true, true}));
+}

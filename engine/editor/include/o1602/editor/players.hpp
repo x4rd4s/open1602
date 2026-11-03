@@ -55,8 +55,8 @@ struct PlayerValues {
                                                                   const PlayerValues& values);
 
 /// A new computer player in the next slot (sim::player_slot), with the first free banner, the money
-/// of the first computer and nothing else: without a city or a ship it sits the game out until the
-/// scenario gives it one. The diplomacy starts over as in a new game. Fails (LimitExceeded) with
+/// of the first computer and nothing else: without a city or a ship it is out of the game (defeated)
+/// as soon as it starts, unless the scenario gives it one; at peace with everyone. The relations of the others stay. Fails (LimitExceeded) with
 /// sim::kMaxPlayers players.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world);
 
@@ -64,5 +64,21 @@ struct PlayerValues {
 /// that only held its place. Fails (Unsupported) for the first four slots, which every scenario
 /// has, and (Unsupported) while the player owns a city, ship or soldier.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world);
+
+/// How two players stand at the start: at peace or at war, with a trade treaty or without.
+struct Relations {
+    bool peace = true;
+    bool trade = false;
+    friend bool operator==(const Relations&, const Relations&) = default;
+};
+
+/// How `a` and `b` stand (a's side; the editor keeps both sides alike).
+[[nodiscard]] Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b);
+
+/// `a` and `b`, both humans or computers, standing as `r` towards each other when the game starts,
+/// both sides alike, offers and memories (tribute, trade, damage) cleared. Fails (NotFound) for no
+/// human or computer and (InvalidFormat) for a player with himself or a trade treaty at war.
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a,
+                                                                     sim::PlayerId b, Relations r);
 
 }  // namespace o1602::editor

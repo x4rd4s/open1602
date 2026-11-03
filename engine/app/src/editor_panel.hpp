@@ -165,6 +165,13 @@ struct EditorPlayer {
     std::uint16_t monuments_allowed = 0;
     std::uint16_t arches_allowed = 0;
     std::string colour;  ///< the banner's colour, Windows-1252
+    /// How it stands at the start with each slot of EditorModel::player_slots, in that order
+    /// (its own entry unused).
+    struct Standing {
+        bool peace = true;
+        bool trade = false;
+    };
+    std::vector<Standing> relations;
 };
 
 /// What the panel shows; the viewer fills it every frame.
@@ -301,6 +308,8 @@ struct EditorRequest {
         SetPlayer,
         AddPlayer,     ///< a computer player in the next slot
         RemovePlayer,  ///< the last slot taken away
+        /// `player.slot` and slot `index` standing at the start as `player.relations[0]`.
+        SetRelations,
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
@@ -342,7 +351,8 @@ public:
         CityName,
         CityGoods,
         Players,
-        PlayerName
+        PlayerName,
+        Relations
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -418,6 +428,9 @@ private:
     void layout_city_goods(const EditorModel& model);
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
+    void layout_relations(const EditorModel& model);
+    /// The notice (or the note `note_key`) from `y` down and the button `back` at the panel's foot.
+    void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, ui::Form::Id back);
     void layout_placeholder_actions(const EditorModel& model, std::int32_t& y);
     /// The buttons of an island selected: move, turn, copy, take out; or a note while placing.
     void layout_island_actions(const EditorModel& model, std::int32_t& y);
@@ -436,6 +449,7 @@ private:
     std::size_t m_first = 0;      ///< the first file shown on the page "Open", the first line on "Check"
     std::size_t m_page_rows = 1;  ///< lines of the check list on its page as laid out last
     std::size_t m_player = 0;     ///< the slot the page "Players" shows
+    std::size_t m_partner = 0;    ///< the other slot the page "Relations" shows
 };
 
 }  // namespace o1602::app

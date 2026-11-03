@@ -167,12 +167,17 @@ and the natives keep theirs and are not listed). Each change is one step of undo
 | Kind | Human or computer. |
 | Colour | The player's colour; one another player has goes to it in exchange. |
 | Starting money | The gold the player starts with: 1000 a click, 10 000 above 50 000; the right button takes it off again. |
-| Allowed | How many monuments and triumphal arches the player may build (0 to 9). |
+| Monuments, Triumphal arches | How many of each the player may build (0 to 9). |
 | Rename | The player's name; left empty, the game calls the player after its colour. |
-| Add, Remove last | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
+| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
 
-A player without a city and a ship sits the game out: give a new player a ship or a Kontor on the
+A player without a city and a ship is out of the game (defeated) as soon as it starts: give a new player a ship or a Kontor on the
 page **Place objects**.
+
+**Diplomacy** sets how the player shown stands with each other player when the game starts: at
+peace or at war, with a trade treaty or without. A change applies to both sides, and clears what
+the two remember of each other (tribute, trade, damage). A trade treaty needs peace; war ends it.
+Adding a player keeps the relations of the others; the new one starts at peace with everyone.
 
 ## Keys
 

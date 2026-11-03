@@ -949,9 +949,10 @@ TEST_CASE("editor panel: the page Players goes through the slots and changes wha
     CHECK(says(panel, "Merlin"));
     CHECK(says(panel, "Human"));
     CHECK(says(panel, "20000 gold"));
+    CHECK(find(panel, "Back to the map").has_value());  // at the foot, the note above it
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
-        if (w.text == "Remove last") {
+        if (w.text == "Remove") {
             CHECK(!w.enabled);  // the first four stay
         }
     }
@@ -969,7 +970,7 @@ TEST_CASE("editor panel: the page Players goes through the slots and changes wha
     r = click(panel, m, "20000 gold", ui::MouseButton::Right);
     REQUIRE(r.has_value());
     CHECK(r->player.money == 19000);
-    r = click(panel, m, "Monuments 0");
+    r = click_id(panel, m, ui::Form::Id{95});  // monuments
     REQUIRE(r.has_value());
     CHECK(r->player.monuments_allowed == 1);
     r = click(panel, m, "Blue");
@@ -993,4 +994,55 @@ TEST_CASE("editor panel: the page Players goes through the slots and changes wha
     CHECK(panel.page() == EditorPanel::Page::Players);
     CHECK(!click(panel, m, "Back to the map").has_value());
     CHECK(panel.page() == EditorPanel::Page::Document);
+}
+
+TEST_CASE("editor panel: the page Relations sets how two players stand at the start") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    for (std::uint8_t i = 0; i < 3; ++i) {
+        app::EditorPlayer p;
+        p.slot = i == 2 ? std::uint8_t{7} : i;
+        p.name = "Player " + std::to_string(i);
+        p.relations.assign(3, app::EditorPlayer::Standing{});
+        m.player_slots.push_back(p);
+    }
+    m.player_slots[0].relations[1].peace = false;  // 0 and 1 at war
+    m.player_slots[1].relations[0].peace = false;
+    CHECK(!click_id(panel, m, ui::Form::Id{90}).has_value());
+    CHECK(!click(panel, m, "Diplomacy").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Relations);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Player 1"));  // the first other
+    CHECK(says(panel, "War"));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+        if (w.text == "No") {
+            CHECK(!w.enabled);  // no trade at war
+        }
+    }
+    auto r = click(panel, m, "War");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetRelations);
+    CHECK(r->player.slot == 0);
+    CHECK(r->index == 1);
+    REQUIRE(r->player.relations.size() == 1);
+    CHECK(r->player.relations[0].peace);
+    CHECK(!r->player.relations[0].trade);
+
+    // The next other is slot 7, at peace: a trade treaty.
+    CHECK(!click(panel, m, "Player 1").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Player 2"));
+    r = click(panel, m, "No");
+    REQUIRE(r.has_value());
+    CHECK(r->index == 7);
+    CHECK(r->player.relations[0].trade);
+    // Around past itself to slot 1 again.
+    CHECK(!click(panel, m, "Player 2").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "War"));
+    CHECK(!click_id(panel, m, ui::Form::Id{160}).has_value());  // back
+    CHECK(panel.page() == EditorPanel::Page::Players);
 }

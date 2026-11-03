@@ -27,6 +27,19 @@ bool owns_anything(const sim::World& world, sim::PlayerId player) {
                        [&](const sim::Soldier& s) { return s.owner == player; });
 }
 
+/// `after` with `players`, the relations among the players `before` had kept (a new number of
+/// players starts the diplomacy over, sim::World::set_players).
+void keep_relations(const sim::World& before, sim::World& after, std::vector<sim::Player> players) {
+    after.set_players(std::move(players));
+    const std::size_t n = std::min(before.players().size(), after.players().size());
+    for (std::size_t a = 0; a < n; ++a) {
+        for (std::size_t b = 0; b < n; ++b) {
+            after.diplomacy().relation(static_cast<sim::PlayerId>(a), static_cast<sim::PlayerId>(b)) =
+                before.diplomacy().relation(static_cast<sim::PlayerId>(a), static_cast<sim::PlayerId>(b));
+        }
+    }
+}
+
 }  // namespace
 
 std::vector<sim::PlayerId> player_slots(const sim::World& world) {
@@ -134,7 +147,7 @@ core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world) {
     }
     players[slot] = std::move(fresh);
     sim::World after = world;
-    after.set_players(std::move(players));
+    keep_relations(world, after, std::move(players));
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_add"));
 }
 
@@ -156,8 +169,38 @@ core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& wo
         players.pop_back();
     }
     sim::World after = world;
-    after.set_players(std::move(players));
+    keep_relations(world, after, std::move(players));
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_remove"));
+}
+
+Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {
+    const sim::Relation& r = world.diplomacy().relation(a, b);
+    return Relations{r.peace == sim::Treaty::Signed, r.trade == sim::Treaty::Signed};
+}
+
+core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b,
+                                                       Relations r) {
+    const sim::Player* pa = world.player(a);
+    const sim::Player* pb = world.player(b);
+    if (pa == nullptr || pb == nullptr || !playing(*pa) || !playing(*pb)) {
+        return make_error(ErrorCode::NotFound, "relations only between humans and computers");
+    }
+    if (a == b) {
+        return make_error(ErrorCode::InvalidFormat, "a player has no relations with himself");
+    }
+    if (r.trade && !r.peace) {
+        return make_error(ErrorCode::InvalidFormat, "a trade treaty needs peace");
+    }
+    sim::World after = world;
+    for (const auto& [x, y] : {std::pair{a, b}, std::pair{b, a}}) {
+        sim::Relation& rel = after.diplomacy().relation(x, y);
+        rel.peace = r.peace ? sim::Treaty::Signed : sim::Treaty::None;
+        rel.trade = r.trade ? sim::Treaty::Signed : sim::Treaty::None;
+        rel.tribute = 0;
+        rel.trade_mood = 0;
+        rel.damage = 0;
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "relations_change"));
 }
 
 }  // namespace o1602::editor
