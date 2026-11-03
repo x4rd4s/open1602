@@ -1103,13 +1103,16 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
     }
     // The tool's note, or in its place the notice of the last stroke (as tall as the panel is at
     // 1024 x 768: the back button stays below it).
-    constexpr std::int32_t kTerrainNote = 4 * 20;
+    // The tools with few settings have room for a longer note (the smaller screens' font is wider).
+    const bool few = t.tool == Tool::Land || t.tool == Tool::Water || t.tool == Tool::Coast || t.tool == Tool::Random ||
+                     t.tool == Tool::Pipette;
+    const std::int32_t note_h = (few ? 6 : 4) * 20;
     if (!model.notice.empty()) {
-        f.paragraph(Rect{kX, y, kW, kTerrainNote}, model.notice, model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
+        f.paragraph(Rect{kX, y, kW, note_h}, model.notice, model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
     } else {
-        f.paragraph(Rect{kX, y, kW, kTerrainNote}, note, Tone::Dim, 20);
+        f.paragraph(Rect{kX, y, kW, note_h}, note, Tone::Dim, 20);
     }
-    y += kTerrainNote + 4;
+    y += note_h + 4;
     f.button(kBack, Rect{kX, y, kW, kButtonH}, ui::tr("editor.back"));
 }
 
