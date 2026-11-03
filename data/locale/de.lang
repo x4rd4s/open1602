@@ -1014,6 +1014,7 @@ editor.new.islands.none = Keine, nur Meer
 editor.new.islands.few = Wenige
 editor.new.islands.normal = Wie im Original
 editor.new.islands.many = Viele
+editor.new.landscape = Art der Inseln
 editor.new.players = Spieler mit Start
 editor.new.seed = Weltnummer
 editor.new.reroll = Andere Welt

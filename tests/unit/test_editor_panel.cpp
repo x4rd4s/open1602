@@ -8,6 +8,7 @@
 #include "../test_framework.hpp"
 #include "editor_panel.hpp"
 
+#include "o1602/sim/climates.hpp"
 #include "o1602/ui/localization.hpp"
 
 using namespace o1602;
@@ -421,6 +422,7 @@ TEST_CASE("editor panel: an island's crops are ticked, it is saved, and saved is
     m.island = 1;
     m.island_free = true;
     m.island_climate = 0;
+    m.island_crops = sim::original_climate_crops(0);
     m.island_fertility = 1U << 2U;  // spices
     CHECK(panel.show_selection());
     auto r = click(panel, m, "Save");
@@ -666,4 +668,47 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     CHECK(says(panel, "no players to build for"));
     CHECK(!click(panel, m, "Back to the map").has_value());
     CHECK(panel.page() == EditorPanel::Page::Document);
+}
+
+TEST_CASE("editor panel: the kind of islands of a new map and the packages' climates") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.landscapes = {"Original", "Varied", "Atolls"};
+    CHECK(!click(panel, m, "New map").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Kind of islands"));
+    CHECK(!click(panel, m, "Original").has_value());
+    CHECK(!click(panel, m, "Varied").has_value());
+    CHECK(panel.new_map().landscape == 2);
+    CHECK(!click(panel, m, "Atolls").has_value());
+    CHECK(panel.new_map().landscape == 0);
+    (void)click(panel, m, "Original", ui::MouseButton::Right);
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+    }
+    auto r = click(panel, m, "Create");
+    REQUIRE(r.has_value());
+    CHECK(r->map.landscape == 2);
+
+    // North, south, then the packages' climates; a placeholder only north or south.
+    m.climates = {"Tundra"};
+    m.has_plan = true;
+    CHECK(!click(panel, m, "Edit islands").has_value());
+    CHECK(!click(panel, m, "North").has_value());
+    CHECK(!click(panel, m, "South").has_value());
+    CHECK(panel.new_island().climate == 2);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Tundra"));
+    r = click(panel, m, "Place");
+    REQUIRE(r.has_value());
+    CHECK(r->island.climate == 2);
+    (void)click(panel, m, "Original template", ui::MouseButton::Right);  // a placeholder
+    (void)panel.draw(m, kNoFonts);
+    CHECK(panel.new_island().climate == 0);
+    CHECK(!says(panel, "Tundra"));
+    CHECK(!click(panel, m, "North").has_value());
+    CHECK(!click(panel, m, "South").has_value());
+    CHECK(panel.new_island().climate == 0);
 }
