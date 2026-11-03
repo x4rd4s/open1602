@@ -146,6 +146,7 @@ enum class EditorCommand : std::uint8_t {
     Preview,
     Players,
     Rules,
+    Goals,
     Check,
     Keys,
 };
@@ -234,6 +235,15 @@ struct EditorRule {
     std::string label;    ///< Windows-1252
     std::string value;    ///< Windows-1252
     bool enabled = true;  ///< false: it does not matter with the others as they are
+};
+
+/// A mission of the scenario as the page "Goals" shows it: its text, its goals and loss conditions
+/// (label and value, by editor::GoalField; `enabled` false where it does not matter as the others
+/// are), and which of EditorModel::player_slots hold it.
+struct EditorMission {
+    std::string text;  ///< Windows-1252
+    std::vector<EditorRule> goals;
+    std::vector<bool> holders;
 };
 
 /// An entry of the world plan as the page "Random elements" shows it: x at random, y on the map.
@@ -345,6 +355,9 @@ struct EditorModel {
     std::vector<EditorRule> rules;
     /// The page "Random elements": the world plan's entries (only a world that has a plan).
     std::vector<EditorRandom> randoms;
+    /// The page "Goals": the scenario's missions, and how many it can have at most.
+    std::vector<EditorMission> missions;
+    std::size_t max_missions = 0;
     /// The dice preview: the map shows the islands of the plan as one start of a game makes them
     /// (roll `preview_roll` of this preview, `preview_islands` islands); the plan waits meanwhile.
     bool previewing = false;
@@ -409,6 +422,15 @@ struct EditorRequest {
         RandomRoll,
         RandomPreviewEnd,  ///< the plan back from the dice preview
         ShowKeys,          ///< the overview of the keys (F1)
+        MissionAdd,        ///< a new mission without goals
+        MissionRemove,     ///< the mission `index` taken away
+        /// The slot EditorModel::player_slots[`amount`] holding the mission `index`, or none if it
+        /// holds it already.
+        MissionHolder,
+        /// The goal `goal` (editor::GoalField) of the mission `index` to its next value (`amount`
+        /// 1) or the one before (0).
+        GoalStep,
+        MissionText,  ///< the mission `index` with the text `name`
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
@@ -422,6 +444,7 @@ struct EditorRequest {
     EditorObjects objects{};      ///< Objects
     EditorPlayer player{};        ///< SetPlayer
     std::uint32_t amount = 0;     ///< CityGoods
+    std::size_t goal = 0;         ///< GoalStep
 };
 
 class EditorPanel {
@@ -455,7 +478,9 @@ public:
         PlayerName,
         Relations,
         Rules,
-        Random
+        Random,
+        Goals,
+        GoalText
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -495,8 +520,11 @@ public:
     void ask_new(const EditorNewMap& map);
     /// A name is being typed: the keys go here.
     [[nodiscard]] bool typing() const noexcept {
-        return m_page == Page::SaveAs || m_page == Page::CityName || m_page == Page::PlayerName;
+        return m_page == Page::SaveAs || m_page == Page::CityName || m_page == Page::PlayerName ||
+               m_page == Page::GoalText;
     }
+    /// The mission the page "Goals" shows (index into EditorModel::missions).
+    [[nodiscard]] std::size_t chosen_mission() const noexcept { return m_mission; }
     /// The slot the page "Players" shows (index into EditorModel::player_slots).
     [[nodiscard]] std::size_t chosen_player() const noexcept { return m_player; }
     [[nodiscard]] const std::string& text() const noexcept { return m_text; }
@@ -561,6 +589,8 @@ private:
     void layout_players_table(const EditorModel& model);
     void layout_relations_table(const EditorModel& model);
     void layout_settings_grid(const EditorModel& model, bool rules);
+    void layout_goals(const EditorModel& model);
+    void layout_goal_text(const EditorModel& model);
     /// The notice (or the note `note_key`, `short_key` where it does not fit whole) from `y`
     /// down and the button `back` labelled `back_key` at the panel's foot.
     void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,
@@ -589,6 +619,7 @@ private:
     std::size_t m_first = 0;         ///< the first file shown on the page "Open", the first line on "Check"
     std::size_t m_page_rows = 1;     ///< lines of the check list on its page as laid out last
     std::size_t m_player = 0;        ///< the slot the page "Players" shows
+    std::size_t m_mission = 0;       ///< the mission the page "Goals" shows
     std::size_t m_partner = 0;       ///< the other slot the page "Relations" shows
     std::size_t m_first_column = 0;  ///< the first slot of the diplomacy table's columns
     std::int32_t m_screen_w = 0;     ///< the window, design units (0: no dialogs)
