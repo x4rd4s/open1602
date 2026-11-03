@@ -221,7 +221,8 @@ Adding a player keeps the relations of the others; the new one starts at peace w
 
 **Description** (menu Scenario) sets what the scenario list shows of the scenario: its name and
 introduction in German and English, the difficulty in stars (0 to 5), the author and a version.
-A click on a text opens a field to type it; an empty text takes that language away. Without a
+A click on a text opens a field to type it (Shift+Enter breaks a line in an introduction);
+an empty text takes that language away. Without a
 name the list shows the file's name, which still finds the scenario. Texts in other languages,
 written by other tools, are kept. **The original's limits** switches the check of the original's
 size, islands, players and buildings on or off.
@@ -260,7 +261,7 @@ saved and cannot be edited; undo, save and the other pages wait until the plan i
 hold at the same time, and up to two loss conditions; each human or computer holds one mission or
 none, and several players can hold the same one. The tabs at the top choose the mission, **+** adds
 one (up to 16), **-** takes the one shown away. Below them, a switch for each player says who holds
-it; **Change text** types the text the player reads about the mission.
+it; **Change text** types the text the player reads about the mission (Shift+Enter breaks a line).
 
 | Goal | What it asks for |
 |---|---|

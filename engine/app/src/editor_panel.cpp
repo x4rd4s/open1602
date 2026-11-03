@@ -1665,7 +1665,7 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
     f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.scenario.title"), Align::Left, Tone::Heading);
     y += 32;
     constexpr std::int32_t kRow = kButtonH + 4;
-    const std::int32_t label = m_w * 40 / 100;
+    const std::int32_t label = m_w * 45 / 100;
     for (std::size_t i = 0; i < model.scenario_rows.size() && i < kEditorScenarioRows; ++i) {
         const EditorRule& r = model.scenario_rows[i];
         f.label(Rect{m_x, y, label - kGap, kButtonH}, r.label, Align::Left, Tone::Normal);
@@ -1700,7 +1700,10 @@ void EditorPanel::layout_goal_text(const EditorModel& model) {
                                   : ui::tr("editor.goals.text_title", {count(m_mission + 1)});
     f.label(Rect{m_x, y, m_w, 28}, title, Align::Left, Tone::Heading);
     y += 34;
-    f.field(kField, Rect{m_x, y, m_w, 32}, m_text);
+    // The field is one line: a line break shows as a space there, the text below shows it.
+    std::string line = m_text;
+    std::replace(line.begin(), line.end(), '\n', ' ');
+    f.field(kField, Rect{m_x, y, m_w, 32}, line);
     y += 38;
     // The whole text as it will read, the field showing its end only.
     const std::int32_t room = std::max(2 * 20, m_top + m_height - 4 - kButtonH - kGap - y);
@@ -2499,6 +2502,23 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
                 m_text.clear();
             } else if (!m_text.empty()) {
                 m_text.pop_back();
+            }
+            return std::nullopt;
+        case 10:  // Shift+Enter: a line break where the text may have lines, else Enter
+            if (const bool lines = m_page == Page::GoalText ||
+                                   (m_page == Page::ScenarioText &&
+                                    (m_scenario_row == static_cast<std::size_t>(EditorScenarioRow::BriefingDe) ||
+                                     m_scenario_row == static_cast<std::size_t>(EditorScenarioRow::BriefingEn)));
+                !lines) {
+                return commit_name();
+            }
+            if (all) {
+                m_text.clear();
+            }
+            if (m_text.size() < (m_page == Page::GoalText
+                                     ? kMaxMissionText
+                                     : scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row)))) {
+                m_text.push_back('\n');
             }
             return std::nullopt;
         case 13:

@@ -567,7 +567,7 @@ TEST_CASE("main menu: a scenario of the editor shows the name and stars of its d
     CHECK(list[1].name == "Broken");
     CHECK(list[1].briefing.empty());
     CHECK(list[2].name == "Two Coasts");
-    CHECK(list[2].header.ranking == 4);
+    CHECK(list[2].header.ranking == 3);
     CHECK(list[2].briefing == "Found a city.");
     CHECK(list[2].base.filename() == "coasts");
     std::filesystem::remove_all(folder);
@@ -594,7 +594,7 @@ TEST_CASE("main menu: the packages' scenarios under their own heading, with star
     REQUIRE(list[1].files.size() == 1);
     CHECK(list[1].files[0].first == 0xFF);
     CHECK(list[1].files[0].second == s.file);
-    CHECK(list[1].header.ranking == 4);
+    CHECK(list[1].header.ranking == 3);
     CHECK(list[1].package_scenario == "isles:north");
     CHECK(list[1].briefing == "Siedelt im Norden.");
 }
@@ -619,7 +619,7 @@ TEST_CASE("main menu: a package's campaign is one entry with a part per scenario
     CHECK(c.package_campaign == "isles:frost");
     CHECK(c.package_scenario.empty());
     CHECK(c.briefing == "Two winters.");
-    CHECK(c.header.ranking == 3);
+    CHECK(c.header.ranking == 2);
     CHECK(c.base == std::filesystem::path("isles_frost"));
     REQUIRE(c.files.size() == 2);
     CHECK(c.files[0].first == 0);

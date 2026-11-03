@@ -1559,4 +1559,20 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::Author));
     CHECK(r->name == "Merlin and friends");
     CHECK(panel.page() == EditorPanel::Page::Scenario);
+
+    // Shift+Enter breaks a line in an introduction; in a name it stores, as Enter.
+    (void)click(panel, m, "Found a city.");
+    REQUIRE(panel.page() == EditorPanel::Page::ScenarioText);
+    CHECK(!panel.key(10).has_value());
+    panel.type("Keep it fed.");
+    r = panel.key(13);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::BriefingDe));
+    CHECK(r->name == "Found a city.\nKeep it fed.");
+    (void)click(panel, m, "Two Coasts");
+    REQUIRE(panel.page() == EditorPanel::Page::ScenarioText);
+    r = panel.key(10);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ScenarioText);
+    CHECK(r->name == "Two Coasts");
 }

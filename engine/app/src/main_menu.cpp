@@ -111,6 +111,12 @@ std::vector<std::uint8_t> choice_digits(const MenuScenario& s) {
     return digits;
 }
 
+/// The list's ranking for a difficulty of 1 to 5 stars (the original counts from 0 for one star);
+/// 0 stars shows none.
+std::uint32_t ranking_of_stars(std::uint8_t stars) {
+    return stars == 0 ? assets::ScenarioHeader::kNone : std::uint32_t{stars} - 1U;
+}
+
 std::string lower(std::string_view s) {
     std::string out(s);
     std::transform(out.begin(), out.end(), out.begin(),
@@ -284,7 +290,7 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         MenuScenario s;
         s.name = c.name(language);
         s.base = base_of(c.id);
-        s.header.ranking = c.stars;
+        s.header.ranking = ranking_of_stars(c.stars);
         s.package_campaign = c.id;
         s.briefing = c.briefing(language);
         for (std::size_t i = 0; i < c.parts.size(); ++i) {
@@ -302,7 +308,7 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         s.name = p.name(language);
         s.base = base_of(p.id);
         s.files.emplace_back(std::uint8_t{0xFF}, p.file);
-        s.header.ranking = p.stars;
+        s.header.ranking = ranking_of_stars(p.stars);
         s.package_scenario = p.id;
         s.briefing = p.briefing(language);
         out.push_back(std::move(s));
@@ -373,7 +379,7 @@ std::vector<MenuScenario> own_scenario_list(const std::filesystem::path& folder,
             continue;
         }
         const sim::ScenarioInfo& scenario = *info->meta->scenario;
-        s.header.ranking = scenario.stars;
+        s.header.ranking = ranking_of_stars(scenario.stars);
         const std::string_view language = ui::current_language();
         if (const std::string_view name = sim::scenario_text(scenario.names, language); !name.empty()) {
             s.name = utf8_to_cp1252(name);
