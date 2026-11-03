@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -31,6 +32,22 @@ std::vector<SetupItem> scenario_items() {
     return items;
 }
 
+/// The start dialog's label, or a shorter one where the panel is too narrow for it.
+std::string rule_label(SetupItem item) {
+    switch (item) {
+        case SetupItem::TradeCarts:
+            return ui::tr("editor.rules.label.trade_carts");
+        case SetupItem::BalanceShips:
+            return ui::tr("editor.rules.label.ship_holds");
+        case SetupItem::ShipPurchases:
+            return ui::tr("editor.rules.label.ship_purchases");
+        case SetupItem::Reveal:
+            return ui::tr("editor.rules.label.reveal");
+        default:
+            return setup_label(item);
+    }
+}
+
 }  // namespace
 
 void MapViewer::editor_rules_model(EditorModel& m) const {
@@ -40,7 +57,7 @@ void MapViewer::editor_rules_model(EditorModel& m) const {
     EndlessSetup setup = EndlessSetup::defaults(SetupScope::Scenario);
     setup.rules = own.value_or(m_app_settings.scenario.rules);
     for (const SetupItem item : scenario_items()) {
-        m.rules.push_back(EditorRule{setup_label(item), setup_value(setup, item), setup_item_used(setup, item)});
+        m.rules.push_back(EditorRule{rule_label(item), setup_value(setup, item), setup_item_used(setup, item)});
     }
 }
 

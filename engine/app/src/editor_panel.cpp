@@ -703,7 +703,8 @@ void EditorPanel::layout_rules(const EditorModel& model) {
     const std::size_t n = model.rules.size();
     const auto fit = static_cast<std::size_t>(std::max<std::int32_t>(1, (bottom - y) / kRuleH));
     m_page_rows = std::min<std::size_t>(fit, 20);
-    m_first = std::min(m_first, n > m_page_rows ? n - m_page_rows : 0);
+    // Pages of whole rows: the last shows what is left, nothing twice.
+    m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const EditorRule& r = model.rules[m_first + row];
         const bool on = model.rules_own && r.enabled;
