@@ -687,10 +687,10 @@ void EditorPanel::layout_islands(const EditorModel& model) {
     y += kButtonH + kGap;
     f.button(kLoadIsland, Rect{kX, y, kW, kButtonH}, ui::tr("editor.islands.load"), !model.placing);
     y += kButtonH + kGap;
-    // The note in the room the buttons below leave, as many lines as fit (at most three).
+    // The note where its three lines fit above the buttons below: a sentence cut reads wrong.
     const std::int32_t below = (model.placing ? 2 : 1) * (kButtonH + kGap) + 4;
-    const std::int32_t note = std::min(3 * 20, (m_top + m_height - 4 - below - y) / 20 * 20);
-    if (note >= 20) {
+    constexpr std::int32_t note = 3 * 20;
+    if (m_top + m_height - 4 - below - y >= note) {
         f.paragraph(Rect{kX, y, kW, note},
                     ui::tr(!model.placing         ? "editor.islands.note"
                            : m_island.placeholder ? "editor.placeholder.placing"
