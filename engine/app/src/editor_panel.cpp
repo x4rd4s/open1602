@@ -128,7 +128,7 @@ constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
 /// The dialogs' widths at most: wide for tables, narrow for the other pages.
-constexpr std::int32_t kWideDialog = 920;
+constexpr std::int32_t kWideDialog = 980;
 constexpr std::int32_t kNarrowDialog = 560;
 /// Below this width the dialogs keep the column's forms.
 constexpr std::int32_t kWideForm = 600;
@@ -455,13 +455,24 @@ bool EditorPanel::dialog() const noexcept {
 ui::Rect EditorPanel::dialog_rect() const noexcept {
     using P = Page;
     const bool wide = m_page == P::Players || m_page == P::Relations || m_page == P::Rules || m_page == P::Random;
-    const std::int32_t w = std::max(kWidth, std::min(m_screen_w - 120, wide ? kWideDialog : kNarrowDialog));
-    const std::int32_t h = std::max(300, std::min(m_screen_h - 100, wide ? 620 : 580));
-    return Rect{(m_screen_w - w) / 2 - m_column_x, (m_screen_h - h) / 2, w, h};
+    // Right of the tool bar, between the menu bar and the status line; as tall as the page needs.
+    constexpr std::int32_t kToolBar = 42;
+    constexpr std::int32_t kBars = 26 + 24;
+    const std::int32_t room_w = m_screen_w - kToolBar - 16;
+    const std::int32_t room_h = m_screen_h - kBars - 16;
+    const std::int32_t want = m_page == P::PlayerName ? 230 : m_page == P::WorldSize ? 440 : wide ? 620 : 580;
+    const std::int32_t w = std::max(kWidth, std::min(room_w, wide ? kWideDialog : kNarrowDialog));
+    const std::int32_t h = std::max(200, std::min(room_h, want));
+    return Rect{kToolBar + 8 + (room_w - w) / 2 - m_column_x, 26 + 8 + (room_h - h) / 2, w, h};
 }
 
 void EditorPanel::layout(const EditorModel& model) {
     m_form.clear();
+    if (m_page != m_laid_page) {
+        // Another page: a button held on the last one is not this one's.
+        m_form.cancel_press();
+        m_laid_page = m_page;
+    }
     m_previewing = model.previewing;
     if (model.previewing) {
         // The plan waits: nothing but another roll or the way back to it.
@@ -1293,8 +1304,8 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     f.button(kTabRelations, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_relations"), n > 1);
     y += kButtonH + kGap + 4;
     // Every slot in a row: its number, then a button for each of its values.
-    constexpr std::int32_t kNumber = 30;
-    constexpr std::array<std::int32_t, 6> kShares = {28, 14, 15, 19, 12, 12};  // percent of the room
+    constexpr std::int32_t kNumber = 40;
+    constexpr std::array<std::int32_t, 6> kShares = {30, 12, 16, 16, 13, 13};  // percent of the room
     constexpr std::array<const char*, 6> kHeads = {"editor.players.name",      "editor.players.role",
                                                    "editor.players.colour",    "editor.players.money",
                                                    "editor.players.monuments", "editor.players.arches"};
@@ -1363,8 +1374,8 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
              true);
     y += kButtonH + kGap + 4;
     // The players down the left and along the top by their numbers; each cell how the two stand.
-    constexpr std::int32_t kNames = 170;
-    constexpr std::int32_t kCell = 74;  // room for the longest standing
+    constexpr std::int32_t kNames = 220;
+    constexpr std::int32_t kCell = 84;  // room for the longest standing in the smaller screens' font
     const auto columns = static_cast<std::size_t>(std::max<std::int32_t>(1, (m_w - kNames) / (kCell + 2)));
     const std::size_t shown = std::min({n, columns, kTableSide});
     m_first_column = n <= shown ? 0 : std::min(m_first_column, n - shown);
@@ -1383,7 +1394,8 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const std::size_t a = m_first + row;
         const EditorPlayer& p = model.player_slots[a];
-        f.label(Rect{m_x, y, kNames - kGap, kButtonH}, count(a + 1) + "  " + p.name, Align::Left, Tone::Normal);
+        f.label(Rect{m_x, y, 30, kButtonH}, count(a + 1), Align::Right, Tone::Dim);
+        f.label(Rect{m_x + 32, y, kNames - 32 - kGap, kButtonH}, p.name, Align::Left, Tone::Normal);
         for (std::size_t c = 0; c < shown; ++c) {
             const std::size_t b = m_first_column + c;
             const Rect r{m_x + kNames + static_cast<std::int32_t>(c) * (cell + 2), y, cell, kButtonH};
@@ -1434,14 +1446,18 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
     const std::int32_t quarter = (m_w - 3 * kGap) / 4;
     if (rules) {
         // Whose settings, the two presets and the plan's random elements in one row.
-        f.cycle_button(kRulesOwn, Rect{m_x, y, quarter, kButtonH},
+        // Whose rules takes two fifths, its name being the longest.
+        const std::int32_t fifth = (m_w - 3 * kGap) / 5;
+        const std::int32_t own = m_w - 3 * kGap - 3 * fifth;
+        f.cycle_button(kRulesOwn, Rect{m_x, y, own, kButtonH},
                        ui::tr(model.rules_own ? "editor.rules.own" : "editor.rules.players"));
-        f.button(kRulesOriginal, Rect{m_x + quarter + kGap, y, quarter, kButtonH}, ui::tr("editor.rules.original"),
-                 true, model.rules_own && model.rules_original);
-        f.button(kRulesOpen1602, Rect{m_x + 2 * (quarter + kGap), y, quarter, kButtonH},
-                 ui::tr("editor.rules.open1602"));
-        f.button(kRandomPage, Rect{m_x + 3 * (quarter + kGap), y, m_w - 3 * (quarter + kGap), kButtonH},
-                 ui::tr("editor.random.edit"), model.has_plan);
+        std::int32_t bx = m_x + own + kGap;
+        f.button(kRulesOriginal, Rect{bx, y, fifth, kButtonH}, ui::tr("editor.rules.original"), true,
+                 model.rules_own && model.rules_original);
+        bx += fifth + kGap;
+        f.button(kRulesOpen1602, Rect{bx, y, fifth, kButtonH}, ui::tr("editor.rules.open1602"));
+        bx += fifth + kGap;
+        f.button(kRandomPage, Rect{bx, y, fifth, kButtonH}, ui::tr("editor.random.edit"), model.has_plan);
         y += kButtonH + kGap + 4;
     } else {
         f.paragraph(Rect{m_x, y, m_w, 20}, ui::tr("editor.random.note_short"), Tone::Dim, 20);

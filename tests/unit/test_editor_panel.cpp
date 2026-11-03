@@ -1282,7 +1282,11 @@ TEST_CASE("editor panel: the whole map's pages open as dialogs in the window's m
     CHECK(panel.dialog());
     const ui::Rect d = panel.dialog_rect();
     CHECK(d.x < 0);  // over the map, left of the column
-    CHECK(d.x + (1024 - EditorPanel::kWidth) + d.w / 2 == 512);
+    // Right of the tool bar, between the menu bar and the status line.
+    CHECK(d.x + (1024 - EditorPanel::kWidth) >= 42);
+    CHECK(d.x + (1024 - EditorPanel::kWidth) + d.w <= 1024);
+    CHECK(d.y >= 26);
+    CHECK(d.y + d.h <= 768 - 24);
     for (const auto command : {app::EditorCommand::Players, app::EditorCommand::Rules, app::EditorCommand::WorldSize,
                                app::EditorCommand::Check}) {
         (void)panel.command(command, m);

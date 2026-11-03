@@ -579,8 +579,9 @@ private:
     std::size_t m_first_column = 0;  ///< the first slot of the diplomacy table's columns
     std::int32_t m_screen_w = 0;     ///< the window, design units (0: no dialogs)
     std::int32_t m_screen_h = 0;
-    std::int32_t m_column_x = 0;  ///< where the column begins in the window
-    bool m_previewing = false;    ///< the dice preview, as laid out last (its page is the column's)
+    std::int32_t m_column_x = 0;        ///< where the column begins in the window
+    Page m_laid_page = Page::Document;  ///< the page laid out last
+    bool m_previewing = false;          ///< the dice preview, as laid out last (its page is the column's)
 };
 
 }  // namespace o1602::app
