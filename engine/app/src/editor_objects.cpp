@@ -45,7 +45,8 @@ const ui::BuildCategory& landscape_group() {
         std::vector<ui::BuildButton> row;
         for (std::size_t i = 0; i < assets::id::kLandscape.size(); ++i) {
             const std::uint32_t id = assets::id::kLandscape[i];
-            if (id != 21304 && id != 22802) {
+            if (id != assets::id::island_shape::kForestNorth.front() &&
+                id != assets::id::island_shape::kForestSouth.front()) {
                 row.push_back(ui::BuildButton{id, 0, static_cast<std::int32_t>(i), {}, {}});
             }
         }
