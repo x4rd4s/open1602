@@ -31,7 +31,31 @@ namespace o1602::app {
 
 namespace {
 
-/// The build menu's categories that list buildings (not the demolish tool), in the menu's order.
+/// The button number of the natives' and pirates' group (no button of the build menu has it).
+constexpr std::int32_t kLandscapeGroup = 31099;
+
+/// The group of the natives' and pirates' buildings, which no build menu lists: the original's
+/// list after the menu's (Text.cod [LANDSCHAFT]) without its two forests, which the terrain has.
+const ui::BuildCategory& landscape_group() {
+    static const ui::BuildCategory group = [] {
+        ui::BuildCategory c;
+        c.button = kLandscapeGroup;
+        c.names = "LANDSCHAFT";
+        std::vector<ui::BuildButton> row;
+        for (std::size_t i = 0; i < assets::id::kLandscape.size(); ++i) {
+            const std::uint32_t id = assets::id::kLandscape[i];
+            if (id != 21304 && id != 22802) {
+                row.push_back(ui::BuildButton{id, 0, static_cast<std::int32_t>(i), {}, {}});
+            }
+        }
+        c.rows.push_back(std::move(row));
+        return c;
+    }();
+    return group;
+}
+
+/// The build menu's categories that list buildings (not the demolish tool), in the menu's order,
+/// then the natives' and pirates' buildings.
 std::vector<const ui::BuildCategory*> object_groups() {
     std::vector<const ui::BuildCategory*> groups;
     for (const ui::BuildCategory& c : ui::build_menu().categories) {
@@ -39,16 +63,26 @@ std::vector<const ui::BuildCategory*> object_groups() {
             groups.push_back(&c);
         }
     }
+    groups.push_back(&landscape_group());
     return groups;
 }
 
-/// The players a building can be placed for: humans and computers, as the panel counts them.
+/// The players a building, ship or unit can be placed for: humans and computers, then the natives
+/// and the pirates.
 std::vector<sim::PlayerId> object_owners(const sim::World& world) {
     std::vector<sim::PlayerId> owners;
     for (std::size_t i = 0; i < world.players().size(); ++i) {
+        const auto p = static_cast<sim::PlayerId>(i);
         const sim::PlayerRole role = world.players()[i].role;
         if (role == sim::PlayerRole::Human || role == sim::PlayerRole::Computer) {
-            owners.push_back(static_cast<sim::PlayerId>(i));
+            owners.push_back(p);
+        }
+    }
+    for (std::size_t i = 0; i < world.players().size(); ++i) {
+        const auto p = static_cast<sim::PlayerId>(i);
+        if (world.players()[i].role == sim::PlayerRole::Neutral &&
+            (world.acts_as(p, sim::FactionBehaviour::Natives) || world.acts_as(p, sim::FactionBehaviour::Pirates))) {
+            owners.push_back(p);
         }
     }
     return owners;
@@ -144,6 +178,8 @@ void MapViewer::editor_object_model(EditorModel& m) const {
             } else if (const assets::OwnUnit* unit =
                            tool == Tool::Unit ? assets::find_own_unit(m_own_units, figure) : nullptr) {
                 m.object_name = unit->name(ui::current_language());
+            } else if (figure == assets::figure::kPirate) {
+                m.object_name = ui::tr("editor.objects.ship.pirate");
             } else if (index < 4) {
                 m.object_name = ui::tr(key + std::to_string(index));
             } else {
@@ -405,6 +441,9 @@ std::vector<std::uint16_t> MapViewer::editor_figures(EditorObjects::Tool tool) c
         }
         for (const auto& [number, type] : m_figures.package_ships()) {
             figures.push_back(static_cast<std::uint16_t>(number));  // below kMaxFigures
+        }
+        if (m_figures.get(assets::figure::kPirate) != nullptr) {
+            figures.push_back(assets::figure::kPirate);  // for the pirates
         }
     } else if (tool == EditorObjects::Tool::Unit) {
         for (const std::uint32_t family : m_figures.unit_families()) {

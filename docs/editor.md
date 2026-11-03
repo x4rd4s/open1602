@@ -106,10 +106,10 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 | Setting | What it does |
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
-| Group | The groups of the build menu (with the buildings packages add to it); not for ships and units. |
-| Building, Ship, Unit, Resource | The group's buildings by name; the four ships of the shipyards and the four land units of the castle, each followed by those packages add; a big or small iron vein, gold, a treasure or deer. |
+| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...); not for ships and units. |
+| Building, Ship, Unit, Resource | The group's buildings by name; the four ships of the shipyards (with those packages add) and the pirates' ship, the four land units of the castle (with those packages add); a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns; the way a ship or unit faces. |
-| Owner | The player the building, ship or unit is for: one of the map's humans and computers. |
+| Owner | The player the building, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them. |
 
 A building is placed as the game builds it, only without gold, goods, unlocked levels or limits
 (castle, cathedral, monuments): it needs its ground, the owner's land (a Kontor at the coast founds a

@@ -1565,3 +1565,29 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
     CHECK(island.world.ships().size() == before.ships().size());
     CHECK(island.world.soldiers().empty());
 }
+
+TEST_CASE("construction: the editor gives the pirates a ship of theirs") {
+    Island island;
+    std::vector<sim::Player> players = island.world.players();
+    players.resize(3);
+    sim::make_neutral(players[2], sim::faction::kPirates);
+    island.world.set_players(players);
+    const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+    const auto doc = assets::cod::parse(
+        "Objekt: FIGUR\n"
+        "  Nummer: 31\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 2\n  Speed: 500\n  Maxenergy: 60\n"
+        "EndObj\n",
+        types);
+    auto figures = assets::FigureTable::from_cod(doc);
+    REQUIRE(figures.ok());
+    auto ship = editor::place_ship(island.world, island.buildings, *figures, 2, assets::figure::kPirate, 3, 3, 0);
+    REQUIRE(ship.ok());
+    (*ship)->apply(island.world);
+    CHECK(island.world.ships().back().owner == 2);
+    CHECK(island.world.ships().back().figure == assets::figure::kPirate);
+    // Not for the free trader.
+    players.resize(4);
+    sim::make_neutral(players[3], sim::faction::kTrader);
+    island.world.set_players(players);
+    CHECK(!editor::place_ship(island.world, island.buildings, *figures, 3, assets::figure::kPirate, 6, 6, 0).ok());
+}
