@@ -153,7 +153,8 @@ void draw_icon(std::vector<ui::DrawItem>& out, const Icon& icon, const Rect& r, 
 /// The width of `text` in design units in `font` (without one every byte is 9 units wide, more
 /// than any letter of the panels' font).
 std::int32_t text_width(const ui::Font* font, const std::string& text) {
-    return font != nullptr ? static_cast<std::int32_t>(font->width(text)) : static_cast<std::int32_t>(text.size()) * 9;
+    return font != nullptr ? static_cast<std::int32_t>(std::ceil(font->width(text) / font->design_scale()))
+                           : static_cast<std::int32_t>(text.size()) * 9;
 }
 
 }  // namespace
@@ -347,11 +348,13 @@ std::vector<ui::DrawItem> EditorChrome::draw_back(const std::array<const ui::Fon
     m_back.clear();
     m_back.panel(Rect{m_width - kColumn, 0, kColumn, m_height});
     if (minimap.w > 0 && minimap.h > 0) {
-        // The minimap's frame, the column's width less its margins, the map in its middle.
+        // The minimap's frame, close about it.
         constexpr std::int32_t kMargin = 6;
+        const auto left = static_cast<std::int32_t>(std::floor(minimap.x / m_scale));
         const auto top = static_cast<std::int32_t>(std::floor(minimap.y / m_scale));
+        const auto width = static_cast<std::int32_t>(std::ceil((minimap.x + minimap.w) / m_scale)) - left;
         const auto height = static_cast<std::int32_t>(std::ceil((minimap.y + minimap.h) / m_scale)) - top;
-        m_back.panel(Rect{m_width - kColumn + kMargin, top - kMargin, kColumn - 2 * kMargin, height + 2 * kMargin});
+        m_back.panel(Rect{left - kMargin, top - kMargin, width + 2 * kMargin, height + 2 * kMargin});
     }
     return m_back.draw(fonts);
 }

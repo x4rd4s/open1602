@@ -2045,6 +2045,9 @@ bool MapViewer::editor_stroke(std::optional<render::TilePos> tile, Stroke phase,
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (panel != nullptr && panel->page() == EditorPanel::Page::Objects && !m_editor->placing) {
         editor_end_stroke();
+        if (erase) {
+            return false;  // the right button drags the map, it never builds
+        }
         return editor_objects_stroke(tile, phase);
     }
     editor_end_objects();  // the page left while the button was held

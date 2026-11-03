@@ -644,8 +644,8 @@ void EditorPanel::layout_selection(const EditorModel& model) {
     f.label(Rect{kX, y, kW, 28}, ui::tr("editor.selection.title"), Align::Left, Tone::Heading);
     y += 30;
     if (model.selection.empty()) {
-        f.paragraph(Rect{kX, y, kW, 3 * 20}, ui::tr("editor.selection.none"), Tone::Dim, 20);
-        y += 3 * 20 + 4;
+        f.paragraph(Rect{kX, y, kW, 5 * 20}, ui::tr("editor.selection.none"), Tone::Dim, 20);
+        y += 5 * 20 + 4;
     } else {
         f.paragraph(Rect{kX, y, kW, 2 * kLine}, model.selection, Tone::Normal, kLine);
         y += 2 * kLine + 4;
