@@ -699,7 +699,9 @@ void MapViewer::editor_island_request(const EditorRequest& request) {
     using Placing = EditorSession::Placing;
     const sim::World& world = m_editor->document.world();
     if (request.kind == Kind::StopPlacing) {
-        (void)editor_cancel_place();
+        if (m_editor->placing) {
+            (void)editor_cancel_place();
+        }
         return;
     }
     if (request.kind == Kind::PlaceIsland && request.island.placeholder) {
@@ -1033,8 +1035,19 @@ bool MapViewer::editor_place(const render::TilePos& tile) {
 }
 
 bool MapViewer::editor_cancel_place() {
-    if (!m_editor || !m_editor->placing) {
+    if (!m_editor) {
         return false;
+    }
+    if (!m_editor->placing) {
+        // Nothing being placed: an object in hand (the page "Objects") is put away, the tool
+        // "Select" takes over.
+        const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
+        if (panel == nullptr || panel->page() != EditorPanel::Page::Objects || m_editor->object_drag) {
+            return false;
+        }
+        m_hud->editor_tool(EditorTool::Select);
+        m_editor->notice.clear();
+        return true;
     }
     m_editor->placing.reset();
     m_editor->notice.clear();
@@ -1561,6 +1574,9 @@ EditorChromeModel MapViewer::editor_chrome() const {
                           ? ui::tr("editor.status.sea", {std::to_string(tile->x), std::to_string(tile->y)})
                           : ui::tr("editor.status.island",
                                    {std::to_string(tile->x), std::to_string(tile->y), std::to_string(cell.island + 1)});
+        }
+        if (tile) {
+            c.hover = editor_hover_refusal(tile->x, tile->y);
         }
     }
     return c;
