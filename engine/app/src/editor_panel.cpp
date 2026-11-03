@@ -532,8 +532,8 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     f.label(Rect{kX, y, kW, 28}, ui::tr("editor.city.stock_title", {model.city->name}), Align::Left, Tone::Heading);
     y += 28;
-    f.paragraph(Rect{kX, y, kW, 2 * 20}, ui::tr("editor.city.room", {count(model.city->room / 32)}), Tone::Dim, 20);
-    y += 2 * 20 + 4;
+    f.paragraph(Rect{kX, y, kW, 3 * 20}, ui::tr("editor.city.room", {count(model.city->room / 32)}), Tone::Dim, 20);
+    y += 3 * 20 + 4;
     // As many rows as fit above the buttons below: back, and the pages.
     constexpr std::int32_t kGoodH = 26;
     const std::int32_t bottom = m_top + m_height - 2 * (kButtonH + kGap) - kGap;
@@ -545,7 +545,7 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const EditorGood& g = model.city->goods[m_first + row];
         const auto id = static_cast<Id>(row);
-        constexpr std::int32_t kAmount = 72;  // "999 t" in the panel's font
+        constexpr std::int32_t kAmount = 40;  // "999" (tons, as the hint says) in the panel's font
         f.label(Rect{kX, y, kW - 2 * kStep - kAmount - 4, kGoodH - 2}, g.name);
         f.label(Rect{kX + kW - 2 * kStep - kAmount - 4, y, kAmount, kGoodH - 2},
                 ui::tr("editor.city.tons", {count(g.amount / 32)}), Align::Right);

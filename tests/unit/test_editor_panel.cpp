@@ -787,7 +787,7 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
     REQUIRE(panel.page() == EditorPanel::Page::CityGoods);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Stock of Abemsberg"));
-    CHECK(says(panel, "25 t"));
+    CHECK(says(panel, "25"));
     std::vector<ui::Rect> more;
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
@@ -811,8 +811,10 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
     REQUIRE(r.has_value());
     CHECK(r->index == 0);
     CHECK(r->amount == 32U);
-    CHECK(!click(panel, m, "More").has_value());
-    (void)panel.draw(m, kNoFonts);
+    for (int page = 0; page < 5 && !says(panel, "Good 29"); ++page) {
+        CHECK(!click(panel, m, "More").has_value());
+        (void)panel.draw(m, kNoFonts);
+    }
     CHECK(says(panel, "Good 29"));
     CHECK(!click(panel, m, "Back to the selection").has_value());
     CHECK(panel.page() == EditorPanel::Page::Selection);
