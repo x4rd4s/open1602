@@ -1449,7 +1449,7 @@ TEST_CASE("editor panel: the goals dialog shows a mission's holders and goals, a
     for (int i = 0; i < 4; ++i) {
         app::EditorPlayer p;
         p.slot = static_cast<std::uint8_t>(i);
-        p.name = "Player " + std::to_string(i + 1);
+        p.colour = "Player " + std::to_string(i + 1);
         m.player_slots.push_back(p);
     }
     (void)panel.command(app::EditorCommand::Goals, m);

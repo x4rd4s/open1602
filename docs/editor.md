@@ -262,8 +262,8 @@ it; **Change text** types the text the player reads about the mission.
 | All islands with 1 and 2 | Every island fertile for the crop, or with iron ore or gold, settled, with no human or computer opponent on it. |
 | City 1 to 3, Every city | A city (or every own city) with so many inhabitants, of whom so many from a level up. The three cities are distinct ones. |
 | Target player, City of the target player | A city of that player (or of any opponent) so large. |
-| Lost: protected city below, Lost: target's cities below | The mission is lost when no city of the target player stays that large, or the target player keeps fewer cities. |
-| Computers can win | Computers holding the mission can win by it too. |
+| Lost: city below, Lost: cities below | The mission is lost when no city of the target player stays that large, or the target player keeps fewer cities. |
+| Computers win too | Computers holding the mission can win by it too. |
 | Message on winning | The message and its video for the winner: "Mission accomplished", or the multiplayer win in the winner's colour. |
 
 Each value goes on with the left button and back with the right one, through **Off**; a detail

@@ -1604,9 +1604,11 @@ void EditorPanel::layout_goals(const EditorModel& model) {
         for (std::size_t i = 0; i < slots; ++i) {
             const auto col = static_cast<std::int32_t>(i % per_row);
             const auto row = static_cast<std::int32_t>(i / per_row);
+            // Its own name, else its colour, as the players' table names it.
+            const EditorPlayer& p = model.player_slots[i];
             f.button(kMissionHolder + static_cast<Id>(i),
-                     Rect{m_x + col * (w + kGap), y + row * (kButtonH + 2), w, kButtonH}, model.player_slots[i].name,
-                     true, mission.holders[i]);
+                     Rect{m_x + col * (w + kGap), y + row * (kButtonH + 2), w, kButtonH},
+                     p.own_name.empty() ? p.colour : p.own_name, true, mission.holders[i]);
         }
         const auto rows = static_cast<std::int32_t>((slots + per_row - 1) / per_row);
         y += rows * (kButtonH + 2) + kGap;
@@ -1626,7 +1628,7 @@ void EditorPanel::layout_goals(const EditorModel& model) {
     const std::int32_t bottom = foot - kGap;
     const std::int32_t columns = m_w >= 500 ? 2 : 1;
     const std::int32_t column = (m_w - (columns - 1) * 2 * kGap) / columns;
-    const std::int32_t label = column * 58 / 100;
+    const std::int32_t label = column * 62 / 100;
     const auto per_column = static_cast<std::size_t>(std::max(1, (bottom - y) / kRow));
     const std::size_t rows_n = mission.goals.size();
     m_page_rows = std::min<std::size_t>(static_cast<std::size_t>(columns) * per_column, 20);
