@@ -66,7 +66,7 @@ core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world
     const sim::MapCell& cell =
         map.top(static_cast<std::uint32_t>(at->origin.x), static_cast<std::uint32_t>(at->origin.y));
     const std::int32_t k = at->type->kind;
-    if (at->city == sim::MapCell::kNoCity &&
+    if ((at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) &&
         (k == assets::kind::kPier || k == assets::kind::kRuin || k == assets::kind::kBeachRuin)) {
         // A pier or ruin outside every city (left by a Kontor taken away in an older map): the
         // ground under it comes back.
@@ -91,13 +91,29 @@ core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world
         return make_error(ErrorCode::Unsupported, "the building cannot be taken away");
     }
     if (kontor) {
-        // Its piers go with it: those in front of it that no city holds any more.
+        // With the city gone, what was left of it (its piers, roads) fell to ruins: in the editor
+        // the ground comes back there instead, and the piers in front of it go too.
         sim::IslandMap& m = after.island(island).map;
-        for (std::int32_t y = at->origin.y - 1; y <= at->origin.y + static_cast<std::int32_t>(at->height); ++y) {
-            for (std::int32_t x = at->origin.x - 1; x <= at->origin.x + static_cast<std::int32_t>(at->width); ++x) {
-                const auto pier = sim::building_at(after, buildings, island, {x, y});
-                if (pier && pier->type->kind == assets::kind::kPier && pier->city == sim::MapCell::kNoCity) {
-                    (void)clear_to_ground(m, *pier);
+        const sim::IslandMap& was = world.islands()[island].map;
+        const auto ruin = [&](const sim::IslandMap& in, std::uint32_t x, std::uint32_t y) {
+            const assets::BuildingType* b = buildings.by_sprite(in.top(x, y).sprite);
+            return b != nullptr && (b->kind == assets::kind::kRuin || b->kind == assets::kind::kBeachRuin);
+        };
+        for (std::uint32_t y = 0; y < m.height(); ++y) {
+            for (std::uint32_t x = 0; x < m.width(); ++x) {
+                const sim::MapCell& top = m.top(x, y);
+                const bool pier = [&] {
+                    const assets::BuildingType* b = buildings.by_sprite(top.sprite);
+                    return b != nullptr && b->kind == assets::kind::kPier;
+                }();
+                if (top.city != sim::MapCell::kNoCity && after.city(island, top.city) != nullptr) {
+                    continue;
+                }
+                if ((ruin(m, x, y) && !ruin(was, x, y)) || pier) {
+                    const sim::MapCell& ground = m.ground(x, y);
+                    if (top.sprite != ground.sprite || top.rotation != ground.rotation) {
+                        m.restore_ground(x, y);
+                    }
                 }
             }
         }

@@ -457,15 +457,22 @@ TEST_CASE("construction: the editor places and takes away buildings, each a step
     REQUIRE(gone.ok());
     (*gone)->apply(island.world);
     CHECK(island.world.house(0, 8, 13) == nullptr);
-    // The Kontor last, its piers with it.
+    // The Kontor last, its piers with it; a road left in its city does not fall to ruins.
     REQUIRE(island.at(4, 11)->id == 21073);
+    order.player = 1;
+    order.items = {{kRoad, 9, 16, 0, 0}};
+    editor::PlacedBuildings road = editor::place_buildings(island.world, island.buildings, order, island.names);
+    REQUIRE(road.step != nullptr);
+    road.step->apply(island.world);
     auto kontor_gone = editor::remove_building(island.world, island.buildings, 0, {5, 10});
     REQUIRE(kontor_gone.ok());
     (*kontor_gone)->apply(island.world);
     CHECK(island.world.cities().empty());
     CHECK(island.at(4, 11)->id == kBeach);
+    CHECK(island.at(9, 16)->id == kGround);
     CHECK(!editor::remove_building(island.world, island.buildings, 0, {4, 11}).ok());  // beach, not built
     (*kontor_gone)->revert(island.world);
+    road.step->revert(island.world);
     (*gone)->revert(island.world);
     CHECK(island.world.house(0, 8, 13) != nullptr);
     house.step->revert(island.world);

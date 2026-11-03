@@ -320,9 +320,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
         f.button(id, Rect{kX, y, kW, pitch - gap}, ui::tr(text), enabled);
         y += pitch;
     };
-    full(kNew, "editor.new");
-    full(kOpen, "editor.open");
-    // Two buttons side by side in one row: save and save as, undo and redo.
+    // Two buttons of short names side by side in one row: new and open, overlays and check.
     const auto pair = [&](Id left, const char* left_text, bool left_on, Id right, const char* right_text,
                           bool right_on) {
         const std::int32_t half = (kW - kGap) / 2;
@@ -330,14 +328,16 @@ void EditorPanel::layout_document(const EditorModel& model) {
         f.button(right, Rect{kX + half + kGap, y, kW - half - kGap, pitch - gap}, ui::tr(right_text), right_on);
         y += pitch;
     };
-    pair(kSave, "editor.save", true, kSaveAs, "editor.save_as", true);
-    pair(kUndo, "editor.undo", model.can_undo, kRedo, "editor.redo", model.can_redo);
+    pair(kNew, "editor.new", true, kOpen, "editor.open", true);
+    full(kSave, "editor.save");
+    full(kSaveAs, "editor.save_as");
+    full(kUndo, "editor.undo", model.can_undo);
+    full(kRedo, "editor.redo", model.can_redo);
     full(kIslandPage, "editor.islands.edit");
     full(kTerrainPage, "editor.terrain.edit");
     full(kObjectsPage, "editor.objects.edit");
     full(kWorldSizePage, "editor.world_size.edit");
-    full(kView, "editor.view");
-    full(kCheck, "editor.check");
+    pair(kView, "editor.view", true, kCheck, "editor.check", true);
     full(kClose, "editor.close");
     // The notice where two lines fit: in a small window the buttons take the room, and the status
     // bar shows it.
