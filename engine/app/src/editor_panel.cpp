@@ -311,7 +311,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
     y += kLine + 4;
     // The buttons share what is left above two lines of the notice: as high as the game's in a
     // large window, lower in a small one, so that the last stays in the panel.
-    constexpr std::int32_t kButtons = 11;                        // rows
+    constexpr std::int32_t kButtons = 12;                        // rows
     constexpr std::int32_t kNoticeRoom = 2 * 20 + 6 + kButtons;  // and what rounding the pitch down loses
     const std::int32_t bottom = m_top + m_height - 4;
     const std::int32_t pitch = std::clamp((bottom - kNoticeRoom - y) / kButtons, 22, kButtonH + kGap);
@@ -320,7 +320,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
         f.button(id, Rect{kX, y, kW, pitch - gap}, ui::tr(text), enabled);
         y += pitch;
     };
-    // Two buttons of short names side by side in one row: new and open, overlays and check.
+    // Two buttons of short names side by side in one row: open and check.
     const auto pair = [&](Id left, const char* left_text, bool left_on, Id right, const char* right_text,
                           bool right_on) {
         const std::int32_t half = (kW - kGap) / 2;
@@ -328,7 +328,8 @@ void EditorPanel::layout_document(const EditorModel& model) {
         f.button(right, Rect{kX + half + kGap, y, kW - half - kGap, pitch - gap}, ui::tr(right_text), right_on);
         y += pitch;
     };
-    pair(kNew, "editor.new", true, kOpen, "editor.open", true);
+    full(kNew, "editor.new");
+    pair(kOpen, "editor.open", true, kCheck, "editor.check", true);
     full(kSave, "editor.save");
     full(kSaveAs, "editor.save_as");
     full(kUndo, "editor.undo", model.can_undo);
@@ -337,7 +338,7 @@ void EditorPanel::layout_document(const EditorModel& model) {
     full(kTerrainPage, "editor.terrain.edit");
     full(kObjectsPage, "editor.objects.edit");
     full(kWorldSizePage, "editor.world_size.edit");
-    pair(kView, "editor.view", true, kCheck, "editor.check", true);
+    full(kView, "editor.view");
     full(kClose, "editor.close");
     // The notice where two lines fit: in a small window the buttons take the room, and the status
     // bar shows it.

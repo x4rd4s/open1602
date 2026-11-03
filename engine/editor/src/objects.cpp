@@ -76,6 +76,9 @@ core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world
         }
         return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "building_remove"));
     }
+    if (at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) {
+        return make_error(ErrorCode::NotFound, "no building there");  // terrain
+    }
     const bool kontor = at->type->kind == assets::kind::kHq;
     sim::DemolishOrder order;
     order.player = cell.owner;
