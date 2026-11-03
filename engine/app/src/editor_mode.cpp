@@ -875,6 +875,9 @@ void MapViewer::editor_islands_changed() {
         return;
     }
     m_building_figures = render::collect_building_figures(m_state->world, m_buildings, m_figures);
+    // The land units as they stand now: the editor's world does not run, so nothing else draws
+    // or finds a unit placed, taken away or brought back by undo.
+    m_soldiers.reset(m_state->world, m_buildings, m_figures);
     m_camera.set_world_size(m_state->world.width(), m_state->world.height());
     if (m_hud) {
         m_hud->rebuild_minimap();

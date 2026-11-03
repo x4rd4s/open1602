@@ -31,7 +31,7 @@ makes; they are made when a game of it starts, as in the original.
 | Edit islands | New islands: one of the original's templates (or a package's, from `islands.toml`) or one of its own shape, north, south or of a package's climate (`climates.toml`; a placeholder only north or south), in the five sizes of the templates (30 × 30 up to 100 × 90); Another one picks the next template, the panel saying which (its number, or a package's island by name), or another shape. Place puts it in hand: its outline follows the mouse, green where it fits on open sea and red where not; a left click puts it down, a right click or Cancel puts it back. Load island lists the islands saved with Save (below) and the original's island files (`.scp`) put into the folder `islands` in Open1602's user data folder, and puts the one chosen in hand the same way; an `.scp` file, which does not tell its climate, gets the climate chosen on the page. |
 | Placeholders | A scenario of the original that makes its islands when a game starts has a world plan: each of its islands is a placeholder, drawn as a yellow outline of its size class with its name. The shape Placeholder on Edit islands sets a new one (north or south, a size class, its template drawn when the game starts); a click on a placeholder selects it (below). Islands cannot be put on a placeholder. When a game of the scenario starts, the world keeps what the editor left (its islands, cities, players and ships) and only the placeholders become islands; what is beyond the original's limits does not start with it. |
 | Edit terrain | The terrain tools (below). |
-| Buildings, ships, units | The objects' tools (below). |
+| Place objects | The objects' tools (below). |
 | Change map size | Makes the map larger or smaller in steps of 50 tiles, or fits it to its content with some sea around. It grows or is cut at the right and the bottom, so everything keeps its place, and it cannot be cut below the islands, ships, land units and markers. |
 | Overlays | What the map shows over the world: the players' land in their colours, the numbers of the islands, the coordinates of the tile under the mouse. |
 | Check | The check list: what keeps the scenario from being saved (the world must hold together, its description and markers be right), and what the original cannot have (its map size, more islands, cities, ships, land units, towers or players with a start than it holds, larger islands, more ore deposits, content of a package, a script). The second group is a fault only for a scenario that is to keep to the original's limits. |
@@ -100,7 +100,7 @@ ship or a land unit as they are. Each stroke, fill or replacement is one step of
 
 ## Objects
 
-**Buildings, ships, units** places the buildings of the build menu, ships and land units for a
+**Place objects** puts down the buildings of the build menu, ships and land units for a
 player, without costs, and takes them away again. Each click, or each drag, is one step of undo.
 
 | Setting | What it does |

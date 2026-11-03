@@ -619,7 +619,7 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     m.object_group = "Farms";
     m.object_name = "Cattle farm";
     m.object_owner = "Merchant";
-    CHECK(!click(panel, m, "Buildings, ships, units").has_value());
+    CHECK(!click(panel, m, "Place objects").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Objects);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Cattle farm (1/4)"));
@@ -695,10 +695,11 @@ TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they
     m.object_pieces = 5;
     m.object_name = "Large trading ship";
     m.object_turns = true;
-    CHECK(!click(panel, m, "Buildings, ships, units").has_value());
+    CHECK(!click(panel, m, "Place objects").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Objects);
     (void)panel.draw(m, kNoFonts);
-    CHECK(says(panel, "Large trading ship (2/5)"));
+    CHECK(says(panel, "Large trading ship"));
+    CHECK(says(panel, "Ship (2/5)"));  // the number above, the long name alone on its button
     CHECK(says(panel, "new, empty ship"));
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         if (w.text == "Farms") {
@@ -708,7 +709,7 @@ TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they
     }
     // The type steps the ship, not the building, and keeps the way it faces.
     m.objects.rotation = 2;
-    auto r = click(panel, m, "Large trading ship (2/5)");
+    auto r = click(panel, m, "Large trading ship");
     REQUIRE(r.has_value());
     CHECK(r->objects.ship == 2);
     CHECK(r->objects.piece == 2);
@@ -726,7 +727,8 @@ TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they
     m.object_name = "Musketeer";
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "land unit of the owner"));
-    r = click(panel, m, "Musketeer (1/4)", ui::MouseButton::Right);
+    CHECK(says(panel, "Unit (1/4)"));
+    r = click(panel, m, "Musketeer", ui::MouseButton::Right);
     REQUIRE(r.has_value());
     CHECK(r->objects.unit == 3);
     CHECK(r->objects.ship == 1);

@@ -709,22 +709,31 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     // Ships and land units: the piece is their type, the rotation the way they face.
     const bool figure = o.tool == Tool::Ship || o.tool == Tool::Unit;
     const std::size_t chosen = o.tool == Tool::Ship ? o.ship : o.tool == Tool::Unit ? o.unit : o.piece;
-    const auto value = [&](Id id, const char* label, std::string text, bool enabled) {
-        f.label(Rect{kX, y, kW, 18}, ui::tr(label), Align::Left, enabled ? Tone::Normal : Tone::Dim);
+    const auto value = [&](Id id, const std::string& label, std::string text, bool enabled) {
+        f.label(Rect{kX, y, kW, 18}, label, Align::Left, enabled ? Tone::Normal : Tone::Dim);
         y += 18;
         f.cycle_button(id, Rect{kX, y, kW, kButtonH}, std::move(text), enabled);
         y += kButtonH + 2;
     };
-    value(kObjectsTool, "editor.objects.tool", ui::tr(kObjectToolTexts[static_cast<std::size_t>(o.tool)]), true);
-    value(kObjectsGroup, "editor.objects.group", model.object_group, build && model.object_groups > 0);
-    value(kObjectsPiece, kObjectPieceLabels[static_cast<std::size_t>(o.tool)],
-          model.object_pieces > 0
-              ? ui::tr("editor.objects.piece_value", {model.object_name, count(chosen + 1), count(model.object_pieces)})
-              : ui::tr("editor.terrain.no_piece"),
-          (build || figure) && model.object_pieces > 0);
-    value(kObjectsRotation, "editor.objects.rotation", ui::tr(kTerrainRotationTexts[o.rotation & 3U]),
+    value(kObjectsTool, ui::tr("editor.objects.tool"), ui::tr(kObjectToolTexts[static_cast<std::size_t>(o.tool)]),
+          true);
+    value(kObjectsGroup, ui::tr("editor.objects.group"), model.object_group, build && model.object_groups > 0);
+    // A ship's or unit's name is long: its number goes on the label above it.
+    const char* piece_label = kObjectPieceLabels[static_cast<std::size_t>(o.tool)];
+    std::string piece = ui::tr("editor.terrain.no_piece");
+    std::string label = ui::tr(piece_label);
+    if (model.object_pieces > 0) {
+        const std::string n = count(std::min(chosen, model.object_pieces - 1) + 1);
+        piece = figure ? model.object_name
+                       : ui::tr("editor.objects.piece_value", {model.object_name, n, count(model.object_pieces)});
+        if (figure) {
+            label = ui::tr(piece_label, {n, count(model.object_pieces)});
+        }
+    }
+    value(kObjectsPiece, label, std::move(piece), (build || figure) && model.object_pieces > 0);
+    value(kObjectsRotation, ui::tr("editor.objects.rotation"), ui::tr(kTerrainRotationTexts[o.rotation & 3U]),
           (build && model.object_turns) || figure);
-    value(kObjectsOwner, "editor.objects.owner",
+    value(kObjectsOwner, ui::tr("editor.objects.owner"),
           model.players > 0 ? model.object_owner : ui::tr("editor.objects.no_owner"),
           (build || figure) && model.players > 0);
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
