@@ -214,12 +214,15 @@ public:
     /// A pick the next click on the map answers: an attack (A) or a patrol (P).
     enum class Pick : std::uint8_t { None, Attack, Patrol };
     [[nodiscard]] Pick pick() const noexcept { return m_pick; }
+    /// F1: the keys as they are bound now, over the map.
+    void show_key_help();
+    /// The first key of `action` in the editor's context, as the overview names it ("Ctrl+S");
+    /// empty: none.
+    [[nodiscard]] std::string editor_keys(ui::KeyAction action) const;
 
 private:
     /// The keys of ADR 0010.
     void setup_keys();
-    /// F1: the keys as they are bound now, over the map.
-    void show_key_help();
     void handle_key(int key, int scancode, std::uint16_t mod);
     [[nodiscard]] ui::KeyContext key_context() const;
     void run_action(const ui::KeyBinding& binding);

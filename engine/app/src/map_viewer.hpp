@@ -365,6 +365,10 @@ private:
     void editor_rules_request(const EditorRequest& request);
     /// The dice preview: another roll of the plan shown on the map, or the plan back.
     void editor_roll();
+    /// What the editor's frame shows besides the panel: the keys, where the mouse is.
+    [[nodiscard]] EditorChromeModel editor_chrome() const;
+    /// The key "rotate": the piece or object in hand a quarter on, the copy turned.
+    void editor_rotate_tool();
     void editor_end_preview();
     /// The buildings' tools' settings from the panel.
     void editor_objects_request(const EditorRequest& request);

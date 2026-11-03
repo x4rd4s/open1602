@@ -287,6 +287,146 @@ bool EditorPanel::back() noexcept {
     return true;
 }
 
+std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const EditorModel& model) {
+    m_form.set_focus(std::nullopt);
+    switch (command) {
+        case EditorCommand::New:
+            return press(kNew, model, true);
+        case EditorCommand::Open:
+            return press(kOpen, model, true);
+        case EditorCommand::Save:
+            return press(kSave, model, true);
+        case EditorCommand::SaveAs:
+            return press(kSaveAs, model, true);
+        case EditorCommand::Close:
+            return press(kClose, model, true);
+        case EditorCommand::Undo:
+            return model.can_undo ? press(kUndo, model, true) : std::nullopt;
+        case EditorCommand::Redo:
+            return model.can_redo ? press(kRedo, model, true) : std::nullopt;
+        case EditorCommand::View:
+            return press(kView, model, true);
+        case EditorCommand::Islands:
+            m_island.placeholder = false;
+            return press(kIslandPage, model, true);
+        case EditorCommand::WorldSize:
+            return press(kWorldSizePage, model, true);
+        case EditorCommand::Random:
+            return press(kRandomPage, model, true);
+        case EditorCommand::Preview:
+            if (!model.has_plan && !model.previewing) {
+                return std::nullopt;
+            }
+            m_page = Page::Random;
+            m_first = 0;
+            return EditorRequest{EditorRequest::Kind::RandomRoll};
+        case EditorCommand::Players:
+            return press(kPlayersPage, model, true);
+        case EditorCommand::Rules:
+            return press(kRulesPage, model, true);
+        case EditorCommand::Check:
+            return press(kCheck, model, true);
+        case EditorCommand::Keys:
+            return EditorRequest{EditorRequest::Kind::ShowKeys};
+    }
+    return std::nullopt;
+}
+
+namespace {
+
+constexpr std::array<std::pair<EditorTool, EditorTerrain::Tool>, 10> kTerrainTools = {{
+    {EditorTool::Land, EditorTerrain::Tool::Land},
+    {EditorTool::Water, EditorTerrain::Tool::Water},
+    {EditorTool::Coast, EditorTerrain::Tool::Coast},
+    {EditorTool::Brush, EditorTerrain::Tool::Brush},
+    {EditorTool::Random, EditorTerrain::Tool::Random},
+    {EditorTool::Fill, EditorTerrain::Tool::Fill},
+    {EditorTool::Replace, EditorTerrain::Tool::Replace},
+    {EditorTool::Pipette, EditorTerrain::Tool::Pipette},
+    {EditorTool::Area, EditorTerrain::Tool::Select},
+    {EditorTool::Paste, EditorTerrain::Tool::Paste},
+}};
+
+constexpr std::array<std::pair<EditorTool, EditorObjects::Tool>, 6> kObjectTools = {{
+    {EditorTool::Build, EditorObjects::Tool::Build},
+    {EditorTool::Template, EditorObjects::Tool::Template},
+    {EditorTool::Ship, EditorObjects::Tool::Ship},
+    {EditorTool::Unit, EditorObjects::Tool::Unit},
+    {EditorTool::Resource, EditorObjects::Tool::Resource},
+    {EditorTool::Remove, EditorObjects::Tool::Remove},
+}};
+
+}  // namespace
+
+std::optional<EditorRequest> EditorPanel::choose_tool(EditorTool tool, const EditorModel& model) {
+    m_form.set_focus(std::nullopt);
+    switch (tool) {
+        case EditorTool::Select:
+            m_page = Page::Selection;
+            return std::nullopt;
+        case EditorTool::Island:
+            m_page = Page::Islands;
+            m_island.placeholder = false;
+            return std::nullopt;
+        case EditorTool::Placeholder:
+            if (model.has_plan) {
+                m_page = Page::Islands;
+                m_island.placeholder = true;
+            }
+            return std::nullopt;
+        default:
+            break;
+    }
+    for (const auto& [t, terrain] : kTerrainTools) {
+        if (t == tool) {
+            m_page = Page::Terrain;
+            EditorRequest r{EditorRequest::Kind::Terrain};
+            r.terrain = model.terrain;
+            r.terrain.tool = terrain;
+            return r;
+        }
+    }
+    for (const auto& [t, objects] : kObjectTools) {
+        if (t == tool) {
+            m_page = Page::Objects;
+            EditorRequest r{EditorRequest::Kind::Objects};
+            r.objects = model.objects;
+            r.objects.tool = objects;
+            return r;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) const noexcept {
+    switch (m_page) {
+        case Page::Selection:
+        case Page::CityName:
+        case Page::CityGoods:
+        case Page::Fertility:
+            return EditorTool::Select;
+        case Page::Islands:
+        case Page::IslandFiles:
+            return m_island.placeholder && model.has_plan ? EditorTool::Placeholder : EditorTool::Island;
+        case Page::Terrain:
+            for (const auto& [t, terrain] : kTerrainTools) {
+                if (terrain == model.terrain.tool) {
+                    return t;
+                }
+            }
+            return std::nullopt;
+        case Page::Objects:
+            for (const auto& [t, objects] : kObjectTools) {
+                if (objects == model.objects.tool) {
+                    return t;
+                }
+            }
+            return std::nullopt;
+        default:
+            return std::nullopt;
+    }
+}
+
 void EditorPanel::layout(const EditorModel& model) {
     m_form.clear();
     m_form.panel(Rect{kX - 6, m_top, kWidth - 2 * (kX - 6), m_height});
@@ -382,40 +522,12 @@ void EditorPanel::layout_document(const EditorModel& model) {
     y += kLine;
     f.entry(Rect{kX, y, kW, kLine}, ui::tr("editor.players"), count(model.players), Tone::Dim);
     y += kLine + 4;
-    // The buttons share what is left above two lines of the notice: as high as the game's in a
-    // large window, lower in a small one, so that the last stays in the panel.
-    constexpr std::int32_t kButtons = 12;                        // rows
-    constexpr std::int32_t kNoticeRoom = 2 * 20 + 6 + kButtons;  // and what rounding the pitch down loses
+    // What the files, the pages of the whole map and the tools are: the menu bar above the map and
+    // the tool bar left of it (EditorChrome) have them, and each its key.
     const std::int32_t bottom = m_top + m_height - 4;
-    const std::int32_t pitch = std::clamp((bottom - kNoticeRoom - y) / kButtons, 22, kButtonH + kGap);
-    const std::int32_t gap = std::min(kGap, std::max(2, pitch / 8));
-    const auto full = [&](Id id, const char* text, bool enabled = true) {
-        f.button(id, Rect{kX, y, kW, pitch - gap}, ui::tr(text), enabled);
-        y += pitch;
-    };
-    // Two buttons of short names side by side in one row: open and check.
-    const auto pair = [&](Id left, const char* left_text, bool left_on, Id right, const char* right_text,
-                          bool right_on) {
-        const std::int32_t half = (kW - kGap) / 2;
-        f.button(left, Rect{kX, y, half, pitch - gap}, ui::tr(left_text), left_on);
-        f.button(right, Rect{kX + half + kGap, y, kW - half - kGap, pitch - gap}, ui::tr(right_text), right_on);
-        y += pitch;
-    };
-    full(kNew, "editor.new");
-    full(kOpen, "editor.open");
-    full(kSave, "editor.save");
-    full(kSaveAs, "editor.save_as");
-    full(kUndo, "editor.undo", model.can_undo);
-    full(kRedo, "editor.redo", model.can_redo);
-    full(kIslandPage, "editor.islands.edit");
-    full(kTerrainPage, "editor.terrain.edit");
-    full(kObjectsPage, "editor.objects.edit");
-    full(kWorldSizePage, "editor.world_size.edit");
-    pair(kPlayersPage, "editor.players.edit", true, kRulesPage, "editor.rules.edit", true);
-    pair(kView, "editor.view", true, kCheck, "editor.check", true);
-    full(kClose, "editor.close");
-    // The notice where two lines fit: in a small window the buttons take the room, and the status
-    // bar shows it.
+    f.paragraph(Rect{kX, y, kW, std::max(0, std::min(5 * 20, bottom - y))}, ui::tr("editor.document.hint"), Tone::Dim,
+                20, ui::tr("editor.document.hint_short"));
+    y += 5 * 20 + kGap;
     if (!model.notice.empty() && bottom - y - 2 >= 2 * 20) {
         f.paragraph(Rect{kX, y + 2, kW, std::max(0, bottom - y - 2)}, model.notice,
                     model.notice_is_error ? Tone::Warning : Tone::Dim, 20);
@@ -1216,7 +1328,11 @@ std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, 
     if (!id) {
         return std::nullopt;
     }
-    const bool forward = m_form.clicked_with() == ui::MouseButton::Left;
+    return press(*id, model, m_form.clicked_with() == ui::MouseButton::Left);
+}
+
+std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& model, bool forward) {
+    const std::optional<Id> id = pressed;
     switch (*id) {
         case kNew:
             ask_new(m_new);

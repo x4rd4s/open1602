@@ -162,6 +162,31 @@ bool MapInput::editor_key(ui::KeyAction action) noexcept {
         case KeyAction::EditorUndo:
         case KeyAction::EditorRedo:
         case KeyAction::EditorSave:
+        case KeyAction::EditorNew:
+        case KeyAction::EditorOpen:
+        case KeyAction::EditorSaveAs:
+        case KeyAction::EditorRotate:
+        case KeyAction::EditorBrushBigger:
+        case KeyAction::EditorBrushSmaller:
+        case KeyAction::EditorToolSelect:
+        case KeyAction::EditorToolIsland:
+        case KeyAction::EditorToolPlaceholder:
+        case KeyAction::EditorToolLand:
+        case KeyAction::EditorToolWater:
+        case KeyAction::EditorToolCoast:
+        case KeyAction::EditorToolBrush:
+        case KeyAction::EditorToolRandom:
+        case KeyAction::EditorToolFill:
+        case KeyAction::EditorToolReplace:
+        case KeyAction::EditorToolPipette:
+        case KeyAction::EditorToolArea:
+        case KeyAction::EditorToolPaste:
+        case KeyAction::EditorToolBuild:
+        case KeyAction::EditorToolTemplate:
+        case KeyAction::EditorToolShip:
+        case KeyAction::EditorToolUnit:
+        case KeyAction::EditorToolResource:
+        case KeyAction::EditorToolRemove:
             return true;
         default:
             return false;
@@ -264,6 +289,35 @@ void MapInput::setup_keys() {
     editor(chord(SDLK_Y, true), KeyAction::EditorRedo);
     editor(chord(SDLK_Z, true, true), KeyAction::EditorRedo);
     editor(chord(SDLK_S, true), KeyAction::EditorSave);
+    editor(chord(SDLK_N, true), KeyAction::EditorNew);
+    editor(chord(SDLK_O, true), KeyAction::EditorOpen);
+    editor(chord(SDLK_S, true, true), KeyAction::EditorSaveAs);
+    editor(chord(SDLK_R), KeyAction::EditorRotate);
+    editor(chord(SDLK_PLUS), KeyAction::EditorBrushBigger);
+    editor(chord(SDLK_EQUALS), KeyAction::EditorBrushBigger);
+    editor(chord(SDLK_KP_PLUS), KeyAction::EditorBrushBigger);
+    editor(chord(SDLK_MINUS), KeyAction::EditorBrushSmaller);
+    editor(chord(SDLK_KP_MINUS), KeyAction::EditorBrushSmaller);
+    // The tools: keys that the view's (W A S D, Q, E by their place) leave free.
+    editor(chord(SDLK_V), KeyAction::EditorToolSelect);
+    editor(chord(SDLK_I), KeyAction::EditorToolIsland);
+    editor(chord(SDLK_H), KeyAction::EditorToolPlaceholder);
+    editor(chord(SDLK_L), KeyAction::EditorToolLand);
+    editor(chord(SDLK_O), KeyAction::EditorToolWater);
+    editor(chord(SDLK_K), KeyAction::EditorToolCoast);
+    editor(chord(SDLK_P), KeyAction::EditorToolBrush);
+    editor(chord(SDLK_Z), KeyAction::EditorToolRandom);
+    editor(chord(SDLK_F), KeyAction::EditorToolFill);
+    editor(chord(SDLK_F, false, true), KeyAction::EditorToolReplace);
+    editor(chord(SDLK_C), KeyAction::EditorToolPipette);
+    editor(chord(SDLK_B), KeyAction::EditorToolArea);
+    editor(chord(SDLK_V, true, false), KeyAction::EditorToolPaste);
+    editor(chord(SDLK_G), KeyAction::EditorToolBuild);
+    editor(chord(SDLK_T), KeyAction::EditorToolTemplate);
+    editor(chord(SDLK_S, false, true), KeyAction::EditorToolShip);
+    editor(chord(SDLK_U), KeyAction::EditorToolUnit);
+    editor(chord(SDLK_R, false, true), KeyAction::EditorToolResource);
+    editor(chord(SDLK_X), KeyAction::EditorToolRemove);
     // Building
     building(chord(SDLK_R), KeyAction::RotateBuilding);
     building(chord(SDLK_R, false, true), KeyAction::RotateBuildingBack);
@@ -341,6 +395,15 @@ void MapInput::show_key_help() {
     auto pages = key_help_pages(entries, [](KeyAction a) { return action_label(a); });
     add_click_lines(pages);
     m_hud->show_help(std::move(pages));
+}
+
+std::string MapInput::editor_keys(ui::KeyAction action) const {
+    for (const ui::KeyBinding& b : m_keys.all()) {
+        if (b.action == action && b.context == ui::KeyContext::Editor) {
+            return key_label(b.chord);
+        }
+    }
+    return {};
 }
 
 ui::KeyContext MapInput::key_context() const {
@@ -665,6 +728,31 @@ void MapInput::run_action(const ui::KeyBinding& b) {
         case KeyAction::EditorUndo:
         case KeyAction::EditorRedo:
         case KeyAction::EditorSave:
+        case KeyAction::EditorNew:
+        case KeyAction::EditorOpen:
+        case KeyAction::EditorSaveAs:
+        case KeyAction::EditorRotate:
+        case KeyAction::EditorBrushBigger:
+        case KeyAction::EditorBrushSmaller:
+        case KeyAction::EditorToolSelect:
+        case KeyAction::EditorToolIsland:
+        case KeyAction::EditorToolPlaceholder:
+        case KeyAction::EditorToolLand:
+        case KeyAction::EditorToolWater:
+        case KeyAction::EditorToolCoast:
+        case KeyAction::EditorToolBrush:
+        case KeyAction::EditorToolRandom:
+        case KeyAction::EditorToolFill:
+        case KeyAction::EditorToolReplace:
+        case KeyAction::EditorToolPipette:
+        case KeyAction::EditorToolArea:
+        case KeyAction::EditorToolPaste:
+        case KeyAction::EditorToolBuild:
+        case KeyAction::EditorToolTemplate:
+        case KeyAction::EditorToolShip:
+        case KeyAction::EditorToolUnit:
+        case KeyAction::EditorToolResource:
+        case KeyAction::EditorToolRemove:
             if (m_editor) {
                 m_host.editor_key(b.action);
             }

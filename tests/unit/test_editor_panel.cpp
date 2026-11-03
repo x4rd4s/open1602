@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../test_framework.hpp"
+#include "editor_chrome.hpp"
 #include "editor_panel.hpp"
 
 #include "o1602/sim/climates.hpp"
@@ -51,11 +52,28 @@ std::optional<std::array<std::int32_t, 2>> find(const EditorPanel& panel, const 
     return std::nullopt;
 }
 
+/// The command of the menu bar (EditorChrome) whose entry says `text`, if one does.
+std::optional<app::EditorCommand> menu_command(const std::string& text) {
+    for (std::size_t c = 0; c <= static_cast<std::size_t>(app::EditorCommand::Keys); ++c) {
+        const auto command = static_cast<app::EditorCommand>(c);
+        if (ui::tr(app::EditorChrome::command_text(command)) == text) {
+            return command;
+        }
+    }
+    return std::nullopt;
+}
+
+/// A click on the button that says `text`; where the page has none, the menu bar's entry of that
+/// name (the files, undo, the pages of the whole map are there).
 std::optional<EditorRequest> click(EditorPanel& panel, const EditorModel& model, const std::string& text,
                                    ui::MouseButton button = ui::MouseButton::Left) {
     panel.layout(model);
     const auto at = find(panel, text);
-    REQUIRE(at.has_value());
+    if (!at) {
+        const auto command = menu_command(text);
+        REQUIRE(command.has_value());
+        return panel.command(*command, model);
+    }
     (void)panel.mouse((*at)[0], (*at)[1], true, model, button);
     return panel.mouse((*at)[0], (*at)[1], false, model, button);
 }
@@ -526,7 +544,7 @@ TEST_CASE("editor panel: the terrain tools go through their tools, kinds, pieces
     EditorModel m = document();
     m.terrain_pieces = 3;
     m.terrain_id = 22722;
-    CHECK(!click(panel, m, "Edit terrain").has_value());
+    (void)panel.choose_tool(app::EditorTool::Brush, m);  // the tool bar's brush
     REQUIRE(panel.page() == EditorPanel::Page::Terrain);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "22722 (1/3)"));
@@ -620,8 +638,8 @@ TEST_CASE("editor panel: the buildings' tools go through their tools, groups, bu
     m.object_group = "Farms";
     m.object_name = "Cattle farm";
     m.object_owner = "Merchant";
-    m.object_owners = 6;  // four players, the natives and the pirates
-    CHECK(!click(panel, m, "Place objects").has_value());
+    m.object_owners = 6;                                 // four players, the natives and the pirates
+    (void)panel.choose_tool(app::EditorTool::Build, m);  // the tool bar's buildings
     REQUIRE(panel.page() == EditorPanel::Page::Objects);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Cattle farm"));
@@ -700,7 +718,7 @@ TEST_CASE("editor panel: the tools Ship and Unit choose their type, the way they
     m.object_name = "Large trading ship";
     m.object_turns = true;
     m.object_owners = 4;
-    CHECK(!click(panel, m, "Place objects").has_value());
+    (void)panel.choose_tool(app::EditorTool::Build, m);  // the tool bar's buildings
     REQUIRE(panel.page() == EditorPanel::Page::Objects);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Large trading ship"));
@@ -943,7 +961,7 @@ TEST_CASE("editor panel: the page Players goes through the slots and changes wha
         m.player_slots.push_back(p);
     }
     m.can_add_player = true;
-    CHECK(!click_id(panel, m, ui::Form::Id{90}).has_value());  // the button "Players" (the line above says it too)
+    CHECK(!panel.command(app::EditorCommand::Players, m).has_value());  // the menu bar's "Players"
     REQUIRE(panel.page() == EditorPanel::Page::Players);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Player (1/4)"));
@@ -1011,7 +1029,7 @@ TEST_CASE("editor panel: the page Relations sets how two players stand at the st
     }
     m.player_slots[0].relations[1].peace = false;  // 0 and 1 at war
     m.player_slots[1].relations[0].peace = false;
-    CHECK(!click_id(panel, m, ui::Form::Id{90}).has_value());
+    CHECK(!panel.command(app::EditorCommand::Players, m).has_value());
     CHECK(!click(panel, m, "Diplomacy").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Relations);
     (void)panel.draw(m, kNoFonts);

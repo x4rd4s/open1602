@@ -204,6 +204,7 @@ core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::pa
     if (m_hud) {
         m_hud->close_menu();
         m_hud->set_editing(true);
+        lay_out();  // the editor's frame: the map's room is another
     }
     std::fprintf(stderr, "editor: %s, %ux%u, %zu islands\n",
                  file.empty() ? "new map" : core::path_to_utf8(file).c_str(), m_state->world.width(),
@@ -330,6 +331,7 @@ void MapViewer::leave_editor() {
     m_input->set_editor(false);
     if (m_hud) {
         m_hud->set_editing(false);
+        lay_out();
         m_hud->open_menu();
     } else {
         m_running = false;
@@ -465,6 +467,12 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         // The dice preview shows a roll, not the document: the plan back before anything else.
         if (request.kind == Kind::RandomRoll || request.kind == Kind::RandomPreviewEnd) {
             editor_rules_request(request);
+            return;
+        }
+        if (request.kind == Kind::ShowKeys) {
+            if (m_input) {
+                m_input->show_key_help();
+            }
             return;
         }
         if (request.kind != Kind::New && request.kind != Kind::Open && request.kind != Kind::Close) {
@@ -610,6 +618,11 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::RemovePlaceholder:
         case Kind::ChangePlaceholder:
             editor_placeholder_request(request);
+            break;
+        case Kind::ShowKeys:
+            if (m_input) {
+                m_input->show_key_help();
+            }
             break;
         case Kind::ListIslandFiles:
             m_editor_files.clear();
@@ -1483,6 +1496,40 @@ void MapViewer::apply_editor() {
         m_editor->placing.reset();
     }
     m_hud->set_editor_model(editor_model());
+    m_hud->set_editor_chrome(editor_chrome());
+}
+
+EditorChromeModel MapViewer::editor_chrome() const {
+    EditorChromeModel c;
+    if (m_input) {
+        const auto first = static_cast<int>(ui::KeyAction::EditorToolSelect);
+        for (std::size_t t = 0; t < kEditorTools; ++t) {
+            c.tool_keys[t] = m_input->editor_keys(static_cast<ui::KeyAction>(first + static_cast<int>(t)));
+        }
+        const auto key = [&](EditorCommand command, ui::KeyAction action) {
+            c.command_keys[static_cast<std::size_t>(command)] = m_input->editor_keys(action);
+        };
+        key(EditorCommand::New, ui::KeyAction::EditorNew);
+        key(EditorCommand::Open, ui::KeyAction::EditorOpen);
+        key(EditorCommand::Save, ui::KeyAction::EditorSave);
+        key(EditorCommand::SaveAs, ui::KeyAction::EditorSaveAs);
+        key(EditorCommand::Undo, ui::KeyAction::EditorUndo);
+        key(EditorCommand::Redo, ui::KeyAction::EditorRedo);
+        c.command_keys[static_cast<std::size_t>(EditorCommand::Keys)] = "F1";
+        // Where the mouse is: the world tile, and the island's number and its own tile there.
+        const auto mx = static_cast<std::int32_t>(m_input->mouse_x());
+        const auto my = static_cast<std::int32_t>(m_input->mouse_y());
+        const auto tile = m_hud && m_hud->covers(mx, my) ? std::nullopt : m_input->tile_at_mouse();
+        if (tile && tile->x < m_state->world.width() && tile->y < m_state->world.height()) {
+            const sim::World& world = m_state->world;
+            const sim::World::Cell& cell = world.cell(tile->x, tile->y);
+            c.place = cell.island == sim::World::kSea
+                          ? ui::tr("editor.status.sea", {std::to_string(tile->x), std::to_string(tile->y)})
+                          : ui::tr("editor.status.island",
+                                   {std::to_string(tile->x), std::to_string(tile->y), std::to_string(cell.island + 1)});
+        }
+    }
+    return c;
 }
 
 namespace {
@@ -2063,6 +2110,28 @@ bool MapViewer::editor_stroke(std::optional<render::TilePos> tile, Stroke phase)
     return false;
 }
 
+void MapViewer::editor_rotate_tool() {
+    const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
+    if (!m_editor || panel == nullptr) {
+        return;
+    }
+    if (panel->page() == EditorPanel::Page::Objects) {
+        EditorRequest r{EditorRequest::Kind::Objects};
+        r.objects = m_editor->objects;
+        r.objects.rotation = static_cast<std::uint8_t>((r.objects.rotation + 1U) & 3U);
+        editor_request(r);
+    } else if (panel->page() == EditorPanel::Page::Terrain) {
+        if (m_editor->terrain.tool == EditorTerrain::Tool::Paste) {
+            editor_request(EditorRequest{EditorRequest::Kind::TerrainTurn});
+            return;
+        }
+        EditorRequest r{EditorRequest::Kind::Terrain};
+        r.terrain = m_editor->terrain;
+        r.terrain.rotation = static_cast<std::uint8_t>((r.terrain.rotation + 1U) & 3U);
+        editor_request(r);
+    }
+}
+
 void MapViewer::editor_key(ui::KeyAction action) {
     switch (action) {
         case ui::KeyAction::EditorUndo:
@@ -2074,8 +2143,43 @@ void MapViewer::editor_key(ui::KeyAction action) {
         case ui::KeyAction::EditorSave:
             editor_request(EditorRequest{EditorRequest::Kind::Save});
             break;
-        default:
+        case ui::KeyAction::EditorNew:
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::New);
+            }
             break;
+        case ui::KeyAction::EditorOpen:
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::Open);
+            }
+            break;
+        case ui::KeyAction::EditorSaveAs:
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::SaveAs);
+            }
+            break;
+        case ui::KeyAction::EditorRotate:
+            editor_rotate_tool();
+            break;
+        case ui::KeyAction::EditorBrushBigger:
+        case ui::KeyAction::EditorBrushSmaller: {
+            EditorRequest r{EditorRequest::Kind::Terrain};
+            r.terrain = m_editor->terrain;
+            const bool bigger = action == ui::KeyAction::EditorBrushBigger;
+            const auto last = static_cast<std::uint8_t>(kTerrainBrushes.size() - 1);
+            r.terrain.brush = bigger ? std::min<std::uint8_t>(last, r.terrain.brush + 1)
+                                     : static_cast<std::uint8_t>(r.terrain.brush > 0 ? r.terrain.brush - 1 : 0);
+            editor_request(r);
+            break;
+        }
+        default: {
+            const auto first = static_cast<int>(ui::KeyAction::EditorToolSelect);
+            const auto a = static_cast<int>(action);
+            if (m_hud && a >= first && a < first + static_cast<int>(kEditorTools)) {
+                m_hud->editor_tool(static_cast<EditorTool>(a - first));
+            }
+            break;
+        }
     }
 }
 
