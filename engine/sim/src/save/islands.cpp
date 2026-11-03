@@ -67,9 +67,13 @@ void io_explored(A& a, E& e, std::uint16_t version) {
             } else {
                 a.u32(words[0]);
             }
-            mask = assets::SlotSet::from_words(std::move(words));
+            mask = assets::SlotSet::from_words(words);
         } else if (version >= kWideDepositKnowledge) {
-            a.u32s(mask.words());
+            std::vector<std::uint32_t> words(mask.word_count());
+            for (std::size_t i = 0; i < words.size(); ++i) {
+                words[i] = mask.word(i);
+            }
+            a.u32s(words);
         } else {
             a.u32(mask.word(0));
         }
@@ -124,7 +128,7 @@ std::vector<Decoded::IslandPart> read_islands(Reader& in, std::uint16_t version)
 std::uint16_t explored_version(const World& w) {
     for (const WorldIsland& i : w.islands()) {
         for (const auto& d : i.header.deposits) {
-            if (d.mask.words().size() > 1) {
+            if (d.mask.word_count() > 1) {
                 return kWideDepositKnowledge;
             }
         }

@@ -620,7 +620,7 @@ TEST_CASE("deposits: who knows one is a set of player slots without an upper lim
     CHECK(set.contains(100));
     CHECK(!set.contains(99));
     CHECK(!set.contains(1000));
-    CHECK(set.words().size() == 4);
+    CHECK(set.word_count() == 4);
     CHECK(set.word(3) == 1U << 4);
     CHECK(set.word(9) == 0);
     // Trailing zero words do not count: equal sets compare equal.
