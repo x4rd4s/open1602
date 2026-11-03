@@ -1223,7 +1223,7 @@ std::string goal_problem_text(const sim::World& world, const editor::GoalProblem
         case Kind::TargetNoCity:
             return ui::tr("editor.check.goal.target_no_city", {mission});
     }
-    return mission;
+    return {};
 }
 
 }  // namespace
