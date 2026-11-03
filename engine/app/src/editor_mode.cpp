@@ -19,6 +19,7 @@
 #include "o1602/assets/text_table.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/core/text.hpp"
+#include "o1602/editor/fairness.hpp"
 #include "o1602/editor/goals.hpp"
 #include "o1602/editor/islands.hpp"
 #include "o1602/editor/objects.hpp"
@@ -1486,6 +1487,44 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     if (goal_problems.empty()) {
         lines.push_back(Line{ui::tr(world.missions().empty() ? "editor.check.no_missions" : "editor.check.goals_fine"),
                              Line::Kind::Fine});
+    }
+    // What each player finds around its start, and what is uneven between them.
+    const auto areas = editor::start_areas(world, m_buildings);
+    if (areas.size() >= 2) {
+        lines.push_back(Line{ui::tr("editor.check.starts"), Line::Kind::Heading});
+        static constexpr std::array<const char*, editor::kStartCrops> kCrops = {
+            "editor.crop.tobacco", "editor.crop.spices", "editor.crop.sugar",
+            "editor.crop.cotton",  "editor.crop.wine",   "editor.crop.cocoa"};
+        const auto who = [&](sim::PlayerId id) {
+            const sim::Player* p = world.player(id);
+            return p != nullptr ? player_name(*p) : ui::tr("editor.goals.slot", {number(id + 1U)});
+        };
+        for (const editor::StartArea& a : areas) {
+            std::string crops;
+            for (std::size_t c = 0; c < editor::kStartCrops; ++c) {
+                if (a.crops[c] != 0) {
+                    crops += (crops.empty() ? "" : ", ") + ui::tr(kCrops[c]);
+                }
+            }
+            lines.push_back(
+                Line{ui::tr("editor.check.start", {who(a.player), number(a.islands), number(a.land),
+                                                   crops.empty() ? ui::tr("editor.check.start_no_crops") : crops,
+                                                   number(a.ore), number(a.gold), number(a.rival)}),
+                     Line::Kind::Note});
+        }
+        const auto uneven = editor::unfairness(areas);
+        for (const editor::Unfairness& u : uneven) {
+            using UK = editor::Unfairness::Kind;
+            const std::string text = u.kind == UK::Land  ? ui::tr("editor.check.unfair.land", {who(u.player)})
+                                     : u.kind == UK::Ore ? ui::tr("editor.check.unfair.ore", {who(u.player)})
+                                     : u.kind == UK::Gold
+                                         ? ui::tr("editor.check.unfair.gold", {who(u.player)})
+                                         : ui::tr("editor.check.unfair.crop", {who(u.player), ui::tr(kCrops[u.crop])});
+            lines.push_back(Line{text, Line::Kind::Warning});
+        }
+        if (uneven.empty()) {
+            lines.push_back(Line{ui::tr("editor.check.fair"), Line::Kind::Fine});
+        }
     }
     // What the original cannot have: a fault only while the scenario is to keep to its limits.
     const auto& info = world.scenario_info();
