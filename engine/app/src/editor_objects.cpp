@@ -13,6 +13,7 @@
 #include "map_input.hpp"
 #include "map_viewer.hpp"
 #include "names.hpp"
+#include "templates.hpp"
 
 #include "o1602/assets/own_figures.hpp"
 #include "o1602/assets/text_table.hpp"
@@ -156,6 +157,12 @@ void MapViewer::editor_object_model(EditorModel& m) const {
     }
     using Tool = EditorObjects::Tool;
     const Tool tool = m_editor->objects.tool;
+    if (tool == Tool::Template) {
+        m.object_pieces = m_templates ? m_templates->all().size() : 0;
+        m.object_turns = true;
+        const BuildTemplate* t = editor_template();
+        m.object_name = t != nullptr ? t->name : std::string();
+    }
     if (tool == Tool::Resource) {
         m.object_pieces = editor::kResources;
         m.object_turns = false;
@@ -188,6 +195,7 @@ void MapViewer::editor_object_model(EditorModel& m) const {
         }
     }
     const auto owners = object_owners(m_editor->document.world());
+    m.object_owners = owners.size();
     if (!owners.empty()) {
         const sim::Player* p = m_editor->document.world().player(owners[m_editor->objects.owner % owners.size()]);
         m.object_owner = p != nullptr ? player_name(*p) : std::string("-");
@@ -290,8 +298,87 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
 void MapViewer::editor_objects_request(const EditorRequest& request) {
     EditorObjects o = request.objects;
     o.rotation &= 3U;
+    if (o.tool == EditorObjects::Tool::Template && m_editor->objects.tool != EditorObjects::Tool::Template) {
+        template_store().load();  // saved in a game meanwhile
+    }
     m_editor->objects = o;
     m_editor->notice.clear();
+}
+
+const BuildTemplate* MapViewer::editor_template() const {
+    if (!m_editor || !m_templates || m_templates->all().empty()) {
+        return nullptr;
+    }
+    const std::vector<BuildTemplate>& all = m_templates->all();
+    return &all[std::min(m_editor->objects.stamp, all.size() - 1)];
+}
+
+std::optional<sim::BuildOrder> MapViewer::editor_template_order(std::int64_t x, std::int64_t y) const {
+    const sim::World& world = m_editor->document.world();
+    const BuildTemplate* t = editor_template();
+    const sim::PlayerId owner = editor_object_owner();
+    if (t == nullptr || owner == sim::kNoPlayer || x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    BuildTool::Layout layout = t->layout;
+    layout.rotate(m_editor->objects.rotation & 3);
+    // The template hangs at the mouse by its middle, as in the copy tool's hand, and keeps its
+    // buildings' rotations.
+    sim::BuildOrder order;
+    order.player = owner;
+    order.island = c.island;
+    order.free = true;
+    order.orient_to_road = false;
+    const std::int32_t ox = static_cast<std::int32_t>(c.local_x) - (layout.width - 1) / 2;
+    const std::int32_t oy = static_cast<std::int32_t>(c.local_y) - (layout.height - 1) / 2;
+    for (const BuildTool::Layout::Item& item : layout.items) {
+        if (m_buildings.by_id(item.building) != nullptr) {
+            order.items.push_back(sim::BuildItem{item.building, ox + item.x, oy + item.y, item.rotation, 0});
+        }
+    }
+    if (order.items.empty()) {
+        return std::nullopt;
+    }
+    return order;
+}
+
+void MapViewer::editor_place_template(std::int64_t x, std::int64_t y) {
+    (void)template_store();  // read on first use
+    if (editor_object_owner() == sim::kNoPlayer) {
+        editor_notice(ui::tr("editor.objects.note.no_players"), true, "no owner");
+        return;
+    }
+    if (editor_template() == nullptr) {
+        editor_notice(ui::tr("editor.objects.note.no_templates"), true, "no template");
+        return;
+    }
+    const auto order = editor_template_order(x, y);
+    if (!order) {
+        editor_notice(ui::tr("editor.objects.refused.island"), true, "template not on an island");
+        return;
+    }
+    const std::size_t items = order->items.size();
+    editor::PlacedBuildings placed =
+        editor::place_buildings(m_editor->document.world(), m_buildings, *order, m_city_names);
+    if (!placed.step) {
+        if (!placed.plan.items.empty()) {
+            editor_notice(build_refusal(placed.plan.items.front().refusal), true, "template refused");
+        }
+        return;
+    }
+    m_editor->document.perform(std::move(placed.step));
+    editor_islands_changed();
+    m_editor->notice.clear();
+    if (placed.plan.placed < items) {
+        // Some of it did not fit: say how much stands.
+        editor_notice(
+            ui::tr("editor.objects.template_part", {std::to_string(placed.plan.placed), std::to_string(items)}), false,
+            "template placed in part");
+    }
 }
 
 std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, std::int64_t y) const {
@@ -384,6 +471,10 @@ bool MapViewer::editor_objects_stroke(std::optional<render::TilePos> tile, Strok
             }
             if (m_editor->objects.tool == EditorObjects::Tool::Resource) {
                 editor_place_resource(*tile);
+                return true;
+            }
+            if (m_editor->objects.tool == EditorObjects::Tool::Template) {
+                editor_place_template(tile->x, tile->y);  // one at a click
                 return true;
             }
             if (m_editor->objects.tool != EditorObjects::Tool::Build) {

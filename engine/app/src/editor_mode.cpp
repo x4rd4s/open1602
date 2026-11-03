@@ -1304,6 +1304,26 @@ void MapViewer::draw_editor_marks() {
                          : editor::unit_fits(world, m_buildings, tile->x, tile->y)) == editor::UnitRefusal::None;
                 outline(tile->x, tile->y, 1, 1,
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
+            } else if (tool == EditorObjects::Tool::Template) {
+                // A template: each of its buildings where a click puts it, green where it can stand,
+                // red where not.
+                if (const auto order = editor_template_order(tile->x, tile->y)) {
+                    const sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+                    const sim::WorldIsland& isl = world.islands()[order->island];
+                    for (std::size_t i = 0; i < order->items.size() && i < plan.items.size(); ++i) {
+                        const sim::BuildItem& item = order->items[i];
+                        std::uint32_t w = 1;
+                        std::uint32_t h = 1;
+                        if (const assets::BuildingType* t = m_buildings.by_id(item.building)) {
+                            sim::rotated_size(*t, item.rotation, w, h);
+                        }
+                        outline(std::int64_t{isl.x} + item.x, std::int64_t{isl.y} + item.y, w, h,
+                                ui::rgb_ink(plan.items[i].ok() ? assets::Rgba{90, 230, 90, 255}
+                                                               : assets::Rgba{230, 60, 60, 255}));
+                    }
+                } else {
+                    outline(tile->x, tile->y, 1, 1, ui::rgb_ink(assets::Rgba{230, 60, 60, 255}));
+                }
             } else if (tool == EditorObjects::Tool::Resource) {
                 // A vein, treasure or deer: its tile, green where it can go.
                 bool fits = false;
