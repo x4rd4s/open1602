@@ -1392,7 +1392,8 @@ std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, 
             m_player = model.player_slots.size();  // the new one
             return EditorRequest{EditorRequest::Kind::AddPlayer};
         case kPlayerRemove:
-            m_player = model.player_slots.size() > 1 ? model.player_slots.size() - 2 : 0;
+            // The slot shown stays; once the last is gone, the page shows the one before (it
+            // clamps the choice), and a refused removal leaves it as it was.
             return EditorRequest{EditorRequest::Kind::RemovePlayer};
         case kPlayerRole:
         case kPlayerColour:
