@@ -143,7 +143,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 
 The object stays in hand after it is placed, so the next click places another. A right click
 without dragging, or Escape, puts it away and the tool Select takes over. Where the tool would not
-place, the status line below the map says why (no land of the owner there, no water for a ship, no
+place, the status line below the map and the column's note say why (no land of the owner there, no water for a ship, no
 mountain for a vein, ...) before the click. With Shift held, a drag of Build places along a straight
 row: across or down from where it began, whichever way the mouse went further.
 

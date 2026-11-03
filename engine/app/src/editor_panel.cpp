@@ -1239,29 +1239,30 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     } else if (o.tool == Tool::Template && model.object_pieces == 0) {
         note = ui::tr("editor.objects.note.no_templates");
     }
-    // The objects placed lately, two to a row, as far as room is left above the note and "Back".
+    // The objects placed lately, one to a row (their names are long), as far as room is left
+    // above the note and "Back".
     const std::int32_t bottom = m_top + m_height - 4;
     constexpr std::int32_t kRecentH = 26;
     const std::size_t recent = std::min(model.recent_objects.size(), kEditorRecent);
     if (recent > 0) {
         const std::int32_t room = bottom - y - (kButtonH + 4) - 3 * 20 - 18;
-        const std::size_t rows = std::min((recent + 1) / 2, static_cast<std::size_t>(std::max(0, room / kRecentH)));
+        const std::size_t rows = std::min(recent, static_cast<std::size_t>(std::max(0, room / kRecentH)));
         if (rows > 0) {
             f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.objects.recent"), Align::Left, Tone::Normal);
             y += 18;
-            const std::int32_t half = (m_w - 4) / 2;
-            for (std::size_t i = 0; i < std::min(recent, rows * 2); ++i) {
-                const auto col = static_cast<std::int32_t>(i % 2);
-                const auto row = static_cast<std::int32_t>(i / 2);
+            for (std::size_t i = 0; i < rows; ++i) {
                 f.button(kRecent + static_cast<Id>(i),
-                         Rect{m_x + col * (half + 4), y + row * kRecentH, half, kRecentH - 2},
+                         Rect{m_x, y + static_cast<std::int32_t>(i) * kRecentH, m_w, kRecentH - 2},
                          model.recent_objects[i].name);
             }
             y += static_cast<std::int32_t>(rows) * kRecentH + 2;
         }
     }
     const std::int32_t kObjectsNote = std::clamp(bottom - y - (kButtonH + 4), 3 * 20, 4 * 20);
-    if (!model.notice.empty()) {
+    if (!model.object_hover.empty()) {
+        // Why a click where the mouse is would not place, in full (the status line is short).
+        f.paragraph(Rect{m_x, y, m_w, kObjectsNote}, model.object_hover, Tone::Warning, 20);
+    } else if (!model.notice.empty()) {
         f.paragraph(Rect{m_x, y, m_w, kObjectsNote}, model.notice, model.notice_is_error ? Tone::Warning : Tone::Dim,
                     20);
     } else {

@@ -436,6 +436,13 @@ EditorModel MapViewer::editor_model() const {
         }
     }
     editor_object_model(m);
+    if (m_input) {
+        const auto mx = static_cast<std::int32_t>(m_input->mouse_x());
+        const auto my = static_cast<std::int32_t>(m_input->mouse_y());
+        if (const auto tile = m_hud && m_hud->covers(mx, my) ? std::nullopt : m_input->tile_at_mouse()) {
+            m.object_hover = editor_hover_refusal(tile->x, tile->y);
+        }
+    }
     editor_city_model(m);
     editor_players_model(m);
     editor_rules_model(m);

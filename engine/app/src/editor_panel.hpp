@@ -327,6 +327,9 @@ struct EditorModel {
     std::string object_owner;
     /// The objects placed lately, the last first (at most kEditorRecent).
     std::vector<EditorRecent> recent_objects;
+    /// Why the tool in hand would not place where the mouse is on the map (Windows-1252), empty:
+    /// it would, or the mouse is off the map.
+    std::string object_hover;
     /// The city of the building selected (the page "Selection"), its stock and owner.
     std::optional<EditorCity> city;
     /// The humans' and computers' slots (the page "Players"), in the order of the slots; whether
