@@ -687,13 +687,17 @@ void EditorPanel::layout_islands(const EditorModel& model) {
     y += kButtonH + kGap;
     f.button(kLoadIsland, Rect{kX, y, kW, kButtonH}, ui::tr("editor.islands.load"), !model.placing);
     y += kButtonH + kGap;
-    constexpr std::int32_t kIslandNote = 3 * 20;
-    f.paragraph(Rect{kX, y, kW, kIslandNote},
-                ui::tr(!model.placing         ? "editor.islands.note"
-                       : m_island.placeholder ? "editor.placeholder.placing"
-                                              : "editor.islands.placing"),
-                Tone::Dim, 20);
-    y += kIslandNote + 4;
+    // The note in the room the buttons below leave, as many lines as fit (at most three).
+    const std::int32_t below = (model.placing ? 2 : 1) * (kButtonH + kGap) + 4;
+    const std::int32_t note = std::min(3 * 20, (m_top + m_height - 4 - below - y) / 20 * 20);
+    if (note >= 20) {
+        f.paragraph(Rect{kX, y, kW, note},
+                    ui::tr(!model.placing         ? "editor.islands.note"
+                           : m_island.placeholder ? "editor.placeholder.placing"
+                                                  : "editor.islands.placing"),
+                    Tone::Dim, 20);
+        y += note + 4;
+    }
     if (model.placing) {
         f.button(kStopPlacing, Rect{kX, y, kW, kButtonH}, ui::tr("editor.cancel"));
         y += kButtonH + kGap;
