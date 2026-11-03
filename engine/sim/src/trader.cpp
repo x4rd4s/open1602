@@ -520,9 +520,19 @@ std::string Fleet::next_ship_name() {
     if (m_ship_names.empty()) {
         return {};  // the game shows a name in its language (MD-10)
     }
-    const std::string& name = m_ship_names[m_name_index % m_ship_names.size()];
-    ++m_name_index;
-    return name;
+    // Round robin, passing over the names a ship has already (the start ships of many players);
+    // all taken, the next one.
+    const std::size_t count = m_ship_names.size();
+    for (std::size_t tries = 0; tries < count; ++tries) {
+        const std::string& name = m_ship_names[(m_name_index + tries) % count];
+        const auto taken = std::any_of(m_world->ships().begin(), m_world->ships().end(),
+                                       [&](const Ship& ship) { return ship.name == name; });
+        if (!taken) {
+            m_name_index += static_cast<std::uint32_t>(tries + 1);
+            return name;
+        }
+    }
+    return m_ship_names[m_name_index++ % count];
 }
 
 }  // namespace o1602::sim
