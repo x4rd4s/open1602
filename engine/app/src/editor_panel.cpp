@@ -244,7 +244,22 @@ std::uint32_t fitted(std::uint32_t used) {
 /// Whether a page goes back and on by the rows it shows (else by kRows).
 bool paged_by_rows(EditorPanel::Page page) noexcept {
     using P = EditorPanel::Page;
-    return page == P::Check || page == P::CityGoods || page == P::Rules || page == P::Random || page == P::Goals;
+    return page == P::Check || page == P::CityGoods || page == P::Rules || page == P::Random || page == P::Goals ||
+           page == P::Open || page == P::IslandFiles || page == P::ScriptFiles;
+}
+
+/// The lines a list of files takes: a line each, and one for each group's heading.
+std::size_t file_lines(const std::vector<EditorFile>& files) {
+    std::size_t lines = 0;
+    const std::string* group = nullptr;
+    for (const EditorFile& file : files) {
+        if (group == nullptr || file.group != *group) {
+            group = &file.group;
+            ++lines;
+        }
+        ++lines;
+    }
+    return lines;
 }
 
 std::string count(std::size_t n) {
@@ -568,10 +583,11 @@ void EditorPanel::layout(const EditorModel& model) {
         m_check_h = h;
     }
     if (m_page == Page::ScriptFiles) {
-        // The list of scripts as tall as its rows, the buttons right below.
+        // The list of scripts as tall as its lines (as tall as a page, where it has more than
+        // one), the buttons right below.
         const std::size_t n = model.files.size();
-        const auto rows = static_cast<std::int32_t>(std::min(n, kRows));
-        m_files_h = 16 + 6 + 32 + (n == 0 ? 84 : kRowH + rows * kRowH + 4 + kButtonH + kGap) + kButtonH + 8;
+        const auto rows = static_cast<std::int32_t>(std::min(file_lines(model.files), kRows));
+        m_files_h = 16 + 6 + 32 + (n == 0 ? 84 : rows * kRowH + 4 + kButtonH + kGap) + kButtonH + 8;
     }
     if (m_page == Page::Campaign) {
         // Without a package's scenario the dialog holds a note only.
@@ -720,7 +736,10 @@ void EditorPanel::layout_markers(const EditorModel& model) {
         f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.markers.none"), Align::Left, Tone::Dim);
         y += kLine + kGap;
     } else {
-        m_first = std::min(m_first, n > kRows ? n - kRows : 0);
+        // Pages of whole rows, the last with what is left; as tall as a full one, so that the
+        // buttons below stay where they are from page to page.
+        m_first = std::min(m_first, (n - 1) / kRows * kRows);
+        const std::int32_t top = y;
         for (std::size_t i = m_first; i < n && i < m_first + kRows; ++i) {
             const auto row = static_cast<Id>(i - m_first);
             f.row(kFirstRow + row, Rect{m_x, y, m_w, kRowH - 2}, model.marker == i);
@@ -728,7 +747,7 @@ void EditorPanel::layout_markers(const EditorModel& model) {
             y += kRowH;
         }
         if (n > kRows) {
-            y += 4;
+            y = top + static_cast<std::int32_t>(kRows) * kRowH + 4;
             const std::int32_t half = (m_w - kGap) / 2;
             f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
             f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + kRows < n);
@@ -935,26 +954,41 @@ void EditorPanel::layout_open(const EditorModel& model) {
         y += 84;
     } else {
         const std::size_t n = model.files.size();
-        m_first = std::min(m_first, n > kRows ? n - kRows : 0);
+        m_first = std::min(m_first, n - 1);
+        // Pages of kRows lines, a group's heading one of them; a list of more than one page as
+        // tall as a page, so that the buttons below stay where they are from page to page.
+        const bool paged = file_lines(model.files) > kRows;
+        const std::int32_t top = y;
         std::string group;  // every page begins with the heading of its first file's group
-        std::size_t shown = 0;
-        for (std::size_t i = m_first; i < n && shown < kRows; ++i) {
+        std::size_t lines = 0;
+        std::size_t i = m_first;
+        for (; i < n; ++i) {
             const EditorFile& file = model.files[i];
-            if (file.group != group) {
+            const bool heading = i == m_first || file.group != group;
+            // A heading goes to the next page with its first file.
+            if (lines + (heading ? 2 : 1) > kRows) {
+                break;
+            }
+            if (heading) {
                 group = file.group;
                 f.label(Rect{m_x, y, m_w, kRowH}, group, Align::Left, Tone::Heading);
                 y += kRowH;
+                ++lines;
             }
             const auto row = static_cast<Id>(i - m_first);
             f.row(kFirstRow + row, Rect{m_x, y, m_w, kRowH - 2}, false);
             f.label(Rect{m_x + 4, y, m_w - 8, kRowH - 2}, file.name);
             y += kRowH;
-            ++shown;
+            ++lines;
+        }
+        m_page_rows = std::max<std::size_t>(1, i - m_first);
+        if (paged) {
+            y = top + static_cast<std::int32_t>(kRows) * kRowH;
         }
         y += 4;
         const std::int32_t half = (m_w - kGap) / 2;
         f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
-        f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + kRows < n);
+        f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), i < n);
         y += kButtonH + kGap;
     }
     f.button(islands   ? kIslandPage
@@ -1285,7 +1319,9 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     const std::size_t n = model.city->goods.size();
     const auto fit = static_cast<std::size_t>(std::max<std::int32_t>(1, (bottom - y) / kGoodH));
     m_page_rows = std::min({fit, kGoodRows, std::max<std::size_t>(n, 1)});
-    m_first = std::min(m_first, n > m_page_rows ? n - m_page_rows : 0);
+    // Pages of whole rows, the last with what is left, the buttons below at the same place.
+    m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
+    const std::int32_t top = y;
     constexpr std::int32_t kStep = 28;
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const EditorGood& g = model.city->goods[m_first + row];
@@ -1300,7 +1336,7 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
                        g.amount < model.city->room);
         y += kGoodH;
     }
-    y += 4;
+    y = top + static_cast<std::int32_t>(m_page_rows) * kGoodH + 4;
     const std::int32_t half = (m_w - kGap) / 2;
     f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
     f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + m_page_rows < n);

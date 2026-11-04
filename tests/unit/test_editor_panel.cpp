@@ -216,9 +216,23 @@ TEST_CASE("editor panel: the list of files opens one, in pages, with the groups'
     CHECK(shows(items, "Own scenarios"));
     CHECK(says(panel, "Scenarios of the game"));
     CHECK(!shows(items, "Game 9.szs"));  // on the next page
+    const auto more = find(panel, "More");
+    REQUIRE(more.has_value());
     (void)click(panel, m, "More");
     items = panel.draw(m, kNoFonts);
     CHECK(says(panel, "Scenarios of the game"));  // the group goes on: its heading again
+    CHECK(shows(items, "Game 9.szs"));
+    CHECK(find(panel, "More") == more);  // the buttons where they were: no mouse to move after them
+    // The last page: what is left, nothing twice, the buttons still in their place.
+    (void)click(panel, m, "More");
+    items = panel.draw(m, kNoFonts);
+    CHECK(shows(items, "Game 19.szs"));
+    CHECK(!shows(items, "Game 17.szs"));
+    CHECK(find(panel, "More") == more);
+    CHECK(!find_enabled(panel, m, "More"));
+    (void)click(panel, m, "Back");
+    items = panel.draw(m, kNoFonts);
+    CHECK(shows(items, "Game 7.szs"));  // where the page before began
     CHECK(shows(items, "Game 9.szs"));
     r = click(panel, m, "Game 9.szs");
     REQUIRE(r.has_value());
