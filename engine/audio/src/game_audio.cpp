@@ -239,13 +239,27 @@ void Effects::flush() {
             if (!sound) {
                 continue;
             }
+            // As in the History Edition: a sound still playing is not started again.
+            std::vector<Mixer::VoiceId>& voices = m_playing[sound.get()];
+            std::erase_if(voices, [this](Mixer::VoiceId v) { return !m_mixer->playing(v); });
+            if (voices.size() >= m_copies) {
+                continue;
+            }
             PlayOptions o;
             o.volume = place->first * m_gain;
             o.pan = place->second;
-            m_mixer->play(sound, o);
+            const Mixer::VoiceId voice = m_mixer->play(sound, o);
+            if (voice != Mixer::kNoVoice) {
+                voices.push_back(voice);
+            }
         }
     }
     m_queue.clear();
+    // Sounds that play no more are forgotten, so replaced or reloaded sounds do not pile up.
+    std::erase_if(m_playing, [this](auto& kv) {
+        std::erase_if(kv.second, [this](Mixer::VoiceId v) { return !m_mixer->playing(v); });
+        return kv.second.empty();
+    });
 }
 
 SceneryReach scenery_reach(double width, double height, double magnification) noexcept {

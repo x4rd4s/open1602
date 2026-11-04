@@ -229,12 +229,46 @@ TEST_CASE("audio: effects play inside the view only, pan with x, and ten per fra
     audio::SoundBank bank(*game);
     audio::Mixer mixer(22050, 64);
     audio::Effects effects(mixer, bank);
+    effects.set_copies(64);  // the limit per frame alone
     for (int i = 0; i < 15; ++i) {
         effects.request(audio::kWavEvent, 0.0F, 0.0F);
     }
     effects.request(audio::kWavEvent, 2.0F, 0.0F);
     effects.flush();
     CHECK(mixer.playing_count(audio::Group::Effects) == 10);
+}
+
+TEST_CASE("audio: a sound still playing is not started again, as in the History Edition") {
+    FakeGame fake;
+    auto game = assets::GameDirectory::open(fake.root);
+    REQUIRE(game.ok());
+    audio::SoundBank bank(*game);
+    audio::Mixer mixer(22050, 64);
+    audio::Effects effects(mixer, bank);
+    CHECK(effects.copies() == 1);
+    // A wood full of birds asks for the same call again and again: one plays.
+    for (int frame = 0; frame < 5; ++frame) {
+        effects.request(audio::kWavEvent, 0.0F, 0.0F);
+        effects.request(audio::kWavEvent, 0.5F, 0.0F);
+        effects.flush();
+        CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    }
+    // Once it has finished, it plays again.
+    std::vector<std::int16_t> out(2 * 22050);
+    for (int i = 0; i < 20 && mixer.playing_count(audio::Group::Effects) > 0; ++i) {
+        mixer.mix(out.data(), 22050);
+    }
+    REQUIRE(mixer.playing_count(audio::Group::Effects) == 0);
+    effects.request(audio::kWavEvent, 0.0F, 0.0F);
+    effects.flush();
+    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    // Up to five at once, as the King's Edition allowed.
+    effects.set_copies(5);
+    for (int i = 0; i < 8; ++i) {
+        effects.request(audio::kWavEvent, 0.0F, 0.0F);
+    }
+    effects.flush();
+    CHECK(mixer.playing_count(audio::Group::Effects) == 5);
 }
 
 TEST_CASE("audio: a voice without a message (the menu's banner choice), not when speech is off") {

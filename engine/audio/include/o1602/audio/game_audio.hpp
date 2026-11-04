@@ -92,6 +92,9 @@ struct AudioSettings {
 /// pans with x and softens towards the corners (DirectSound3D with the listener half a view behind
 /// the screen and rolloff 2). At most `per_frame` requests per frame play, as in
 /// the original (10, later ones are dropped).
+/// How many times one sound plays at once by default: once, as in the History Edition.
+inline constexpr std::size_t kSoundCopies = 1;
+
 class Effects {
 public:
     Effects(Mixer& mixer, SoundBank& bank, std::size_t per_frame = 10)
@@ -107,8 +110,14 @@ public:
     void set_replaced_sounds(std::vector<std::shared_ptr<const Pcm>> by_id) { m_replaced = std::move(by_id); }
     /// Queues a sound at (x, y) of the view: one of the original's, or of a package.
     void request(SampleId id, float x, float y);
-    /// Plays what was queued since the last call.
+    /// Plays what was queued since the last call. A sound already playing `copies` times is
+    /// dropped, not restarted (set_copies).
     void flush();
+    /// How many times one sound may play at once. The History Edition plays each sound once: a
+    /// request while it still plays is dropped, so a wood full of birds never sounds more than its
+    /// six calls at a time (the King's Edition allowed five of each).
+    void set_copies(std::size_t copies) noexcept { m_copies = copies; }
+    [[nodiscard]] std::size_t copies() const noexcept { return m_copies; }
 
     /// Volume and pan of a sound at (x, y) of the view; nothing outside it.
     [[nodiscard]] static std::optional<std::pair<float, float>> placement(float x, float y) noexcept;
@@ -122,9 +131,12 @@ private:
     Mixer* m_mixer;
     SoundBank* m_bank;
     std::size_t m_limit;
+    std::size_t m_copies = kSoundCopies;
     bool m_enabled = true;
     float m_gain = 1.0F;
     std::vector<Request> m_queue;
+    /// The voices each sound plays on; finished ones are let go when the sound is asked for again.
+    std::map<const Pcm*, std::vector<Mixer::VoiceId>> m_playing;
     std::vector<std::shared_ptr<const Pcm>> m_package;
     std::vector<std::shared_ptr<const Pcm>> m_replaced;
 };
