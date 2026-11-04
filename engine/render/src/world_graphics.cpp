@@ -131,8 +131,9 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
     std::vector<std::pair<std::size_t, std::size_t>> package_flag_at;  // banner, source
     if (banners != nullptr) {
         for (std::size_t b = 0; b < banners->size(); ++b) {
-            const Banner& banner = *banners->get(static_cast<sim::BannerId>(b));
-            const assets::PackageFlag* flag = assets::find_package_flag(options.package_flags, banner.id);
+            const Banner* banner = banners->get(static_cast<sim::BannerId>(b));
+            const assets::PackageFlag* flag =
+                banner != nullptr ? assets::find_package_flag(options.package_flags, banner->id) : nullptr;
             if (flag == nullptr) {
                 continue;
             }
@@ -144,7 +145,7 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
             sources.push_back(std::move(image));
             if (flag->tint) {
                 sources.push_back(std::make_unique<TintedFlagSource>(*frames, 0, assets::kFlagFrames,
-                                                                     std::vector{banner.colour}, false));
+                                                                     std::vector{banner->colour}, false));
             } else {
                 sources.push_back(std::make_unique<PlacedSources>());
                 static_cast<PlacedSources&>(*sources.back()).place(0, *frames);
