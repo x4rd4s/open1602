@@ -897,6 +897,12 @@ EditorModel MapViewer::editor_model() const {
         m.terrain_pieces = pieces.size();
         if (const assets::BuildingType* b = editor_terrain_piece()) {
             m.terrain_id = b->id;
+            // Its kind without the number (the pieces of a group are told apart by their place).
+            m.terrain_name = editor_building_name(*b, m_buildings, m_hud ? m_hud->texts() : nullptr);
+            const std::string own = " (" + std::to_string(b->id) + ")";
+            if (m.terrain_name.ends_with(own)) {
+                m.terrain_name.resize(m.terrain_name.size() - own.size());
+            }
             m.terrain_width = b->size_x;
             m.terrain_height = b->size_y;
             m.terrain_turns = b->rotate > 0;
@@ -1836,6 +1842,11 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
                 if (a.crops[c] != 0) {
                     crops += (crops.empty() ? "" : ", ") + ui::tr(kCrops[c]);
                 }
+            }
+            if (a.islands == 0) {
+                lines.push_back(
+                    Line{ui::tr("editor.check.start_sea", {who(a.player), number(a.rival)}), Line::Kind::Note});
+                continue;
             }
             lines.push_back(
                 Line{ui::tr("editor.check.start", {who(a.player), number(a.islands), number(a.land),

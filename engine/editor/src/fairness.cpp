@@ -2,6 +2,7 @@
 #include "o1602/editor/fairness.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <optional>
 
 #include "o1602/assets/game_data.hpp"
@@ -107,8 +108,11 @@ std::vector<StartArea> start_areas(const sim::World& world, const assets::Buildi
     return areas;
 }
 
-std::vector<Unfairness> unfairness(const std::vector<StartArea>& areas) {
+std::vector<Unfairness> unfairness(const std::vector<StartArea>& all) {
     std::vector<Unfairness> out;
+    // A start at sea with no land in reach (a fleet the mission gives) has nothing to compare.
+    std::vector<StartArea> areas;
+    std::copy_if(all.begin(), all.end(), std::back_inserter(areas), [](const StartArea& a) { return a.islands > 0; });
     if (areas.size() < 2) {
         return out;
     }

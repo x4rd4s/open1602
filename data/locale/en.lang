@@ -1855,6 +1855,7 @@ editor.check.limits_kept = The original's limits, to be kept
 editor.check.fits = Fits the original's limits.
 editor.check.starts = Start areas (islands up to 60 tiles around the start)
 editor.check.start = {1}: {2} islands, {3} tiles of land; fertile for {4}; ore {5}, gold {6}; nearest rival {7} tiles away.
+editor.check.start_sea = {1}: starts at sea with no land in reach; nearest rival {2} tiles away.
 editor.check.start_no_crops = nothing
 editor.check.unfair.land = {1} has much less land than the richest start.
 editor.check.unfair.crop = {1} finds no island for {2}, others do.
