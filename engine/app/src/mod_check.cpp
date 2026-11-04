@@ -91,7 +91,8 @@ std::optional<Place> place_of(std::string_view text) {
 
 bool has_banner(const render::BannerTable& banners, std::string_view id) {
     for (std::size_t b = 0; b < banners.size(); ++b) {
-        if (banners.get(static_cast<sim::BannerId>(b))->id == id) {
+        const render::Banner* banner = banners.get(static_cast<sim::BannerId>(b));
+        if (banner != nullptr && banner->id == id) {
             return true;
         }
     }
