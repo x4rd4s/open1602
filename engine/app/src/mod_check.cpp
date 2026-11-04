@@ -89,6 +89,15 @@ std::optional<Place> place_of(std::string_view text) {
     return place;
 }
 
+bool has_banner(const render::BannerTable& banners, std::string_view id) {
+    for (std::size_t b = 0; b < banners.size(); ++b) {
+        if (banners.get(static_cast<sim::BannerId>(b))->id == id) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 void check_music_replacements(std::span<const audio::MusicTrack> music, std::span<const std::string> tracks,
@@ -108,12 +117,17 @@ void check_music_replacements(std::span<const audio::MusicTrack> music, std::spa
 void check_arms_banners(std::span<const assets::PackageArms> arms, const render::BannerTable& banners,
                         std::vector<std::string>& problems) {
     for (const assets::PackageArms& a : arms) {
-        bool found = false;
-        for (std::size_t b = 0; b < banners.size() && !found; ++b) {
-            found = banners.get(static_cast<sim::BannerId>(b))->id == a.banner;
-        }
-        if (!found) {
+        if (!has_banner(banners, a.banner)) {
             problems.push_back(a.icon + ": no banner is called \"" + a.banner + "\"; its coat of arms is not shown");
+        }
+    }
+}
+
+void check_flag_banners(std::span<const assets::PackageFlag> flags, const render::BannerTable& banners,
+                        std::vector<std::string>& problems) {
+    for (const assets::PackageFlag& f : flags) {
+        if (!has_banner(banners, f.banner)) {
+            problems.push_back(f.image.id + ": no banner is called \"" + f.banner + "\"; its flag is not shown");
         }
     }
 }

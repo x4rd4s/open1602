@@ -79,15 +79,14 @@ int cmd_check_mod(const Args& args) {
     // The icons first, as the game sets them: the messages, the build menu and the coats of arms
     // may name them.
     std::vector<assets::PackageIcon> icons = app::load_package_icons(packages, problems);
-    {
-        auto banners = render::BannerTable::original();
-        banners.add_more_players();
-        app::check_arms_banners(app::load_package_arms(packages, icons, problems), banners, problems);
-    }
+    auto banners = render::BannerTable::original();
+    banners.add_more_players();
+    app::check_arms_banners(app::load_package_arms(packages, icons, problems), banners, problems);
     ui::set_package_icons(std::move(icons));
     (void)app::load_package_landscapes(packages, problems);
     (void)sim::load_package_islands(packages, problems);
     const app::ModRules rules = app::load_mod_rules(packages, *buildings, *figures, problems);
+    app::check_flag_banners(rules.flags, banners, problems);
     {
         std::vector<std::string> tracks;
         std::vector<std::string> fights;

@@ -11,6 +11,7 @@
 
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/package_arms.hpp"
+#include "o1602/assets/package_flags.hpp"
 #include "o1602/audio/package_music.hpp"
 #include "o1602/render/banner.hpp"
 
@@ -23,6 +24,10 @@ void check_music_replacements(std::span<const audio::MusicTrack> music, std::spa
 
 /// A problem for each coat of arms of a banner that `banners` has not. The game passes it over.
 void check_arms_banners(std::span<const assets::PackageArms> arms, const render::BannerTable& banners,
+                        std::vector<std::string>& problems);
+
+/// A problem for each flag of a banner that `banners` has not. The game passes it over.
+void check_flag_banners(std::span<const assets::PackageFlag> flags, const render::BannerTable& banners,
                         std::vector<std::string>& problems);
 
 /// The packages and problems as one JSON object:
