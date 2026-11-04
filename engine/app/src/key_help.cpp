@@ -84,6 +84,7 @@ KeyHelpPlace key_help_place(KeyAction action) noexcept {
         case KeyAction::EditorTestPlay:
         case KeyAction::EditorBookmarkSet:
         case KeyAction::EditorBookmarkGo:
+        case KeyAction::EditorFind:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:

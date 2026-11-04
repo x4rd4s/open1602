@@ -1591,3 +1591,30 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     CHECK(r->kind == EditorRequest::Kind::ScenarioText);
     CHECK(r->name == "Two Coasts");
 }
+
+TEST_CASE("editor panel: the page Find lists what holds the text and goes there") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(184, 564);
+    EditorModel m = document();
+    CHECK(!panel.command(app::EditorCommand::Find, m).has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Find);
+    CHECK(panel.typing());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Type the name"));
+    CHECK(!panel.key(13).has_value());  // nothing typed: nowhere to go
+    panel.type("Hav");
+    CHECK(panel.find_text() == "Hav");
+    m.found = {"City Havn (island 3)", "Ship Havfrue"};
+    (void)panel.draw(m, kNoFonts);
+    auto r = click(panel, m, "Ship Havfrue");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::FindGo);
+    CHECK(r->index == 1);
+    r = panel.key(13);
+    REQUIRE(r.has_value());
+    CHECK(r->index == 0);
+    CHECK(!panel.key(27).has_value());
+    CHECK(panel.page() == EditorPanel::Page::Document);
+    CHECK(panel.find_text().empty());
+}

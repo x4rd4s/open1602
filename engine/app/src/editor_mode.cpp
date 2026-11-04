@@ -570,6 +570,48 @@ void MapViewer::list_editor_files() {
     }
 }
 
+std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) const {
+    std::vector<Found> out;
+    if (!m_editor || text.empty()) {
+        return out;
+    }
+    const auto low = [](std::string s) {
+        for (char& c : s) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        return s;
+    };
+    const std::string wanted = low(text);
+    const auto holds = [&](const std::string& name) { return low(name).find(wanted) != std::string::npos; };
+    const sim::World& world = m_editor->document.world();
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        const std::string name = ui::tr("editor.find.island", {number(i + 1)});
+        if (holds(name) || number(i + 1) == text) {
+            const sim::WorldIsland& island = world.islands()[i];
+            out.push_back(
+                Found{name, EditorPick{EditorPick::Kind::Island, static_cast<std::uint16_t>(i), island.x, island.y},
+                      render::TilePos{island.x + island.map.width() / 2, island.y + island.map.height() / 2}});
+        }
+    }
+    for (const sim::City& c : world.cities()) {
+        if (!holds(c.name) || c.island >= world.islands().size() || !c.warehouse_x || !c.warehouse_y) {
+            continue;
+        }
+        const sim::WorldIsland& island = world.islands()[c.island];
+        const std::uint32_t x = island.x + *c.warehouse_x;
+        const std::uint32_t y = island.y + *c.warehouse_y;
+        out.push_back(Found{ui::tr("editor.find.city", {c.name, number(c.island + 1U)}),
+                            EditorPick{EditorPick::Kind::Island, c.island, x, y}, render::TilePos{x, y}});
+    }
+    for (const sim::Ship& s : world.ships()) {
+        if (holds(s.name)) {
+            out.push_back(Found{ui::tr("editor.find.ship", {s.name}),
+                                EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
+        }
+    }
+    return out;
+}
+
 EditorModel MapViewer::editor_model() const {
     EditorModel m;
     if (!m_editor) {
@@ -577,6 +619,11 @@ EditorModel MapViewer::editor_model() const {
     }
     const editor::Document& doc = m_editor->document;
     const sim::World& world = doc.world();
+    if (m_hud && m_hud->editor_panel() != nullptr) {
+        for (const Found& f : editor_find(m_hud->editor_panel()->find_text())) {
+            m.found.push_back(f.label);
+        }
+    }
     m.file = m_editor->file.empty() ? m_editor->source_name : shown_name(m_editor->file);
     m.modified = doc.modified();
     m.width = world.width();
@@ -881,6 +928,15 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
                 editor_notice(
                     ui::tr("editor.export_image.done", {core::utf8_to_cp1252(core::path_to_utf8(path.filename()))}),
                     false, "map picture " + core::path_to_utf8(path));
+            }
+            break;
+        }
+        case Kind::FindGo: {
+            const auto found = editor_find(
+                m_hud && m_hud->editor_panel() != nullptr ? m_hud->editor_panel()->find_text() : std::string());
+            if (request.index < found.size()) {
+                m_camera.center_on(found[request.index].tile);
+                editor_pick(found[request.index].pick);
             }
             break;
         }
@@ -1921,6 +1977,7 @@ EditorChromeModel MapViewer::editor_chrome() const {
         key(EditorCommand::Undo, ui::KeyAction::EditorUndo);
         key(EditorCommand::Redo, ui::KeyAction::EditorRedo);
         key(EditorCommand::TestPlay, ui::KeyAction::EditorTestPlay);
+        key(EditorCommand::Find, ui::KeyAction::EditorFind);
         c.command_keys[static_cast<std::size_t>(EditorCommand::Keys)] = "F1";
         // Where the mouse is: the world tile, and the island's number and its own tile there.
         const auto mx = static_cast<std::int32_t>(m_input->mouse_x());
@@ -2586,6 +2643,11 @@ void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
             break;
         case ui::KeyAction::EditorTestPlay:
             editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            break;
+        case ui::KeyAction::EditorFind:
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::Find);
+            }
             break;
         case ui::KeyAction::EditorBookmarkSet:
             if (param < m_editor->bookmarks.size()) {

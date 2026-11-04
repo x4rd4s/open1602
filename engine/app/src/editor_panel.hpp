@@ -151,6 +151,7 @@ enum class EditorCommand : std::uint8_t {
     Check,
     TestPlay,
     ExportImage,
+    Find,
     Keys,
 };
 
@@ -395,6 +396,8 @@ struct EditorModel {
     /// as typed (the texts, Windows-1252; empty for the rows that are no text).
     std::vector<EditorRule> scenario_rows;
     std::vector<std::string> scenario_texts;
+    /// The page "Find": the islands, cities and ships whose names hold the text typed (Windows-1252).
+    std::vector<std::string> found;
     /// The dice preview: the map shows the islands of the plan as one start of a game makes them
     /// (roll `preview_roll` of this preview, `preview_islands` islands); the plan waits meanwhile.
     bool previewing = false;
@@ -476,6 +479,7 @@ struct EditorRequest {
         Recover,       ///< the map kept by the editor's recovery, opened instead of the new one
         ShowIsland,    ///< the island `index` in the view's middle, selected
         ExportImage,   ///< the map as a picture (PNG) in the screenshots' folder
+        FindGo,        ///< the view to EditorModel::found[`index`], selected
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
@@ -527,7 +531,8 @@ public:
         Goals,
         GoalText,
         Scenario,
-        ScenarioText
+        ScenarioText,
+        Find
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -568,7 +573,12 @@ public:
     /// A name is being typed: the keys go here.
     [[nodiscard]] bool typing() const noexcept {
         return m_page == Page::SaveAs || m_page == Page::CityName || m_page == Page::PlayerName ||
-               m_page == Page::GoalText || m_page == Page::ScenarioText;
+               m_page == Page::GoalText || m_page == Page::ScenarioText || m_page == Page::Find;
+    }
+    /// The text typed on the page "Find" (Windows-1252); empty on another page.
+    [[nodiscard]] const std::string& find_text() const noexcept {
+        static const std::string kNone;
+        return m_page == Page::Find ? m_text : kNone;
     }
     /// The mission the page "Goals" shows (index into EditorModel::missions).
     [[nodiscard]] std::size_t chosen_mission() const noexcept { return m_mission; }
@@ -639,6 +649,7 @@ private:
     void layout_goals(const EditorModel& model);
     void layout_goal_text(const EditorModel& model);
     void layout_scenario(const EditorModel& model);
+    void layout_find(const EditorModel& model);
     /// The notice (or the note `note_key`, `short_key` where it does not fit whole) from `y`
     /// down and the button `back` labelled `back_key` at the panel's foot.
     void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,

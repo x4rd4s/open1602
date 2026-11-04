@@ -18,7 +18,7 @@ passes. Only the pictures go on as they do (water, flags).
 The editor has a frame of its own around the map instead of the game's panel:
 
 - **The menu bar** above the map: **File** (new map, open, save, save as, test play, save the map as a picture, leave the editor), **Edit**
-  (undo, redo), **View** (the overlays), **Map** (islands, map size, random elements, dice preview),
+  (undo, redo, find), **View** (the overlays), **Map** (islands, map size, random elements, dice preview),
   **Players**, **Scenario** (description, rules, goals), **Check** and **Help** (the keys). The menus name each command's key. At
   its right end it shows the map's name, with `*` while it has changes that are not saved.
 - **The tool bar** down the map's left edge: a symbol for each tool, in groups: select; island and
@@ -323,6 +323,7 @@ there are, a target player who starts without the cities the loss conditions ask
 | Right click | Puts back what is in hand (an island being placed, an object) |
 | Shift and Build dragged | Places along a straight row |
 | F5 | Test play; in the test game F5 leads back |
+| Ctrl+F | Find an island, a city or a ship |
 | Ctrl+1 to Ctrl+9 | Keeps the view as a bookmark (for this session) |
 | 1 to 9 | Goes to the bookmark |
 | F1 | The keys |
@@ -331,6 +332,12 @@ there are, a target player who starts without the cities the loss conditions ask
 The view's keys are those of the game (WASD and the arrows, Q and E, Page Up and Page Down, F12 for a
 screenshot, F11 for the full screen). F1 shows the keys the editor knows. All of them can be changed
 in `keys.cfg`; the editor's are in the context `editor`.
+
+## Find
+
+**Find** (menu Edit, Ctrl+F) lists, while a name is typed, the islands (by their number), the
+cities and the ships whose names hold it. A click on one, or Enter for the first, moves the view
+there and selects it.
 
 ## Test play
 

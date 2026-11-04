@@ -320,6 +320,14 @@ private:
     /// is offered.
     void editor_offer_recovery();
     void editor_recover();
+    /// What the editor's page "Find" lists for `text`: islands, cities and ships, where the view
+    /// goes and what is selected there.
+    struct Found {
+        std::string label;  ///< Windows-1252
+        EditorPick pick;
+        render::TilePos tile;
+    };
+    [[nodiscard]] std::vector<Found> editor_find(const std::string& text) const;
     /// The building, class, infrastructure and figure values of `world` in the tables.
     void apply_world_values(const sim::World& world);
     /// Every frame of the editor: what its panel asked for, and the panel's model.

@@ -364,6 +364,12 @@ std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const E
             return EditorRequest{EditorRequest::Kind::TestPlay};
         case EditorCommand::ExportImage:
             return EditorRequest{EditorRequest::Kind::ExportImage};
+        case EditorCommand::Find:
+            m_page = Page::Find;
+            m_first = 0;
+            m_text.clear();
+            m_form.set_focus(kField);
+            return std::nullopt;
         case EditorCommand::Keys:
             return EditorRequest{EditorRequest::Kind::ShowKeys};
     }
@@ -609,7 +615,31 @@ void EditorPanel::layout_page(const EditorModel& model) {
         case Page::Scenario:
             layout_scenario(model);
             break;
+        case Page::Find:
+            layout_find(model);
+            break;
     }
+}
+
+void EditorPanel::layout_find(const EditorModel& model) {
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 4;
+    f.label(Rect{m_x, y, m_w, 24}, ui::tr("editor.find.title"), Align::Left, Tone::Heading);
+    y += 28;
+    f.field(kField, Rect{m_x, y, m_w, 28}, m_text);
+    y += 34;
+    const std::int32_t bottom = m_top + m_height - kButtonH - 8;
+    if (m_text.empty()) {
+        f.paragraph(Rect{m_x, y, m_w, bottom - y}, ui::tr("editor.find.note"), Tone::Dim, 20);
+    } else if (model.found.empty()) {
+        f.paragraph(Rect{m_x, y, m_w, bottom - y}, ui::tr("editor.find.none"), Tone::Dim, 20);
+    }
+    constexpr std::int32_t kRow = kButtonH + 2;
+    for (std::size_t i = 0; i < model.found.size() && i < 20 && y + kRow <= bottom; ++i) {
+        f.button(kFirstRow + static_cast<Id>(i), Rect{m_x, y, m_w, kButtonH}, model.found[i]);
+        y += kRow;
+    }
+    f.button(kBack, Rect{m_x, bottom + 4, m_w, kButtonH}, ui::tr("editor.back"));
 }
 
 void EditorPanel::layout_document(const EditorModel& model) {
@@ -1828,6 +1858,9 @@ std::vector<ui::DrawItem> EditorPanel::draw(const EditorModel& model,
 }
 
 std::optional<EditorRequest> EditorPanel::commit_name() {
+    if (m_page == Page::Find) {
+        return m_text.empty() ? std::nullopt : std::optional{EditorRequest{EditorRequest::Kind::FindGo, 0}};
+    }
     if (m_page == Page::ScenarioText) {
         m_page = Page::Scenario;
         m_form.set_focus(std::nullopt);
@@ -2440,6 +2473,13 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 return press(kPlayersPage, model, true);
             case Target::WorldSize:
                 return press(kWorldSizePage, model, true);
+        }
+        return std::nullopt;
+    }
+    if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::Find) {
+        const auto row = static_cast<std::size_t>(*id - kFirstRow);
+        if (row < model.found.size()) {
+            return EditorRequest{EditorRequest::Kind::FindGo, row};
         }
         return std::nullopt;
     }

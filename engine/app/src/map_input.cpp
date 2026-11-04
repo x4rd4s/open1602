@@ -171,6 +171,7 @@ bool MapInput::editor_key(ui::KeyAction action) noexcept {
         case KeyAction::EditorTestPlay:
         case KeyAction::EditorBookmarkSet:
         case KeyAction::EditorBookmarkGo:
+        case KeyAction::EditorFind:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:
@@ -302,6 +303,7 @@ void MapInput::setup_keys() {
     editor(chord(SDLK_MINUS), KeyAction::EditorBrushSmaller);
     editor(chord(SDLK_KP_MINUS), KeyAction::EditorBrushSmaller);
     editor(chord(SDLK_F5), KeyAction::EditorTestPlay);
+    editor(chord(SDLK_F, true), KeyAction::EditorFind);
     // Bookmarks of the view: Ctrl and a digit keeps it, the digit goes there (by their place, as the
     // groups' digits).
     const std::array<SDL_Scancode, 9> marks{SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3,
@@ -760,6 +762,7 @@ void MapInput::run_action(const ui::KeyBinding& b) {
         case KeyAction::EditorTestPlay:
         case KeyAction::EditorBookmarkSet:
         case KeyAction::EditorBookmarkGo:
+        case KeyAction::EditorFind:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:
