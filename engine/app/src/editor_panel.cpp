@@ -575,15 +575,13 @@ void EditorPanel::layout(const EditorModel& model) {
     }
     if (m_page == Page::Campaign) {
         // Without a package's scenario the dialog holds a note only.
-        // Else as tall as its rows: the choice, a name typed, the parts, the note and the buttons.
-        const std::size_t n = model.campaigns.size();
-        const bool fresh = std::min(m_campaign, n) == n;
-        const std::size_t parts = fresh ? 0 : model.campaigns[std::min(m_campaign, n - 1)].parts.size();
+        // Else room for the name field and every part, the same in every state, so that the
+        // choice stays under the mouse while it goes round.
         m_campaign_h = model.package_scenario.empty()
                            ? 16 + 6 + 34 + 4 * 20 + kGap + kButtonH + 8
-                           : 16 + 6 + 34 + kLine + kButtonH + kGap + (fresh ? kLine + 38 : 0) + kLine +
-                                 static_cast<std::int32_t>(std::max<std::size_t>(parts, 1)) * kLine + 4 + 3 * 20 +
-                                 kGap + kButtonH + 8;
+                           : 16 + 6 + 34 + kLine + kButtonH + kGap + kLine + 38 + kLine +
+                                 static_cast<std::int32_t>(assets::kMaxCampaignParts) * kLine + 4 + 3 * 20 + kGap +
+                                 kButtonH + 8;
     }
     if (m_page == Page::Packages) {
         // The list of packages as tall as its lines, the button right below.
