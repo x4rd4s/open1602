@@ -587,7 +587,7 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
     const sim::World& world = m_editor->document.world();
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
         const std::string name = ui::tr("editor.find.island", {number(i + 1)});
-        if (number(i + 1).find(text) == 0) {  // by the number only: the word would match every island
+        if (number(i + 1).find(text) != std::string::npos) {  // by the number only: the word would match every island
             const sim::WorldIsland& island = world.islands()[i];
             out.push_back(
                 Found{name, EditorPick{EditorPick::Kind::Island, static_cast<std::uint16_t>(i), island.x, island.y},
@@ -601,8 +601,8 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
         const sim::WorldIsland& island = world.islands()[c.island];
         const std::uint32_t x = island.x + *c.warehouse_x;
         const std::uint32_t y = island.y + *c.warehouse_y;
-        out.push_back(Found{ui::tr("editor.find.city", {c.name, number(c.island + 1U)}),
-                            EditorPick{EditorPick::Kind::Island, c.island, x, y}, render::TilePos{x, y}});
+        out.push_back(Found{ui::tr("editor.find.city", {c.name}), EditorPick{EditorPick::Kind::Island, c.island, x, y},
+                            render::TilePos{x, y}});
     }
     for (const sim::Ship& s : world.ships()) {
         if (holds(s.name)) {
