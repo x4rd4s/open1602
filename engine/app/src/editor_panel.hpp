@@ -728,6 +728,7 @@ private:
     Page m_laid_page = Page::Document;       ///< the page laid out last
     std::vector<std::size_t> m_page_starts;  ///< where the pages before began (the check list, the stock)
     std::int32_t m_check_h = 580;            ///< the height the check list's dialog wants
+    std::int32_t m_files_h = 0;              ///< the height the dialog of the scripts to load needs
     bool m_previewing = false;               ///< the dice preview, as laid out last (its page is the column's)
 };
 

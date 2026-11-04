@@ -512,7 +512,7 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
                               : m_page == P::GoalText || m_page == P::ScenarioText ? 330
                               : m_page == P::Scenario                              ? 470
                               : m_page == P::Script                                ? 400
-                              : m_page == P::ScriptFiles                           ? 460
+                              : m_page == P::ScriptFiles                           ? m_files_h
                               : m_page == P::WorldSize                             ? 440
                               : m_page == P::Check                                 ? m_check_h
                               : wide                                               ? 620
@@ -544,6 +544,12 @@ void EditorPanel::layout(const EditorModel& model) {
             h += check_line_h(line, text_w);
         }
         m_check_h = h;
+    }
+    if (m_page == Page::ScriptFiles) {
+        // The list of scripts as tall as its rows, the buttons right below.
+        const std::size_t n = model.files.size();
+        const auto rows = static_cast<std::int32_t>(std::min(n, kRows));
+        m_files_h = 16 + 6 + 32 + (n == 0 ? 84 : kRowH + rows * kRowH + 4 + kButtonH + kGap) + kButtonH + 8;
     }
     if (dialog()) {
         // A page of the whole map: a dialog in the window's middle, laid out inside its frame.
