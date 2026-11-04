@@ -636,9 +636,17 @@ void EditorPanel::layout_find(const EditorModel& model) {
         f.paragraph(Rect{m_x, y, m_w, bottom - y}, ui::tr("editor.find.none"), Tone::Dim, 20);
     }
     constexpr std::int32_t kRow = kButtonH + 2;
-    for (std::size_t i = 0; i < model.found.size() && i < 20 && y + kRow <= bottom; ++i) {
+    const auto fit = static_cast<std::size_t>(std::max(0, (bottom - y) / kRow));
+    // What does not fit: a line that says how much more there is (typing more narrows it).
+    const std::size_t shown =
+        std::min<std::size_t>(model.found.size() > fit ? (fit > 0 ? fit - 1 : 0) : model.found.size(), 20);
+    for (std::size_t i = 0; i < shown; ++i) {
         f.button(kFirstRow + static_cast<Id>(i), Rect{m_x, y, m_w, kButtonH}, model.found[i]);
         y += kRow;
+    }
+    if (shown < model.found.size()) {
+        f.label(Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.find.more", {std::to_string(model.found.size() - shown)}),
+                Align::Left, Tone::Dim);
     }
     f.button(kBack, Rect{m_x, bottom + 4, m_w, kButtonH}, ui::tr("editor.back"));
 }
@@ -2361,12 +2369,26 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
             return r;
         }
         case kPrevious: {
-            // The check list and the stock go back by the lines their page shows.
+            // The check list and the stock go back to where the page before began.
+            while (!m_page_starts.empty() && m_page_starts.back() >= m_first) {
+                m_page_starts.pop_back();  // of another list
+            }
+            if (paged_by_rows(m_page) && !m_page_starts.empty()) {
+                m_first = m_page_starts.back();
+                m_page_starts.pop_back();
+                return std::nullopt;
+            }
             const std::size_t rows = paged_by_rows(m_page) ? m_page_rows : kRows;
             m_first = m_first > rows ? m_first - rows : 0;
             return std::nullopt;
         }
         case kNext:
+            if (paged_by_rows(m_page)) {
+                while (!m_page_starts.empty() && m_page_starts.back() >= m_first) {
+                    m_page_starts.pop_back();
+                }
+                m_page_starts.push_back(m_first);
+            }
             m_first += paged_by_rows(m_page) ? m_page_rows : kRows;
             return std::nullopt;
         default:

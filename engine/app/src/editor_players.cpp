@@ -32,6 +32,10 @@ std::string colour_name(sim::BannerId banner) {
 
 }  // namespace
 
+std::string MapViewer::editor_player_label(const sim::Player& p) {
+    return p.name.empty() ? colour_name(p.banner) : p.name;
+}
+
 void MapViewer::editor_players_model(EditorModel& m) const {
     const sim::World& world = m_editor->document.world();
     for (const sim::PlayerId slot : editor::player_slots(world)) {

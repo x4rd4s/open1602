@@ -328,6 +328,13 @@ TEST_CASE("editor panel: the overlays go on and off, the check list goes through
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
     }
+    // Back leads to the first page as it was, the heading on top.
+    CHECK(!click(panel, m, "Back").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "For saving"));
+    CHECK(!find_enabled(panel, m, "Back"));
+    CHECK(!click(panel, m, "More").has_value());
+    (void)panel.draw(m, kNoFonts);
     // A line that leads somewhere: the island on the map, the mission in the goals dialog.
     r = click(panel, m, "Island 10 has 3 ore deposits");
     REQUIRE(r.has_value());

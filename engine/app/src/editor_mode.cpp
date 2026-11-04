@@ -587,7 +587,7 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
     const sim::World& world = m_editor->document.world();
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
         const std::string name = ui::tr("editor.find.island", {number(i + 1)});
-        if (holds(name) || number(i + 1) == text) {
+        if (number(i + 1).find(text) == 0) {  // by the number only: the word would match every island
             const sim::WorldIsland& island = world.islands()[i];
             out.push_back(
                 Found{name, EditorPick{EditorPick::Kind::Island, static_cast<std::uint16_t>(i), island.x, island.y},
@@ -606,8 +606,10 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
     }
     for (const sim::Ship& s : world.ships()) {
         if (holds(s.name)) {
-            out.push_back(Found{ui::tr("editor.find.ship", {s.name}),
-                                EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
+            const sim::Player* owner = world.player(s.owner);
+            out.push_back(Found{
+                ui::tr("editor.find.ship", {s.name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
+                EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
         }
     }
     return out;
@@ -1511,8 +1513,8 @@ std::string goal_problem_text(const sim::World& world, const editor::GoalProblem
     using Kind = editor::GoalProblem::Kind;
     const std::string mission = std::to_string(p.mission + 1);
     const sim::Player* player = world.player(p.player);
-    const std::string who =
-        player != nullptr ? player_name(*player) : ui::tr("editor.goals.slot", {std::to_string(p.player + 1)});
+    const std::string who = player != nullptr ? MapViewer::editor_player_label(*player)
+                                              : ui::tr("editor.goals.slot", {std::to_string(p.player + 1)});
     switch (p.kind) {
         case Kind::NobodyHolds:
             return ui::tr("editor.check.goal.nobody_holds", {mission});
@@ -1576,7 +1578,7 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
             "editor.crop.cotton",  "editor.crop.wine",   "editor.crop.cocoa"};
         const auto who = [&](sim::PlayerId id) {
             const sim::Player* p = world.player(id);
-            return p != nullptr ? player_name(*p) : ui::tr("editor.goals.slot", {number(id + 1U)});
+            return p != nullptr ? editor_player_label(*p) : ui::tr("editor.goals.slot", {number(id + 1U)});
         };
         for (const editor::StartArea& a : areas) {
             std::string crops;

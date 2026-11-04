@@ -96,6 +96,8 @@ public:
 
     /// The user's data folder of Open1602 (settings; the savegames in "saves" below it).
     [[nodiscard]] static std::filesystem::path data_folder();
+    /// A player as the editor's lists name it (Windows-1252): its own name, else its colour.
+    [[nodiscard]] static std::string editor_player_label(const sim::Player& p);
     /// The player's own scenarios (<data folder>/scenarios), listed after the game folder's;
     /// made if it is missing.
     [[nodiscard]] static std::filesystem::path own_scenario_folder();
@@ -328,6 +330,7 @@ private:
         render::TilePos tile;
     };
     [[nodiscard]] std::vector<Found> editor_find(const std::string& text) const;
+
     /// The building, class, infrastructure and figure values of `world` in the tables.
     void apply_world_values(const sim::World& world);
     /// Every frame of the editor: what its panel asked for, and the panel's model.
