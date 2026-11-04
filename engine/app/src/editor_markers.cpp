@@ -189,6 +189,48 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
     }
 }
 
+namespace {
+
+/// The editor's state (section EDIT) is lines "key=value" of UTF-8; "script" names the file the
+/// script was loaded from.
+constexpr std::string_view kScriptKey = "script=";
+
+}  // namespace
+
+void MapViewer::editor_keep_script_file() {
+    const std::vector<std::uint8_t>& state = m_state->world.editor_state();
+    std::string text(state.begin(), state.end());
+    std::string kept;
+    std::size_t at = 0;
+    while (at < text.size()) {
+        const std::size_t end = std::min(text.find('\n', at), text.size());
+        const std::string_view line(text.data() + at, end - at);
+        if (!line.starts_with(kScriptKey) && !line.empty()) {
+            kept.append(line);
+            kept.push_back('\n');
+        }
+        at = end + 1;
+    }
+    if (!m_editor->script_file.empty() && !m_state->world.scenario_script().empty()) {
+        kept += std::string(kScriptKey) + core::path_to_utf8(m_editor->script_file) + "\n";
+    }
+    m_state->world.set_editor_state(std::vector<std::uint8_t>(kept.begin(), kept.end()));
+}
+
+void MapViewer::editor_find_script_file() {
+    const std::vector<std::uint8_t>& state = m_state->world.editor_state();
+    const std::string text(state.begin(), state.end());
+    std::size_t at = 0;
+    while (at < text.size()) {
+        const std::size_t end = std::min(text.find('\n', at), text.size());
+        const std::string_view line(text.data() + at, end - at);
+        if (line.starts_with(kScriptKey)) {
+            m_editor->script_file = core::path_from_utf8(std::string(line.substr(kScriptKey.size())));
+        }
+        at = end + 1;
+    }
+}
+
 bool MapViewer::editor_load_script(const std::filesystem::path& file) {
     const std::string shown = core::utf8_to_cp1252(core::path_to_utf8(file.filename()));
     auto bytes = core::read_file(file);

@@ -244,7 +244,8 @@ undo.
 **Script** (menu Scenario) gives the scenario a Lua script of its own, saved with it, which runs in
 the game like a package's script ([scripts.md](modding/scripts.md)), after the packages'. **Load**
 lists the `.lua` files in the folder `scripts` in Open1602's user data folder; **Reload** reads the
-file loaded last again after it was changed elsewhere; **Remove** takes the script away. The dialog
+file loaded last again after it was changed elsewhere (the scenario keeps where it came from, so
+this works after it is opened again); **Remove** takes the script away. The dialog
 shows the script's size and its first syntax error with the line; an error while the game runs is
 shown in the status line with its line, as for a package's script. Test play runs the script too.
 

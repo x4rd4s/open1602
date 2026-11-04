@@ -312,6 +312,10 @@ private:
     void editor_markers_request(const EditorRequest& request);
     /// The scenario's script from `file` (a step of undo); false with a notice if it cannot be.
     bool editor_load_script(const std::filesystem::path& file);
+    /// The file the script was loaded from, kept in the editor's state (section EDIT) of the
+    /// scenario when it is saved, and found there again when it is opened, so that "Reload" works.
+    void editor_keep_script_file();
+    void editor_find_script_file();
     /// A new map in the editor.
     core::Status editor_new(const EditorNewMap& map);
     /// Saves the document under `file`; what happened goes to the panel's notice.

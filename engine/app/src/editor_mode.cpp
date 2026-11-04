@@ -214,6 +214,7 @@ core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::pa
                                    {},
                                    {}});
     m_editor->slot = slot;
+    editor_find_script_file();
     m_input->set_editor(true);
     if (m_hud) {
         m_hud->close_menu();
@@ -376,6 +377,7 @@ void MapViewer::editor_save(const std::filesystem::path& file) {
                       target.error().message);
         return;
     }
+    editor_keep_script_file();
     auto bytes = m_editor->document.save(m_buildings);
     if (!bytes) {
         editor_notice(ui::tr("editor.save_failed", {ui::error_text(bytes.error(), "editor")}), true,

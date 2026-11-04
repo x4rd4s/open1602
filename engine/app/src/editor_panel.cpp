@@ -512,6 +512,7 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
                               : m_page == P::GoalText || m_page == P::ScenarioText ? 330
                               : m_page == P::Scenario                              ? 470
                               : m_page == P::Script                                ? 400
+                              : m_page == P::ScriptFiles                           ? 460
                               : m_page == P::WorldSize                             ? 440
                               : m_page == P::Check                                 ? m_check_h
                               : wide                                               ? 620
@@ -671,9 +672,7 @@ void EditorPanel::layout_markers(const EditorModel& model) {
         for (std::size_t i = m_first; i < n && i < m_first + kRows; ++i) {
             const auto row = static_cast<Id>(i - m_first);
             f.row(kFirstRow + row, Rect{m_x, y, m_w, kRowH - 2}, model.marker == i);
-            const std::int32_t half = m_w * 45 / 100;
-            f.label(Rect{m_x + 4, y, half - 8, kRowH - 2}, model.markers[i].name);
-            f.label(Rect{m_x + half, y, m_w - half - 4, kRowH - 2}, model.markers[i].place, Align::Right, Tone::Dim);
+            f.label(Rect{m_x + 4, y, m_w - 8, kRowH - 2}, model.markers[i].name);
             y += kRowH;
         }
         if (n > kRows) {
@@ -686,9 +685,14 @@ void EditorPanel::layout_markers(const EditorModel& model) {
         y += kGap;
     }
     const bool chosen = model.marker && *model.marker < n;
-    const std::int32_t half = (m_w - kGap) / 2;
-    f.button(kMarkerRename, Rect{m_x, y, half, kButtonH}, ui::tr("editor.markers.rename"), chosen);
-    f.button(kMarkerRemove, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.markers.remove"), chosen);
+    if (chosen) {
+        // Where the selected marker lies: a line of its own, the list has the names only.
+        f.label(Rect{m_x, y, m_w, kLine}, model.markers[*model.marker].place, Align::Left, Tone::Dim);
+        y += kLine + 2;
+    }
+    f.button(kMarkerRename, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.rename"), chosen);
+    y += kButtonH + kGap;
+    f.button(kMarkerRemove, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.remove"), chosen);
     y += kButtonH + kGap;
     const std::int32_t bottom = m_top + m_height - 4;
     if (!model.notice.empty() && bottom - y - 2 >= 2 * 20) {
