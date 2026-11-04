@@ -10,8 +10,8 @@ the white original flag (`render::BannerTable`), custom images per banner (`Flag
 the skull), units in player colour (`render/unit_tint.hpp`) and the interface's coats of arms and message
 icons in player colour (`render/variant_tint.hpp`, [below](#interface-art-in-player-colour)) and the flag menu of the
 endless game with the twelve presets ([below](#the-flag-menu)) and coats of arms of packages
-(`arms.toml`, [below](#coats-of-arms-of-a-package)). Still open: the free RGB colour (interface) and custom
-flags as PNG of packages.
+(`arms.toml`, [below](#coats-of-arms-of-a-package)) and flags of packages as PNG (`flags.toml`,
+[below](#flags-of-a-package)). Still open: the free RGB colour (interface).
 
 ## How tinting works
 

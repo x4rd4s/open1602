@@ -13,7 +13,7 @@ merchants need and the computers build (a public building of a kind of its own),
 music, a WebM video for a message, a script, a scenario with a campaign, a kind of island world and an
 island template, and changes a few values of the original. It also replaces some of the original's
 art: the small merchant ship is drawn as a cog, the watchtower as the lighthouse, and the red
-player's coat of arms is a lighthouse in red. Copy it, rename the folder and change it, or read it next to the guides below.
+player's coat of arms is a lighthouse in red. The blue player flies a pennant of its own. Copy it, rename the folder and change it, or read it next to the guides below.
 The tests load it with and without the original's data and expect no warning, so it always works
 with the version of Open1602 it comes with.
 
