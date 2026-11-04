@@ -4,8 +4,13 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <filesystem>
 #include <optional>
 #include <string_view>
+#include <system_error>
+
+#include "o1602/core/file.hpp"
+#include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
 
@@ -67,7 +72,7 @@ std::optional<Place> place_of(std::string_view text) {
         file.remove_suffix(1);
     }
     const bool known = file.ends_with(".toml") || file.ends_with(".lua") || file.ends_with(".o1602") ||
-                       file.ends_with(".szs") || file.ends_with(".scp");
+                       file.ends_with(".szs") || file.ends_with(".scp") || file.ends_with(".lang");
     if (!known) {
         return std::nullopt;
     }
@@ -129,6 +134,29 @@ void check_flag_banners(std::span<const assets::PackageFlag> flags, const render
     for (const assets::PackageFlag& f : flags) {
         if (!has_banner(banners, f.banner)) {
             problems.push_back(f.image.id + ": no banner is called \"" + f.banner + "\"; its flag is not shown");
+        }
+    }
+}
+
+void check_package_catalogues(std::span<const assets::ModPackage> packages, std::vector<std::string>& problems) {
+    for (const assets::ModPackage& package : packages) {
+        std::vector<std::filesystem::path> files;
+        std::error_code error;
+        for (std::filesystem::directory_iterator it(package.folder / ui::kPackageLocaleFolder, error), end;
+             !error && it != end; it.increment(error)) {
+            if (it->is_regular_file(error) && it->path().extension() == ".lang") {
+                files.push_back(it->path());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        for (const std::filesystem::path& file : files) {
+            if (const auto bytes = core::read_file(file)) {
+                const std::u8string name = file.filename().u8string();
+                const std::string where = package.id + "/" + std::string(ui::kPackageLocaleFolder) + "/" +
+                                          std::string(name.begin(), name.end());
+                ui::check_catalogue(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()),
+                                    where, problems);
+            }
         }
     }
 }

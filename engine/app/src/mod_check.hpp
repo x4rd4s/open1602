@@ -30,6 +30,9 @@ void check_arms_banners(std::span<const assets::PackageArms> arms, const render:
 void check_flag_banners(std::span<const assets::PackageFlag> flags, const render::BannerTable& banners,
                         std::vector<std::string>& problems);
 
+/// The problems of the packages' catalogues (<package>/locale/<code>.lang, ui::check_catalogue).
+void check_package_catalogues(std::span<const assets::ModPackage> packages, std::vector<std::string>& problems);
+
 /// The packages and problems as one JSON object:
 /// {"packages":[{"id":..,"version":..}],"problems":[{"text":..,"package":..,"file":..,"line":N}]}.
 /// `package`, `file` and `line` are there when the problem starts "<package>/<file> line <N>: "

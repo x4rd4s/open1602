@@ -3143,7 +3143,8 @@ void MapViewer::apply_language() {
         const auto texts = assets::TextTable::load(m_game);
         code = ui::installation_language(m_game, texts ? &texts.value() : nullptr);
     }
-    ui::set_language(code, data_folder() / "locale");
+    ui::set_language(code, data_folder() / "locale", m_locale_packages);
+    m_language_applied = true;
     std::fprintf(stderr, "language: %s\n", ui::current_language().c_str());
 }
 
@@ -3458,6 +3459,17 @@ void MapViewer::use_game_packages() {
     const auto& wanted = m_state->world.packages();
     const std::vector<assets::ModPackage> known = known_packages();
     const std::vector<assets::ModPackage> used = wanted ? assets::packages_for(known, *wanted, problems) : m_packages;
+    // Their catalogues first: the texts below are made in the language they give.
+    std::vector<std::filesystem::path> locale_packages;
+    for (const assets::ModPackage& package : used) {
+        locale_packages.push_back(package.folder);
+    }
+    if (locale_packages != m_locale_packages) {
+        m_locale_packages = std::move(locale_packages);
+        if (m_language_applied) {
+            apply_language();
+        }
+    }
     // The icons first: the messages and the build menu may name them.
     std::vector<assets::PackageIcon> icons = load_package_icons(used, problems);
     ui::set_package_arms(load_package_arms(used, icons, problems));

@@ -43,6 +43,7 @@ package's own is in [open-work.md](open-work.md).
     landscapes.toml    kinds of island world for new games (landscapes.md)
     climates.toml      climates of the package's own (climates.md)
     islands.toml       island templates of the package's own (islands.md)
+    locale/<code>.lang Open1602's own texts in a language (languages.md)
 ```
 
 The folder's name is the package's id, for example `lighthouse`. The ids of a package's entries

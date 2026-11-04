@@ -13,6 +13,7 @@
 
 #include "../test_framework.hpp"
 #include "message_table.hpp"
+#include "mod_check.hpp"
 #include "mod_rules.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -63,7 +64,7 @@ TEST_CASE("the example package has every file a package can have") {
           "goods.toml",     "classes.toml",    "levels.toml",     "script.lua",         "scenarios.toml",
           "campaigns.toml", "graphics.toml",   "icons.toml",      "figure_images.toml", "music.toml",
           "sounds.toml",    "landscapes.toml", "climates.toml",   "slots.toml",         "building_images.toml",
-          "arms.toml",      "flags.toml"}) {
+          "arms.toml",      "flags.toml",      "locale/fr.lang"}) {
         if (!fs::is_regular_file(kMods / "example" / name)) {
             std::fprintf(stderr, "missing: %s\n", name);
             CHECK(false);
@@ -100,7 +101,8 @@ TEST_CASE("the example package loads without a warning, as far as it needs no or
     CHECK(islands[0].id == "example:lagoon");
     app::MessageTable messages;
     messages.load_mods(packages, problems);
-    CHECK(messages.package_videos().size() == 1);  // videos/beacon.webm
+    CHECK(messages.package_videos().size() == 1);       // videos/beacon.webm
+    app::check_package_catalogues(packages, problems);  // locale/fr.lang
 
     const std::vector<assets::PackageScenario> scenarios = assets::load_package_scenarios(packages, problems);
     CHECK(scenarios.size() == 1);

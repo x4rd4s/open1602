@@ -197,7 +197,8 @@ private:
     /// The settings and savegame names of the user's data folder into the panel (at the start).
     void load_options();
     /// Chooses the language of Open1602's own texts: --language, else settings.cfg, else the
-    /// installation's; catalogues in <data folder>/locale extend the built-in ones.
+    /// installation's; the catalogues of the packages in use (<package>/locale) and then those in
+    /// <data folder>/locale extend the built-in ones.
     void apply_language();
     /// What the settings panel asked for this frame (save, load, quit, sounds, window size).
     void apply_options();
@@ -708,6 +709,10 @@ private:
     std::vector<assets::SpriteRedirect> m_sprite_redirects;
     /// The flags the packages give banners (flags.toml).
     std::vector<assets::PackageFlag> m_package_flags;
+    /// The folders of the packages whose catalogues tr() has (apply_language()).
+    std::vector<std::filesystem::path> m_locale_packages;
+    /// Whether apply_language() chose the language yet (load_options()).
+    bool m_language_applied = false;
     /// The content packages installed in <data folder>/mods, in their load order (docs/modding/packages.md).
     std::vector<assets::ModPackage> m_packages;
     /// Packages received from hosts, in <data folder>/mods-cache: used only by games that name them.
