@@ -59,6 +59,7 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       name: ${{ steps.version.outputs.name }}
+      platforms: ${{ steps.platforms.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -89,6 +90,25 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "Packages are named Open1602-$name-<platform>${tag:+, published as $tag}"
 
+      # The platforms this run builds (see the top). Built on Ubuntu 24.04, the Linux package needs
+      # glibc 2.39 (Ubuntu 24.04, Debian 13, Fedora 40 and newer, Arch).
+      - name: Choose the platforms
+        id: platforms
+        shell: bash
+        env:
+          CHOICE: ${{ github.event_name == 'pull_request' && 'without-macos' || inputs.platforms || 'all' }}
+        run: |
+          linux='{"name":"Linux","os":"ubuntu-24.04","platform":"linux-x64"}'
+          windows='{"name":"Windows","os":"windows-2025","platform":"windows-x64"}'
+          macos='{"name":"macOS","os":"macos-15","platform":"macos-universal"}'
+          case "$CHOICE" in
+            without-macos) matrix="[$linux,$windows]" ;;
+            macos-only)    matrix="[$macos]" ;;
+            *)             matrix="[$linux,$windows,$macos]" ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "Platforms ($CHOICE): $matrix"
+
   package:
     name: Package (${{ matrix.name }})
     needs: version
@@ -96,17 +116,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Built on Ubuntu 24.04: the package needs glibc 2.39 (Ubuntu 24.04, Debian 13, Fedora 40
-          # and newer, Arch).
-          - { name: Linux,   os: ubuntu-24.04, platform: linux-x64 }
-          - { name: Windows, os: windows-2025, platform: windows-x64 }
-          - { name: macOS,   os: macos-15,     platform: macos-universal }
-        # Leaves out the platforms the run's choice does not build (an empty value matches none).
-        exclude:
-          - platform: ${{ (github.event_name == 'pull_request' || inputs.platforms == 'without-macos') && 'macos-universal' || 'none' }}
-          - platform: ${{ inputs.platforms == 'macos-only' && 'linux-x64' || 'none' }}
-          - platform: ${{ inputs.platforms == 'macos-only' && 'windows-x64' || 'none' }}
+        include: ${{ fromJSON(needs.version.outputs.platforms) }}
     env:
       PACKAGE: Open1602-${{ needs.version.outputs.name }}-${{ matrix.platform }}
     steps:
