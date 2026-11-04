@@ -905,6 +905,10 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             }
             break;
         }
+        case Kind::CampaignAdd:
+        case Kind::CampaignRemove:
+            editor_campaign(request.name, request.kind == Kind::CampaignAdd);
+            break;
         case Kind::SavePackage: {
             // The packages as the dialog lists them: the folders (editor_packages_model).
             std::vector<std::string> folders;
