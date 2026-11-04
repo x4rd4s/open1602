@@ -51,6 +51,8 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         e.monuments_allowed = p.monuments_allowed;
         e.arches_allowed = p.arches_allowed;
         e.colour = colour_name(p.banner);
+        e.faction = p.faction;
+        e.faction_name = p.faction == sim::faction::kSettlers ? ui::tr("editor.players.settlers") : world.faction(p).id;
         m.player_slots.push_back(std::move(e));
     }
     for (EditorPlayer& e : m.player_slots) {
@@ -59,6 +61,7 @@ void MapViewer::editor_players_model(EditorModel& m) const {
             e.relations.push_back(EditorPlayer::Standing{r.peace, r.trade});
         }
     }
+    m.slot_factions = editor::slot_factions(world);
     m.can_add_player = m.player_slots.size() < sim::kMaxPlayers;
     m.can_remove_player = !m.player_slots.empty() && m.player_slots.back().slot >= sim::kOriginalPlayers;
 }
@@ -120,6 +123,8 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
         const auto it = std::find(banners.begin(), banners.end(), v.banner);
         const std::size_t at = it == banners.end() ? 0 : static_cast<std::size_t>(it - banners.begin());
         v.banner = banners[request.index == 1 ? (at + 1) % banners.size() : (at + banners.size() - 1) % banners.size()];
+    } else if (request.index == 4) {
+        v.faction = request.player.faction;
     } else {
         v.role = request.player.human ? sim::PlayerRole::Human : sim::PlayerRole::Computer;
         v.money = std::clamp(request.player.money, editor::kMinStartMoney, editor::kMaxStartMoney);
