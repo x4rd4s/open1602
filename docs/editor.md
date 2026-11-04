@@ -254,8 +254,8 @@ package. The scenario list of the main menu shows the new scenario at once.
 **Campaign** (menu Scenario) puts a package's scenario into one of the package's campaigns
 ([scenarios.md](modding/scenarios.md#campaigns)): it lists the package's campaigns with their parts
 and adds the map as the next part (`part.<n>` in `campaigns.toml`), up to five. A new campaign gets
-a name of lower case letters, digits and `_`, and the scenario's names as its own until the file
-gives others. **Take out** removes the map again while it is the last part and not the only one.
+a name of lower case letters, digits and `_`, and the scenario's German and English names with
+"(Kampagne)" and "(campaign)" added, so the list tells the two apart, until the file gives others. **Take out** removes the map again while it is the last part and not the only one.
 The file's other tables, keys and comments stay as they are. It works once the map is saved into
 the package.
 

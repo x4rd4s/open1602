@@ -770,6 +770,7 @@ private:
     std::int32_t m_check_h = 580;            ///< the height the check list's dialog wants
     std::int32_t m_files_h = 0;              ///< the height the dialog of the scripts to load needs
     std::int32_t m_packages_h = 0;           ///< the height the dialog of the packages needs
+    std::int32_t m_campaign_h = 480;         ///< the height the dialog of the campaigns needs
     bool m_previewing = false;               ///< the dice preview, as laid out last (its page is the column's)
 };
 

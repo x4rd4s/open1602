@@ -534,7 +534,7 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
                               : m_page == P::ScriptFiles                           ? m_files_h
                               : m_page == P::Packages                              ? m_packages_h
                               : m_page == P::PackageSave                           ? 360
-                              : m_page == P::Campaign                              ? 480
+                              : m_page == P::Campaign                              ? m_campaign_h
                               : m_page == P::WorldSize                             ? 440
                               : m_page == P::Check                                 ? m_check_h
                               : wide                                               ? 620
@@ -572,6 +572,10 @@ void EditorPanel::layout(const EditorModel& model) {
         const std::size_t n = model.files.size();
         const auto rows = static_cast<std::int32_t>(std::min(n, kRows));
         m_files_h = 16 + 6 + 32 + (n == 0 ? 84 : kRowH + rows * kRowH + 4 + kButtonH + kGap) + kButtonH + 8;
+    }
+    if (m_page == Page::Campaign) {
+        // Without a package's scenario the dialog holds a note only.
+        m_campaign_h = model.package_scenario.empty() ? 16 + 6 + 34 + 4 * 20 + kGap + kButtonH + 8 : 480;
     }
     if (m_page == Page::Packages) {
         // The list of packages as tall as its lines, the button right below.
@@ -2059,11 +2063,13 @@ void EditorPanel::layout_campaign(const EditorModel& model) {
     y += 4;
     f.paragraph(Rect{m_x, y, m_w, std::max(2 * 20, foot - kGap - y)}, note,
                 !named && !m_text.empty() ? Tone::Warning : Tone::Dim, 20);
-    f.button(kCampaignAdd, Rect{m_x, foot, 2 * quarter + kGap, kButtonH},
-             ui::tr("editor.campaign.add", {count(parts.size() + 1)}), !contained && !full && named);
-    f.button(kCampaignRemove, Rect{m_x + 2 * (quarter + kGap), foot, quarter, kButtonH},
-             ui::tr("editor.campaign.remove"), contained && at + 1 == parts.end() && parts.size() > 1);
-    f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+    // Three buttons of a third each: the longest German label needs more than a quarter.
+    const std::int32_t third = (m_w - 2 * kGap) / 3;
+    f.button(kCampaignAdd, Rect{m_x, foot, third, kButtonH}, ui::tr("editor.campaign.add", {count(parts.size() + 1)}),
+             !contained && !full && named);
+    f.button(kCampaignRemove, Rect{m_x + third + kGap, foot, third, kButtonH}, ui::tr("editor.campaign.remove"),
+             contained && at + 1 == parts.end() && parts.size() > 1);
+    f.button(kBack, Rect{m_x + m_w - third, foot, third, kButtonH}, ui::tr("editor.dialog.close"));
 }
 
 void EditorPanel::layout_goal_text(const EditorModel& model) {

@@ -269,9 +269,11 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
         if (parts.empty()) {
             // A new campaign: its name in the list as the scenario's, until the file gives another.
             if (const auto& info = m_editor->document.world().scenario_info()) {
+                // Told apart from the scenario of the same name in the list.
                 for (const sim::ScenarioText& t : info->names) {
-                    if (!t.text.empty() && language_code(t.language)) {
-                        lines.push_back({"name." + t.language, core::data_string(t.text)});
+                    if (!t.text.empty() && (t.language == "de" || t.language == "en")) {
+                        const std::string& word = t.language == "de" ? "Kampagne" : "campaign";
+                        lines.push_back({"name." + t.language, core::data_string(t.text + " (" + word + ")")});
                     }
                 }
             }
