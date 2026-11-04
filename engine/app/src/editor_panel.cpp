@@ -1760,8 +1760,7 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
         const EditorPlayer& p = model.player_slots[a];
         // The number, and the player's own name or else its colour (the colour's name is shorter).
         f.label(Rect{m_x, y, 40, kButtonH}, count(a + 1), Align::Right, Tone::Dim);
-        f.label(Rect{m_x + 42, y, kNames - 42 - kGap, kButtonH}, p.own_name.empty() ? p.colour : p.own_name,
-                Align::Left, Tone::Normal);
+        f.label(Rect{m_x + 42, y, kNames - 42 - kGap, kButtonH}, p.name, Align::Left, Tone::Normal);
         for (std::size_t c = 0; c < shown; ++c) {
             const std::size_t b = m_first_column + c;
             const Rect r{m_x + kNames + static_cast<std::int32_t>(c) * (cell + 2), y, cell, kButtonH};
@@ -1916,8 +1915,8 @@ void EditorPanel::layout_goals(const EditorModel& model) {
             // Its own name, else its colour, as the players' table names it.
             const EditorPlayer& p = model.player_slots[i];
             f.button(kMissionHolder + static_cast<Id>(i),
-                     Rect{m_x + col * (w + kGap), y + row * (kButtonH + 2), w, kButtonH},
-                     p.own_name.empty() ? p.colour : p.own_name, true, mission.holders[i]);
+                     Rect{m_x + col * (w + kGap), y + row * (kButtonH + 2), w, kButtonH}, p.name, true,
+                     mission.holders[i]);
         }
         const auto rows = static_cast<std::int32_t>((slots + per_row - 1) / per_row);
         y += rows * (kButtonH + 2) + kGap;

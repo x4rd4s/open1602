@@ -1486,6 +1486,7 @@ TEST_CASE("editor panel: the goals dialog shows a mission's holders and goals, a
         app::EditorPlayer p;
         p.slot = static_cast<std::uint8_t>(i);
         p.colour = "Player " + std::to_string(i + 1);
+        p.name = p.colour;  // the model names a nameless player by its colour
         m.player_slots.push_back(p);
     }
     (void)panel.command(app::EditorCommand::Goals, m);
