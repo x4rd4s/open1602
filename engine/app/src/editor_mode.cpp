@@ -220,6 +220,18 @@ core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::pa
         m_hud->set_editing(true);
         lay_out();  // the editor's frame: the map's room is another
     }
+    if (slot) {
+        // A saved game opens where its player is (the editor has no player of its own).
+        const sim::World& w = m_state->world;
+        const sim::PlayerId human = sim::first_human_player(w);
+        for (const sim::City& c : w.cities()) {
+            if (c.owner == human && c.warehouse_x && c.warehouse_y && c.island < w.islands().size()) {
+                m_camera.center_on(render::TilePos{w.islands()[c.island].x + *c.warehouse_x,
+                                                   w.islands()[c.island].y + *c.warehouse_y});
+                break;
+            }
+        }
+    }
     std::fprintf(stderr, "editor: %s, %ux%u, %zu islands\n",
                  file.empty() ? "new map" : core::path_to_utf8(file).c_str(), m_state->world.width(),
                  m_state->world.height(), m_state->world.islands().size());
