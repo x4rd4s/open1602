@@ -3461,6 +3461,12 @@ void MapViewer::use_game_packages() {
                 problems.push_back(id + ": the game's scenario is not installed; its script does not run");
             }
         }
+        // A scenario of the editor carries its own script (section SLUA): it runs last, in a game
+        // (the editor shows the world only).
+        if (const std::string& own = m_state->world.scenario_script(); !own.empty() && !m_state->view_only) {
+            scripts.push_back(
+                script::PackageScript{std::string(script::kScenarioScript), own, std::string(script::kScenarioScript)});
+        }
         m_state->use_scripts(std::move(scripts));
     } catch (const std::bad_alloc&) {
         problems.emplace_back("not enough memory for the scripts");
