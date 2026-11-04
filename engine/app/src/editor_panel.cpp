@@ -1595,7 +1595,7 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     constexpr std::int32_t kNumber = 40;
     // With packages' factions to choose, a column of them takes room from the name and the colour.
     const bool factions = model.slot_factions.size() > 1;
-    const std::array<std::int32_t, 7> shares = factions ? std::array<std::int32_t, 7>{27, 13, 12, 15, 14, 10, 9}
+    const std::array<std::int32_t, 7> shares = factions ? std::array<std::int32_t, 7>{30, 13, 12, 15, 12, 7, 11}
                                                         : std::array<std::int32_t, 7>{30, 12, 16, 16, 13, 13, 0};
     constexpr std::array<const char*, 7> kHeads = {
         "editor.players.name",      "editor.players.role",   "editor.players.colour", "editor.players.money",
