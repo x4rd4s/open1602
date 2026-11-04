@@ -33,7 +33,9 @@ constexpr std::int32_t kTransferRight = 45008;
 constexpr std::int32_t kArrowGap = 6;  // between an arrow and the coat of arms beside it
 
 // The hint of Open1602's way back into a won game, over the buttons.
-constexpr std::int32_t kHintX = 512;
+// Its middle left of the screen's middle: the total's word ("Summe") reaches down beside it
+// from about x 590.
+constexpr std::int32_t kHintX = 440;
 constexpr std::int32_t kHintY = 680;
 constexpr std::int32_t kHintHalf = 8;  // half the hint's height
 constexpr std::int32_t kText = 4;      // text colour of the original (ui::text_colour)

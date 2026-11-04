@@ -739,6 +739,11 @@ void EditorPanel::layout_markers(const EditorModel& model) {
         // Pages of whole rows, the last with what is left; as tall as a full one, so that the
         // buttons below stay where they are from page to page.
         m_first = std::min(m_first, (n - 1) / kRows * kRows);
+        if (model.marker != m_shown_marker && model.marker && *model.marker < n) {
+            // Another marker chosen (one placed, one brought back): its page.
+            m_first = *model.marker / kRows * kRows;
+        }
+        m_shown_marker = model.marker;
         const std::int32_t top = y;
         for (std::size_t i = m_first; i < n && i < m_first + kRows; ++i) {
             const auto row = static_cast<Id>(i - m_first);
