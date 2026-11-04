@@ -2,7 +2,11 @@
 #include "keys_menu.hpp"
 
 #include <algorithm>
+#include <array>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "key_help.hpp"
 

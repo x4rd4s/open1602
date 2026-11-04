@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The window of the keys (engine/app/src/keys_menu.hpp) and the key settings file it keeps.
 
+#include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "../test_framework.hpp"
