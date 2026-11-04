@@ -933,7 +933,8 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
     }
     plan.city = planner.city;
 
-    // What the order may spend: the city's warehouse (or the ship when founding) and the gold.
+    // What the order may spend: the city's warehouse (or the ship when founding or taking a city
+    // over) and the gold.
     const assets::BuildingTable::Materials& m = buildings.materials();
     BuildBill available;
     if (order.ship) {
@@ -1054,20 +1055,21 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
                     refusal = BuildRefusal::SecondKontor;
                 }
             }
-            if (refusal == BuildRefusal::None && order.ship) {
-                // The ship lies within the circle of radius 16 around the footprint.
-                const Ship* ship = world.ship(*order.ship);
-                const Footprint f = footprint_of(*type, item.x, item.y, out.rotation);
-                const std::int32_t sx =
-                    ship != nullptr ? static_cast<std::int32_t>(ship->x) - static_cast<std::int32_t>(island.x) : -1000;
-                const std::int32_t sy =
-                    ship != nullptr ? static_cast<std::int32_t>(ship->y) - static_cast<std::int32_t>(island.y) : -1000;
-                const std::int32_t dx = std::max({f.x - sx, 0, sx - (f.x + static_cast<std::int32_t>(f.w) - 1)});
-                const std::int32_t dy = std::max({f.y - sy, 0, sy - (f.y + static_cast<std::int32_t>(f.h) - 1)});
-                static const std::vector<std::uint8_t> kCircle = circle_half_widths(kShipRange);
-                if (dy > kShipRange || dx > kCircle[static_cast<std::size_t>(dy)]) {
-                    refusal = BuildRefusal::ShipTooFar;
-                }
+        }
+        // Founding a city, or taking one over (as in the original), is done from a ship within the
+        // circle of radius 16 around the footprint.
+        if (refusal == BuildRefusal::None && ((order.ship && !out.upgrade) || plan.takeover)) {
+            const Ship* ship = order.ship ? world.ship(*order.ship) : nullptr;
+            const Footprint f = footprint_of(*type, out.x, out.y, out.rotation);
+            const std::int32_t sx =
+                ship != nullptr ? static_cast<std::int32_t>(ship->x) - static_cast<std::int32_t>(island.x) : -1000;
+            const std::int32_t sy =
+                ship != nullptr ? static_cast<std::int32_t>(ship->y) - static_cast<std::int32_t>(island.y) : -1000;
+            const std::int32_t dx = std::max({f.x - sx, 0, sx - (f.x + static_cast<std::int32_t>(f.w) - 1)});
+            const std::int32_t dy = std::max({f.y - sy, 0, sy - (f.y + static_cast<std::int32_t>(f.h) - 1)});
+            static const std::vector<std::uint8_t> kCircle = circle_half_widths(kShipRange);
+            if (dy > kShipRange || dx > kCircle[static_cast<std::size_t>(dy)]) {
+                refusal = BuildRefusal::ShipTooFar;
             }
         }
         if (refusal == BuildRefusal::None) {
@@ -2346,6 +2348,9 @@ std::vector<TilePos> plan_demolish(const World& world, const assets::BuildingTab
     // Origins already looked at, one bit per tile of the island (MS-3: a rectangle over a whole
     // island visits every tile; a set of pairs made that several times slower).
     std::vector<bool> seen(drag ? std::size_t{map.width()} * map.height() : 0);
+    // The houses a rectangle passes over: they go only when nothing else in it would (Open1602;
+    // the original leaves them standing, so a block of houses could only be cleared click by click).
+    std::vector<TilePos> houses;
     for (std::int32_t y = y0; y <= y1; ++y) {
         for (std::int32_t x = x0; x <= x1; ++x) {
             const auto b = building_at(world, buildings, order.island, {x, y});
@@ -2406,13 +2411,16 @@ std::vector<TilePos> plan_demolish(const World& world, const assets::BuildingTab
             if (drag) {
                 // A rectangle leaves real buildings standing.
                 if (std::find(kRealBuildings.begin(), kRealBuildings.end(), t.kind) != kRealBuildings.end()) {
+                    if (t.prod_kind == prod::kHouse) {
+                        houses.push_back(b->origin);
+                    }
                     continue;
                 }
             }
             result.push_back(b->origin);
         }
     }
-    return result;
+    return result.empty() ? houses : result;
 }
 
 DemolishLoss demolish_loss(const World& world, const assets::BuildingTable& buildings, const DemolishOrder& order) {
