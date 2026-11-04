@@ -64,7 +64,7 @@ TEST_CASE("the example package has every file a package can have") {
           "goods.toml",     "classes.toml",    "levels.toml",     "script.lua",         "scenarios.toml",
           "campaigns.toml", "graphics.toml",   "icons.toml",      "figure_images.toml", "music.toml",
           "sounds.toml",    "landscapes.toml", "climates.toml",   "slots.toml",         "building_images.toml",
-          "arms.toml",      "flags.toml",      "locale/fr.lang"}) {
+          "arms.toml",      "flags.toml",      "locale/fr.lang",  "interface.toml"}) {
         if (!fs::is_regular_file(kMods / "example" / name)) {
             std::fprintf(stderr, "missing: %s\n", name);
             CHECK(false);
@@ -85,6 +85,11 @@ TEST_CASE("the example package loads without a warning, as far as it needs no or
         const std::vector<assets::PackageArms> arms = app::load_package_arms(packages, ui::package_icons(), problems);
         REQUIRE(arms.size() == 1);
         CHECK(arms[0].banner == "anno1602:red");
+        const std::vector<assets::InterfaceSprite> sprites =
+            app::load_package_interface(packages, ui::package_icons(), true, problems);
+        REQUIRE(sprites.size() == 1);
+        CHECK(sprites[0].sheet == 1);
+        CHECK(sprites[0].sprite == 23);  // START.BSH of the History Edition
     }
     const std::vector<sim::PackageLandscape> landscapes = app::load_package_landscapes(packages, problems);
     CHECK(landscapes.size() == 1);

@@ -2,6 +2,7 @@
 #include "mod_check.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdio>
 #include <filesystem>
@@ -9,8 +10,10 @@
 #include <string_view>
 #include <system_error>
 
+#include "o1602/assets/sprite_sheet.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/ui/localization.hpp"
+#include "o1602/ui/resources.hpp"
 
 namespace o1602::app {
 
@@ -134,6 +137,39 @@ void check_flag_banners(std::span<const assets::PackageFlag> flags, const render
     for (const assets::PackageFlag& f : flags) {
         if (!has_banner(banners, f.banner)) {
             problems.push_back(f.image.id + ": no banner is called \"" + f.banner + "\"; its flag is not shown");
+        }
+    }
+}
+
+void check_interface_sprites(std::span<const assets::InterfaceSprite> sprites,
+                             std::span<const assets::PackageIcon> icons, const assets::GameDirectory& game,
+                             std::vector<std::string>& problems) {
+    std::array<std::optional<assets::SpriteSheet>, assets::kInterfaceSheets.size()> sheets;
+    std::array<bool, assets::kInterfaceSheets.size()> read{};
+    for (const assets::InterfaceSprite& s : sprites) {
+        const auto b = static_cast<std::size_t>(s.sheet);
+        if (b >= sheets.size()) {
+            continue;
+        }
+        if (!read[b]) {
+            read[b] = true;
+            if (const auto path = game.resolve(ui::sheet_file(s.sheet, ui::ArtSize::Large))) {
+                if (auto sheet = assets::SpriteSheet::load(*path)) {
+                    sheets[b] = std::move(sheet).value();
+                }
+            }
+        }
+        const std::string name = std::string(assets::kInterfaceSheets[b]) + ":" + std::to_string(s.sprite);
+        if (!sheets[b] || static_cast<std::size_t>(s.sprite) >= sheets[b]->size()) {
+            problems.push_back(s.icon + ": the installation has no sprite " + name + "; the icon is not shown");
+            continue;
+        }
+        const assets::PackageIcon* icon = assets::find_package_icon(icons, s.icon);
+        const assets::SpriteInfo& info = sheets[b]->info(static_cast<std::size_t>(s.sprite));
+        if (icon != nullptr && (icon->width != info.width || icon->height != info.height)) {
+            problems.push_back(s.icon + ": " + std::to_string(icon->width) + " x " + std::to_string(icon->height) +
+                               " pixels in place of " + name + ", which is " + std::to_string(info.width) + " x " +
+                               std::to_string(info.height) + "; it may not fit its place");
         }
     }
 }

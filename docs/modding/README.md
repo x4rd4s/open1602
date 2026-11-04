@@ -14,7 +14,7 @@ music, a WebM video for a message, a script, a scenario with a campaign, a kind 
 island template, and changes a few values of the original. It also replaces some of the original's
 art: the small merchant ship is drawn as a cog, the watchtower as the lighthouse, and the red
 player's coat of arms is a lighthouse in red. The blue player flies a pennant of its own,
-and the beginning of a French translation shows how a package brings a language. Copy it, rename the folder and change it, or read it next to the guides below.
+the first star of the level choice is drawn anew, and the beginning of a French translation shows how a package brings a language. Copy it, rename the folder and change it, or read it next to the guides below.
 The tests load it with and without the original's data and expect no warning, so it always works
 with the version of Open1602 it comes with.
 
@@ -63,6 +63,7 @@ Each file does one thing; a package has only the files it needs.
 | the build menu | `build_menu.toml` | [build-menu.md](build-menu.md) |
 | messages of the status bar | `messages.toml` | [messages.md](messages.md) |
 | images of buildings, figures and ships, also in place of the original's; icons | `graphics.toml`, `figure_images.toml`, `building_images.toml`, `icons.toml` | [graphics.md](graphics.md) |
+| the original's interface art: buttons, panels, menu backgrounds | `interface.toml` | [graphics.md](graphics.md#interface-art-of-the-original) |
 | coats of arms of the players | `arms.toml` | [flags.md](flags.md#coats-of-arms-of-a-package) |
 | flags of the players as PNG | `flags.toml` | [flags.md](flags.md#flags-of-a-package) |
 | Open1602's own texts in a language of its own, or changed | `locale/<code>.lang` | [languages.md](languages.md#languages-of-a-package) |
@@ -111,7 +112,8 @@ problem: lighthouse/figure_images.toml line 2: [anno1602:small_merchant_ship]: i
 It needs the original's installation (`ANNO1602_DIR`), since a package builds on its buildings and
 figures, and exits with 1 when there is a problem. The game writes the same lines to its log.
 Beyond what the game's readers report, it checks what needs the installation or the game's banners:
-a track that replaces a title `MUSIC8` has not, a coat of arms or flag of a banner no game has, and
+a track that replaces a title `MUSIC8` has not, a coat of arms or flag of a banner no game has, an
+interface sprite the installation has not or of another size than its icon, and
 a line of a catalogue (`locale/<code>.lang`) with a key or a `{N}` Open1602 does not have.
 
 With `--json` it prints the packages and the problems as one JSON object instead, for a script or a

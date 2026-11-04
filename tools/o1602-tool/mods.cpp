@@ -82,6 +82,9 @@ int cmd_check_mod(const Args& args) {
     auto banners = render::BannerTable::original();
     banners.add_more_players();
     app::check_arms_banners(app::load_package_arms(packages, icons, problems), banners, problems);
+    app::check_interface_sprites(
+        app::load_package_interface(packages, icons, !game->localized_root().empty(), problems), icons, *game,
+        problems);
     ui::set_package_icons(std::move(icons));
     (void)app::load_package_landscapes(packages, problems);
     (void)sim::load_package_islands(packages, problems);

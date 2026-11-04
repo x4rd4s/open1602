@@ -3473,6 +3473,7 @@ void MapViewer::use_game_packages() {
     // The icons first: the messages and the build menu may name them.
     std::vector<assets::PackageIcon> icons = load_package_icons(used, problems);
     ui::set_package_arms(load_package_arms(used, icons, problems));
+    ui::set_interface_sprites(load_package_interface(used, icons, !m_game.localized_root().empty(), problems));
     ui::set_package_icons(std::move(icons));
     if (m_hud) {
         m_hud->forget_package_icons();
