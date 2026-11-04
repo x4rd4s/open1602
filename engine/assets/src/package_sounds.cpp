@@ -33,7 +33,7 @@ bool is_sample_name(std::string_view name) noexcept {
 std::string lower_name(std::string_view name) {
     std::string s(name);
     std::transform(s.begin(), s.end(), s.begin(),
-                   [](const char c) { return c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c; });
+                   [](const char c) { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
     return s;
 }
 
