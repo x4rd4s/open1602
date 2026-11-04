@@ -517,8 +517,9 @@ void EditorPanel::layout(const EditorModel& model) {
     if (m_page == Page::Check) {
         // The check list's dialog as tall as its lines (up to its room; then it has pages).
         std::int32_t h = 16 + 6 + 32 + (kButtonH + kGap) + 6 + 8;
+        const std::int32_t text_w = dialog_rect().w - 36 - 8;
         for (const EditorCheckLine& line : model.check) {
-            h += line.kind == EditorCheckLine::Kind::Heading ? 2 * 20 + 2 : 3 * 20;
+            h += check_line_h(line, text_w);
         }
         m_check_h = h;
     }
@@ -1799,6 +1800,16 @@ void EditorPanel::layout_view(const EditorModel& model) {
     f.button(kBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.back"));
 }
 
+std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept {
+    if (line.kind == EditorCheckLine::Kind::Heading) {
+        return 2 * 20 + 2;
+    }
+    // As many lines as the text needs, about 8 design units a letter; three at least.
+    const auto per_line = static_cast<std::size_t>(std::max(20, width / 8));
+    const auto lines = static_cast<std::int32_t>((line.text.size() + per_line - 1) / per_line);
+    return std::clamp(lines + 1, 3, 6) * 20;
+}
+
 void EditorPanel::layout_check(const EditorModel& model) {
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
@@ -1806,24 +1817,26 @@ void EditorPanel::layout_check(const EditorModel& model) {
     y += 32;
     // Each line gets three lines of text, a heading two; as many as the room holds above the
     // buttons, the rest on the next pages.
-    constexpr std::int32_t kItem = 3 * 20;
     constexpr std::int32_t kHeading = 2 * 20 + 2;
+    const std::int32_t text_w = m_w - 8;
     const std::size_t n = model.check.size();
     m_first = std::min(m_first, n == 0 ? 0 : n - 1);
     using Kind = EditorCheckLine::Kind;
     // Room for the pages' buttons only where the lines left do not fit without them.
     std::int32_t rest = 0;
     for (std::size_t k = m_first; k < n; ++k) {
-        rest += model.check[k].kind == Kind::Heading ? kHeading : kItem;
+        rest += check_line_h(model.check[k], text_w);
     }
     const std::int32_t one_row = m_top + m_height - (kButtonH + kGap) - 6;
-    const std::int32_t bottom = m_first == 0 && y + rest <= one_row ? one_row : one_row - (kButtonH + kGap);
+    const bool paged = m_first > 0 || y + rest > one_row;
+    const std::int32_t bottom = paged ? one_row - (kButtonH + kGap) : one_row;
     std::size_t i = m_first;
     for (; i < n; ++i) {
         const EditorCheckLine& line = model.check[i];
-        const std::int32_t h = line.kind == Kind::Heading ? kHeading : kItem;
+        const std::int32_t h = check_line_h(line, text_w);
         // A heading goes to the next page with its first line.
-        const std::int32_t needs = line.kind == Kind::Heading && i + 1 < n ? h + kItem : h;
+        const std::int32_t needs =
+            line.kind == Kind::Heading && i + 1 < n ? h + check_line_h(model.check[i + 1], text_w) : h;
         if (y + needs > bottom && i > m_first) {
             break;
         }
@@ -1834,19 +1847,20 @@ void EditorPanel::layout_check(const EditorModel& model) {
                               : line.kind == Kind::Fine                              ? Tone::Normal
                                                                                      : Tone::Dim;
             if (line.target != EditorCheckLine::Target::None) {
-                f.row(kCheckLine + static_cast<Id>(i), Rect{m_x, y, m_w, kItem - 4}, false);
+                f.row(kCheckLine + static_cast<Id>(i), Rect{m_x, y, m_w, h - 4}, false);
             }
-            f.paragraph(Rect{m_x + 8, y, m_w - 8, kItem}, line.text, tone, 20);
+            f.paragraph(Rect{m_x + 8, y, m_w - 8, h}, line.text, tone, 20);
         }
         y += h;
     }
     m_page_rows = std::max<std::size_t>(1, i - m_first);
-    y += 4;
-    if (m_first > 0 || i < n) {
+    // The buttons at the foot, at the same place on every page.
+    y = one_row + 4;
+    if (paged) {
         const std::int32_t half = (m_w - kGap) / 2;
-        f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
-        f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), i < n);
-        y += kButtonH + kGap;
+        const std::int32_t row = y - (kButtonH + kGap);
+        f.button(kPrevious, Rect{m_x, row, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
+        f.button(kNext, Rect{m_x + half + kGap, row, half, kButtonH}, ui::tr("editor.next"), i < n);
     }
     f.button(kBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.back"));
 }

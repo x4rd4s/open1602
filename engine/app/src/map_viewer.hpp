@@ -827,7 +827,7 @@ private:
         std::optional<sim::World> preview_plan{};
         std::uint32_t preview_rolls = 0;
         /// The views kept with Ctrl and a digit, for this session.
-        std::array<std::optional<render::Camera>, 9> bookmarks{};
+        std::array<std::optional<render::Camera>, 10> bookmarks{};  ///< the keys 1..9, 0
     };
     std::optional<EditorSession> m_editor;
     /// The editor aside while a test game of its map runs: its world (view only), its document,

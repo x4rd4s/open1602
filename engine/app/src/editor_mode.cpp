@@ -461,7 +461,8 @@ void MapViewer::editor_recover() {
     m_editor->source_name = name;
     m_editor->document.set_unsaved();
     m_editor_recovery_written = true;  // it stays until the map is saved or discarded
-    editor_notice(ui::tr("editor.recover.done"), false, "recovered " + path);
+    editor_notice(ui::tr("editor.recover.done"), false,
+                  "recovered " + (path.empty() ? std::string("a new map") : path));
 }
 
 void MapViewer::apply_world_values(const sim::World& world) {
@@ -2652,7 +2653,7 @@ void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
         case ui::KeyAction::EditorBookmarkSet:
             if (param < m_editor->bookmarks.size()) {
                 m_editor->bookmarks[param] = m_camera;
-                editor_notice(ui::tr("editor.bookmark.set", {number(param + 1U)}), false, "bookmark kept");
+                editor_notice(ui::tr("editor.bookmark.set", {number((param + 1U) % 10U)}), false, "bookmark kept");
             }
             break;
         case ui::KeyAction::EditorBookmarkGo:
@@ -2661,7 +2662,7 @@ void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
                     m_camera = *mark;
                     lay_out();  // the window may have another size since
                 } else {
-                    editor_notice(ui::tr("editor.bookmark.none", {number(param + 1U)}), true, "no bookmark");
+                    editor_notice(ui::tr("editor.bookmark.none", {number((param + 1U) % 10U)}), true, "no bookmark");
                 }
             }
             break;

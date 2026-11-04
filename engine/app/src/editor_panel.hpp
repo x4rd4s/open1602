@@ -650,6 +650,8 @@ private:
     void layout_goal_text(const EditorModel& model);
     void layout_scenario(const EditorModel& model);
     void layout_find(const EditorModel& model);
+    /// The height of a line of the check list in a dialog `width` design units wide.
+    [[nodiscard]] static std::int32_t check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept;
     /// The notice (or the note `note_key`, `short_key` where it does not fit whole) from `y`
     /// down and the button `back` labelled `back_key` at the panel's foot.
     void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,

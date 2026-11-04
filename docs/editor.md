@@ -324,8 +324,8 @@ there are, a target player who starts without the cities the loss conditions ask
 | Shift and Build dragged | Places along a straight row |
 | F5 | Test play; in the test game F5 leads back |
 | Ctrl+F | Find an island, a city or a ship |
-| Ctrl+1 to Ctrl+9 | Keeps the view as a bookmark (for this session) |
-| 1 to 9 | Goes to the bookmark |
+| Ctrl+1 to Ctrl+0 | Keeps the view as a bookmark (for this session) |
+| 1 to 0 | Goes to the bookmark |
 | F1 | The keys |
 | Escape | Closes a menu, or goes back from a page of the column |
 

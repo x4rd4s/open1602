@@ -306,9 +306,9 @@ void MapInput::setup_keys() {
     editor(chord(SDLK_F, true), KeyAction::EditorFind);
     // Bookmarks of the view: Ctrl and a digit keeps it, the digit goes there (by their place, as the
     // groups' digits).
-    const std::array<SDL_Scancode, 9> marks{SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3,
-                                            SDL_SCANCODE_4, SDL_SCANCODE_5, SDL_SCANCODE_6,
-                                            SDL_SCANCODE_7, SDL_SCANCODE_8, SDL_SCANCODE_9};
+    const std::array<SDL_Scancode, 10> marks{SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4,
+                                             SDL_SCANCODE_5, SDL_SCANCODE_6, SDL_SCANCODE_7, SDL_SCANCODE_8,
+                                             SDL_SCANCODE_9, SDL_SCANCODE_0};
     for (std::size_t m = 0; m < marks.size(); ++m) {
         k.bind(KeyContext::Editor, place(marks[m], true), KeyAction::EditorBookmarkSet, static_cast<std::uint8_t>(m));
         k.bind(KeyContext::Editor, place(marks[m]), KeyAction::EditorBookmarkGo, static_cast<std::uint8_t>(m));
