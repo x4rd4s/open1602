@@ -169,6 +169,8 @@ bool MapInput::editor_key(ui::KeyAction action) noexcept {
         case KeyAction::EditorBrushBigger:
         case KeyAction::EditorBrushSmaller:
         case KeyAction::EditorTestPlay:
+        case KeyAction::EditorBookmarkSet:
+        case KeyAction::EditorBookmarkGo:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:
@@ -300,6 +302,15 @@ void MapInput::setup_keys() {
     editor(chord(SDLK_MINUS), KeyAction::EditorBrushSmaller);
     editor(chord(SDLK_KP_MINUS), KeyAction::EditorBrushSmaller);
     editor(chord(SDLK_F5), KeyAction::EditorTestPlay);
+    // Bookmarks of the view: Ctrl and a digit keeps it, the digit goes there (by their place, as the
+    // groups' digits).
+    const std::array<SDL_Scancode, 9> marks{SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3,
+                                            SDL_SCANCODE_4, SDL_SCANCODE_5, SDL_SCANCODE_6,
+                                            SDL_SCANCODE_7, SDL_SCANCODE_8, SDL_SCANCODE_9};
+    for (std::size_t m = 0; m < marks.size(); ++m) {
+        k.bind(KeyContext::Editor, place(marks[m], true), KeyAction::EditorBookmarkSet, static_cast<std::uint8_t>(m));
+        k.bind(KeyContext::Editor, place(marks[m]), KeyAction::EditorBookmarkGo, static_cast<std::uint8_t>(m));
+    }
     // The tools: keys that the view's (W A S D, Q, E by their place) leave free.
     editor(chord(SDLK_V), KeyAction::EditorToolSelect);
     editor(chord(SDLK_I), KeyAction::EditorToolIsland);
@@ -386,7 +397,8 @@ void MapInput::show_key_help() {
         }
         std::string key = key_label(b.chord);
         if (b.action == KeyAction::GroupStore || b.action == KeyAction::GroupAdd ||
-            b.action == KeyAction::GroupRecall) {
+            b.action == KeyAction::GroupRecall || b.action == KeyAction::EditorBookmarkSet ||
+            b.action == KeyAction::EditorBookmarkGo) {
             if (b.param != 0) {
                 continue;
             }
@@ -746,6 +758,8 @@ void MapInput::run_action(const ui::KeyBinding& b) {
         case KeyAction::EditorBrushBigger:
         case KeyAction::EditorBrushSmaller:
         case KeyAction::EditorTestPlay:
+        case KeyAction::EditorBookmarkSet:
+        case KeyAction::EditorBookmarkGo:
         case KeyAction::EditorToolSelect:
         case KeyAction::EditorToolIsland:
         case KeyAction::EditorToolPlaceholder:
@@ -766,7 +780,7 @@ void MapInput::run_action(const ui::KeyBinding& b) {
         case KeyAction::EditorToolResource:
         case KeyAction::EditorToolRemove:
             if (m_editor) {
-                m_host.editor_key(b.action);
+                m_host.editor_key(b.action, b.param);
             }
             break;
         case KeyAction::ModeBuild:

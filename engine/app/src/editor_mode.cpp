@@ -18,10 +18,12 @@
 
 #include "o1602/assets/text_table.hpp"
 #include "o1602/core/file.hpp"
+#include "o1602/core/png_writer.hpp"
 #include "o1602/core/text.hpp"
 #include "o1602/editor/fairness.hpp"
 #include "o1602/editor/goals.hpp"
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/map_image.hpp"
 #include "o1602/editor/objects.hpp"
 #include "o1602/editor/original_check.hpp"
 #include "o1602/editor/resources.hpp"
@@ -473,6 +475,10 @@ void MapViewer::editor_test_play() {
     if (!m_editor || !m_state || m_session) {
         return;
     }
+    if (sim::first_human_player(m_state->world) == sim::kNoPlayer) {
+        editor_notice(ui::tr("editor.test_play.no_human"), true, "no human player to test with");
+        return;
+    }
     // The game starts from the bytes a save would write, as the scenario list would start it:
     // what the test shows is what the file gives.
     const auto failed = [&](const core::Error& e) {
@@ -862,6 +868,22 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::Recover:
             editor_recover();
             break;
+        case Kind::ExportImage: {
+            const editor::MapImage image = editor::map_image(m_editor->document.world(), m_buildings);
+            std::filesystem::path path = next_screenshot_path();
+            path.replace_filename("map" + core::path_to_utf8(path.filename()).substr(std::string("open1602").size()));
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            if (auto written = core::write_png_rgba(path, image.width, image.height, image.rgba); !written) {
+                editor_notice(ui::tr("editor.export_image.failed", {ui::error_text(written.error(), "editor")}), true,
+                              written.error().message);
+            } else {
+                editor_notice(
+                    ui::tr("editor.export_image.done", {core::utf8_to_cp1252(core::path_to_utf8(path.filename()))}),
+                    false, "map picture " + core::path_to_utf8(path));
+            }
+            break;
+        }
         case Kind::ShowIsland:
             if (request.index < m_editor->document.world().islands().size()) {
                 const sim::WorldIsland& island = m_editor->document.world().islands()[request.index];
@@ -2533,7 +2555,7 @@ void MapViewer::editor_rotate_tool() {
     }
 }
 
-void MapViewer::editor_key(ui::KeyAction action) {
+void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
     switch (action) {
         case ui::KeyAction::EditorUndo:
             editor_request(EditorRequest{EditorRequest::Kind::Undo});
@@ -2564,6 +2586,22 @@ void MapViewer::editor_key(ui::KeyAction action) {
             break;
         case ui::KeyAction::EditorTestPlay:
             editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            break;
+        case ui::KeyAction::EditorBookmarkSet:
+            if (param < m_editor->bookmarks.size()) {
+                m_editor->bookmarks[param] = m_camera;
+                editor_notice(ui::tr("editor.bookmark.set", {number(param + 1U)}), false, "bookmark kept");
+            }
+            break;
+        case ui::KeyAction::EditorBookmarkGo:
+            if (param < m_editor->bookmarks.size()) {
+                if (const auto& mark = m_editor->bookmarks[param]) {
+                    m_camera = *mark;
+                    lay_out();  // the window may have another size since
+                } else {
+                    editor_notice(ui::tr("editor.bookmark.none", {number(param + 1U)}), true, "no bookmark");
+                }
+            }
             break;
         case ui::KeyAction::EditorBrushBigger:
         case ui::KeyAction::EditorBrushSmaller: {

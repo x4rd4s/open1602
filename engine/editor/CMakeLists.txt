@@ -9,6 +9,7 @@ add_library(o1602_editor
     src/goals.cpp
     src/history.cpp
     src/islands.cpp
+    src/map_image.cpp
     src/objects.cpp
     src/operations.cpp
     src/original_check.cpp

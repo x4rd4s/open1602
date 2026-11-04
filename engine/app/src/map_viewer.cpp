@@ -2646,6 +2646,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                     m_running = false;
                     break;
                 }
+                if (m_test_play && m_test_play->running) {
+                    editor_end_test_play();  // a test game is not kept: back to the editor
+                    break;
+                }
                 // "Ende": the game is kept as lastgame, then back to the main menu
                 // (no score sheet, no high score), or the end without one.
                 const auto status = save_slot(kLastGameSlot, std::string(kLastGameName));
@@ -3219,7 +3223,8 @@ void MapViewer::apply_options() {
                 // The original leaves at once (M1 in the report); Open1602 asks first.
                 if (m_options.confirm) {
                     m_quit_pending = true;
-                    m_hud->ask(ui::tr("dialog.quit_game"));
+                    m_hud->ask(
+                        ui::tr(m_test_play && m_test_play->running ? "dialog.quit_test_game" : "dialog.quit_game"));
                 } else {
                     m_quit_pending = true;
                     Hud::Action yes{Hud::Action::Kind::Answer};

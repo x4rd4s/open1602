@@ -138,7 +138,7 @@ private:
     void toggle_pause_video() override;
     void save_template() override;
     void notify(std::string text, std::string_view log) override;
-    void editor_key(ui::KeyAction action) override;
+    void editor_key(ui::KeyAction action, std::uint8_t param = 0) override;
     void editor_pick(const EditorPick& pick) override;
     bool editor_place(const render::TilePos& tile) override;
     bool editor_cancel_place() override;
@@ -818,6 +818,8 @@ private:
         /// the map shows a roll of it, and the rolls made since the preview began.
         std::optional<sim::World> preview_plan{};
         std::uint32_t preview_rolls = 0;
+        /// The views kept with Ctrl and a digit, for this session.
+        std::array<std::optional<render::Camera>, 9> bookmarks{};
     };
     std::optional<EditorSession> m_editor;
     /// The editor aside while a test game of its map runs: its world (view only), its document,

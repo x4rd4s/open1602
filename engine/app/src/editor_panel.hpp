@@ -150,6 +150,7 @@ enum class EditorCommand : std::uint8_t {
     Goals,
     Check,
     TestPlay,
+    ExportImage,
     Keys,
 };
 
@@ -474,6 +475,7 @@ struct EditorRequest {
         TestPlay,      ///< a game of the map as it is now; F5 in it leads back
         Recover,       ///< the map kept by the editor's recovery, opened instead of the new one
         ShowIsland,    ///< the island `index` in the view's middle, selected
+        ExportImage,   ///< the map as a picture (PNG) in the screenshots' folder
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;

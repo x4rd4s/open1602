@@ -362,6 +362,8 @@ std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const E
             return press(kCheck, model, true);
         case EditorCommand::TestPlay:
             return EditorRequest{EditorRequest::Kind::TestPlay};
+        case EditorCommand::ExportImage:
+            return EditorRequest{EditorRequest::Kind::ExportImage};
         case EditorCommand::Keys:
             return EditorRequest{EditorRequest::Kind::ShowKeys};
     }

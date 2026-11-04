@@ -4,6 +4,7 @@
 #include "../test_framework.hpp"
 
 #include "o1602/editor/fairness.hpp"
+#include "o1602/editor/map_image.hpp"
 #include "o1602/sim/ship.hpp"
 
 using namespace o1602;
@@ -60,4 +61,28 @@ TEST_CASE("editor fairness: a world without starts has no start areas") {
     CHECK(areas[0].islands == 0);
     CHECK(areas[0].rival == 22);
     CHECK(areas[1].x == 25);
+}
+
+TEST_CASE("editor map picture: a square of the sea's colour a tile, a start marked") {
+    const assets::BuildingTable buildings;
+    sim::World world(10, 6);
+    auto image = editor::map_image(world, buildings, 3);
+    CHECK(image.width == 30);
+    CHECK(image.height == 18);
+    REQUIRE(image.rgba.size() == std::size_t{30} * 18 * 4);
+    CHECK(image.rgba[0] == 30);  // sea
+    CHECK(image.rgba[3] == 255);
+
+    std::vector<sim::Player> players(2);
+    players[0].role = sim::PlayerRole::Human;
+    players[1].role = sim::PlayerRole::Computer;
+    world.set_players(players);
+    sim::Ship s;
+    s.owner = 0;
+    s.x = 5;
+    s.y = 3;
+    world.add_ship(s);
+    image = editor::map_image(world, buildings, 3);
+    const std::size_t middle = (std::size_t{3 * 3 + 1} * 30 + (5 * 3 + 1)) * 4;
+    CHECK(image.rgba[middle] == 255);  // the start's white square
 }

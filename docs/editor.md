@@ -17,7 +17,7 @@ passes. Only the pictures go on as they do (water, flags).
 
 The editor has a frame of its own around the map instead of the game's panel:
 
-- **The menu bar** above the map: **File** (new map, open, save, save as, test play, leave the editor), **Edit**
+- **The menu bar** above the map: **File** (new map, open, save, save as, test play, save the map as a picture, leave the editor), **Edit**
   (undo, redo), **View** (the overlays), **Map** (islands, map size, random elements, dice preview),
   **Players**, **Scenario** (description, rules, goals), **Check** and **Help** (the keys). The menus name each command's key. At
   its right end it shows the map's name, with `*` while it has changes that are not saved.
@@ -323,6 +323,8 @@ there are, a target player who starts without the cities the loss conditions ask
 | Right click | Puts back what is in hand (an island being placed, an object) |
 | Shift and Build dragged | Places along a straight row |
 | F5 | Test play; in the test game F5 leads back |
+| Ctrl+1 to Ctrl+9 | Keeps the view as a bookmark (for this session) |
+| 1 to 9 | Goes to the bookmark |
 | F1 | The keys |
 | Escape | Closes a menu, or goes back from a page of the column |
 
@@ -336,7 +338,9 @@ in `keys.cfg`; the editor's are in the context `editor`.
 start it from its file: with the scenario's rules, its random elements rolled, the missions held
 as set. Nothing has to be saved first. In the test game F5 (the quick save's key) leads back to
 the editor as it was: the same map, its undo and the same view. The main menu's **Editor** leads
-back too, also after another game was loaded meanwhile. The test game is not saved automatically.
+back too, also after another game was loaded meanwhile. The test game is not saved automatically, and ending it in the game's menu leads back to the editor without keeping it as `lastgame`. Test play needs a human player.
+
+**Save map as picture** (menu File) writes the map as a PNG into the screenshots folder: two pixels a tile, in the colours of the new game's preview, with the players' starts as white squares.
 
 ## Recovery
 

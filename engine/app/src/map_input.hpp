@@ -82,7 +82,8 @@ public:
         /// A short note in the status line (EventPresenter::notify).
         virtual void notify(std::string text, std::string_view log) = 0;
         /// A key of the editor (undo, redo, save) while it runs.
-        virtual void editor_key(ui::KeyAction action) = 0;
+        /// `param`: the binding's (the bookmark's number).
+        virtual void editor_key(ui::KeyAction action, std::uint8_t param = 0) = 0;
         /// A left click on the editor's map picked `pick`.
         virtual void editor_pick(const EditorPick& pick) = 0;
         /// A left click on the editor's map at `tile` while an island is being placed puts it
