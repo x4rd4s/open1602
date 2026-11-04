@@ -52,7 +52,10 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         e.arches_allowed = p.arches_allowed;
         e.colour = colour_name(p.banner);
         e.faction = p.faction;
-        e.faction_name = p.faction == sim::faction::kSettlers ? ui::tr("editor.players.settlers") : world.faction(p).id;
+        // A package's faction by its own name ("league" of "example:league"): the table has little room.
+        const std::string& id = world.faction(p).id;
+        e.faction_name =
+            p.faction == sim::faction::kSettlers ? ui::tr("editor.players.settlers") : id.substr(id.find(':') + 1);
         m.player_slots.push_back(std::move(e));
     }
     for (EditorPlayer& e : m.player_slots) {
