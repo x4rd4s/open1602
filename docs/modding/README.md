@@ -107,6 +107,15 @@ problem: lighthouse/figure_images.toml line 2: [anno1602:small_merchant_ship]: i
 
 It needs the original's installation (`ANNO1602_DIR`), since a package builds on its buildings and
 figures, and exits with 1 when there is a problem. The game writes the same lines to its log.
+Beyond what the game's readers report, it checks what needs the installation or the game's banners:
+a track that replaces a title `MUSIC8` has not, and a coat of arms of a banner no game has.
+
+With `--json` it prints the packages and the problems as one JSON object instead, for a script or a
+CI job; a problem that names a file of a package carries it and its line:
+
+```
+{"packages":[{"id":"lighthouse","version":"1.0"}],"problems":[{"text":"lighthouse/figure_images.toml line 2: ...","package":"lighthouse","file":"figure_images.toml","line":2}]}
+```
 
 To see the package's pictures on a map without starting the game, render it:
 `o1602-tool render-world <savegame> out.png --zoom 0 --mods ~/.local/share/Open1602/mods`.
