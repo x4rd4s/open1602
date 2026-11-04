@@ -133,6 +133,13 @@ A new game uses every package that is turned on in the main menu's screen "Mods"
 its savegame; a multiplayer game lets in only computers with the same packages, and the host can
 send them.
 
+While you work on a package, **Ctrl+Shift+R** in a game reads its files again without leaving
+the game: pictures, flags, icons, the interface's art, sounds, music, texts and catalogues,
+messages, the build menu and the scripts, which start anew as after loading a game. The values of
+buildings and figures are read again too; what the game itself keeps (the balance of its world,
+its buildings and goods on the map) stays. The status bar says when it is done, the log names the
+problems. In a game with other people the key does nothing, since every computer must play alike.
+
 ### 7. Share it
 
 Pack the folder as a zip archive (`lighthouse.zip`) and put it into another player's `mods`

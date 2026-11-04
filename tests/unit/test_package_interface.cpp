@@ -55,7 +55,7 @@ TEST_CASE("interface sprites: interface.toml draws sprites of the original with 
                                  "[\"tools:14\"]\nsize = 3\n",             // lines 10, 11
                                  icons, warnings);
     REQUIRE(sprites.size() == 2);
-    CHECK((sprites[0] == assets::InterfaceSprite{1, 0, "panels:back"}));
+    CHECK((sprites[0] == assets::InterfaceSprite{1, 0, "panels:back", std::nullopt}));
     CHECK((sprites[1] == assets::InterfaceSprite{0, 12, "panels:ok", 14}));
     REQUIRE(warnings.size() == 4);
     CHECK(warnings[0].find("line 6: [menu:3]: names no sprite of the interface") != std::string::npos);

@@ -392,7 +392,7 @@ TEST_CASE("sdl ui renderer: a sprite of the original a package draws anew is its
     icon.width = 3;
     icon.height = 5;
     ui::set_package_icons({icon});
-    ui::set_interface_sprites({assets::InterfaceSprite{0, 1, "test:button"}});
+    ui::set_interface_sprites({assets::InterfaceSprite{0, 1, "test:button", std::nullopt}});
     s.ui.forget_package_icons();
 
     CHECK(s.ui.sprite_size(0, 1) == (std::pair<std::int32_t, std::int32_t>{3, 5}));

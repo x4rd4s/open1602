@@ -29,7 +29,7 @@ std::optional<InterfaceSprite> parse_interface_sprite(std::string_view name) noe
         end != digits.data() + digits.size() || number < 0) {
         return std::nullopt;
     }
-    return InterfaceSprite{static_cast<std::int32_t>(sheet - kInterfaceSheets.begin()), number, {}};
+    return InterfaceSprite{static_cast<std::int32_t>(sheet - kInterfaceSheets.begin()), number, {}, std::nullopt};
 }
 
 void use_edition(std::vector<InterfaceSprite>& sprites, bool history_edition) {
