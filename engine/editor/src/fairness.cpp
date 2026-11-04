@@ -34,7 +34,8 @@ std::optional<std::pair<std::uint32_t, std::uint32_t>> start_of(const sim::World
         }
     }
     for (const sim::Ship& s : world.ships()) {
-        if (s.owner == p) {
+        // A ship at sea, not a trade cart (which the ships' list holds too) nor one off the map.
+        if (s.owner == p && !s.cart() && !s.sinking && s.x < world.width() && s.y < world.height()) {
             return std::pair{std::uint32_t{s.x}, std::uint32_t{s.y}};
         }
     }
