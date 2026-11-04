@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "main_menu.hpp"
 #include "map_viewer.hpp"
 
 #include "o1602/assets/package_scenarios.hpp"
@@ -141,11 +142,20 @@ void MapViewer::editor_packages_model(EditorModel& m) const {
     for (const assets::PackageScenario& s : m_package_scenarios) {
         m.package_scenarios.push_back(s.id);
     }
-    m.package_name = !m_editor->package_scenario.empty()
-                         ? m_editor->package_scenario
-                         : scenario_name_of(m_editor->file.empty()
-                                                ? m_editor->source_name
-                                                : core::utf8_to_cp1252(core::path_to_utf8(m_editor->file.stem())));
+    // The name offered: the scenario's in its package, else the file's, else the description's.
+    m.package_name = m_editor->package_scenario;
+    if (m.package_name.empty()) {
+        m.package_name =
+            scenario_name_of(m_editor->file.empty() ? m_editor->source_name
+                                                    : core::utf8_to_cp1252(core::path_to_utf8(m_editor->file.stem())));
+    }
+    if (const auto& info = world.scenario_info(); m.package_name.empty() && info) {
+        for (const sim::ScenarioText& t : info->names) {
+            if (m.package_name.empty()) {
+                m.package_name = scenario_name_of(core::utf8_to_cp1252(t.text));
+            }
+        }
+    }
 }
 
 void MapViewer::editor_save_to_package(const std::string& package, const std::string& name) {
@@ -198,6 +208,11 @@ void MapViewer::editor_save_to_package(const std::string& package, const std::st
     // The package's files changed: its hash, and its scenarios for the menu's list.
     it->hash = assets::package_hash(it->folder);
     load_package_scenarios();
+    if (m_hud) {
+        if (MainMenu* menu = m_hud->menu()) {
+            menu->set_package_scenarios(m_package_scenarios, m_package_campaigns);
+        }
+    }
     const std::string id = package + ":" + name;
     editor_notice(ui::tr("editor.package_save.saved", {core::utf8_to_cp1252(id)}), false,
                   "saved as the package's scenario " + id);

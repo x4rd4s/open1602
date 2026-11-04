@@ -564,7 +564,7 @@ void EditorPanel::layout(const EditorModel& model) {
     if (m_page == Page::Packages) {
         // The list of packages as tall as its lines, the button right below.
         const auto rows = static_cast<std::int32_t>(std::min(model.packages.size(), kRows));
-        m_packages_h = 16 + 6 + 32 + 3 * 20 + 4 + std::max(1, rows) * kLine + kGap + kButtonH + 8;
+        m_packages_h = 16 + 6 + 32 + 4 * 20 + 4 + std::max(1, rows) * kLine + kGap + kButtonH + 8;
     }
     if (dialog()) {
         // A page of the whole map: a dialog in the window's middle, laid out inside its frame.
@@ -1595,7 +1595,7 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     constexpr std::int32_t kNumber = 40;
     // With packages' factions to choose, a column of them takes room from the name and the colour.
     const bool factions = model.slot_factions.size() > 1;
-    const std::array<std::int32_t, 7> shares = factions ? std::array<std::int32_t, 7>{22, 11, 13, 14, 10, 10, 20}
+    const std::array<std::int32_t, 7> shares = factions ? std::array<std::int32_t, 7>{17, 12, 13, 17, 12, 11, 16}
                                                         : std::array<std::int32_t, 7>{30, 12, 16, 16, 13, 13, 0};
     constexpr std::array<const char*, 7> kHeads = {
         "editor.players.name",      "editor.players.role",   "editor.players.colour", "editor.players.money",
@@ -1927,8 +1927,8 @@ void EditorPanel::layout_packages(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.packages.title"), Align::Left, Tone::Heading);
     y += 32;
-    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, ui::tr("editor.packages.note"), Tone::Dim, 20);
-    y += 3 * 20 + 4;
+    f.paragraph(Rect{m_x, y, m_w, 4 * 20}, ui::tr("editor.packages.note"), Tone::Dim, 20);
+    y += 4 * 20 + 4;
     if (model.packages.empty()) {
         f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.packages.none"), Align::Left, Tone::Dim);
         y += kLine;
