@@ -36,10 +36,10 @@ inline constexpr std::size_t kMaxCityName = 40;
                                                                       std::uint16_t island, std::uint8_t city,
                                                                       std::uint8_t ware, std::uint32_t amount);
 
-/// The city and every tile it holds given to `owner`, a human or a computer, as when a player
-/// takes a city over: its statistics start anew. Fails (NotFound) without the city or the player,
-/// (Unsupported) where `owner` has a city on the island already (one Kontor each) or is no human
-/// or computer.
+/// The city and every tile it holds given to `owner`, a human, a computer, the natives or the
+/// pirates (for whom the editor places buildings too), as when a player takes a city over: its
+/// statistics start anew. Fails (NotFound) without the city or the player, (Unsupported) where
+/// `owner` has a city on the island already (one each) or is none of those.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world, std::uint16_t island,
                                                                          std::uint8_t city, sim::PlayerId owner);
 
