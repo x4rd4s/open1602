@@ -62,6 +62,14 @@ void pirate_nest_offer(World& world, const assets::BuildingTable& buildings, Cit
 /// faction's reach_players the share a game of that many would have, at least 3.
 [[nodiscard]] std::size_t trader_candidates(const World& world, const Rules& rules, std::size_t kontors) noexcept;
 
+/// Upper bound of trader_count, whatever the world's size.
+inline constexpr std::uint32_t kMaxScaledTraders = 64;
+
+/// How many free traders sail when `wanted` would (his faction's ships for the Kontors): with
+/// Rules::trader_reach scaled, on a world larger than settings_for_players makes for the human and
+/// computer players, as many more as it is larger; else `wanted`, the original's count.
+[[nodiscard]] std::uint32_t trader_count(const World& world, const Rules& rules, std::uint32_t wanted) noexcept;
+
 /// Room of one hold of a ship.
 inline constexpr std::uint32_t kHoldCapacity = 50 * 32;
 /// Room of one of the trade cart's three holds (History Edition: "10t Holz" in each).

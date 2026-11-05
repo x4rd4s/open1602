@@ -780,9 +780,10 @@ void Generator::place_village(Slot& slot) {
     // The village part of a native template of the island's climate (NordNat, SuedNat), moved
     // onto inland that is only ground and forest, with a tile of room around it; its records move
     // with it (village_records). The templates are tried in a random order of their own.
-    // Only the village itself is moved (roads, ruins, squares, buildings): the layer of a native
-    // template holds the beach, surf, forest and ground around it too, and often a whole island,
-    // which would never find room on another.
+    // Only the village itself is moved: its roads, ruins, squares and buildings, and the forest,
+    // fields and ground of its land (the tiles with its city), which are the village's territory
+    // and its fields. The layer of a native template holds the beach, surf, rocks and slopes around
+    // it too, and often a whole island, which would never find room on another.
     constexpr std::uint64_t kVillageStream = 0x1602'D0F0ULL;
     constexpr std::size_t kTemplates = 24;  // templates tried before the island stays without
     // The tile coordinates of the village's records are bytes: on a larger island the village
@@ -836,7 +837,12 @@ void Generator::place_village(Slot& slot) {
         std::vector<assets::IslandTile>& tiles = village.layers.front();
         std::erase_if(tiles, [&](const assets::IslandTile& t) {
             const assets::BuildingType* b = m_buildings.by_id(t.cod_id());
-            return b != nullptr && b->kind != assets::kind::kRoad && b->kind != assets::kind::kRuin &&
+            if (b == nullptr) {
+                return false;  // unknown: the template is skipped below
+            }
+            const bool land = (b->kind == assets::kind::kForest || b->kind == assets::kind::kGround) &&
+                              b->size_x == 1 && b->size_y == 1 && t.city() != assets::IslandTile::kNoCity;
+            return !land && b->kind != assets::kind::kRoad && b->kind != assets::kind::kRuin &&
                    b->kind != assets::kind::kSquare && b->kind != assets::kind::kBuilding &&
                    b->kind != assets::kind::kHq;
         });

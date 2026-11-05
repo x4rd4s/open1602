@@ -8,6 +8,7 @@
 
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/ships.hpp"
+#include "o1602/sim/world_plan.hpp"
 
 namespace o1602::sim {
 
@@ -63,6 +64,30 @@ std::size_t trader_reach_players(const World& world, const Rules& rules) noexcep
         players += p.role == PlayerRole::Human || p.role == PlayerRole::Computer ? 1U : 0U;
     }
     return players > reach ? players : 0;
+}
+
+std::uint32_t trader_count(const World& world, const Rules& rules, std::uint32_t wanted) noexcept {
+    if (rules.trader_reach == TraderReach::Original || wanted == 0) {
+        return wanted;
+    }
+    std::uint32_t players = 0;
+    for (const Player& p : world.players()) {
+        players += p.role == PlayerRole::Human || p.role == PlayerRole::Computer ? 1U : 0U;
+    }
+    if (players == 0) {
+        return wanted;
+    }
+    // A world larger than the players usually get (settings_for_players) is like several such
+    // worlds side by side: as many more traders, so that each still comes by as often. A world of
+    // the usual size or smaller keeps the original's count.
+    const WorldSettings usual = settings_for_players(static_cast<std::uint8_t>(std::min<std::uint32_t>(players, 255)));
+    const std::uint64_t usual_area = std::uint64_t{usual.width} * usual.height;
+    const std::uint64_t area = std::uint64_t{world.width()} * world.height();
+    if (usual_area == 0 || area <= usual_area) {
+        return wanted;
+    }
+    const std::uint64_t scaled = (std::uint64_t{wanted} * area + usual_area - 1) / usual_area;
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(scaled, kMaxScaledTraders));
 }
 
 std::size_t trader_candidates(const World& world, const Rules& rules, std::size_t kontors) noexcept {
@@ -490,10 +515,11 @@ void Fleet::trader_tick(std::uint32_t dt_ms) {
     if ((m_world->game_settings().flags & World::GameSettings::kNoTrader) != 0) {
         return;
     }
-    // By default one trader for every three Kontors (none with fewer than two), at most one new
-    // per pass.
+    // By default one trader for every three Kontors (none with fewer than two), more on a world
+    // larger than usual for the players (trader_count), at most one new per pass.
     const Player* trader = m_world->player(m_world->first_of(FactionBehaviour::Trader));
-    const std::uint32_t wanted = trader != nullptr ? m_world->faction(*trader).ships.of(kontors) : 0U;
+    const std::uint32_t wanted =
+        trader != nullptr ? trader_count(*m_world, *m_rules, m_world->faction(*trader).ships.of(kontors)) : 0U;
     std::uint32_t traders = 0;
     for (const Ship& s : m_world->ships()) {
         traders += s.trader ? 1U : 0U;  // counted anew: a sunk trader is replaced (S-080)
