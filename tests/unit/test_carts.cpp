@@ -581,21 +581,21 @@ TEST_CASE("carts: an improved computer sends no cart to a partner it cannot driv
     CHECK(west.goods[kWood] == 50 * kTon);
 }
 
-TEST_CASE("carts: an improved computer's gift run brings home what the natives leave of the gift") {
-    // The natives in the west sell wood but give nothing without goodwill; they take a little
-    // cloth for it, so the computer's cart brings a load of cloth first.
+TEST_CASE("carts: an improved computer's gift the natives do not take comes back into its city") {
+    // The natives sell wood and take a single ton of cloth; the computer's city has plenty of cloth
+    // and no wood, and it has no goodwill with the natives.
     constexpr std::uint8_t kCloth = 19;
     Land land;
     sim::make_neutral(*land.world.player(0), sim::faction::kNatives);
-    sim::City& west = *land.world.city(0, 0);
-    sim::City& east = *land.world.city(0, 1);
-    west.goods[kWood] = 50 * kTon;
-    west.trade[kWood].sell = true;
-    west.trade[kWood].sell_price = 10;
-    west.trade[kCloth].buy = true;
-    west.trade[kCloth].limit = 2 * kTon;
-    east.goods[kWood] = 0;
-    east.goods[kCloth] = 30 * kTon;
+    sim::City& natives = *land.world.city(0, 0);
+    natives.goods[kWood] = 50 * kTon;
+    natives.trade[kWood].sell = true;
+    natives.trade[kWood].sell_price = 10;
+    natives.trade[kCloth].buy = true;
+    natives.trade[kCloth].limit = kTon;
+    sim::City& home = *land.world.city(0, 1);
+    home.goods[kWood] = 0;
+    home.goods[kCloth] = 30 * kTon;
     land.world.island(0).header.template_number = 1;
     land.world.island(0).header.template_size = 4;
     for (const auto& [a, b] : {std::pair{0, 1}, std::pair{1, 0}}) {
@@ -606,27 +606,24 @@ TEST_CASE("carts: an improved computer's gift run brings home what the natives l
     }
     land.rules.bugs.classic_ai = false;
     sim::Simulation s(land.world, land.buildings, land.figures, land.rules);
-    std::optional<sim::TradeRoute> route;
-    for (std::uint32_t t = 0; t < 240'000 && !route; t += sim::Simulation::kTickMs) {
+    REQUIRE(natives.goodwill.size() > 1);
+    natives.goodwill[1] = 0;
+    bool gift_run = false;
+    bool home_again = false;
+    for (std::uint32_t t = 0; t < 600'000 && !home_again; t += sim::Simulation::kTickMs) {
+        // These Kontors have no storage value of their own, which the simulation would count.
+        natives.capacity = 60 * kTon;
+        home.capacity = 60 * kTon;
         s.tick();
         const sim::Ship* cart = sim::trade_cart_of(land.world, 1, 0);
-        if (cart != nullptr && cart->route.active && !cart->route.stops[2].target.empty()) {
-            route = cart->route;
-        }
+        gift_run = gift_run || (cart != nullptr && cart->route.active && cart->load(kCloth) != 0);
+        home_again = gift_run && !cart->route.active;
     }
-    // Cloth from home, cloth to the natives and wood loaded there, home: wood and the cloth left.
-    REQUIRE(route.has_value());
-    CHECK(route->stops[0].target == sim::Target::city_of(0, 1));
-    CHECK(route->stops[0].entries[0].ware == kCloth);
-    CHECK(!route->stops[0].entries[0].unload);
-    CHECK(route->stops[1].target == sim::Target::city_of(0, 0));
-    CHECK(route->stops[1].entries[0].ware == kCloth);
-    CHECK(route->stops[1].entries[0].unload);
-    CHECK(route->stops[2].target == sim::Target::city_of(0, 1));
-    CHECK(route->stops[2].entries[0].ware == kWood);
-    CHECK(route->stops[2].entries[0].unload);
-    CHECK(route->stops[2].entries[1].ware == kCloth);
-    CHECK(route->stops[2].entries[1].unload);
+    REQUIRE(gift_run);
+    REQUIRE(home_again);
+    CHECK(natives.goods[kCloth] != 0);  // the gift was given
+    CHECK(sim::trade_cart_of(land.world, 1, 0)->load(kCloth) == 0);
+    CHECK(home.goods[kCloth] == 29 * kTon);  // all but the one ton they took
 }
 
 TEST_CASE("carts: the editor puts a player's cart on a road beside its Kontor or market, one per island") {
