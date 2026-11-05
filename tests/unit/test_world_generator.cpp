@@ -1602,6 +1602,8 @@ TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
     const auto more_mountains = measure(0, 300);
     CHECK(few_mountains.second < none.second);
     CHECK(more_mountains.second > none.second);
+    // The mountains beside the lakes follow the share of mountains too.
+    CHECK(measure(300, 0).second < many.second);
 }
 
 TEST_CASE("world generator: a native village on an island larger than the original's, within its first 255 tiles") {

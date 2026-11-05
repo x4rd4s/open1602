@@ -678,6 +678,9 @@ std::optional<shapes::ShapeRequest> Generator::own_request(const Slot& slot) con
     if (std::min(own->width, own->height) >= kLakeSide) {
         const std::uint32_t lakes = area * m_landscape.lakes / 100 / kTilesPerLake;
         r.lakes = static_cast<std::uint8_t>(std::min<std::uint32_t>(lakes, 255));
+        // The mountains beside the lakes follow the share of mountains too (up to one per lake).
+        r.lake_mountains =
+            static_cast<std::uint8_t>(std::min<std::uint32_t>((std::uint32_t{r.lakes} * percent + 50) / 100, r.lakes));
     }
     return r;
 }

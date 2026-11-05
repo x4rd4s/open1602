@@ -46,7 +46,7 @@ gap = "wide"
 | `coast` | `smooth`, `natural`, `rugged` | the coast |
 | `outline` | `round`, `long`, `branched` | the outline |
 | `forest` | `little`, `normal`, `much` | forest |
-| `mountains` | 0 to 300 (`little`, `normal`, `much`: 50, 100, 200) | ore mountains for the size of an island, in percent of the usual number (100: as the original's islands) |
+| `mountains` | 0 to 300 (`little`, `normal`, `much`: 50, 100, 200) | the mountains of an island for its size (with or without a vein, those by the lakes too), in percent of the usual number (100: as the original's islands); a home island keeps at least one big and one small one |
 | `lakes` | 0 to 300 | inland lakes with a river on large islands, in percent of the usual number (100: one per 6,000 tiles of an island at least 48 tiles on its shorter side) |
 
 The fields are those of the command line's `--island-<field>`. A field with a value outside its

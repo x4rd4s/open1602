@@ -57,6 +57,9 @@ struct ShapeRequest {
     /// Lakes inland, each with a river from a mountain beside it running into it. Those that find
     /// no room are left out.
     std::uint8_t lakes = 0;
+    /// How many of the lakes get a small ore mountain beside them, its river running into the lake
+    /// (the first ones; at most all of them).
+    std::uint8_t lake_mountains = 255;
     Roughness roughness = Roughness::Natural;
     Form form = Form::Compact;
     Share forest = Share::Normal;
