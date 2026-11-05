@@ -112,6 +112,7 @@ struct MilitaryEvent {
         TroopsLanded,       ///< 16: soldiers of `player` landed on an island where `owner` has a city
         Boarded,            ///< `unit` went on board ship `target`
         NativesCurse,       ///< MELDUNG 4: the natives curse `player` (a drought on their island if `pirates`)
+        BuildingTaken,      ///< `target`, a neutral building, went over to `player` whole
     };
     Kind kind = Kind::Shot;
     Target unit;

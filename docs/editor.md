@@ -138,7 +138,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 | Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
 | Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) the natives' spearman, placed for the natives only, and the trade cart; a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
-| Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader; for a trade cart only the humans and computers. |
+| Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader; for a trade cart only the humans and computers. For buildings, templates and units the last is "Neutral": buildings for nobody on free land, without a Kontor, which soldiers take ([the neutral buildings](modding/factions.md#the-neutral-buildings)); the map gets their player when it is first chosen. |
 | Placed lately | The last six objects placed, the last first: a click takes one in hand again (its tool, building or type and rotation), for the owner chosen now. |
 
 The object stays in hand after it is placed, so the next click places another. A right click
@@ -164,7 +164,9 @@ them over. **Remove** takes them away again and the ground under them comes back
 
 Each owner founds one city on an island, the natives and the pirates as well. Their cities are named
 after what they are ("Native village", "Pirates' nest", with a number from the second on); the
-others take the next name of the game's list of cities.
+others take the next name of the game's list of cities. The neutral buildings need no Kontor: each
+stands on free land, and those on one island are one city of theirs ("Neutral buildings"), which
+holds only the ground under them. They take no Kontor and no market.
 
 A template is built as one step, each of its buildings as above; it hangs at the mouse by its
 middle, and the outline shows each of its buildings green where it can stand and red where not.
@@ -198,7 +200,7 @@ buttons on the Selection page, each change one step of undo:
 | Name | Types a new name for the city, up to 40 characters, as a player may give it. |
 | Stock | The city's trade goods with the tons in its warehouses: + and - change them by 10 t, with the right button by 1 t, up to the room its Kontor, markets and warehouses give (the game would lose what is above). |
 | Trade | What the city's Kontor sells to and buys from other players' ships and the free trader, as its trade window in the game sets it. The list shows each trade good with what the Kontor does with it; a click on a good opens it: **Sell** or **Buy** (clicked again: not traded), the price per ton (from 300/1024 of the base price to the base price; + and - by 10 gold, with the right button by 1) and the tons the city keeps when selling or buys up to (by 10 t, with the right button by 1 t, up to its room). A player's Kontor trades in no more goods than its slots allow. A native village trades for goodwill instead of gold, so it has no prices; **Village goods** gives it the offer of a new game's villages again: tobacco goods in the north or spices in the south for sale, alcohol and cloth bought up to 10 t. A village founded in the editor starts with that offer. For any other city, **Trade nothing** switches all trade off. The pirates choose their offer anew during the game, so theirs holds only until then. |
-| Owner | Gives the city with all its land and buildings to the next human or computer, or to the natives or the pirates where the map has them (the right button: the one before), as when a player takes a city over; one with a city on the island already is passed over. |
+| Owner | Gives the city with all its land and buildings to the next human or computer, or to the natives or the pirates where the map has them (the right button: the one before), as when a player takes a city over; one with a city on the island already is passed over. The neutral buildings, which have no Kontor, keep their owner. |
 
 A selected ship has the button **Cargo**: a row for each of its holds with the ware in it (a click
 the next trade good, the right button the one before, and empty), and + and - for its tons, by

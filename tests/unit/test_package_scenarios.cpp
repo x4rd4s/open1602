@@ -351,8 +351,8 @@ TEST_CASE("package scenarios: slots of the map go to the factions the scenario n
     CHECK(warnings.size() == 3);
     CHECK(world.players()[0].faction == sim::faction::kSettlers);
     CHECK(world.players()[0].role == sim::PlayerRole::Human);
-    CHECK(world.players()[1].faction == 4);
+    CHECK(world.players()[1].faction == 5);
     CHECK(world.players()[1].role == sim::PlayerRole::Neutral);
-    CHECK(world.players()[2].faction == 5);
+    CHECK(world.players()[2].faction == 6);
     CHECK(world.players()[2].role == sim::PlayerRole::Computer);  // the settlers' behaviour: the computer steers
 }

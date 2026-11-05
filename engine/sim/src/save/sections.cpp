@@ -639,11 +639,13 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
     section(out, kPlayers, [&](Writer& o) { write_players(o, world); });
     if (has_own_factions(world)) {
         // Optional: a reader without it plays the base game's factions the role bytes give;
-        // required when scripts steer a faction, which such a reader would steer itself.
+        // required when scripts steer a faction, which such a reader would steer itself, and with
+        // the neutral buildings, whose slot such a reader would take for a person's.
         const std::uint16_t factions_at = factions_version(world);
         section(
             out, kFactions, [&](Writer& o) { write_factions(o, world, factions_at); },
-            factions_at >= kScriptedFactions ? Need::Required : Need::Optional, factions_at);
+            factions_at >= kScriptedFactions || has_neutral_player(world) ? Need::Required : Need::Optional,
+            factions_at);
     }
     if (!original_numbers(world.balance())) {
         // Required: a reader without it would compute another game.

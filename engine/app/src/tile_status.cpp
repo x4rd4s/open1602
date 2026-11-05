@@ -134,6 +134,7 @@ std::string unit_status(const sim::World& world, const ui::UnitRef& unit, const 
                 return line(texts, "LEISTE", kLeisteTraderShip);
             case sim::FactionBehaviour::Settlers:
             case sim::FactionBehaviour::Natives:
+            case sim::FactionBehaviour::Neutral:
                 break;
         }
         return line(texts, "LEISTE", kLeisteShip);

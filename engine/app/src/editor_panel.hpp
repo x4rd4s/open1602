@@ -462,6 +462,8 @@ struct EditorModel {
     /// The group of special objects: placed without owner (no owner to choose).
     bool object_ownerless = false;
     std::string object_owner;
+    /// The owner chosen is the neutral buildings' player (FactionBehaviour::Neutral).
+    bool object_neutral = false;
     /// The objects placed lately, the last first (at most kEditorRecent).
     std::vector<EditorRecent> recent_objects;
     /// Why the tool in hand would not place where the mouse is on the map (Windows-1252), empty:

@@ -1,7 +1,7 @@
 # Factions
 
 Besides the players who found cities, a game of Anno 1602 has the free trader, the pirates and the
-natives. In Open1602 these are **factions as data**
+natives; a map of Open1602 may also have neutral buildings. In Open1602 these are **factions as data**
 ([ADR 0007](../architecture/0007-extensibility-and-modding.md), section 3): who steers a player slot
 (a person, the computer or nobody) is apart from the faction the slot belongs to, and the numbers a
 faction grows with when more people play are values a mod can change.
@@ -21,6 +21,7 @@ own: with `scripted` the game no longer steers a faction, its package's script d
 | `anno1602:trader` | the free trader: sails from Kontor to Kontor, buys and sells |
 | `anno1602:pirates` | at war with everyone but the trader, hunt ships from their nests |
 | `anno1602:natives` | villages on the islands, trade with the settlers |
+| `anno1602:neutral` | Open1602: buildings a map places on free land for nobody ([below](#the-neutral-buildings)) |
 
 A game keeps the factions it started with: they are saved with it (section `FACT` of
 [o1602-save.md](../formats/o1602-save.md), written only when they differ from the base game's), so a
@@ -88,7 +89,7 @@ nests.per = 2
 
 | Field | Value |
 |---|---|
-| `behaviour` | `"settlers"`, `"trader"`, `"pirates"` or `"natives"`: what the simulation does for the faction's players. Required for a new faction; it does not change later |
+| `behaviour` | `"settlers"`, `"trader"`, `"pirates"`, `"natives"` or `"neutral"`: what the simulation does for the faction's players. Required for a new faction; it does not change later |
 | `name.<language>` | the faction's name as the editor shows it, by language code (`name.de = "Liga"`, `name.en = "League"`); without one the editor shows the name of its table (`league`) |
 | `replaces` | a faction of the same behaviour whose slots the new one takes in the games started afterwards (new games and the original's scenarios and savegames); the first package that replaces a faction gets its slots |
 | the numbers | as above |
@@ -143,3 +144,25 @@ end
 
 The free trader and the natives are always steered by the game; `scripted` is passed over for
 them with a warning. A game keeps the field with its factions (section `FACT`).
+
+## The neutral buildings
+
+A map made in the [editor](../editor.md#objects) may place buildings for nobody: the owner
+"Neutral". They stand on free land without a Kontor, a fort in the wilderness or a lone watchtower,
+and hold the ground they stand on and no more. The editor gives the map their player the first time
+"Neutral" is chosen as the owner; it has a slot of its own behind every player's, and its faction is
+`anno1602:neutral`, saved with the game (section `FACT`).
+
+- **Nobody steers them**: no computer player, no economy (no goods, taxes or running costs), no
+  Kontor and no market of their own.
+- **No diplomacy**: they are at war with the humans and computers from the start, and at peace with
+  the free trader, the pirates and the natives. No treaty can be offered to them or by them.
+- **Defended**: their towers and soldiers placed by the map fight like anybody's.
+- **Taken by soldiers**: when soldiers (or a ship's cannons) of a player spend a neutral
+  building's health, it goes over to that player whole, with its ground, if the player's land
+  reaches all of it: the circle of a Kontor or a market, or the reach of a tower of one of the
+  player's cities on the island. Elsewhere it falls to ruins like any enemy building. A ruin is
+  nobody's, and once the last neutral building on an island is gone, so is their city there.
+  The ground of a neutral building that is gone goes to the city whose land lies around it, or is
+  free.
+
