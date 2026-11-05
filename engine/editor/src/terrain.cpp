@@ -592,6 +592,15 @@ bool TerrainStroke::shape_tiles(std::uint16_t island, std::span<const ShapeTile>
             }
         }
     }
+    // Whether any tile turns from land to water or back: only then (or tidying) is the sea about
+    // it laid anew by its depth (a copy laid on land leaves the sea as it was).
+    bool turned_any = false;
+    for (std::int64_t y = y0; y <= y1 && !turned_any; ++y) {
+        for (std::int64_t x = x0; x <= x1 && !turned_any; ++x) {
+            turned_any = is_land(x, y) ==
+                         water(*m_buildings, map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)));
+        }
+    }
     // The tiles laid anew where their kind or their coast changed.
     const bool before = m_changed;
     m_changed = false;
@@ -690,10 +699,12 @@ bool TerrainStroke::shape_tiles(std::uint16_t island, std::span<const ShapeTile>
     }
     // The open sea about the new coast by its depth.
     constexpr std::int64_t kDepth = 6;
-    for (const SeaTile& t :
-         sea_depth(*m_world, *m_buildings, island, x0 - kDepth, y0 - kDepth, x1 + kDepth, y1 + kDepth, seed)) {
-        if (const assets::BuildingType* b = m_buildings->by_id(t.id)) {
-            (void)stamp(island, t.x, t.y, *b, t.rotation, t.phase);
+    if (turned_any || tidy) {
+        for (const SeaTile& t :
+             sea_depth(*m_world, *m_buildings, island, x0 - kDepth, y0 - kDepth, x1 + kDepth, y1 + kDepth, seed)) {
+            if (const assets::BuildingType* b = m_buildings->by_id(t.id)) {
+                (void)stamp(island, t.x, t.y, *b, t.rotation, t.phase);
+            }
         }
     }
     m_shaping = false;
@@ -908,7 +919,7 @@ std::vector<SeaTile> sea_depth(const sim::World& world, const assets::BuildingTa
 }
 
 bool TerrainStroke::paste(std::uint16_t island, std::int64_t x, std::int64_t y, const TerrainClip& clip,
-                          std::uint64_t seed) {
+                          std::uint64_t seed, bool with_water) {
     if (island >= m_world->islands().size() || clip.empty()) {
         return false;
     }
@@ -916,23 +927,28 @@ bool TerrainStroke::paste(std::uint16_t island, std::int64_t x, std::int64_t y, 
     const auto w = static_cast<std::int64_t>(map.width());
     const auto h = static_cast<std::int64_t>(map.height());
     std::vector<ShapeTile> tiles;
+    bool inside = false;
     for (std::uint32_t cy = 0; cy < clip.height; ++cy) {
         for (std::uint32_t cx = 0; cx < clip.width; ++cx) {
             const std::int64_t tx = x + cx;
             const std::int64_t ty = y + cy;
-            if (tx >= 0 && ty >= 0 && tx < w && ty < h) {
-                tiles.push_back(ShapeTile{static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty),
-                                          clip.land[std::size_t{cy} * clip.width + cx] != 0});
+            const bool land = clip.land[std::size_t{cy} * clip.width + cx] != 0;
+            if (tx < 0 || ty < 0 || tx >= w || ty >= h) {
+                continue;
+            }
+            inside = true;
+            if (land || with_water) {
+                tiles.push_back(ShapeTile{static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty), land});
             }
         }
     }
-    if (tiles.empty()) {
+    if (!inside) {
         note(Refusal::NoIsland);
         return false;
     }
     // The copy's land is laid as one: a form without coast tiles refuses it before anything
     // changes.
-    const bool shaped = shape_tiles(island, tiles, true, seed, false);
+    const bool shaped = !tiles.empty() && shape_tiles(island, tiles, true, seed, false);
     if (!shaped && first_refusal() == Refusal::Shape) {
         return false;
     }

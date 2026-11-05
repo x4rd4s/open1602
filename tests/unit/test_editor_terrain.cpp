@@ -625,6 +625,35 @@ TEST_CASE("editor terrain: copy, turn, mirror and paste terrain; the coast clean
     CHECK(id_at(2, 11, 11) != kGrass);
     CHECK(id_at(2, 14, 13) == kGrass);
 
+    // Pasted on land: only the copy's land is laid, the island's land and sea where the copy has
+    // water stay as they were, and the sea about the island too.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> wide;
+    for (std::uint32_t y = 6; y < 26; ++y) {
+        for (std::uint32_t x = 6; x < 26; ++x) {
+            wide.emplace_back(x, y);
+        }
+    }
+    editor::TerrainStroke grow(world, buildings);
+    REQUIRE(grow.shape(2, wide, true, 5));
+    (void)grow.finish("terrain");
+    const sim::World grown = world;
+    editor::TerrainStroke on_land(world, buildings);
+    CHECK(on_land.paste(2, 8, 8, mirror, 9));
+    (void)on_land.finish("terrain_paste");
+    CHECK(id_at(2, 14, 13) == kGrass);
+    CHECK(world.islands()[2].map.top(14, 13).rotation == 3);
+    const sim::IslandMap& after = world.islands()[2].map;
+    const sim::IslandMap& was = grown.islands()[2].map;
+    for (std::uint32_t y = 0; y < after.height(); ++y) {
+        for (std::uint32_t x = 0; x < after.width(); ++x) {
+            const bool copy_land =
+                x >= 8 && y >= 8 && x <= 20 && y <= 22 && clip.land[std::size_t{y - 8} * clip.width + (x - 8)] != 0;
+            if (!copy_land) {
+                CHECK(after.top(x, y).sprite == was.top(x, y).sprite);
+            }
+        }
+    }
+
     // A stray beach tile inland: the clean-up lays meadow there.
     REQUIRE(world.island(1).map.place(*buildings.by_id(kBeach), 14, 16, 0, 0).ok());
     editor::TerrainStroke tidy(world, buildings);

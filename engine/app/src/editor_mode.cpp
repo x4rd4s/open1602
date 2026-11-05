@@ -917,6 +917,7 @@ EditorModel MapViewer::editor_model() const {
         }
     }
     editor_city_model(m);
+    editor_ship_model(m);
     editor_players_model(m);
     editor_rules_model(m);
     editor_goals_model(m);
@@ -1097,6 +1098,9 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::CityOwner:
             editor_city_request(request);
             break;
+        case Kind::ShipCargo:
+            editor_ship_request(request);
+            break;
         case Kind::SetPlayer:
         case Kind::AddPlayer:
         case Kind::RemovePlayer:
@@ -1247,7 +1251,8 @@ namespace {
 bool shows_pick(EditorPanel::Page page) {
     return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
            page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods ||
-           page == EditorPanel::Page::CityTrade || page == EditorPanel::Page::CityWare;
+           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::CityTrade ||
+           page == EditorPanel::Page::CityWare;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.
@@ -2745,7 +2750,8 @@ void MapViewer::editor_paste(std::int64_t x, std::int64_t y) {
     const std::int64_t ly = std::int64_t{c.local_y} - (std::int64_t{clip.height} - 1) / 2;
     ++m_editor->strokes;
     editor::TerrainStroke stroke(m_state->world, m_buildings);
-    const bool laid = stroke.paste(c.island, lx, ly, clip, tile_seed(m_editor->strokes, x, y));
+    const bool laid =
+        stroke.paste(c.island, lx, ly, clip, tile_seed(m_editor->strokes, x, y), m_editor->terrain.paste_water);
     const editor::TerrainStroke::Refusal refused = stroke.first_refusal();
     if (!laid) {
         stroke.cancel();

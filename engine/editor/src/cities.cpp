@@ -114,8 +114,10 @@ core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& wor
     if (p == nullptr) {
         return make_error(ErrorCode::NotFound, "no player " + std::to_string(owner));
     }
-    if (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer) {
-        return make_error(ErrorCode::Unsupported, "only a human or a computer takes a city");
+    if (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer &&
+        !world.acts_as(owner, sim::FactionBehaviour::Natives) &&
+        !world.acts_as(owner, sim::FactionBehaviour::Pirates)) {
+        return make_error(ErrorCode::Unsupported, "only a human, a computer, the natives or the pirates take a city");
     }
     if (c->owner == owner) {
         return make_error(ErrorCode::Unsupported, "the city is the player's already");
@@ -137,6 +139,17 @@ core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& wor
     }
     sim::City& changed = *after.city(island, city);
     changed.owner = owner;
+    // Natives trade for goodwill at price 0: a village's offer for a new village, and nothing for
+    // a city that stops being one, so that it sells nothing for free.
+    const bool was_village = world.acts_as(c->owner, sim::FactionBehaviour::Natives);
+    const bool is_village = after.acts_as(owner, sim::FactionBehaviour::Natives);
+    if (is_village && !was_village) {
+        sim::native_village_offer(after, after.islands()[island], changed);
+    } else if (was_village && !is_village) {
+        for (sim::City::Trade& t : changed.trade) {
+            t = sim::City::Trade{};
+        }
+    }
     changed.ledger.clear();  // the new owner's statistics start with the city
     changed.history.clear();
     return edit(std::move(after), "city_owner");

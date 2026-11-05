@@ -1840,7 +1840,7 @@ void MapViewer::render() {
                             !terrain_preview->paste(c.island,
                                                     std::int64_t{c.local_x} - (std::int64_t{clip.width} - 1) / 2,
                                                     std::int64_t{c.local_y} - (std::int64_t{clip.height} - 1) / 2, clip,
-                                                    m_editor->strokes + 1) &&
+                                                    m_editor->strokes + 1, m_editor->terrain.paste_water) &&
                             terrain_preview->first_refusal() != editor::TerrainStroke::Refusal::Free;
                     }
                 } else {
