@@ -605,6 +605,11 @@ private:
     /// total area and the beach tiles of no city.
     void scan_area(std::uint16_t island, AreaScan& out) const;
     std::vector<AreaScan> m_area_scans;
+    /// Whether the water tile (x, y) of an island joins the sea around it (Open1602): false on a
+    /// lake inside the island, and on land. Water stays where it is during a game, so each
+    /// island's map of it is made once, at the first question.
+    [[nodiscard]] bool open_water(std::uint16_t island, std::int32_t x, std::int32_t y);
+    std::vector<std::vector<std::uint8_t>> m_open_water;  ///< per island, row by row: 1 open water
     /// The newest block revision of an island's map: equal while none of its tiles changed.
     [[nodiscard]] std::uint64_t island_revision(std::uint16_t island) const;
     /// city_defenceless, from one scan of the island per revision for all its cities (TB-9).

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "o1602/editor/original_check.hpp"
 
+#include <algorithm>
+
 #include "o1602/sim/faction.hpp"
 #include "o1602/sim/original_limits.hpp"
 
@@ -69,6 +71,10 @@ std::vector<LimitProblem> original_limit_problems(const sim::World& world) {
     if (!world.scenario_script().empty()) {
         problems.push_back(LimitProblem{Kind::Script});
     }
+    if (std::any_of(world.players().begin(), world.players().end(),
+                    [](const sim::Player& p) { return p.scenario.has(sim::scenario_flag::kPiratePeace); })) {
+        problems.push_back(LimitProblem{Kind::PiratePeace});
+    }
     return problems;
 }
 
@@ -111,6 +117,8 @@ std::string describe(const LimitProblem& p, const sim::World& world) {
             return "values of the balance changed by a content package";
         case Kind::Script:
             return "a script";
+        case Kind::PiratePeace:
+            return "a lasting peace with the pirates";
     }
     return {};
 }

@@ -221,6 +221,21 @@ struct EditorGood {
     std::uint32_t amount = 0;  ///< 1/32 t
 };
 
+/// What a city's Kontor does with a ware: nothing, sell or buy.
+enum class EditorTradeMode : std::uint8_t { None, Sell, Buy };
+
+/// The trade of a ware at a city's Kontor (the page "Trade").
+struct EditorTrade {
+    std::uint8_t ware = 0;
+    std::string name;  ///< Windows-1252
+    EditorTradeMode mode = EditorTradeMode::None;
+    std::uint16_t price = 0;   ///< per ton: what a ship pays (Sell) or gets (Buy)
+    std::uint32_t amount = 0;  ///< 1/32 t: what the city keeps (Sell) or buys up to (Buy)
+    std::uint32_t stock = 0;   ///< 1/32 t in the warehouses
+    std::uint16_t min_price = 0;
+    std::uint16_t max_price = 0;
+};
+
 /// The city of the building selected on the map.
 struct EditorCity {
     std::string name;   ///< Windows-1252
@@ -228,6 +243,15 @@ struct EditorCity {
     /// Room per ware in 1/32 t (sim::City::capacity); 0: no Kontor, no stock.
     std::uint32_t room = 0;
     std::vector<EditorGood> goods;  ///< the world's trade goods in the order panels list them
+    /// The trade of each trade good, in the order of `goods` (only while a page of the trade shows).
+    std::vector<EditorTrade> trade;
+    bool natives = false;  ///< a native village: it trades for goodwill, not for gold
+    bool pirates = false;  ///< a pirates' nest: the pirates choose their offer anew in the game
+    /// How many wares the Kontor sells and buys, and at most (0: no limit).
+    std::size_t sells = 0;
+    std::size_t buys = 0;
+    std::size_t max_sells = 0;
+    std::size_t max_buys = 0;
 };
 
 /// A ship's holds (the page "Cargo"): what each holds, and the wares it can be loaded with.
@@ -259,7 +283,20 @@ struct EditorPlayer {
         bool trade = false;
     };
     std::vector<Standing> relations;
+    /// How it stands at the start towards each party of EditorModel::neutrals, in that order.
+    struct Towards {
+        bool peace = true;
+        /// Natives: it trades at their villages; pirates: at their nests; trader: he calls.
+        bool trade = true;
+        std::uint32_t goodwill = 200;  ///< natives: their villages' goodwill (sim::City::goodwill)
+        bool lasting = false;          ///< pirates: the peace lasts whatever their mood
+    };
+    std::vector<Towards> towards;
 };
+
+/// A party of its own behaviour whose relations a scenario sets on the page "Others"
+/// (editor::Neutral, in its order).
+enum class EditorNeutral : std::uint8_t { Natives, Pirates, Trader };
 
 /// A game setting as the page "Rules" shows it.
 struct EditorRule {
@@ -422,6 +459,8 @@ struct EditorModel {
     std::string object_group;
     std::string object_name;
     bool object_turns = false;
+    /// The group of special objects: placed without owner (no owner to choose).
+    bool object_ownerless = false;
     std::string object_owner;
     /// The owner chosen is the neutral buildings' player (FactionBehaviour::Neutral).
     bool object_neutral = false;
@@ -441,6 +480,10 @@ struct EditorModel {
     std::vector<std::uint8_t> slot_factions;
     bool can_add_player = false;
     bool can_remove_player = false;
+    /// The natives, pirates and trader the world has (the page "Others"), and whether the natives
+    /// have villages (only these hold a goodwill).
+    std::vector<EditorNeutral> neutrals;
+    bool native_villages = false;
     /// The page "Rules": whether the scenario has settings of its own (else the player's apply),
     /// whether they are the original's, and each setting a scenario can have, in the start
     /// dialog's order.
@@ -502,7 +545,11 @@ struct EditorRequest {
         RenameCity,         ///< the selected building's city named `name`
         CityGoods,          ///< the city's stock of ware `index` set to `amount` (1/32 t)
         CityOwner,          ///< the city to the next owner (`index` 1) or the one before (0)
-        ShipCargo,          ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
+        /// The city's Kontor trading ware `index` as `trade` says: its mode, and the price and
+        /// amount where they are given (else the mode's defaults).
+        CityTrade,
+        CityTradeReset,  ///< the city's trade as its owner starts with it (a village's offer, else none)
+        ShipCargo,       ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
         /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is.
@@ -511,6 +558,9 @@ struct EditorRequest {
         RemovePlayer,  ///< the last slot taken away
         /// `player.slot` and slot `index` standing at the start as `player.relations[0]`.
         SetRelations,
+        /// `player.slot` standing at the start towards the party `index` (EditorNeutral) as
+        /// `player.towards[0]`.
+        SetNeutral,
         /// The scenario's settings: `index` 0 none (the player's), 1 the original's, 2 Open1602's,
         /// 3 those the player last started a scenario with.
         RulesPreset,
@@ -566,7 +616,14 @@ struct EditorRequest {
     EditorPlayer player{};        ///< SetPlayer
     std::uint32_t amount = 0;     ///< CityGoods, ShipCargo
     std::uint8_t ware = 0;        ///< ShipCargo
-    std::size_t goal = 0;         ///< GoalStep
+    /// CityTrade: what the Kontor does with the ware.
+    struct Trade {
+        EditorTradeMode mode = EditorTradeMode::None;
+        std::optional<std::uint16_t> price;
+        std::optional<std::uint32_t> amount;  ///< 1/32 t
+    };
+    Trade trade{};
+    std::size_t goal = 0;  ///< GoalStep
 };
 
 class EditorPanel {
@@ -596,6 +653,8 @@ public:
         Objects,
         CityName,
         CityGoods,
+        CityTrade,  ///< the wares the city's Kontor sells and buys
+        CityWare,   ///< the trade of one ware
         ShipCargo,
         Players,
         PlayerName,
@@ -613,7 +672,8 @@ public:
         ScriptFiles,
         Packages,
         PackageSave,
-        Campaign
+        Campaign,
+        Neutrals  ///< the players towards the natives, the pirates and the trader
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -718,6 +778,8 @@ private:
     void layout_objects(const EditorModel& model);
     void layout_city_name(const EditorModel& model);
     void layout_city_goods(const EditorModel& model);
+    void layout_city_trade(const EditorModel& model);
+    void layout_city_ware(const EditorModel& model);
     void layout_ship_cargo(const EditorModel& model);
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
@@ -729,6 +791,16 @@ private:
     /// two columns.
     void layout_players_table(const EditorModel& model);
     void layout_relations_table(const EditorModel& model);
+    /// The page "Others": how the players stand towards the natives, the pirates and the trader;
+    /// a table in a wide dialog, the slot the page "Players" shows in the column.
+    void layout_neutrals(const EditorModel& model);
+    void layout_neutrals_table(const EditorModel& model);
+    /// The request for a click on the value `column` (NeutralColumn) of the slot `slot` (index
+    /// into EditorModel::player_slots).
+    [[nodiscard]] std::optional<EditorRequest> press_neutral(const EditorModel& model, std::size_t slot,
+                                                             std::size_t column, bool forward) const;
+    /// The header of the players' dialog: its heading and the tabs, the one of `page` chosen.
+    void dialog_tabs(const EditorModel& model, const char* heading, Page page);
     void layout_settings_grid(const EditorModel& model, bool rules);
     void layout_goals(const EditorModel& model);
     void layout_goal_text(const EditorModel& model);
@@ -779,6 +851,7 @@ private:
     std::size_t m_player = 0;                   ///< the slot the page "Players" shows
     std::size_t m_mission = 0;                  ///< the mission the page "Goals" shows
     std::size_t m_scenario_row = 0;             ///< the row of the page "Scenario" being typed
+    std::size_t m_ware = 0;                     ///< the row of EditorCity::trade the page "Ware" shows
     std::size_t m_partner = 0;                  ///< the other slot the page "Relations" shows
     std::optional<std::size_t> m_shown_marker;  ///< the marker chosen when the page Markers was laid out last
     std::size_t m_first_column = 0;             ///< the first slot of the diplomacy table's columns

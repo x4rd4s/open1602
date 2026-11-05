@@ -26,6 +26,8 @@ constexpr std::int32_t kRings = 16;
 /// `p.search`, so the next step goes on where this one stopped. Without the cap a built-up city
 /// with no free site walked its whole road list with up to four `plan_build` calls per position.
 constexpr std::int32_t kSearchPositions = 32;
+/// Open1602: the trees next to a woodcutter enough where no place has the usual 10 (search_farm).
+constexpr std::int32_t kSparseWoodTrees = 4;
 /// Island rows the wide quarry and mine search scans per step (TB-15).
 constexpr std::int32_t kMineRows = 8;
 
@@ -583,9 +585,21 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
         return true;
     }
     const std::uint8_t own = b->ware;
+    // Open1602: a woodcutter wants 10 trees about it. Where no place along the roads has them (an
+    // island with little forest), a second round takes a place with a few, whose woodcutter the
+    // trees planted about it (task_farm) feed; the original's computer built none and ran out of wood.
+    const bool sparse = woodcutter && s.phase == 1;
+    const auto finished = [&] {
+        if (woodcutter && s.best == 0 && s.phase == 0 && !classic()) {
+            start_search(p, *b, s.slot, false);
+            p.search.phase = 1;
+            return false;
+        }
+        return true;
+    };
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
-            return true;
+            return finished();
         }
         const Segment& g = p.segments[static_cast<std::size_t>(s.segment)];
         bool any = false;
@@ -662,7 +676,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                 }
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
                 const std::int32_t score = parity_penalty(acc.score, parity, 4);
-                const bool enough = woodcutter ? acc.count >= 10 : acc.count >= 19;
+                const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10) : acc.count >= 19;
                 if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
                     s.best_x0 = c.x0;
@@ -675,7 +689,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
             }
         }
         if (!advance_cursor(p, 6)) {
-            return true;
+            return finished();
         }
         if (any || visited >= kSearchPositions) {
             return false;

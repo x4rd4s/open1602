@@ -8,7 +8,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "map_input.hpp"
@@ -16,6 +18,7 @@
 #include "names.hpp"
 #include "templates.hpp"
 
+#include "o1602/assets/game_data.hpp"
 #include "o1602/assets/own_figures.hpp"
 #include "o1602/assets/text_table.hpp"
 #include "o1602/editor/cities.hpp"
@@ -23,9 +26,11 @@
 #include "o1602/editor/operations.hpp"
 #include "o1602/editor/players.hpp"
 #include "o1602/editor/resources.hpp"
+#include "o1602/editor/special_objects.hpp"
 #include "o1602/editor/terrain.hpp"
 #include "o1602/editor/units.hpp"
 #include "o1602/sim/construction.hpp"
+#include "o1602/sim/growth.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/ui/build_menu.hpp"
@@ -70,6 +75,65 @@ std::vector<const ui::BuildCategory*> object_groups() {
     }
     groups.push_back(&landscape_group());
     return groups;
+}
+
+/// The number of groups of the tool "Build": the build menu's, the natives' and pirates', and last
+/// the special objects (special_pieces()), which are placed without owner.
+std::size_t object_group_count() {
+    return object_groups().size() + 1;
+}
+
+/// Whether `group` is the group of the special objects.
+bool special_group(std::size_t group) {
+    return group % object_group_count() == object_group_count() - 1;
+}
+
+/// The name of a special object, in the player's language: a field by its crop and stage, a ruin or
+/// building by its number.
+std::string special_name(const editor::SpecialPiece& p, const assets::BuildingTable& buildings) {
+    using Kind = editor::SpecialKind;
+    const assets::BuildingType* b = buildings.by_id(p.id);
+    const std::string number = std::to_string(p.id);
+    if (p.kind == Kind::Growing || p.kind == Kind::Ripe || p.kind == Kind::Withered) {
+        const std::uint8_t ware = b != nullptr ? sim::crop_ware(buildings, *b) : 0;
+        const assets::BuildingType* ripe =
+            b != nullptr && p.kind == Kind::Withered ? sim::ripe_of_withered(buildings, *b) : nullptr;
+        const std::uint8_t crop = ripe != nullptr ? ripe->ware : ware;
+        const std::string name = crop >= assets::ware::kCornField && crop <= assets::ware::kCocoaField
+                                     ? ui::tr("editor.special.crop." + std::to_string(crop))
+                                     : ui::tr("editor.special.crop", {number});
+        if (p.kind == Kind::Growing) {
+            return ui::tr("editor.special.growing", {name, std::to_string(p.stage + 1), std::to_string(p.stages)});
+        }
+        return ui::tr(p.kind == Kind::Ripe ? "editor.special.ripe" : "editor.special.withered", {name});
+    }
+    if (p.kind == Kind::Ruin) {
+        return ui::tr(
+            b != nullptr && b->kind == assets::kind::kBeachRuin ? "editor.special.beach_ruin" : "editor.special.ruin",
+            {number});
+    }
+    if (p.id == assets::id::kUnusedBuildings[0]) {
+        return ui::tr("editor.special.outpost", {number});
+    }
+    return ui::tr("editor.special.building", {number});
+}
+
+/// Why a special object is not placed, in the player's language.
+std::string special_refusal(editor::SpecialRefusal refusal) {
+    using R = editor::SpecialRefusal;
+    switch (refusal) {
+        case R::NoIsland:
+            return ui::tr("editor.objects.refused.island");
+        case R::Ground:
+            return ui::tr("editor.objects.refused.special_ground");
+        case R::Taken:
+            return ui::tr("editor.objects.refused.special_taken");
+        case R::Unit:
+            return ui::tr("editor.objects.refused.unit_near");
+        case R::None:
+            break;
+    }
+    return {};
 }
 
 /// The players a building, ship or unit can be placed for: humans and computers, then the natives
@@ -170,9 +234,55 @@ std::string build_refusal(sim::BuildRefusal refusal) {
 
 }  // namespace
 
+std::optional<editor::SpecialPiece> MapViewer::editor_special_piece() const {
+    if (!m_editor || m_editor->objects.tool != EditorObjects::Tool::Build || !special_group(m_editor->objects.group)) {
+        return std::nullopt;
+    }
+    const std::vector<editor::SpecialPiece> pieces = editor::special_pieces(m_buildings);
+    if (pieces.empty()) {
+        return std::nullopt;
+    }
+    return pieces[std::min(m_editor->objects.piece, pieces.size() - 1)];
+}
+
+std::optional<std::pair<std::uint16_t, sim::TilePos>> MapViewer::editor_special_origin(std::int64_t x,
+                                                                                       std::int64_t y) const {
+    const sim::World& world = m_state->world;
+    const auto piece = editor_special_piece();
+    const assets::BuildingType* b = piece ? m_buildings.by_id(piece->id) : nullptr;
+    if (b == nullptr || x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    std::uint32_t w = 1;
+    std::uint32_t h = 1;
+    sim::rotated_size(*b, m_editor->objects.rotation, w, h);
+    // The footprint about the mouse, as for a building.
+    return std::pair{c.island,
+                     sim::TilePos{static_cast<std::int32_t>(c.local_x) - static_cast<std::int32_t>((w - 1) / 2),
+                                  static_cast<std::int32_t>(c.local_y) - static_cast<std::int32_t>((h - 1) / 2)}};
+}
+
+editor::SpecialRefusal MapViewer::editor_special_fits(std::int64_t x, std::int64_t y) const {
+    const auto piece = editor_special_piece();
+    const auto origin = editor_special_origin(x, y);
+    if (!piece || !origin) {
+        return editor::SpecialRefusal::NoIsland;
+    }
+    return editor::special_fits(m_state->world, m_buildings, origin->first, origin->second, *piece,
+                                m_editor->objects.rotation);
+}
+
 const assets::BuildingType* MapViewer::editor_object_piece() const {
     if (!m_editor) {
         return nullptr;
+    }
+    if (special_group(m_editor->objects.group)) {
+        const auto piece = editor_special_piece();
+        return piece ? m_buildings.by_id(piece->id) : nullptr;
     }
     const auto groups = object_groups();
     if (groups.empty()) {
@@ -186,8 +296,17 @@ const assets::BuildingType* MapViewer::editor_object_piece() const {
 void MapViewer::editor_object_model(EditorModel& m) const {
     m.objects = m_editor->objects;
     const auto groups = object_groups();
-    m.object_groups = groups.size();
-    if (!groups.empty()) {
+    m.object_groups = object_group_count();
+    const bool special = special_group(m_editor->objects.group);
+    if (special) {
+        const std::vector<editor::SpecialPiece> pieces = editor::special_pieces(m_buildings);
+        m.object_pieces = pieces.size();
+        m.object_group = ui::tr("editor.objects.group.special");
+        if (!pieces.empty()) {
+            const editor::SpecialPiece& p = pieces[std::min(m_editor->objects.piece, pieces.size() - 1)];
+            m.object_name = special_name(p, m_buildings);
+        }
+    } else if (!groups.empty()) {
         const ui::BuildCategory& c = *groups[m_editor->objects.group % groups.size()];
         m.object_pieces = c.size();
         const std::size_t index = std::min(m_editor->objects.piece, c.size() - 1);
@@ -207,6 +326,7 @@ void MapViewer::editor_object_model(EditorModel& m) const {
     }
     using Tool = EditorObjects::Tool;
     const Tool tool = m_editor->objects.tool;
+    m.object_ownerless = tool == Tool::Build && special;
     if (tool == Tool::Template) {
         m.object_pieces = m_templates ? m_templates->all().size() : 0;
         m.object_turns = true;
@@ -283,8 +403,10 @@ void MapViewer::editor_city_model(EditorModel& m) const {
     city.name = c->name;
     city.owner = owner_label(world, c->owner);
     const auto* panel = m_hud ? m_hud->editor_panel() : nullptr;
+    const bool trading = panel != nullptr && (panel->page() == EditorPanel::Page::CityTrade ||
+                                              panel->page() == EditorPanel::Page::CityWare);
     if (panel != nullptr && panel->page() != EditorPanel::Page::CityGoods &&
-        panel->page() != EditorPanel::Page::Selection) {
+        panel->page() != EditorPanel::Page::Selection && !trading) {
         m.city = std::move(city);  // the stock only where it shows: its room takes a look at every building
         return;
     }
@@ -300,7 +422,33 @@ void MapViewer::editor_city_model(EditorModel& m) const {
             g.name = ware < names.size() ? names[ware] : std::to_string(ware);
         }
         g.amount = ware < c->goods.size() ? c->goods[ware] : 0;
+        if (trading) {
+            EditorTrade t;
+            t.ware = ware;
+            t.name = g.name;
+            t.stock = g.amount;
+            if (const sim::City::Trade* trade = c->trade_of(ware)) {
+                t.mode = trade->sell  ? EditorTradeMode::Sell
+                         : trade->buy ? EditorTradeMode::Buy
+                                      : EditorTradeMode::None;
+                t.price = trade->sell ? trade->sell_price : trade->buy_price;
+                t.amount = trade->sell ? trade->keep : trade->limit;
+            }
+            const sim::TradePriceRange range = sim::trade_price_range(world, ware);
+            t.min_price = range.min;
+            t.max_price = range.max;
+            city.trade.push_back(std::move(t));
+        }
         city.goods.push_back(std::move(g));
+    }
+    city.natives = world.acts_as(c->owner, sim::FactionBehaviour::Natives);
+    city.pirates = world.acts_as(c->owner, sim::FactionBehaviour::Pirates);
+    if (trading) {
+        const sim::TradeSlots slots = sim::trade_slots(world, m_buildings, *c);
+        city.sells = slots.sells;
+        city.buys = slots.buys;
+        city.max_sells = slots.max_sells;
+        city.max_buys = slots.max_buys;
     }
     m.city = std::move(city);
 }
@@ -372,6 +520,28 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
         if (op) {
             m_editor->document.perform(std::move(op).value());
             m_editor->notice.clear();
+        }
+    } else if (request.kind == Kind::CityTrade) {
+        sim::TradeSetting setting;
+        setting.ware = static_cast<std::uint8_t>(request.index);
+        setting.mode = request.trade.mode == EditorTradeMode::Sell  ? sim::TradeSetting::Mode::Sell
+                       : request.trade.mode == EditorTradeMode::Buy ? sim::TradeSetting::Mode::Buy
+                                                                    : sim::TradeSetting::Mode::None;
+        setting.price = request.trade.price;
+        setting.amount = request.trade.amount;
+        auto op = editor::set_city_trade(world, m_buildings, island, index, setting);
+        if (op) {
+            m_editor->document.perform(std::move(op).value());
+            m_editor->notice.clear();
+        } else if (op.error().code == core::ErrorCode::Unsupported && setting.mode != sim::TradeSetting::Mode::None &&
+                   !setting.price && !setting.amount) {
+            editor_notice(ui::tr("editor.trade.no_slot"), true, op.error().message);
+        }
+    } else if (request.kind == Kind::CityTradeReset) {
+        auto op = editor::reset_city_trade(world, island, index);
+        if (op) {
+            m_editor->document.perform(std::move(op).value());
+            editor_notice(ui::tr("editor.trade.reset"), false, "city trade reset");
         }
     } else if (request.kind == Kind::CityOwner) {
         // The next player, the natives or the pirates that can take the city, forward or back.
@@ -506,7 +676,8 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
     const sim::World& world = m_state->world;
     const assets::BuildingType* b = editor_object_piece();
     const auto owners = object_owners(world);
-    if (b == nullptr || owners.empty() || x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
+    if (special_group(m_editor->objects.group) || b == nullptr || owners.empty() || x < 0 || y < 0 ||
+        x >= world.width() || y >= world.height()) {
         return std::nullopt;
     }
     const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
@@ -559,6 +730,29 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
 
 bool MapViewer::editor_place_object(std::int64_t x, std::int64_t y, bool tell) {
     editor_neutral_owner();  // an undo took it away
+    if (const auto piece = editor_special_piece()) {
+        // A special object: without owner, on open land outside every city.
+        const auto origin = editor_special_origin(x, y);
+        if (!origin) {
+            if (tell) {
+                editor_notice(ui::tr("editor.objects.refused.island"), true, "special object not on an island");
+            }
+            return false;
+        }
+        auto op = editor::place_special(m_state->world, m_buildings, origin->first, origin->second, *piece,
+                                        m_editor->objects.rotation);
+        if (!op) {
+            if (tell) {
+                editor_notice(special_refusal(editor::special_fits(m_state->world, m_buildings, origin->first,
+                                                                   origin->second, *piece, m_editor->objects.rotation)),
+                              true, op.error().message);
+            }
+            return false;
+        }
+        (*op)->apply(m_state->world);
+        m_editor->object_steps.push_back(std::move(op).value());
+        return true;
+    }
     const auto order = editor_object_order(x, y);
     if (!order) {
         if (tell) {
@@ -878,6 +1072,9 @@ std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) cons
     }
     using Tool = EditorObjects::Tool;
     const Tool tool = m_editor->objects.tool;
+    if (tool == Tool::Build && special_group(m_editor->objects.group)) {
+        return special_refusal(editor_special_fits(x, y));
+    }
     if (tool == Tool::Build) {
         const auto order = editor_object_order(x, y);
         if (!order) {

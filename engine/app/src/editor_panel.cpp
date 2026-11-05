@@ -84,6 +84,15 @@ constexpr Id kTerrainBigger = 79;       ///< the brush a size bigger
 constexpr Id kTerrainShape = 173;       ///< the brush's shape
 constexpr Id kTerrainSlider = 174;      ///< the brush's size slid
 constexpr Id kTerrainPasteWater = 175;  ///< whether a paste lays the copy's water too
+constexpr Id kCityTradePage = 188;
+constexpr Id kTradeSell = 176;   ///< the ware sold, or no longer
+constexpr Id kTradeBuy = 177;    ///< the ware bought, or no longer
+constexpr Id kTradeReset = 178;  ///< the city's trade as its owner starts with it
+constexpr Id kTradeBack = 179;   ///< from a ware back to the page "Trade"
+constexpr Id kPriceLess = 184;   ///< the ware's price: left 10, right 1 gold
+constexpr Id kPriceMore = 185;
+constexpr Id kAmountLess = 186;  ///< what the city keeps or buys up to: left 10 t, right 1 t
+constexpr Id kAmountMore = 187;
 constexpr Id kObjectsPage = 59;
 constexpr Id kObjectsTool = 80;
 constexpr Id kObjectsGroup = 81;
@@ -152,6 +161,9 @@ constexpr Id kScenarioBack = 271;              ///< from the packages back to th
 constexpr Id kCampaignChoice = 272;            ///< the campaign shown, or a new one
 constexpr Id kCampaignAdd = 273;               ///< the scenario as the campaign's next part
 constexpr Id kCampaignRemove = 274;            ///< the scenario, the campaign's last part, taken out
+constexpr Id kTabNeutrals = 275;               ///< the players dialog's tab of the natives, pirates, trader
+constexpr Id kNeutralsPage = 276;              ///< the page of the natives, pirates and trader (column)
+constexpr Id kNeutralCell = 280;               ///< + the NeutralColumn of the slot shown (column)
 constexpr Id kCheckLine = 800;                 ///< + the line of the check list (a line that leads somewhere)
 constexpr Id kRecent = 190;                    ///< + the object placed lately (the page "Objects")
 constexpr Id kShipCargoPage = 1000;            ///< the selected ship's holds
@@ -163,6 +175,8 @@ constexpr Id kPlayerTable = 300;               ///< + 8 * the row + the column o
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
+constexpr Id kNeutralTable = 430;  ///< + kNeutralColumns * the row + the column of the table "Others"
+constexpr std::size_t kNeutralRows = 13;
 /// The dialogs' widths at most: wide for tables, narrow for the other pages.
 constexpr std::int32_t kWideDialog = 980;
 constexpr std::int32_t kNarrowDialog = 560;
@@ -250,8 +264,8 @@ std::uint32_t fitted(std::uint32_t used) {
 /// Whether a page goes back and on by the rows it shows (else by kRows).
 bool paged_by_rows(EditorPanel::Page page) noexcept {
     using P = EditorPanel::Page;
-    return page == P::Check || page == P::CityGoods || page == P::Rules || page == P::Random || page == P::Goals ||
-           page == P::Open || page == P::IslandFiles || page == P::ScriptFiles;
+    return page == P::Check || page == P::CityGoods || page == P::CityTrade || page == P::Rules || page == P::Random ||
+           page == P::Goals || page == P::Open || page == P::IslandFiles || page == P::ScriptFiles;
 }
 
 /// The lines a list of files takes: a line each, and one for each group's heading.
@@ -281,6 +295,91 @@ std::size_t climate_choices(const EditorModel& model, bool placeholder) {
 /// The next value of a cycle of `n` values, forward or back.
 std::size_t step(std::size_t value, std::size_t n, bool forward) {
     return forward ? (value + 1) % n : (value + n - 1) % n;
+}
+
+/// The values of the page "Others", each a column of its table.
+enum NeutralColumn : std::size_t {
+    kNativesStanding,  ///< war, peace, trade
+    kNativesGoodwill,
+    kPiratesStanding,  ///< war, peace, lasting peace
+    kPiratesTrade,     ///< the player's ships trade at their nests
+    kTraderCalls,      ///< the trader calls at the player's Kontors
+    kNeutralColumns
+};
+
+constexpr std::array<const char*, kNeutralColumns> kNeutralHeads = {
+    "editor.neutrals.natives", "editor.neutrals.goodwill", "editor.neutrals.pirates", "editor.neutrals.pirate_trade",
+    "editor.neutrals.trader"};
+
+EditorNeutral party_of(std::size_t column) noexcept {
+    return column <= kNativesGoodwill ? EditorNeutral::Natives
+           : column <= kPiratesTrade  ? EditorNeutral::Pirates
+                                      : EditorNeutral::Trader;
+}
+
+/// The party's place in EditorModel::neutrals, none if the world does not have it.
+std::optional<std::size_t> neutral_index(const EditorModel& model, EditorNeutral party) {
+    const auto it = std::find(model.neutrals.begin(), model.neutrals.end(), party);
+    return it == model.neutrals.end()
+               ? std::nullopt
+               : std::optional<std::size_t>(static_cast<std::size_t>(it - model.neutrals.begin()));
+}
+
+/// The columns of the page "Others" the world has a party for, in their order.
+std::vector<std::size_t> neutral_columns(const EditorModel& model) {
+    std::vector<std::size_t> columns;
+    for (std::size_t c = 0; c < kNeutralColumns; ++c) {
+        if (neutral_index(model, party_of(c))) {
+            columns.push_back(c);
+        }
+    }
+    return columns;
+}
+
+EditorPlayer::Towards towards(const EditorModel& model, const EditorPlayer& p, EditorNeutral party) {
+    const std::optional<std::size_t> i = neutral_index(model, party);
+    return i && *i < p.towards.size() ? p.towards[*i] : EditorPlayer::Towards{};
+}
+
+/// The goodwills a click steps through; one between them goes to the next or the one before.
+constexpr std::array<std::uint32_t, 8> kGoodwillSteps = {0, 50, 100, 200, 500, 1000, 2000, 5000};
+
+std::uint32_t step_goodwill(std::uint32_t value, bool forward) noexcept {
+    if (forward) {
+        for (const std::uint32_t g : kGoodwillSteps) {
+            if (g > value) {
+                return g;
+            }
+        }
+        return kGoodwillSteps.front();
+    }
+    for (auto it = kGoodwillSteps.rbegin(); it != kGoodwillSteps.rend(); ++it) {
+        if (*it < value) {
+            return *it;
+        }
+    }
+    return kGoodwillSteps.back();
+}
+
+/// The text of a value of the page "Others"; `enabled` whether a click changes it.
+std::string neutral_text(const EditorModel& model, const EditorPlayer& p, std::size_t column, bool& enabled) {
+    const EditorPlayer::Towards t = towards(model, p, party_of(column));
+    enabled = true;
+    switch (column) {
+        case kNativesStanding:
+            return ui::tr(!t.peace  ? "editor.relations.war"
+                          : t.trade ? "editor.relations.trade_short"
+                                    : "editor.relations.peace");
+        case kNativesGoodwill:
+            enabled = model.native_villages;
+            return enabled ? count(t.goodwill) : std::string("-");
+        case kPiratesStanding:
+            return ui::tr(!t.peace    ? "editor.relations.war"
+                          : t.lasting ? "editor.neutrals.lasting"
+                                      : "editor.relations.peace");
+        default:
+            return ui::tr(t.trade ? "editor.relations.trade_yes" : "editor.relations.trade_no");
+    }
 }
 
 }  // namespace
@@ -503,6 +602,8 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
         case Page::Selection:
         case Page::CityName:
         case Page::CityGoods:
+        case Page::CityTrade:
+        case Page::CityWare:
         case Page::ShipCargo:
         case Page::Fertility:
             return EditorTool::Select;
@@ -534,16 +635,17 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
 bool EditorPanel::dialog() const noexcept {
     using P = Page;
     return m_screen_w > 0 && !m_previewing &&
-           (m_page == P::Players || m_page == P::PlayerName || m_page == P::Relations || m_page == P::Rules ||
-            m_page == P::Random || m_page == P::WorldSize || m_page == P::Check || m_page == P::Goals ||
-            m_page == P::GoalText || m_page == P::Scenario || m_page == P::ScenarioText || m_page == P::Script ||
-            m_page == P::ScriptFiles || m_page == P::Packages || m_page == P::PackageSave || m_page == P::Campaign);
+           (m_page == P::Players || m_page == P::PlayerName || m_page == P::Relations || m_page == P::Neutrals ||
+            m_page == P::Rules || m_page == P::Random || m_page == P::WorldSize || m_page == P::Check ||
+            m_page == P::Goals || m_page == P::GoalText || m_page == P::Scenario || m_page == P::ScenarioText ||
+            m_page == P::Script || m_page == P::ScriptFiles || m_page == P::Packages || m_page == P::PackageSave ||
+            m_page == P::Campaign);
 }
 
 ui::Rect EditorPanel::dialog_rect() const noexcept {
     using P = Page;
-    const bool wide = m_page == P::Players || m_page == P::Relations || m_page == P::Rules || m_page == P::Random ||
-                      m_page == P::Goals;
+    const bool wide = m_page == P::Players || m_page == P::Relations || m_page == P::Neutrals || m_page == P::Rules ||
+                      m_page == P::Random || m_page == P::Goals;
     // Right of the tool bar, between the menu bar and the status line; as tall as the page needs.
     constexpr std::int32_t kToolBar = 42;
     constexpr std::int32_t kBars = 26 + 24;
@@ -679,6 +781,12 @@ void EditorPanel::layout_page(const EditorModel& model) {
         case Page::CityGoods:
             layout_city_goods(model);
             break;
+        case Page::CityTrade:
+            layout_city_trade(model);
+            break;
+        case Page::CityWare:
+            layout_city_ware(model);
+            break;
         case Page::ShipCargo:
             layout_ship_cargo(model);
             break;
@@ -690,6 +798,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::Relations:
             wide ? layout_relations_table(model) : layout_relations(model);
+            break;
+        case Page::Neutrals:
+            wide ? layout_neutrals_table(model) : layout_neutrals(model);
             break;
         case Page::Rules:
             wide ? layout_settings_grid(model, true) : layout_rules(model);
@@ -1043,8 +1154,8 @@ void EditorPanel::layout_selection(const EditorModel& model) {
     } else {
         f.paragraph(Rect{m_x, y, m_w, 2 * kLine}, model.selection, Tone::Normal, kLine);
         y += 2 * kLine + 4;
-        // Room for the buttons below: back, and an island's three rows or a city's two.
-        const std::int32_t rows = model.island || model.placeholder ? 4 : model.city ? 3 : model.ship ? 2 : 1;
+        // Room for the buttons below: back, and an island's three rows, a city's three or a ship's one.
+        const std::int32_t rows = model.island || model.placeholder || model.city ? 4 : model.ship ? 2 : 1;
         const std::int32_t bottom = m_top + m_height - rows * (kButtonH + kGap) - kGap;
         for (const EditorProperty& p : model.properties) {
             if (y + kLine > bottom) {
@@ -1063,6 +1174,8 @@ void EditorPanel::layout_selection(const EditorModel& model) {
             f.button(kCityNamePage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.city.rename"));
             f.button(kCityGoodsPage, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.city.stock"),
                      model.city->room > 0);
+            y += kButtonH + kGap;
+            f.button(kCityTradePage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.trade"), model.city->room > 0);
             y += kButtonH + kGap;
             f.cycle_button(kCityOwner, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.owner", {model.city->owner}));
             y += kButtonH + kGap;
@@ -1145,6 +1258,9 @@ void EditorPanel::layout_players(const EditorModel& model) {
     y += kGap - 2;
     f.button(kPlayerNamePage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.players.rename"), on);
     f.button(kRelationsPage, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.relations"), n > 1);
+    y += kButtonH + kGap;
+    f.button(kNeutralsPage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.players.neutrals"),
+             on && !model.neutrals.empty());
     y += kButtonH + kGap;
     f.button(kPlayerAdd, Rect{m_x, y, half, kButtonH}, ui::tr("editor.players.add"), model.can_add_player);
     f.button(kPlayerRemove, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.remove"), model.can_remove_player);
@@ -1401,6 +1517,129 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
 }
 
+namespace {
+
+/// What a ware's row on the page "Trade" says of it: sold or bought, at which price.
+std::string trade_state(const EditorTrade& t, bool natives) {
+    switch (t.mode) {
+        case EditorTradeMode::Sell:
+            return natives ? ui::tr("editor.trade.sells") : ui::tr("editor.trade.sells_for", {count(t.price)});
+        case EditorTradeMode::Buy:
+            return natives ? ui::tr("editor.trade.buys") : ui::tr("editor.trade.buys_for", {count(t.price)});
+        case EditorTradeMode::None:
+            break;
+    }
+    return "-";
+}
+
+}  // namespace
+
+void EditorPanel::layout_city_trade(const EditorModel& model) {
+    if (!model.city || model.city->room == 0) {
+        m_page = Page::Selection;
+        layout_selection(model);
+        return;
+    }
+    const EditorCity& city = *model.city;
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.trade.title", {city.name}), Align::Left, Tone::Heading);
+    y += 28;
+    // Who trades how: a village for goodwill, the pirates choosing anew, a Kontor's slots.
+    std::string note = city.natives   ? ui::tr("editor.trade.natives")
+                       : city.pirates ? ui::tr("editor.trade.pirates")
+                                      : ui::tr("editor.trade.hint");
+    if (city.max_sells != 0 || city.max_buys != 0) {
+        note += " " + ui::tr("editor.trade.slots",
+                             {count(city.sells), count(city.max_sells), count(city.buys), count(city.max_buys)});
+    }
+    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, note, Tone::Dim, 20);
+    y += 3 * 20 + 4;
+    // As many rows as fit above the buttons below: the pages, the start's trade, and back.
+    const std::int32_t bottom = m_top + m_height - 3 * (kButtonH + kGap) - kGap;
+    const std::size_t n = city.trade.size();
+    const auto fit = static_cast<std::size_t>(std::max<std::int32_t>(1, (bottom - y) / kRowH));
+    m_page_rows = std::min({fit, std::size_t{20}, std::max<std::size_t>(n, 1)});
+    m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
+    const std::int32_t top = y;
+    for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
+        const EditorTrade& t = city.trade[m_first + row];
+        f.row(kFirstRow + static_cast<Id>(row), Rect{m_x, y, m_w, kRowH - 2}, false);
+        f.entry(Rect{m_x + 4, y, m_w - 8, kRowH - 2}, t.name, trade_state(t, city.natives), Tone::Normal,
+                t.mode == EditorTradeMode::None ? Tone::Dim : Tone::Normal);
+        y += kRowH;
+    }
+    y = top + static_cast<std::int32_t>(m_page_rows) * kRowH + 4;
+    const std::int32_t half = (m_w - kGap) / 2;
+    f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
+    f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + m_page_rows < n);
+    y += kButtonH + kGap;
+    f.button(kTradeReset, Rect{m_x, y, m_w, kButtonH},
+             ui::tr(city.natives ? "editor.trade.village" : "editor.trade.none"));
+    y += kButtonH + kGap;
+    f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
+}
+
+void EditorPanel::layout_city_ware(const EditorModel& model) {
+    if (!model.city || model.city->room == 0 || m_ware >= model.city->trade.size()) {
+        m_page = model.city && model.city->room > 0 ? Page::CityTrade : Page::Selection;
+        if (m_page == Page::CityTrade) {
+            layout_city_trade(model);
+        } else {
+            layout_selection(model);
+        }
+        return;
+    }
+    const EditorCity& city = *model.city;
+    const EditorTrade& t = city.trade[m_ware];
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, t.name, Align::Left, Tone::Heading);
+    y += 30;
+    f.entry(Rect{m_x, y, m_w, kLine}, ui::tr("editor.trade.stock"), ui::tr("editor.trade.tons", {count(t.stock / 32)}),
+            Tone::Dim);
+    y += kLine + kGap;
+    // Sell or buy, one at a time; the one chosen again stops the trade. A Kontor whose slots are
+    // all taken offers no further ware.
+    const bool sell = t.mode == EditorTradeMode::Sell;
+    const bool buy = t.mode == EditorTradeMode::Buy;
+    const bool sell_free = city.max_sells == 0 || city.sells < city.max_sells;
+    const bool buy_free = city.max_buys == 0 || city.buys < city.max_buys;
+    const std::int32_t half = (m_w - kGap) / 2;
+    f.button(kTradeSell, Rect{m_x, y, half, kButtonH}, ui::tr("editor.trade.sell"), sell || sell_free, sell);
+    f.button(kTradeBuy, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.trade.buy"), buy || buy_free, buy);
+    y += kButtonH + kGap;
+    std::string note;
+    if (t.mode == EditorTradeMode::None) {
+        note = ui::tr(!sell_free && !buy_free ? "editor.trade.full" : "editor.trade.off");
+    } else if (city.natives) {
+        note = ui::tr("editor.trade.goodwill");
+    } else {
+        note = ui::tr("editor.trade.range", {count(t.min_price), count(t.max_price)});
+    }
+    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, note, Tone::Dim, 20);
+    y += 3 * 20 + 4;
+    if (t.mode != EditorTradeMode::None) {
+        // Rows with cycle buttons as the stock's: the left button 10, the right one 1.
+        constexpr std::int32_t kStep = 28;
+        constexpr std::int32_t kH = 26;
+        const std::int32_t text_w = m_w - 2 * kStep - 6;
+        if (!city.natives) {
+            f.entry(Rect{m_x, y, text_w, kH - 2}, ui::tr("editor.trade.price"),
+                    ui::tr("editor.trade.gold", {count(t.price)}));
+            f.cycle_button(kPriceLess, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kH - 2}, "-", t.price > t.min_price);
+            f.cycle_button(kPriceMore, Rect{m_x + m_w - kStep, y, kStep, kH - 2}, "+", t.price < t.max_price);
+            y += kH + 2;
+        }
+        f.entry(Rect{m_x, y, text_w, kH - 2}, ui::tr(sell ? "editor.trade.keep" : "editor.trade.limit"),
+                ui::tr("editor.trade.tons", {count(t.amount / 32)}));
+        f.cycle_button(kAmountLess, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kH - 2}, "-", t.amount > 0);
+        f.cycle_button(kAmountMore, Rect{m_x + m_w - kStep, y, kStep, kH - 2}, "+", t.amount < city.room);
+        y += kH + kGap;
+    }
+    f.button(kTradeBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.trade.back"));
+}
+
 void EditorPanel::layout_island_actions(const EditorModel& model, std::int32_t& y) {
     ui::Form& f = m_form;
     const std::int32_t half = (m_w - kGap) / 2;
@@ -1611,10 +1850,14 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     value(kObjectsRotation, ui::tr("editor.objects.rotation"), ui::tr(kTerrainRotationTexts[o.rotation & 3U]),
           (build && model.object_turns) || (owned && !build));
     value(kObjectsOwner, ui::tr("editor.objects.owner"),
-          model.object_owners > 0 ? model.object_owner : ui::tr("editor.objects.no_owner"),
-          owned && model.object_owners > 0);
+          model.object_ownerless    ? ui::tr("editor.objects.ownerless")
+          : model.object_owners > 0 ? model.object_owner
+                                    : ui::tr("editor.objects.no_owner"),
+          owned && model.object_owners > 0 && !model.object_ownerless);
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
-    if (owned && model.object_owners == 0) {
+    if (model.object_ownerless) {
+        note = ui::tr("editor.objects.note.special");
+    } else if (owned && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
     } else if (build && model.object_neutral) {
         note = ui::tr("editor.objects.note.neutral");
@@ -1713,12 +1956,7 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
     const std::size_t n = model.player_slots.size();
-    // The heading, and the dialog's two tabs at its right.
-    constexpr std::int32_t kTab = 150;
-    f.label(Rect{m_x, y, m_w - 2 * (kTab + kGap), 28}, ui::tr("editor.players.title"), Align::Left, Tone::Heading);
-    f.button(kTabPlayers, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH}, ui::tr("editor.players.tab_players"),
-             true, true);
-    f.button(kTabRelations, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_relations"), n > 1);
+    dialog_tabs(model, "editor.players.title", Page::Players);
     y += kButtonH + kGap + 4;
     // Every slot in a row: its number, then a button for each of its values.
     constexpr std::int32_t kNumber = 40;
@@ -1784,6 +2022,145 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
 }
 
+void EditorPanel::dialog_tabs(const EditorModel& model, const char* heading, Page page) {
+    // The heading, and the dialog's tabs at its right.
+    ui::Form& f = m_form;
+    const std::int32_t y = m_top + 6;
+    constexpr std::int32_t kTab = 150;
+    const std::size_t n = model.player_slots.size();
+    f.label(Rect{m_x, y, m_w - 3 * (kTab + kGap), 28}, ui::tr(heading), Align::Left, Tone::Heading);
+    f.button(kTabPlayers, Rect{m_x + m_w - 3 * kTab - 2 * kGap, y, kTab, kButtonH},
+             ui::tr("editor.players.tab_players"), true, page == Page::Players);
+    f.button(kTabRelations, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH},
+             ui::tr("editor.players.tab_relations"), n > 1, page == Page::Relations);
+    f.button(kTabNeutrals, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_neutrals"),
+             n > 0 && !model.neutrals.empty(), page == Page::Neutrals);
+}
+
+void EditorPanel::layout_neutrals(const EditorModel& model) {
+    const std::size_t n = model.player_slots.size();
+    if (n == 0 || model.neutrals.empty()) {
+        m_page = Page::Players;
+        layout_players(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.neutrals.title"), Align::Left, Tone::Heading);
+    y += 28;
+    const EditorPlayer& p = model.player_slots[std::min(m_player, n - 1)];
+    f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.relations.of"), Align::Left, Tone::Normal);
+    y += 18;
+    f.cycle_button(kPlayerSlot, Rect{m_x, y, m_w, kButtonH}, p.name);
+    y += kButtonH + 2;
+    for (const std::size_t c : neutral_columns(model)) {
+        bool enabled = true;
+        std::string text = neutral_text(model, p, c, enabled);
+        f.label(Rect{m_x, y, m_w, 18}, ui::tr(kNeutralHeads[c]), Align::Left, enabled ? Tone::Normal : Tone::Dim);
+        y += 18;
+        f.cycle_button(kNeutralCell + static_cast<Id>(c), Rect{m_x, y, m_w, kButtonH}, std::move(text), enabled);
+        y += kButtonH + 2;
+    }
+    y += kGap;
+    note_and_back(model, y, "editor.neutrals.note", "editor.neutrals.note_short", kPlayersBack,
+                  "editor.relations.back");
+}
+
+void EditorPanel::layout_neutrals_table(const EditorModel& model) {
+    const std::size_t n = model.player_slots.size();
+    if (n == 0 || model.neutrals.empty()) {
+        m_page = Page::Players;
+        layout_players_table(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    dialog_tabs(model, "editor.neutrals.title", Page::Neutrals);
+    y += kButtonH + kGap + 4;
+    // The players down the left; a column for each value towards a party the world has.
+    constexpr std::int32_t kNames = 220;
+    const std::vector<std::size_t> columns = neutral_columns(model);
+    const auto shown = static_cast<std::int32_t>(columns.size());
+    const std::int32_t cell = std::min<std::int32_t>(170, (m_w - kNames) / shown - kGap);
+    const auto column_x = [&](std::size_t i) { return m_x + kNames + static_cast<std::int32_t>(i) * (cell + kGap); };
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        f.label(Rect{column_x(i), y, cell, 18}, ui::tr(kNeutralHeads[columns[i]]), Align::Centre, Tone::Dim);
+    }
+    y += 20;
+    constexpr std::int32_t kRow = kButtonH + 2;
+    const std::int32_t foot = m_top + m_height - kButtonH - 4;
+    const std::int32_t bottom = foot - 2 * 20 - kGap;
+    m_page_rows = std::clamp<std::size_t>(static_cast<std::size_t>(std::max(1, (bottom - y) / kRow)), 1, kNeutralRows);
+    m_first = std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
+    for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
+        const EditorPlayer& p = model.player_slots[m_first + row];
+        f.label(Rect{m_x, y, 40, kButtonH}, count(m_first + row + 1), Align::Right, Tone::Dim);
+        f.label(Rect{m_x + 42, y, kNames - 42 - kGap, kButtonH}, p.name, Align::Left, Tone::Normal);
+        for (std::size_t i = 0; i < columns.size(); ++i) {
+            bool enabled = true;
+            std::string text = neutral_text(model, p, columns[i], enabled);
+            const Id id = kNeutralTable + static_cast<Id>(row * kNeutralColumns + columns[i]);
+            f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+        }
+        y += kRow;
+    }
+    const bool notice = !model.notice.empty();
+    f.paragraph(Rect{m_x, bottom, m_w, 2 * 20}, notice ? model.notice : ui::tr("editor.neutrals.table_note"),
+                notice && model.notice_is_error ? Tone::Warning : Tone::Dim, 20,
+                notice ? std::string() : ui::tr("editor.neutrals.note_short"));
+    const std::int32_t quarter = (m_w - 3 * kGap) / 4;
+    if (n > m_page_rows) {
+        const std::int32_t eighth = (quarter - kGap) / 2;
+        f.button(kPrevious, Rect{m_x, foot, eighth, kButtonH}, "<", m_first > 0);
+        f.button(kNext, Rect{m_x + eighth + kGap, foot, quarter - eighth - kGap, kButtonH}, ">",
+                 m_first + m_page_rows < n);
+    }
+    f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+}
+
+std::optional<EditorRequest> EditorPanel::press_neutral(const EditorModel& model, std::size_t slot, std::size_t column,
+                                                        bool forward) const {
+    if (slot >= model.player_slots.size() || column >= kNeutralColumns) {
+        return std::nullopt;
+    }
+    const EditorNeutral party = party_of(column);
+    if (!neutral_index(model, party)) {
+        return std::nullopt;
+    }
+    const EditorPlayer& p = model.player_slots[slot];
+    EditorPlayer::Towards t = towards(model, p, party);
+    switch (column) {
+        case kNativesStanding: {
+            // War, peace, peace and trade, round (the right button back): the natives trade at peace.
+            const std::size_t next = step(!t.peace ? 0 : t.trade ? 2 : 1, 3, forward);
+            t.peace = next > 0;
+            t.trade = next == 2;
+            break;
+        }
+        case kNativesGoodwill:
+            if (!model.native_villages) {
+                return std::nullopt;
+            }
+            t.goodwill = step_goodwill(t.goodwill, forward);
+            break;
+        case kPiratesStanding: {
+            // War, peace (it fades as a bought one), lasting peace, round.
+            const std::size_t next = step(!t.peace ? 0 : t.lasting ? 2 : 1, 3, forward);
+            t.peace = next > 0;
+            t.lasting = next == 2;
+            break;
+        }
+        default:
+            t.trade = !t.trade;
+            break;
+    }
+    EditorRequest r{EditorRequest::Kind::SetNeutral};
+    r.player.slot = p.slot;
+    r.player.towards = {t};
+    r.index = static_cast<std::size_t>(party);
+    return r;
+}
+
 void EditorPanel::layout_relations_table(const EditorModel& model) {
     const std::size_t n = model.player_slots.size();
     if (n < 2) {
@@ -1793,11 +2170,7 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
     }
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
-    constexpr std::int32_t kTab = 150;
-    f.label(Rect{m_x, y, m_w - 2 * (kTab + kGap), 28}, ui::tr("editor.relations.title"), Align::Left, Tone::Heading);
-    f.button(kTabPlayers, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH}, ui::tr("editor.players.tab_players"));
-    f.button(kTabRelations, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_relations"), true,
-             true);
+    dialog_tabs(model, "editor.relations.title", Page::Relations);
     y += kButtonH + kGap + 4;
     // The players down the left and along the top by their numbers; each cell how the two stand.
     constexpr std::int32_t kNames = 220;
@@ -2784,6 +3157,13 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 m_first_column = 0;
             }
             return std::nullopt;
+        case kTabNeutrals:
+        case kNeutralsPage:
+            if (!model.player_slots.empty() && !model.neutrals.empty()) {
+                m_page = Page::Neutrals;
+                m_first = 0;
+            }
+            return std::nullopt;
         case kColumnsBack:
             m_first_column = m_first_column > kTableSide / 2 ? m_first_column - kTableSide / 2 : 0;
             return std::nullopt;
@@ -2901,6 +3281,51 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
             m_page = Page::CityGoods;
             m_first = 0;
             return std::nullopt;
+        case kCityTradePage:
+            m_page = Page::CityTrade;
+            m_first = 0;
+            return std::nullopt;
+        case kTradeBack:
+            m_page = Page::CityTrade;
+            return std::nullopt;
+        case kTradeReset:
+            return EditorRequest{EditorRequest::Kind::CityTradeReset};
+        case kTradeSell:
+        case kTradeBuy:
+        case kPriceLess:
+        case kPriceMore:
+        case kAmountLess:
+        case kAmountMore: {
+            if (!model.city || m_ware >= model.city->trade.size()) {
+                return std::nullopt;
+            }
+            const EditorTrade& t = model.city->trade[m_ware];
+            EditorRequest r{EditorRequest::Kind::CityTrade, t.ware};
+            r.trade.mode = t.mode;
+            if (*id == kTradeSell || *id == kTradeBuy) {
+                // The mode chosen again: no trade; another: its defaults.
+                const EditorTradeMode mode = *id == kTradeSell ? EditorTradeMode::Sell : EditorTradeMode::Buy;
+                r.trade.mode = t.mode == mode ? EditorTradeMode::None : mode;
+                return r;
+            }
+            if (t.mode == EditorTradeMode::None) {
+                return std::nullopt;
+            }
+            // Down to whole steps, then by steps, as the stock goes.
+            const auto down = [](std::uint32_t v, std::uint32_t step) {
+                return v % step != 0 ? v / step * step : v - std::min(v, step);
+            };
+            if (*id == kPriceLess || *id == kPriceMore) {
+                const std::uint32_t step = forward ? 10 : 1;
+                const std::uint32_t price = *id == kPriceMore ? (t.price / step + 1) * step : down(t.price, step);
+                r.trade.price = static_cast<std::uint16_t>(std::clamp<std::uint32_t>(price, t.min_price, t.max_price));
+            } else {
+                const std::uint32_t step = forward ? 10 * 32 : 32;
+                r.trade.amount = *id == kAmountMore ? std::min(model.city->room, (t.amount / step + 1) * step)
+                                                    : down(t.amount, step);
+            }
+            return r;
+        }
         case kShipCargoPage:
             m_page = Page::ShipCargo;
             return std::nullopt;
@@ -2993,6 +3418,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                                               kPlayerMonuments, kPlayerArches, kPlayerFaction};
         return column < 7 ? press(kCells[static_cast<std::size_t>(column)], model, forward) : std::nullopt;
     }
+    if (*id >= kNeutralTable && *id < kNeutralTable + static_cast<Id>(kNeutralRows * kNeutralColumns)) {
+        const auto cell = static_cast<std::size_t>(*id - kNeutralTable);
+        return press_neutral(model, m_first + cell / kNeutralColumns, cell % kNeutralColumns, forward);
+    }
+    if (*id >= kNeutralCell && *id < kNeutralCell + static_cast<Id>(kNeutralColumns) && !model.player_slots.empty()) {
+        return press_neutral(model, std::min(m_player, model.player_slots.size() - 1),
+                             static_cast<std::size_t>(*id - kNeutralCell), forward);
+    }
     if (*id >= kRelationTable && *id < kRelationTable + static_cast<Id>(kTableSide * kTableSide)) {
         // A cell of the diplomacy table: war, peace, peace and trade, round (the right button back).
         const auto a = m_first + static_cast<std::size_t>(*id - kRelationTable) / kTableSide;
@@ -3073,6 +3506,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         EditorRequest r{EditorRequest::Kind::Overlay};
         r.index = static_cast<std::size_t>(*id - kFirstOverlay);
         return r;
+    }
+    if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::CityTrade) {
+        const std::size_t index = m_first + static_cast<std::size_t>(*id - kFirstRow);
+        if (model.city && index < model.city->trade.size()) {
+            m_ware = index;
+            m_page = Page::CityWare;
+        }
+        return std::nullopt;
     }
     if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::Rules) {
         const std::size_t index = m_first + static_cast<std::size_t>(*id - kFirstRow);

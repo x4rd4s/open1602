@@ -7,7 +7,9 @@
 #include <utility>
 
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/special_objects.hpp"
 #include "o1602/sim/logistics.hpp"
+#include "o1602/sim/ships.hpp"
 
 namespace o1602::editor {
 
@@ -74,6 +76,14 @@ PlacedBuildings place_buildings(const sim::World& world, const assets::BuildingT
     }
     sim::World after = world;
     result.plan = sim::execute_build(after, buildings, order, city_names, nullptr);
+    // A native village founded trades as a new game's villages do (the author may change it).
+    for (std::uint8_t index = 0; index < sim::kMaxCitiesPerIsland; ++index) {
+        sim::City* c = after.city(order.island, index);
+        if (c != nullptr && !has_city(world, order.island, index) &&
+            after.acts_as(c->owner, sim::FactionBehaviour::Natives)) {
+            sim::native_village_offer(after, after.islands()[order.island], *c);
+        }
+    }
     if (!own_name.empty()) {
         // A city founded: its own name, and the list's turn stays where it was.
         for (std::uint8_t index = 0; index < sim::kMaxCitiesPerIsland; ++index) {
@@ -117,13 +127,19 @@ core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world
         map.top(static_cast<std::uint32_t>(at->origin.x), static_cast<std::uint32_t>(at->origin.y));
     const std::int32_t k = at->type->kind;
     if ((at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) &&
-        (k == assets::kind::kPier || k == assets::kind::kRuin || k == assets::kind::kBeachRuin)) {
-        // A pier or ruin outside every city (left by a Kontor taken away in an older map): the
-        // ground under it comes back.
+        (k == assets::kind::kPier || is_special(buildings, *at->type))) {
+        // A pier or ruin outside every city (left by a Kontor taken away in an older map), or a
+        // special object (a wild field, an unused building): the ground under it comes back.
         sim::World after = world;
         if (!clear_to_ground(after.island(island).map, *at)) {
             return make_error(ErrorCode::Unsupported, "the building cannot be taken away");
         }
+        // A growing field grows no more.
+        std::erase_if(after.growth().entries, [&](const sim::GrowthEntry& e) {
+            return e.island == island && e.x >= at->origin.x && e.y >= at->origin.y &&
+                   e.x < at->origin.x + static_cast<std::int32_t>(at->width) &&
+                   e.y < at->origin.y + static_cast<std::int32_t>(at->height);
+        });
         return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "building_remove"));
     }
     if (at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) {

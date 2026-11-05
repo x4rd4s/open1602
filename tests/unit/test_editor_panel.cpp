@@ -1110,6 +1110,125 @@ TEST_CASE("editor panel: a ship's holds are loaded on the page Cargo") {
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }
 
+TEST_CASE("editor panel: a city's Kontor sells and buys goods at prices of its own") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.selection = "Kontor";
+    app::EditorCity city;
+    city.name = "Abemsberg";
+    city.owner = "Blue";
+    city.room = 50 * 32;
+    for (std::uint8_t w = 0; w < 30; ++w) {
+        city.goods.push_back(app::EditorGood{w, "Good " + std::to_string(w), 0});
+        app::EditorTrade t;
+        t.ware = w;
+        t.name = "Good " + std::to_string(w);
+        t.min_price = 20;
+        t.max_price = 70;
+        if (w == 2) {
+            t.mode = app::EditorTradeMode::Sell;
+            t.price = 35;
+            t.amount = 5 * 32;
+        }
+        city.trade.push_back(t);
+    }
+    city.sells = 1;
+    city.max_sells = 4;
+    city.max_buys = 4;
+    m.city = city;
+    CHECK(panel.show_selection());
+    (void)panel.draw(m, kNoFonts);
+
+    // The list: each good with what the Kontor does with it, and the slots it has.
+    CHECK(!click(panel, m, "Trade").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::CityTrade);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Trade of Abemsberg"));
+    CHECK(says(panel, "sells for 35"));
+    CHECK(says(panel, "Sells 1 of 4, buys 0 of 4."));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+    }
+
+    // A good: sell or buy it; the price 10 a click, 1 a right click, within its range.
+    CHECK(!click(panel, m, "Good 2").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::CityWare);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "35 gold"));
+    CHECK(says(panel, "Keeps at least"));
+    std::vector<ui::Rect> more;
+    std::vector<ui::Rect> less;
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "+") {
+            more.push_back(w.rect);
+        } else if (w.text == "-") {
+            less.push_back(w.rect);
+        }
+    }
+    REQUIRE(more.size() == 2);
+    REQUIRE(less.size() == 2);
+    const auto press = [&](const ui::Rect& at, ui::MouseButton button) {
+        const std::int32_t x = at.x + at.w / 2;
+        const std::int32_t y = at.y + at.h / 2;
+        (void)panel.mouse(x, y, true, m, button);
+        return panel.mouse(x, y, false, m, button);
+    };
+    auto r = press(more[0], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::CityTrade);
+    CHECK(r->index == 2);
+    CHECK(r->trade.mode == app::EditorTradeMode::Sell);
+    REQUIRE(r->trade.price.has_value());
+    CHECK(*r->trade.price == 40);
+    CHECK(!r->trade.amount.has_value());
+    r = press(less[0], ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(*r->trade.price == 34);
+    r = press(more[1], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    REQUIRE(r->trade.amount.has_value());
+    CHECK(*r->trade.amount == 10U * 32U);
+    r = press(less[1], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(*r->trade.amount == 0U);
+
+    // Sell again stops the trade, Buy switches to buying.
+    r = click(panel, m, "Sell");
+    REQUIRE(r.has_value());
+    CHECK(r->trade.mode == app::EditorTradeMode::None);
+    r = click(panel, m, "Buy");
+    REQUIRE(r.has_value());
+    CHECK(r->trade.mode == app::EditorTradeMode::Buy);
+    CHECK(!r->trade.price.has_value());
+
+    // Back to the list, set back, and back to the selection.
+    CHECK(!click(panel, m, "Back to the goods").has_value());
+    CHECK(panel.page() == EditorPanel::Page::CityTrade);
+    (void)panel.draw(m, kNoFonts);
+    r = click(panel, m, "Trade nothing");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::CityTradeReset);
+    CHECK(!click(panel, m, "Back to the selection").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Selection);
+
+    // A native village: no prices, its village goods to set back to.
+    m.city->natives = true;
+    m.city->max_sells = 0;
+    m.city->max_buys = 0;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "Trade").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Village goods"));
+    CHECK(!says(panel, "sells for 35"));
+    CHECK(says(panel, "sells"));
+    CHECK(!click(panel, m, "Good 2").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!says(panel, "35 gold"));
+    CHECK(says(panel, "Keeps at least"));
+}
+
 TEST_CASE("editor panel: the page Players goes through the slots and changes what each is") {
     ui::set_language("en");
     EditorPanel panel;
@@ -1505,6 +1624,142 @@ TEST_CASE("editor panel: the players dialog shows every player in a row and the 
     CHECK(panel.page() == EditorPanel::Page::Players);
     CHECK(!click(panel, m, "Close").has_value());
     CHECK(!panel.dialog());
+}
+
+TEST_CASE("editor panel: the tab Others sets how the players start towards natives, pirates and trader") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(184, 564);
+    panel.set_screen(1024, 768, 1024 - EditorPanel::kWidth);
+    EditorModel m = four_players();
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Pirates, app::EditorNeutral::Trader};
+    m.native_villages = true;
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {false, true, 200}, {true, true, 200}};
+    }
+    (void)panel.command(app::EditorCommand::Players, m);
+    CHECK(!click(panel, m, "Others").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Neutrals);
+    CHECK(panel.dialog());
+    (void)panel.draw(m, kNoFonts);
+    for (const char* text : {"Natives", "Goodwill", "Pirates", "Trade at nests", "Trader calls", "Merlin"}) {
+        CHECK(find(panel, text).has_value());
+    }
+    const ui::Rect d = panel.dialog_rect();
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.x + w.rect.w <= d.x + d.w);
+        CHECK(w.rect.y + w.rect.h <= d.y + d.h);
+    }
+    // The natives: trade, war, peace, round; the right button back.
+    auto r = click_nth(panel, m, "Trade", 1);  // the second row
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetNeutral);
+    CHECK(r->player.slot == 1);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Natives));
+    REQUIRE(r->player.towards.size() == 1);
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+    r = click_nth(panel, m, "Trade", 0, ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 0);
+    CHECK(r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+    // The goodwill steps on; one between the steps goes to the next.
+    r = click_nth(panel, m, "200", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->player.towards[0].goodwill == 500);
+    m.player_slots[0].towards[0].goodwill = 300;
+    r = click_nth(panel, m, "300", 0, ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->player.towards[0].goodwill == 200);
+    // The pirates: war to peace; their nests' trade.
+    r = click_nth(panel, m, "War", 2);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(r->player.slot == 2);
+    CHECK(r->player.towards[0].peace);
+    CHECK(r->player.towards[0].trade);
+    m.player_slots[2].towards[1].peace = true;  // at peace: on to a lasting peace
+    r = click_nth(panel, m, "Peace", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 2);
+    CHECK(r->player.towards[0].peace);
+    CHECK(r->player.towards[0].lasting);
+    m.player_slots[2].towards[1].lasting = true;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(find(panel, "Lasting peace").has_value());
+    r = click_nth(panel, m, "Lasting peace", 0);
+    REQUIRE(r.has_value());
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].lasting);
+    r = click_nth(panel, m, "Yes", 0);  // the first row's trade at the nests
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(!r->player.towards[0].trade);
+    // The trader stays away from a player.
+    r = click_nth(panel, m, "Yes", 1);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Trader));
+    CHECK(r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+
+    // Natives without villages have no goodwill to set; a world without pirates has no columns of them.
+    m.native_villages = false;
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Trader};
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {true, true, 200}};
+    }
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!find(panel, "Pirates").has_value());
+    CHECK(!find(panel, "200").has_value());
+    r = click_nth(panel, m, "Yes", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Trader));
+    // Without any of them the tab cannot be chosen.
+    m.neutrals.clear();
+    panel.layout(m);
+    CHECK(panel.page() == EditorPanel::Page::Players);
+    CHECK(!click(panel, m, "Close").has_value());
+    CHECK(!panel.dialog());
+}
+
+TEST_CASE("editor panel: in the column, the page Others shows the slot of the page Players") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = four_players();
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Pirates, app::EditorNeutral::Trader};
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {false, true, 200}, {true, true, 200}};
+    }
+    CHECK(!panel.command(app::EditorCommand::Players, m).has_value());
+    CHECK(!click(panel, m, "Natives, pirates, trader").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Neutrals);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Merlin"));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+        if (w.text == "-") {
+            CHECK(!w.enabled);  // no villages: no goodwill
+        }
+    }
+    auto r = click(panel, m, "War");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetNeutral);
+    CHECK(r->player.slot == 0);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(r->player.towards[0].peace);
+    // The next slot.
+    CHECK(!click(panel, m, "Merlin").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Computer 1"));
+    r = click(panel, m, "Trade");
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 1);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Natives));
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!click_id(panel, m, ui::Form::Id{160}).has_value());  // back
+    CHECK(panel.page() == EditorPanel::Page::Players);
 }
 
 TEST_CASE("editor panel: the rules dialog shows its settings in two columns") {

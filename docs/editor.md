@@ -29,7 +29,7 @@ The editor has a frame of its own around the map instead of the game's panel:
   the command (its settings, or what is selected).
 - **The status line** below the map: what happened last (saved, or why something was refused), and
   the tile under the mouse with its island.
-- **Dialogs** in the window's middle for the pages of the whole map: Players (with Diplomacy), Rules
+- **Dialogs** in the window's middle for the pages of the whole map: Players (with Diplomacy and Others), Rules
   (with Random elements), Map size and Check. A dialog takes every click until it is closed with
   its button **Close** or with Escape; a tool chosen meanwhile closes it too.
 
@@ -135,7 +135,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 | Setting | What it does |
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Template**: a left click builds one of the templates saved in games (the copy tool's pieces, kept in the folder "templates" of the user's data folder) about the mouse, for the owner; what does not fit is left out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
-| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...); not for ships and units. |
+| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
 | Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) and the natives' spearman, placed for the natives only; a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
 | Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader. For buildings, templates and units the last is "Neutral": buildings for nobody on free land, without a Kontor, which soldiers take ([the neutral buildings](modding/factions.md#the-neutral-buildings)); the map gets their player when it is first chosen. |
@@ -154,6 +154,13 @@ buried treasure leaves it in the ground. The outline under the mouse is green wh
 stand and red where not; a Kontor, shipyard, mill or mine finds the coast, river or rock face near
 the mouse and turns to it. A refused click says why. A Kontor goes only once its city has nothing
 else, and its piers go with it.
+
+The group **Special objects** holds pieces no build menu offers, placed without owner on open land
+(ground or forest) outside every city: every crop field at each of its growing stages, ripe and
+withered, as wild vegetation; the ruins of the land and of the beach (a beach ruin on the beach); and
+the buildings of the game data no list uses (a wooden outpost, a 2 x 2 building). A growing field
+grows on in the game. In a game they count like forest and ruins: a city that claims their land takes
+them over. **Remove** takes them away again and the ground under them comes back.
 
 Each owner founds one city on an island, the natives and the pirates as well. Their cities are named
 after what they are ("Native village", "Pirates' nest", with a number from the second on); the
@@ -192,6 +199,7 @@ buttons on the Selection page, each change one step of undo:
 |---|---|
 | Name | Types a new name for the city, up to 40 characters, as a player may give it. |
 | Stock | The city's trade goods with the tons in its warehouses: + and - change them by 10 t, with the right button by 1 t, up to the room its Kontor, markets and warehouses give (the game would lose what is above). |
+| Trade | What the city's Kontor sells to and buys from other players' ships and the free trader, as its trade window in the game sets it. The list shows each trade good with what the Kontor does with it; a click on a good opens it: **Sell** or **Buy** (clicked again: not traded), the price per ton (from 300/1024 of the base price to the base price; + and - by 10 gold, with the right button by 1) and the tons the city keeps when selling or buys up to (by 10 t, with the right button by 1 t, up to its room). A player's Kontor trades in no more goods than its slots allow. A native village trades for goodwill instead of gold, so it has no prices; **Village goods** gives it the offer of a new game's villages again: tobacco goods in the north or spices in the south for sale, alcohol and cloth bought up to 10 t. A village founded in the editor starts with that offer. For any other city, **Trade nothing** switches all trade off. The pirates choose their offer anew during the game, so theirs holds only until then. |
 | Owner | Gives the city with all its land and buildings to the next human or computer, or to the natives or the pirates where the map has them (the right button: the one before), as when a player takes a city over; one with a city on the island already is passed over. The neutral buildings, which have no Kontor, keep their owner. |
 
 A selected ship has the button **Cargo**: a row for each of its holds with the ware in it (a click
@@ -224,6 +232,19 @@ from war to peace to peace with a trade treaty and back to war; the right button
 way. A change applies to both sides, and clears what
 the two remember of each other (tribute, trade, damage). A trade treaty needs peace; war ends it.
 Adding a player keeps the relations of the others; the new one starts at peace with everyone.
+
+The tab **Others** (in a narrow window the button "Natives, pirates, trader" on the page Players)
+shows how each player starts towards the parties of their own behaviour, a column for each the
+map has. A click steps a value, the right button goes back; each change clears what the two
+remember of each other.
+
+| Column | What it does |
+|---|---|
+| Natives | War, peace, or peace with trade at their villages, for every natives' slot. The natives trade only at peace, as in the game: a village that was attacked never trades with its attacker again. |
+| Goodwill | Only with villages on the map: the natives' goodwill towards the player, the same in every village (0 to 5000; a new game starts at 200). The villages give goods for it, and it fades towards 49 over time. |
+| Pirates | War, peace or lasting peace. The pirates make war and peace by their mood, so a peace holds as one the player bought at the start, and fades as that does; a lasting peace holds whatever their mood and their ships leave the player's alone, until the player attacks them (the original cannot have it: the check lists it). War forgets what the pirates liked about the player. |
+| Trade at nests | Whether the player's ships may trade at the pirates' nests; they do at war too. |
+| Trader calls | Whether the free trader calls at the player's Kontors: a scenario switch the original's scenario files have as well. |
 
 ## Description
 

@@ -14,6 +14,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "app_settings.hpp"
@@ -48,6 +49,7 @@
 #include "o1602/core/file.hpp"
 #include "o1602/core/result.hpp"
 #include "o1602/editor/document.hpp"
+#include "o1602/editor/special_objects.hpp"
 #include "o1602/editor/terrain.hpp"
 #include "o1602/net/enet_transport.hpp"
 #include "o1602/net/lan.hpp"
@@ -428,13 +430,22 @@ private:
     void editor_terrain_request(const EditorRequest& request);
     /// The building chosen on the page "Buildings" (nothing if its group has none).
     [[nodiscard]] const assets::BuildingType* editor_object_piece() const;
+    /// The special object chosen on the page "Buildings" (its last group), nothing for another group.
+    [[nodiscard]] std::optional<editor::SpecialPiece> editor_special_piece() const;
+    /// The island and the top-left tile of the special object in hand about the world tile (x, y),
+    /// nothing off the islands.
+    [[nodiscard]] std::optional<std::pair<std::uint16_t, sim::TilePos>> editor_special_origin(std::int64_t x,
+                                                                                              std::int64_t y) const;
+    /// Whether the special object in hand fits about the world tile (x, y).
+    [[nodiscard]] editor::SpecialRefusal editor_special_fits(std::int64_t x, std::int64_t y) const;
     /// The page "Buildings" of the model: its settings, groups, building and owner.
     void editor_object_model(EditorModel& m) const;
     /// The city of the building selected on the map, nullptr for none.
     [[nodiscard]] const sim::City* editor_picked_city() const;
     /// The selected building's city on the panel: its name, owner and stock.
     void editor_city_model(EditorModel& m) const;
-    /// A city renamed, its stock or owner changed (EditorRequest RenameCity, CityGoods, CityOwner).
+    /// A city renamed, its stock, trade or owner changed (EditorRequest RenameCity, CityGoods, CityTrade,
+    /// CityTradeReset, CityOwner).
     void editor_city_request(const EditorRequest& request);
     /// The selected ship's holds for the page "Cargo".
     void editor_ship_model(EditorModel& m) const;

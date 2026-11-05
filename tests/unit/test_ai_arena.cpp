@@ -423,15 +423,18 @@ TEST_CASE("ai arena: a computer's shipyard builds ships of a package of the type
     }
     REQUIRE(yard.has_value());
     std::set<std::uint32_t> ordered;
-    for (int minute = 0; minute < 40 && ordered.size() < 2; ++minute) {
+    const auto package_ship = [&] { return ordered.count(*cog) + ordered.count(*galley) != 0; };
+    for (int minute = 0; minute < 40 && !package_ship(); ++minute) {
         for (int k = 0; k < 6; ++k) {
             run(s, 10'000);
-            for (const sim::CostBuilding& b : a.world.cost_buildings()) {
+            for (sim::CostBuilding& b : a.world.cost_buildings()) {
                 if (b.kind == sim::CostBuilding::Kind::Shipyard && b.order != sim::CostBuilding::kNoOrder) {
                     const std::uint32_t built = sim::yard_ship(b);
                     // The original's ship of the order's type or the package's beside it.
                     CHECK(a.figures.ship_type_of(built) == std::optional<std::uint8_t>{b.order});
                     ordered.insert(built);
+                    // Taken back, so that the computer orders again: each order draws anew.
+                    b.order = sim::CostBuilding::kNoOrder;
                 }
             }
         }
@@ -442,8 +445,9 @@ TEST_CASE("ai arena: a computer's shipyard builds ships of a package of the type
         }
     }
     REQUIRE(!ordered.empty());
-    // The dice of this game pick the package's ship of the type (the galley, beside KRIEG1).
-    CHECK((ordered.count(*cog) + ordered.count(*galley)) != 0);
+    // Of the orders, the dice pick the package's ship of the type now and then (the galley beside
+    // KRIEG1, the cog beside HANDEL1).
+    CHECK(package_ship());
 }
 
 TEST_CASE("ai arena: two runs of the same game stay the same, minute by minute") {
@@ -517,8 +521,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         std::ofstream(*path, std::ios::binary) << out;
     }
     if (minutes == 60) {
-        // The computers' state version 4 (a search's target); the revised bread chain by default.
-        test::check_golden("arena after an hour", s.state_hash(), 0x0f97fea171afb034ULL);
+        // The computers' state version 4 (a search's target); the revised bread chain by default;
+        // a woodcutter where trees are few when no place has many.
+        test::check_golden("arena after an hour", s.state_hash(), 0x0e665fac429445e4ULL);
     }
 }
 

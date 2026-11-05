@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Taking a market (Open1602): a market built over the destroyed market of another player's city
-// joins the builder's city and takes the land the destroyed one held, with what stands on it.
+// Taking a market, as in the original: when a city of a human or computer player loses its last
+// standing market, Kontor or tower, its land within the circles of another standing city goes
+// to that city with what stands on it; a market can then be built over the destroyed one there.
 #include <string>
 #include <vector>
 
@@ -17,9 +18,11 @@ namespace {
 
 constexpr std::uint32_t kGround = 20101;
 constexpr std::uint32_t kHouse = 20103;
+constexpr std::uint32_t kTower = 20105;
 constexpr std::uint32_t kKontor = 20108;
 constexpr std::uint32_t kMarket = 20120;
-constexpr std::uint32_t kMarketDestroyed = 20121;
+constexpr std::uint32_t kKontorDestroyed = 22121;  // ruin slot 8
+constexpr std::uint32_t kMarketDestroyed = 20823;  // ruin slot 14
 
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
@@ -29,12 +32,19 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 1\n  Id: 20103\n  Kind: 14\n  Gfx: 2\n  Size: 2, 2\n  Maxenergy: 20\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n"  // a house
         "  @Nummer: 2\n  Id: 20108\n  Kind: 35\n  Gfx: 30\n  Size: 2, 2\n  Maxenergy: 20\n"
-        "  KreuzBase: 6\n  Ausbauflg: 1\n"
+        "  KreuzBase: 6\n  Ausbauflg: 1\n  Ruinenr: 8\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n  EndObj\n"  // Kontor
         "  @Nummer: 3\n  Id: 20120\n  Kind: 14\n  Gfx: 40\n  Size: 2, 2\n  Maxenergy: 115\n"
+        "  KreuzBase: 7\n  Ausbauflg: 1\n  Ruinenr: 14\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 8\n  EndObj\n"  // market
-        "  @Nummer: 4\n  Id: 20121\n  Kind: 14\n  Gfx: 50\n  Size: 2, 2\n  Destroyflg: 1\n"
+        "  @Nummer: 4\n  Id: 20823\n  Kind: 14\n  Gfx: 50\n  Size: 2, 2\n  Destroyflg: 1\n"
+        "  KreuzBase: 7\n  Ausbauflg: 1\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 8\n  EndObj\n"  // destroyed market
+        "  @Nummer: 5\n  Id: 22121\n  Kind: 35\n  Gfx: 60\n  Size: 2, 2\n  Destroyflg: 1\n"
+        "  KreuzBase: 6\n  Ausbauflg: 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n  EndObj\n"  // destroyed Kontor
+        "  @Nummer: 6\n  Id: 20105\n  Kind: 6\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 55\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 16\n  EndObj\n"  // tower
         "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -42,14 +52,14 @@ assets::BuildingTable make_buildings() {
     return std::move(table).value();
 }
 
-/// An island of 40 x 20: player 0's city 0 in the west (its Kontor at 2, 5, land up to x = `own_x`),
-/// player 1's city 1 in the east (its Kontor at 34, 5) with a destroyed market at 20, 5 and a
-/// house at 18, 9 on the land only that market held.
+/// An island of 40 x 20: player 0's city 0 in the west (its Kontor at 2, 5, a market at 12, 5,
+/// land up to x = 13), player 1's city 1 in the east (its Kontor at 34, 5) with a destroyed market
+/// at 20, 5 and a house at 18, 9 within the circle of player 0's market.
 struct Island {
     assets::BuildingTable buildings = make_buildings();
     sim::World world{80, 60};
 
-    explicit Island(std::int32_t own_x = 12, std::uint32_t ruin = kMarketDestroyed) {
+    Island() {
         std::vector<sim::Player> players(2);
         players[0].role = sim::PlayerRole::Human;
         players[0].money = 10000;
@@ -73,20 +83,25 @@ struct Island {
         }
         sim::IslandMap& m = world.island(0).map;
         REQUIRE(m.place(*buildings.by_id(kKontor), 2, 5, 0, 0, 0, 0).ok());
+        REQUIRE(m.place(*buildings.by_id(kMarket), 12, 5, 0, 0, 0, 0).ok());
         REQUIRE(m.place(*buildings.by_id(kKontor), 34, 5, 0, 0, 1, 1).ok());
-        REQUIRE(m.place(*buildings.by_id(ruin), 20, 5, 0, 0, 1, 1).ok());
+        REQUIRE(m.place(*buildings.by_id(kMarketDestroyed), 20, 5, 0, 0, 1, 1).ok());
         REQUIRE(m.place(*buildings.by_id(kHouse), 18, 9, 0, 0, 1, 1).ok());
         for (std::uint32_t y = 0; y < 20; ++y) {
             for (std::uint32_t x = 0; x < 40; ++x) {
-                const bool west = static_cast<std::int32_t>(x) <= own_x;
-                const bool east = x >= 13;
-                if (west) {
+                if (x <= 13) {
                     m.set_city(x, y, 0, 0);
-                } else if (east) {
+                } else {
                     m.set_city(x, y, 1, 1);
                 }
             }
         }
+    }
+
+    [[nodiscard]] const sim::IslandMap& map() const { return world.islands()[0].map; }
+
+    [[nodiscard]] std::uint32_t id_at(std::uint32_t x, std::uint32_t y) const {
+        return buildings.by_sprite(map().top(x, y).sprite)->id;
     }
 
     [[nodiscard]] sim::BuildOrder market_order(std::int32_t x = 21, std::int32_t y = 6) const {
@@ -100,53 +115,62 @@ struct Island {
 
 }  // namespace
 
-TEST_CASE("market capture: a market over another player's destroyed market takes its land and buildings") {
+TEST_CASE("market capture: no market over the destroyed market of a city that still stands") {
     Island f;
-    const sim::BuildPlan preview = sim::plan_build(f.world, f.buildings, f.market_order());
-    CHECK(preview.captured_city == 1);
-    CHECK(preview.city == 0);
-    REQUIRE(preview.placed == 1);
-    CHECK(preview.items[0].x == 20);  // where the destroyed one stands, whichever tile was clicked
-    CHECK(preview.items[0].y == 5);
-
-    std::vector<sim::ConstructionEvent> events;
-    const sim::BuildPlan plan = sim::execute_build(f.world, f.buildings, f.market_order(), {}, &events);
-    REQUIRE(plan.placed == 1);
-    const sim::IslandMap& m = f.world.islands()[0].map;
-    CHECK(m.top(20, 5).city == 0);
-    CHECK(m.top(20, 5).owner == 0);
-    CHECK(f.buildings.by_sprite(m.top(20, 5).sprite)->id == kMarket);
-    // The house on the land only the destroyed market held goes along.
-    CHECK(m.top(18, 9).city == 0);
-    CHECK(m.top(18, 9).owner == 0);
-    CHECK(f.buildings.by_sprite(m.top(18, 9).sprite)->id == kHouse);
-    CHECK(m.top(15, 2).city == 0);
-    // What the other city's Kontor holds stays its own, and its city goes on.
-    CHECK(m.top(30, 5).city == 1);
-    CHECK(m.top(30, 5).owner == 1);
-    REQUIRE(f.world.city(0, 1) != nullptr);
-    CHECK(f.world.city(0, 1)->owner == 1);
-    CHECK(f.world.city(0, 0)->owner == 0);
+    const sim::BuildPlan plan = sim::plan_build(f.world, f.buildings, f.market_order());
+    CHECK(plan.placed == 0);
+    CHECK(plan.items[0].refusal == sim::BuildRefusal::ForeignCity);
+    // Nothing changes hands while the city has its Kontor.
+    CHECK(f.map().top(20, 5).city == 1);
+    CHECK(f.map().top(18, 9).city == 1);
 }
 
-TEST_CASE("market capture: only over a destroyed market, and only where the builder's land reaches") {
-    // A standing market is another player's: no building there.
-    Island standing(12, kMarket);
-    const sim::BuildPlan over_standing = sim::plan_build(standing.world, standing.buildings, standing.market_order());
-    CHECK(over_standing.placed == 0);
-    CHECK(over_standing.captured_city == sim::MapCell::kNoCity);
-    CHECK(over_standing.items[0].refusal == sim::BuildRefusal::ForeignCity);
+TEST_CASE("market capture: a city that loses its last Kontor gives the land in another city's circle") {
+    Island f;
+    REQUIRE(sim::destroy_building(f.world, f.buildings, 0, {34, 5}, nullptr));
+    const sim::IslandMap& m = f.map();
+    CHECK(f.id_at(34, 5) == kKontorDestroyed);
+    // The land within the circle of player 0's market goes to its city, with what stands on it.
+    CHECK(m.top(20, 5).city == 0);
+    CHECK(m.top(20, 5).owner == 0);
+    CHECK(f.id_at(20, 5) == kMarketDestroyed);
+    CHECK(m.top(18, 9).city == 0);
+    CHECK(m.top(18, 9).owner == 0);
+    CHECK(f.id_at(18, 9) == kHouse);
+    // The rest, with the destroyed Kontor, stays with the city, which goes on.
+    CHECK(m.top(30, 5).city == 1);
+    CHECK(m.top(30, 5).owner == 1);
+    CHECK(m.top(34, 5).city == 1);
+    REQUIRE(f.world.city(0, 1) != nullptr);
+    CHECK(f.world.city(0, 1)->owner == 1);
 
-    // The builder's land ends far from the destroyed market's circle.
-    Island far(3);
-    const sim::BuildPlan out_of_reach = sim::plan_build(far.world, far.buildings, far.market_order());
-    CHECK(out_of_reach.placed == 0);
-    CHECK(out_of_reach.captured_city == sim::MapCell::kNoCity);
+    // Now the destroyed market stands on player 0's land: a market replaces it.
+    const sim::BuildPlan plan = sim::execute_build(f.world, f.buildings, f.market_order(20, 5), {}, nullptr);
+    REQUIRE(plan.placed == 1);
+    CHECK(plan.city == 0);
+    CHECK(plan.items[0].x == 20);
+    CHECK(plan.items[0].y == 5);
+    CHECK(f.id_at(20, 5) == kMarket);
+    CHECK(m.top(20, 5).city == 0);
+}
 
-    // The owner itself rebuilds its market as usual, nothing is captured.
-    Island own;
-    sim::BuildOrder rebuild = own.market_order();
-    rebuild.player = 1;
-    const sim::BuildPlan by_owner = sim::plan_build(own.world, own.buildings, rebuild);
-    CHECK(by_owner.captured_city == sim::MapCell::kNoCity);
+TEST_CASE("market capture: a tower keeps the city's land") {
+    Island f;
+    sim::IslandMap& m = f.world.island(0).map;
+    REQUIRE(m.place(*f.buildings.by_id(kTower), 28, 15, 0, 0, 1, 1).ok());
+    REQUIRE(sim::destroy_building(f.world, f.buildings, 0, {34, 5}, nullptr));
+    CHECK(m.top(20, 5).city == 1);
+    CHECK(m.top(18, 9).city == 1);
+    const sim::BuildPlan plan = sim::plan_build(f.world, f.buildings, f.market_order());
+    CHECK(plan.placed == 0);
+}
+
+TEST_CASE("market capture: an already defenceless city keeps its land until something falls") {
+    // As in the original, a city found defenceless (a loaded game) gives nothing by itself.
+    Island f;
+    sim::IslandMap& m = f.world.island(0).map;
+    REQUIRE(m.place(*f.buildings.by_id(kKontorDestroyed), 34, 5, 0, 0, 1, 1).ok());
+    CHECK(sim::city_defenceless(f.world, f.buildings, 0, 1));
+    CHECK(m.top(20, 5).city == 1);
+    CHECK(sim::plan_build(f.world, f.buildings, f.market_order()).placed == 0);
 }

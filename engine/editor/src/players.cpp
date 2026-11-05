@@ -2,6 +2,7 @@
 #include "o1602/editor/players.hpp"
 
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <string>
 #include <utility>
@@ -42,6 +43,36 @@ void keep_relations(const sim::World& before, sim::World& after, std::vector<sim
                 before.diplomacy().relation(static_cast<sim::PlayerId>(a), static_cast<sim::PlayerId>(b));
         }
     }
+}
+
+sim::FactionBehaviour behaviour_of(Neutral party) {
+    switch (party) {
+        case Neutral::Natives:
+            return sim::FactionBehaviour::Natives;
+        case Neutral::Pirates:
+            return sim::FactionBehaviour::Pirates;
+        case Neutral::Trader:
+            break;
+    }
+    return sim::FactionBehaviour::Trader;
+}
+
+/// The slots of the party's behaviour (a package's faction may act as one too).
+std::vector<sim::PlayerId> party_slots(const sim::World& world, Neutral party) {
+    std::vector<sim::PlayerId> slots;
+    for (std::size_t p = 0; p < world.players().size(); ++p) {
+        const sim::Player& player = world.players()[p];
+        if (player.role == sim::PlayerRole::Neutral && world.behaviour(player) == behaviour_of(party)) {
+            slots.push_back(static_cast<sim::PlayerId>(p));
+        }
+    }
+    return slots;
+}
+
+bool native_village(const sim::World& world, const sim::City& city) {
+    const sim::Player* owner = world.player(city.owner);
+    return owner != nullptr && owner->role == sim::PlayerRole::Neutral &&
+           world.behaviour(*owner) == sim::FactionBehaviour::Natives;
 }
 
 }  // namespace
@@ -289,6 +320,126 @@ core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, 
         rel.tribute = 0;
         rel.trade_mood = 0;
         rel.damage = 0;
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "relations_change"));
+}
+
+std::vector<Neutral> neutral_parties(const sim::World& world) {
+    std::vector<Neutral> parties;
+    for (const Neutral party : {Neutral::Natives, Neutral::Pirates, Neutral::Trader}) {
+        if (!party_slots(world, party).empty()) {
+            parties.push_back(party);
+        }
+    }
+    return parties;
+}
+
+bool has_native_villages(const sim::World& world) {
+    return std::any_of(world.cities().begin(), world.cities().end(),
+                       [&](const sim::City& c) { return native_village(world, c); });
+}
+
+NeutralRelations neutral_relations(const sim::World& world, sim::PlayerId player, Neutral party) {
+    NeutralRelations r;
+    const sim::Player* p = world.player(player);
+    if (p == nullptr) {
+        return r;
+    }
+    if (party == Neutral::Trader) {
+        r.trade = !p->scenario.has(sim::scenario_flag::kNoTrader);
+        return r;
+    }
+    const std::vector<sim::PlayerId> slots = party_slots(world, party);
+    if (slots.empty()) {
+        return r;
+    }
+    const sim::Relation& rel = world.diplomacy().relation(player, slots.front());
+    r.peace = rel.peace == sim::Treaty::Signed;
+    r.trade = rel.trade == sim::Treaty::Signed;
+    r.lasting = party == Neutral::Pirates && r.peace && p->scenario.has(sim::scenario_flag::kPiratePeace);
+    if (party == Neutral::Natives) {
+        for (const sim::City& c : world.cities()) {
+            if (native_village(world, c)) {
+                // A village without an entry for the player gets the start's when the game begins.
+                r.goodwill = player < c.goodwill.size() ? c.goodwill[player] : sim::kNativeGoodwillStart;
+                break;
+            }
+        }
+    }
+    return r;
+}
+
+core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world, sim::PlayerId player,
+                                                               Neutral party, const NeutralRelations& r) {
+    const sim::Player* p = world.player(player);
+    const std::vector<sim::PlayerId> slots = party_slots(world, party);
+    if (p == nullptr || !playing(*p) || slots.empty()) {
+        return make_error(ErrorCode::NotFound, "relations only of a human or computer with a party the world has");
+    }
+    if (party == Neutral::Natives && r.trade && !r.peace) {
+        return make_error(ErrorCode::InvalidFormat, "the natives trade only at peace");
+    }
+    if (party == Neutral::Trader && !r.peace) {
+        return make_error(ErrorCode::InvalidFormat, "the trader is at peace with everyone");
+    }
+    if (r.lasting && (party != Neutral::Pirates || !r.peace)) {
+        return make_error(ErrorCode::InvalidFormat, "only a peace with the pirates can be lasting");
+    }
+    if (r.goodwill > sim::kMaxNativeGoodwill) {
+        return make_error(ErrorCode::InvalidFormat, "goodwill out of range");
+    }
+    sim::World after = world;
+    if (party == Neutral::Trader) {
+        sim::Player& changed = *after.player(player);
+        changed.scenario.flags = r.trade ? changed.scenario.flags & ~sim::scenario_flag::kNoTrader
+                                         : changed.scenario.flags | sim::scenario_flag::kNoTrader;
+        return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "relations_change"));
+    }
+    if (party == Neutral::Pirates) {
+        sim::Player& changed = *after.player(player);
+        changed.scenario.flags = r.lasting ? changed.scenario.flags | sim::scenario_flag::kPiratePeace
+                                           : changed.scenario.flags & ~sim::scenario_flag::kPiratePeace;
+    }
+    sim::Diplomacy& d = after.diplomacy();
+    const sim::Treaty peace = r.peace ? sim::Treaty::Signed : sim::Treaty::None;
+    const sim::Treaty trade = r.trade ? sim::Treaty::Signed : sim::Treaty::None;
+    for (const sim::PlayerId slot : slots) {
+        for (const auto& [x, y] : {std::pair{player, slot}, std::pair{slot, player}}) {
+            sim::Relation& rel = d.relation(x, y);
+            rel.peace = peace;
+            rel.tribute = 0;
+            rel.trade_mood = 0;
+            rel.damage = 0;
+        }
+        d.relation(player, slot).trade = trade;
+        if (party == Neutral::Natives) {
+            d.relation(slot, player).trade = trade;
+            continue;
+        }
+        // The pirates make war and peace by their mood (sim::pirates_reconsider): a peace lasts as
+        // one the player bought, a war keeps nothing that would end it at once.
+        std::array<sim::DiplomacyEvent, sim::Diplomacy::kEvents> events = d.events(slot);
+        for (sim::DiplomacyEvent& e : events) {
+            const bool good = e.type == sim::DiplomacyEventType::PeaceBought ||
+                              e.type == sim::DiplomacyEventType::BribedBy ||
+                              e.type == sim::DiplomacyEventType::Surrendered;
+            if (e.partner == player && good) {
+                e = sim::DiplomacyEvent{};
+            }
+        }
+        d.set_events(slot, events);
+        if (r.peace) {
+            d.add_event(slot, player, sim::DiplomacyEventType::PeaceBought, after.time_ms());
+        }
+    }
+    if (party == Neutral::Natives) {
+        sim::fit_goodwill(after);
+        for (const sim::City& c : world.cities()) {
+            sim::City* village = after.city(c.island, c.index);
+            if (village != nullptr && native_village(after, *village) && player < village->goodwill.size()) {
+                village->goodwill[player] = r.goodwill;
+            }
+        }
     }
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "relations_change"));
 }

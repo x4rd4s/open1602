@@ -956,7 +956,7 @@ private:
                     // The others keep what the file had: their slot is never read.
                     r[0x0C] = player->mission < kOriginalMissionSlots ? player->mission : std::uint8_t{0xFF};
                     put16(r, 0x0A, player->bankrupt_checks);
-                    put32(r, 0x1C, player->scenario.flags);
+                    put32(r, 0x1C, player->scenario.flags & scenario_flag::kOriginalFlags);
                     put16(r, 0x20, player->scenario.rival_inhabitants);
                     put16(r, 0x22, player->scenario.own_inhabitants);
                     r[0x24] = player->scenario.own_development;

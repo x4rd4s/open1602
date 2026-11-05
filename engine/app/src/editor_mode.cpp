@@ -241,6 +241,8 @@ std::string limit_text(const editor::LimitProblem& p) {
             return ui::tr("editor.limit.balance");
         case Kind::Script:
             return ui::tr("editor.limit.script");
+        case Kind::PiratePeace:
+            return ui::tr("editor.limit.pirate_peace");
     }
     return {};
 }
@@ -1093,6 +1095,8 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             break;
         case Kind::RenameCity:
         case Kind::CityGoods:
+        case Kind::CityTrade:
+        case Kind::CityTradeReset:
         case Kind::CityOwner:
             editor_city_request(request);
             break;
@@ -1103,6 +1107,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::AddPlayer:
         case Kind::RemovePlayer:
         case Kind::SetRelations:
+        case Kind::SetNeutral:
             editor_players_request(request);
             break;
         case Kind::RulesPreset:
@@ -1249,7 +1254,8 @@ namespace {
 bool shows_pick(EditorPanel::Page page) {
     return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
            page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods ||
-           page == EditorPanel::Page::ShipCargo;
+           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::CityTrade ||
+           page == EditorPanel::Page::CityWare;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.
@@ -1880,10 +1886,10 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     const auto problems = editor::original_limit_problems(world);
     for (const editor::LimitProblem& p : problems) {
         using LK = editor::LimitProblem::Kind;
-        const Line::Target target = p.kind == LK::IslandSize || p.kind == LK::Deposits ? Line::Target::Island
-                                    : p.kind == LK::MapSize                            ? Line::Target::WorldSize
-                                    : p.kind == LK::Players                            ? Line::Target::Players
-                                                                                       : Line::Target::None;
+        const Line::Target target = p.kind == LK::IslandSize || p.kind == LK::Deposits   ? Line::Target::Island
+                                    : p.kind == LK::MapSize                              ? Line::Target::WorldSize
+                                    : p.kind == LK::Players || p.kind == LK::PiratePeace ? Line::Target::Players
+                                                                                         : Line::Target::None;
         lines.push_back(Line{limit_text(p), keep ? Line::Kind::Warning : Line::Kind::Note, target, p.island});
     }
     if (problems.empty()) {
@@ -2136,6 +2142,15 @@ void MapViewer::draw_editor_marks() {
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             } else if (tool == EditorObjects::Tool::Remove || b == nullptr) {
                 outline(tile->x, tile->y, 1, 1, ui::rgb_ink(assets::Rgba{250, 250, 250, 255}));
+            } else if (editor_special_piece()) {
+                // A special object: its footprint about the mouse, green where it can stand.
+                std::uint32_t w = 1;
+                std::uint32_t h = 1;
+                sim::rotated_size(*b, m_editor->objects.rotation, w, h);
+                const bool fits = editor_special_fits(tile->x, tile->y) == editor::SpecialRefusal::None;
+                outline(std::int64_t{tile->x} - (std::int64_t{w} - 1) / 2,
+                        std::int64_t{tile->y} - (std::int64_t{h} - 1) / 2, w, h,
+                        ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             } else {
                 std::uint32_t w = 1;
                 std::uint32_t h = 1;
