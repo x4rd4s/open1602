@@ -167,7 +167,7 @@ TEST_CASE("neutral buildings: on free land, holding only their ground, never a K
     REQUIRE(fort.placed == 1);
     // A city of theirs without a Kontor, holding the fort's tiles and no more.
     REQUIRE(f.world.cities().size() == 2);
-    const sim::City& city = f.world.cities()[1];
+    const sim::City city = f.world.cities()[1];  // a copy: later builds change the list
     CHECK(city.owner == f.neutral);
     CHECK(!city.warehouse_x);
     CHECK(city.name == "Neutral");
