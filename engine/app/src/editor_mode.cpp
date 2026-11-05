@@ -2131,6 +2131,15 @@ void MapViewer::draw_editor_marks() {
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             } else if (tool == EditorObjects::Tool::Remove || b == nullptr) {
                 outline(tile->x, tile->y, 1, 1, ui::rgb_ink(assets::Rgba{250, 250, 250, 255}));
+            } else if (editor_special_piece()) {
+                // A special object: its footprint about the mouse, green where it can stand.
+                std::uint32_t w = 1;
+                std::uint32_t h = 1;
+                sim::rotated_size(*b, m_editor->objects.rotation, w, h);
+                const bool fits = editor_special_fits(tile->x, tile->y) == editor::SpecialRefusal::None;
+                outline(std::int64_t{tile->x} - (std::int64_t{w} - 1) / 2,
+                        std::int64_t{tile->y} - (std::int64_t{h} - 1) / 2, w, h,
+                        ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             } else {
                 std::uint32_t w = 1;
                 std::uint32_t h = 1;

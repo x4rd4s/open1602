@@ -24,6 +24,7 @@ add_executable(o1602_tests
     unit/test_editor_players.cpp
     unit/test_editor_random.cpp
     unit/test_editor_resources.cpp
+    unit/test_editor_special.cpp
     unit/test_editor_terrain.cpp
     unit/test_computer_orders.cpp
     unit/test_climates.cpp

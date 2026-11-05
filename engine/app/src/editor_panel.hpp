@@ -412,6 +412,8 @@ struct EditorModel {
     std::string object_group;
     std::string object_name;
     bool object_turns = false;
+    /// The group of special objects: placed without owner (no owner to choose).
+    bool object_ownerless = false;
     std::string object_owner;
     /// The objects placed lately, the last first (at most kEditorRecent).
     std::vector<EditorRecent> recent_objects;

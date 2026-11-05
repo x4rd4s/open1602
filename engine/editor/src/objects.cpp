@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/special_objects.hpp"
 #include "o1602/sim/logistics.hpp"
 
 namespace o1602::editor {
@@ -117,13 +118,19 @@ core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world
         map.top(static_cast<std::uint32_t>(at->origin.x), static_cast<std::uint32_t>(at->origin.y));
     const std::int32_t k = at->type->kind;
     if ((at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) &&
-        (k == assets::kind::kPier || k == assets::kind::kRuin || k == assets::kind::kBeachRuin)) {
-        // A pier or ruin outside every city (left by a Kontor taken away in an older map): the
-        // ground under it comes back.
+        (k == assets::kind::kPier || is_special(buildings, *at->type))) {
+        // A pier or ruin outside every city (left by a Kontor taken away in an older map), or a
+        // special object (a wild field, an unused building): the ground under it comes back.
         sim::World after = world;
         if (!clear_to_ground(after.island(island).map, *at)) {
             return make_error(ErrorCode::Unsupported, "the building cannot be taken away");
         }
+        // A growing field grows no more.
+        std::erase_if(after.growth().entries, [&](const sim::GrowthEntry& e) {
+            return e.island == island && e.x >= at->origin.x && e.y >= at->origin.y &&
+                   e.x < at->origin.x + static_cast<std::int32_t>(at->width) &&
+                   e.y < at->origin.y + static_cast<std::int32_t>(at->height);
+        });
         return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "building_remove"));
     }
     if (at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) {

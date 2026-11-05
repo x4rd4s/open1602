@@ -1552,10 +1552,14 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     value(kObjectsRotation, ui::tr("editor.objects.rotation"), ui::tr(kTerrainRotationTexts[o.rotation & 3U]),
           (build && model.object_turns) || (owned && !build));
     value(kObjectsOwner, ui::tr("editor.objects.owner"),
-          model.object_owners > 0 ? model.object_owner : ui::tr("editor.objects.no_owner"),
-          owned && model.object_owners > 0);
+          model.object_ownerless    ? ui::tr("editor.objects.ownerless")
+          : model.object_owners > 0 ? model.object_owner
+                                    : ui::tr("editor.objects.no_owner"),
+          owned && model.object_owners > 0 && !model.object_ownerless);
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
-    if (owned && model.object_owners == 0) {
+    if (model.object_ownerless) {
+        note = ui::tr("editor.objects.note.special");
+    } else if (owned && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
     } else if (o.tool == Tool::Template && model.object_pieces == 0) {
         note = ui::tr("editor.objects.note.no_templates");
