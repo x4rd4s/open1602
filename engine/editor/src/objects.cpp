@@ -8,6 +8,7 @@
 
 #include "o1602/editor/islands.hpp"
 #include "o1602/sim/logistics.hpp"
+#include "o1602/sim/ships.hpp"
 
 namespace o1602::editor {
 
@@ -74,6 +75,14 @@ PlacedBuildings place_buildings(const sim::World& world, const assets::BuildingT
     }
     sim::World after = world;
     result.plan = sim::execute_build(after, buildings, order, city_names, nullptr);
+    // A native village founded trades as a new game's villages do (the author may change it).
+    for (std::uint8_t index = 0; index < sim::kMaxCitiesPerIsland; ++index) {
+        sim::City* c = after.city(order.island, index);
+        if (c != nullptr && !has_city(world, order.island, index) &&
+            after.acts_as(c->owner, sim::FactionBehaviour::Natives)) {
+            sim::native_village_offer(after, after.islands()[order.island], *c);
+        }
+    }
     if (!own_name.empty()) {
         // A city founded: its own name, and the list's turn stays where it was.
         for (std::uint8_t index = 0; index < sim::kMaxCitiesPerIsland; ++index) {

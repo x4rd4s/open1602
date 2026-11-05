@@ -11,6 +11,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::editor {
@@ -35,6 +36,21 @@ inline constexpr std::size_t kMaxCityName = 40;
                                                                       const assets::BuildingTable& buildings,
                                                                       std::uint16_t island, std::uint8_t city,
                                                                       std::uint8_t ware, std::uint32_t amount);
+
+/// What the city's Kontor offers for the ware of `setting` to other players' ships and the free
+/// trader: its mode, price and amount (keep or limit, at most city_room()) as the Kontor's trade
+/// window sets them (sim::apply_trade_setting; the setting's player, island and city are not read).
+/// Fails (NotFound) without the city or without room (no Kontor), (InvalidFormat) for a ware that is
+/// no trade good, (Unsupported) for one more ware than the Kontor's slots allow (sim::trade_slots).
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world,
+                                                                      const assets::BuildingTable& buildings,
+                                                                      std::uint16_t island, std::uint8_t city,
+                                                                      const sim::TradeSetting& setting);
+
+/// The city's trade as its owner starts with it: a native village's offer
+/// (sim::native_village_offer), nothing for everybody else. Fails (NotFound) without the city.
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world, std::uint16_t island,
+                                                                        std::uint8_t city);
 
 /// The city and every tile it holds given to `owner`, a human or a computer, as when a player
 /// takes a city over: its statistics start anew. Fails (NotFound) without the city or the player,

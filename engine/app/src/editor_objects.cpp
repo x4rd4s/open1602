@@ -252,8 +252,10 @@ void MapViewer::editor_city_model(EditorModel& m) const {
     const sim::Player* owner = world.player(c->owner);
     city.owner = owner != nullptr ? editor_player_label(*owner) : std::string("-");
     const auto* panel = m_hud ? m_hud->editor_panel() : nullptr;
+    const bool trading = panel != nullptr && (panel->page() == EditorPanel::Page::CityTrade ||
+                                              panel->page() == EditorPanel::Page::CityWare);
     if (panel != nullptr && panel->page() != EditorPanel::Page::CityGoods &&
-        panel->page() != EditorPanel::Page::Selection) {
+        panel->page() != EditorPanel::Page::Selection && !trading) {
         m.city = std::move(city);  // the stock only where it shows: its room takes a look at every building
         return;
     }
@@ -269,7 +271,33 @@ void MapViewer::editor_city_model(EditorModel& m) const {
             g.name = ware < names.size() ? names[ware] : std::to_string(ware);
         }
         g.amount = ware < c->goods.size() ? c->goods[ware] : 0;
+        if (trading) {
+            EditorTrade t;
+            t.ware = ware;
+            t.name = g.name;
+            t.stock = g.amount;
+            if (const sim::City::Trade* trade = c->trade_of(ware)) {
+                t.mode = trade->sell  ? EditorTradeMode::Sell
+                         : trade->buy ? EditorTradeMode::Buy
+                                      : EditorTradeMode::None;
+                t.price = trade->sell ? trade->sell_price : trade->buy_price;
+                t.amount = trade->sell ? trade->keep : trade->limit;
+            }
+            const sim::TradePriceRange range = sim::trade_price_range(world, ware);
+            t.min_price = range.min;
+            t.max_price = range.max;
+            city.trade.push_back(std::move(t));
+        }
         city.goods.push_back(std::move(g));
+    }
+    city.natives = world.acts_as(c->owner, sim::FactionBehaviour::Natives);
+    city.pirates = world.acts_as(c->owner, sim::FactionBehaviour::Pirates);
+    if (trading) {
+        const sim::TradeSlots slots = sim::trade_slots(world, m_buildings, *c);
+        city.sells = slots.sells;
+        city.buys = slots.buys;
+        city.max_sells = slots.max_sells;
+        city.max_buys = slots.max_buys;
     }
     m.city = std::move(city);
 }
@@ -297,6 +325,28 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
         if (op) {
             m_editor->document.perform(std::move(op).value());
             m_editor->notice.clear();
+        }
+    } else if (request.kind == Kind::CityTrade) {
+        sim::TradeSetting setting;
+        setting.ware = static_cast<std::uint8_t>(request.index);
+        setting.mode = request.trade.mode == EditorTradeMode::Sell  ? sim::TradeSetting::Mode::Sell
+                       : request.trade.mode == EditorTradeMode::Buy ? sim::TradeSetting::Mode::Buy
+                                                                    : sim::TradeSetting::Mode::None;
+        setting.price = request.trade.price;
+        setting.amount = request.trade.amount;
+        auto op = editor::set_city_trade(world, m_buildings, island, index, setting);
+        if (op) {
+            m_editor->document.perform(std::move(op).value());
+            m_editor->notice.clear();
+        } else if (op.error().code == core::ErrorCode::Unsupported && setting.mode != sim::TradeSetting::Mode::None &&
+                   !setting.price && !setting.amount) {
+            editor_notice(ui::tr("editor.trade.no_slot"), true, op.error().message);
+        }
+    } else if (request.kind == Kind::CityTradeReset) {
+        auto op = editor::reset_city_trade(world, island, index);
+        if (op) {
+            m_editor->document.perform(std::move(op).value());
+            editor_notice(ui::tr("editor.trade.reset"), false, "city trade reset");
         }
     } else if (request.kind == Kind::CityOwner) {
         // The next human or computer that can take the city, forward or back.

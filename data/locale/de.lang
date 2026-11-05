@@ -1340,6 +1340,36 @@ editor.city.back = Zurück zur Auswahl
 editor.city.renamed = Die Stadt heißt jetzt {1}.
 editor.city.owner_changed = Die Stadt gehört jetzt {1}.
 editor.city.no_owner = Kein anderer Spieler kann die Stadt nehmen: Jeder hat schon eine Stadt auf der Insel.
+editor.trade = Handel
+editor.trade.title = Handel von {1}
+editor.trade.hint = Klick auf eine Ware: verkaufen oder kaufen.
+editor.trade.natives = Das Dorf handelt für Wohlwollen, nicht für Gold. Klick auf eine Ware ändert sie.
+editor.trade.pirates = Die Piraten wählen ihr Angebot im Spiel neu. Klick auf eine Ware ändert sie.
+# {1}, {3}: verkaufte und gekaufte Waren; {2}, {4}: so viele, wie das Kontor erlaubt
+editor.trade.slots = Verkauft {1} von {2}, kauft {3} von {4}.
+editor.trade.sells = verkauft
+editor.trade.buys = kauft
+# {1}: Preis je Tonne in Gold
+editor.trade.sells_for = verkauft für {1}
+editor.trade.buys_for = kauft für {1}
+editor.trade.village = Dorfwaren
+editor.trade.none = Nichts handeln
+editor.trade.stock = Im Lager
+editor.trade.tons = {1} t
+editor.trade.sell = Verkaufen
+editor.trade.buy = Kaufen
+editor.trade.off = Wird nicht gehandelt. Wähle Verkaufen oder Kaufen; ein zweiter Klick darauf beendet den Handel.
+editor.trade.full = Wird nicht gehandelt: Das Kontor handelt schon mit so vielen Waren, wie es kann.
+editor.trade.goodwill = Kein Gold: Verkaufen an das Dorf bringt Wohlwollen, Kaufen dort verbraucht es.
+# {1}, {2}: niedrigster und höchster Preis je Tonne in Gold
+editor.trade.range = Preis je Tonne von {1} bis {2} Gold. Klick: 10, Rechtsklick: 1.
+editor.trade.price = Preis
+editor.trade.gold = {1} Gold
+editor.trade.keep = Behält mindestens
+editor.trade.limit = Kauft bis
+editor.trade.back = Zurück zu den Waren
+editor.trade.no_slot = Das Kontor handelt mit keiner weiteren Ware.
+editor.trade.reset = Der Handel der Stadt ist zurückgesetzt.
 editor.step.city_rename = Stadt umbenannt
 editor.step.city_goods = Lager geändert
 editor.step.city_owner = Besitzer gewechselt
