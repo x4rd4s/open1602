@@ -1192,9 +1192,10 @@ void plan_blueprint(const World& world, const assets::BuildingTable& buildings, 
 
 namespace {
 
-/// Something built that stands: not its ruin, not the ground, a forest or other terrain.
+/// Something placed that stands: not its ruin, the ground or other terrain.
 bool standing(const assets::BuildingType& b) noexcept {
     switch (b.kind) {
+        case kind::kForest:  // fields and trees placed for them
         case kind::kRoad:
         case kind::kGate:
         case kind::kWall:

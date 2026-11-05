@@ -24,6 +24,7 @@ constexpr std::uint32_t kKontor = 20108;
 constexpr std::uint32_t kMarket = 20120;
 constexpr std::uint32_t kFort = 20130;
 constexpr std::uint32_t kTower = 20305;
+constexpr std::uint32_t kField = 21301;
 
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
@@ -36,6 +37,8 @@ assets::BuildingTable make_buildings() {
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 8\n  EndObj\n"                     // market
         "  @Nummer: 3\n  Id: 20130\n  Kind: 14\n  Gfx: 50\n  Size: 2, 2\n  Maxenergy: 50\n"  // a fort
         "  @Nummer: 4\n  Id: 20305\n  Kind: 6\n  Gfx: 60\n  Size: 1, 1\n  Maxenergy: 50\n"   // a tower
+        "  @Nummer: 5\n  Id: 21301\n  Kind: 10\n  Gfx: 70\n  Size: 1, 1\n"                   // a field
+        "  Objekt: HAUS_PRODTYP\n    Kind: 10\n  EndObj\n"
         "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -185,9 +188,13 @@ TEST_CASE("neutral buildings: on free land, holding only their ground, never a K
     CHECK(f.build(kTower, 8, 8, f.neutral).items[0].refusal == sim::BuildRefusal::ForeignCity);
     CHECK(f.build(kTower, 30, 10, 0).placed == 0);
 
-    // The land is checked again (a market of the player's goes up): the fort keeps its ground.
+    REQUIRE(f.build(kField, 25, 5, f.neutral).placed == 1);
+    // The land is checked again (a market of the player's goes up): the fort and the field keep
+    // their ground.
     REQUIRE(f.build(kMarket, 10, 5, 0).placed == 1);
     CHECK(f.at(20, 5).city == city.index);
+    CHECK(f.at(25, 5).city == city.index);
+    CHECK(f.buildings.by_sprite(f.at(25, 5).sprite)->id == kField);
     CHECK(f.world.cities().size() == 2);
 }
 

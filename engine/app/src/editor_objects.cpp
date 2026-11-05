@@ -81,7 +81,8 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const auto p = static_cast<sim::PlayerId>(i);
         const sim::PlayerRole role = world.players()[i].role;
-        if (role == sim::PlayerRole::Human || role == sim::PlayerRole::Computer) {
+        if ((role == sim::PlayerRole::Human || role == sim::PlayerRole::Computer) &&
+            world.players()[i].status != sim::PlayerStatus::Absent) {  // not a slot that only holds a place
             owners.push_back(p);
         }
     }
