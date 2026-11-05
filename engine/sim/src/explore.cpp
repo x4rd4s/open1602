@@ -2,6 +2,8 @@
 // "Insel erkunden": a ship explores the crops and deposits of the island it stands in.
 // Part of sim::Fleet.
 
+#include <algorithm>
+
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/ships.hpp"
 
@@ -113,10 +115,16 @@ void Fleet::explore_step(Ship& ship) {
         e.y = static_cast<std::uint16_t>(isl.map.height() / 2);
         m_events.push_back(e);
     } else if (n == kFirstOreStep || n == kSecondOreStep || n == kGoldStep) {
-        // Deposits from the end of the list; one ore deposit, or up to two gold veins.
+        // Deposits from the end of the list. The original finds one ore deposit at each ore step
+        // and up to two gold veins, which is every deposit of its islands. Islands of their own
+        // shape can have many more, so one exploration finds them all: half of the unknown ore
+        // (rounded up) at the first ore step, the rest at the second, every gold vein at the
+        // gold step. Up to two of each, that is exactly the original's count.
         const std::uint8_t ware = n == kGoldStep ? ware::kGold : ware::kOre;
-        std::uint32_t left = n == kGoldStep ? 2U : 1U;
         auto& deposits = isl.header.deposits;
+        const auto unknown = static_cast<std::uint32_t>(std::count_if(
+            deposits.begin(), deposits.end(), [&](const auto& d) { return d.ware == ware && !deposit_known(d, p); }));
+        std::uint32_t left = n == kFirstOreStep ? (unknown + 1) / 2 : unknown;
         for (auto it = deposits.rbegin(); it != deposits.rend() && left != 0; ++it) {
             if (it->ware != ware || deposit_known(*it, p)) {
                 continue;

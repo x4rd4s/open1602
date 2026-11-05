@@ -14,6 +14,7 @@
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
+#include "o1602/sim/world_plan.hpp"
 
 using namespace o1602;
 
@@ -737,6 +738,33 @@ TEST_CASE("ships: with more than four players the free trader looks only as far 
     CHECK(sim::trader_reach_players(sea.world, sea.rules) == 12);
     CHECK(sim::trader_reach_players(sea.world, original) == 0);
     CHECK(sim::trader_candidates(sea.world, original, 12) == 12);
+}
+
+TEST_CASE("ships: on a world larger than usual for its players more free traders sail") {
+    const auto world_of = [](std::uint32_t width, std::uint32_t height, std::size_t players) {
+        sim::World w{width, height};
+        std::vector<sim::Player> list(players);
+        for (sim::Player& p : list) {
+            p.role = sim::PlayerRole::Computer;
+        }
+        w.set_players(list);
+        return w;
+    };
+    const sim::Rules scaled = sim::Rules::open1602();
+    const sim::Rules original = sim::Rules::original();
+    REQUIRE(scaled.trader_reach == sim::TraderReach::Scaled);
+    // The usual world of four players (500 x 350) and a smaller one: the original's count.
+    CHECK(sim::trader_count(world_of(500, 350, 4), scaled, 3) == 3);
+    CHECK(sim::trader_count(world_of(300, 200, 4), scaled, 3) == 3);
+    // Four times the area: four times the traders; rounded up in between.
+    CHECK(sim::trader_count(world_of(1000, 700, 4), scaled, 3) == 12);
+    CHECK(sim::trader_count(world_of(600, 400, 4), scaled, 2) == 3);
+    CHECK(sim::trader_count(world_of(1000, 700, 4), scaled, 0) == 0);
+    // The usual world of twelve players is larger: there it is the original's count again.
+    const sim::WorldSettings twelve = sim::settings_for_players(12);
+    CHECK(sim::trader_count(world_of(twelve.width, twelve.height, 12), scaled, 5) == 5);
+    // The original's rule never scales.
+    CHECK(sim::trader_count(world_of(1000, 700, 4), original, 3) == 3);
 }
 
 TEST_CASE("ships: with more than four players a trader without profit goes where no one went for longest") {

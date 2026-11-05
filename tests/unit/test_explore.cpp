@@ -112,7 +112,7 @@ struct Coast {
 
 }  // namespace
 
-TEST_CASE("explore: crops after 3 s, an ore deposit at 7.5 s and 10.5 s, two gold veins at 15 s") {
+TEST_CASE("explore: crops after 3 s, an ore deposit at 7.5 s and 10.5 s, the gold veins at 15 s") {
     Coast c;
     const std::uint32_t id = c.add(41, 21);  // in the water ring, inside the island's rectangle
     const sim::Ship& ship = *c.world.ship(id);
@@ -133,26 +133,40 @@ TEST_CASE("explore: crops after 3 s, an ore deposit at 7.5 s and 10.5 s, two gol
     c.run(3'000);  // 10.5 s
     CHECK(c.found(2) == 2);
     CHECK(c.found(3) == 0);
-    c.run(4'500);  // 15 s
-    CHECK(c.found(3) == 2);
+    c.run(4'500);  // 15 s: every gold vein in one go, the third too
+    CHECK(c.found(3) == 3);
     CHECK(c.count(sim::ShipEvent::Kind::ExploreFinished) == 0);
     c.run(1'500);  // 16.5 s
     CHECK(c.count(sim::ShipEvent::Kind::ExploreFinished) == 1);
     CHECK(ship.explore_steps == 0);
-    // From the end of the list: the gold vein at (3, 7) and the one at (9, 3); the first stays unknown.
     const auto& deposits = c.world.islands()[0].header.deposits;
-    CHECK(sim::deposit_known(deposits[4], 0));
-    CHECK(sim::deposit_known(deposits[3], 0));
-    CHECK(!sim::deposit_known(deposits[1], 0));
-    CHECK(sim::deposit_known(deposits[0], 0));
-    CHECK(sim::deposit_known(deposits[2], 0));
-    // A gold vein is left: a second round finds it, then the island is done.
-    CHECK(c.fleet->explore_state(ship, 0) == sim::ExploreState::Possible);
-    REQUIRE(c.fleet->explore(sim::ExploreOrder{0, id}));
-    c.run(17'000);
-    CHECK(c.count(sim::ShipEvent::Kind::CropsExplored) == 1);  // known: no second message
-    CHECK(c.found(3) == 3);
+    for (const auto& d : deposits) {
+        CHECK(sim::deposit_known(d, 0));
+    }
     CHECK(c.fleet->explore_state(ship, 0) == sim::ExploreState::Done);
+}
+
+TEST_CASE("explore: an island with many deposits is explored in one go") {
+    Coast c;
+    auto& deposits = c.world.island(0).header.deposits;
+    for (std::uint8_t i = 0; i < 5; ++i) {
+        assets::IslandHeader::Deposit d;
+        d.ware = 2;
+        d.x = static_cast<std::uint8_t>(3 + i);
+        d.y = 5;
+        d.amount = 1000;
+        deposits.push_back(d);
+    }
+    // Seven ore deposits: four at the first ore step, three at the second.
+    const std::uint32_t id = c.add(41, 21);
+    REQUIRE(c.fleet->explore(sim::ExploreOrder{0, id}));
+    c.run(7'500);
+    CHECK(c.found(2) == 4);
+    c.run(3'000);
+    CHECK(c.found(2) == 7);
+    c.run(6'000);
+    CHECK(c.found(3) == 3);
+    CHECK(c.fleet->explore_state(*c.world.ship(id), 0) == sim::ExploreState::Done);
 }
 
 TEST_CASE("explore: only in the island's rectangle; an order ends it") {

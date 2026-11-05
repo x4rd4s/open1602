@@ -123,7 +123,8 @@ enum class TraderPrices : std::uint8_t {
 /// of more than four players he then mostly sails across the world.
 enum class TraderReach : std::uint8_t {
     Original,  ///< the 12 nearest Kontors, a random one when none promises profit
-    Scaled,    ///< with more than four players (the faction's reach) only as many as four would have
+    Scaled,    ///< with more than four players (the faction's reach) only as many as four would have;
+               ///< on a world larger than usual for the players more traders (trader_count)
 };
 
 /// The prestige buildings a condition asks for.
@@ -302,7 +303,8 @@ struct Rules {
     PirateNests pirate_nests = PirateNests::Scaled;
     /// Prices of the free trader.
     TraderPrices trader_prices = TraderPrices::Original;
-    /// How far the free trader looks. Up to four players both are the original.
+    /// How far the free trader looks and, on a larger world than usual, how many sail. Up to four
+    /// players on a world of the usual size both are the original.
     TraderReach trader_reach = TraderReach::Scaled;
     /// Whether large iron veins run out. Endless: the
     /// ore mine still digs only down to 120 t; below that the deep mine digs on, as in the original,
