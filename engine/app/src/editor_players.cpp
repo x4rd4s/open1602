@@ -80,7 +80,7 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         for (const EditorNeutral party : m.neutrals) {
             const editor::NeutralRelations r =
                 editor::neutral_relations(world, e.slot, static_cast<editor::Neutral>(party));
-            e.towards.push_back(EditorPlayer::Towards{r.peace, r.trade, r.goodwill});
+            e.towards.push_back(EditorPlayer::Towards{r.peace, r.trade, r.goodwill, r.lasting});
         }
     }
     m.slot_factions = editor::slot_factions(world);
@@ -128,7 +128,7 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
         }
         const EditorPlayer::Towards& t = request.player.towards.front();
         auto op = editor::set_neutral_relations(world, request.player.slot, static_cast<editor::Neutral>(request.index),
-                                                editor::NeutralRelations{t.peace, t.trade, t.goodwill});
+                                                editor::NeutralRelations{t.peace, t.trade, t.goodwill, t.lasting});
         if (!op) {
             editor_notice(ui::tr("editor.relations.refused"), true, op.error().message);
             return;

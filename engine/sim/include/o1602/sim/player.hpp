@@ -55,6 +55,11 @@ inline constexpr std::uint32_t kNoFleet = 0x040;         ///< no supply and patr
 inline constexpr std::uint32_t kOwnSize = 0x080;         ///< sulks at humans while below own_inhabitants
 inline constexpr std::uint32_t kOwnDevelopment = 0x100;  ///< sulks at everyone while below own_development
 inline constexpr std::uint32_t kRivalDevelopment = 0x200;  ///< minds humans beyond rival_development
+/// Open1602's own: the pirates keep their peace with the player whatever their mood, until the
+/// player attacks them. The original's files do not hold it (kOriginalFlags).
+inline constexpr std::uint32_t kPiratePeace = 0x10000;
+/// The switches the original's files hold.
+inline constexpr std::uint32_t kOriginalFlags = 0x3FE;
 }  // namespace scenario_flag
 
 /// A scenario's switches for a player and the thresholds of its attitude (PLAYER4 +0x1C .. +0x25).
@@ -127,7 +132,7 @@ struct Player {
     std::int64_t purchases = 0;
     std::int64_t sales = 0;
     /// What the scenario asks of this player. Only humans and computers have it; of a human only
-    /// kNoTrader counts.
+    /// kNoTrader and kPiratePeace count.
     ScenarioSwitches scenario{};
     /// The player closed the gates of his cities (GateOrder): foreign soldiers cannot pass them.
     /// The original's gates have no state; any soldier walks through their middle.

@@ -109,6 +109,9 @@ struct NeutralRelations {
     /// The natives: the goodwill of their villages towards the player (sim::City::goodwill), the
     /// same in each; the first village's is given.
     std::uint32_t goodwill = sim::kNativeGoodwillStart;
+    /// The pirates: the peace lasts whatever their mood, until the player attacks them
+    /// (sim::scenario_flag::kPiratePeace, which the original's files do not hold).
+    bool lasting = false;
     friend bool operator==(const NeutralRelations&, const NeutralRelations&) = default;
 };
 
@@ -119,12 +122,13 @@ struct NeutralRelations {
 /// starts, memories (tribute, trade, damage) cleared:
 /// - natives: peace and trade on both sides, the goodwill in every village;
 /// - pirates: peace on both sides; a peace holds as one the player bought at the start (it fades
-///   with time, as in the game), a war forgets the pirates' good memories of the player. The trade
-///   is the player's side only: the pirates' ships trade with nobody;
+///   with time, as in the game), or for good if it is `lasting`; a war forgets the pirates' good
+///   memories of the player. The trade is the player's side only: the pirates' ships trade with
+///   nobody;
 /// - trader: whether he calls at the player's Kontors (a scenario switch of the original).
 /// Fails (NotFound) for no human or computer or a party the world does not have, (InvalidFormat)
-/// for a trade with the natives at war, a war with the trader or a goodwill above
-/// sim::kMaxNativeGoodwill.
+/// for a trade with the natives at war, a war with the trader, a lasting peace other than with the
+/// pirates or at war, or a goodwill above sim::kMaxNativeGoodwill.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world,
                                                                              sim::PlayerId player, Neutral party,
                                                                              const NeutralRelations& r);

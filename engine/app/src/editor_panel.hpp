@@ -265,6 +265,7 @@ struct EditorPlayer {
         /// Natives: it trades at their villages; pirates: at their nests; trader: he calls.
         bool trade = true;
         std::uint32_t goodwill = 200;  ///< natives: their villages' goodwill (sim::City::goodwill)
+        bool lasting = false;          ///< pirates: the peace lasts whatever their mood
     };
     std::vector<Towards> towards;
 };

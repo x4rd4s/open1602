@@ -292,7 +292,7 @@ std::size_t step(std::size_t value, std::size_t n, bool forward) {
 enum NeutralColumn : std::size_t {
     kNativesStanding,  ///< war, peace, trade
     kNativesGoodwill,
-    kPiratesStanding,  ///< war, peace
+    kPiratesStanding,  ///< war, peace, lasting peace
     kPiratesTrade,     ///< the player's ships trade at their nests
     kTraderCalls,      ///< the trader calls at the player's Kontors
     kNeutralColumns
@@ -365,7 +365,9 @@ std::string neutral_text(const EditorModel& model, const EditorPlayer& p, std::s
             enabled = model.native_villages;
             return enabled ? count(t.goodwill) : std::string("-");
         case kPiratesStanding:
-            return ui::tr(t.peace ? "editor.relations.peace" : "editor.relations.war");
+            return ui::tr(!t.peace    ? "editor.relations.war"
+                          : t.lasting ? "editor.neutrals.lasting"
+                                      : "editor.relations.peace");
         default:
             return ui::tr(t.trade ? "editor.relations.trade_yes" : "editor.relations.trade_no");
     }
@@ -1993,9 +1995,13 @@ std::optional<EditorRequest> EditorPanel::press_neutral(const EditorModel& model
             }
             t.goodwill = step_goodwill(t.goodwill, forward);
             break;
-        case kPiratesStanding:
-            t.peace = !t.peace;
+        case kPiratesStanding: {
+            // War, peace (it fades as a bought one), lasting peace, round.
+            const std::size_t next = step(!t.peace ? 0 : t.lasting ? 2 : 1, 3, forward);
+            t.peace = next > 0;
+            t.lasting = next == 2;
             break;
+        }
         default:
             t.trade = !t.trade;
             break;

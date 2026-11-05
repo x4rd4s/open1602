@@ -232,7 +232,7 @@ remember of each other.
 |---|---|
 | Natives | War, peace, or peace with trade at their villages, for every natives' slot. The natives trade only at peace, as in the game: a village that was attacked never trades with its attacker again. |
 | Goodwill | Only with villages on the map: the natives' goodwill towards the player, the same in every village (0 to 5000; a new game starts at 200). The villages give goods for it, and it fades towards 49 over time. |
-| Pirates | War or peace. The pirates make war and peace by their mood, so a peace holds as one the player bought at the start, and fades as that does; war forgets what the pirates liked about the player. |
+| Pirates | War, peace or lasting peace. The pirates make war and peace by their mood, so a peace holds as one the player bought at the start, and fades as that does; a lasting peace holds whatever their mood and their ships leave the player's alone, until the player attacks them (the original cannot have it: the check lists it). War forgets what the pirates liked about the player. |
 | Trade at nests | Whether the player's ships may trade at the pirates' nests; they do at war too. |
 | Trader calls | Whether the free trader calls at the player's Kontors: a scenario switch the original's scenario files have as well. |
 

@@ -248,6 +248,41 @@ TEST_CASE("editor players: the start towards the natives, the pirates and the tr
     CHECK(!editor::set_neutral_relations(alone, 0, Neutral::Pirates, {}).ok());
 }
 
+TEST_CASE("editor players: a lasting peace with the pirates holds until the player attacks them") {
+    using editor::Neutral;
+    using editor::NeutralRelations;
+    sim::World world = seven_slots();
+    CHECK(!editor::set_neutral_relations(world, 0, Neutral::Pirates, {false, true, 200, true}).ok());
+    CHECK(!editor::set_neutral_relations(world, 0, Neutral::Natives, {true, true, 200, true}).ok());
+    auto lasting = editor::set_neutral_relations(world, 0, Neutral::Pirates, NeutralRelations{true, true, 200, true});
+    REQUIRE(lasting.ok());
+    (*lasting)->apply(world);
+    CHECK(editor::neutral_relations(world, 0, Neutral::Pirates).lasting);
+    CHECK(world.players()[0].scenario.has(sim::scenario_flag::kPiratePeace));
+    CHECK(editor::original_limit_problems(world).back().kind == editor::LimitProblem::Kind::PiratePeace);
+    // Long after any bought peace would have faded, and bribed against the player: still peace.
+    world.set_time_ms(10ULL * 60 * 60 * 1000);
+    world.diplomacy().add_event(5, 0, sim::DiplomacyEventType::BribedAgainst, world.time_ms());
+    sim::pirates_reconsider(world);
+    CHECK(!world.diplomacy().hostile(5, 0));
+    // What a scenario saves keeps it, though not in the part the original reads.
+    auto bytes = sim::write_game(world, assets::BuildingTable{});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, assets::BuildingTable{});
+    REQUIRE(loaded.ok());
+    CHECK(editor::neutral_relations(*loaded, 0, Neutral::Pirates).lasting);
+    // An attack of the player breaks it for good.
+    world.diplomacy().set_peace(world, 0, 5, sim::Treaty::None, world.time_ms());
+    sim::pirates_reconsider(world);
+    CHECK(world.diplomacy().hostile(5, 0));
+    CHECK(!world.players()[0].scenario.has(sim::scenario_flag::kPiratePeace));
+    // A plain peace takes the switch away again.
+    auto plain = editor::set_neutral_relations(world, 0, Neutral::Pirates, NeutralRelations{true, true, 200, false});
+    REQUIRE(plain.ok());
+    (*plain)->apply(world);
+    CHECK(!editor::neutral_relations(world, 0, Neutral::Pirates).lasting);
+}
+
 TEST_CASE("editor: a scenario's own settings are a step of undo") {
     sim::World world(40, 40);
     CHECK(!editor::scenario_rules(world).has_value());

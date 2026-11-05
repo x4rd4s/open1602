@@ -31,6 +31,7 @@ struct LimitProblem {
         PackageFactions,  ///< factions of a content package
         Balance,          ///< values of the balance changed by a content package
         Script,           ///< a script
+        PiratePeace,      ///< a lasting peace with the pirates (sim::scenario_flag::kPiratePeace)
     };
     Kind kind = Kind::MapSize;
     std::size_t count = 0;
@@ -43,7 +44,8 @@ struct LimitProblem {
 
 /// Everything of `world` the original cannot have: the map's size, more islands, cities, ships,
 /// soldiers or towers, a larger island or more deposits on one, more than four players with a
-/// start, anything of a content package, values of the balance changed, a script. Empty if it fits.
+/// start, anything of a content package, values of the balance changed, a script, a lasting peace
+/// with the pirates. Empty if it fits.
 [[nodiscard]] std::vector<LimitProblem> original_limit_problems(const sim::World& world);
 
 /// A problem as one line in English (`world` names the island).
