@@ -395,7 +395,7 @@ the game gets (`sim::preview_world`, "Reroll" draws another world number).
 Part 3 done on 2026-10-31: the landscape on the command line of the game and of `o1602-tool
 new-world`, with the same names as the setup files (`--island-preset varied|archipelago|continents|
 giants|even`, `--island-land`, `--island-min`, `--island-max`, `--island-spread`, `--island-gap`,
-`--island-coast`, `--island-outline`, `--island-forest`, `--island-mountains`, `--island-lakes`; `sim::set_landscape`,
+`--island-coast`, `--island-outline`, `--island-forest`, `--island-mountains`, `--island-lakes`, `--island-veins`; `sim::set_landscape`,
 `sim::landscape_presets()`).
 
 Part 4 done on 2026-11-01, from

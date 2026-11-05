@@ -648,6 +648,10 @@ TEST_CASE("world plan: the landscape's settings by name, as setup files and the 
     CHECK(l.lakes == 300);
     CHECK(!sim::set_landscape(l, "lakes", "little"));
     CHECK(!sim::set_landscape(l, "lakes", "301"));
+    CHECK(l.veins == 100);
+    CHECK(sim::set_landscape(l, "veins", "250"));
+    CHECK(l.veins == 250);
+    CHECK(!sim::set_landscape(l, "veins", "much"));
     CHECK(!sim::set_landscape(l, "rivers", "many"));
     // Every preset has a name of its own and is a landscape the settings can give.
     for (const sim::LandscapePreset& p : sim::landscape_presets()) {

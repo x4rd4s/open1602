@@ -757,7 +757,9 @@ void Generator::give_own_shape(Slot& slot) {
         // Of its own size: veins by its area, as many as a big template's two up to its size,
         // then one more for every kTilesPerVein tiles (a 200 x 200 island has twenty).
         const std::uint32_t area = std::uint32_t{own->width} * own->height;
-        slot.deposits.set_limit(static_cast<std::uint8_t>(std::clamp<std::uint32_t>(area / kTilesPerVein, 2, 255)));
+        // As many more or fewer as the landscape's share of veins (at least the two).
+        const std::uint32_t slots = area * m_landscape.veins / 100 / kTilesPerVein;
+        slot.deposits.set_limit(static_cast<std::uint8_t>(std::clamp<std::uint32_t>(slots, 2, 255)));
     }
     slot.treasure = false;
     count_mountains(slot);

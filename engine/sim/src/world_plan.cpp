@@ -1079,6 +1079,14 @@ WorldPlan Planner::finish() {
     plan.ores[0] = ScenarioPlan::Resource{id::kOreMine, ores_scaled(kBigIron[d]), 0};
     plan.ores[1] = ScenarioPlan::Resource{id::kOreMine, ores_scaled(kSmallIron[d]), 1};
     plan.ores[2] = ScenarioPlan::Resource{id::kGoldMine, ores_scaled(kGold[d]), 2};
+    if (free_sizes()) {
+        // As many more or fewer veins as the landscape asks for (none at 0: the home islands
+        // still get their iron).
+        for (ScenarioPlan::Resource& r : plan.ores) {
+            r.count = static_cast<std::uint16_t>(std::min<std::uint32_t>(
+                (std::uint32_t{r.count} * m_s.landscape.veins + 50) / 100, std::numeric_limits<std::uint16_t>::max()));
+        }
+    }
     if (m_s.gold_islands != 0) {
         plan.ores[2].count = m_s.gold_islands;
         out.gold_islands = m_s.gold_islands;
@@ -1280,13 +1288,15 @@ bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, st
         if (landscape.min_side > landscape.max_side) {
             (min ? landscape.max_side : landscape.min_side) = static_cast<std::uint16_t>(n);
         }
-    } else if (key == "mountains" || key == "lakes") {
+    } else if (key == "mountains" || key == "lakes" || key == "veins") {
         const bool mountains = key == "mountains";
         if (number) {
             if (n > L::kMaxTerrain) {
                 return false;
             }
-            (mountains ? landscape.mountains : landscape.lakes) = static_cast<std::uint16_t>(n);
+            (mountains        ? landscape.mountains
+             : key == "lakes" ? landscape.lakes
+                              : landscape.veins) = static_cast<std::uint16_t>(n);
         } else if (const auto i = mountains ? choice(names::kShare) : std::nullopt) {
             landscape.mountains = names::kMountainPercent[*i];  // a setup of before the percent
         } else {
