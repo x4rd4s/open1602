@@ -1428,34 +1428,9 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
     if (wall == nullptr) {
         return std::nullopt;
     }
-    if (wall_land(t.kind)) {
-        // Only the border: without a neighbour outside the city the flags cannot come out right,
-        // so the wide scan is skipped.
-        bool border = false;
-        rings(p, RingFilter::Any, x, y, x, y, 1,
-              [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t) { border = border || o.city != p.city; });
-        if (!border) {
-            return std::nullopt;
-        }
-        // At war the border away from other cities, at peace the border towards them.
-        if (scan(war ? 9 : 6).flags != (war ? 1 : 3)) {
-            return std::nullopt;
-        }
-        if (t.kind == kind::kRoad) {
-            demolish_tile(p, x, y);  // at once, whether the wall can be paid or not
-        }
-        return BuildItem{wall->id, x, y, 0, 0};
-    }
-    if (wall_beach(t.kind)) {
-        // The coast: beach with land beside it and sea close by (only the first two rings count).
-        const Border b = scan(2);
-        if (b.land == 0 || b.sea == 0) {
-            return std::nullopt;
-        }
-        return BuildItem{wall->id, x, y, 0, 0};
-    }
-    if (!war && t.kind == kind::kWall) {
-        // A gate where the wall crosses a straight road, unless a gate is already beside it.
+    // A gate on (x, y) where a road crosses it straight, along x or along y, unless a gate is
+    // beside it already; its rotation follows the road.
+    const auto gate_item = [&]() -> std::optional<BuildItem> {
         const std::array<std::int32_t, 4> k{tile(p.island, x + 1, y).kind, tile(p.island, x - 1, y).kind,
                                             tile(p.island, x, y + 1).kind, tile(p.island, x, y - 1).kind};
         if (std::find(k.begin(), k.end(), kind::kGate) != k.end()) {
@@ -1473,8 +1448,105 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
             return std::nullopt;
         }
         return BuildItem{gate->id, x, y, static_cast<std::uint8_t>(across_x ? 2 : 1), 0};
+    };
+    if (wall_land(t.kind)) {
+        // Only the border: without a neighbour outside the city the flags cannot come out right,
+        // so the wide scan is skipped.
+        bool border = false;
+        rings(p, RingFilter::Any, x, y, x, y, 1,
+              [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t) { border = border || o.city != p.city; });
+        if (!border) {
+            return std::nullopt;
+        }
+        // At war the border away from other cities, at peace the border towards them.
+        if (scan(war ? 9 : 6).flags != (war ? 1 : 3)) {
+            return std::nullopt;
+        }
+        if (t.kind == kind::kRoad) {
+            if (!classic()) {
+                // Open1602: the road stays open, the carts' way with it: a gate where it runs
+                // straight, else a gap in the wall (the original walled it off, at war for good).
+                return gate_item();
+            }
+            demolish_tile(p, x, y);  // at once, whether the wall can be paid or not
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if (wall_beach(t.kind)) {
+        // The coast: beach with land beside it and sea close by (only the first two rings count).
+        const Border b = scan(2);
+        if (b.land == 0 || b.sea == 0) {
+            return std::nullopt;
+        }
+        if (!classic()) {
+            // Open1602: only the shore of the sea. No ship lands on a lake inside the island, so
+            // the original's wall along its shore was bricks for nothing.
+            bool sea = false;
+            rings(p, RingFilter::Any, x, y, x, y, 2, [&](const Tile&, std::int32_t ox, std::int32_t oy, std::int32_t) {
+                sea = sea || open_water(p.island, ox, oy);
+            });
+            if (!sea) {
+                return std::nullopt;
+            }
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if ((!war || !classic()) && t.kind == kind::kWall) {
+        // A gate where the wall crosses a straight road (Open1602: at war too, so that a wall built
+        // across a road earlier opens again).
+        return gate_item();
     }
     return std::nullopt;
+}
+
+bool Engine::open_water(std::uint16_t island, std::int32_t x, std::int32_t y) {
+    if (m_open_water.size() < m_world.islands().size()) {
+        m_open_water.resize(m_world.islands().size());
+    }
+    const IslandMap& map = island_of(island).map;
+    const auto w = static_cast<std::int32_t>(map.width());
+    const auto h = static_cast<std::int32_t>(map.height());
+    if (x < 0 || y < 0 || x >= w || y >= h) {
+        return false;
+    }
+    std::vector<std::uint8_t>& open = m_open_water[island];
+    if (open.size() != static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
+        // The water reached from the edge of the island's rectangle through sea, surf and piers;
+        // a river does not count, it runs into a lake as well as into the sea.
+        const auto water = [&](std::int32_t tx, std::int32_t ty) {
+            const std::int32_t k = tile(island, tx, ty).kind;
+            return k == kind::kSea || k == kind::kSurf || k == kind::kSurfCorner || k == kind::kPier;
+        };
+        open.assign(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), 0);
+        std::vector<std::pair<std::int32_t, std::int32_t>> todo;
+        const auto reach = [&](std::int32_t tx, std::int32_t ty) {
+            if (tx < 0 || ty < 0 || tx >= w || ty >= h) {
+                return;
+            }
+            std::uint8_t& o =
+                open[static_cast<std::size_t>(ty) * static_cast<std::size_t>(w) + static_cast<std::size_t>(tx)];
+            if (o == 0 && water(tx, ty)) {
+                o = 1;
+                todo.emplace_back(tx, ty);
+            }
+        };
+        for (std::int32_t i = 0; i < w; ++i) {
+            reach(i, 0);
+            reach(i, h - 1);
+        }
+        for (std::int32_t i = 0; i < h; ++i) {
+            reach(0, i);
+            reach(w - 1, i);
+        }
+        while (!todo.empty()) {
+            const auto [tx, ty] = todo.back();
+            todo.pop_back();
+            for (const auto& n : kStep) {
+                reach(tx + n[0], ty + n[1]);
+            }
+        }
+    }
+    return open[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)] != 0;
 }
 
 bool Engine::inner_wall(AiPlayer& p, std::int32_t x, std::int32_t y) {
