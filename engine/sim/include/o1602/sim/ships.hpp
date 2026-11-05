@@ -423,6 +423,9 @@ public:
 
     /// The trade cart of `player` on `island`, if it has one.
     [[nodiscard]] const Ship* cart_of(PlayerId player, std::uint16_t island) const;
+    /// Whether a trade cart of `owner` standing on world tile (x, y) finds a way on land to
+    /// `target`, a city or a tile of that island. Forests or walls can part two cities of an island.
+    [[nodiscard]] bool cart_way(PlayerId owner, std::uint32_t x, std::uint32_t y, const Target& target);
     /// Cannons, cargo overboard, name, sale (ship_orders.cpp).
     bool command(const ShipCommand& command);
     /// What buying the ship costs (Preis * sale factor / 128).

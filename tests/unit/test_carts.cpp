@@ -553,6 +553,34 @@ TEST_CASE("carts: an improved computer fetches what its city lacks from a partne
     CHECK(wood == 50 * kTon);
 }
 
+TEST_CASE("carts: an improved computer sends no cart to a partner it cannot drive to") {
+    // As before, but a closed row of houses without a gate parts the two cities.
+    Land land;
+    sim::City& west = *land.world.city(0, 0);
+    west.goods[kWood] = 50 * kTon;
+    west.trade[kWood].sell = true;
+    west.trade[kWood].sell_price = 10;
+    land.world.city(0, 1)->goods[kWood] = 0;
+    land.world.island(0).header.template_number = 1;
+    land.world.island(0).header.template_size = 4;
+    for (const auto& [a, b] : {std::pair{0, 1}, std::pair{1, 0}}) {
+        sim::Relation& r =
+            land.world.diplomacy().relation(static_cast<sim::PlayerId>(a), static_cast<sim::PlayerId>(b));
+        r.trade = sim::Treaty::Signed;
+        r.peace = sim::Treaty::Signed;
+    }
+    for (std::int32_t y = 0; y < 12; ++y) {
+        REQUIRE(land.world.island(0).map.place(*land.buildings.by_id(kHouse), 19, y, 0, 0, 1, 1).ok());
+    }
+    land.rules.bugs.classic_ai = false;
+    sim::Simulation s(land.world, land.buildings, land.figures, land.rules);
+    for (std::uint32_t t = 0; t < 120'000; t += sim::Simulation::kTickMs) {
+        s.tick();
+    }
+    CHECK(sim::trade_cart_of(land.world, 1, 0) == nullptr);
+    CHECK(west.goods[kWood] == 50 * kTon);
+}
+
 TEST_CASE("carts: the editor puts a player's cart on a road beside its Kontor or market, one per island") {
     Land land;
     using editor::UnitRefusal;
