@@ -249,7 +249,19 @@ struct EditorPlayer {
         bool trade = false;
     };
     std::vector<Standing> relations;
+    /// How it stands at the start towards each party of EditorModel::neutrals, in that order.
+    struct Towards {
+        bool peace = true;
+        /// Natives: it trades at their villages; pirates: at their nests; trader: he calls.
+        bool trade = true;
+        std::uint32_t goodwill = 200;  ///< natives: their villages' goodwill (sim::City::goodwill)
+    };
+    std::vector<Towards> towards;
 };
+
+/// A party of its own behaviour whose relations a scenario sets on the page "Others"
+/// (editor::Neutral, in its order).
+enum class EditorNeutral : std::uint8_t { Natives, Pirates, Trader };
 
 /// A game setting as the page "Rules" shows it.
 struct EditorRule {
@@ -427,6 +439,10 @@ struct EditorModel {
     std::vector<std::uint8_t> slot_factions;
     bool can_add_player = false;
     bool can_remove_player = false;
+    /// The natives, pirates and trader the world has (the page "Others"), and whether the natives
+    /// have villages (only these hold a goodwill).
+    std::vector<EditorNeutral> neutrals;
+    bool native_villages = false;
     /// The page "Rules": whether the scenario has settings of its own (else the player's apply),
     /// whether they are the original's, and each setting a scenario can have, in the start
     /// dialog's order.
@@ -496,6 +512,9 @@ struct EditorRequest {
         RemovePlayer,  ///< the last slot taken away
         /// `player.slot` and slot `index` standing at the start as `player.relations[0]`.
         SetRelations,
+        /// `player.slot` standing at the start towards the party `index` (EditorNeutral) as
+        /// `player.towards[0]`.
+        SetNeutral,
         /// The scenario's settings: `index` 0 none (the player's), 1 the original's, 2 Open1602's,
         /// 3 those the player last started a scenario with.
         RulesPreset,
@@ -596,7 +615,8 @@ public:
         ScriptFiles,
         Packages,
         PackageSave,
-        Campaign
+        Campaign,
+        Neutrals  ///< the players towards the natives, the pirates and the trader
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -711,6 +731,16 @@ private:
     /// two columns.
     void layout_players_table(const EditorModel& model);
     void layout_relations_table(const EditorModel& model);
+    /// The page "Others": how the players stand towards the natives, the pirates and the trader;
+    /// a table in a wide dialog, the slot the page "Players" shows in the column.
+    void layout_neutrals(const EditorModel& model);
+    void layout_neutrals_table(const EditorModel& model);
+    /// The request for a click on the value `column` (NeutralColumn) of the slot `slot` (index
+    /// into EditorModel::player_slots).
+    [[nodiscard]] std::optional<EditorRequest> press_neutral(const EditorModel& model, std::size_t slot,
+                                                             std::size_t column, bool forward) const;
+    /// The header of the players' dialog: its heading and the tabs, the one of `page` chosen.
+    void dialog_tabs(const EditorModel& model, const char* heading, Page page);
     void layout_settings_grid(const EditorModel& model, bool rules);
     void layout_goals(const EditorModel& model);
     void layout_goal_text(const EditorModel& model);

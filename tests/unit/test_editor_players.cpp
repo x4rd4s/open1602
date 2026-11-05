@@ -6,6 +6,7 @@
 #include "o1602/editor/original_check.hpp"
 #include "o1602/editor/players.hpp"
 #include "o1602/editor/scenario_rules.hpp"
+#include "o1602/sim/save_game.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -154,6 +155,97 @@ TEST_CASE("editor players: relations at the start are set on both sides and kept
     (*gone)->apply(world);
     CHECK((editor::relations(world, 0, 1) == editor::Relations{false, false}));
     CHECK((editor::relations(world, 2, 3) == editor::Relations{true, true}));
+}
+
+TEST_CASE("editor players: the start towards the natives, the pirates and the trader") {
+    using editor::Neutral;
+    using editor::NeutralRelations;
+    sim::World world = seven_slots();
+    CHECK(
+        (editor::neutral_parties(world) == std::vector<Neutral>{Neutral::Natives, Neutral::Pirates, Neutral::Trader}));
+    CHECK(!editor::has_native_villages(world));
+    sim::City village;
+    village.owner = 6;
+    world.add_city(village);
+    CHECK(editor::has_native_villages(world));
+    // As a new game starts: trade and peace with the natives, war with the pirates, the trader calls.
+    CHECK((editor::neutral_relations(world, 0, Neutral::Natives) == NeutralRelations{true, true, 200}));
+    CHECK(!editor::neutral_relations(world, 0, Neutral::Pirates).peace);
+    CHECK(editor::neutral_relations(world, 0, Neutral::Pirates).trade);
+    CHECK((editor::neutral_relations(world, 2, Neutral::Trader) == NeutralRelations{true, true, 200}));
+
+    // The natives: peace without trade and more goodwill in their village; it is undone whole.
+    world.diplomacy().relation(6, 1).damage = 50;
+    auto natives = editor::set_neutral_relations(world, 1, Neutral::Natives, NeutralRelations{true, false, 1000});
+    REQUIRE(natives.ok());
+    (*natives)->apply(world);
+    CHECK((editor::neutral_relations(world, 1, Neutral::Natives) == NeutralRelations{true, false, 1000}));
+    CHECK(!world.diplomacy().may_trade(1, 6));
+    CHECK(!world.diplomacy().may_trade(6, 1));
+    CHECK(world.diplomacy().relation(6, 1).damage == 0);
+    REQUIRE(world.cities()[0].goodwill.size() == 7);
+    CHECK(world.cities()[0].goodwill[1] == 1000);
+    CHECK(world.cities()[0].goodwill[0] == sim::kNativeGoodwillStart);  // the others' as a game starts
+    (*natives)->revert(world);
+    CHECK(world.diplomacy().may_trade(1, 6));
+    CHECK(world.cities()[0].goodwill.empty());
+    auto war = editor::set_neutral_relations(world, 0, Neutral::Natives, NeutralRelations{false, false, 200});
+    REQUIRE(war.ok());
+    (*war)->apply(world);
+    CHECK(world.diplomacy().hostile(0, 6));
+    CHECK(world.diplomacy().hostile(6, 0));
+    // No trade with the natives at war, no goodwill beyond the game's.
+    CHECK(!editor::set_neutral_relations(world, 0, Neutral::Natives, NeutralRelations{false, true, 200}).ok());
+    CHECK(!editor::set_neutral_relations(world, 0, Neutral::Natives, {true, true, sim::kMaxNativeGoodwill + 1}).ok());
+
+    // The pirates: a peace holds as a bought one, so they keep it when they look at the player again.
+    auto peace = editor::set_neutral_relations(world, 2, Neutral::Pirates, NeutralRelations{true, false, 200});
+    REQUIRE(peace.ok());
+    (*peace)->apply(world);
+    CHECK(!world.diplomacy().hostile(5, 2));
+    CHECK(!world.diplomacy().may_trade(2, 5));  // the player's ships stay away from their nests
+    sim::pirates_reconsider(world);
+    CHECK(!world.diplomacy().hostile(2, 5));
+    CHECK(world.diplomacy().hostile(3, 5));  // the others stay at war
+    auto again = editor::set_neutral_relations(world, 2, Neutral::Pirates, NeutralRelations{false, true, 200});
+    REQUIRE(again.ok());
+    (*again)->apply(world);
+    sim::pirates_reconsider(world);
+    CHECK(world.diplomacy().hostile(2, 5));
+    CHECK(world.diplomacy().may_trade(2, 5));  // their nests trade at war too
+    auto peace_again = editor::set_neutral_relations(world, 2, Neutral::Pirates, NeutralRelations{true, true, 200});
+    REQUIRE(peace_again.ok());
+    (*peace_again)->apply(world);
+
+    // The trader passes the Kontors of a player by: the scenario switch of the original.
+    auto trader = editor::set_neutral_relations(world, 3, Neutral::Trader, NeutralRelations{true, false, 200});
+    REQUIRE(trader.ok());
+    (*trader)->apply(world);
+    CHECK(world.players()[3].scenario.has(sim::scenario_flag::kNoTrader));
+    CHECK(!editor::neutral_relations(world, 3, Neutral::Trader).trade);
+    CHECK(!editor::set_neutral_relations(world, 3, Neutral::Trader, NeutralRelations{false, false, 200}).ok());
+    // Only humans and computers, only towards parties the world has.
+    CHECK(!editor::set_neutral_relations(world, 4, Neutral::Natives, {}).ok());
+    CHECK(!editor::set_neutral_relations(world, 9, Neutral::Natives, {}).ok());
+
+    // What a scenario saves comes back when it is opened or played (the village has no island to
+    // be saved on; the goodwill of cities comes back as the save game's own tests show).
+    world.remove_city(0, 0);
+    auto bytes = sim::write_game(world, assets::BuildingTable{});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, assets::BuildingTable{});
+    REQUIRE(loaded.ok());
+    CHECK((editor::neutral_relations(*loaded, 0, Neutral::Natives) == NeutralRelations{false, false, 200}));
+    CHECK(editor::neutral_relations(*loaded, 2, Neutral::Pirates).peace);
+    CHECK(!editor::neutral_relations(*loaded, 3, Neutral::Trader).trade);
+    sim::pirates_reconsider(*loaded);
+    CHECK(!loaded->diplomacy().hostile(2, 5));
+
+    sim::World alone(40, 40);
+    std::vector<sim::Player> two(2);
+    alone.set_players(two);
+    CHECK(editor::neutral_parties(alone).empty());
+    CHECK(!editor::set_neutral_relations(alone, 0, Neutral::Pirates, {}).ok());
 }
 
 TEST_CASE("editor: a scenario's own settings are a step of undo") {
