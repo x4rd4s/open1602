@@ -288,6 +288,7 @@ NeutralRelations neutral_relations(const sim::World& world, sim::PlayerId player
     const sim::Relation& rel = world.diplomacy().relation(player, slots.front());
     r.peace = rel.peace == sim::Treaty::Signed;
     r.trade = rel.trade == sim::Treaty::Signed;
+    r.lasting = party == Neutral::Pirates && r.peace && p->scenario.has(sim::scenario_flag::kPiratePeace);
     if (party == Neutral::Natives) {
         for (const sim::City& c : world.cities()) {
             if (native_village(world, c)) {
@@ -313,6 +314,9 @@ core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World&
     if (party == Neutral::Trader && !r.peace) {
         return make_error(ErrorCode::InvalidFormat, "the trader is at peace with everyone");
     }
+    if (r.lasting && (party != Neutral::Pirates || !r.peace)) {
+        return make_error(ErrorCode::InvalidFormat, "only a peace with the pirates can be lasting");
+    }
     if (r.goodwill > sim::kMaxNativeGoodwill) {
         return make_error(ErrorCode::InvalidFormat, "goodwill out of range");
     }
@@ -322,6 +326,11 @@ core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World&
         changed.scenario.flags = r.trade ? changed.scenario.flags & ~sim::scenario_flag::kNoTrader
                                          : changed.scenario.flags | sim::scenario_flag::kNoTrader;
         return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "relations_change"));
+    }
+    if (party == Neutral::Pirates) {
+        sim::Player& changed = *after.player(player);
+        changed.scenario.flags = r.lasting ? changed.scenario.flags | sim::scenario_flag::kPiratePeace
+                                           : changed.scenario.flags & ~sim::scenario_flag::kPiratePeace;
     }
     sim::Diplomacy& d = after.diplomacy();
     const sim::Treaty peace = r.peace ? sim::Treaty::Signed : sim::Treaty::None;

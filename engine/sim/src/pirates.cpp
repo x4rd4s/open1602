@@ -287,6 +287,10 @@ void Fleet::pirate_choose(Ship& ship) {
                 continue;
             }
             const auto pb = static_cast<PlayerId>(b);
+            if (player.scenario.has(scenario_flag::kPiratePeace) &&
+                m_world->diplomacy().relation(p, pb).peace == Treaty::Signed) {
+                continue;  // a lasting peace of the scenario: they do not go after its ships
+            }
             const std::int32_t mood = m_world->diplomacy().mood(*m_world, p, pb, 0, m_world->time_ms());
             const bool has_ship = std::any_of(m_world->ships().begin(), m_world->ships().end(),
                                               [&](const Ship& s) { return s.owner == pb && is_prey(s); });

@@ -706,6 +706,14 @@ void pirates_reconsider(World& world) {
             continue;
         }
         const auto pb = static_cast<PlayerId>(b);
+        if (Player* p = world.player(pb); p != nullptr && p->scenario.has(scenario_flag::kPiratePeace)) {
+            // A lasting peace of the scenario holds whatever their mood; a player who attacked
+            // them has broken it for good.
+            if (d.relation(pirates, pb).peace == Treaty::Signed) {
+                continue;
+            }
+            p->scenario.flags &= ~scenario_flag::kPiratePeace;
+        }
         const std::int32_t m = d.mood(world, pirates, pb, 0, world.time_ms());
         if (m <= 0) {
             d.set_peace(world, pirates, pb, Treaty::None, world.time_ms());

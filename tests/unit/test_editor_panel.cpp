@@ -1679,6 +1679,19 @@ TEST_CASE("editor panel: the tab Others sets how the players start towards nativ
     CHECK(r->player.slot == 2);
     CHECK(r->player.towards[0].peace);
     CHECK(r->player.towards[0].trade);
+    m.player_slots[2].towards[1].peace = true;  // at peace: on to a lasting peace
+    r = click_nth(panel, m, "Peace", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 2);
+    CHECK(r->player.towards[0].peace);
+    CHECK(r->player.towards[0].lasting);
+    m.player_slots[2].towards[1].lasting = true;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(find(panel, "Lasting peace").has_value());
+    r = click_nth(panel, m, "Lasting peace", 0);
+    REQUIRE(r.has_value());
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].lasting);
     r = click_nth(panel, m, "Yes", 0);  // the first row's trade at the nests
     REQUIRE(r.has_value());
     CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
