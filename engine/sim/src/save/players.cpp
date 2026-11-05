@@ -258,8 +258,13 @@ std::vector<Player> read_players(Reader& in) {
     return list;
 }
 
+bool has_neutral_player(const World& w) {
+    return std::any_of(w.players().begin(), w.players().end(),
+                       [&](const Player& p) { return w.behaviour(p) == FactionBehaviour::Neutral; });
+}
+
 bool has_own_factions(const World& w) {
-    return w.factions() != base_factions();
+    return w.factions() != base_factions() || has_neutral_player(w);
 }
 
 std::uint16_t factions_version(const World& w) {

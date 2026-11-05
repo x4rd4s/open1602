@@ -110,6 +110,8 @@ std::string refusal_text(sim::BuildRefusal refusal) {
                 return "build.refusal.ship_too_far";
             case sim::BuildRefusal::Immovable:
                 return "build.refusal.immovable";
+            case sim::BuildRefusal::Neutral:
+                return "build.refusal.neutral";
         }
         return "build.refusal.unknown";
     }();

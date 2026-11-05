@@ -119,6 +119,10 @@ core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& wor
         !world.acts_as(owner, sim::FactionBehaviour::Pirates)) {
         return make_error(ErrorCode::Unsupported, "only a human, a computer, the natives or the pirates take a city");
     }
+    if (world.acts_as(c->owner, sim::FactionBehaviour::Neutral)) {
+        // Their buildings stand without a Kontor, which every other city has.
+        return make_error(ErrorCode::Unsupported, "the neutral buildings go over only to soldiers");
+    }
     if (c->owner == owner) {
         return make_error(ErrorCode::Unsupported, "the city is the player's already");
     }

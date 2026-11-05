@@ -71,6 +71,24 @@ struct PlayerValues {
 /// has, and (Unsupported) while the player owns a city, ship or soldier.
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world);
 
+/// The slot the neutral buildings' player takes (sim::FactionBehaviour::Neutral): behind the slots
+/// of every human and computer, so that adding and taking them away leaves it where it is.
+inline constexpr sim::PlayerId kNeutralSlot = static_cast<sim::PlayerId>(sim::kMaxPlayerSlots);
+/// The banner the neutral buildings show: the natives', without a flag.
+inline constexpr sim::BannerId kNeutralBanner = 5;
+
+/// The neutral buildings' player of the world, kNoPlayer if it has none yet.
+[[nodiscard]] sim::PlayerId neutral_player(const sim::World& world) noexcept;
+
+/// The neutral buildings' player added to `world` if it has none (in kNeutralSlot, the slots before
+/// it held by absent players; the faction anno1602:neutral added if the world's factions lack it),
+/// at war with the humans and computers, whose soldiers take its buildings, and at peace with the
+/// rest. The relations of the others stay. Its id.
+sim::PlayerId add_neutral_player(sim::World& world);
+
+/// add_neutral_player() as a step of its own. Fails (Unsupported) if the world has one already.
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world);
+
 /// How two players stand at the start: at peace or at war, with a trade treaty or without.
 struct Relations {
     bool peace = true;

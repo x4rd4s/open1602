@@ -1859,6 +1859,8 @@ void EditorPanel::layout_objects(const EditorModel& model) {
         note = ui::tr("editor.objects.note.special");
     } else if (owned && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
+    } else if (build && model.object_neutral) {
+        note = ui::tr("editor.objects.note.neutral");
     } else if (o.tool == Tool::Template && model.object_pieces == 0) {
         note = ui::tr("editor.objects.note.no_templates");
     }

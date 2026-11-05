@@ -502,6 +502,14 @@ void Military::damage_building(std::uint16_t island, std::uint16_t x, std::uint1
         m_world->diplomacy().set_blamed(victim, attacker);
     }
     const Target what = Target::building(island, ox, oy);
+    // A neutral building is taken whole where the attacker's land reaches it.
+    if (m_world->acts_as(victim, FactionBehaviour::Neutral) &&
+        capture_neutral_building(*m_world, *m_buildings, island, {ox, oy}, attacker, construction)) {
+        m_events.push_back(MilitaryEvent{MilitaryEvent::Kind::BuildingTaken, {}, what, attacker, victim});
+        m_combat->island_changed(island);
+        update_towers(island);
+        return;
+    }
     const std::uint8_t city = cell.city;
     const Player* owner = m_world->player(victim);
     const bool natives =

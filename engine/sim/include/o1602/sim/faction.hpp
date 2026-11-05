@@ -2,8 +2,8 @@
 //
 // Factions as data (ADR 0007, section 3; docs/modding/factions.md). A player slot is steered by a
 // person, the computer or nobody (PlayerRole) and belongs to a faction: the settlers, the free
-// trader, the pirates, the natives, or one of a content package. A faction names the behaviour
-// the simulation gives it and the numbers it grows with when more people play.
+// trader, the pirates, the natives, the neutral buildings of a map, or one of a content package. A faction names the
+// behaviour the simulation gives it and the numbers it grows with when more people play.
 //
 // The world holds its factions (World::factions()) and saves them with the game, so a game keeps
 // its factions whatever packages are installed later, and every computer of a multiplayer game
@@ -33,8 +33,11 @@ enum class FactionBehaviour : std::uint8_t {
     Trader,    ///< the free trader: sails from Kontor to Kontor and buys and sells
     Pirates,   ///< at war with everyone but the trader, hunt ships from their nests
     Natives,   ///< villages on the islands, trade with the settlers
+    /// Buildings a map places on free land, nobody's to steer: no computer player, no diplomacy, no
+    /// economy. The settlers' soldiers take them (capture_neutral_building).
+    Neutral,
 };
-inline constexpr FactionBehaviour kLastBehaviour = FactionBehaviour::Natives;
+inline constexpr FactionBehaviour kLastBehaviour = FactionBehaviour::Neutral;
 
 /// A number that grows with the game: `base`, and one more for each `per` of what is counted
 /// (begun), held between `min` and `max`; below `from` counted it is 0.
@@ -85,6 +88,7 @@ inline constexpr FactionId kSettlers = 0;
 inline constexpr FactionId kTrader = 1;
 inline constexpr FactionId kPirates = 2;
 inline constexpr FactionId kNatives = 3;
+inline constexpr FactionId kNeutral = 4;
 }  // namespace faction
 
 /// The package of the original's factions.
@@ -98,7 +102,7 @@ inline constexpr std::string_view kBaseFactionPackage = "anno1602";
     return static_cast<FactionId>(behaviour);
 }
 
-/// For logs and tools: "settlers", "free trader", "pirates", "natives".
+/// For logs and tools: "settlers", "free trader", "pirates", "natives", "neutral".
 [[nodiscard]] const char* behaviour_name(FactionBehaviour behaviour) noexcept;
 
 /// The file of a content package with its changes to the factions.
@@ -114,7 +118,7 @@ struct FactionReplacement {
 /// Changes `factions` field by field as the `factions.toml` of `package` (UTF-8) says
 /// (docs/modding/factions.md), and adds the package's own factions: a table of a new id of the
 /// package with a `behaviour` (one of the base game's: "settlers", "trader", "pirates",
-/// "natives"). A faction of the package with `replaces` goes to `replacements`. Problems go to
+/// "natives", "neutral"). A faction of the package with `replaces` goes to `replacements`. Problems go to
 /// `warnings` with the file and the line; a field with a wrong value is passed over, a file that is
 /// no valid data file as a whole.
 void apply_faction_file(std::vector<Faction>& factions, std::string_view package, std::string_view utf8,

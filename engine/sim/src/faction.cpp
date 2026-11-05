@@ -48,7 +48,8 @@ std::vector<Faction> base_factions() {
     std::vector<Faction> factions;
     for (const auto& [name, behaviour] :
          {std::pair{"settlers", FactionBehaviour::Settlers}, std::pair{"trader", FactionBehaviour::Trader},
-          std::pair{"pirates", FactionBehaviour::Pirates}, std::pair{"natives", FactionBehaviour::Natives}}) {
+          std::pair{"pirates", FactionBehaviour::Pirates}, std::pair{"natives", FactionBehaviour::Natives},
+          std::pair{"neutral", FactionBehaviour::Neutral}}) {
         Faction f;
         f.id = std::string(kBaseFactionPackage) + ":" + name;
         f.behaviour = behaviour;
@@ -67,6 +68,8 @@ const char* behaviour_name(FactionBehaviour behaviour) noexcept {
             return "pirates";
         case FactionBehaviour::Natives:
             return "natives";
+        case FactionBehaviour::Neutral:
+            return "neutral";
     }
     return "?";
 }
@@ -138,7 +141,7 @@ void apply_faction_file(std::vector<Faction>& factions, std::string_view package
             }
             if (!behaviour) {
                 warnings.push_back(line_of(where, table.line) + "the new faction " + id +
-                                   " needs 'behaviour': settlers, trader, pirates or natives");
+                                   " needs 'behaviour': settlers, trader, pirates, natives or neutral");
                 continue;
             }
             if (factions.size() >= kMaxFactions) {

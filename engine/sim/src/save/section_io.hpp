@@ -399,6 +399,8 @@ void write_players(Writer& out, const World& w);
 [[nodiscard]] std::vector<Player> read_players(Reader& in);
 /// Whether the world has other factions than the base game's (only then FACT is written).
 [[nodiscard]] bool has_own_factions(const World& w);
+/// Whether a player of the world is one of the neutral buildings' (FactionBehaviour::Neutral).
+[[nodiscard]] bool has_neutral_player(const World& w);
 /// The version of FACT the factions need: kScriptedFactions when one is scripted, else 1.
 [[nodiscard]] std::uint16_t factions_version(const World& w);
 void write_factions(Writer& out, const World& w, std::uint16_t version);

@@ -499,6 +499,9 @@ private:
     [[nodiscard]] bool editor_cart() const;
     /// The chosen owner of the page "Objects", kNoPlayer without players.
     [[nodiscard]] sim::PlayerId editor_object_owner() const;
+    /// The neutral buildings' player added to the map when it is the owner chosen and the map has
+    /// none yet (editor::add_neutral).
+    void editor_neutral_owner();
     /// Whether the ship, land unit or trade cart in hand can go on the world tile (x, y).
     [[nodiscard]] editor::UnitRefusal editor_figure_fits(std::int64_t x, std::int64_t y) const;
     /// Why the ship, land unit or trade cart in hand cannot go on a tile, in the player's language;

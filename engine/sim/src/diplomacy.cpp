@@ -157,11 +157,13 @@ void Diplomacy::reset(const std::vector<Player>& players, const std::vector<Fact
             const FactionBehaviour rb = behaviour(players[b]);
             Relation& r = m_pairs[a * m_count + b];
             const bool pirates = ra == FactionBehaviour::Pirates || rb == FactionBehaviour::Pirates;
+            const bool neutral = ra == FactionBehaviour::Neutral || rb == FactionBehaviour::Neutral;
             // Peace with everyone except the pirates; the pirates are at peace only with the
-            // trader and themselves.
-            r.peace = pirates && !(ra == FactionBehaviour::Trader || rb == FactionBehaviour::Trader || a == b)
-                          ? Treaty::None
-                          : Treaty::Signed;
+            // trader and themselves. The neutral buildings stand against the settlers alone, whose
+            // soldiers take them; the others pass them by.
+            const bool war = neutral ? (ra == FactionBehaviour::Settlers || rb == FactionBehaviour::Settlers)
+                                     : pirates && !(ra == FactionBehaviour::Trader || rb == FactionBehaviour::Trader);
+            r.peace = war && a != b ? Treaty::None : Treaty::Signed;
             Treaty trade = Treaty::None;
             switch (ra) {
                 case FactionBehaviour::Settlers:
@@ -172,8 +174,12 @@ void Diplomacy::reset(const std::vector<Player>& players, const std::vector<Fact
                     trade = acts_diplomatically(rb) ? Treaty::Signed : Treaty::None;
                     break;
                 case FactionBehaviour::Pirates:
+                case FactionBehaviour::Neutral:
                     trade = a == b ? Treaty::Signed : Treaty::None;
                     break;
+            }
+            if (rb == FactionBehaviour::Neutral && a != b) {
+                trade = Treaty::None;  // nobody trades with them
             }
             r.trade = trade;
         }
@@ -224,6 +230,9 @@ bool Diplomacy::set_peace(const World& world, PlayerId a, PlayerId b, Treaty v, 
     }
     const FactionBehaviour ra = behaviour_of(world, a);
     const FactionBehaviour rb = behaviour_of(world, b);
+    if (ra == FactionBehaviour::Neutral || rb == FactionBehaviour::Neutral) {
+        return false;  // the neutral buildings make no treaties
+    }
     Relation& ab = relation(a, b);
     Relation& ba = relation(b, a);
     switch (v) {
@@ -275,9 +284,11 @@ bool Diplomacy::set_peace(const World& world, PlayerId a, PlayerId b, Treaty v, 
 }
 
 bool Diplomacy::set_trade(const World& world, PlayerId a, PlayerId b, Treaty v, std::uint64_t now_ms) {
-    (void)world;
     if (a == b || a >= m_count || b >= m_count || relation(a, b).trade == v || v == Treaty::Received) {
         return false;
+    }
+    if (behaviour_of(world, a) == FactionBehaviour::Neutral || behaviour_of(world, b) == FactionBehaviour::Neutral) {
+        return false;  // the neutral buildings make no treaties
     }
     Relation& ab = relation(a, b);
     Relation& ba = relation(b, a);
