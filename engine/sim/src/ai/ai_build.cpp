@@ -1428,34 +1428,9 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
     if (wall == nullptr) {
         return std::nullopt;
     }
-    if (wall_land(t.kind)) {
-        // Only the border: without a neighbour outside the city the flags cannot come out right,
-        // so the wide scan is skipped.
-        bool border = false;
-        rings(p, RingFilter::Any, x, y, x, y, 1,
-              [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t) { border = border || o.city != p.city; });
-        if (!border) {
-            return std::nullopt;
-        }
-        // At war the border away from other cities, at peace the border towards them.
-        if (scan(war ? 9 : 6).flags != (war ? 1 : 3)) {
-            return std::nullopt;
-        }
-        if (t.kind == kind::kRoad) {
-            demolish_tile(p, x, y);  // at once, whether the wall can be paid or not
-        }
-        return BuildItem{wall->id, x, y, 0, 0};
-    }
-    if (wall_beach(t.kind)) {
-        // The coast: beach with land beside it and sea close by (only the first two rings count).
-        const Border b = scan(2);
-        if (b.land == 0 || b.sea == 0) {
-            return std::nullopt;
-        }
-        return BuildItem{wall->id, x, y, 0, 0};
-    }
-    if (!war && t.kind == kind::kWall) {
-        // A gate where the wall crosses a straight road, unless a gate is already beside it.
+    // A gate on (x, y) where a road crosses it straight, along x or along y, unless a gate is
+    // beside it already; its rotation follows the road.
+    const auto gate_item = [&]() -> std::optional<BuildItem> {
         const std::array<std::int32_t, 4> k{tile(p.island, x + 1, y).kind, tile(p.island, x - 1, y).kind,
                                             tile(p.island, x, y + 1).kind, tile(p.island, x, y - 1).kind};
         if (std::find(k.begin(), k.end(), kind::kGate) != k.end()) {
@@ -1473,6 +1448,42 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
             return std::nullopt;
         }
         return BuildItem{gate->id, x, y, static_cast<std::uint8_t>(across_x ? 2 : 1), 0};
+    };
+    if (wall_land(t.kind)) {
+        // Only the border: without a neighbour outside the city the flags cannot come out right,
+        // so the wide scan is skipped.
+        bool border = false;
+        rings(p, RingFilter::Any, x, y, x, y, 1,
+              [&](const Tile& o, std::int32_t, std::int32_t, std::int32_t) { border = border || o.city != p.city; });
+        if (!border) {
+            return std::nullopt;
+        }
+        // At war the border away from other cities, at peace the border towards them.
+        if (scan(war ? 9 : 6).flags != (war ? 1 : 3)) {
+            return std::nullopt;
+        }
+        if (t.kind == kind::kRoad) {
+            if (!classic()) {
+                // Open1602: the road stays open, the carts' way with it: a gate where it runs
+                // straight, else a gap in the wall (the original walled it off, at war for good).
+                return gate_item();
+            }
+            demolish_tile(p, x, y);  // at once, whether the wall can be paid or not
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if (wall_beach(t.kind)) {
+        // The coast: beach with land beside it and sea close by (only the first two rings count).
+        const Border b = scan(2);
+        if (b.land == 0 || b.sea == 0) {
+            return std::nullopt;
+        }
+        return BuildItem{wall->id, x, y, 0, 0};
+    }
+    if ((!war || !classic()) && t.kind == kind::kWall) {
+        // A gate where the wall crosses a straight road (Open1602: at war too, so that a wall built
+        // across a road earlier opens again).
+        return gate_item();
     }
     return std::nullopt;
 }

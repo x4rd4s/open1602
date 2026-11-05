@@ -486,6 +486,18 @@ void Engine::cart_supply(AiPlayer& p) {
         }
         std::uint32_t target = 0;
         const std::vector<std::uint8_t> wares = supply_wares(p, home, &target);
+        // Natives give their goods for goodwill, which goods they take bring: cloth or alcohol from
+        // home, a cart load of it (10 t) while home keeps 5 t; nothing where they take neither.
+        const auto natives_gift = [&](const City& c) -> std::uint8_t {
+            for (const std::uint8_t g : {ware::kCloth, ware::kAlcohol}) {
+                const City::Trade* t = c.trade_of(g);
+                if (t != nullptr && t->buy && c.stock(g) + kTon <= t->limit && home.stock(g) >= 15 * kTon) {
+                    return g;
+                }
+            }
+            return 0;
+        };
+        const auto goodwill = [&](const City& c) { return p.player < c.goodwill.size() ? c.goodwill[p.player] : 0U; };
         std::optional<std::size_t> source;
         std::uint8_t ware = 0;
         for (const std::uint8_t w : wares) {
@@ -504,6 +516,12 @@ void Engine::cart_supply(AiPlayer& p) {
                 if (t == nullptr || !t->sell || c.stock(w) <= t->keep + 5 * kTon || t->sell_price >= best_price) {
                     continue;
                 }
+                // Not to natives who would give nothing (too little goodwill for a ton) and take no gift.
+                if (m_world.acts_as(c.owner, FactionBehaviour::Natives) &&
+                    goodwill(c) < std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U) &&
+                    natives_gift(c) == 0) {
+                    continue;
+                }
                 source = i;
                 best_price = t->sell_price;
             }
@@ -520,6 +538,11 @@ void Engine::cart_supply(AiPlayer& p) {
         const std::uint16_t island = home.island;
         const Target load = Target::city_of(from.island, from.index);
         const std::uint32_t amount = std::max<std::uint32_t>(target - home.stock(ware), 5 * kTon);
+        // A gift only while the goodwill there would not pay for the load.
+        const std::uint64_t needed =
+            std::uint64_t{std::max<std::uint32_t>(1, m_world.goods().price(ware) * 42U / 128U)} * amount / kTon;
+        const std::uint8_t gift =
+            m_world.acts_as(from.owner, FactionBehaviour::Natives) && goodwill(from) < needed ? natives_gift(from) : 0;
         std::uint32_t id = cart != nullptr ? cart->id : 0;
         if (cart == nullptr) {
             const WorldIsland& isl = island_of(island);
@@ -549,21 +572,34 @@ void Engine::cart_supply(AiPlayer& p) {
         clear.op = RouteEdit::Op::ClearStop;
         clear.stop = 0xFF;
         edit(clear);
-        const std::array<std::pair<Target, RouteEntry>, 2> stops = {
-            std::pair{load, RouteEntry{ware, false, amount}},
-            std::pair{Target::city_of(island, home_index), RouteEntry{ware, true, 50 * kTon}}};
-        for (std::uint8_t i = 0; i < stops.size(); ++i) {
+        // To natives first the gift from home, unloaded there before the ware is loaded.
+        struct Stop {
+            Target target;
+            std::vector<RouteEntry> entries;
+        };
+        std::vector<Stop> stops;
+        const Target home_stop = Target::city_of(island, home_index);
+        if (gift != 0) {
+            stops.push_back(Stop{home_stop, {RouteEntry{gift, false, kCartHoldCapacity}}});
+            stops.push_back(Stop{load, {RouteEntry{gift, true, kCartHoldCapacity}, RouteEntry{ware, false, amount}}});
+        } else {
+            stops.push_back(Stop{load, {RouteEntry{ware, false, amount}}});
+        }
+        stops.push_back(Stop{home_stop, {RouteEntry{ware, true, 50 * kTon}}});
+        for (std::size_t i = 0; i < stops.size(); ++i) {
             RouteEdit stop;
             stop.op = RouteEdit::Op::SetStop;
-            stop.stop = i;
-            stop.target = stops[i].first;
+            stop.stop = static_cast<std::uint8_t>(i);
+            stop.target = stops[i].target;
             edit(stop);
-            RouteEdit entry;
-            entry.op = RouteEdit::Op::SetEntry;
-            entry.stop = i;
-            entry.entry = 0;
-            entry.value = stops[i].second;
-            edit(entry);
+            for (std::size_t e = 0; e < stops[i].entries.size(); ++e) {
+                RouteEdit entry;
+                entry.op = RouteEdit::Op::SetEntry;
+                entry.stop = static_cast<std::uint8_t>(i);
+                entry.entry = static_cast<std::uint8_t>(e);
+                entry.value = stops[i].entries[e];
+                edit(entry);
+            }
         }
         RouteEdit way;
         way.op = RouteEdit::Op::OneWay;
@@ -572,7 +608,7 @@ void Engine::cart_supply(AiPlayer& p) {
         RouteEdit start;
         start.op = RouteEdit::Op::Start;
         edit(start);
-        log(p, "trade cart %u fetches ware %u from city %u/%u", id, ware, load.island, load.city);
+        log(p, "trade cart %u fetches ware %u from city %u/%u, gift %u", id, ware, load.island, load.city, gift);
     }
 }
 

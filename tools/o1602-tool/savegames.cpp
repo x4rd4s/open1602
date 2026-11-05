@@ -139,9 +139,77 @@ std::optional<core::Result<OwnSave>> read_own_save(const fs::path& path, const s
     return core::Result<OwnSave>(OwnSave{std::move(buildings).value(), std::move(world).value()});
 }
 
+/// Per human or computer player: cities, houses, inhabitants, woodcutters, trees on its land and the
+/// building materials and food in its cities, to compare how far the computers got.
+void player_summary(const sim::World& world, const assets::BuildingTable& buildings) {
+    struct Sum {
+        std::size_t cities = 0;
+        std::size_t houses = 0;
+        std::size_t inhabitants = 0;
+        std::size_t woodcutter_tiles = 0;
+        std::size_t woodcutter_size = 1;
+        std::size_t trees = 0;
+        std::array<std::uint64_t, 6> stock{};
+    };
+    static constexpr std::array<std::uint8_t, 6> kWares = {assets::ware::kWood,   assets::ware::kTools,
+                                                           assets::ware::kBricks, assets::ware::kFood,
+                                                           assets::ware::kCloth,  assets::ware::kAlcohol};
+    std::map<unsigned, Sum> sums;
+    for (const sim::City& c : world.cities()) {
+        Sum& s = sums[c.owner];
+        ++s.cities;
+        for (std::size_t i = 0; i < kWares.size(); ++i) {
+            s.stock[i] += kWares[i] < c.goods.size() ? c.goods[kWares[i]] : 0U;
+        }
+    }
+    for (const sim::House& h : world.houses()) {
+        const sim::City* c = world.city(h.island, h.city);
+        if (c != nullptr) {
+            Sum& s = sums[c->owner];
+            ++s.houses;
+            s.inhabitants += h.inhabitants();
+        }
+    }
+    for (const sim::WorldIsland& island : world.islands()) {
+        const sim::IslandMap& map = island.map;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::MapCell& cell = map.top(x, y);
+                const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+                if (b == nullptr || cell.city == sim::MapCell::kNoCity) {
+                    continue;
+                }
+                Sum& s = sums[cell.owner];
+                if (b->ware == assets::ware::kTree) {
+                    ++s.trees;
+                } else if (b->ware == assets::ware::kWood) {
+                    ++s.woodcutter_tiles;
+                    s.woodcutter_size = std::max<std::size_t>(b->tile_count(), 1);
+                }
+            }
+        }
+    }
+    for (const auto& [owner, s] : sums) {
+        const sim::Player* p = world.player(static_cast<sim::PlayerId>(owner));
+        if (p == nullptr || (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer)) {
+            continue;
+        }
+        std::printf(
+            "summary of player %u: %zu cities, %zu houses, %zu inhabitants, %zu woodcutters, %zu trees; "
+            "t wood %llu, tools %llu, bricks %llu, food %llu, cloth %llu, alcohol %llu; money %d\n",
+            owner, s.cities, s.houses, s.inhabitants, s.woodcutter_tiles / s.woodcutter_size, s.trees,
+            static_cast<unsigned long long>(s.stock[0] / 32), static_cast<unsigned long long>(s.stock[1] / 32),
+            static_cast<unsigned long long>(s.stock[2] / 32), static_cast<unsigned long long>(s.stock[3] / 32),
+            static_cast<unsigned long long>(s.stock[4] / 32), static_cast<unsigned long long>(s.stock[5] / 32),
+            p->money);
+    }
+}
+
 /// `state` of a .o1602: players, cities with their goods, ships, the computers' producers a package
-/// changed; with `buildings_of_players`, how many buildings of each Id every player owns.
-int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players) {
+/// changed; with `buildings_of_players`, how many buildings of each Id every player owns; with
+/// `summary`, player_summary().
+int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players,
+              bool summary) {
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const sim::Player& p = world.players()[i];
         std::printf("player %zu: role %u, banner %u, money %d %s\n", i, static_cast<unsigned>(p.role),
@@ -191,6 +259,9 @@ int own_state(const sim::World& world, const assets::BuildingTable& buildings, b
             std::printf("\n");
         }
     }
+    if (summary) {
+        player_summary(world, buildings);
+    }
     std::printf("%zu players, %zu cities, %zu ships, %zu soldiers\n", world.players().size(), world.cities().size(),
                 world.ships().size(), world.soldiers().size());
     return 0;
@@ -232,7 +303,8 @@ int cmd_state(const Args& args) {
     }
     const auto mods = args.options.find("--mods");
     if (auto own = read_own_save(fs::path(args.positional[0]), mods != args.options.end() ? &mods->second : nullptr)) {
-        return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings")) : fail(own->error());
+        return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"))
+                    : fail(own->error());
     }
     auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
     if (!file) {
