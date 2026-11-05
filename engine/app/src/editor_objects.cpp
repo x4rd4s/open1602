@@ -139,8 +139,8 @@ std::string special_refusal(editor::SpecialRefusal refusal) {
 /// The players a building, ship or unit can be placed for: humans and computers, then the natives
 /// and the pirates; for a ship the free trader last, else the neutral buildings' player last (its
 /// slot, editor::kNeutralSlot, while the world has none: it comes with the first choice of it,
-/// MapViewer::editor_neutral_owner).
-std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false) {
+/// MapViewer::editor_neutral_owner). A trade cart only for humans and computers.
+std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false, bool cart = false) {
     std::vector<sim::PlayerId> owners;
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const auto p = static_cast<sim::PlayerId>(i);
@@ -149,6 +149,9 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
             world.players()[i].status != sim::PlayerStatus::Absent) {  // not a slot that only holds a place
             owners.push_back(p);
         }
+    }
+    if (cart) {
+        return owners;
     }
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const auto p = static_cast<sim::PlayerId>(i);
@@ -361,6 +364,8 @@ void MapViewer::editor_object_model(EditorModel& m) const {
                 m.object_name = ui::tr("editor.objects.ship.trader");
             } else if (figure == assets::figure::kSpearman) {
                 m.object_name = ui::tr("editor.objects.unit.spearman");
+            } else if (tool == Tool::Unit && figure == assets::figure::kTradeCart) {
+                m.object_name = ui::tr("editor.objects.unit.cart");
             } else if (index < 4) {
                 m.object_name = ui::tr(key + std::to_string(index));
             } else {
@@ -369,7 +374,7 @@ void MapViewer::editor_object_model(EditorModel& m) const {
         }
     }
     m.recent_objects = m_editor->recent_objects;
-    const auto owners = object_owners(m_editor->document.world(), tool == Tool::Ship);
+    const auto owners = object_owners(m_editor->document.world(), tool == Tool::Ship, editor_cart());
     m.object_owners = owners.size();
     if (!owners.empty()) {
         const sim::World& world = m_editor->document.world();
@@ -877,6 +882,9 @@ std::vector<std::uint16_t> MapViewer::editor_figures(EditorObjects::Tool tool) c
             m_editor->document.world().first_of(sim::FactionBehaviour::Natives) != sim::kNoPlayer) {
             figures.push_back(assets::figure::kSpearman);  // for the natives
         }
+        if (m_figures.get(assets::figure::kTradeCart) != nullptr) {
+            figures.push_back(assets::figure::kTradeCart);  // a player's trade cart, on its roads
+        }
     }
     return figures;
 }
@@ -890,9 +898,65 @@ std::uint16_t MapViewer::editor_figure() const {
     return figures[std::min(o.tool == EditorObjects::Tool::Ship ? o.ship : o.unit, figures.size() - 1)];
 }
 
+bool MapViewer::editor_cart() const {
+    return m_editor->objects.tool == EditorObjects::Tool::Unit && editor_figure() == assets::figure::kTradeCart;
+}
+
 sim::PlayerId MapViewer::editor_object_owner() const {
-    const auto owners = object_owners(m_editor->document.world(), m_editor->objects.tool == EditorObjects::Tool::Ship);
+    const auto owners =
+        object_owners(m_editor->document.world(), m_editor->objects.tool == EditorObjects::Tool::Ship, editor_cart());
     return owners.empty() ? sim::kNoPlayer : owners[m_editor->objects.owner % owners.size()];
+}
+
+editor::UnitRefusal MapViewer::editor_figure_fits(std::int64_t x, std::int64_t y) const {
+    const sim::World& world = m_editor->document.world();
+    if (m_editor->objects.tool == EditorObjects::Tool::Ship) {
+        return editor::ship_fits(world, m_buildings, x, y);
+    }
+    if (editor_cart()) {
+        return editor::cart_fits(world, m_buildings, editor_object_owner(), x, y);
+    }
+    return editor::unit_fits(world, m_buildings, x, y);
+}
+
+std::string MapViewer::editor_figure_refusal(editor::UnitRefusal refused, const std::string& why) const {
+    using R = editor::UnitRefusal;
+    const bool ship = m_editor->objects.tool == EditorObjects::Tool::Ship;
+    switch (refused) {
+        case R::None:
+            return {};
+        case R::NoWater:
+            return ui::tr("editor.objects.refused.water");
+        case R::NoGround:
+        case R::Outside:
+            return ui::tr(ship ? "editor.objects.refused.water" : "editor.objects.refused.ground");
+        case R::Taken:
+            return ui::tr(
+                ship ? "editor.objects.refused.ship_near"
+                     : (editor_cart() ? "editor.objects.refused.cart_near" : "editor.objects.refused.unit_near"));
+        case R::NoRoad:
+            return ui::tr("editor.objects.refused.cart_road");
+        case R::NoMarket:
+            return ui::tr("editor.objects.refused.cart_market");
+        case R::CartLimit:
+            return ui::tr("editor.objects.refused.cart_limit");
+        case R::NoOwner:
+            if (editor_cart()) {
+                return ui::tr("editor.objects.refused.cart_owner");
+            }
+            break;
+        case R::NoType:
+            break;
+    }
+    if (!ship && editor_figure() == assets::figure::kSpearman &&
+        !m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Natives)) {
+        return ui::tr("editor.objects.refused.spearman");
+    }
+    if (ship && (editor_figure() == assets::figure::kTrader ||
+                 m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Trader))) {
+        return ui::tr("editor.objects.refused.trader");  // his ship and no other, for him and no other
+    }
+    return ui::tr("editor.objects.refused.other", {why.empty() ? std::string(editor::refusal_name(refused)) : why});
 }
 
 void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
@@ -905,26 +969,16 @@ void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
         return;
     }
     const auto direction = static_cast<std::uint8_t>((m_editor->objects.rotation & 3U) * 2U);
-    auto op = ship ? editor::place_ship(world, m_buildings, m_figures, owner, editor_figure(), x, y, direction)
-                   : editor::place_unit(world, m_buildings, m_figures, owner, editor_figure(), x, y, direction);
+    const bool cart = editor_cart();
+    auto op = ship   ? editor::place_ship(world, m_buildings, m_figures, owner, editor_figure(), x, y, direction)
+              : cart ? editor::place_cart(world, m_buildings, m_figures, owner, x, y, direction)
+                     : editor::place_unit(world, m_buildings, m_figures, owner, editor_figure(), x, y, direction);
     if (!op) {
-        const editor::UnitRefusal refused =
-            ship ? editor::ship_fits(world, m_buildings, x, y) : editor::unit_fits(world, m_buildings, x, y);
-        const char* key = "editor.objects.refused.other";
-        if (refused == editor::UnitRefusal::NoWater) {
-            key = "editor.objects.refused.water";
-        } else if (refused == editor::UnitRefusal::NoGround || refused == editor::UnitRefusal::Outside) {
-            key = ship ? "editor.objects.refused.water" : "editor.objects.refused.ground";
-        } else if (refused == editor::UnitRefusal::Taken) {
-            key = ship ? "editor.objects.refused.ship_near" : "editor.objects.refused.unit_near";
-        } else if (!ship && editor_figure() == assets::figure::kSpearman &&
-                   !m_editor->document.world().acts_as(owner, sim::FactionBehaviour::Natives)) {
-            key = "editor.objects.refused.spearman";
-        } else if (ship && (editor_figure() == assets::figure::kTrader ||
-                            m_editor->document.world().acts_as(owner, sim::FactionBehaviour::Trader))) {
-            key = "editor.objects.refused.trader";  // his ship and no other, for him and no other
-        }
-        editor_notice(ui::tr(key, {op.error().message}), true, op.error().message);
+        // Where the place would do, the type or its owner refused it.
+        const editor::UnitRefusal refused = editor_figure_fits(x, y);
+        const std::string text = editor_figure_refusal(
+            refused == editor::UnitRefusal::None ? editor::UnitRefusal::NoType : refused, op.error().message);
+        editor_notice(text, true, op.error().message);
         return;
     }
     m_editor->document.perform(std::move(op).value());
@@ -934,7 +988,7 @@ void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
     // A computer disbands its soldiers on an island without a city of its own in peacetime: say so.
     const sim::World& placed = m_editor->document.world();
     const sim::Player* p = placed.player(owner);
-    if (!ship && p != nullptr && p->role == sim::PlayerRole::Computer &&
+    if (!ship && !cart && p != nullptr && p->role == sim::PlayerRole::Computer &&
         placed.contains(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y))) {
         const std::uint16_t island = placed.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)).island;
         const bool city = std::any_of(placed.cities().begin(), placed.cities().end(),
@@ -1087,16 +1141,10 @@ std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) cons
                                                                : std::string();
     }
     if (tool == Tool::Ship || tool == Tool::Unit) {
-        const bool ship = tool == Tool::Ship;
-        const editor::UnitRefusal refused =
-            ship ? editor::ship_fits(world, m_buildings, x, y) : editor::unit_fits(world, m_buildings, x, y);
-        if (refused == editor::UnitRefusal::None) {
-            return {};
+        if (editor_cart() && editor_object_owner() == sim::kNoPlayer) {
+            return ui::tr("editor.objects.note.no_players");
         }
-        if (refused == editor::UnitRefusal::Taken) {
-            return ui::tr(ship ? "editor.objects.refused.ship_near" : "editor.objects.refused.unit_near");
-        }
-        return ui::tr(ship ? "editor.objects.refused.water" : "editor.objects.refused.ground");
+        return editor_figure_refusal(editor_figure_fits(x, y));
     }
     if (tool == Tool::Resource) {
         const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));

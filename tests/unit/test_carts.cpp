@@ -9,6 +9,8 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/editor/scenario_rules.hpp"
+#include "o1602/editor/units.hpp"
 #include "o1602/sim/diplomacy.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/ships.hpp"
@@ -549,4 +551,92 @@ TEST_CASE("carts: an improved computer fetches what its city lacks from a partne
     // The original's computers never send a cart out.
     CHECK(!run_game(true, wood).has_value());
     CHECK(wood == 50 * kTon);
+}
+
+TEST_CASE("carts: the editor puts a player's cart on a road beside its Kontor or market, one per island") {
+    Land land;
+    using editor::UnitRefusal;
+    const sim::World before = land.world;
+    // Beside player 0's Kontor at world (10, 14) and its market at (22, 14); player 1's Kontor at (37, 14).
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 12, 14) == UnitRefusal::None);
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 24, 16) == UnitRefusal::None);
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 3, 3) == UnitRefusal::NoRoad);      // the sea
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 10, 14) == UnitRefusal::NoRoad);    // the Kontor
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 30, 20) == UnitRefusal::NoMarket);  // far from it
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 36, 14) == UnitRefusal::NoMarket);  // a foreign Kontor
+    CHECK(editor::cart_fits(land.world, land.buildings, 1, 36, 14) == UnitRefusal::None);
+    CHECK(editor::cart_fits(land.world, land.buildings, 5, 12, 14) == UnitRefusal::NoOwner);
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, -1, 14) == UnitRefusal::Outside);
+
+    auto cart = editor::place_cart(land.world, land.buildings, land.figures, 0, 12, 14, 2);
+    REQUIRE(cart.ok());
+    (*cart)->apply(land.world);
+    const sim::Ship& placed = land.world.ships().back();
+    CHECK(placed.cart());
+    CHECK(placed.owner == 0);
+    CHECK(placed.x == 12);
+    CHECK(placed.y == 14);
+    CHECK(placed.direction == 2);
+    CHECK(placed.health == land.figures.get(assets::figure::kTradeCart)->ship.max_health);
+    CHECK(placed.cargo.size() == 3);
+    CHECK(placed.target.empty());
+    CHECK(placed.previous.kind == sim::Target::Kind::City);
+    CHECK(placed.previous.city == 0);
+    CHECK(sim::trade_cart_of(land.world, 0, 0) == &placed);
+
+    // Not a second on the tile, nor on the island beyond what the game gives; player 1 has its own.
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 12, 14) == UnitRefusal::Taken);
+    CHECK(editor::cart_fits(land.world, land.buildings, 0, 24, 16) == UnitRefusal::CartLimit);
+    CHECK(!editor::place_cart(land.world, land.buildings, land.figures, 0, 24, 16, 0).ok());
+    CHECK(editor::cart_fits(land.world, land.buildings, 1, 36, 14) == UnitRefusal::None);
+
+    // Named when the game starts, as the players' ships.
+    {
+        sim::World game = land.world;
+        sim::Fleet fleet(game, land.buildings, land.figures, land.rules);
+        fleet.set_ship_names({"Altair"});
+        fleet.name_unnamed_ships();
+        CHECK(game.ships().back().name == "Altair");
+    }
+
+    // Taken away as a ship is, and undone.
+    auto gone = editor::remove_ship(land.world, placed.id);
+    REQUIRE(gone.ok());
+    (*gone)->apply(land.world);
+    CHECK(sim::trade_cart_of(land.world, 0, 0) == nullptr);
+    (*gone)->revert(land.world);
+    (*cart)->revert(land.world);
+    CHECK(land.world.ships().size() == before.ships().size());
+}
+
+TEST_CASE("carts: with the scenario's rule for more carts the editor gives one for each Kontor and market") {
+    for (const bool more : {true, false}) {
+        Land land;
+        for (const auto& [x, y] : {std::pair{0, 4}, std::pair{12, 4}}) {
+            sim::Production p;
+            p.x = static_cast<std::uint16_t>(x);
+            p.y = static_cast<std::uint16_t>(y);
+            land.world.productions().push_back(p);
+        }
+        sim::Rules rules = sim::Rules::open1602();
+        rules.more_carts = more;
+        editor::set_scenario_rules(land.world, rules)->apply(land.world);
+        auto first = editor::place_cart(land.world, land.buildings, land.figures, 0, 12, 14, 0);
+        REQUIRE(first.ok());
+        (*first)->apply(land.world);
+        CHECK(editor::place_cart(land.world, land.buildings, land.figures, 0, 24, 16, 0).ok() == more);
+    }
+}
+
+TEST_CASE("carts: the editor places no cart without the cart in the figure tables") {
+    Land land;
+    const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+    const auto doc = assets::cod::parse(
+        "Objekt: FIGUR\n"
+        "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Speed: 500\n  Maxenergy: 50\n"
+        "EndObj\n",
+        types);
+    auto figures = assets::FigureTable::from_cod(doc);
+    REQUIRE(figures.ok());
+    CHECK(!editor::place_cart(land.world, land.buildings, *figures, 0, 12, 14, 0).ok());
 }

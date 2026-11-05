@@ -1528,6 +1528,84 @@ TEST_CASE("world generator: large islands of their own size get veins by their s
     CHECK(sim::validate(*world).ok());
 }
 
+TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
+    const auto& fake = full_game();
+    const auto templates = sim::island_templates(fake.game, buildings());
+    REQUIRE(!templates.empty());
+    // Water no sea reaches from the map's edge (the lakes) and mountain tiles, by the world.
+    using Tile = sim::WorldPreview::Tile;
+    const auto measure = [&](std::uint16_t lakes, std::uint16_t mountains) {
+        sim::WorldSettings settings;
+        settings.seed = 5;
+        settings.shapes = sim::WorldSettings::Shapes::Own;
+        settings.landscape.land = 25;
+        settings.landscape.min_side = 120;
+        settings.landscape.max_side = 160;
+        settings.landscape.lakes = lakes;
+        settings.landscape.mountains = mountains;
+        std::vector<std::string> warnings;
+        auto plan = sim::plan_world(settings, templates, &warnings);
+        REQUIRE(plan.ok());
+        sim::WorldStart start;
+        start.seed = 5;
+        auto w = sim::generate_islands(scenario(standard_plan()), *plan, fake.game, buildings(), start, &warnings);
+        REQUIRE(w.ok());
+        auto world = sim::load_world(w->file, buildings(), fake.game, &warnings, start);
+        REQUIRE(world.ok());
+        const sim::WorldPreview p = sim::preview_of(*world, buildings());
+        const auto water = [&](std::size_t i) { return p.tiles[i] == Tile::Sea || p.tiles[i] == Tile::Surf; };
+        std::vector<bool> sea(p.tiles.size(), false);
+        std::vector<std::size_t> wave;
+        for (std::uint32_t y = 0; y < p.height; ++y) {
+            for (std::uint32_t x = 0; x < p.width; ++x) {
+                const std::size_t i = std::size_t{y} * p.width + x;
+                if ((x == 0 || y == 0 || x + 1 == p.width || y + 1 == p.height) && water(i)) {
+                    sea[i] = true;
+                    wave.push_back(i);
+                }
+            }
+        }
+        while (!wave.empty()) {
+            const std::size_t i = wave.back();
+            wave.pop_back();
+            const std::uint32_t x = static_cast<std::uint32_t>(i % p.width);
+            const std::uint32_t y = static_cast<std::uint32_t>(i / p.width);
+            const std::array<std::pair<std::int64_t, std::int64_t>, 4> steps = {{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
+            for (const auto& [dx, dy] : steps) {
+                const std::int64_t nx = std::int64_t{x} + dx;
+                const std::int64_t ny = std::int64_t{y} + dy;
+                if (nx < 0 || ny < 0 || nx >= std::int64_t{p.width} || ny >= std::int64_t{p.height}) {
+                    continue;
+                }
+                const auto n = static_cast<std::size_t>(ny * p.width + nx);
+                if (!sea[n] && water(n)) {
+                    sea[n] = true;
+                    wave.push_back(n);
+                }
+            }
+        }
+        std::size_t inland = 0;
+        std::size_t rock = 0;
+        for (std::size_t i = 0; i < p.tiles.size(); ++i) {
+            inland += water(i) && !sea[i] ? 1U : 0U;
+            rock += p.tiles[i] == Tile::Mountain ? 1U : 0U;
+        }
+        return std::pair{inland, rock};
+    };
+    const auto none = measure(0, 100);
+    const auto usual = measure(100, 100);
+    const auto many = measure(300, 100);
+    CHECK(none.first == 0);
+    CHECK(usual.first > 0);
+    CHECK(many.first > usual.first);
+    const auto few_mountains = measure(0, 0);
+    const auto more_mountains = measure(0, 300);
+    CHECK(few_mountains.second < none.second);
+    CHECK(more_mountains.second > none.second);
+    // The mountains beside the lakes follow the share of mountains too.
+    CHECK(measure(300, 0).second < many.second);
+}
+
 TEST_CASE("world generator: a native village on an island larger than the original's, within its first 255 tiles") {
     const auto& fake = full_game();
     const auto templates = sim::island_templates(fake.game, buildings());

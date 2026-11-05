@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/scenario_rules.hpp"
 #include "o1602/sim/land_paths.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/ship.hpp"
@@ -30,6 +31,27 @@ bool owner_ok(const sim::World& world, sim::PlayerId owner) {
     return p != nullptr && (p->role == sim::PlayerRole::Human || p->role == sim::PlayerRole::Computer ||
                             world.acts_as(owner, sim::FactionBehaviour::Natives) ||
                             world.acts_as(owner, sim::FactionBehaviour::Pirates));
+}
+
+/// The players who keep trade carts: humans and computers.
+bool cart_owner_ok(const sim::World& world, sim::PlayerId owner) {
+    const sim::Player* p = world.player(owner);
+    return p != nullptr && (p->role == sim::PlayerRole::Human || p->role == sim::PlayerRole::Computer);
+}
+
+/// The nearest of `owner`'s cities whose Kontor or market a cart on (x, y) reaches, if any.
+const sim::City* cart_home(const sim::World& world, const assets::BuildingTable& buildings, sim::PlayerId owner,
+                           std::int32_t x, std::int32_t y) {
+    // Next to the building first, then within the reach of a route stop.
+    for (const std::int32_t reach : {sim::kCartHandReach, sim::kCartReach}) {
+        for (const std::size_t index : sim::cities_near_cart(world, buildings, x, y, reach)) {
+            const sim::City& city = world.cities()[index];
+            if (city.owner == owner) {
+                return &city;
+            }
+        }
+    }
+    return nullptr;
 }
 
 /// Every order that names `gone` cleared.
@@ -102,6 +124,59 @@ UnitRefusal unit_fits(const sim::World& world, const assets::BuildingTable& buil
         }
     }
     return UnitRefusal::None;
+}
+
+UnitRefusal cart_fits(const sim::World& world, const assets::BuildingTable& buildings, sim::PlayerId owner,
+                      std::int64_t x, std::int64_t y) {
+    if (!on_map(world, x, y)) {
+        return UnitRefusal::Outside;
+    }
+    if (!cart_owner_ok(world, owner)) {
+        return UnitRefusal::NoOwner;
+    }
+    const auto ix = static_cast<std::int32_t>(x);
+    const auto iy = static_cast<std::int32_t>(y);
+    if (!sim::cart_drivable(world, buildings, ix, iy)) {
+        return UnitRefusal::NoRoad;
+    }
+    if (cart_home(world, buildings, owner, ix, iy) == nullptr) {
+        return UnitRefusal::NoMarket;
+    }
+    for (const sim::Ship& s : world.ships()) {
+        if (s.cart() && s.x == ix && s.y == iy) {
+            return UnitRefusal::Taken;
+        }
+    }
+    // As many as the game sends out there (sim::Fleet::request_cart).
+    const std::uint16_t island = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)).island;
+    const bool more = scenario_rules(world).value_or(sim::Rules{}).more_carts;
+    const std::size_t allowed =
+        more ? std::max<std::uint32_t>(1, sim::cart_places(world, buildings, owner, island)) : 1U;
+    if (sim::trade_carts_of(world, owner, island).size() >= allowed) {
+        return UnitRefusal::CartLimit;
+    }
+    return UnitRefusal::None;
+}
+
+core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world, const assets::BuildingTable& buildings,
+                                                    const assets::FigureTable& figures, sim::PlayerId owner,
+                                                    std::int64_t x, std::int64_t y, std::uint8_t direction) {
+    const assets::FigureType* type = figures.get(assets::figure::kTradeCart);
+    const UnitRefusal refused = type == nullptr ? UnitRefusal::NoType : cart_fits(world, buildings, owner, x, y);
+    if (refused != UnitRefusal::None) {
+        return make_error(ErrorCode::InvalidFormat, refusal_name(refused));
+    }
+    const auto ix = static_cast<std::int32_t>(x);
+    const auto iy = static_cast<std::int32_t>(y);
+    const sim::City* home = cart_home(world, buildings, owner, ix, iy);
+    sim::World after = world;
+    sim::Ship cart = sim::make_ship(std::string(), static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                                    assets::figure::kTradeCart, owner, static_cast<std::uint8_t>(direction & 7U));
+    cart.cargo.resize(type->ship.cargo_slots != 0 ? type->ship.cargo_slots : 3U);
+    cart.health = type->ship.max_health;
+    cart.previous = sim::Target::city_of(home->island, home->index);
+    after.add_ship(std::move(cart));
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "cart_place"));
 }
 
 core::Result<std::unique_ptr<Operation>> place_ship(const sim::World& world, const assets::BuildingTable& buildings,
@@ -229,6 +304,12 @@ const char* refusal_name(UnitRefusal refusal) noexcept {
             return "no player to own it";
         case UnitRefusal::NoType:
             return "no such type";
+        case UnitRefusal::NoRoad:
+            return "no ground a cart drives on";
+        case UnitRefusal::NoMarket:
+            return "no Kontor or market of its owner within reach";
+        case UnitRefusal::CartLimit:
+            return "no further cart for its owner on the island";
     }
     return "unknown";
 }

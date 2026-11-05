@@ -1050,12 +1050,15 @@ TEST_CASE("endless setup: the islands' presets and settings, and their lines in 
     app::choose(s, SetupItem::LandShare, 7);
     CHECK(s.world.landscape.land == 45);
     app::choose(s, SetupItem::Forest, 2);
-    app::choose(s, SetupItem::OreMountains, 0);
+    app::choose(s, SetupItem::OreMountains, 2);
+    app::choose(s, SetupItem::Lakes, app::setup_choices(SetupItem::Lakes) - 1);
     app::choose(s, SetupItem::SizeSpread, 2);
     app::choose(s, SetupItem::IslandGap, 0);
     app::choose(s, SetupItem::Outline, 1);
     CHECK(s.world.landscape.forest == sim::shapes::Share::Much);
-    CHECK(s.world.landscape.mountains == sim::shapes::Share::Little);
+    CHECK(s.world.landscape.mountains == 50);
+    CHECK(s.world.landscape.lakes == 300);
+    CHECK(app::setup_value(s, SetupItem::Lakes) == ui::tr("setup.win.percent", {"300"}));
     CHECK(s.world.landscape.spread == Landscape::Spread::FewGiants);
     CHECK(s.world.landscape.gap == Landscape::Gap::Narrow);
     CHECK(s.world.landscape.outline == Landscape::Outline::Long);
@@ -1068,6 +1071,8 @@ TEST_CASE("endless setup: the islands' presets and settings, and their lines in 
     CHECK(text.find("endless.island_land = 45\n") != std::string::npos);
     CHECK(text.find("endless.island_spread = giants\n") != std::string::npos);
     CHECK(text.find("endless.island_outline = long\n") != std::string::npos);
+    CHECK(text.find("endless.island_mountains = 50\n") != std::string::npos);
+    CHECK(text.find("endless.island_lakes = 300\n") != std::string::npos);
     // A changed preset keeps its name, the kind of island world (a climate's share there).
     CHECK(text.find("endless.island_preset = continents\n") != std::string::npos);
     CHECK(text.find("seed") == std::string::npos);
