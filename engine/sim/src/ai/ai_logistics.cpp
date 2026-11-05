@@ -597,7 +597,16 @@ void Engine::cart_supply(AiPlayer& p) {
         } else {
             stops.push_back(Stop{load, {RouteEntry{ware, false, amount}}});
         }
-        stops.push_back(Stop{home_stop, {RouteEntry{ware, true, 50 * kTon}}});
+        // Home again: the ware, and what natives left of a gift, back into the home city's stock.
+        Stop back{home_stop, {RouteEntry{ware, true, 50 * kTon}}};
+        for (const std::uint8_t g : {assets::ware::kCloth, assets::ware::kAlcohol}) {
+            const bool on_board = cart != nullptr && std::any_of(cart->cargo.begin(), cart->cargo.end(),
+                                                                 [g](const CargoSlot& c) { return c.ware == g; });
+            if (g != ware && (g == gift || on_board)) {
+                back.entries.push_back(RouteEntry{g, true, kCartHoldCapacity});
+            }
+        }
+        stops.push_back(std::move(back));
         for (std::size_t i = 0; i < stops.size(); ++i) {
             RouteEdit stop;
             stop.op = RouteEdit::Op::SetStop;
