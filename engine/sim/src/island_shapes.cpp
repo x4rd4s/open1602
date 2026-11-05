@@ -1128,9 +1128,10 @@ assets::Island make_island(const ShapeRequest& request) {
         const std::array<std::uint32_t, 1> volcano{ids::kVolcanoMountain};
         place_mountains(1, ids::kBigMountainSize, volcano, false, nullptr);
     }
-    // A small mountain beside each lake, its river running into the lake.
-    for (const Lake& l : lakes) {
-        place_mountains(1, ids::kSmallMountainSize, ids::kSmallMountain, true, &l);
+    // A small mountain beside each lake (the first lake_mountains of them), its river running
+    // into the lake.
+    for (std::size_t i = 0; i < lakes.size() && i < request.lake_mountains; ++i) {
+        place_mountains(1, ids::kSmallMountainSize, ids::kSmallMountain, true, &lakes[i]);
     }
     place_mountains(request.big_mountains, ids::kBigMountainSize, ids::kBigMountain, true, nullptr);
     place_mountains(request.small_mountains, ids::kSmallMountainSize, ids::kSmallMountain, true, nullptr);

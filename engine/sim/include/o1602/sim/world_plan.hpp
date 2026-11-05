@@ -63,6 +63,8 @@ struct WorldSettings {
         };
         static constexpr std::uint8_t kMinLand = 5;  ///< percent of the map
         static constexpr std::uint8_t kMaxLand = 45;
+        /// Ore mountains and lakes: at most this percent of what an island of its size has by default.
+        static constexpr std::uint16_t kMaxTerrain = 300;
 
         std::uint8_t land = 15;        ///< percent of the map that is land (the original's plans: about 13)
         std::uint16_t min_side = 30;   ///< tiles, at least shapes::kMinSide
@@ -72,7 +74,13 @@ struct WorldSettings {
         shapes::Roughness coast = shapes::Roughness::Natural;
         Outline outline = Outline::Round;
         shapes::Share forest = shapes::Share::Normal;
-        shapes::Share mountains = shapes::Share::Normal;  ///< ore mountains for the size of an island
+        /// Ore mountains for the size of an island, in percent of the templates' (big template, 70 x
+        /// 60: one big and two small ones), 0..kMaxTerrain.
+        std::uint16_t mountains = 100;
+        /// Lakes inland on large islands, each with a river running into it, in percent of the
+        /// default (one per 6000 tiles of an island at least 48 tiles on its shorter side),
+        /// 0..kMaxTerrain.
+        std::uint16_t lakes = 100;
         /// The kind of island world it is: the name of the preset it comes from ("archipelago" or
         /// "<package>:<name>"), "" for none. A changed preset keeps its name; the packages'
         /// climates may take another share of its islands (climates.toml `share.<name>`).
@@ -116,9 +124,11 @@ inline constexpr std::array<std::string_view, 3> kGap = {"narrow", "normal", "wi
 inline constexpr std::array<std::string_view, 3> kCoast = {"smooth", "natural", "rugged"};
 inline constexpr std::array<std::string_view, 3> kOutline = {"round", "long", "branched"};
 inline constexpr std::array<std::string_view, 3> kShare = {"little", "normal", "much"};
+/// The percent of ore mountains an older setup's names (kShare) stand for.
+inline constexpr std::array<std::uint16_t, 3> kMountainPercent = {50, 100, 200};
 /// The keys of set_landscape().
-inline constexpr std::array<std::string_view, 9> kKeys = {"land",  "min",     "max",    "spread",   "gap",
-                                                          "coast", "outline", "forest", "mountains"};
+inline constexpr std::array<std::string_view, 10> kKeys = {"land",  "min",     "max",    "spread",    "gap",
+                                                           "coast", "outline", "forest", "mountains", "lakes"};
 }  // namespace landscape_names
 
 /// A kind of world of islands of their own shape, by name: as they come (the Landscape's
@@ -143,7 +153,8 @@ struct LandscapePreset {
 [[nodiscard]] std::string_view landscape_name(const WorldSettings::Landscape& landscape);
 
 /// Sets one setting of `landscape` from text: `key` one of landscape_names::kKeys, `value` a
-/// number (land: percent, min and max: tiles) or a name of landscape_names. When the smallest
+/// number (land, mountains and lakes: percent, min and max: tiles) or a name of landscape_names
+/// (mountains also little, normal or much: landscape_names::kMountainPercent). When the smallest
 /// island would be larger than the largest, the other side follows. False, and nothing changed,
 /// for an unknown key or a value out of range.
 bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, std::string_view value);

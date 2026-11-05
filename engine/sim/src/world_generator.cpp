@@ -662,8 +662,7 @@ std::optional<shapes::ShapeRequest> Generator::own_request(const Slot& slot) con
                                                                                 : shapes::Form::Compact;
     r.forest = m_landscape.forest;
     r.land = m_landscape.fill();
-    constexpr std::array<std::uint32_t, 3> kPercent = {50, 100, 200};  // Little, Normal, Much
-    const std::uint32_t percent = kPercent[static_cast<std::size_t>(m_landscape.mountains)];
+    const std::uint32_t percent = m_landscape.mountains;
     const std::uint32_t area = std::uint32_t{own->width} * own->height;
     std::uint32_t big = area * percent / 100 / 3500;
     std::uint32_t small = (area * percent / 100 + 1000) / 2000;
@@ -674,9 +673,14 @@ std::optional<shapes::ShapeRequest> Generator::own_request(const Slot& slot) con
     r.big_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(big, 255));
     r.small_mountains = static_cast<std::uint8_t>(std::min<std::uint32_t>(small, 255));
     r.volcano = own->volcano;
-    // Lakes inland on large islands, a river running into each: one for every kTilesPerLake.
+    // Lakes inland on large islands, a river running into each: one for every kTilesPerLake, as
+    // many more or fewer as the landscape asks for.
     if (std::min(own->width, own->height) >= kLakeSide) {
-        r.lakes = static_cast<std::uint8_t>(std::min<std::uint32_t>(area / kTilesPerLake, 255));
+        const std::uint32_t lakes = area * m_landscape.lakes / 100 / kTilesPerLake;
+        r.lakes = static_cast<std::uint8_t>(std::min<std::uint32_t>(lakes, 255));
+        // The mountains beside the lakes follow the share of mountains too (up to one per lake).
+        r.lake_mountains =
+            static_cast<std::uint8_t>(std::min<std::uint32_t>((std::uint32_t{r.lakes} * percent + 50) / 100, r.lakes));
     }
     return r;
 }
