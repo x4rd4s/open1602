@@ -1478,6 +1478,17 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
         if (b.land == 0 || b.sea == 0) {
             return std::nullopt;
         }
+        if (!classic()) {
+            // Open1602: only the shore of the sea. No ship lands on a lake inside the island, so
+            // the original's wall along its shore was bricks for nothing.
+            bool sea = false;
+            rings(p, RingFilter::Any, x, y, x, y, 2, [&](const Tile&, std::int32_t ox, std::int32_t oy, std::int32_t) {
+                sea = sea || open_water(p.island, ox, oy);
+            });
+            if (!sea) {
+                return std::nullopt;
+            }
+        }
         return BuildItem{wall->id, x, y, 0, 0};
     }
     if ((!war || !classic()) && t.kind == kind::kWall) {
@@ -1486,6 +1497,56 @@ std::optional<BuildItem> Engine::wall_item(AiPlayer& p, const City& c, const Til
         return gate_item();
     }
     return std::nullopt;
+}
+
+bool Engine::open_water(std::uint16_t island, std::int32_t x, std::int32_t y) {
+    if (m_open_water.size() < m_world.islands().size()) {
+        m_open_water.resize(m_world.islands().size());
+    }
+    const IslandMap& map = island_of(island).map;
+    const auto w = static_cast<std::int32_t>(map.width());
+    const auto h = static_cast<std::int32_t>(map.height());
+    if (x < 0 || y < 0 || x >= w || y >= h) {
+        return false;
+    }
+    std::vector<std::uint8_t>& open = m_open_water[island];
+    if (open.size() != static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
+        // The water reached from the edge of the island's rectangle through sea, surf and piers;
+        // a river does not count, it runs into a lake as well as into the sea.
+        const auto water = [&](std::int32_t tx, std::int32_t ty) {
+            const std::int32_t k = tile(island, tx, ty).kind;
+            return k == kind::kSea || k == kind::kSurf || k == kind::kSurfCorner || k == kind::kPier;
+        };
+        open.assign(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), 0);
+        std::vector<std::pair<std::int32_t, std::int32_t>> todo;
+        const auto reach = [&](std::int32_t tx, std::int32_t ty) {
+            if (tx < 0 || ty < 0 || tx >= w || ty >= h) {
+                return;
+            }
+            std::uint8_t& o =
+                open[static_cast<std::size_t>(ty) * static_cast<std::size_t>(w) + static_cast<std::size_t>(tx)];
+            if (o == 0 && water(tx, ty)) {
+                o = 1;
+                todo.emplace_back(tx, ty);
+            }
+        };
+        for (std::int32_t i = 0; i < w; ++i) {
+            reach(i, 0);
+            reach(i, h - 1);
+        }
+        for (std::int32_t i = 0; i < h; ++i) {
+            reach(0, i);
+            reach(w - 1, i);
+        }
+        while (!todo.empty()) {
+            const auto [tx, ty] = todo.back();
+            todo.pop_back();
+            for (const auto& n : kStep) {
+                reach(tx + n[0], ty + n[1]);
+            }
+        }
+    }
+    return open[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)] != 0;
 }
 
 bool Engine::inner_wall(AiPlayer& p, std::int32_t x, std::int32_t y) {

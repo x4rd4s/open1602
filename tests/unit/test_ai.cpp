@@ -105,16 +105,18 @@ struct Game {
     assets::FigureTable figures = make_figures();
     sim::World world{90, 90};
 
-    explicit Game(bool computer_ship = true, std::int32_t computer_money = 10000, bool lake = false) {
+    /// With `lake` a lake of 5 x 15 tiles from column `lake_x` on, a beach left of it.
+    explicit Game(bool computer_ship = true, std::int32_t computer_money = 10000, bool lake = false,
+                  std::int32_t lake_x = 26) {
         add_islet(2, 2);
         sim::IslandMap map(50, 50);
         for (std::int32_t y = 0; y < 50; ++y) {
             for (std::int32_t x = 0; x < 50; ++x) {
                 std::uint32_t id = kGround;
                 const bool lake_row = lake && y >= 18 && y <= 32;
-                if (lake_row && x >= 26 && x <= 30) {
+                if (lake_row && x >= lake_x && x < lake_x + 5) {
                     id = kSea;
-                } else if (lake_row && x == 25) {
+                } else if (lake_row && x == lake_x - 1) {
                     id = kBeach;
                 } else if (x > 46) {
                     id = kSea;
@@ -1535,6 +1537,40 @@ TEST_CASE("ai: a computer at peace walls its coast and the border by free beach,
     // The border inland (column 36) faces neither another city nor free beach.
     for (std::uint32_t y = 0; y < 50; ++y) {
         CHECK(!wall_at(g, *city, 36, y));
+    }
+}
+
+TEST_CASE("ai: a computer walls the sea's shore, not a lake's inside its island, the original's both") {
+    for (const bool classic : {false, true}) {
+        Game g(true, 50'000, true, 37);  // the lake's beach in column 36, in the city
+        g.buildings = make_buildings(kWallRecords);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s);
+        sim::City* city = computer_city(g);
+        REQUIRE(city != nullptr);
+        const std::uint8_t bricks = g.buildings.materials().bricks;
+        city->ensure_ware(bricks);
+        g.world.player(kComputer)->set_unlocked(25, true);
+        run_until(s, 240'000, [&] {
+            city->goods[bricks] = 60 * sim::kStockUnitsPerTon;
+            g.world.player(kComputer)->money = 50'000;
+            return false;
+        });
+        CHECK(wall_at(g, *city, 46, 12));  // the sea's beach
+        // The lake's beach inside the city, as the sea's is.
+        const sim::IslandMap& map = g.world.islands()[city->island].map;
+        std::uint32_t owned = 0;
+        for (std::uint32_t y = 18; y <= 32; ++y) {
+            owned += map.top(36, y).city == city->index ? 1U : 0U;
+        }
+        REQUIRE(owned > 0);
+        std::uint32_t lake = 0;
+        for (std::uint32_t y = 18; y <= 32; ++y) {
+            lake += wall_at(g, *city, 36, y) ? 1U : 0U;
+        }
+        CHECK((lake > 0) == classic);
     }
 }
 
