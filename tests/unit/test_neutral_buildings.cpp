@@ -229,6 +229,23 @@ TEST_CASE("neutral buildings: destroyed, their ground is free and their city gon
     CHECK(f.world.city(0, 0) != nullptr);
 }
 
+TEST_CASE("neutral buildings: the editor takes one away, and their city with the last") {
+    Island f;
+    REQUIRE(f.build(kFort, 20, 5, f.neutral).placed == 1);
+    REQUIRE(f.build(kTower, 30, 10, f.neutral).placed == 1);
+    const std::uint8_t city = f.at(20, 5).city;
+    auto fort = editor::remove_building(f.world, f.buildings, 0, {21, 6});
+    REQUIRE(fort.ok());
+    (*fort)->apply(f.world);
+    CHECK(f.at(20, 5).city == sim::MapCell::kNoCity);
+    CHECK(f.world.city(0, city) != nullptr);  // the tower holds it
+    auto tower = editor::remove_building(f.world, f.buildings, 0, {30, 10});
+    REQUIRE(tower.ok());
+    (*tower)->apply(f.world);
+    CHECK(f.at(30, 10).city == sim::MapCell::kNoCity);
+    CHECK(f.world.city(0, city) == nullptr);
+}
+
 TEST_CASE("neutral buildings: the savegame keeps their player, faction and buildings") {
     Island f;
     REQUIRE(f.build(kFort, 20, 5, f.neutral).placed == 1);

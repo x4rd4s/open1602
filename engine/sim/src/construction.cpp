@@ -1355,6 +1355,10 @@ public:
         const auto oy = static_cast<std::uint16_t>(old.origin.y);
         const std::int32_t p = old.type->prod_kind;
         std::optional<Production> state;
+        if (const City* c = m_world.city(m_island, old.city);
+            c != nullptr && m_world.acts_as(c->owner, FactionBehaviour::Neutral)) {
+            m_territory = true;  // the neutral buildings hold only the ground under what stands
+        }
         forget_disaster(m_world, m_island, old.origin);  // its fire or plague goes with it
         if (const auto index = m_world.production_index(m_island, ox, oy)) {
             state = m_world.productions()[*index];
@@ -2148,9 +2152,6 @@ public:
         services_of(to);
     }
 
-    /// The territory is checked again in finish().
-    void territory_changed() noexcept { m_territory = true; }
-
     /// The tiles of footprint `f` of city `from` go to city `to` with what stands on them
     /// (capture_neutral_building).
     void take_over(const Footprint& f, std::uint8_t from, std::uint8_t to) {
@@ -2815,9 +2816,6 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
                           world.acts_as(cell.owner, FactionBehaviour::Settlers);
     Builder builder(world, buildings, island, events);
     builder.destroy(*b);
-    if (b->city != MapCell::kNoCity && world.acts_as(cell.owner, FactionBehaviour::Neutral)) {
-        builder.territory_changed();  // the ruin is nobody's: the neutral buildings hold only what stands
-    }
     // Open1602: a village without its chief's house, market and huts is gone, and so is a computer
     // player's city without Kontor, market, tower and houses: its land is free for anybody's
     // Kontor or market. As in the original (OriginalBugs::native_land) the ruin of the chief's
