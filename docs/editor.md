@@ -135,7 +135,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 | Setting | What it does |
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Template**: a left click builds one of the templates saved in games (the copy tool's pieces, kept in the folder "templates" of the user's data folder) about the mouse, for the owner; what does not fit is left out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
-| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...); not for ships and units. |
+| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
 | Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) and the natives' spearman, placed for the natives only; a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
 | Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader. |
@@ -154,6 +154,13 @@ buried treasure leaves it in the ground. The outline under the mouse is green wh
 stand and red where not; a Kontor, shipyard, mill or mine finds the coast, river or rock face near
 the mouse and turns to it. A refused click says why. A Kontor goes only once its city has nothing
 else, and its piers go with it.
+
+The group **Special objects** holds pieces no build menu offers, placed without owner on open land
+(ground or forest) outside every city: every crop field at each of its growing stages, ripe and
+withered, as wild vegetation; the ruins of the land and of the beach (a beach ruin on the beach); and
+the buildings of the game data no list uses (a wooden outpost, a 2 x 2 building). A growing field
+grows on in the game. In a game they count like forest and ruins: a city that claims their land takes
+them over. **Remove** takes them away again and the ground under them comes back.
 
 Each owner founds one city on an island, the natives and the pirates as well. Their cities are named
 after what they are ("Native village", "Pirates' nest", with a number from the second on); the

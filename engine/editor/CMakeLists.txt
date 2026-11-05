@@ -16,6 +16,7 @@ add_library(o1602_editor
     src/players.cpp
     src/random_elements.cpp
     src/scenario_rules.cpp
+    src/special_objects.cpp
     src/resources.cpp
     src/terrain.cpp
     src/units.cpp

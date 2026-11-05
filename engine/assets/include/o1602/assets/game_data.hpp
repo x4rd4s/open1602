@@ -553,6 +553,10 @@ inline constexpr std::array<WeightedId, 15> kGroundMix{{{22722, 51},
 /// [LANDSCHAFT]: the natives' and pirates' buildings and a few others.
 inline constexpr std::array<std::uint32_t, 17> kLandscape{22201, 22202, 22203, 22204, 22205, 22231, 22232, 22233, 22234,
                                                           22235, 22211, 22221, 22222, 22223, 22241, 21304, 22802};
+/// Buildings of the game data that no build menu, no list of the natives or pirates and no ruin
+/// slot offers, with pictures of their own: a 1 x 1 wooden outpost and a 2 x 2 building. The editor
+/// places them as special objects, without owner.
+inline constexpr std::array<std::uint32_t, 2> kUnusedBuildings{21801, 20601};
 /// The records a game cannot run without (BuildingTable::missing): demolition, volcanoes and ruins
 /// place them.
 inline constexpr std::array<std::uint32_t, 3> kRequired{kMeadow, kBigOreMountain, kRuin};
