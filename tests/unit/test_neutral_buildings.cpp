@@ -253,6 +253,26 @@ TEST_CASE("neutral buildings: the editor takes one away, and their city with the
     CHECK(f.world.city(0, city) == nullptr);
 }
 
+TEST_CASE("neutral buildings: the ground of one the editor takes away goes to the land around it") {
+    Island f;
+    REQUIRE(f.build(kTower, 14, 5, f.neutral).placed == 1);
+    sim::IslandMap& m = f.world.island(0).map;
+    REQUIRE(m.place(*f.buildings.by_id(kMarket), 18, 5, 0, 0, 0, 0).ok());
+    for (std::uint32_t y = 0; y < 20; ++y) {
+        for (std::uint32_t x = 13; x <= 24; ++x) {
+            if (x != 14 || y != 5) {
+                m.set_city(x, y, 0, 0);
+            }
+        }
+    }
+    REQUIRE(f.at(14, 5).owner == f.neutral);
+    auto tower = editor::remove_building(f.world, f.buildings, 0, {14, 5});
+    REQUIRE(tower.ok());
+    (*tower)->apply(f.world);
+    CHECK(f.at(14, 5).city == 0);
+    CHECK(f.at(14, 5).owner == 0);
+}
+
 TEST_CASE("neutral buildings: the savegame keeps their player, faction and buildings") {
     Island f;
     REQUIRE(f.build(kFort, 20, 5, f.neutral).placed == 1);

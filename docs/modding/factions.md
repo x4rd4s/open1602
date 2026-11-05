@@ -163,4 +163,6 @@ and hold the ground they stand on and no more. The editor gives the map their pl
   reaches all of it: the circle of a Kontor or a market, or the reach of a tower of one of the
   player's cities on the island. Elsewhere it falls to ruins like any enemy building. A ruin is
   nobody's, and once the last neutral building on an island is gone, so is their city there.
+  The ground of a neutral building that is gone goes to the city whose land lies around it, or is
+  free.
 

@@ -1274,7 +1274,8 @@ std::uint8_t covering_city(const World& world, std::uint16_t island, std::uint8_
             return c;
         }
     }
-    if (!acting_player(world, own->owner)) {
+    // The ground of a neutral building that is gone goes to the city whose land lies around it.
+    if (!acting_player(world, own->owner) && !world.acts_as(own->owner, FactionBehaviour::Neutral)) {
         return MapCell::kNoCity;
     }
     for (std::uint8_t c = 0; c < kCitySlotsPerIsland; ++c) {
