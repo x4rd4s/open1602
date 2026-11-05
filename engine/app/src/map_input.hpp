@@ -170,6 +170,10 @@ public:
     /// Every frame of the game: a window changed the selection (filters, formations), or units
     /// died, sank or changed hands: the windows follow.
     void follow_selection();
+    /// Every frame of the game: blueprint mode ends with the build menu (the status button, a
+    /// right click back to the player status, Escape, another mode), so the next building is a
+    /// real one again.
+    void end_blueprint_outside_build();
 
     /// The selection changed: the windows follow (a single ship in the info mode, groups and land
     /// units in the military mode).

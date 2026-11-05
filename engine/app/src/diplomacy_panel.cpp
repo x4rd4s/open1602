@@ -75,6 +75,12 @@ public:
                 break;
             }
         }
+        // Open1602: the partner's name bar and shield tell with whom the partner is at war.
+        for (std::size_t r = 0; r < m_rows; ++r) {
+            for (const std::int32_t id : {kBoard, kName, kShieldShadow, kShield}) {
+                m_vertrag.set_hover_only(id + static_cast<std::int32_t>(r), true);
+            }
+        }
     }
 
     void set_scale(double scale) override {
@@ -227,7 +233,7 @@ public:
                     return std::nullopt;
             }
         }
-        for (const std::int32_t base : {kTrade, kPeace, kHand, kShield}) {
+        for (const std::int32_t base : {kTrade, kPeace, kHand, kShield, kShieldShadow, kName, kBoard}) {
             const std::int32_t r = id - base;
             if (r < 0 || static_cast<std::size_t>(r) >= std::min(partners.size(), m_rows)) {
                 continue;
@@ -236,7 +242,7 @@ public:
             if (base == kHand) {
                 return panel_detail::help_line(c, 207);
             }
-            if (base == kShield) {
+            if (base == kShield || base == kShieldShadow || base == kName || base == kBoard) {
                 return diplomacy::wars_text(c.world(), b);  // Open1602: the partner's wars
             }
             return treaty_line(b, base == kTrade);

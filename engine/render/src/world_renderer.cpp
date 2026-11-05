@@ -1438,13 +1438,13 @@ void build_world_draw_list(const sim::World& world, const assets::BuildingTable&
                     if (layers.lighting == nullptr || !layers.lighting->active()) {
                         return;
                     }
-                    // Water, the island's shallows, surf, river mouths and the bare beach included,
-                    // is never land to build on: the whole shore is shaded like the sea, whoever's
-                    // land it lies in, instead of bright strips along the own coast.
+                    // As in the original, water, surf and river mouths are shaded like the sea,
+                    // whoever's land they lie in; the beach and the steep coast are land like the
+                    // rest: lit on the player's own land, dimmed elsewhere.
                     const assets::BuildingType* t =
                         cell != nullptr && !cell->empty() ? buildings.by_sprite(cell->sprite) : nullptr;
-                    const bool land = t != nullptr && (t->kind < sim::building_kind::kSea ||
-                                                       t->kind > sim::building_kind::kBeachVariant);
+                    const bool land = t != nullptr &&
+                                      (t->kind < sim::building_kind::kSea || t->kind > sim::building_kind::kRiverMouth);
                     // A building is lit or dark as a whole, whichever of its tiles is drawn.
                     TileLighting::Footprint footprint{wx, wy, 1, 1};
                     if (t != nullptr && t->tile_count() > 1 && !hidden) {

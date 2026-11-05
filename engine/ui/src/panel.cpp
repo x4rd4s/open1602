@@ -94,6 +94,12 @@ void Panel::set_no_select(std::int32_t id, bool on) {
     }
 }
 
+void Panel::set_hover_only(std::int32_t id, bool on) {
+    if (const auto i = m_layout.index_of(id)) {
+        m_state[*i].hover_only = on;
+    }
+}
+
 void Panel::set_visible(std::int32_t id, bool on) {
     if (const auto i = m_layout.index_of(id)) {
         m_state[*i].hidden = !on;
@@ -210,7 +216,7 @@ std::optional<std::size_t> Panel::hit(std::int32_t x, std::int32_t y) const {
     std::optional<std::size_t> found;
     for (std::size_t i = 0; i < m_layout.gadgets.size(); ++i) {
         const assets::Gadget& g = m_layout.gadgets[i];
-        if (g.kind == GadgetKind::Unused || g.no_select || m_state[i].no_select) {
+        if (g.kind == GadgetKind::Unused || m_state[i].no_select || (g.no_select && !m_state[i].hover_only)) {
             continue;
         }
         if (x >= g.pos[0] && y >= g.pos[1] && x < g.pos[0] + g.size[0] && y < g.pos[1] + g.size[1]) {
@@ -248,8 +254,8 @@ std::vector<PanelEvent> Panel::mouse(std::int32_t x, std::int32_t y, bool down) 
     };
     if (down && !m_down) {
         m_down = true;
-        m_pressed = over;
-        if (over) {
+        m_pressed = over && !m_state[*over].hover_only ? over : std::nullopt;
+        if (m_pressed) {
             const assets::Gadget& g = m_layout.gadgets[*over];
             if (g.menu) {
                 events.push_back(PanelEvent{PanelEvent::Kind::Pressed, g.id});
