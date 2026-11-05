@@ -173,6 +173,15 @@ constexpr std::array<std::uint32_t, 11> kSmallest = {16, 20, 25, 30, 40, 50, 60,
 constexpr std::array<std::uint32_t, 14> kLargest = {40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 700, 1000};
 static_assert(kLandShares.front() >= Landscape::kMinLand && kLandShares.back() <= Landscape::kMaxLand);
 static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= sim::shapes::kMaxSide);
+/// Ore mountains and lakes: percent of what an island of its size has by default, the slider's
+/// steps.
+constexpr std::array<std::uint32_t, 13> kTerrainPercents = {0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300};
+static_assert(kTerrainPercents.back() <= Landscape::kMaxTerrain);
+
+/// A share of ore mountains or lakes as the dialog shows it: "None" or "<n> %".
+std::string terrain_text(std::uint32_t percent) {
+    return percent == 0 ? ui::tr("setup.amount.none") : ui::tr("setup.win.percent", {std::to_string(percent)});
+}
 
 /// The kinds of world of the page's first item, after the original's islands: Open1602's
 /// (setup.island_preset.<name>), then the packages' (landscapes.toml).
@@ -433,8 +442,10 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::Outline:
             return kOutlineNames.size();
         case SetupItem::Forest:
-        case SetupItem::OreMountains:
             return kShareNames.size();
+        case SetupItem::OreMountains:
+        case SetupItem::Lakes:
+            return kTerrainPercents.size();
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
             return kAmounts.size();
@@ -596,7 +607,9 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::Forest:
             return enum_choice(w.landscape.forest, kShareNames.size());
         case SetupItem::OreMountains:
-            return enum_choice(w.landscape.mountains, kShareNames.size());
+            return nearest(kTerrainPercents, w.landscape.mountains);
+        case SetupItem::Lakes:
+            return nearest(kTerrainPercents, w.landscape.lakes);
         case SetupItem::Villages:
             return index_of(kAmounts, w.natives);
         case SetupItem::VolcanoIslands:
@@ -810,7 +823,10 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             w.landscape.forest = static_cast<Share>(choice);
             break;
         case SetupItem::OreMountains:
-            w.landscape.mountains = static_cast<Share>(choice);
+            w.landscape.mountains = static_cast<std::uint16_t>(kTerrainPercents[choice]);
+            break;
+        case SetupItem::Lakes:
+            w.landscape.lakes = static_cast<std::uint16_t>(kTerrainPercents[choice]);
             break;
         case SetupItem::Villages:
             w.natives = kAmounts[choice];
@@ -931,6 +947,7 @@ bool setup_item_used(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::Outline:
         case SetupItem::Forest:
         case SetupItem::OreMountains:
+        case SetupItem::Lakes:
             return setup.own_world && setup.world.shapes == Shapes::Own;
         case SetupItem::WorldSize:
         case SetupItem::Players:
@@ -1227,8 +1244,9 @@ std::string_view setup_label_key(SetupItem item) {
         "setup.largest_island",
         "setup.size_spread",
         "setup.island_gap",
-        "setup.forest",
         "setup.ore_mountains",
+        "setup.lakes",
+        "setup.forest",
         "setup.climate_crops",
         "setup.big_ore_veins",
         "setup.reveal_resources",
@@ -1380,8 +1398,10 @@ std::string setup_value(SetupItem item, std::size_t choice) {
         case SetupItem::Outline:
             return ui::tr("setup.outline." + std::string(kOutlineNames[choice]));
         case SetupItem::Forest:
-        case SetupItem::OreMountains:
             return ui::tr("setup.share." + std::string(kShareNames[choice]));
+        case SetupItem::OreMountains:
+        case SetupItem::Lakes:
+            return terrain_text(kTerrainPercents[choice]);
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
             return amount_text(kAmounts[choice]);
@@ -1533,6 +1553,16 @@ std::optional<std::string> custom_value(const EndlessSetup& setup, SetupItem ite
         case SetupItem::LargestIsland:
             if (!offered(kLargest, std::uint32_t{w.landscape.max_side})) {
                 return ui::tr("setup.tiles", {std::to_string(w.landscape.max_side)});
+            }
+            break;
+        case SetupItem::OreMountains:
+            if (!offered(kTerrainPercents, std::uint32_t{w.landscape.mountains})) {
+                return terrain_text(w.landscape.mountains);
+            }
+            break;
+        case SetupItem::Lakes:
+            if (!offered(kTerrainPercents, std::uint32_t{w.landscape.lakes})) {
+                return terrain_text(w.landscape.lakes);
             }
             break;
         case SetupItem::WinInhabitants:
@@ -1830,7 +1860,8 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("island_coast", kCoastNames[enum_choice(l.coast, kCoastNames.size())]);
     line("island_outline", kOutlineNames[enum_choice(l.outline, kOutlineNames.size())]);
     line("island_forest", kShareNames[enum_choice(l.forest, kShareNames.size())]);
-    line("island_mountains", kShareNames[enum_choice(l.mountains, kShareNames.size())]);
+    line("island_mountains", std::to_string(l.mountains));
+    line("island_lakes", std::to_string(l.lakes));
     line("villages", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.natives), kAmountNames.size() - 1)]);
     line("volcano_islands",
          kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.volcanoes), kAmountNames.size() - 1)]);

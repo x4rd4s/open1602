@@ -635,9 +635,19 @@ TEST_CASE("world plan: the landscape's settings by name, as setup files and the 
     CHECK(l.outline == L::Outline::Branched);
     CHECK(sim::set_landscape(l, "forest", "little"));
     CHECK(l.forest == sim::shapes::Share::Little);
-    CHECK(sim::set_landscape(l, "mountains", "much"));
-    CHECK(l.mountains == sim::shapes::Share::Much);
+    CHECK(sim::set_landscape(l, "mountains", "much"));  // a setup of before the percent
+    CHECK(l.mountains == 200);
+    CHECK(sim::set_landscape(l, "mountains", "75"));
+    CHECK(l.mountains == 75);
     CHECK(!sim::set_landscape(l, "mountains", "many"));
+    CHECK(!sim::set_landscape(l, "mountains", "301"));
+    CHECK(l.lakes == 100);
+    CHECK(sim::set_landscape(l, "lakes", "0"));
+    CHECK(l.lakes == 0);
+    CHECK(sim::set_landscape(l, "lakes", "300"));
+    CHECK(l.lakes == 300);
+    CHECK(!sim::set_landscape(l, "lakes", "little"));
+    CHECK(!sim::set_landscape(l, "lakes", "301"));
     CHECK(!sim::set_landscape(l, "rivers", "many"));
     // Every preset has a name of its own and is a landscape the settings can give.
     for (const sim::LandscapePreset& p : sim::landscape_presets()) {

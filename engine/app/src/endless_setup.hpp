@@ -109,8 +109,9 @@ enum class SetupItem : std::uint8_t {
     LargestIsland,
     SizeSpread,
     IslandGap,
+    OreMountains,  ///< a slider (setup_item_slider), as Lakes
+    Lakes,
     Forest,
-    OreMountains,
     ClimateCrops,     ///< Rules::climate_crops
     BigOreVeins,      ///< Rules::big_ore_veins
     RevealResources,  ///< Rules::reveal_resources
@@ -167,12 +168,17 @@ enum class SetupItem : std::uint8_t {
 [[nodiscard]] std::string balance_summary(const sim::Rules& rules);
 /// Whether an item is on the page of the islands.
 [[nodiscard]] constexpr bool island_item(SetupItem item) noexcept {
-    return item >= SetupItem::IslandPreset && item <= SetupItem::OreMountains;
+    return item >= SetupItem::IslandPreset && item <= SetupItem::Forest;
 }
 /// Whether an item shapes the islands of a world of islands of their own shape and size (the
 /// page's items after the shapes).
 [[nodiscard]] constexpr bool landscape_item(SetupItem item) noexcept {
-    return item >= SetupItem::Coast && item <= SetupItem::OreMountains;
+    return item >= SetupItem::Coast && item <= SetupItem::Forest;
+}
+/// Whether the dialog shows an item as a slider over its values (the share of ore mountains and
+/// of lakes) instead of a button that steps through them.
+[[nodiscard]] constexpr bool setup_item_slider(SetupItem item) noexcept {
+    return item == SetupItem::OreMountains || item == SetupItem::Lakes;
 }
 /// The page of the islands in a few words: the preset it matches, or "own settings".
 [[nodiscard]] std::string islands_summary(const EndlessSetup& setup);

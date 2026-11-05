@@ -107,18 +107,33 @@ constexpr Group kDisasterGroups[] = {
     {"setup.group.disasters", SetupItem::Droughts, SetupItem::Fires, kLeft},
 };
 
-// The islands: what kind of world, the land and its sizes, and what is on the islands; the
-// preview on the right.
+// The islands: what kind of world, the land and its sizes, and what is on the islands; on the
+// right the preview and below it the sliders of the ore mountains and the lakes.
 constexpr Group kIslandGroups[] = {
     {"setup.group.island_shapes", SetupItem::IslandPreset, SetupItem::Outline, kLeft},
     {"setup.group.island_sizes", SetupItem::LandShare, SetupItem::IslandGap, kLeft},
     {"setup.group.island_nature", SetupItem::Forest, SetupItem::RevealResources, kLeft},
+    {"setup.group.island_terrain", SetupItem::OreMountains, SetupItem::Lakes, kRight},
 };
 
 // The preview: its frame in the right column, the picture inside it at most this large.
 constexpr std::int32_t kPreviewW = kGroupW - 24;
-constexpr std::int32_t kPreviewH = 330;
+constexpr std::int32_t kPreviewH = 320;
+/// The preview's frame, high.
+constexpr std::int32_t kPreviewFrameH = 12 + kPreviewH + 8 + 26 + 8 + 44 + 12;
+/// The value beside a slider ("300 %").
+constexpr std::int32_t kSliderValueW = 80;
 constexpr std::int32_t kCell = 2;  ///< design units of one cell of the picture
+
+/// The value of a slider item for its knob at `position` (0..1): the nearest step.
+std::size_t slider_choice(SetupItem item, double position) {
+    const std::size_t n = setup_choices(item);
+    if (n < 2) {
+        return 0;
+    }
+    const double at = std::clamp(position, 0.0, 1.0) * static_cast<double>(n - 1);
+    return std::min(n - 1, static_cast<std::size_t>(std::lround(at)));
+}
 
 std::string_view title_key(SetupScope scope) {
     switch (scope) {
@@ -267,8 +282,7 @@ void GameSettingsMenu::picture(const sim::WorldPreview& p) {
 
 void GameSettingsMenu::layout_preview(std::int32_t x, std::int32_t y) {
     ui::Form& f = m_form;
-    const std::int32_t h = 12 + kPreviewH + 8 + 26 + 8 + 44 + 12;
-    f.panel(Rect{x, y, kGroupW, h});
+    f.panel(Rect{x, y, kGroupW, kPreviewFrameH});
     const Rect area{x + 12, y + 12, kPreviewW, kPreviewH};
     update_preview();
     if (m_preview && m_picture_w > 0) {
@@ -369,7 +383,10 @@ GameSettingsMenu::Result GameSettingsMenu::mouse(std::int32_t x, std::int32_t y,
     if (*id >= kItem && *id < kItem + static_cast<Id>(kSetupItems)) {
         const auto item = static_cast<SetupItem>(*id - kItem);
         if (editable && setup_item_open(m_setup, m_scope, item)) {
-            if (m_form.clicked_with() == ui::MouseButton::Right) {
+            if (setup_item_slider(item)) {
+                // The slider, let go: the nearest of the item's values.
+                choose(m_setup, item, slider_choice(item, m_form.slid_to()));
+            } else if (m_form.clicked_with() == ui::MouseButton::Right) {
                 choose_previous(m_setup, item);
             } else {
                 choose_next(m_setup, item);
@@ -499,6 +516,11 @@ void GameSettingsMenu::layout() {
             measure(ui::tr("setup.balance"));
         }
     }
+    if (islands) {
+        // The preview first: the right column's groups follow below it.
+        layout_preview(kRight, kTop);
+        right_y = kTop + kPreviewFrameH + kGap;
+    }
     const std::int32_t label_w = std::clamp(static_cast<std::int32_t>(std::ceil(longest)) + 2 * kTextPadding,
                                             kMinLabelW, kRowW - 4 - kMinValueW);
     const std::int32_t value_w = kRowW - 4 - label_w;
@@ -549,7 +571,23 @@ void GameSettingsMenu::layout() {
             const bool used = setup_item_used(m_setup, item);
             const std::int32_t y = top + static_cast<std::int32_t>(i) * kRowH;
             tip(Rect{g.x + 12, y, kRowW, kRowH - 4}, setup_label_key(item));
-            if (editable) {
+            if (editable && setup_item_slider(item)) {
+                // A slider, with its value beside it; while it is dragged the value it would take
+                // (as the display settings' sliders).
+                const bool open = setup_item_open(m_setup, m_scope, item);
+                const Id id = kItem + static_cast<Id>(item);
+                const Rect value = row(g.x, y, setup_label(item), used);
+                std::string shown = setup_value(m_setup, item);
+                if (const auto at = f.sliding(id)) {
+                    shown = setup_value(item, slider_choice(item, *at));
+                }
+                const std::size_t n = setup_choices(item);
+                const double position =
+                    n > 1 ? static_cast<double>(setup_choice(m_setup, item)) / static_cast<double>(n - 1) : 0.0;
+                f.slider(id, Rect{value.x, value.y, value.w - kSliderValueW, value.h}, position, open);
+                f.label(Rect{value.x + value.w - kSliderValueW, value.y, kSliderValueW, value.h}, shown, Align::Right,
+                        used ? Tone::Normal : Tone::Dim);
+            } else if (editable) {
                 f.cycle_button(kItem + static_cast<Id>(item), row(g.x, y, setup_label(item), used),
                                setup_value(m_setup, item), setup_item_open(m_setup, m_scope, item));
             } else {
@@ -572,10 +610,6 @@ void GameSettingsMenu::layout() {
         tip(Rect{kLeft + 12, top, kRowW, kRowH - 4}, "setup.bugs");
         const Rect value = row(kLeft, top, ui::tr("setup.bugs"), page_bugs(m_setup.rules.bugs).count() != 0);
         f.button(kBugs, value, ui::tr("setup.bugs.open", {bugs_summary(m_setup.rules.bugs)}));
-    }
-    if (islands) {
-        layout_preview(kRight, kTop);
-        right_y = kTop + 12 + kPreviewH + 8 + 26 + 8 + 44 + 12 + kGap;
     }
     // The hint below the lower column; three lines of it fit above the buttons.
     const std::int32_t hint_y = std::max({kHintY, left_y, right_y});

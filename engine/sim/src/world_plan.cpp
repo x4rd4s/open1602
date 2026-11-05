@@ -1280,13 +1280,25 @@ bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, st
         if (landscape.min_side > landscape.max_side) {
             (min ? landscape.max_side : landscape.min_side) = static_cast<std::uint16_t>(n);
         }
+    } else if (key == "mountains" || key == "lakes") {
+        const bool mountains = key == "mountains";
+        if (number) {
+            if (n > L::kMaxTerrain) {
+                return false;
+            }
+            (mountains ? landscape.mountains : landscape.lakes) = static_cast<std::uint16_t>(n);
+        } else if (const auto i = mountains ? choice(names::kShare) : std::nullopt) {
+            landscape.mountains = names::kMountainPercent[*i];  // a setup of before the percent
+        } else {
+            return false;
+        }
     } else {
-        const std::array<std::string_view, 3>* list = key == "spread"                         ? &names::kSpread
-                                                      : key == "gap"                          ? &names::kGap
-                                                      : key == "coast"                        ? &names::kCoast
-                                                      : key == "outline"                      ? &names::kOutline
-                                                      : key == "forest" || key == "mountains" ? &names::kShare
-                                                                                              : nullptr;
+        const std::array<std::string_view, 3>* list = key == "spread"    ? &names::kSpread
+                                                      : key == "gap"     ? &names::kGap
+                                                      : key == "coast"   ? &names::kCoast
+                                                      : key == "outline" ? &names::kOutline
+                                                      : key == "forest"  ? &names::kShare
+                                                                         : nullptr;
         const auto i = list != nullptr ? choice(*list) : std::nullopt;
         if (!i) {
             return false;
@@ -1300,7 +1312,7 @@ bool set_landscape(WorldSettings::Landscape& landscape, std::string_view key, st
         } else if (key == "outline") {
             landscape.outline = static_cast<L::Outline>(*i);
         } else {
-            (key == "forest" ? landscape.forest : landscape.mountains) = static_cast<shapes::Share>(*i);
+            landscape.forest = static_cast<shapes::Share>(*i);
         }
     }
     return true;
