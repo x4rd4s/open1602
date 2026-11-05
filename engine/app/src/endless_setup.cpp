@@ -176,7 +176,7 @@ static_assert(kSmallest.front() >= sim::shapes::kMinSide && kLargest.back() <= s
 /// Ore mountains and lakes: percent of what an island of its size has by default, the slider's
 /// steps.
 constexpr std::array<std::uint32_t, 13> kTerrainPercents = {0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300};
-static_assert(kTerrainPercents.back() <= Landscape::kMaxTerrain);
+static_assert(kTerrainPercents.back() <= Landscape::kMaxTerrain);  // mountains, lakes, veins
 
 /// A share of ore mountains or lakes as the dialog shows it: "None" or "<n> %".
 std::string terrain_text(std::uint32_t percent) {
@@ -445,6 +445,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kShareNames.size();
         case SetupItem::OreMountains:
         case SetupItem::Lakes:
+        case SetupItem::Veins:
             return kTerrainPercents.size();
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
@@ -610,6 +611,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return nearest(kTerrainPercents, w.landscape.mountains);
         case SetupItem::Lakes:
             return nearest(kTerrainPercents, w.landscape.lakes);
+        case SetupItem::Veins:
+            return nearest(kTerrainPercents, w.landscape.veins);
         case SetupItem::Villages:
             return index_of(kAmounts, w.natives);
         case SetupItem::VolcanoIslands:
@@ -828,6 +831,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::Lakes:
             w.landscape.lakes = static_cast<std::uint16_t>(kTerrainPercents[choice]);
             break;
+        case SetupItem::Veins:
+            w.landscape.veins = static_cast<std::uint16_t>(kTerrainPercents[choice]);
+            break;
         case SetupItem::Villages:
             w.natives = kAmounts[choice];
             break;
@@ -948,6 +954,7 @@ bool setup_item_used(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::Forest:
         case SetupItem::OreMountains:
         case SetupItem::Lakes:
+        case SetupItem::Veins:
             return setup.own_world && setup.world.shapes == Shapes::Own;
         case SetupItem::WorldSize:
         case SetupItem::Players:
@@ -1247,6 +1254,7 @@ std::string_view setup_label_key(SetupItem item) {
         "setup.ore_mountains",
         "setup.lakes",
         "setup.forest",
+        "setup.veins",
         "setup.climate_crops",
         "setup.big_ore_veins",
         "setup.reveal_resources",
@@ -1401,6 +1409,7 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr("setup.share." + std::string(kShareNames[choice]));
         case SetupItem::OreMountains:
         case SetupItem::Lakes:
+        case SetupItem::Veins:
             return terrain_text(kTerrainPercents[choice]);
         case SetupItem::Villages:
         case SetupItem::VolcanoIslands:
@@ -1563,6 +1572,11 @@ std::optional<std::string> custom_value(const EndlessSetup& setup, SetupItem ite
         case SetupItem::Lakes:
             if (!offered(kTerrainPercents, std::uint32_t{w.landscape.lakes})) {
                 return terrain_text(w.landscape.lakes);
+            }
+            break;
+        case SetupItem::Veins:
+            if (!offered(kTerrainPercents, std::uint32_t{w.landscape.veins})) {
+                return terrain_text(w.landscape.veins);
             }
             break;
         case SetupItem::WinInhabitants:
@@ -1862,6 +1876,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("island_forest", kShareNames[enum_choice(l.forest, kShareNames.size())]);
     line("island_mountains", std::to_string(l.mountains));
     line("island_lakes", std::to_string(l.lakes));
+    line("island_veins", std::to_string(l.veins));
     line("villages", kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.natives), kAmountNames.size() - 1)]);
     line("volcano_islands",
          kAmountNames[std::min<std::size_t>(static_cast<std::size_t>(w.volcanoes), kAmountNames.size() - 1)]);

@@ -1534,7 +1534,8 @@ TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
     REQUIRE(!templates.empty());
     // Water no sea reaches from the map's edge (the lakes) and mountain tiles, by the world.
     using Tile = sim::WorldPreview::Tile;
-    const auto measure = [&](std::uint16_t lakes, std::uint16_t mountains) {
+    std::size_t veins = 0;  // of the last world measured: iron and gold
+    const auto measure = [&](std::uint16_t lakes, std::uint16_t mountains, std::uint16_t vein_share = 100) {
         sim::WorldSettings settings;
         settings.seed = 5;
         settings.shapes = sim::WorldSettings::Shapes::Own;
@@ -1543,6 +1544,7 @@ TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
         settings.landscape.max_side = 160;
         settings.landscape.lakes = lakes;
         settings.landscape.mountains = mountains;
+        settings.landscape.veins = vein_share;
         std::vector<std::string> warnings;
         auto plan = sim::plan_world(settings, templates, &warnings);
         REQUIRE(plan.ok());
@@ -1550,6 +1552,7 @@ TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
         start.seed = 5;
         auto w = sim::generate_islands(scenario(standard_plan()), *plan, fake.game, buildings(), start, &warnings);
         REQUIRE(w.ok());
+        veins = deposits_of(*w, kIron) + deposits_of(*w, kGold);
         auto world = sim::load_world(w->file, buildings(), fake.game, &warnings, start);
         REQUIRE(world.ok());
         const sim::WorldPreview p = sim::preview_of(*world, buildings());
@@ -1604,6 +1607,17 @@ TEST_CASE("world generator: the landscape's share of lakes and ore mountains") {
     CHECK(more_mountains.second > none.second);
     // The mountains beside the lakes follow the share of mountains too.
     CHECK(measure(300, 0).second < many.second);
+    // The veins on as many mountains: none but the home islands' iron, more than usual.
+    const auto mountains_usual = measure(0, 300, 100);
+    const std::size_t usual_veins = veins;
+    const auto mountains_few_veins = measure(0, 300, 0);
+    const std::size_t few_veins = veins;
+    const auto mountains_many_veins = measure(0, 300, 300);
+    const std::size_t many_veins = veins;
+    CHECK(mountains_few_veins.second == mountains_usual.second);  // the same mountains
+    CHECK(mountains_many_veins.second == mountains_usual.second);
+    CHECK(few_veins < usual_veins);
+    CHECK(many_veins > usual_veins);
 }
 
 TEST_CASE("world generator: a native village on an island larger than the original's, within its first 255 tiles") {
