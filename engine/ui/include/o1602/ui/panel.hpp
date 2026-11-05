@@ -133,6 +133,9 @@ public:
     void set_hidden(std::int32_t id, bool on);
     /// Not clickable.
     void set_no_select(std::int32_t id, bool on);
+    /// Answers the mouse for its help line although the layout makes it not clickable; a press
+    /// on it does nothing. A hidden gadget (set_visible) stays quiet.
+    void set_hover_only(std::int32_t id, bool on);
     /// Hidden and not clickable, or both undone: what the original's windows do with gadgets that
     /// do not apply (hidden ones would still answer the mouse).
     void set_visible(std::int32_t id, bool on);
@@ -194,6 +197,7 @@ private:
         bool disabled = false;
         bool faded = false;
         bool no_select = false;
+        bool hover_only = false;
         std::array<std::int32_t, 2> slider{};
         std::int32_t scroll = 0;
         std::string text;

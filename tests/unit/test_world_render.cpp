@@ -651,6 +651,55 @@ TEST_CASE("world renderer: a building on the border of a catchment circle is lit
     }
 }
 
+TEST_CASE("world renderer: building lights the player's beach and dims surf and river mouths, as the original") {
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"HAUS_PRODTYP", 2}};
+    const auto doc = assets::cod::parse(
+        "Objekt: HAUS\n"
+        "  @Nummer: 0\n"
+        "  Id: 21201\n  Gfx: 10\n  Size: 1, 1\n  Kind: 19\n"
+        "  @Nummer: +1\n"
+        "  Id: 21300\n  Gfx: 20\n  Size: 1, 1\n  Kind: 23\n"  // beach
+        "  @Nummer: +1\n"
+        "  Id: 21301\n  Gfx: 21\n  Size: 1, 1\n  Kind: 27\n"  // steep coast
+        "  @Nummer: +1\n"
+        "  Id: 21302\n  Gfx: 22\n  Size: 1, 1\n  Kind: 20\n"  // surf
+        "  @Nummer: +1\n"
+        "  Id: 21303\n  Gfx: 23\n  Size: 1, 1\n  Kind: 22\n"  // river mouth
+        "EndObj\n",
+        types);
+    auto loaded = assets::BuildingTable::from_cod(doc);
+    REQUIRE(loaded.ok());
+    const assets::BuildingTable table = std::move(loaded).value();
+    sim::World world;
+    auto island = make_island(10, 20, 4, 2);
+    // Row 0 the player's city, row 1 nobody's: beach, steep coast, surf, river mouth.
+    for (std::int32_t y = 0; y < 2; ++y) {
+        const sim::PlayerId owner = y == 0 ? 0 : sim::kNoPlayer;
+        const std::uint8_t city = y == 0 ? 0 : sim::MapCell::kNoCity;
+        for (std::int32_t x = 0; x < 4; ++x) {
+            const auto id = static_cast<std::uint32_t>(21300 + x);
+            REQUIRE(island.map.place(*table.by_id(id), x, y, 0, 0, owner, city).ok());
+        }
+    }
+    REQUIRE(world.add_island(std::move(island)).ok());
+    const render::AnimationClock clock(table);
+    const render::TileLighting lighting = render::TileLighting::territory(0);
+    render::WorldView view;
+    view.zoom = render::Zoom::Small;
+    render::Viewport all;
+    render::world_pixel_size(view, all.width, all.height);
+    render::WorldLayers layers;
+    layers.extent = render::SpriteExtent{16, 8};
+    layers.lighting = &lighting;
+    std::vector<render::DrawCommand> commands;
+    render::build_world_draw_list(world, table, clock, view, all, layers, commands);
+    std::size_t lit = 0;
+    for (const auto& c : commands) {
+        lit += static_cast<std::size_t>(c.mode == render::DrawCommand::Mode::Normal);
+    }
+    CHECK(lit == 2);  // the player's beach and steep coast; surf, river mouth and the rest dark
+}
+
 TEST_CASE("world renderer: viewport culling keeps exactly the visible tiles (all rotations)") {
     const auto table = make_table();
     const sim::World world;

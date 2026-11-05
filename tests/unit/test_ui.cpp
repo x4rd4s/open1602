@@ -158,6 +158,30 @@ TEST_CASE("ui: regions of the screen and the original's rounding") {
     CHECK(ui::text_art_size(0.5) == ui::ArtSize::Small);
 }
 
+TEST_CASE("ui: a gadget the layout makes not clickable answers the mouse for its help only when told") {
+    assets::GadgetLayout l = layout();
+    for (auto& g : l.gadgets) {
+        if (g.id == 500) {
+            g.no_select = true;
+        }
+    }
+    ui::Panel panel(l, 1.0);
+    panel.mouse(20, 30, false);
+    CHECK(!panel.hovered());
+    panel.set_hover_only(500, true);
+    panel.mouse(20, 30, false);
+    CHECK(panel.hovered() == std::optional<std::int32_t>(500));
+    // A press on it does nothing: no pressed picture, no click.
+    CHECK(panel.mouse(20, 30, true).empty());
+    CHECK(!panel.held());
+    CHECK(panel.mouse(20, 30, false).empty());
+    CHECK(!panel.selected(500));
+    // Hidden, it stays quiet.
+    panel.set_visible(500, false);
+    panel.mouse(20, 30, false);
+    CHECK(!panel.hovered());
+}
+
 TEST_CASE("ui: a panel draws by state and answers the mouse") {
     ui::Panel panel(layout(), 1.0);
     panel.set_text(501, "Ja");

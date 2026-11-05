@@ -1938,6 +1938,14 @@ void MapInput::toggle_blueprint() {
     }
 }
 
+void MapInput::end_blueprint_outside_build() {
+    if (!m_tool.blueprint() || !m_hud || m_hud->mode() == Hud::kModeBuild) {
+        return;
+    }
+    m_tool.set_blueprint(false);
+    m_hud->set_blueprint_in_build_menu(false);
+}
+
 void MapInput::build_blueprints() {
     const auto spot = spot_at_mouse();
     if (!spot) {

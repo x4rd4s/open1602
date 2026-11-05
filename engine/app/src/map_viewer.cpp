@@ -1056,6 +1056,7 @@ void MapViewer::update(std::uint32_t delta_ms) {
     // The pause of the video ended another way (F3, another player): the video goes too.
     m_video->follow_pause(m_state->simulation.paused());
     m_input->follow_selection();
+    m_input->end_blueprint_outside_build();
     // While the game is paused this only carries out the commands (building is possible then).
     // Ticks run while the frame has time (at least one); before each, the positions of the ships,
     // soldiers and walkers are kept so that they move smoothly between ticks. A computer too slow
