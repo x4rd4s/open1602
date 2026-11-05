@@ -72,6 +72,7 @@ struct EditorTerrain {
     std::uint8_t rotation = 0;  ///< 0..3, a quarter clockwise each
     std::uint8_t brush = 0;     ///< index into editor::kBrushSizes
     std::uint8_t shape = 1;     ///< editor::BrushShape of the shaping tools (Land, Water, Coast, Random)
+    bool paste_water = false;   ///< Paste: the copy's water too (exactly), else only its land
     friend bool operator==(const EditorTerrain&, const EditorTerrain&) = default;
 };
 
@@ -227,6 +228,15 @@ struct EditorCity {
     /// Room per ware in 1/32 t (sim::City::capacity); 0: no Kontor, no stock.
     std::uint32_t room = 0;
     std::vector<EditorGood> goods;  ///< the world's trade goods in the order panels list them
+};
+
+/// A ship's holds (the page "Cargo"): what each holds, and the wares it can be loaded with.
+struct EditorShip {
+    std::string name;  ///< Windows-1252
+    /// What a hold takes in 1/32 t (sim::hold_capacity).
+    std::uint32_t room = 0;
+    std::vector<EditorGood> holds;  ///< per hold: its ware (0 empty), name and amount
+    std::vector<EditorGood> wares;  ///< the trade goods a hold can take, in the order panels list them
 };
 
 /// A human's or computer's slot as the page "Players" shows it.
@@ -432,6 +442,8 @@ struct EditorModel {
     std::string object_hover;
     /// The city of the building selected (the page "Selection"), its stock and owner.
     std::optional<EditorCity> city;
+    /// The ship selected (the page "Selection"), its holds.
+    std::optional<EditorShip> ship;
     /// The humans' and computers' slots (the page "Players"), in the order of the slots; whether
     /// another can be added and the last taken away.
     std::vector<EditorPlayer> player_slots;
@@ -504,6 +516,7 @@ struct EditorRequest {
         RenameCity,         ///< the selected building's city named `name`
         CityGoods,          ///< the city's stock of ware `index` set to `amount` (1/32 t)
         CityOwner,          ///< the city to the next owner (`index` 1) or the one before (0)
+        ShipCargo,          ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
         /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is.
@@ -568,7 +581,8 @@ struct EditorRequest {
     EditorTerrain terrain{};      ///< Terrain
     EditorObjects objects{};      ///< Objects
     EditorPlayer player{};        ///< SetPlayer
-    std::uint32_t amount = 0;     ///< CityGoods
+    std::uint32_t amount = 0;     ///< CityGoods, ShipCargo
+    std::uint8_t ware = 0;        ///< ShipCargo
     std::size_t goal = 0;         ///< GoalStep
 };
 
@@ -599,6 +613,7 @@ public:
         Objects,
         CityName,
         CityGoods,
+        ShipCargo,
         Players,
         PlayerName,
         Relations,
@@ -721,6 +736,7 @@ private:
     void layout_objects(const EditorModel& model);
     void layout_city_name(const EditorModel& model);
     void layout_city_goods(const EditorModel& model);
+    void layout_ship_cargo(const EditorModel& model);
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
     void layout_relations(const EditorModel& model);

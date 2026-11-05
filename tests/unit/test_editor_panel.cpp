@@ -1020,6 +1020,12 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "Stock of Abemsberg"));
     CHECK(says(panel, "25"));
+    // Room for "9999" in the widest font, about 12 units a digit (amounts from 100 t were cut).
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "25") {
+            CHECK(w.rect.w - 2 * ui::kTextPadding >= 4 * 12);
+        }
+    }
     std::vector<ui::Rect> more;
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
@@ -1048,6 +1054,58 @@ TEST_CASE("editor panel: a building's city is renamed, its stock filled and its 
         (void)panel.draw(m, kNoFonts);
     }
     CHECK(says(panel, "Good 29"));
+    CHECK(!click(panel, m, "Back to the selection").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Selection);
+}
+
+TEST_CASE("editor panel: a ship's holds are loaded on the page Cargo") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.selection = "Ship";
+    app::EditorShip ship;
+    ship.name = "Elise";
+    ship.room = 50 * 32;
+    ship.holds = {app::EditorGood{0, "", 0}, app::EditorGood{5, "Cloth", 20U * 32U}};
+    ship.wares = {app::EditorGood{3, "Wood", 0}, app::EditorGood{5, "Cloth", 0}};
+    m.ship = ship;
+    CHECK(panel.show_selection());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "Cargo").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::ShipCargo);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Cargo of Elise"));
+    CHECK(says(panel, "Cloth"));
+    // An empty hold: the first ware, the hold full; back from the last ware to empty.
+    auto r = click(panel, m, "Empty");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ShipCargo);
+    CHECK(r->index == 0);
+    CHECK(r->ware == 3);
+    CHECK(r->amount == 50U * 32U);
+    r = click(panel, m, "Empty", ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->ware == 5);
+    r = click(panel, m, "Cloth");
+    REQUIRE(r.has_value());
+    CHECK(r->index == 1);
+    CHECK(r->ware == 0);
+    CHECK(r->amount == 0);
+    // Its tons: 10 t more with the left button, within the room.
+    std::vector<ui::Rect> more;
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "+") {
+            more.push_back(w.rect);
+        }
+    }
+    REQUIRE(more.size() == 2);
+    (void)panel.mouse(more[1].x + 2, more[1].y + 2, true, m, ui::MouseButton::Left);
+    r = panel.mouse(more[1].x + 2, more[1].y + 2, false, m, ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(r->index == 1);
+    CHECK(r->ware == 5);
+    CHECK(r->amount == 30U * 32U);
     CHECK(!click(panel, m, "Back to the selection").has_value());
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }

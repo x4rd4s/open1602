@@ -10,6 +10,7 @@
 #include "o1602/sim/land_paths.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/ship.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/sim/soldier.hpp"
 
 namespace o1602::editor {
@@ -144,10 +145,12 @@ core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world, con
                                                     std::uint8_t direction) {
     const auto unit = figures.unit_of(family);
     const assets::FigureType* type = figures.get(family);
+    // The natives' spearman is theirs alone, as in a game.
+    const bool spearman = family == assets::figure::kSpearman;
     UnitRefusal refused = UnitRefusal::None;
-    if (!unit || unit->family != family || type == nullptr) {
+    if (type == nullptr || (!spearman && (!unit || unit->family != family))) {
         refused = UnitRefusal::NoType;
-    } else if (!owner_ok(world, owner)) {
+    } else if (!owner_ok(world, owner) || (spearman && !world.acts_as(owner, sim::FactionBehaviour::Natives))) {
         refused = UnitRefusal::NoOwner;
     } else {
         refused = unit_fits(world, buildings, x, y);
@@ -164,6 +167,29 @@ core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world, con
     s.anim = 1;  // standing
     after.add_soldier(std::move(s));
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_place"));
+}
+
+core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id, std::size_t slot,
+                                                        std::uint8_t ware, std::uint32_t amount) {
+    const sim::Ship* ship = world.ship(id);
+    if (ship == nullptr || slot >= ship->cargo.size()) {
+        return make_error(ErrorCode::NotFound, "no such ship or hold");
+    }
+    const auto& trade = world.goods().trade_wares();
+    if (ware != 0 && std::find(trade.begin(), trade.end(), ware) == trade.end()) {
+        return make_error(ErrorCode::OutOfRange, "ware " + std::to_string(ware) + " is no trade ware");
+    }
+    if (amount > sim::hold_capacity(*ship)) {
+        return make_error(ErrorCode::OutOfRange, "more than a hold takes");
+    }
+    sim::World after = world;
+    sim::CargoSlot& hold = after.ship(id)->cargo[slot];
+    hold = sim::CargoSlot{};  // no price paid, no unit of a package
+    if (ware != 0 && amount > 0) {
+        hold.ware = ware;
+        hold.amount = amount;
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_cargo"));
 }
 
 core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id) {

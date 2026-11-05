@@ -16,6 +16,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/save_game.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/sim/simulation.hpp"
 
 using namespace o1602;
@@ -1493,6 +1494,26 @@ TEST_CASE("construction: the editor renames a city, fills its stock and gives it
     CHECK(!editor::change_city_owner(island.world, 0, city, 9).ok());
     (*taken)->revert(island.world);
     CHECK(island.world.city(0, city)->owner == 0);
+    // To the natives and to the pirates as well, not to the free trader.
+    {
+        sim::World world = island.world;
+        std::vector<sim::Player> players = world.players();
+        players.resize(5);
+        sim::make_neutral(players[2], sim::faction::kNatives);
+        sim::make_neutral(players[3], sim::faction::kPirates);
+        sim::make_neutral(players[4], sim::faction::kTrader);
+        world.set_players(players);
+        auto natives = editor::change_city_owner(world, 0, city, 2);
+        REQUIRE(natives.ok());
+        (*natives)->apply(world);
+        CHECK(world.city(0, city)->owner == 2);
+        CHECK(world.islands()[0].map.top(5, 10).owner == 2);
+        auto pirates = editor::change_city_owner(world, 0, city, 3);
+        REQUIRE(pirates.ok());
+        (*pirates)->apply(world);
+        CHECK(world.city(0, city)->owner == 3);
+        CHECK(!editor::change_city_owner(world, 0, city, 4).ok());
+    }
     CHECK(island.world.islands()[0].map.top(5, 10).owner == 0);
 }
 
@@ -1552,6 +1573,28 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
     CHECK(soldier.pos_x / sim::kPosUnit == 20);
     CHECK(editor::unit_fits(island.world, island.buildings, 20, 20) == UnitRefusal::Taken);
 
+    // Its holds loaded: a trade ware up to a hold's room, emptied with 0 t.
+    {
+        const std::uint32_t id = island.world.ships().back().id;
+        REQUIRE(!island.world.goods().trade_wares().empty());
+        const std::uint8_t ware = island.world.goods().trade_wares().front();
+        CHECK(!editor::set_ship_cargo(island.world, id, 9, ware, 32).ok());
+        CHECK(!editor::set_ship_cargo(island.world, id, 0, ware, sim::kHoldCapacity + 1).ok());
+        CHECK(!editor::set_ship_cargo(island.world, id + 100, 0, ware, 32).ok());
+        auto loaded = editor::set_ship_cargo(island.world, id, 1, ware, 30 * 32);
+        REQUIRE(loaded.ok());
+        (*loaded)->apply(island.world);
+        CHECK(island.world.ship(id)->cargo[1].ware == ware);
+        CHECK(island.world.ship(id)->cargo[1].amount == 30U * 32U);
+        auto emptied = editor::set_ship_cargo(island.world, id, 1, ware, 0);
+        REQUIRE(emptied.ok());
+        (*emptied)->apply(island.world);
+        CHECK(island.world.ship(id)->cargo[1].ware == 0);
+        (*emptied)->revert(island.world);
+        (*loaded)->revert(island.world);
+        CHECK(island.world.ship(id)->cargo[1].ware == 0);
+    }
+
     // Taken away, with the orders that name them.
     const std::uint32_t ship_id = island.world.ships().back().id;
     island.world.ships().front().target = sim::Target{sim::Target::Kind::Ship, 0, 0, 0, 0, ship_id, 0};
@@ -1600,6 +1643,30 @@ TEST_CASE("construction: the editor gives the pirates a ship of theirs") {
     sim::make_neutral(players[3], sim::faction::kTrader);
     island.world.set_players(players);
     CHECK(!editor::place_ship(island.world, island.buildings, *figures, 3, assets::figure::kPirate, 6, 6, 0).ok());
+}
+
+TEST_CASE("construction: the editor gives the natives their spearmen, and them alone") {
+    Island island;
+    std::vector<sim::Player> players = island.world.players();
+    players.resize(3);
+    sim::make_neutral(players[2], sim::faction::kNatives);
+    island.world.set_players(players);
+    const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+    const auto doc = assets::cod::parse(
+        "Objekt: FIGUR\n"
+        "  Nummer: 33\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Maxenergy: 15\n"
+        "EndObj\n",
+        types);
+    auto figures = assets::FigureTable::from_cod(doc);
+    REQUIRE(figures.ok());
+    CHECK(!editor::place_unit(island.world, island.buildings, *figures, 0, assets::figure::kSpearman, 20, 20, 0).ok());
+    auto unit = editor::place_unit(island.world, island.buildings, *figures, 2, assets::figure::kSpearman, 20, 20, 0);
+    REQUIRE(unit.ok());
+    (*unit)->apply(island.world);
+    REQUIRE(island.world.soldiers().size() == 1);
+    CHECK(island.world.soldiers().back().owner == 2);
+    CHECK(island.world.soldiers().back().figure == assets::figure::kSpearman);
+    CHECK(island.world.soldiers().back().health == figures->get(assets::figure::kSpearman)->combat.max_health);
 }
 
 TEST_CASE("construction: the editor gives the free trader his ship, and him alone") {
