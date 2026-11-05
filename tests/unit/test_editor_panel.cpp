@@ -1507,6 +1507,129 @@ TEST_CASE("editor panel: the players dialog shows every player in a row and the 
     CHECK(!panel.dialog());
 }
 
+TEST_CASE("editor panel: the tab Others sets how the players start towards natives, pirates and trader") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(184, 564);
+    panel.set_screen(1024, 768, 1024 - EditorPanel::kWidth);
+    EditorModel m = four_players();
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Pirates, app::EditorNeutral::Trader};
+    m.native_villages = true;
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {false, true, 200}, {true, true, 200}};
+    }
+    (void)panel.command(app::EditorCommand::Players, m);
+    CHECK(!click(panel, m, "Others").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Neutrals);
+    CHECK(panel.dialog());
+    (void)panel.draw(m, kNoFonts);
+    for (const char* text : {"Natives", "Goodwill", "Pirates", "Trade at nests", "Trader calls", "Merlin"}) {
+        CHECK(find(panel, text).has_value());
+    }
+    const ui::Rect d = panel.dialog_rect();
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.x + w.rect.w <= d.x + d.w);
+        CHECK(w.rect.y + w.rect.h <= d.y + d.h);
+    }
+    // The natives: trade, war, peace, round; the right button back.
+    auto r = click_nth(panel, m, "Trade", 1);  // the second row
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetNeutral);
+    CHECK(r->player.slot == 1);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Natives));
+    REQUIRE(r->player.towards.size() == 1);
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+    r = click_nth(panel, m, "Trade", 0, ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 0);
+    CHECK(r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+    // The goodwill steps on; one between the steps goes to the next.
+    r = click_nth(panel, m, "200", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->player.towards[0].goodwill == 500);
+    m.player_slots[0].towards[0].goodwill = 300;
+    r = click_nth(panel, m, "300", 0, ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->player.towards[0].goodwill == 200);
+    // The pirates: war to peace; their nests' trade.
+    r = click_nth(panel, m, "War", 2);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(r->player.slot == 2);
+    CHECK(r->player.towards[0].peace);
+    CHECK(r->player.towards[0].trade);
+    r = click_nth(panel, m, "Yes", 0);  // the first row's trade at the nests
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(!r->player.towards[0].trade);
+    // The trader stays away from a player.
+    r = click_nth(panel, m, "Yes", 1);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Trader));
+    CHECK(r->player.towards[0].peace);
+    CHECK(!r->player.towards[0].trade);
+
+    // Natives without villages have no goodwill to set; a world without pirates has no columns of them.
+    m.native_villages = false;
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Trader};
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {true, true, 200}};
+    }
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!find(panel, "Pirates").has_value());
+    CHECK(!find(panel, "200").has_value());
+    r = click_nth(panel, m, "Yes", 0);
+    REQUIRE(r.has_value());
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Trader));
+    // Without any of them the tab cannot be chosen.
+    m.neutrals.clear();
+    panel.layout(m);
+    CHECK(panel.page() == EditorPanel::Page::Players);
+    CHECK(!click(panel, m, "Close").has_value());
+    CHECK(!panel.dialog());
+}
+
+TEST_CASE("editor panel: in the column, the page Others shows the slot of the page Players") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = four_players();
+    m.neutrals = {app::EditorNeutral::Natives, app::EditorNeutral::Pirates, app::EditorNeutral::Trader};
+    for (app::EditorPlayer& p : m.player_slots) {
+        p.towards = {{true, true, 200}, {false, true, 200}, {true, true, 200}};
+    }
+    CHECK(!panel.command(app::EditorCommand::Players, m).has_value());
+    CHECK(!click(panel, m, "Natives, pirates, trader").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Neutrals);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Merlin"));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+        if (w.text == "-") {
+            CHECK(!w.enabled);  // no villages: no goodwill
+        }
+    }
+    auto r = click(panel, m, "War");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SetNeutral);
+    CHECK(r->player.slot == 0);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Pirates));
+    CHECK(r->player.towards[0].peace);
+    // The next slot.
+    CHECK(!click(panel, m, "Merlin").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Computer 1"));
+    r = click(panel, m, "Trade");
+    REQUIRE(r.has_value());
+    CHECK(r->player.slot == 1);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorNeutral::Natives));
+    CHECK(!r->player.towards[0].peace);
+    CHECK(!click_id(panel, m, ui::Form::Id{160}).has_value());  // back
+    CHECK(panel.page() == EditorPanel::Page::Players);
+}
+
 TEST_CASE("editor panel: the rules dialog shows its settings in two columns") {
     ui::set_language("en");
     EditorPanel panel;

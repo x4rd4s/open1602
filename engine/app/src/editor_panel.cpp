@@ -152,6 +152,9 @@ constexpr Id kScenarioBack = 271;              ///< from the packages back to th
 constexpr Id kCampaignChoice = 272;            ///< the campaign shown, or a new one
 constexpr Id kCampaignAdd = 273;               ///< the scenario as the campaign's next part
 constexpr Id kCampaignRemove = 274;            ///< the scenario, the campaign's last part, taken out
+constexpr Id kTabNeutrals = 275;               ///< the players dialog's tab of the natives, pirates, trader
+constexpr Id kNeutralsPage = 276;              ///< the page of the natives, pirates and trader (column)
+constexpr Id kNeutralCell = 280;               ///< + the NeutralColumn of the slot shown (column)
 constexpr Id kCheckLine = 800;                 ///< + the line of the check list (a line that leads somewhere)
 constexpr Id kRecent = 190;                    ///< + the object placed lately (the page "Objects")
 constexpr Id kShipCargoPage = 1000;            ///< the selected ship's holds
@@ -163,6 +166,8 @@ constexpr Id kPlayerTable = 300;               ///< + 8 * the row + the column o
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
+constexpr Id kNeutralTable = 430;  ///< + kNeutralColumns * the row + the column of the table "Others"
+constexpr std::size_t kNeutralRows = 13;
 /// The dialogs' widths at most: wide for tables, narrow for the other pages.
 constexpr std::int32_t kWideDialog = 980;
 constexpr std::int32_t kNarrowDialog = 560;
@@ -281,6 +286,89 @@ std::size_t climate_choices(const EditorModel& model, bool placeholder) {
 /// The next value of a cycle of `n` values, forward or back.
 std::size_t step(std::size_t value, std::size_t n, bool forward) {
     return forward ? (value + 1) % n : (value + n - 1) % n;
+}
+
+/// The values of the page "Others", each a column of its table.
+enum NeutralColumn : std::size_t {
+    kNativesStanding,  ///< war, peace, trade
+    kNativesGoodwill,
+    kPiratesStanding,  ///< war, peace
+    kPiratesTrade,     ///< the player's ships trade at their nests
+    kTraderCalls,      ///< the trader calls at the player's Kontors
+    kNeutralColumns
+};
+
+constexpr std::array<const char*, kNeutralColumns> kNeutralHeads = {
+    "editor.neutrals.natives", "editor.neutrals.goodwill", "editor.neutrals.pirates", "editor.neutrals.pirate_trade",
+    "editor.neutrals.trader"};
+
+EditorNeutral party_of(std::size_t column) noexcept {
+    return column <= kNativesGoodwill ? EditorNeutral::Natives
+           : column <= kPiratesTrade  ? EditorNeutral::Pirates
+                                      : EditorNeutral::Trader;
+}
+
+/// The party's place in EditorModel::neutrals, none if the world does not have it.
+std::optional<std::size_t> neutral_index(const EditorModel& model, EditorNeutral party) {
+    const auto it = std::find(model.neutrals.begin(), model.neutrals.end(), party);
+    return it == model.neutrals.end()
+               ? std::nullopt
+               : std::optional<std::size_t>(static_cast<std::size_t>(it - model.neutrals.begin()));
+}
+
+/// The columns of the page "Others" the world has a party for, in their order.
+std::vector<std::size_t> neutral_columns(const EditorModel& model) {
+    std::vector<std::size_t> columns;
+    for (std::size_t c = 0; c < kNeutralColumns; ++c) {
+        if (neutral_index(model, party_of(c))) {
+            columns.push_back(c);
+        }
+    }
+    return columns;
+}
+
+EditorPlayer::Towards towards(const EditorModel& model, const EditorPlayer& p, EditorNeutral party) {
+    const std::optional<std::size_t> i = neutral_index(model, party);
+    return i && *i < p.towards.size() ? p.towards[*i] : EditorPlayer::Towards{};
+}
+
+/// The goodwills a click steps through; one between them goes to the next or the one before.
+constexpr std::array<std::uint32_t, 8> kGoodwillSteps = {0, 50, 100, 200, 500, 1000, 2000, 5000};
+
+std::uint32_t step_goodwill(std::uint32_t value, bool forward) noexcept {
+    if (forward) {
+        for (const std::uint32_t g : kGoodwillSteps) {
+            if (g > value) {
+                return g;
+            }
+        }
+        return kGoodwillSteps.front();
+    }
+    for (auto it = kGoodwillSteps.rbegin(); it != kGoodwillSteps.rend(); ++it) {
+        if (*it < value) {
+            return *it;
+        }
+    }
+    return kGoodwillSteps.back();
+}
+
+/// The text of a value of the page "Others"; `enabled` whether a click changes it.
+std::string neutral_text(const EditorModel& model, const EditorPlayer& p, std::size_t column, bool& enabled) {
+    const EditorPlayer::Towards t = towards(model, p, party_of(column));
+    enabled = true;
+    switch (column) {
+        case kNativesStanding:
+            return ui::tr(!t.peace  ? "editor.relations.war"
+                          : t.trade ? "editor.relations.trade_short"
+                                    : "editor.relations.peace");
+        case kNativesGoodwill:
+            enabled = model.native_villages;
+            return enabled ? count(t.goodwill) : std::string("-");
+        case kPiratesStanding:
+            return ui::tr(t.peace ? "editor.relations.peace" : "editor.relations.war");
+        default:
+            return ui::tr(t.trade ? "editor.relations.trade_yes" : "editor.relations.trade_no");
+    }
 }
 
 }  // namespace
@@ -534,16 +622,17 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
 bool EditorPanel::dialog() const noexcept {
     using P = Page;
     return m_screen_w > 0 && !m_previewing &&
-           (m_page == P::Players || m_page == P::PlayerName || m_page == P::Relations || m_page == P::Rules ||
-            m_page == P::Random || m_page == P::WorldSize || m_page == P::Check || m_page == P::Goals ||
-            m_page == P::GoalText || m_page == P::Scenario || m_page == P::ScenarioText || m_page == P::Script ||
-            m_page == P::ScriptFiles || m_page == P::Packages || m_page == P::PackageSave || m_page == P::Campaign);
+           (m_page == P::Players || m_page == P::PlayerName || m_page == P::Relations || m_page == P::Neutrals ||
+            m_page == P::Rules || m_page == P::Random || m_page == P::WorldSize || m_page == P::Check ||
+            m_page == P::Goals || m_page == P::GoalText || m_page == P::Scenario || m_page == P::ScenarioText ||
+            m_page == P::Script || m_page == P::ScriptFiles || m_page == P::Packages || m_page == P::PackageSave ||
+            m_page == P::Campaign);
 }
 
 ui::Rect EditorPanel::dialog_rect() const noexcept {
     using P = Page;
-    const bool wide = m_page == P::Players || m_page == P::Relations || m_page == P::Rules || m_page == P::Random ||
-                      m_page == P::Goals;
+    const bool wide = m_page == P::Players || m_page == P::Relations || m_page == P::Neutrals || m_page == P::Rules ||
+                      m_page == P::Random || m_page == P::Goals;
     // Right of the tool bar, between the menu bar and the status line; as tall as the page needs.
     constexpr std::int32_t kToolBar = 42;
     constexpr std::int32_t kBars = 26 + 24;
@@ -690,6 +779,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::Relations:
             wide ? layout_relations_table(model) : layout_relations(model);
+            break;
+        case Page::Neutrals:
+            wide ? layout_neutrals_table(model) : layout_neutrals(model);
             break;
         case Page::Rules:
             wide ? layout_settings_grid(model, true) : layout_rules(model);
@@ -1145,6 +1237,9 @@ void EditorPanel::layout_players(const EditorModel& model) {
     y += kGap - 2;
     f.button(kPlayerNamePage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.players.rename"), on);
     f.button(kRelationsPage, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.relations"), n > 1);
+    y += kButtonH + kGap;
+    f.button(kNeutralsPage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.players.neutrals"),
+             on && !model.neutrals.empty());
     y += kButtonH + kGap;
     f.button(kPlayerAdd, Rect{m_x, y, half, kButtonH}, ui::tr("editor.players.add"), model.can_add_player);
     f.button(kPlayerRemove, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.remove"), model.can_remove_player);
@@ -1711,12 +1806,7 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
     const std::size_t n = model.player_slots.size();
-    // The heading, and the dialog's two tabs at its right.
-    constexpr std::int32_t kTab = 150;
-    f.label(Rect{m_x, y, m_w - 2 * (kTab + kGap), 28}, ui::tr("editor.players.title"), Align::Left, Tone::Heading);
-    f.button(kTabPlayers, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH}, ui::tr("editor.players.tab_players"),
-             true, true);
-    f.button(kTabRelations, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_relations"), n > 1);
+    dialog_tabs(model, "editor.players.title", Page::Players);
     y += kButtonH + kGap + 4;
     // Every slot in a row: its number, then a button for each of its values.
     constexpr std::int32_t kNumber = 40;
@@ -1782,6 +1872,141 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
 }
 
+void EditorPanel::dialog_tabs(const EditorModel& model, const char* heading, Page page) {
+    // The heading, and the dialog's tabs at its right.
+    ui::Form& f = m_form;
+    const std::int32_t y = m_top + 6;
+    constexpr std::int32_t kTab = 150;
+    const std::size_t n = model.player_slots.size();
+    f.label(Rect{m_x, y, m_w - 3 * (kTab + kGap), 28}, ui::tr(heading), Align::Left, Tone::Heading);
+    f.button(kTabPlayers, Rect{m_x + m_w - 3 * kTab - 2 * kGap, y, kTab, kButtonH},
+             ui::tr("editor.players.tab_players"), true, page == Page::Players);
+    f.button(kTabRelations, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH},
+             ui::tr("editor.players.tab_relations"), n > 1, page == Page::Relations);
+    f.button(kTabNeutrals, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_neutrals"),
+             n > 0 && !model.neutrals.empty(), page == Page::Neutrals);
+}
+
+void EditorPanel::layout_neutrals(const EditorModel& model) {
+    const std::size_t n = model.player_slots.size();
+    if (n == 0 || model.neutrals.empty()) {
+        m_page = Page::Players;
+        layout_players(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.neutrals.title"), Align::Left, Tone::Heading);
+    y += 28;
+    const EditorPlayer& p = model.player_slots[std::min(m_player, n - 1)];
+    f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.relations.of"), Align::Left, Tone::Normal);
+    y += 18;
+    f.cycle_button(kPlayerSlot, Rect{m_x, y, m_w, kButtonH}, p.name);
+    y += kButtonH + 2;
+    for (const std::size_t c : neutral_columns(model)) {
+        bool enabled = true;
+        std::string text = neutral_text(model, p, c, enabled);
+        f.label(Rect{m_x, y, m_w, 18}, ui::tr(kNeutralHeads[c]), Align::Left, enabled ? Tone::Normal : Tone::Dim);
+        y += 18;
+        f.cycle_button(kNeutralCell + static_cast<Id>(c), Rect{m_x, y, m_w, kButtonH}, std::move(text), enabled);
+        y += kButtonH + 2;
+    }
+    y += kGap;
+    note_and_back(model, y, "editor.neutrals.note", "editor.neutrals.note_short", kPlayersBack,
+                  "editor.relations.back");
+}
+
+void EditorPanel::layout_neutrals_table(const EditorModel& model) {
+    const std::size_t n = model.player_slots.size();
+    if (n == 0 || model.neutrals.empty()) {
+        m_page = Page::Players;
+        layout_players_table(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    dialog_tabs(model, "editor.neutrals.title", Page::Neutrals);
+    y += kButtonH + kGap + 4;
+    // The players down the left; a column for each value towards a party the world has.
+    constexpr std::int32_t kNames = 220;
+    const std::vector<std::size_t> columns = neutral_columns(model);
+    const auto shown = static_cast<std::int32_t>(columns.size());
+    const std::int32_t cell = std::min<std::int32_t>(170, (m_w - kNames) / shown - kGap);
+    const auto column_x = [&](std::size_t i) { return m_x + kNames + static_cast<std::int32_t>(i) * (cell + kGap); };
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        f.label(Rect{column_x(i), y, cell, 18}, ui::tr(kNeutralHeads[columns[i]]), Align::Centre, Tone::Dim);
+    }
+    y += 20;
+    constexpr std::int32_t kRow = kButtonH + 2;
+    const std::int32_t foot = m_top + m_height - kButtonH - 4;
+    const std::int32_t bottom = foot - 2 * 20 - kGap;
+    m_page_rows = std::clamp<std::size_t>(static_cast<std::size_t>(std::max(1, (bottom - y) / kRow)), 1, kNeutralRows);
+    m_first = std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
+    for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
+        const EditorPlayer& p = model.player_slots[m_first + row];
+        f.label(Rect{m_x, y, 40, kButtonH}, count(m_first + row + 1), Align::Right, Tone::Dim);
+        f.label(Rect{m_x + 42, y, kNames - 42 - kGap, kButtonH}, p.name, Align::Left, Tone::Normal);
+        for (std::size_t i = 0; i < columns.size(); ++i) {
+            bool enabled = true;
+            std::string text = neutral_text(model, p, columns[i], enabled);
+            const Id id = kNeutralTable + static_cast<Id>(row * kNeutralColumns + columns[i]);
+            f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+        }
+        y += kRow;
+    }
+    const bool notice = !model.notice.empty();
+    f.paragraph(Rect{m_x, bottom, m_w, 2 * 20}, notice ? model.notice : ui::tr("editor.neutrals.table_note"),
+                notice && model.notice_is_error ? Tone::Warning : Tone::Dim, 20,
+                notice ? std::string() : ui::tr("editor.neutrals.note_short"));
+    const std::int32_t quarter = (m_w - 3 * kGap) / 4;
+    if (n > m_page_rows) {
+        const std::int32_t eighth = (quarter - kGap) / 2;
+        f.button(kPrevious, Rect{m_x, foot, eighth, kButtonH}, "<", m_first > 0);
+        f.button(kNext, Rect{m_x + eighth + kGap, foot, quarter - eighth - kGap, kButtonH}, ">",
+                 m_first + m_page_rows < n);
+    }
+    f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+}
+
+std::optional<EditorRequest> EditorPanel::press_neutral(const EditorModel& model, std::size_t slot, std::size_t column,
+                                                        bool forward) const {
+    if (slot >= model.player_slots.size() || column >= kNeutralColumns) {
+        return std::nullopt;
+    }
+    const EditorNeutral party = party_of(column);
+    if (!neutral_index(model, party)) {
+        return std::nullopt;
+    }
+    const EditorPlayer& p = model.player_slots[slot];
+    EditorPlayer::Towards t = towards(model, p, party);
+    switch (column) {
+        case kNativesStanding: {
+            // War, peace, peace and trade, round (the right button back): the natives trade at peace.
+            const std::size_t next = step(!t.peace ? 0 : t.trade ? 2 : 1, 3, forward);
+            t.peace = next > 0;
+            t.trade = next == 2;
+            break;
+        }
+        case kNativesGoodwill:
+            if (!model.native_villages) {
+                return std::nullopt;
+            }
+            t.goodwill = step_goodwill(t.goodwill, forward);
+            break;
+        case kPiratesStanding:
+            t.peace = !t.peace;
+            break;
+        default:
+            t.trade = !t.trade;
+            break;
+    }
+    EditorRequest r{EditorRequest::Kind::SetNeutral};
+    r.player.slot = p.slot;
+    r.player.towards = {t};
+    r.index = static_cast<std::size_t>(party);
+    return r;
+}
+
 void EditorPanel::layout_relations_table(const EditorModel& model) {
     const std::size_t n = model.player_slots.size();
     if (n < 2) {
@@ -1791,11 +2016,7 @@ void EditorPanel::layout_relations_table(const EditorModel& model) {
     }
     ui::Form& f = m_form;
     std::int32_t y = m_top + 6;
-    constexpr std::int32_t kTab = 150;
-    f.label(Rect{m_x, y, m_w - 2 * (kTab + kGap), 28}, ui::tr("editor.relations.title"), Align::Left, Tone::Heading);
-    f.button(kTabPlayers, Rect{m_x + m_w - 2 * kTab - kGap, y, kTab, kButtonH}, ui::tr("editor.players.tab_players"));
-    f.button(kTabRelations, Rect{m_x + m_w - kTab, y, kTab, kButtonH}, ui::tr("editor.players.tab_relations"), true,
-             true);
+    dialog_tabs(model, "editor.relations.title", Page::Relations);
     y += kButtonH + kGap + 4;
     // The players down the left and along the top by their numbers; each cell how the two stand.
     constexpr std::int32_t kNames = 220;
@@ -2782,6 +3003,13 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 m_first_column = 0;
             }
             return std::nullopt;
+        case kTabNeutrals:
+        case kNeutralsPage:
+            if (!model.player_slots.empty() && !model.neutrals.empty()) {
+                m_page = Page::Neutrals;
+                m_first = 0;
+            }
+            return std::nullopt;
         case kColumnsBack:
             m_first_column = m_first_column > kTableSide / 2 ? m_first_column - kTableSide / 2 : 0;
             return std::nullopt;
@@ -2990,6 +3218,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         constexpr std::array<Id, 7> kCells = {kPlayerNamePage,  kPlayerRole,   kPlayerColour, kPlayerMoney,
                                               kPlayerMonuments, kPlayerArches, kPlayerFaction};
         return column < 7 ? press(kCells[static_cast<std::size_t>(column)], model, forward) : std::nullopt;
+    }
+    if (*id >= kNeutralTable && *id < kNeutralTable + static_cast<Id>(kNeutralRows * kNeutralColumns)) {
+        const auto cell = static_cast<std::size_t>(*id - kNeutralTable);
+        return press_neutral(model, m_first + cell / kNeutralColumns, cell % kNeutralColumns, forward);
+    }
+    if (*id >= kNeutralCell && *id < kNeutralCell + static_cast<Id>(kNeutralColumns) && !model.player_slots.empty()) {
+        return press_neutral(model, std::min(m_player, model.player_slots.size() - 1),
+                             static_cast<std::size_t>(*id - kNeutralCell), forward);
     }
     if (*id >= kRelationTable && *id < kRelationTable + static_cast<Id>(kTableSide * kTableSide)) {
         // A cell of the diplomacy table: war, peace, peace and trade, round (the right button back).

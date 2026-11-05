@@ -1103,6 +1103,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::AddPlayer:
         case Kind::RemovePlayer:
         case Kind::SetRelations:
+        case Kind::SetNeutral:
             editor_players_request(request);
             break;
         case Kind::RulesPreset:

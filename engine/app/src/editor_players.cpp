@@ -72,6 +72,17 @@ void MapViewer::editor_players_model(EditorModel& m) const {
             e.relations.push_back(EditorPlayer::Standing{r.peace, r.trade});
         }
     }
+    for (const editor::Neutral party : editor::neutral_parties(world)) {
+        m.neutrals.push_back(static_cast<EditorNeutral>(party));
+    }
+    m.native_villages = editor::has_native_villages(world);
+    for (EditorPlayer& e : m.player_slots) {
+        for (const EditorNeutral party : m.neutrals) {
+            const editor::NeutralRelations r =
+                editor::neutral_relations(world, e.slot, static_cast<editor::Neutral>(party));
+            e.towards.push_back(EditorPlayer::Towards{r.peace, r.trade, r.goodwill});
+        }
+    }
     m.slot_factions = editor::slot_factions(world);
     m.can_add_player = m.player_slots.size() < sim::kMaxPlayers;
     m.can_remove_player = !m.player_slots.empty() && m.player_slots.back().slot >= sim::kOriginalPlayers;
@@ -108,6 +119,23 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
         m_editor->document.perform(std::move(op).value());
         m_editor->notice.clear();
         std::fprintf(stderr, "editor: relations of players %u and %u changed\n",
+                     static_cast<unsigned>(request.player.slot), static_cast<unsigned>(request.index));
+        return;
+    }
+    if (request.kind == Kind::SetNeutral) {
+        if (request.player.towards.empty() || request.index > static_cast<std::size_t>(editor::Neutral::Trader)) {
+            return;
+        }
+        const EditorPlayer::Towards& t = request.player.towards.front();
+        auto op = editor::set_neutral_relations(world, request.player.slot, static_cast<editor::Neutral>(request.index),
+                                                editor::NeutralRelations{t.peace, t.trade, t.goodwill});
+        if (!op) {
+            editor_notice(ui::tr("editor.relations.refused"), true, op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        m_editor->notice.clear();
+        std::fprintf(stderr, "editor: relations of player %u towards party %u changed\n",
                      static_cast<unsigned>(request.player.slot), static_cast<unsigned>(request.index));
         return;
     }

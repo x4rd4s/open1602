@@ -87,4 +87,46 @@ struct Relations {
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a,
                                                                      sim::PlayerId b, Relations r);
 
+/// The parties of their own behaviour a scenario sets the start towards: the natives, the pirates
+/// and the free trader.
+enum class Neutral : std::uint8_t { Natives, Pirates, Trader };
+
+/// The neutral parties the world has (a slot of that behaviour), in the order of Neutral.
+[[nodiscard]] std::vector<Neutral> neutral_parties(const sim::World& world);
+
+/// Whether the world has villages of the natives (cities of a slot of their behaviour): only they
+/// hold a goodwill.
+[[nodiscard]] bool has_native_villages(const sim::World& world);
+
+/// How a human or computer stands at the start towards a neutral party.
+struct NeutralRelations {
+    /// At peace or at war (the natives, the pirates); the trader is always at peace.
+    bool peace = true;
+    /// The natives: the player's ships trade at their villages (it needs peace, as in the game: an
+    /// attacked village never trades with the attacker again). The pirates: at their nests, at war
+    /// too. The trader: he calls at the player's Kontors (sim::scenario_flag::kNoTrader cleared).
+    bool trade = true;
+    /// The natives: the goodwill of their villages towards the player (sim::City::goodwill), the
+    /// same in each; the first village's is given.
+    std::uint32_t goodwill = sim::kNativeGoodwillStart;
+    friend bool operator==(const NeutralRelations&, const NeutralRelations&) = default;
+};
+
+/// How `player` stands towards `party` (towards its first slot, when there are more).
+[[nodiscard]] NeutralRelations neutral_relations(const sim::World& world, sim::PlayerId player, Neutral party);
+
+/// `player`, a human or computer, standing as `r` towards every slot of `party` when the game
+/// starts, memories (tribute, trade, damage) cleared:
+/// - natives: peace and trade on both sides, the goodwill in every village;
+/// - pirates: peace on both sides; a peace holds as one the player bought at the start (it fades
+///   with time, as in the game), a war forgets the pirates' good memories of the player. The trade
+///   is the player's side only: the pirates' ships trade with nobody;
+/// - trader: whether he calls at the player's Kontors (a scenario switch of the original).
+/// Fails (NotFound) for no human or computer or a party the world does not have, (InvalidFormat)
+/// for a trade with the natives at war, a war with the trader or a goodwill above
+/// sim::kMaxNativeGoodwill.
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world,
+                                                                             sim::PlayerId player, Neutral party,
+                                                                             const NeutralRelations& r);
+
 }  // namespace o1602::editor

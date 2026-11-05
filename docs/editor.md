@@ -29,7 +29,7 @@ The editor has a frame of its own around the map instead of the game's panel:
   the command (its settings, or what is selected).
 - **The status line** below the map: what happened last (saved, or why something was refused), and
   the tile under the mouse with its island.
-- **Dialogs** in the window's middle for the pages of the whole map: Players (with Diplomacy), Rules
+- **Dialogs** in the window's middle for the pages of the whole map: Players (with Diplomacy and Others), Rules
   (with Random elements), Map size and Check. A dialog takes every click until it is closed with
   its button **Close** or with Escape; a tool chosen meanwhile closes it too.
 
@@ -222,6 +222,19 @@ from war to peace to peace with a trade treaty and back to war; the right button
 way. A change applies to both sides, and clears what
 the two remember of each other (tribute, trade, damage). A trade treaty needs peace; war ends it.
 Adding a player keeps the relations of the others; the new one starts at peace with everyone.
+
+The tab **Others** (in a narrow window the button "Natives, pirates, trader" on the page Players)
+shows how each player starts towards the parties of their own behaviour, a column for each the
+map has. A click steps a value, the right button goes back; each change clears what the two
+remember of each other.
+
+| Column | What it does |
+|---|---|
+| Natives | War, peace, or peace with trade at their villages, for every natives' slot. The natives trade only at peace, as in the game: a village that was attacked never trades with its attacker again. |
+| Goodwill | Only with villages on the map: the natives' goodwill towards the player, the same in every village (0 to 5000; a new game starts at 200). The villages give goods for it, and it fades towards 49 over time. |
+| Pirates | War or peace. The pirates make war and peace by their mood, so a peace holds as one the player bought at the start, and fades as that does; war forgets what the pirates liked about the player. |
+| Trade at nests | Whether the player's ships may trade at the pirates' nests; they do at war too. |
+| Trader calls | Whether the free trader calls at the player's Kontors: a scenario switch the original's scenario files have as well. |
 
 ## Description
 
