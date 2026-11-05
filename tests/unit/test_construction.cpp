@@ -1517,6 +1517,170 @@ TEST_CASE("construction: the editor renames a city, fills its stock and gives it
     CHECK(island.world.islands()[0].map.top(5, 10).owner == 0);
 }
 
+TEST_CASE("construction: the editor sets what a Kontor sells and buys, and a village trades its goods") {
+    Island island;
+    sim::BuildOrder order;
+    order.player = 0;
+    order.island = 0;
+    order.items = {{kKontor, 5, 10, 0, 0}};
+    editor::PlacedBuildings kontor = editor::place_buildings(island.world, island.buildings, order, island.names);
+    REQUIRE(kontor.step != nullptr);
+    kontor.step->apply(island.world);
+    const std::uint8_t city = island.world.cities()[0].index;
+    const std::uint32_t room = editor::city_room(island.world, island.buildings, 0, city);
+    REQUIRE(room > 0);
+    const std::uint8_t wood = island.buildings.materials().wood;
+    const std::uint8_t tools = island.buildings.materials().tools;
+    const std::uint16_t base = island.world.goods().price(wood);
+    REQUIRE(base > 0);
+    const sim::TradePriceRange range = sim::trade_price_range(island.world, wood);
+    CHECK(range.max == base);
+    CHECK(range.min == base * 300 / 1024);
+
+    // Selling switched on: half the base price, nothing kept; then a price and an amount of its own,
+    // the price within its range and the amount within the room.
+    sim::TradeSetting s;
+    s.ware = wood;
+    s.mode = sim::TradeSetting::Mode::Sell;
+    auto sell = editor::set_city_trade(island.world, island.buildings, 0, city, s);
+    REQUIRE(sell.ok());
+    (*sell)->apply(island.world);
+    const sim::City::Trade* t = island.world.city(0, city)->trade_of(wood);
+    REQUIRE(t != nullptr);
+    CHECK(t->sell);
+    CHECK(!t->buy);
+    CHECK(t->sell_price == base * 64 / 128);
+    CHECK(t->keep == 0);
+    s.price = 9999;
+    s.amount = room + 5000;
+    auto priced = editor::set_city_trade(island.world, island.buildings, 0, city, s);
+    REQUIRE(priced.ok());
+    (*priced)->apply(island.world);
+    t = island.world.city(0, city)->trade_of(wood);
+    CHECK(t->sell_price == range.max);
+    CHECK(t->keep == room);
+    s.price = 0;
+    auto cheap = editor::set_city_trade(island.world, island.buildings, 0, city, s);
+    REQUIRE(cheap.ok());
+    (*cheap)->apply(island.world);
+    CHECK(island.world.city(0, city)->trade_of(wood)->sell_price == range.min);
+    CHECK(!editor::set_city_trade(island.world, island.buildings, 0, city, s).ok());  // nothing changes
+
+    // Buying instead: up to the room at three quarters of the base price; undo goes back.
+    sim::TradeSetting b;
+    b.ware = tools;
+    b.mode = sim::TradeSetting::Mode::Buy;
+    auto buy = editor::set_city_trade(island.world, island.buildings, 0, city, b);
+    REQUIRE(buy.ok());
+    (*buy)->apply(island.world);
+    t = island.world.city(0, city)->trade_of(tools);
+    CHECK(t->buy);
+    CHECK(t->limit == room);
+    CHECK(t->buy_price == island.world.goods().price(tools) * 96 / 128);
+    (*buy)->revert(island.world);
+    CHECK(!island.world.city(0, city)->trade_of(tools)->buy);
+
+    // The scenario keeps it.
+    auto bytes = sim::write_game(island.world, island.buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, island.buildings);
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded->city(0, city) != nullptr);
+    const sim::City::Trade* kept = loaded->city(0, city)->trade_of(wood);
+    REQUIRE(kept != nullptr);
+    CHECK(*kept == *island.world.city(0, city)->trade_of(wood));
+
+    // Wrong goods, cities without a Kontor; no more wares than the Kontor's slots.
+    sim::TradeSetting wrong = s;
+    wrong.ware = 0;
+    CHECK(!editor::set_city_trade(island.world, island.buildings, 0, city, wrong).ok());
+    CHECK(!editor::set_city_trade(island.world, island.buildings, 0, 7, s).ok());
+    const sim::TradeSlots slots = sim::trade_slots(island.world, island.buildings, *island.world.city(0, city));
+    CHECK(slots.sells == 1);
+    if (slots.limited()) {
+        std::size_t sold = slots.sells;
+        for (const std::uint8_t w : island.world.goods().trade_wares()) {
+            if (sold >= slots.max_sells) {
+                sim::TradeSetting more;
+                more.ware = w;
+                more.mode = sim::TradeSetting::Mode::Sell;
+                CHECK(!editor::set_city_trade(island.world, island.buildings, 0, city, more).ok());
+                break;
+            }
+            if (w == wood) {
+                continue;
+            }
+            sim::TradeSetting more;
+            more.ware = w;
+            more.mode = sim::TradeSetting::Mode::Sell;
+            auto op = editor::set_city_trade(island.world, island.buildings, 0, city, more);
+            REQUIRE(op.ok());
+            (*op)->apply(island.world);
+            ++sold;
+        }
+    }
+
+    // Set back: a player's city trades nothing.
+    auto reset = editor::reset_city_trade(island.world, 0, city);
+    REQUIRE(reset.ok());
+    (*reset)->apply(island.world);
+    for (const sim::City::Trade& each : island.world.city(0, city)->trade) {
+        CHECK(!each.sell);
+        CHECK(!each.buy);
+    }
+
+    // A native village founded in the editor trades as a new game's villages do: tobacco goods
+    // in the north, alcohol and cloth bought up to 10 t, all for goodwill.
+    std::vector<sim::Player> players = island.world.players();
+    sim::Player natives;
+    sim::make_neutral(natives, sim::faction::kNatives);
+    players.push_back(natives);
+    island.world.set_players(players);
+    const auto village_owner = static_cast<sim::PlayerId>(players.size() - 1);
+    sim::BuildOrder hut;
+    hut.player = village_owner;
+    hut.island = 0;
+    hut.items = {{kKontor, 5, 22, 0, 0}};
+    editor::PlacedBuildings founded = editor::place_buildings(island.world, island.buildings, hut, island.names);
+    REQUIRE(founded.step != nullptr);
+    founded.step->apply(island.world);
+    REQUIRE(island.world.cities().size() == 2);
+    const std::uint8_t vi = island.world.cities()[1].index;
+    const sim::City& v = *island.world.city(0, vi);
+    CHECK(v.owner == village_owner);
+    REQUIRE(v.trade_of(assets::ware::kTobaccoGoods) != nullptr);
+    CHECK(v.trade_of(assets::ware::kTobaccoGoods)->sell);
+    CHECK(v.trade_of(assets::ware::kTobaccoGoods)->sell_price == 0);
+    CHECK(!v.trade_of(assets::ware::kSpices)->sell);
+    CHECK(v.trade_of(assets::ware::kAlcohol)->buy);
+    CHECK(v.trade_of(assets::ware::kCloth)->limit == 10 * 32);
+    CHECK(v.trade_of(assets::ware::kCloth)->buy_price == 0);
+    // Set back after a change; in the south: spices.
+    island.world.island(0).header.climate = 1;
+    auto offer = editor::reset_city_trade(island.world, 0, vi);
+    REQUIRE(offer.ok());
+    (*offer)->apply(island.world);
+    sim::City& south = *island.world.city(0, vi);
+    CHECK(south.trade_of(assets::ware::kSpices)->sell);
+    CHECK(!south.trade_of(assets::ware::kTobaccoGoods)->sell);
+
+    // A village given to a player trades nothing (it would sell for nothing); the player's city
+    // given to the natives gets a village's offer.
+    auto taken = editor::change_city_owner(island.world, 0, vi, 1);
+    REQUIRE(taken.ok());
+    (*taken)->apply(island.world);
+    for (const sim::City::Trade& each : island.world.city(0, vi)->trade) {
+        CHECK(!each.sell);
+        CHECK(!each.buy);
+    }
+    auto native = editor::change_city_owner(island.world, 0, city, village_owner);
+    (*taken)->revert(island.world);
+    REQUIRE(native.ok());
+    (*native)->apply(island.world);
+    CHECK(island.world.city(0, city)->trade_of(assets::ware::kSpices)->sell);
+    CHECK(island.world.city(0, city)->trade_of(assets::ware::kAlcohol)->buy);
+}
+
 TEST_CASE("construction: the editor puts ships on the water and units on land, and takes them away") {
     Island island;
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};

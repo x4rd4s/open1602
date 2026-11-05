@@ -434,7 +434,8 @@ private:
     [[nodiscard]] const sim::City* editor_picked_city() const;
     /// The selected building's city on the panel: its name, owner and stock.
     void editor_city_model(EditorModel& m) const;
-    /// A city renamed, its stock or owner changed (EditorRequest RenameCity, CityGoods, CityOwner).
+    /// A city renamed, its stock, trade or owner changed (EditorRequest RenameCity, CityGoods, CityTrade,
+    /// CityTradeReset, CityOwner).
     void editor_city_request(const EditorRequest& request);
     /// The selected ship's holds for the page "Cargo".
     void editor_ship_model(EditorModel& m) const;

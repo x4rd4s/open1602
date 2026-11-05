@@ -1735,37 +1735,56 @@ std::uint32_t Fleet::transfer(const CargoTransfer& t) {
 
 bool Fleet::set_trade(const TradeSetting& s) {
     City* city = m_world->city(s.island, s.city);
-    if (city == nullptr || (s.player != kNoPlayer && city->owner != s.player) || !m_world->goods().is_trade(s.ware)) {
+    if (city == nullptr || (s.player != kNoPlayer && city->owner != s.player)) {
         return false;
     }
-    if (city->trade.size() <= s.ware) {
-        city->trade.resize(std::size_t{s.ware} + 1);
+    return apply_trade_setting(*m_world, *m_buildings, *city, s, city->capacity);
+}
+
+TradePriceRange trade_price_range(const World& world, std::uint8_t ware) noexcept {
+    // Prices range from 300/1024 of the base price to the base price, as in the original.
+    const std::uint16_t base = world.goods().price(ware);
+    return TradePriceRange{static_cast<std::uint16_t>(base * 300U / 1024U), base};
+}
+
+TradeSlots trade_slots(const World& world, const assets::BuildingTable& buildings, const City& city) {
+    TradeSlots slots;
+    for (const City::Trade& t : city.trade) {
+        slots.sells += t.sell ? 1U : 0U;
+        slots.buys += t.buy ? 1U : 0U;
     }
-    City::Trade& t = city->trade[s.ware];
-    const Player* owner = m_world->player(city->owner);
-    const bool natives = owner != nullptr && m_world->behaviour(*owner) == FactionBehaviour::Natives;
-    // A Kontor trades in at most Maxware wares to sell and its second value to buy (HAUS +0x45,
-    // +0x46): the original's window allows no more, Open1602's command checks it.
+    // A Kontor trades in at most Maxware wares to sell and its second value to buy, and the limit
+    // holds for a human's or a computer's only; data without Maxware (both 0) sets no limit.
+    const Player* owner = world.player(city.owner);
     if (owner != nullptr && (owner->role == PlayerRole::Human || owner->role == PlayerRole::Computer)) {
-        if (const assets::BuildingType* kontor = kontor_of(*m_world, *m_buildings, *city);
+        if (const assets::BuildingType* kontor = kontor_of(world, buildings, city);
             kontor != nullptr && (kontor->max_wares != 0 || kontor->max_wares2 != 0)) {
-            std::size_t sells = 0;
-            std::size_t buys = 0;
-            for (const City::Trade& o : city->trade) {
-                sells += o.sell ? 1U : 0U;
-                buys += o.buy ? 1U : 0U;
-            }
-            if ((s.mode == TradeSetting::Mode::Sell && !t.sell && sells >= kontor->max_wares) ||
-                (s.mode == TradeSetting::Mode::Buy && !t.buy && buys >= kontor->max_wares2)) {
-                return false;
-            }
+            slots.max_sells = kontor->max_wares;
+            slots.max_buys = kontor->max_wares2;
         }
     }
-    const std::uint16_t base = m_world->goods().price(s.ware);
-    // Prices range from 300/1024 of the base price to the base price (UI 0x84E6-0x84E8).
-    const auto clamp_price = [&](std::uint16_t p) {
-        return static_cast<std::uint16_t>(std::clamp<std::uint32_t>(p, base * 300U / 1024U, base));
-    };
+    return slots;
+}
+
+bool apply_trade_setting(const World& world, const assets::BuildingTable& buildings, City& city, const TradeSetting& s,
+                         std::uint32_t room) {
+    if (!world.goods().is_trade(s.ware)) {
+        return false;
+    }
+    if (city.trade.size() <= s.ware) {
+        city.trade.resize(std::size_t{s.ware} + 1);
+    }
+    const TradeSlots slots = trade_slots(world, buildings, city);
+    City::Trade& t = city.trade[s.ware];
+    // The original's window allows no more wares than the Kontor's slots; Open1602's command checks it.
+    if (slots.limited() && ((s.mode == TradeSetting::Mode::Sell && !t.sell && slots.sells >= slots.max_sells) ||
+                            (s.mode == TradeSetting::Mode::Buy && !t.buy && slots.buys >= slots.max_buys))) {
+        return false;
+    }
+    const bool natives = world.acts_as(city.owner, FactionBehaviour::Natives);
+    const std::uint16_t base = world.goods().price(s.ware);
+    const TradePriceRange range = trade_price_range(world, s.ware);
+    const auto clamp_price = [&](std::uint16_t p) { return std::clamp(p, range.min, range.max); };
     switch (s.mode) {
         case TradeSetting::Mode::None:
             t.sell = false;
@@ -1787,7 +1806,7 @@ bool Fleet::set_trade(const TradeSetting& s) {
             return true;
         case TradeSetting::Mode::Buy:
             if (!t.buy) {  // up to the room, three quarters of the base price
-                t.limit = city->capacity;
+                t.limit = room;
                 t.buy_price = natives ? 0 : static_cast<std::uint16_t>(base * 96U / 128U);
             }
             t.buy = true;
@@ -1801,6 +1820,29 @@ bool Fleet::set_trade(const TradeSetting& s) {
             return true;
     }
     return false;
+}
+
+void native_village_offer(const World& world, const WorldIsland& island, City& village) {
+    // A native village sells tobacco goods (north) or spices (south) and buys alcohol and cloth
+    // up to 10 t, all for goodwill instead of gold; everything else is off.
+    constexpr std::uint32_t kBuyLimit = 10 * 32;
+    if (village.trade.size() < world.goods().end()) {
+        village.trade.resize(world.goods().end());
+    }
+    for (City::Trade& t : village.trade) {
+        t = City::Trade{};
+    }
+    const bool south = (island.header.climate & 1U) != 0;
+    const std::uint8_t sold = south ? ware::kSpices : ware::kTobaccoGoods;
+    if (sold < village.trade.size()) {
+        village.trade[sold].sell = true;
+    }
+    for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
+        if (w < village.trade.size()) {
+            village.trade[w].buy = true;
+            village.trade[w].limit = kBuyLimit;
+        }
+    }
 }
 
 // ---- Trade routes ------------------------------------------------------------------------------

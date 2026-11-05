@@ -1093,6 +1093,8 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             break;
         case Kind::RenameCity:
         case Kind::CityGoods:
+        case Kind::CityTrade:
+        case Kind::CityTradeReset:
         case Kind::CityOwner:
             editor_city_request(request);
             break;
@@ -1250,7 +1252,8 @@ namespace {
 bool shows_pick(EditorPanel::Page page) {
     return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
            page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods ||
-           page == EditorPanel::Page::ShipCargo;
+           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::CityTrade ||
+           page == EditorPanel::Page::CityWare;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.

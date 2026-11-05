@@ -197,6 +197,36 @@ struct TradeSetting {
     std::optional<std::uint32_t> amount;  ///< keep (selling) or limit (buying); none = default
 };
 
+/// The prices a Kontor may ask or pay for a ware: from 300/1024 of its base price to the base price.
+struct TradePriceRange {
+    std::uint16_t min = 0;
+    std::uint16_t max = 0;
+};
+[[nodiscard]] TradePriceRange trade_price_range(const World& world, std::uint8_t ware) noexcept;
+
+/// How many wares a city sells and buys, and how many its Kontor allows (Maxware and its second
+/// value). Only a human's or a computer's Kontor is limited; max_sells and max_buys are 0 otherwise.
+struct TradeSlots {
+    std::size_t sells = 0;
+    std::size_t buys = 0;
+    std::size_t max_sells = 0;
+    std::size_t max_buys = 0;
+    [[nodiscard]] bool limited() const noexcept { return max_sells != 0 || max_buys != 0; }
+};
+[[nodiscard]] TradeSlots trade_slots(const World& world, const assets::BuildingTable& buildings, const City& city);
+
+/// The trade setting `setting` (its ware, mode, price and amount; not its player, island or city)
+/// applied to `city` of `world`, as the Kontor's trade window does: switching selling on keeps
+/// nothing at half the base price, buying buys up to `room` at three quarters of it; prices within
+/// trade_price_range(), natives trade for goodwill (price 0). False, and nothing changed, for a
+/// ware that is no trade good or one more than the Kontor's slots allow (trade_slots()).
+bool apply_trade_setting(const World& world, const assets::BuildingTable& buildings, City& city,
+                         const TradeSetting& setting, std::uint32_t room);
+
+/// The offer of a native village, as a new game gives it: it sells tobacco goods (north) or
+/// spices (south) and buys alcohol and cloth up to 10 t, all for goodwill; every other ware off.
+void native_village_offer(const World& world, const WorldIsland& island, City& village);
+
 /// "Insel erkunden": a ship standing in the rectangle of an island explores its crops and
 /// deposits (button 0x9487).
 struct ExploreOrder {

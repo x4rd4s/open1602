@@ -1110,6 +1110,125 @@ TEST_CASE("editor panel: a ship's holds are loaded on the page Cargo") {
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }
 
+TEST_CASE("editor panel: a city's Kontor sells and buys goods at prices of its own") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.selection = "Kontor";
+    app::EditorCity city;
+    city.name = "Abemsberg";
+    city.owner = "Blue";
+    city.room = 50 * 32;
+    for (std::uint8_t w = 0; w < 30; ++w) {
+        city.goods.push_back(app::EditorGood{w, "Good " + std::to_string(w), 0});
+        app::EditorTrade t;
+        t.ware = w;
+        t.name = "Good " + std::to_string(w);
+        t.min_price = 20;
+        t.max_price = 70;
+        if (w == 2) {
+            t.mode = app::EditorTradeMode::Sell;
+            t.price = 35;
+            t.amount = 5 * 32;
+        }
+        city.trade.push_back(t);
+    }
+    city.sells = 1;
+    city.max_sells = 4;
+    city.max_buys = 4;
+    m.city = city;
+    CHECK(panel.show_selection());
+    (void)panel.draw(m, kNoFonts);
+
+    // The list: each good with what the Kontor does with it, and the slots it has.
+    CHECK(!click(panel, m, "Trade").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::CityTrade);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Trade of Abemsberg"));
+    CHECK(says(panel, "sells for 35"));
+    CHECK(says(panel, "Sells 1 of 4, buys 0 of 4."));
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        CHECK(w.rect.y + w.rect.h <= 760);
+    }
+
+    // A good: sell or buy it; the price 10 a click, 1 a right click, within its range.
+    CHECK(!click(panel, m, "Good 2").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::CityWare);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "35 gold"));
+    CHECK(says(panel, "Keeps at least"));
+    std::vector<ui::Rect> more;
+    std::vector<ui::Rect> less;
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "+") {
+            more.push_back(w.rect);
+        } else if (w.text == "-") {
+            less.push_back(w.rect);
+        }
+    }
+    REQUIRE(more.size() == 2);
+    REQUIRE(less.size() == 2);
+    const auto press = [&](const ui::Rect& at, ui::MouseButton button) {
+        const std::int32_t x = at.x + at.w / 2;
+        const std::int32_t y = at.y + at.h / 2;
+        (void)panel.mouse(x, y, true, m, button);
+        return panel.mouse(x, y, false, m, button);
+    };
+    auto r = press(more[0], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::CityTrade);
+    CHECK(r->index == 2);
+    CHECK(r->trade.mode == app::EditorTradeMode::Sell);
+    REQUIRE(r->trade.price.has_value());
+    CHECK(*r->trade.price == 40);
+    CHECK(!r->trade.amount.has_value());
+    r = press(less[0], ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(*r->trade.price == 34);
+    r = press(more[1], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    REQUIRE(r->trade.amount.has_value());
+    CHECK(*r->trade.amount == 10U * 32U);
+    r = press(less[1], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(*r->trade.amount == 0U);
+
+    // Sell again stops the trade, Buy switches to buying.
+    r = click(panel, m, "Sell");
+    REQUIRE(r.has_value());
+    CHECK(r->trade.mode == app::EditorTradeMode::None);
+    r = click(panel, m, "Buy");
+    REQUIRE(r.has_value());
+    CHECK(r->trade.mode == app::EditorTradeMode::Buy);
+    CHECK(!r->trade.price.has_value());
+
+    // Back to the list, set back, and back to the selection.
+    CHECK(!click(panel, m, "Back to the goods").has_value());
+    CHECK(panel.page() == EditorPanel::Page::CityTrade);
+    (void)panel.draw(m, kNoFonts);
+    r = click(panel, m, "Trade nothing");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::CityTradeReset);
+    CHECK(!click(panel, m, "Back to the selection").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Selection);
+
+    // A native village: no prices, its village goods to set back to.
+    m.city->natives = true;
+    m.city->max_sells = 0;
+    m.city->max_buys = 0;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "Trade").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Village goods"));
+    CHECK(!says(panel, "sells for 35"));
+    CHECK(says(panel, "sells"));
+    CHECK(!click(panel, m, "Good 2").has_value());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!says(panel, "35 gold"));
+    CHECK(says(panel, "Keeps at least"));
+}
+
 TEST_CASE("editor panel: the page Players goes through the slots and changes what each is") {
     ui::set_language("en");
     EditorPanel panel;

@@ -221,6 +221,21 @@ struct EditorGood {
     std::uint32_t amount = 0;  ///< 1/32 t
 };
 
+/// What a city's Kontor does with a ware: nothing, sell or buy.
+enum class EditorTradeMode : std::uint8_t { None, Sell, Buy };
+
+/// The trade of a ware at a city's Kontor (the page "Trade").
+struct EditorTrade {
+    std::uint8_t ware = 0;
+    std::string name;  ///< Windows-1252
+    EditorTradeMode mode = EditorTradeMode::None;
+    std::uint16_t price = 0;   ///< per ton: what a ship pays (Sell) or gets (Buy)
+    std::uint32_t amount = 0;  ///< 1/32 t: what the city keeps (Sell) or buys up to (Buy)
+    std::uint32_t stock = 0;   ///< 1/32 t in the warehouses
+    std::uint16_t min_price = 0;
+    std::uint16_t max_price = 0;
+};
+
 /// The city of the building selected on the map.
 struct EditorCity {
     std::string name;   ///< Windows-1252
@@ -228,6 +243,15 @@ struct EditorCity {
     /// Room per ware in 1/32 t (sim::City::capacity); 0: no Kontor, no stock.
     std::uint32_t room = 0;
     std::vector<EditorGood> goods;  ///< the world's trade goods in the order panels list them
+    /// The trade of each trade good, in the order of `goods` (only while a page of the trade shows).
+    std::vector<EditorTrade> trade;
+    bool natives = false;  ///< a native village: it trades for goodwill, not for gold
+    bool pirates = false;  ///< a pirates' nest: the pirates choose their offer anew in the game
+    /// How many wares the Kontor sells and buys, and at most (0: no limit).
+    std::size_t sells = 0;
+    std::size_t buys = 0;
+    std::size_t max_sells = 0;
+    std::size_t max_buys = 0;
 };
 
 /// A ship's holds (the page "Cargo"): what each holds, and the wares it can be loaded with.
@@ -516,7 +540,11 @@ struct EditorRequest {
         RenameCity,         ///< the selected building's city named `name`
         CityGoods,          ///< the city's stock of ware `index` set to `amount` (1/32 t)
         CityOwner,          ///< the city to the next owner (`index` 1) or the one before (0)
-        ShipCargo,          ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
+        /// The city's Kontor trading ware `index` as `trade` says: its mode, and the price and
+        /// amount where they are given (else the mode's defaults).
+        CityTrade,
+        CityTradeReset,  ///< the city's trade as its owner starts with it (a village's offer, else none)
+        ShipCargo,       ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
         /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is.
@@ -583,7 +611,14 @@ struct EditorRequest {
     EditorPlayer player{};        ///< SetPlayer
     std::uint32_t amount = 0;     ///< CityGoods, ShipCargo
     std::uint8_t ware = 0;        ///< ShipCargo
-    std::size_t goal = 0;         ///< GoalStep
+    /// CityTrade: what the Kontor does with the ware.
+    struct Trade {
+        EditorTradeMode mode = EditorTradeMode::None;
+        std::optional<std::uint16_t> price;
+        std::optional<std::uint32_t> amount;  ///< 1/32 t
+    };
+    Trade trade{};
+    std::size_t goal = 0;  ///< GoalStep
 };
 
 class EditorPanel {
@@ -613,6 +648,8 @@ public:
         Objects,
         CityName,
         CityGoods,
+        CityTrade,  ///< the wares the city's Kontor sells and buys
+        CityWare,   ///< the trade of one ware
         ShipCargo,
         Players,
         PlayerName,
@@ -736,6 +773,8 @@ private:
     void layout_objects(const EditorModel& model);
     void layout_city_name(const EditorModel& model);
     void layout_city_goods(const EditorModel& model);
+    void layout_city_trade(const EditorModel& model);
+    void layout_city_ware(const EditorModel& model);
     void layout_ship_cargo(const EditorModel& model);
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
@@ -807,6 +846,7 @@ private:
     std::size_t m_player = 0;                   ///< the slot the page "Players" shows
     std::size_t m_mission = 0;                  ///< the mission the page "Goals" shows
     std::size_t m_scenario_row = 0;             ///< the row of the page "Scenario" being typed
+    std::size_t m_ware = 0;                     ///< the row of EditorCity::trade the page "Ware" shows
     std::size_t m_partner = 0;                  ///< the other slot the page "Relations" shows
     std::optional<std::size_t> m_shown_marker;  ///< the marker chosen when the page Markers was laid out last
     std::size_t m_first_column = 0;             ///< the first slot of the diplomacy table's columns

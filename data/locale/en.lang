@@ -1410,6 +1410,36 @@ editor.city.back = Back to the selection
 editor.city.renamed = The city is now called {1}.
 editor.city.owner_changed = The city now belongs to {1}.
 editor.city.no_owner = No other player can take the city: each has a city on the island already.
+editor.trade = Trade
+editor.trade.title = Trade of {1}
+editor.trade.hint = Click a good to sell or buy it.
+editor.trade.natives = The village trades for goodwill, not for gold. Click a good to change it.
+editor.trade.pirates = The pirates choose their offer anew during the game. Click a good to change it.
+# {1}, {3}: goods sold and bought; {2}, {4}: as many as the Kontor allows
+editor.trade.slots = Sells {1} of {2}, buys {3} of {4}.
+editor.trade.sells = sells
+editor.trade.buys = buys
+# {1}: price per ton in gold
+editor.trade.sells_for = sells for {1}
+editor.trade.buys_for = buys for {1}
+editor.trade.village = Village goods
+editor.trade.none = Trade nothing
+editor.trade.stock = In stock
+editor.trade.tons = {1} t
+editor.trade.sell = Sell
+editor.trade.buy = Buy
+editor.trade.off = Not traded. Choose Sell or Buy; a second click on it ends the trade.
+editor.trade.full = Not traded: the Kontor already trades in as many goods as it can.
+editor.trade.goodwill = No gold: selling to the village raises its goodwill, buying from it uses goodwill up.
+# {1}, {2}: lowest and highest price per ton in gold
+editor.trade.range = Price per ton from {1} to {2} gold. Click: 10, right click: 1.
+editor.trade.price = Price
+editor.trade.gold = {1} gold
+editor.trade.keep = Keeps at least
+editor.trade.limit = Buys up to
+editor.trade.back = Back to the goods
+editor.trade.no_slot = The Kontor trades in no further good.
+editor.trade.reset = The trade of the city is set back.
 editor.step.city_rename = city renamed
 editor.step.city_goods = stock changed
 editor.step.ship_cargo = cargo changed

@@ -84,6 +84,15 @@ constexpr Id kTerrainBigger = 79;       ///< the brush a size bigger
 constexpr Id kTerrainShape = 173;       ///< the brush's shape
 constexpr Id kTerrainSlider = 174;      ///< the brush's size slid
 constexpr Id kTerrainPasteWater = 175;  ///< whether a paste lays the copy's water too
+constexpr Id kCityTradePage = 188;
+constexpr Id kTradeSell = 176;   ///< the ware sold, or no longer
+constexpr Id kTradeBuy = 177;    ///< the ware bought, or no longer
+constexpr Id kTradeReset = 178;  ///< the city's trade as its owner starts with it
+constexpr Id kTradeBack = 179;   ///< from a ware back to the page "Trade"
+constexpr Id kPriceLess = 184;   ///< the ware's price: left 10, right 1 gold
+constexpr Id kPriceMore = 185;
+constexpr Id kAmountLess = 186;  ///< what the city keeps or buys up to: left 10 t, right 1 t
+constexpr Id kAmountMore = 187;
 constexpr Id kObjectsPage = 59;
 constexpr Id kObjectsTool = 80;
 constexpr Id kObjectsGroup = 81;
@@ -255,8 +264,8 @@ std::uint32_t fitted(std::uint32_t used) {
 /// Whether a page goes back and on by the rows it shows (else by kRows).
 bool paged_by_rows(EditorPanel::Page page) noexcept {
     using P = EditorPanel::Page;
-    return page == P::Check || page == P::CityGoods || page == P::Rules || page == P::Random || page == P::Goals ||
-           page == P::Open || page == P::IslandFiles || page == P::ScriptFiles;
+    return page == P::Check || page == P::CityGoods || page == P::CityTrade || page == P::Rules || page == P::Random ||
+           page == P::Goals || page == P::Open || page == P::IslandFiles || page == P::ScriptFiles;
 }
 
 /// The lines a list of files takes: a line each, and one for each group's heading.
@@ -591,6 +600,8 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
         case Page::Selection:
         case Page::CityName:
         case Page::CityGoods:
+        case Page::CityTrade:
+        case Page::CityWare:
         case Page::ShipCargo:
         case Page::Fertility:
             return EditorTool::Select;
@@ -767,6 +778,12 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::CityGoods:
             layout_city_goods(model);
+            break;
+        case Page::CityTrade:
+            layout_city_trade(model);
+            break;
+        case Page::CityWare:
+            layout_city_ware(model);
             break;
         case Page::ShipCargo:
             layout_ship_cargo(model);
@@ -1135,8 +1152,8 @@ void EditorPanel::layout_selection(const EditorModel& model) {
     } else {
         f.paragraph(Rect{m_x, y, m_w, 2 * kLine}, model.selection, Tone::Normal, kLine);
         y += 2 * kLine + 4;
-        // Room for the buttons below: back, and an island's three rows or a city's two.
-        const std::int32_t rows = model.island || model.placeholder ? 4 : model.city ? 3 : model.ship ? 2 : 1;
+        // Room for the buttons below: back, and an island's three rows, a city's three or a ship's one.
+        const std::int32_t rows = model.island || model.placeholder || model.city ? 4 : model.ship ? 2 : 1;
         const std::int32_t bottom = m_top + m_height - rows * (kButtonH + kGap) - kGap;
         for (const EditorProperty& p : model.properties) {
             if (y + kLine > bottom) {
@@ -1155,6 +1172,8 @@ void EditorPanel::layout_selection(const EditorModel& model) {
             f.button(kCityNamePage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.city.rename"));
             f.button(kCityGoodsPage, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.city.stock"),
                      model.city->room > 0);
+            y += kButtonH + kGap;
+            f.button(kCityTradePage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.trade"), model.city->room > 0);
             y += kButtonH + kGap;
             f.cycle_button(kCityOwner, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.owner", {model.city->owner}));
             y += kButtonH + kGap;
@@ -1494,6 +1513,129 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + m_page_rows < n);
     y += kButtonH + kGap;
     f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
+}
+
+namespace {
+
+/// What a ware's row on the page "Trade" says of it: sold or bought, at which price.
+std::string trade_state(const EditorTrade& t, bool natives) {
+    switch (t.mode) {
+        case EditorTradeMode::Sell:
+            return natives ? ui::tr("editor.trade.sells") : ui::tr("editor.trade.sells_for", {count(t.price)});
+        case EditorTradeMode::Buy:
+            return natives ? ui::tr("editor.trade.buys") : ui::tr("editor.trade.buys_for", {count(t.price)});
+        case EditorTradeMode::None:
+            break;
+    }
+    return "-";
+}
+
+}  // namespace
+
+void EditorPanel::layout_city_trade(const EditorModel& model) {
+    if (!model.city || model.city->room == 0) {
+        m_page = Page::Selection;
+        layout_selection(model);
+        return;
+    }
+    const EditorCity& city = *model.city;
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.trade.title", {city.name}), Align::Left, Tone::Heading);
+    y += 28;
+    // Who trades how: a village for goodwill, the pirates choosing anew, a Kontor's slots.
+    std::string note = city.natives   ? ui::tr("editor.trade.natives")
+                       : city.pirates ? ui::tr("editor.trade.pirates")
+                                      : ui::tr("editor.trade.hint");
+    if (city.max_sells != 0 || city.max_buys != 0) {
+        note += " " + ui::tr("editor.trade.slots",
+                             {count(city.sells), count(city.max_sells), count(city.buys), count(city.max_buys)});
+    }
+    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, note, Tone::Dim, 20);
+    y += 3 * 20 + 4;
+    // As many rows as fit above the buttons below: the pages, the start's trade, and back.
+    const std::int32_t bottom = m_top + m_height - 3 * (kButtonH + kGap) - kGap;
+    const std::size_t n = city.trade.size();
+    const auto fit = static_cast<std::size_t>(std::max<std::int32_t>(1, (bottom - y) / kRowH));
+    m_page_rows = std::min({fit, std::size_t{20}, std::max<std::size_t>(n, 1)});
+    m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
+    const std::int32_t top = y;
+    for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
+        const EditorTrade& t = city.trade[m_first + row];
+        f.row(kFirstRow + static_cast<Id>(row), Rect{m_x, y, m_w, kRowH - 2}, false);
+        f.entry(Rect{m_x + 4, y, m_w - 8, kRowH - 2}, t.name, trade_state(t, city.natives), Tone::Normal,
+                t.mode == EditorTradeMode::None ? Tone::Dim : Tone::Normal);
+        y += kRowH;
+    }
+    y = top + static_cast<std::int32_t>(m_page_rows) * kRowH + 4;
+    const std::int32_t half = (m_w - kGap) / 2;
+    f.button(kPrevious, Rect{m_x, y, half, kButtonH}, ui::tr("editor.previous"), m_first > 0);
+    f.button(kNext, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.next"), m_first + m_page_rows < n);
+    y += kButtonH + kGap;
+    f.button(kTradeReset, Rect{m_x, y, m_w, kButtonH},
+             ui::tr(city.natives ? "editor.trade.village" : "editor.trade.none"));
+    y += kButtonH + kGap;
+    f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
+}
+
+void EditorPanel::layout_city_ware(const EditorModel& model) {
+    if (!model.city || model.city->room == 0 || m_ware >= model.city->trade.size()) {
+        m_page = model.city && model.city->room > 0 ? Page::CityTrade : Page::Selection;
+        if (m_page == Page::CityTrade) {
+            layout_city_trade(model);
+        } else {
+            layout_selection(model);
+        }
+        return;
+    }
+    const EditorCity& city = *model.city;
+    const EditorTrade& t = city.trade[m_ware];
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, t.name, Align::Left, Tone::Heading);
+    y += 30;
+    f.entry(Rect{m_x, y, m_w, kLine}, ui::tr("editor.trade.stock"), ui::tr("editor.trade.tons", {count(t.stock / 32)}),
+            Tone::Dim);
+    y += kLine + kGap;
+    // Sell or buy, one at a time; the one chosen again stops the trade. A Kontor whose slots are
+    // all taken offers no further ware.
+    const bool sell = t.mode == EditorTradeMode::Sell;
+    const bool buy = t.mode == EditorTradeMode::Buy;
+    const bool sell_free = city.max_sells == 0 || city.sells < city.max_sells;
+    const bool buy_free = city.max_buys == 0 || city.buys < city.max_buys;
+    const std::int32_t half = (m_w - kGap) / 2;
+    f.button(kTradeSell, Rect{m_x, y, half, kButtonH}, ui::tr("editor.trade.sell"), sell || sell_free, sell);
+    f.button(kTradeBuy, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.trade.buy"), buy || buy_free, buy);
+    y += kButtonH + kGap;
+    std::string note;
+    if (t.mode == EditorTradeMode::None) {
+        note = ui::tr(!sell_free && !buy_free ? "editor.trade.full" : "editor.trade.off");
+    } else if (city.natives) {
+        note = ui::tr("editor.trade.goodwill");
+    } else {
+        note = ui::tr("editor.trade.range", {count(t.min_price), count(t.max_price)});
+    }
+    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, note, Tone::Dim, 20);
+    y += 3 * 20 + 4;
+    if (t.mode != EditorTradeMode::None) {
+        // Rows with cycle buttons as the stock's: the left button 10, the right one 1.
+        constexpr std::int32_t kStep = 28;
+        constexpr std::int32_t kH = 26;
+        const std::int32_t text_w = m_w - 2 * kStep - 6;
+        if (!city.natives) {
+            f.entry(Rect{m_x, y, text_w, kH - 2}, ui::tr("editor.trade.price"),
+                    ui::tr("editor.trade.gold", {count(t.price)}));
+            f.cycle_button(kPriceLess, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kH - 2}, "-", t.price > t.min_price);
+            f.cycle_button(kPriceMore, Rect{m_x + m_w - kStep, y, kStep, kH - 2}, "+", t.price < t.max_price);
+            y += kH + 2;
+        }
+        f.entry(Rect{m_x, y, text_w, kH - 2}, ui::tr(sell ? "editor.trade.keep" : "editor.trade.limit"),
+                ui::tr("editor.trade.tons", {count(t.amount / 32)}));
+        f.cycle_button(kAmountLess, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kH - 2}, "-", t.amount > 0);
+        f.cycle_button(kAmountMore, Rect{m_x + m_w - kStep, y, kStep, kH - 2}, "+", t.amount < city.room);
+        y += kH + kGap;
+    }
+    f.button(kTradeBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.trade.back"));
 }
 
 void EditorPanel::layout_island_actions(const EditorModel& model, std::int32_t& y) {
@@ -3127,6 +3269,51 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
             m_page = Page::CityGoods;
             m_first = 0;
             return std::nullopt;
+        case kCityTradePage:
+            m_page = Page::CityTrade;
+            m_first = 0;
+            return std::nullopt;
+        case kTradeBack:
+            m_page = Page::CityTrade;
+            return std::nullopt;
+        case kTradeReset:
+            return EditorRequest{EditorRequest::Kind::CityTradeReset};
+        case kTradeSell:
+        case kTradeBuy:
+        case kPriceLess:
+        case kPriceMore:
+        case kAmountLess:
+        case kAmountMore: {
+            if (!model.city || m_ware >= model.city->trade.size()) {
+                return std::nullopt;
+            }
+            const EditorTrade& t = model.city->trade[m_ware];
+            EditorRequest r{EditorRequest::Kind::CityTrade, t.ware};
+            r.trade.mode = t.mode;
+            if (*id == kTradeSell || *id == kTradeBuy) {
+                // The mode chosen again: no trade; another: its defaults.
+                const EditorTradeMode mode = *id == kTradeSell ? EditorTradeMode::Sell : EditorTradeMode::Buy;
+                r.trade.mode = t.mode == mode ? EditorTradeMode::None : mode;
+                return r;
+            }
+            if (t.mode == EditorTradeMode::None) {
+                return std::nullopt;
+            }
+            // Down to whole steps, then by steps, as the stock goes.
+            const auto down = [](std::uint32_t v, std::uint32_t step) {
+                return v % step != 0 ? v / step * step : v - std::min(v, step);
+            };
+            if (*id == kPriceLess || *id == kPriceMore) {
+                const std::uint32_t step = forward ? 10 : 1;
+                const std::uint32_t price = *id == kPriceMore ? (t.price / step + 1) * step : down(t.price, step);
+                r.trade.price = static_cast<std::uint16_t>(std::clamp<std::uint32_t>(price, t.min_price, t.max_price));
+            } else {
+                const std::uint32_t step = forward ? 10 * 32 : 32;
+                r.trade.amount = *id == kAmountMore ? std::min(model.city->room, (t.amount / step + 1) * step)
+                                                    : down(t.amount, step);
+            }
+            return r;
+        }
         case kShipCargoPage:
             m_page = Page::ShipCargo;
             return std::nullopt;
@@ -3307,6 +3494,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         EditorRequest r{EditorRequest::Kind::Overlay};
         r.index = static_cast<std::size_t>(*id - kFirstOverlay);
         return r;
+    }
+    if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::CityTrade) {
+        const std::size_t index = m_first + static_cast<std::size_t>(*id - kFirstRow);
+        if (model.city && index < model.city->trade.size()) {
+            m_ware = index;
+            m_page = Page::CityWare;
+        }
+        return std::nullopt;
     }
     if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::Rules) {
         const std::size_t index = m_first + static_cast<std::size_t>(*id - kFirstRow);

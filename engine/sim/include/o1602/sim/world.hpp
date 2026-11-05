@@ -192,6 +192,7 @@ struct City {
         std::uint16_t buy_price = 0;   ///< per ton, what the city pays
         std::uint32_t keep = 0;        ///< sells only above this stock (1/32 t)
         std::uint32_t limit = 0;       ///< buys only up to this stock (1/32 t)
+        friend bool operator==(const Trade&, const Trade&) = default;
     };
     std::vector<Trade> trade;  ///< per ware
     /// Natives: goodwill towards each player; selling to them raises it, buying

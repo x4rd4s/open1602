@@ -62,6 +62,48 @@ core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world,
     return edit(std::move(after), "city_goods");
 }
 
+core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world, const assets::BuildingTable& buildings,
+                                                        std::uint16_t island, std::uint8_t city,
+                                                        const sim::TradeSetting& setting) {
+    const std::uint32_t room = city_room(world, buildings, island, city);
+    if (world.city(island, city) == nullptr || room == 0) {
+        return no_city(island, city);
+    }
+    if (!world.goods().is_trade(setting.ware)) {
+        return make_error(ErrorCode::InvalidFormat, "ware " + std::to_string(setting.ware) + " is no trade good");
+    }
+    sim::TradeSetting s = setting;
+    if (s.amount) {
+        s.amount = std::min(*s.amount, room);
+    }
+    sim::World after = world;
+    if (!sim::apply_trade_setting(after, buildings, *after.city(island, city), s, room)) {
+        return make_error(ErrorCode::Unsupported, "the Kontor trades in no more wares");
+    }
+    if (after.city(island, city)->trade == world.city(island, city)->trade) {
+        return make_error(ErrorCode::Unsupported, "the trade is so already");
+    }
+    return edit(std::move(after), "city_trade");
+}
+
+core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world, std::uint16_t island,
+                                                          std::uint8_t city) {
+    if (world.city(island, city) == nullptr) {
+        return no_city(island, city);
+    }
+    sim::World after = world;
+    sim::City& c = *after.city(island, city);
+    if (after.acts_as(c.owner, sim::FactionBehaviour::Natives)) {
+        sim::native_village_offer(after, after.islands()[island], c);
+    } else {
+        for (sim::City::Trade& t : c.trade) {
+            t.sell = false;
+            t.buy = false;
+        }
+    }
+    return edit(std::move(after), "city_trade");
+}
+
 core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world, std::uint16_t island,
                                                            std::uint8_t city, sim::PlayerId owner) {
     const sim::City* c = world.city(island, city);
@@ -97,6 +139,17 @@ core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& wor
     }
     sim::City& changed = *after.city(island, city);
     changed.owner = owner;
+    // Natives trade for goodwill at price 0: a village's offer for a new village, and nothing for
+    // a city that stops being one, so that it sells nothing for free.
+    const bool was_village = world.acts_as(c->owner, sim::FactionBehaviour::Natives);
+    const bool is_village = after.acts_as(owner, sim::FactionBehaviour::Natives);
+    if (is_village && !was_village) {
+        sim::native_village_offer(after, after.islands()[island], changed);
+    } else if (was_village && !is_village) {
+        for (sim::City::Trade& t : changed.trade) {
+            t = sim::City::Trade{};
+        }
+    }
     changed.ledger.clear();  // the new owner's statistics start with the city
     changed.history.clear();
     return edit(std::move(after), "city_owner");
