@@ -15,13 +15,14 @@
 
 using namespace o1602;
 
-TEST_CASE("factions: the base game's four, by id and behaviour") {
+TEST_CASE("factions: the base game's five, by id and behaviour") {
     const std::vector<sim::Faction> base = sim::base_factions();
-    REQUIRE(base.size() == 4);
+    REQUIRE(base.size() == 5);
     CHECK(base[sim::faction::kSettlers].id == "anno1602:settlers");
     CHECK(base[sim::faction::kTrader].id == "anno1602:trader");
     CHECK(base[sim::faction::kPirates].id == "anno1602:pirates");
     CHECK(base[sim::faction::kNatives].id == "anno1602:natives");
+    CHECK(base[sim::faction::kNeutral].id == "anno1602:neutral");
     for (std::size_t i = 0; i < base.size(); ++i) {
         CHECK(sim::base_faction(base[i].behaviour) == i);
     }
@@ -58,7 +59,7 @@ TEST_CASE("factions: a faction of a package acts as the behaviour it names") {
     world.set_factions(factions);
     std::vector<sim::Player> players(3);
     players[1].role = sim::PlayerRole::Computer;
-    sim::make_neutral(players[2], 4);
+    sim::make_neutral(players[2], 5);
     world.set_players(players);
     CHECK(world.faction(world.players()[2]).id == "corsairs:corsairs");
     CHECK(world.first_of(sim::FactionBehaviour::Pirates) == 2);
@@ -103,7 +104,7 @@ TEST_CASE("factions: a package changes the base game's factions field by field")
     CHECK(factions[sim::faction::kTrader].ships.per == 2);
     CHECK(factions[sim::faction::kTrader].ships.from == 2);  // the wrong value is passed over
     CHECK(factions[sim::faction::kTrader].reach_players == 6);
-    CHECK(factions.size() == 4);
+    CHECK(factions.size() == 5);
     REQUIRE(warnings.size() == 4);
     CHECK(warnings[0] == "bigworld/factions.toml line 9: unknown field 'colour'");
     CHECK(warnings[1] == "bigworld/factions.toml line 10: 'ships.from' must be a number from 0 to 65535");
@@ -135,13 +136,13 @@ TEST_CASE("factions: a package adds factions of its own that act as a base game'
                             "[\"other:navy\"]\n"
                             "behaviour = \"settlers\"\n",
                             warnings, &replacements);
-    REQUIRE(factions.size() == 6);
-    CHECK(factions[4].id == "seas:corsairs");
-    CHECK(factions[4].behaviour == sim::FactionBehaviour::Pirates);
-    CHECK(factions[4].nests.per == 2);
-    CHECK(factions[4].ships == sim::base_factions()[sim::faction::kPirates].ships);
-    CHECK(factions[5].id == "seas:guild");
-    CHECK(factions[5].behaviour == sim::FactionBehaviour::Trader);
+    REQUIRE(factions.size() == 7);
+    CHECK(factions[5].id == "seas:corsairs");
+    CHECK(factions[5].behaviour == sim::FactionBehaviour::Pirates);
+    CHECK(factions[5].nests.per == 2);
+    CHECK(factions[5].ships == sim::base_factions()[sim::faction::kPirates].ships);
+    CHECK(factions[6].id == "seas:guild");
+    CHECK(factions[6].behaviour == sim::FactionBehaviour::Trader);
     REQUIRE(replacements.size() == 1);
     CHECK(replacements[0] == (sim::FactionReplacement{"anno1602:pirates", "seas:corsairs"}));
     // The guild acts otherwise than the pirates, the tribe names no behaviour, the navy no faction
@@ -150,7 +151,7 @@ TEST_CASE("factions: a package adds factions of its own that act as a base game'
     CHECK(warnings[0].find("another behaviour") != std::string::npos);
     CHECK(warnings[1].find("needs 'behaviour'") != std::string::npos);
     CHECK(warnings[2].find("only under its own name") != std::string::npos);
-    CHECK(sim::find_faction(factions, "seas:guild") == sim::FactionId{5});
+    CHECK(sim::find_faction(factions, "seas:guild") == sim::FactionId{6});
     CHECK(!sim::find_faction(factions, "seas:tribe"));
 
     // In a game the corsairs take the pirates' slots and are saved with it.
@@ -162,7 +163,7 @@ TEST_CASE("factions: a package adds factions of its own that act as a base game'
     world.set_players(players);
     world.set_factions(factions);
     world.replace_factions(replacements);
-    CHECK(world.players()[1].faction == 4);
+    CHECK(world.players()[1].faction == 5);
     CHECK(world.behaviour(world.players()[1]) == sim::FactionBehaviour::Pirates);
     CHECK(world.players()[2].faction == sim::faction::kNatives);
     CHECK(world.first_of(sim::FactionBehaviour::Pirates) == 1);
@@ -186,10 +187,10 @@ TEST_CASE("factions: 'scripted' gives settlers or pirates a behaviour of their s
     REQUIRE(warnings.size() == 2);
     CHECK(warnings[0].starts_with("seas/factions.toml line 8: 'scripted' is for factions of settlers or pirates"));
     CHECK(warnings[1].starts_with("seas/factions.toml line 10: 'scripted' must be true or false"));
-    REQUIRE(factions.size() == 6);
-    CHECK(factions[4].id == "seas:corsairs");
-    CHECK(factions[4].scripted);
+    REQUIRE(factions.size() == 7);
+    CHECK(factions[5].id == "seas:corsairs");
     CHECK(factions[5].scripted);
+    CHECK(factions[6].scripted);
     CHECK(!factions[sim::faction::kTrader].scripted);
     CHECK(!factions[sim::faction::kPirates].scripted);
 }
@@ -207,8 +208,8 @@ TEST_CASE("factions: a package names its faction by language for the editor") {
                             warnings);
     REQUIRE(warnings.size() == 1);
     CHECK(warnings[0].starts_with("seas/factions.toml line 5: 'name.fr' must be name.<language>"));
-    REQUIRE(factions.size() == 5);
-    const auto& names = factions[4].names;
+    REQUIRE(factions.size() == 6);
+    const auto& names = factions[5].names;
     REQUIRE(names.size() == 2);
     CHECK((names[0].first == "en" && names[0].second == "Hanse League"));
     CHECK((names[1].first == "de" && names[1].second == "St\xE4"

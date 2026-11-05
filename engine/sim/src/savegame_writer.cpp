@@ -892,6 +892,8 @@ private:
                 return assets::PlayerKind::Pirate;
             case FactionBehaviour::Natives:
                 return assets::PlayerKind::Natives;
+            case FactionBehaviour::Neutral:
+                return assets::PlayerKind::Absent;  // the original has no slot for them
         }
         return p.role == PlayerRole::Computer ? assets::PlayerKind::Computer : assets::PlayerKind::Human;
     }

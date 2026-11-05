@@ -31,6 +31,7 @@ add_executable(o1602_tests
     unit/test_diplomacy_strip.cpp
     unit/test_military.cpp
     unit/test_market_capture.cpp
+    unit/test_neutral_buildings.cpp
     unit/test_naval.cpp
     unit/test_pirates.cpp
     unit/test_explore.cpp

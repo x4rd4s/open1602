@@ -1616,6 +1616,8 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
     if (owned && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
+    } else if (build && model.object_neutral) {
+        note = ui::tr("editor.objects.note.neutral");
     } else if (o.tool == Tool::Template && model.object_pieces == 0) {
         note = ui::tr("editor.objects.note.no_templates");
     }

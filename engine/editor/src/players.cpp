@@ -2,6 +2,8 @@
 #include "o1602/editor/players.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "o1602/editor/islands.hpp"
@@ -14,8 +16,10 @@ using core::make_error;
 
 namespace {
 
+/// A human or a computer, not a slot that only holds a place (before the neutral buildings' player).
 bool playing(const sim::Player& p) {
-    return p.role == sim::PlayerRole::Human || p.role == sim::PlayerRole::Computer;
+    return (p.role == sim::PlayerRole::Human || p.role == sim::PlayerRole::Computer) &&
+           p.status != sim::PlayerStatus::Absent;
 }
 
 bool owns_anything(const sim::World& world, sim::PlayerId player) {
@@ -183,6 +187,15 @@ core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& wo
         return make_error(ErrorCode::Unsupported, "the player still owns a city, ship or soldier");
     }
     std::vector<sim::Player> players = world.players();
+    if (const sim::PlayerId neutral = neutral_player(world); neutral != sim::kNoPlayer && neutral > last) {
+        // The neutral buildings' player behind it stays where it is: the slot is empty now.
+        sim::Player absent;
+        absent.status = sim::PlayerStatus::Absent;
+        players[last] = std::move(absent);
+        sim::World after = world;
+        keep_relations(world, after, std::move(players));
+        return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_remove"));
+    }
     players.resize(last);
     // The empty slots that only held its place go with it.
     while (players.size() > sim::kOriginalPlayers && players.back().status == sim::PlayerStatus::Absent &&
@@ -193,6 +206,61 @@ core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& wo
     sim::World after = world;
     keep_relations(world, after, std::move(players));
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_remove"));
+}
+
+sim::PlayerId neutral_player(const sim::World& world) noexcept {
+    return world.first_of(sim::FactionBehaviour::Neutral);
+}
+
+sim::PlayerId add_neutral_player(sim::World& world) {
+    if (const sim::PlayerId p = neutral_player(world); p != sim::kNoPlayer) {
+        return p;
+    }
+    // The faction: the base game's, or the first of a package's acting as it.
+    std::optional<sim::FactionId> faction =
+        sim::find_faction(world.factions(), std::string(sim::kBaseFactionPackage) + ":neutral");
+    if (!faction) {
+        for (std::size_t f = 0; f < world.factions().size(); ++f) {
+            if (world.factions()[f].behaviour == sim::FactionBehaviour::Neutral) {
+                faction = static_cast<sim::FactionId>(f);
+                break;
+            }
+        }
+    }
+    if (!faction) {
+        std::vector<sim::Faction> factions = world.factions();
+        if (factions.size() >= sim::kMaxFactions) {
+            return sim::kNoPlayer;
+        }
+        factions.push_back(sim::base_factions()[sim::faction::kNeutral]);
+        faction = static_cast<sim::FactionId>(factions.size() - 1);
+        world.set_factions(std::move(factions));
+    }
+    std::vector<sim::Player> players = world.players();
+    while (players.size() < kNeutralSlot) {
+        sim::Player absent;  // holds the place of a player's slot
+        absent.status = sim::PlayerStatus::Absent;
+        players.push_back(std::move(absent));
+    }
+    sim::Player neutral;
+    sim::make_neutral(neutral, *faction);
+    neutral.status = sim::PlayerStatus::Playing;
+    neutral.banner = kNeutralBanner;
+    players.push_back(std::move(neutral));
+    const sim::World before = world;
+    keep_relations(before, world, std::move(players));
+    return static_cast<sim::PlayerId>(world.players().size() - 1);
+}
+
+core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world) {
+    if (neutral_player(world) != sim::kNoPlayer) {
+        return make_error(ErrorCode::Unsupported, "the world has the neutral buildings' player already");
+    }
+    sim::World after = world;
+    if (add_neutral_player(after) == sim::kNoPlayer) {
+        return make_error(ErrorCode::LimitExceeded, "no room for another faction");
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "neutral_add"));
 }
 
 Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {

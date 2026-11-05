@@ -150,7 +150,8 @@ core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world, con
     UnitRefusal refused = UnitRefusal::None;
     if (type == nullptr || (!spearman && (!unit || unit->family != family))) {
         refused = UnitRefusal::NoType;
-    } else if (!owner_ok(world, owner) || (spearman && !world.acts_as(owner, sim::FactionBehaviour::Natives))) {
+    } else if ((!owner_ok(world, owner) && !world.acts_as(owner, sim::FactionBehaviour::Neutral)) ||
+               (spearman && !world.acts_as(owner, sim::FactionBehaviour::Natives))) {
         refused = UnitRefusal::NoOwner;
     } else {
         refused = unit_fits(world, buildings, x, y);

@@ -448,7 +448,8 @@ void advance_cities(World& world, const assets::BuildingTable& buildings, std::v
                 consume_pirates(*city, world.random(RandomStream::Pirates));
                 break;
             case FactionBehaviour::Trader:
-                break;  // the free trader consumes nothing
+            case FactionBehaviour::Neutral:
+                break;  // the free trader and the neutral buildings consume nothing
         }
         // The trade statistics fade.
         city->purchases = city->purchases * 89 / 90;

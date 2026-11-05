@@ -485,6 +485,9 @@ private:
     [[nodiscard]] std::uint16_t editor_figure() const;
     /// The chosen owner of the page "Objects", kNoPlayer without players.
     [[nodiscard]] sim::PlayerId editor_object_owner() const;
+    /// The neutral buildings' player added to the map when it is the owner chosen and the map has
+    /// none yet (editor::add_neutral).
+    void editor_neutral_owner();
     /// A click of the tools Ship and Unit at the world tile (x, y): one step of undo, or a note why not.
     void editor_place_figure(std::int64_t x, std::int64_t y);
     /// The template chosen for the tool Template, none if the user has none.

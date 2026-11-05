@@ -21,6 +21,7 @@
 #include "o1602/editor/cities.hpp"
 #include "o1602/editor/objects.hpp"
 #include "o1602/editor/operations.hpp"
+#include "o1602/editor/players.hpp"
 #include "o1602/editor/resources.hpp"
 #include "o1602/editor/terrain.hpp"
 #include "o1602/editor/units.hpp"
@@ -72,7 +73,9 @@ std::vector<const ui::BuildCategory*> object_groups() {
 }
 
 /// The players a building, ship or unit can be placed for: humans and computers, then the natives
-/// and the pirates; for a ship the free trader last.
+/// and the pirates; for a ship the free trader last, else the neutral buildings' player last (its
+/// slot, editor::kNeutralSlot, while the world has none: it comes with the first choice of it,
+/// MapViewer::editor_neutral_owner).
 std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false) {
     std::vector<sim::PlayerId> owners;
     for (std::size_t i = 0; i < world.players().size(); ++i) {
@@ -94,8 +97,26 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
         if (trader != sim::kNoPlayer) {
             owners.push_back(trader);
         }
+    } else if (!owners.empty()) {
+        const sim::PlayerId neutral = editor::neutral_player(world);
+        owners.push_back(neutral != sim::kNoPlayer ? neutral : editor::kNeutralSlot);
     }
     return owners;
+}
+
+/// Whether `owner` is the neutral buildings' player, or its slot before the world has it.
+bool neutral_owner(const sim::World& world, sim::PlayerId owner) {
+    return world.acts_as(owner, sim::FactionBehaviour::Neutral) ||
+           (owner == editor::kNeutralSlot && world.player(owner) == nullptr);
+}
+
+/// The owner as the column names it.
+std::string owner_label(const sim::World& world, sim::PlayerId owner) {
+    if (neutral_owner(world, owner)) {
+        return ui::tr("editor.objects.owner_neutral");
+    }
+    const sim::Player* p = world.player(owner);
+    return p != nullptr ? MapViewer::editor_player_label(*p) : std::string("-");
 }
 
 /// The name of a city the natives or pirates found in the editor; empty for the others, whose
@@ -106,6 +127,9 @@ std::string own_city_name(const sim::World& world, sim::PlayerId owner) {
     }
     if (world.acts_as(owner, sim::FactionBehaviour::Pirates)) {
         return ui::tr("editor.city.pirates");
+    }
+    if (world.acts_as(owner, sim::FactionBehaviour::Neutral)) {
+        return ui::tr("editor.city.neutral");
     }
     return {};
 }
@@ -136,6 +160,8 @@ std::string build_refusal(sim::BuildRefusal refusal) {
             return ui::tr("editor.objects.refused.mine");
         case R::NoRiver:
             return ui::tr("editor.objects.refused.river");
+        case R::Neutral:
+            return ui::tr("editor.objects.refused.neutral");
         default:
             return ui::tr("editor.objects.refused.other", {sim::refusal_name(refusal)});
     }
@@ -225,8 +251,10 @@ void MapViewer::editor_object_model(EditorModel& m) const {
     const auto owners = object_owners(m_editor->document.world(), tool == Tool::Ship);
     m.object_owners = owners.size();
     if (!owners.empty()) {
-        const sim::Player* p = m_editor->document.world().player(owners[m_editor->objects.owner % owners.size()]);
-        m.object_owner = p != nullptr ? editor_player_label(*p) : std::string("-");
+        const sim::World& world = m_editor->document.world();
+        const sim::PlayerId owner = owners[m_editor->objects.owner % owners.size()];
+        m.object_neutral = neutral_owner(world, owner);
+        m.object_owner = owner_label(world, owner);
     }
 }
 
@@ -252,8 +280,7 @@ void MapViewer::editor_city_model(EditorModel& m) const {
     const sim::World& world = m_editor->document.world();
     EditorCity city;
     city.name = c->name;
-    const sim::Player* owner = world.player(c->owner);
-    city.owner = owner != nullptr ? editor_player_label(*owner) : std::string("-");
+    city.owner = owner_label(world, c->owner);
     const auto* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (panel != nullptr && panel->page() != EditorPanel::Page::CityGoods &&
         panel->page() != EditorPanel::Page::Selection) {
@@ -376,6 +403,23 @@ void MapViewer::editor_objects_request(const EditorRequest& request) {
     }
     m_editor->objects = o;
     m_editor->notice.clear();
+    editor_neutral_owner();
+}
+
+void MapViewer::editor_neutral_owner() {
+    const sim::World& world = m_editor->document.world();
+    const sim::PlayerId owner = editor_object_owner();
+    if (owner != editor::kNeutralSlot || world.player(owner) != nullptr) {
+        return;
+    }
+    // The neutral buildings chosen for the first time: the world gets their player, which then
+    // stands in the list of owners where its slot stood.
+    auto op = editor::add_neutral(world);
+    if (!op) {
+        editor_notice(op.error().message, true, op.error().message);
+        return;
+    }
+    m_editor->document.perform(std::move(op).value());
 }
 
 const BuildTemplate* MapViewer::editor_template() const {
@@ -421,6 +465,7 @@ std::optional<sim::BuildOrder> MapViewer::editor_template_order(std::int64_t x, 
 
 void MapViewer::editor_place_template(std::int64_t x, std::int64_t y) {
     (void)template_store();  // read on first use
+    editor_neutral_owner();  // an undo took it away
     if (editor_object_owner() == sim::kNoPlayer) {
         editor_notice(ui::tr("editor.objects.note.no_players"), true, "no owner");
         return;
@@ -512,6 +557,7 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
 }
 
 bool MapViewer::editor_place_object(std::int64_t x, std::int64_t y, bool tell) {
+    editor_neutral_owner();  // an undo took it away
     const auto order = editor_object_order(x, y);
     if (!order) {
         if (tell) {
@@ -655,6 +701,7 @@ sim::PlayerId MapViewer::editor_object_owner() const {
 }
 
 void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
+    editor_neutral_owner();  // an undo took it away
     const sim::World& world = m_editor->document.world();
     const bool ship = m_editor->objects.tool == EditorObjects::Tool::Ship;
     const sim::PlayerId owner = editor_object_owner();

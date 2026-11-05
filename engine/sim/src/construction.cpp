@@ -289,6 +289,16 @@ std::uint32_t cities_on_island(const World& world, std::uint16_t island) {
         std::count_if(world.cities().begin(), world.cities().end(), [&](const City& c) { return c.island == island; }));
 }
 
+/// The city of the neutral buildings of `player` on the island, kNoCity if it has none there.
+std::uint8_t neutral_city(const World& world, std::uint16_t island, PlayerId player) {
+    for (const City& c : world.cities()) {
+        if (c.island == island && c.owner == player) {
+            return c.index;
+        }
+    }
+    return MapCell::kNoCity;
+}
+
 bool player_has_city(const World& world, std::uint16_t island, PlayerId player) {
     return std::any_of(world.cities().begin(), world.cities().end(),
                        [&](const City& c) { return c.island == island && c.owner == player; });
@@ -345,6 +355,9 @@ struct Planner {
     bool foreign = false;
     std::set<std::pair<std::int32_t, std::int32_t>> taken;  // tiles of accepted items
     mutable UnitsOnIsland units;
+    /// The neutral buildings' order: on free land as well, which the building takes for their
+    /// city (neutral_city()).
+    bool neutral = false;
 
     /// Whether the footprint fits (with the fixes of Open1602).
     BuildRefusal can_place(const assets::BuildingType& b, std::uint8_t city_of_tiles, std::uint8_t rotation,
@@ -354,7 +367,7 @@ struct Planner {
             static_cast<std::uint32_t>(y) + f.h > map.height()) {
             return BuildRefusal::OutsideIsland;
         }
-        if (city_of_tiles == MapCell::kNoCity && !b.place_outside) {
+        if (city_of_tiles == MapCell::kNoCity && !b.place_outside && !neutral) {
             return BuildRefusal::Territory;
         }
         if (b.kind == kind::kMine && b.ware != ware::kStone &&
@@ -376,7 +389,7 @@ struct Planner {
                 const MapCell& cell = map.top(static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty));
                 // S-008: every other building lies completely in the city (the original wanted one
                 // full edge and annexed the rest).
-                if (cell.city != city_of_tiles && !(edge_rule && cell.city == MapCell::kNoCity)) {
+                if (cell.city != city_of_tiles && !((edge_rule || neutral) && cell.city == MapCell::kNoCity)) {
                     return BuildRefusal::Territory;
                 }
                 const assets::BuildingType* old = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
@@ -669,6 +682,8 @@ const char* refusal_name(BuildRefusal r) noexcept {
             return "no further city on this island";
         case BuildRefusal::SecondKontor:
             return "the city has a Kontor";
+        case BuildRefusal::Neutral:
+            return "no Kontor or market for the neutral buildings";
         case BuildRefusal::NoCoast:
             return "no coast";
         case BuildRefusal::NoDeposit:
@@ -886,6 +901,10 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
                                            footprint_of(*t, first.x, first.y, first.rotation), order.island);
         planner.city = oc.foreign ? MapCell::kNoCity : oc.city;
         planner.foreign = oc.foreign;
+        planner.neutral = world.acts_as(order.player, FactionBehaviour::Neutral);
+        if (planner.neutral && !oc.foreign && planner.city == MapCell::kNoCity) {
+            planner.city = neutral_city(world, order.island, order.player);
+        }
         // Taking over a city: a Kontor over the destroyed Kontor of a defenceless city of another
         // human or computer player (Ausbau path, build_effects 4.3).
         const bool acting =
@@ -1009,6 +1028,11 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
         }
         if (limited_player && !options.move && !order.free && !player->unlocked(type->infra)) {
             out.refusal = BuildRefusal::Locked;  // S-014: checked here, not only in the menu
+            continue;
+        }
+        if (planner.neutral &&
+            (type->kind == kind::kHq || type->prod_kind == prod::kKontor || type->prod_kind == prod::kMarket)) {
+            out.refusal = BuildRefusal::Neutral;  // nobody trades with them
             continue;
         }
 
@@ -1168,8 +1192,32 @@ void plan_blueprint(const World& world, const assets::BuildingTable& buildings, 
 
 namespace {
 
+/// Something built that stands: not its ruin, not the ground, a forest or other terrain.
+bool standing(const assets::BuildingType& b) noexcept {
+    switch (b.kind) {
+        case kind::kRoad:
+        case kind::kGate:
+        case kind::kWall:
+        case kind::kWallBeach:
+        case kind::kTower:
+        case kind::kTowerBeach:
+        case kind::kSquare:
+        case kind::kBuilding:
+        case kind::kBridge:
+        case kind::kBeachHouse:
+        case kind::kPier:
+        case kind::kMine:
+        case kind::kHarbour:
+        case kind::kMill:
+            return !b.destroyed;
+        default:
+            return false;
+    }
+}
+
 /// Which cities' land reaches each tile of an island: a bit per city number, from the
-/// circles of the markets and Kontors of the city and within 8 tiles of the towers of its owner.
+/// circles of the markets and Kontors of the city and within 8 tiles of the towers of its owner;
+/// the neutral buildings' city holds the tiles of its standing buildings.
 /// Buildings with their origin in `gone` count as removed.
 std::vector<std::uint8_t> territory_coverage(const World& world, const assets::BuildingTable& buildings,
                                              std::uint16_t island, const std::vector<TilePos>& gone) {
@@ -1200,6 +1248,24 @@ std::vector<std::uint8_t> territory_coverage(const World& world, const assets::B
             const SubTile sub = m.sub_tile(buildings, x, y);
             if (sub.origin_x != static_cast<std::int32_t>(x) || sub.origin_y != static_cast<std::int32_t>(y) ||
                 std::find(gone.begin(), gone.end(), TilePos{sub.origin_x, sub.origin_y}) != gone.end()) {
+                continue;
+            }
+            if (const City* owner = world.city(island, cell.city);
+                owner != nullptr && world.acts_as(owner->owner, FactionBehaviour::Neutral)) {
+                // The neutral buildings hold the ground they stand on, and no more.
+                if (standing(*b) && cell.city < kCitySlotsPerIsland) {
+                    const Footprint f = footprint_of(*b, sub.origin_x, sub.origin_y, cell.rotation);
+                    for (std::uint32_t j = 0; j < f.h; ++j) {
+                        for (std::uint32_t i = 0; i < f.w; ++i) {
+                            const std::int32_t tx = f.x + static_cast<std::int32_t>(i);
+                            const std::int32_t ty = f.y + static_cast<std::int32_t>(j);
+                            if (m.contains(tx, ty)) {
+                                covered[static_cast<std::size_t>(ty) * w + static_cast<std::size_t>(tx)] |=
+                                    static_cast<std::uint8_t>(1U << cell.city);
+                            }
+                        }
+                    }
+                }
                 continue;
             }
             const bool market = b->prod_kind == prod::kMarket;
@@ -1771,7 +1837,7 @@ public:
 
     /// Founds a city: the first free city number of the island.
     std::uint8_t found(PlayerId owner, std::int32_t x, std::int32_t y, const std::vector<std::string>& names,
-                       std::size_t classes) {
+                       std::size_t classes, bool warehouse = true) {
         std::uint8_t index = 0;
         while (index < kMaxCitiesPerIsland && m_world.city(m_island, index) != nullptr) {
             ++index;
@@ -1807,8 +1873,10 @@ public:
         c.tax_rate.assign(classes, 128);
         c.upgrade_queue.assign(classes + 1, City::UpgradeSlot{});
         c.food_ratio = 0;
-        c.warehouse_x = static_cast<std::uint16_t>(x);
-        c.warehouse_y = static_cast<std::uint16_t>(y);
+        if (warehouse) {
+            c.warehouse_x = static_cast<std::uint16_t>(x);
+            c.warehouse_y = static_cast<std::uint16_t>(y);
+        }
         m_world.add_city(std::move(c));
         // The city of a human or a computer shows its island to its founder; that the
         // original shows it to every player too (all eight discovery bits) is the game setting
@@ -1950,16 +2018,32 @@ public:
                 lose_tile(x, y, covering_city(m_world, m_island, cell.city, bits));
             }
         }
-        // Cities without their Kontor are dissolved.
+        // Cities without their Kontor are dissolved, the neutral buildings' once it holds no land.
         std::vector<std::uint8_t> dissolve;
         for (const City& c : m_world.cities()) {
-            if (c.island == m_island && !c.warehouse_x) {
+            if (c.island != m_island || c.warehouse_x) {
+                continue;
+            }
+            if (!m_world.acts_as(c.owner, FactionBehaviour::Neutral) || !holds_land(c.index)) {
                 dissolve.push_back(c.index);
             }
         }
         for (const std::uint8_t c : dissolve) {
             dissolve_city(c);
         }
+    }
+
+    /// Whether a tile of the island is the city's.
+    bool holds_land(std::uint8_t city) {
+        const IslandMap& m = map();
+        for (std::uint32_t y = 0; y < m.height(); ++y) {
+            for (std::uint32_t x = 0; x < m.width(); ++x) {
+                if (m.top(x, y).city == city) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// A tile leaves its city: to `next` (same owner) or free; a building on it moves with it or
@@ -2059,6 +2143,29 @@ public:
         }
         m_territory = true;
         m_storage_cities.insert(from);
+        m_storage_cities.insert(to);
+        services_of(from);
+        services_of(to);
+    }
+
+    /// The territory is checked again in finish().
+    void territory_changed() noexcept { m_territory = true; }
+
+    /// The tiles of footprint `f` of city `from` go to city `to` with what stands on them
+    /// (capture_neutral_building).
+    void take_over(const Footprint& f, std::uint8_t from, std::uint8_t to) {
+        const IslandMap& m = map();
+        for (std::uint32_t j = 0; j < f.h; ++j) {
+            for (std::uint32_t i = 0; i < f.w; ++i) {
+                const std::int32_t tx = f.x + static_cast<std::int32_t>(i);
+                const std::int32_t ty = f.y + static_cast<std::int32_t>(j);
+                if (m.contains(tx, ty) &&
+                    m.top(static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty)).city == from) {
+                    lose_tile(static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty), to);
+                }
+            }
+        }
+        m_territory = true;
         m_storage_cities.insert(to);
         services_of(from);
         services_of(to);
@@ -2189,6 +2296,7 @@ BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, co
     }
     Builder builder(world, buildings, order.island, events);
     std::uint8_t city = plan.city;
+    const bool neutral = world.acts_as(order.player, FactionBehaviour::Neutral);
     Random& random = world.random(RandomStream::Construction);
     for (const PlannedBuild& item : plan.items) {
         if (!item.ok()) {
@@ -2196,7 +2304,14 @@ BuildPlan execute_build(World& world, const assets::BuildingTable& buildings, co
         }
         const assets::BuildingType& b = *item.type;
         const std::uint32_t rnd = random.below(32);
-        // Found the city with the first Kontor on the island.
+        // Found the city with the first Kontor on the island; the neutral buildings' with their
+        // first building, without a Kontor or a name of the list.
+        if (city == MapCell::kNoCity && neutral) {
+            city = builder.found(order.player, item.x, item.y, {}, buildings.resident_classes().size(), false);
+            if (city == MapCell::kNoCity) {
+                continue;
+            }
+        }
         if (city == MapCell::kNoCity && b.kind == kind::kHq) {
             city = builder.found(order.player, item.x, item.y, city_names, buildings.resident_classes().size());
             if (city == MapCell::kNoCity) {
@@ -2700,6 +2815,9 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
                           world.acts_as(cell.owner, FactionBehaviour::Settlers);
     Builder builder(world, buildings, island, events);
     builder.destroy(*b);
+    if (b->city != MapCell::kNoCity && world.acts_as(cell.owner, FactionBehaviour::Neutral)) {
+        builder.territory_changed();  // the ruin is nobody's: the neutral buildings hold only what stands
+    }
     // Open1602: a village without its chief's house, market and huts is gone, and so is a computer
     // player's city without Kontor, market, tower and houses: its land is free for anybody's
     // Kontor or market. As in the original (OriginalBugs::native_land) the ruin of the chief's
@@ -2708,6 +2826,52 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
                                                (computer && computer_city_gone(world, buildings, island, b->city)))) {
         builder.dissolve_city(b->city);
     }
+    builder.finish();
+    return true;
+}
+
+bool capture_neutral_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                              TilePos origin, PlayerId taker, std::vector<ConstructionEvent>* events) {
+    if (island >= world.islands().size() || !world.acts_as(taker, FactionBehaviour::Settlers)) {
+        return false;
+    }
+    const auto b = building_at(world, buildings, island, origin);
+    if (!b || b->origin.x != origin.x || b->origin.y != origin.y || b->city == MapCell::kNoCity) {
+        return false;
+    }
+    const City* from = world.city(island, b->city);
+    if (from == nullptr || !world.acts_as(from->owner, FactionBehaviour::Neutral)) {
+        return false;
+    }
+    const IslandMap& map = world.islands()[island].map;
+    const std::vector<std::uint8_t> covered = territory_coverage(world, buildings, island, {});
+    const Footprint f = footprint_of(*b->type, b->origin.x, b->origin.y, b->rotation);
+    const auto reaches = [&](std::uint8_t city) {
+        for (std::uint32_t j = 0; j < f.h; ++j) {
+            for (std::uint32_t i = 0; i < f.w; ++i) {
+                const std::int32_t tx = f.x + static_cast<std::int32_t>(i);
+                const std::int32_t ty = f.y + static_cast<std::int32_t>(j);
+                if (map.contains(tx, ty) &&
+                    (covered[static_cast<std::size_t>(ty) * map.width() + static_cast<std::size_t>(tx)] >> city & 1U) ==
+                        0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    std::uint8_t to = MapCell::kNoCity;
+    for (const City& c : world.cities()) {
+        if (c.island == island && c.owner == taker && c.index < kCitySlotsPerIsland && reaches(c.index)) {
+            to = c.index;
+            break;
+        }
+    }
+    if (to == MapCell::kNoCity) {
+        return false;
+    }
+    Builder builder(world, buildings, island, events);
+    builder.take_over(f, b->city, to);
     builder.finish();
     return true;
 }

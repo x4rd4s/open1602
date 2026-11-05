@@ -56,6 +56,7 @@ enum class BuildRefusal : std::uint8_t {
     Cannons,
     ShipTooFar,  ///< founding from a ship: the ship is more than 16 tiles away
     Immovable,   ///< moving: the building cannot be moved (movable_at)
+    Neutral,     ///< the neutral buildings: no Kontor, no market
 };
 
 [[nodiscard]] const char* refusal_name(BuildRefusal refusal) noexcept;
@@ -318,6 +319,15 @@ void fit_connection(World& world, const assets::BuildingTable& buildings, std::u
 /// OriginalBugs::native_land).
 bool destroy_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island, TilePos origin,
                       std::vector<ConstructionEvent>* events);
+
+/// The neutral buildings (FactionBehaviour::Neutral): the building with origin `origin`, whose
+/// health the soldiers of `taker` (a human or a computer) spent, goes over to `taker` whole with the
+/// ground it stands on, into the first of the taker's cities on the island whose land (the circles
+/// of its Kontor and markets, the reach of its towers) covers all of it. False, and nothing
+/// changed, if no such city is there or it is no neutral building; the soldiers then destroy it.
+/// A neutral city left without buildings is gone.
+bool capture_neutral_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                              TilePos origin, PlayerId taker, std::vector<ConstructionEvent>* events);
 
 /// Whether crops of `ware` grow on the tile: the island's fertility for the ware
 /// (0, 64 or 128), weighted with the Randwachs of the ground and lowered by a drought on the
