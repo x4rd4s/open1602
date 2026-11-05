@@ -72,8 +72,10 @@ core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& wor
     if (p == nullptr) {
         return make_error(ErrorCode::NotFound, "no player " + std::to_string(owner));
     }
-    if (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer) {
-        return make_error(ErrorCode::Unsupported, "only a human or a computer takes a city");
+    if (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer &&
+        !world.acts_as(owner, sim::FactionBehaviour::Natives) &&
+        !world.acts_as(owner, sim::FactionBehaviour::Pirates)) {
+        return make_error(ErrorCode::Unsupported, "only a human, a computer, the natives or the pirates take a city");
     }
     if (c->owner == owner) {
         return make_error(ErrorCode::Unsupported, "the city is the player's already");

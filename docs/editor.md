@@ -112,7 +112,7 @@ the map or puts back what is in hand. The tools:
 | Replace | Paints every tile of the island that looks like the one clicked; tiles that turn keep their turn. |
 | Pipette | Takes the piece of the tile clicked, with its turn, and goes back to the brush. |
 | Select | Drags a rectangle over an island (light blue). **Copy** keeps its land and inland pieces as the copy; **Turn copy** turns it a quarter clockwise, **Mirror copy** mirrors it left to right. |
-| Paste | Lays the copy about the mouse, its land and water, the coast about its land laid anew, then its pieces; one step of undo. The map shows it before the click; where it cannot go, its frame turns red. |
+| Paste | Lays the copy about the mouse, its land, the coast about its land laid anew, then its pieces; one step of undo. **Pasting** chooses what of the copy goes down: **Only its land** (the default) leaves the island's land and sea where the copy has water as they were, and the sea about it too; **Exactly** lays the copy's water as well. The map shows it before the click; where it cannot go, its frame turns red. |
 
 Water, beach and land are three levels of the map's picture, and a piece fits only on its own level:
 the brush leaves the coast as it is, and Land and Water change it. Where a coast would take a form the
@@ -136,7 +136,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Template**: a left click builds one of the templates saved in games (the copy tool's pieces, kept in the folder "templates" of the user's data folder) about the mouse, for the owner; what does not fit is left out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
 | Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
-| Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add); a big or small iron vein, gold, a treasure or deer. |
+| Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) and the natives' spearman, placed for the natives only; a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
 | Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader. |
 | Placed lately | The last six objects placed, the last first: a click takes one in hand again (its tool, building or type and rotation), for the owner chosen now. |
@@ -197,7 +197,12 @@ buttons on the Selection page, each change one step of undo:
 |---|---|
 | Name | Types a new name for the city, up to 40 characters, as a player may give it. |
 | Stock | The city's trade goods with the tons in its warehouses: + and - change them by 10 t, with the right button by 1 t, up to the room its Kontor, markets and warehouses give (the game would lose what is above). |
-| Owner | Gives the city with all its land and buildings to the next human or computer (the right button: the one before), as when a player takes a city over; a player with a city on the island already is passed over. |
+| Owner | Gives the city with all its land and buildings to the next human or computer, or to the natives or the pirates where the map has them (the right button: the one before), as when a player takes a city over; one with a city on the island already is passed over. |
+
+A selected ship has the button **Cargo**: a row for each of its holds with the ware in it (a click
+the next trade good, the right button the one before, and empty), and + and - for its tons, by
+10 t, with the right button by 1 t, up to the 50 t a hold takes. A ware chosen for an empty hold
+fills it. Each change is one step of undo.
 
 ## Players
 

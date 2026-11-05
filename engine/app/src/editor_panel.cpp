@@ -79,10 +79,11 @@ constexpr Id kTerrainBrush = 74;
 constexpr Id kTerrainCopy = 75;
 constexpr Id kTerrainTurn = 76;
 constexpr Id kTerrainMirror = 77;
-constexpr Id kTerrainSmaller = 78;  ///< the brush a size smaller
-constexpr Id kTerrainBigger = 79;   ///< the brush a size bigger
-constexpr Id kTerrainShape = 173;   ///< the brush's shape
-constexpr Id kTerrainSlider = 174;  ///< the brush's size slid
+constexpr Id kTerrainSmaller = 78;      ///< the brush a size smaller
+constexpr Id kTerrainBigger = 79;       ///< the brush a size bigger
+constexpr Id kTerrainShape = 173;       ///< the brush's shape
+constexpr Id kTerrainSlider = 174;      ///< the brush's size slid
+constexpr Id kTerrainPasteWater = 175;  ///< whether a paste lays the copy's water too
 constexpr Id kObjectsPage = 59;
 constexpr Id kObjectsTool = 80;
 constexpr Id kObjectsGroup = 81;
@@ -153,6 +154,11 @@ constexpr Id kCampaignAdd = 273;               ///< the scenario as the campaign
 constexpr Id kCampaignRemove = 274;            ///< the scenario, the campaign's last part, taken out
 constexpr Id kCheckLine = 800;                 ///< + the line of the check list (a line that leads somewhere)
 constexpr Id kRecent = 190;                    ///< + the object placed lately (the page "Objects")
+constexpr Id kShipCargoPage = 1000;            ///< the selected ship's holds
+constexpr Id kFirstHoldWare = 1010;            ///< + the hold on the page "Cargo": its ware
+constexpr Id kFirstHoldLess = 1030;            ///< + the hold: fewer tons
+constexpr Id kFirstHoldMore = 1050;            ///< + the hold: more tons
+constexpr std::size_t kHoldRows = 20;          ///< holds the page "Cargo" shows at most
 constexpr Id kPlayerTable = 300;               ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
@@ -497,6 +503,7 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
         case Page::Selection:
         case Page::CityName:
         case Page::CityGoods:
+        case Page::ShipCargo:
         case Page::Fertility:
             return EditorTool::Select;
         case Page::Markers:
@@ -671,6 +678,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::CityGoods:
             layout_city_goods(model);
+            break;
+        case Page::ShipCargo:
+            layout_ship_cargo(model);
             break;
         case Page::Players:
             wide ? layout_players_table(model) : layout_players(model);
@@ -1034,7 +1044,7 @@ void EditorPanel::layout_selection(const EditorModel& model) {
         f.paragraph(Rect{m_x, y, m_w, 2 * kLine}, model.selection, Tone::Normal, kLine);
         y += 2 * kLine + 4;
         // Room for the buttons below: back, and an island's three rows or a city's two.
-        const std::int32_t rows = model.island || model.placeholder ? 4 : model.city ? 3 : 1;
+        const std::int32_t rows = model.island || model.placeholder ? 4 : model.city ? 3 : model.ship ? 2 : 1;
         const std::int32_t bottom = m_top + m_height - rows * (kButtonH + kGap) - kGap;
         for (const EditorProperty& p : model.properties) {
             if (y + kLine > bottom) {
@@ -1055,6 +1065,10 @@ void EditorPanel::layout_selection(const EditorModel& model) {
                      model.city->room > 0);
             y += kButtonH + kGap;
             f.cycle_button(kCityOwner, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.owner", {model.city->owner}));
+            y += kButtonH + kGap;
+        } else if (model.ship) {
+            f.button(kShipCargoPage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.ship.cargo"),
+                     !model.ship->holds.empty() && !model.ship->wares.empty());
             y += kButtonH + kGap;
         }
     }
@@ -1306,6 +1320,42 @@ void EditorPanel::layout_preview(const EditorModel& model) {
     f.button(kPreviewEnd, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.preview.back"));
 }
 
+void EditorPanel::layout_ship_cargo(const EditorModel& model) {
+    if (!model.ship || model.ship->holds.empty()) {
+        m_page = Page::Selection;  // the ship is gone (undone) or has no holds
+        layout_selection(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    const EditorShip& ship = *model.ship;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.ship.cargo_title", {ship.name}), Align::Left, Tone::Heading);
+    y += 28;
+    f.paragraph(Rect{m_x, y, m_w, 5 * 20}, ui::tr("editor.ship.room", {count(ship.room / 32)}), Tone::Dim, 20);
+    y += 5 * 20 + 4;
+    // Per hold: its ware (a click the next, a right click the one before), its tons, fewer, more.
+    constexpr std::int32_t kHoldH = 30;
+    constexpr std::int32_t kStep = 28;
+    constexpr std::int32_t kAmount = 64;  // as on the page "Stock"
+    const std::int32_t bottom = m_top + m_height - (kButtonH + kGap) - kGap;
+    for (std::size_t i = 0; i < std::min(ship.holds.size(), kHoldRows) && y + kHoldH <= bottom; ++i) {
+        const EditorGood& h = ship.holds[i];
+        const auto id = static_cast<Id>(i);
+        const std::int32_t ware_w = m_w - 2 * kStep - kAmount - 4;
+        f.cycle_button(kFirstHoldWare + id, Rect{m_x, y, ware_w - 2, kHoldH - 4},
+                       h.ware != 0 ? h.name : ui::tr("editor.ship.empty"));
+        f.label(Rect{m_x + ware_w, y, kAmount, kHoldH - 4}, ui::tr("editor.city.tons", {count(h.amount / 32)}),
+                Align::Right);
+        f.cycle_button(kFirstHoldLess + id, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kHoldH - 4}, "-",
+                       h.ware != 0 && h.amount > 0);
+        f.cycle_button(kFirstHoldMore + id, Rect{m_x + m_w - kStep, y, kStep, kHoldH - 4}, "+",
+                       h.ware != 0 && h.amount < ship.room);
+        y += kHoldH;
+    }
+    y += 4;
+    f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
+}
+
 void EditorPanel::layout_city_goods(const EditorModel& model) {
     if (!model.city || model.city->room == 0) {
         m_page = Page::Selection;
@@ -1331,7 +1381,9 @@ void EditorPanel::layout_city_goods(const EditorModel& model) {
     for (std::size_t row = 0; row < m_page_rows && m_first + row < n; ++row) {
         const EditorGood& g = model.city->goods[m_first + row];
         const auto id = static_cast<Id>(row);
-        constexpr std::int32_t kAmount = 40;  // "999" (tons, as the hint says) in the panel's font
+        // "9999" tons and the padding on both sides in the widest of the panel's fonts (the smaller
+        // screens', about 12 units a digit): with 40, amounts from 100 t on were cut.
+        constexpr std::int32_t kAmount = 64;
         f.label(Rect{m_x, y, m_w - 2 * kStep - kAmount - 4, kGoodH - 2}, g.name);
         f.label(Rect{m_x + m_w - 2 * kStep - kAmount - 4, y, kAmount, kGoodH - 2},
                 ui::tr("editor.city.tons", {count(g.amount / 32)}), Align::Right);
@@ -1450,7 +1502,14 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
         y += kButtonH + 4;
         f.button(kTerrainMirror, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.terrain.mirror"), copied);
         y += kButtonH + 4;
-        y += 4 * (18 + kButtonH + 2) - (18 + 3 * (kButtonH + 4));  // as tall as the four settings
+        f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.terrain.paste_mode"), Align::Left,
+                copied ? Tone::Normal : Tone::Dim);
+        y += 18;
+        f.cycle_button(kTerrainPasteWater, Rect{m_x, y, m_w, kButtonH},
+                       ui::tr(t.paste_water ? "editor.terrain.paste_exact" : "editor.terrain.paste_land"), copied);
+        y += kButtonH + 2;
+        // As tall as the four settings.
+        y += 4 * (18 + kButtonH + 2) - (2 * 18 + 3 * (kButtonH + 4) + kButtonH + 2);
     } else {
         const bool shaping = t.tool == Tool::Land || t.tool == Tool::Water || t.tool == Tool::Coast;
         const bool single = model.terrain_width == 1 && model.terrain_height == 1;
@@ -2609,6 +2668,7 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kTerrainSmaller:
         case kTerrainBigger:
         case kTerrainShape:
+        case kTerrainPasteWater:
         case kTerrainSlider: {
             EditorRequest r{EditorRequest::Kind::Terrain};
             EditorTerrain& t = r.terrain;
@@ -2629,6 +2689,8 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 t.brush = static_cast<std::uint8_t>(t.brush > 0 ? t.brush - 1 : 0);
             } else if (*id == kTerrainBigger) {
                 t.brush = static_cast<std::uint8_t>(std::min<std::size_t>(t.brush + 1U, kTerrainBrushes.size() - 1));
+            } else if (*id == kTerrainPasteWater) {
+                t.paste_water = !t.paste_water;
             } else if (*id == kTerrainShape) {
                 t.shape = static_cast<std::uint8_t>(step(t.shape, kBrushShapeTexts.size(), forward));
             } else if (*id == kTerrainSlider) {
@@ -2841,6 +2903,9 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
             m_page = Page::CityGoods;
             m_first = 0;
             return std::nullopt;
+        case kShipCargoPage:
+            m_page = Page::ShipCargo;
+            return std::nullopt;
         case kCitySelection:
             m_page = Page::Selection;
             m_form.set_focus(std::nullopt);
@@ -2974,6 +3039,36 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         // Down to whole tons, then by steps.
         r.amount = more ? std::min(model.city->room, (g.amount / step + 1) * step)
                         : (g.amount % step != 0 ? g.amount / step * step : g.amount - std::min(g.amount, step));
+        return r;
+    }
+    if (*id >= kFirstHoldWare && *id < kFirstHoldMore + static_cast<Id>(kHoldRows) && model.ship) {
+        const EditorShip& ship = *model.ship;
+        const bool ware = *id < kFirstHoldLess;
+        const bool more = *id >= kFirstHoldMore;
+        const auto i = static_cast<std::size_t>(*id - (ware ? kFirstHoldWare : more ? kFirstHoldMore : kFirstHoldLess));
+        if (i >= ship.holds.size() || ship.wares.empty()) {
+            return std::nullopt;
+        }
+        const EditorGood& h = ship.holds[i];
+        EditorRequest r{EditorRequest::Kind::ShipCargo};
+        r.index = i;
+        r.ware = h.ware;
+        r.amount = h.amount;
+        if (ware) {
+            // Empty, then the wares in their order and back to empty; a new ware fills the hold.
+            const auto at = std::find_if(ship.wares.begin(), ship.wares.end(),
+                                         [&](const EditorGood& g) { return g.ware == h.ware; });
+            const std::size_t n = ship.wares.size() + 1;  // with "empty" at 0
+            const std::size_t now = at == ship.wares.end() ? 0 : static_cast<std::size_t>(at - ship.wares.begin()) + 1;
+            const std::size_t next = step(now, n, forward);
+            r.ware = next == 0 ? 0 : ship.wares[next - 1].ware;
+            r.amount = next == 0 ? 0 : (h.amount > 0 ? h.amount : ship.room);
+            return r;
+        }
+        // Left 10 t, right 1 t; within the hold's room, as on the page "Stock".
+        const std::uint32_t unit = forward ? 10 * 32 : 32;
+        r.amount = more ? std::min(ship.room, (h.amount / unit + 1) * unit)
+                        : (h.amount % unit != 0 ? h.amount / unit * unit : h.amount - std::min(h.amount, unit));
         return r;
     }
     if (*id >= kFirstOverlay && *id < kFirstOverlay + static_cast<Id>(kEditorOverlays)) {

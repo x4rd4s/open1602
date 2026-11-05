@@ -31,6 +31,7 @@
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/logistics.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/ui/build_menu.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -331,6 +332,8 @@ void MapViewer::editor_object_model(EditorModel& m) const {
                 m.object_name = ui::tr("editor.objects.ship.pirate");
             } else if (figure == assets::figure::kTrader) {
                 m.object_name = ui::tr("editor.objects.ship.trader");
+            } else if (figure == assets::figure::kSpearman) {
+                m.object_name = ui::tr("editor.objects.unit.spearman");
             } else if (index < 4) {
                 m.object_name = ui::tr(key + std::to_string(index));
             } else {
@@ -394,6 +397,50 @@ void MapViewer::editor_city_model(EditorModel& m) const {
     m.city = std::move(city);
 }
 
+void MapViewer::editor_ship_model(EditorModel& m) const {
+    if (m_editor->pick.kind != EditorPick::Kind::Ship) {
+        return;
+    }
+    const sim::World& world = m_editor->document.world();
+    const sim::Ship* s = world.ship(m_editor->pick.id);
+    if (s == nullptr) {
+        return;
+    }
+    const assets::TextTable* texts = m_hud ? m_hud->texts() : nullptr;
+    const std::vector<std::string> names = texts != nullptr ? texts->section("WARE") : std::vector<std::string>{};
+    const auto ware_name = [&](std::uint8_t ware) {
+        if (const assets::OwnGood* own = world.goods().own(ware)) {
+            return own->name(ui::current_language());
+        }
+        return ware < names.size() ? names[ware] : std::to_string(ware);
+    };
+    EditorShip ship;
+    ship.name = ship_name(*s);
+    ship.room = sim::hold_capacity(*s);
+    for (const sim::CargoSlot& slot : s->cargo) {
+        ship.holds.push_back(EditorGood{slot.ware, slot.ware != 0 ? ware_name(slot.ware) : std::string(),
+                                        slot.ware != 0 ? slot.amount : 0U});
+    }
+    for (const std::uint8_t ware : world.goods().trade_wares()) {
+        ship.wares.push_back(EditorGood{ware, ware_name(ware), 0});
+    }
+    m.ship = std::move(ship);
+}
+
+void MapViewer::editor_ship_request(const EditorRequest& request) {
+    if (m_editor->pick.kind != EditorPick::Kind::Ship) {
+        return;
+    }
+    auto op = editor::set_ship_cargo(m_editor->document.world(), m_editor->pick.id, request.index, request.ware,
+                                     request.amount);
+    if (!op) {
+        editor_notice(op.error().message, true, op.error().message);
+        return;
+    }
+    m_editor->document.perform(std::move(op).value());
+    m_editor->notice.clear();
+}
+
 void MapViewer::editor_city_request(const EditorRequest& request) {
     const sim::City* c = editor_picked_city();
     if (c == nullptr) {
@@ -419,7 +466,7 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
             m_editor->notice.clear();
         }
     } else if (request.kind == Kind::CityOwner) {
-        // The next human or computer that can take the city, forward or back.
+        // The next player, the natives or the pirates that can take the city, forward or back.
         const auto owners = object_owners(world);
         const auto now = std::find(owners.begin(), owners.end(), c->owner);
         const std::size_t start = now == owners.end() ? 0 : static_cast<std::size_t>(now - owners.begin());
@@ -729,6 +776,10 @@ std::vector<std::uint16_t> MapViewer::editor_figures(EditorObjects::Tool tool) c
         for (const std::uint32_t family : m_figures.unit_families()) {
             figures.push_back(static_cast<std::uint16_t>(family));
         }
+        if (m_figures.get(assets::figure::kSpearman) != nullptr &&
+            m_editor->document.world().first_of(sim::FactionBehaviour::Natives) != sim::kNoPlayer) {
+            figures.push_back(assets::figure::kSpearman);  // for the natives
+        }
     }
     return figures;
 }
@@ -768,6 +819,9 @@ void MapViewer::editor_place_figure(std::int64_t x, std::int64_t y) {
             key = ship ? "editor.objects.refused.water" : "editor.objects.refused.ground";
         } else if (refused == editor::UnitRefusal::Taken) {
             key = ship ? "editor.objects.refused.ship_near" : "editor.objects.refused.unit_near";
+        } else if (!ship && editor_figure() == assets::figure::kSpearman &&
+                   !m_editor->document.world().acts_as(owner, sim::FactionBehaviour::Natives)) {
+            key = "editor.objects.refused.spearman";
         } else if (ship && (editor_figure() == assets::figure::kTrader ||
                             m_editor->document.world().acts_as(owner, sim::FactionBehaviour::Trader))) {
             key = "editor.objects.refused.trader";  // his ship and no other, for him and no other
