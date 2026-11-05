@@ -94,6 +94,11 @@ inline constexpr std::uint8_t kCartStops = 4;
                                                         std::int32_t wx, std::int32_t wy,
                                                         std::int32_t reach = kCartReach);
 
+/// Whether a trade cart can drive on the world tile (wx, wy): the walk grid of the carriers (roads,
+/// open ground, ruins, squares, bridges, piers, the middle of gates) of an island.
+[[nodiscard]] bool cart_drivable(const World& world, const assets::BuildingTable& buildings, std::int32_t wx,
+                                 std::int32_t wy);
+
 /// The first trade cart of `player` on `island` (one per player and island as in the original; more
 /// with Rules::more_carts), nullptr if it has none.
 [[nodiscard]] const Ship* trade_cart_of(const World& world, PlayerId player, std::uint16_t island);

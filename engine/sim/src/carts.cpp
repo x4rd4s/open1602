@@ -99,6 +99,10 @@ std::vector<std::size_t> cities_near_cart(const World& world, const assets::Buil
     return out;
 }
 
+bool cart_drivable(const World& world, const assets::BuildingTable& buildings, std::int32_t wx, std::int32_t wy) {
+    return drivable(world, buildings, wx, wy);
+}
+
 const Ship* trade_cart_of(const World& world, PlayerId player, std::uint16_t island) {
     for (const Ship& s : world.ships()) {
         if (s.cart() && s.owner == player && !s.sinking && island_of(world, s.x, s.y) == island) {
