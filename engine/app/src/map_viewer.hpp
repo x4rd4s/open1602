@@ -436,6 +436,9 @@ private:
     void editor_city_model(EditorModel& m) const;
     /// A city renamed, its stock or owner changed (EditorRequest RenameCity, CityGoods, CityOwner).
     void editor_city_request(const EditorRequest& request);
+    /// The selected ship's holds for the page "Cargo".
+    void editor_ship_model(EditorModel& m) const;
+    void editor_ship_request(const EditorRequest& request);
     /// The humans' and computers' slots on the page "Players".
     void editor_players_model(EditorModel& m) const;
     /// A slot changed, added or taken away (EditorRequest SetPlayer, AddPlayer, RemovePlayer).

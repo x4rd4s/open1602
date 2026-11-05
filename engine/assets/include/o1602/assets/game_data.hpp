@@ -355,6 +355,7 @@ inline constexpr std::int32_t kUnitColours = 4;
 }
 inline constexpr std::uint16_t kTrader = 29;      ///< HANDLER: the free trader's ship
 inline constexpr std::uint16_t kPirate = 31;      ///< PIRAT
+inline constexpr std::uint16_t kSpearman = 33;    ///< SPEER1: the natives' warrior, the same for everyone
 inline constexpr std::uint16_t kTradeCart = 37;   ///< TRADER1: a player's trade cart on land
 inline constexpr std::uint16_t kSinking = 45;     ///< UNTERGANG: the splash of a sinking ship
 inline constexpr std::uint16_t kIdle = 46;        ///< NOAKTIV: status icon of production buildings

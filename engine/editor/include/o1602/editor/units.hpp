@@ -48,6 +48,13 @@ enum class UnitRefusal : std::uint8_t {
     const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
     sim::PlayerId owner, std::uint16_t family, std::int64_t x, std::int64_t y, std::uint8_t direction);
 
+/// The hold `slot` of ship `id` loaded with `amount` (1/32 t, at most sim::hold_capacity) of the
+/// trade ware `ware`; 0 tons or ware 0: empty. Fails (NotFound) without the ship or the hold,
+/// (OutOfRange) for a ware that is no trade ware or too much.
+[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id,
+                                                                      std::size_t slot, std::uint8_t ware,
+                                                                      std::uint32_t amount);
+
 /// The ship `id` taken away, with every order of others that names it. Fails (NotFound).
 [[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id);
 /// The land unit `id` taken away, with every order of others that names it. Fails (NotFound).

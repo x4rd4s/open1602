@@ -149,10 +149,12 @@ public:
     /// tiles for is widened on these tiles (land first). False if nothing changed.
     bool tidy_coast(std::uint16_t island, std::span<const std::pair<std::uint32_t, std::uint32_t>> tiles,
                     std::uint64_t seed);
-    /// Lays `clip` with its top left at the island tile (x, y): its land and water, the coast about
-    /// its land as shape() lays it, then its pieces. Tiles beyond the island or refused are left
-    /// out. False, and nothing changed, if a coast would take a form without tiles (Refusal::Shape).
-    bool paste(std::uint16_t island, std::int64_t x, std::int64_t y, const TerrainClip& clip, std::uint64_t seed);
+    /// Lays `clip` with its top left at the island tile (x, y): its land (and with `with_water` its water
+    /// too, else the island's land and sea stay where the copy has water), the coast about its land
+    /// as shape() lays it, then its pieces. Tiles beyond the island or refused are left out. False,
+    /// and nothing changed, if a coast would take a form without tiles (Refusal::Shape).
+    bool paste(std::uint16_t island, std::int64_t x, std::int64_t y, const TerrainClip& clip, std::uint64_t seed,
+               bool with_water = false);
     /// Keeps `refusal` as the first one met, unless one was met before (a tool that found nothing to paint).
     void note(Refusal refusal) noexcept;
     /// The first refusal met, for the tools' note (Free if none).
