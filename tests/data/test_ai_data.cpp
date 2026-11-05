@@ -442,7 +442,8 @@ TEST_CASE("data: no ship of the computers in game10 lies idle for long (America,
         }
         for (const sim::Ship& ship : world->ships()) {
             const sim::Player* owner = world->player(ship.owner);
-            if (ship.trader || owner == nullptr || owner->role != sim::PlayerRole::Computer) {
+            // A cart without a job waits at home; this is about ships.
+            if (ship.trader || ship.cart() || owner == nullptr || owner->role != sim::PlayerRole::Computer) {
                 continue;
             }
             auto [it, fresh] = ships.try_emplace(ship.id);

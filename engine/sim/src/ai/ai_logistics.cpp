@@ -498,6 +498,15 @@ void Engine::cart_supply(AiPlayer& p) {
             return 0;
         };
         const auto goodwill = [&](const City& c) { return p.player < c.goodwill.size() ? c.goodwill[p.player] : 0U; };
+        // A partner the cart cannot drive to and back from stays with the supply ships: forests or
+        // walls can part two cities of an island.
+        const WorldIsland& home_isl = island_of(home.island);
+        const auto cart_gets_there = [&](const City& c) {
+            const Target to = Target::city_of(c.island, c.index);
+            Fleet& fleet = m_sim.m_fleet;
+            return fleet.cart_way(p.player, home_isl.x + *home.warehouse_x, home_isl.y + *home.warehouse_y, to) &&
+                   (cart == nullptr || fleet.cart_way(p.player, cart->x, cart->y, to));
+        };
         std::optional<std::size_t> source;
         std::uint8_t ware = 0;
         for (const std::uint8_t w : wares) {
@@ -520,6 +529,9 @@ void Engine::cart_supply(AiPlayer& p) {
                 if (m_world.acts_as(c.owner, FactionBehaviour::Natives) &&
                     goodwill(c) < std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U) &&
                     natives_gift(c) == 0) {
+                    continue;
+                }
+                if (!cart_gets_there(c)) {
                     continue;
                 }
                 source = i;
@@ -585,7 +597,16 @@ void Engine::cart_supply(AiPlayer& p) {
         } else {
             stops.push_back(Stop{load, {RouteEntry{ware, false, amount}}});
         }
-        stops.push_back(Stop{home_stop, {RouteEntry{ware, true, 50 * kTon}}});
+        // Home again: the ware, and what natives left of a gift, back into the home city's stock.
+        Stop back{home_stop, {RouteEntry{ware, true, 50 * kTon}}};
+        for (const std::uint8_t g : {assets::ware::kCloth, assets::ware::kAlcohol}) {
+            const bool on_board = cart != nullptr && std::any_of(cart->cargo.begin(), cart->cargo.end(),
+                                                                 [g](const CargoSlot& c) { return c.ware == g; });
+            if (g != ware && (g == gift || on_board)) {
+                back.entries.push_back(RouteEntry{g, true, kCartHoldCapacity});
+            }
+        }
+        stops.push_back(std::move(back));
         for (std::size_t i = 0; i < stops.size(); ++i) {
             RouteEdit stop;
             stop.op = RouteEdit::Op::SetStop;

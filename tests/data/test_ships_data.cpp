@@ -107,6 +107,9 @@ TEST_CASE("data: twenty minutes at sea: ships stay on water, traders trade, nobo
                 gave_up += e.kind == sim::ShipEvent::Kind::GaveUp && !pirate ? 1U : 0U;
             }
             for (const sim::Ship& s : world->ships()) {
+                if (s.cart()) {
+                    continue;  // trade carts belong on land
+                }
                 on_land += sim.fleet().sea().sailable(s.x, s.y) ? 0U : 1U;
             }
         }

@@ -352,6 +352,12 @@ bool Fleet::plan_cart(Ship& ship) {
     return true;
 }
 
+bool Fleet::cart_way(PlayerId owner, std::uint32_t x, std::uint32_t y, const Target& target) {
+    Ship probe = make_ship({}, x, y, figure::kTradeCart, owner);
+    probe.target = target;
+    return cart_target_allowed(probe, target) && (cart_at(probe, target) || plan_cart(probe));
+}
+
 void Fleet::decide_cart(Ship& ship) {
     // At the end of each tile whether it has arrived, the next stop of its
     // route, a way to the target. No sea, no fighting, no other ships in its way.
