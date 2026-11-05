@@ -2096,11 +2096,8 @@ void MapViewer::draw_editor_marks() {
             const assets::BuildingType* b = editor_object_piece();
             const EditorObjects::Tool tool = m_editor->objects.tool;
             if (tool == EditorObjects::Tool::Ship || tool == EditorObjects::Tool::Unit) {
-                // A ship or unit: its tile, green where it can go.
-                const bool fits =
-                    (tool == EditorObjects::Tool::Ship
-                         ? editor::ship_fits(world, m_buildings, tile->x, tile->y)
-                         : editor::unit_fits(world, m_buildings, tile->x, tile->y)) == editor::UnitRefusal::None;
+                // A ship, unit or trade cart: its tile, green where it can go.
+                const bool fits = editor_figure_fits(tile->x, tile->y) == editor::UnitRefusal::None;
                 outline(tile->x, tile->y, 1, 1,
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
             } else if (tool == EditorObjects::Tool::Template) {

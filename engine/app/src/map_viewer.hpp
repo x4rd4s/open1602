@@ -51,6 +51,7 @@
 #include "o1602/editor/document.hpp"
 #include "o1602/editor/special_objects.hpp"
 #include "o1602/editor/terrain.hpp"
+#include "o1602/editor/units.hpp"
 #include "o1602/net/enet_transport.hpp"
 #include "o1602/net/lan.hpp"
 #include "o1602/net/session.hpp"
@@ -490,12 +491,19 @@ private:
     /// would (or nothing is to be said).
     [[nodiscard]] std::string editor_hover_refusal(std::int64_t x, std::int64_t y) const;
     /// The ships (Tool::Ship) or land units (Tool::Unit) the page "Objects" offers: their figures,
-    /// the original's first, then the packages'.
+    /// the original's first, then the packages'; the trade cart last among the land units.
     [[nodiscard]] std::vector<std::uint16_t> editor_figures(EditorObjects::Tool tool) const;
     /// The figure chosen for the tool Ship or Unit, 0 for none.
     [[nodiscard]] std::uint16_t editor_figure() const;
+    /// Whether the tool Unit holds the trade cart.
+    [[nodiscard]] bool editor_cart() const;
     /// The chosen owner of the page "Objects", kNoPlayer without players.
     [[nodiscard]] sim::PlayerId editor_object_owner() const;
+    /// Whether the ship, land unit or trade cart in hand can go on the world tile (x, y).
+    [[nodiscard]] editor::UnitRefusal editor_figure_fits(std::int64_t x, std::int64_t y) const;
+    /// Why the ship, land unit or trade cart in hand cannot go on a tile, in the player's language;
+    /// `why` (the operation's reason) where no words of its own fit.
+    [[nodiscard]] std::string editor_figure_refusal(editor::UnitRefusal refused, const std::string& why = {}) const;
     /// A click of the tools Ship and Unit at the world tile (x, y): one step of undo, or a note why not.
     void editor_place_figure(std::int64_t x, std::int64_t y);
     /// The template chosen for the tool Template, none if the user has none.
