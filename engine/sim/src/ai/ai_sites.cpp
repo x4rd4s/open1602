@@ -60,14 +60,14 @@ std::int32_t town_cost(const Tile& t, std::int32_t d) {
     if (!t.origin) {
         return 0;
     }
-    if (t.prod == prod::kHouse && d < 5) {
-        return (5 - d) * 24;
+    if (t.prod == prod::kHouse && d < 6) {
+        return (6 - d) * 40;
     }
-    if (t.prod >= prod::kPublicFirst && t.prod <= prod::kPublicLast && d < 5) {
-        return (5 - d) * 16;
+    if (t.prod >= prod::kPublicFirst && t.prod <= prod::kPublicLast && d < 6) {
+        return (6 - d) * 32;
     }
-    if (t.ware == ware::kAll && t.prod == prod::kMarket && t.kind == kind::kBuilding && d < 7) {
-        return (7 - d) * 24;
+    if (t.ware == ware::kAll && t.prod == prod::kMarket && t.kind == kind::kBuilding && d < 9) {
+        return (9 - d) * 32;
     }
     return 0;
 }
