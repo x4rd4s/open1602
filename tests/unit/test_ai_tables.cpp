@@ -201,3 +201,33 @@ TEST_CASE("ai tables: a city on a large island grows its orders with its free la
     CHECK(grown_count(kGrowLand * 100, 44) == 44 * 8);  // at most eight times as many
     CHECK(grown_count(kGrowLand * 100, 1000) == 1000);  // and no more than an order may ask for
 }
+
+TEST_CASE("ai tables: improved computers build workshops only for the raw material they make") {
+    // Weaving huts: one for every two sheep farms, rounded up; none without sheep.
+    CHECK(workshops_fed(0, 2, 0, false) == 0);
+    CHECK(workshops_fed(1, 2, 0, false) == 1);
+    CHECK(workshops_fed(5, 2, 0, false) == 3);  // not the sixteen of a grown order
+    // Wool brought from elsewhere feeds one more.
+    CHECK(workshops_fed(5, 2, 0, true) == 4);
+    // Stonemasons: two for each quarry.
+    CHECK(workshops_fed(1, 1, 2, false) == 2);
+}
+
+TEST_CASE("ai tables: a city short of food is one whose producers make less than its people eat") {
+    constexpr std::uint32_t kT = o1602::assets::kStockUnitsPerTon;
+    // Producers that make as much as the inhabitants eat leave no margin for the next ones.
+    CHECK(short_of_food(0, 100, 100));
+    CHECK(!short_of_food(0, 113, 100));
+    CHECK(short_of_food(0, 60, 86));  // the white computer's city of the report: 1.9 t for 2.7 t a minute
+    // Food in stock (brought by ship) feeds them for now.
+    CHECK(!short_of_food(kFoodStock * kT, 0, 100));
+    CHECK(!short_of_food(0, 0, 0));  // nobody to feed
+}
+
+TEST_CASE("ai tables: a good that fills the warehouse gets no further producers") {
+    constexpr std::uint32_t kT = o1602::assets::kStockUnitsPerTon;
+    CHECK(full_stock(180 * kT, 180 * kT));
+    CHECK(full_stock(135 * kT, 180 * kT));
+    CHECK(!full_stock(134 * kT, 180 * kT));
+    CHECK(!full_stock(0, 0));
+}

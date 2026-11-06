@@ -160,6 +160,29 @@ workshops to feed them. On the original's large islands a city at the aristocrat
 earns at least 50 gold a minute more than it pays grows the same way from 1000 tiles of free land,
 once there is no next stage its growing could hold up. The original's computer players (`Rules::bugs.classic_ai`, `--ai classic`) keep the plain numbers.
 
+**Following what the inhabitants need.** Open1602's computers fit their economy to their cities:
+
+- *Food first.* A city with less than 20 t of food whose own producers make less than its
+  inhabitants eat plus an eighth (what the producers made in their statistics window, half the full
+  rate for one that has run less than a minute) builds no new houses and plans a food producer
+  before its order: a butcher, bakery or mill where its cattle, mills or grain fields keep one busy,
+  else a pasture, a grain farm where grain grows, or a fisher. So a city feeds itself from its own
+  land before it waits for food from a far island.
+- *Workshops by their raw material.* A workshop whose producer waits for another (`after`, such as
+  a weaving hut for sheep) is built only as often as that other's producers keep busy: one for every
+  two (rounded up; two stonemasons for each quarry), and one more while the city has 20 t of the raw
+  material in stock.
+- *No goods for nobody.* No further producer of a good that fills three quarters of the city's
+  room, and an order's producers grow with the land (above) only while the city has less than 20 t
+  of their good.
+- *A main city stays one.* A city with more than 2000 tiles of free land does not become a second
+  city when another city of the computer has more land, and a second city with that much land moves
+  on to the main city's orders. The original makes the city with less land a second city that grows
+  goods for the other, which on large islands far apart left the first city short of food while its
+  land lay empty. A colony's pastures are no longer built for a home city with that much land.
+
+The original's computer players keep the original's ways.
+
 ## The producers
 
 Each producer an order names (`woodcutter` to `goldsmith`) is one of the original's Needs: a

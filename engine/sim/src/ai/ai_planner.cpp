@@ -5,6 +5,7 @@
 // which asks a fixed list of Needs and queues the first building that is missing.
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <span>
 
 #include "ai_engine.hpp"
@@ -486,6 +487,13 @@ std::int32_t Engine::land_rank(const AiPlayer& p) const {
             rank = 0;
         }
     }
+    // Open1602: a city with land enough for a main city stays one, however much more another city
+    // of the computer has. The original makes the city with less land a second city that grows
+    // goods for the other; on large islands far apart that leaves the first city short of food
+    // while its land lies empty.
+    if (rank == 0 && !classic() && here->land >= kGrowFrom) {
+        rank = 1;
+    }
     return rank;
 }
 
@@ -544,6 +552,16 @@ std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint3
 bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money,
                         std::span<const StageNeed> needs, bool grow) {
     const auto count = [&](std::uint32_t n) { return grow ? grown(r, n) : n; };
+    // Open1602: an order's producers grow with the land only while the city has little of their
+    // good; more would make goods nobody needs.
+    const auto producers = [&](std::uint8_t slot, std::uint32_t n) {
+        const ComputerSlot* k = computer_slot(slots(), slot);
+        const std::uint8_t w = k == nullptr ? 0 : k->ware != 0 ? k->ware : k->count_ware;
+        if (grow && !classic() && w != 0 && c.stock(w) >= kGrowStock * kStockUnitsPerTon) {
+            return n;
+        }
+        return count(n);
+    };
     const auto holds = [money](StageNeed::When w) {
         switch (w) {
             case StageNeed::When::Never:
@@ -566,7 +584,7 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
         bool found = false;
         switch (n.kind) {
             case StageNeed::Kind::Building:
-                found = need(p, n.slot, count(n.n));
+                found = need(p, n.slot, producers(n.slot, n.n));
                 break;
             case StageNeed::Kind::Market:
                 found = need_market(p, n.n);
@@ -670,6 +688,14 @@ bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::u
                     return true;
                 }
                 const City* home = home_city(p);
+                // Open1602: not for a home city with land enough to feed itself (more_food).
+                if (!classic() && home != nullptr) {
+                    for (const CityPlan& h : p.plans) {
+                        if (h.island == home->island && h.city == home->index && h.land >= kGrowFrom) {
+                            return false;
+                        }
+                    }
+                }
                 return home != nullptr && home->stock(m_buildings.food_ware()) < 8 * kTon && need(p, kSlotCattle, k);
             }
             return luxury(p, k, false);
@@ -735,6 +761,18 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         nothing_to_do(p);
     };
+
+    // Open1602: a city that cannot feed its inhabitants builds food producers first (a founded city
+    // and the pioneers have them in their orders).
+    if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
+        return;
+    }
+    // Open1602: a second city with land enough for a main city becomes one (see land_rank).
+    if ((r.stage == stage::kSecond || r.stage == stage::kSecondLuxury || r.stage == stage::kSecondFarming) &&
+        !classic() && r.land >= kGrowFrom) {
+        set_stage(p, r, stage::kMain);
+        return;
+    }
 
     switch (r.stage) {
         case stage::kFounded: {
@@ -1018,6 +1056,16 @@ void Engine::refund(AiPlayer& p) {
     r = Reservation{};
 }
 
+std::uint32_t Engine::processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const {
+    if (k.process_from == kNoProducer || k.process_per == 0) {
+        return std::numeric_limits<std::uint32_t>::max();
+    }
+    const ComputerSlot* source = computer_slot(slots(), k.process_from);
+    const std::uint8_t raw = source == nullptr ? 0 : source->ware != 0 ? source->ware : source->count_ware;
+    return workshops_fed(r.slots[k.process_from].count, k.process_per, k.process_max,
+                         raw != 0 && c.stock(raw) >= kGrowStock * kStockUnitsPerTon);
+}
+
 bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     (void)cov;
     City* c = current_city(p);
@@ -1065,6 +1113,10 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
             wanted = std::min<std::uint32_t>(wanted, 1);
         }
     }
+    // Open1602: workshops only as many as the producers of their raw material keep busy.
+    if (!classic() && d->after != kNoProducer && d->after == slot->process_from) {
+        wanted = std::min(wanted, processors_fed(*c, *r, *slot));
+    }
     if (s.count >= wanted || s.attempts >= d->attempts) {
         return false;
     }
@@ -1089,6 +1141,10 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     }
     const assets::BuildingType* b = d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
     if (b == nullptr) {
+        return false;
+    }
+    // Open1602: no further producer of a good that fills the warehouse.
+    if (!classic() && s.count != 0 && stock_full(*c, b->ware)) {
         return false;
     }
     if (!unlocked(p, *b)) {
@@ -1154,6 +1210,9 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     if (s.count >= wanted || s.attempts >= 2) {
         return false;
     }
+    if (!classic() && s.count != 0 && stock_full(c, n.ware)) {
+        return false;
+    }
     // A workshop waits for the producer of its raw material. The original's Need of it is asked
     // for one; one of a package's comes in its own turn, as the city wants it too.
     if (n.raw_slot != kNoSlot && r.slots[n.raw_slot].count == 0) {
@@ -1185,6 +1244,26 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     }
     reserve(p, *b, field_money);
     return true;
+}
+
+bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
+    if (classic() || population(c) == 0 || !food_short(c)) {
+        return false;
+    }
+    const auto planned = [&](std::uint8_t slot) {
+        const std::size_t before = p.stack.size();
+        (void)need(p, slot, std::uint32_t{r.slots[slot].count} + 1);
+        return p.stack.size() > before;
+    };
+    // Workshops whose raw material the city makes first (need() keeps them to it), then the farms
+    // and fishers: the city's own land before goods brought from far away.
+    for (const std::uint8_t slot : {kSlotButcher, kSlotBakery, kSlotMill, kSlotCattle, kSlotGrain, kSlotFisher}) {
+        if (planned(slot)) {
+            log(p, "city %u/%u: short of food, more of slot %u", r.island, r.city, slot);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Engine::need_iron_mine(AiPlayer& p, std::uint32_t n) {
@@ -1340,6 +1419,10 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
     const assets::BuildingType* b = by_id(id::kHouse);
     if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b) || c->stock(m_buildings.food_ware()) <= kTon / 2 ||
         player(p).money <= 1000) {
+        return false;
+    }
+    // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
+    if (!classic() && food_short(*c)) {
         return false;
     }
     if (plan_building(p, kHouses, *b, kSlotHouses, false)) {

@@ -232,6 +232,15 @@ private:
     }
     /// Demand of a city for a consumer good, 1/32 t per minute.
     [[nodiscard]] std::uint32_t demand(const City& c, std::uint8_t ware) const;
+    /// Open1602: what the producers of `ware` in a city make, 1/32 t per minute, as their
+    /// statistics show (half their full rate for one that has run for less than a minute).
+    [[nodiscard]] std::uint32_t supply(const City& c, std::uint8_t ware) const;
+    /// Open1602: whether a city makes too little food for more inhabitants: with less than
+    /// kFoodStock in stock, its own producers make less than its inhabitants eat and a margin.
+    [[nodiscard]] bool food_short(const City& c) const;
+    /// Open1602: whether a city has so much of `ware` that more producers of it would only fill
+    /// the warehouse (kFullStock of its room).
+    [[nodiscard]] bool stock_full(const City& c, std::uint8_t ware) const;
     [[nodiscard]] std::uint32_t kontor_level(const City& c) const;
     /// Tiles of the city's Kontor each way (its record's size).
     [[nodiscard]] std::int32_t kontor_size(const City& c) const;
@@ -324,6 +333,12 @@ private:
     bool colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field);
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
+    /// Open1602: how many workshops of slot `k` the producers of their raw material in a city keep
+    /// busy (no limit for a slot without such producers).
+    [[nodiscard]] std::uint32_t processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const;
+    /// Open1602: a food producer for a city that makes too little food (food_short), on its own
+    /// island before anything else of its order: true if one was planned.
+    bool more_food(AiPlayer& p, const City& c, const CityPlan& r);
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);
