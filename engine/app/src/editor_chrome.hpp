@@ -22,8 +22,8 @@ namespace o1602::app {
 /// keys.cfg has them, empty: none) and what lies under the mouse on the map.
 struct EditorChromeModel {
     std::array<std::string, kEditorTools> tool_keys{};
-    std::array<std::string, 24> command_keys{};  ///< by EditorCommand
-    std::string status;                          ///< the status line's text (Windows-1252), the notice first
+    std::array<std::string, kEditorCommands> command_keys{};  ///< by EditorCommand
+    std::string status;  ///< the status line's text (Windows-1252), the notice first
     bool status_error = false;
     std::string place;  ///< where the mouse is on the map (Windows-1252), empty: off the map
     /// Why the tool in hand would not place where the mouse is (Windows-1252), empty: it would.

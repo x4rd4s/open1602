@@ -105,7 +105,7 @@ constexpr std::array<PictureBand, 3> kVideoBackBands{{
 constexpr std::int32_t kVideoBox = 66041;  ///< kinds {1, 2}, 5, 7
 constexpr std::int32_t kVideoLabel = 66051;
 
-constexpr std::int32_t kMinVolume = -4000;  ///< 1/100 dB
+constexpr std::int32_t kMinVolume = audio::kMinVolume;  ///< 1/100 dB
 constexpr std::int32_t kVolumeStep = 50;
 
 /// DISK.GAD with the list arrows of MUSIK.GAD (their pictures and sizes) in the place of the last

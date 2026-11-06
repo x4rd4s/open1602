@@ -822,6 +822,17 @@ EditorModel MapViewer::editor_model() const {
     if (!m_editor) {
         return m;
     }
+    {
+        const audio::AudioSettings& a = m_app_settings.audio;
+        const auto shown = [](std::int32_t volume) {
+            return static_cast<std::uint32_t>(std::clamp(volume, audio::kMinVolume, 0) - audio::kMinVolume) *
+                   EditorModel::kVolumeRange / static_cast<std::uint32_t>(-audio::kMinVolume);
+        };
+        m.music = a.music;
+        m.effects = a.effects;
+        m.music_volume = shown(a.music_volume);
+        m.effect_volume = shown(a.effect_volume);
+    }
     const editor::Document& doc = m_editor->document;
     const sim::World& world = doc.world();
     if (m_hud && m_hud->editor_panel() != nullptr) {
@@ -946,6 +957,10 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         return;
     }
     using Kind = EditorRequest::Kind;
+    if (request.kind == Kind::SoundSwitch || request.kind == Kind::SoundVolume || request.kind == Kind::SoundTest) {
+        editor_sound_request(request);  // the game's settings, not the map: at any time
+        return;
+    }
     if (m_editor->stroke) {
         editor_end_stroke();  // a key while the button is held (undo, save)
     }
@@ -1166,6 +1181,10 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
                 m_input->show_key_help();
             }
             break;
+        case Kind::SoundSwitch:
+        case Kind::SoundVolume:
+        case Kind::SoundTest:
+            break;  // taken above (editor_sound_request)
         case Kind::TestPlay:
             editor_test_play();
             return;  // the editor stands aside: nothing of it to do now
@@ -2259,6 +2278,34 @@ void MapViewer::apply_editor() {
     editor_keep_recovery();
     m_hud->set_editor_model(editor_model());
     m_hud->set_editor_chrome(editor_chrome());
+}
+
+void MapViewer::editor_sound_request(const EditorRequest& request) {
+    using Kind = EditorRequest::Kind;
+    if (request.kind == Kind::SoundTest) {
+        if (m_sound) {
+            m_sound->test_effects();
+        }
+        return;
+    }
+    // The same settings as the game's page "Music and effects" changes (OptionsEvent::Audio).
+    audio::AudioSettings& a = m_app_settings.audio;
+    const bool music = request.index == 0;
+    if (request.kind == Kind::SoundSwitch) {
+        (music ? a.music : a.effects) = request.amount != 0;
+    } else {
+        const std::uint32_t at = std::min(request.amount, EditorModel::kVolumeRange);
+        const std::int32_t volume =
+            audio::kMinVolume +
+            static_cast<std::int32_t>(at * static_cast<std::uint32_t>(-audio::kMinVolume) / EditorModel::kVolumeRange);
+        (music ? a.music_volume : a.effect_volume) = volume;
+    }
+    if (m_sound) {
+        m_sound->set_settings(a);
+    }
+    if (!request.held) {
+        save_settings();  // a slider still held is heard now, saved when it is let go
+    }
 }
 
 EditorChromeModel MapViewer::editor_chrome() const {

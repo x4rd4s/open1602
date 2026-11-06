@@ -1899,6 +1899,15 @@ editor.view.title = Overlays
 editor.view.owners = Owners
 editor.view.island_numbers = Island numbers
 editor.view.coordinates = Coordinates
+# The editor's page of the game's music and effects (menu View)
+editor.sound.menu = Music and sound ...
+editor.sound.title = Music and sound
+editor.sound.music = Music
+editor.sound.effects = Effects
+editor.sound.volume = Volume
+# {1}: the volume in percent
+editor.sound.percent = {1} %
+editor.sound.test = Test sound
 editor.selection.title = Selection
 editor.selection.none = Click an island, a building, a ship or a placeholder on the map.
 editor.prop.at = {1}, {2}

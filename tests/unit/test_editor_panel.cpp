@@ -55,7 +55,7 @@ std::optional<std::array<std::int32_t, 2>> find(const EditorPanel& panel, const 
 
 /// The command of the menu bar (EditorChrome) whose entry says `text`, if one does.
 std::optional<app::EditorCommand> menu_command(const std::string& text) {
-    for (std::size_t c = 0; c <= static_cast<std::size_t>(app::EditorCommand::Keys); ++c) {
+    for (std::size_t c = 0; c < app::kEditorCommands; ++c) {
         const auto command = static_cast<app::EditorCommand>(c);
         if (ui::tr(app::EditorChrome::command_text(command)) == text) {
             return command;
@@ -306,6 +306,89 @@ TEST_CASE("editor panel: a pick on the map shows its properties, Back goes to th
     panel.ask_new(EditorNewMap{});
     CHECK(!panel.show_selection());
     CHECK(panel.page() == EditorPanel::Page::New);
+}
+
+TEST_CASE("editor panel: music and sound change the game's volumes from the editor") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.music_volume = EditorModel::kVolumeRange / 2;
+    m.effect_volume = EditorModel::kVolumeRange;
+    // The menu "View" opens the page.
+    CHECK(!click(panel, m, "Music and sound ...").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::Sound);
+    panel.layout(m);
+    CHECK(says(panel, "Music and sound"));
+    CHECK(says(panel, "50 %"));
+    CHECK(says(panel, "100 %"));
+    // The switches.
+    auto r = click(panel, m, "Music");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SoundSwitch);
+    CHECK(r->index == 0);
+    CHECK(r->amount == 0);  // on now: off
+    m.effects = false;
+    r = click(panel, m, "Effects");
+    REQUIRE(r.has_value());
+    CHECK(r->index == 1);
+    CHECK(r->amount == 1);
+    // Effects off: their volume and the test sound cannot be changed.
+    CHECK(!find_enabled(panel, m, "Test sound"));
+    m.effects = true;
+    r = click(panel, m, "Test sound");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SoundTest);
+    // "-" and "+": the first pair is the music's; the effects are at their loudest already.
+    std::vector<std::array<std::int32_t, 2>> minus;
+    std::vector<std::array<std::int32_t, 2>> plus;
+    std::vector<ui::Rect> sliders;
+    panel.layout(m);
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        const std::array<std::int32_t, 2> at{w.rect.x + w.rect.w / 2, w.rect.y + w.rect.h / 2};
+        if (w.kind == ui::Form::Widget::Kind::Button && w.text == "-") {
+            minus.push_back(at);
+        } else if (w.kind == ui::Form::Widget::Kind::Button && w.text == "+") {
+            plus.push_back(at);
+            if (plus.size() == 2) {
+                CHECK(!w.enabled);
+            }
+        } else if (w.kind == ui::Form::Widget::Kind::Slider) {
+            sliders.push_back(w.rect);
+        }
+    }
+    REQUIRE(minus.size() == 2);
+    REQUIRE(plus.size() == 2);
+    REQUIRE(sliders.size() == 2);
+    (void)panel.mouse(plus[0][0], plus[0][1], true, m);
+    r = panel.mouse(plus[0][0], plus[0][1], false, m);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SoundVolume);
+    CHECK(r->index == 0);
+    CHECK(r->amount > m.music_volume);
+    CHECK(!r->held);
+    (void)panel.mouse(minus[1][0], minus[1][1], true, m);
+    r = panel.mouse(minus[1][0], minus[1][1], false, m);
+    REQUIRE(r.has_value());
+    CHECK(r->index == 1);
+    CHECK(r->amount < m.effect_volume);
+    // The music's slider dragged to its left end: heard while held, saved when let go.
+    const ui::Rect s = sliders[0];
+    const std::int32_t sy = s.y + s.h / 2;
+    (void)panel.mouse(s.x + s.w / 2, sy, true, m);
+    r = panel.mouse(s.x - 40, sy, true, m);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::SoundVolume);
+    CHECK(r->amount == 0);
+    CHECK(r->held);
+    panel.layout(m);
+    CHECK(find(panel, "0 %").has_value());  // the value the knob would give
+    r = panel.mouse(s.x - 40, sy, false, m);
+    REQUIRE(r.has_value());
+    CHECK(r->amount == 0);
+    CHECK(!r->held);
+    CHECK(panel.back());
+    CHECK(panel.page() == EditorPanel::Page::Document);
 }
 
 TEST_CASE("editor panel: the overlays go on and off, the check list goes through its pages") {

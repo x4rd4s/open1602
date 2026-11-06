@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <tuple>
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/package_scenarios.hpp"
@@ -164,14 +165,26 @@ constexpr Id kCampaignRemove = 274;            ///< the scenario, the campaign's
 constexpr Id kTabNeutrals = 275;               ///< the players dialog's tab of the natives, pirates, trader
 constexpr Id kNeutralsPage = 276;              ///< the page of the natives, pirates and trader (column)
 constexpr Id kNeutralCell = 280;               ///< + the NeutralColumn of the slot shown (column)
-constexpr Id kCheckLine = 800;                 ///< + the line of the check list (a line that leads somewhere)
-constexpr Id kRecent = 190;                    ///< + the object placed lately (the page "Objects")
-constexpr Id kShipCargoPage = 1000;            ///< the selected ship's holds
-constexpr Id kFirstHoldWare = 1010;            ///< + the hold on the page "Cargo": its ware
-constexpr Id kFirstHoldLess = 1030;            ///< + the hold: fewer tons
-constexpr Id kFirstHoldMore = 1050;            ///< + the hold: more tons
-constexpr std::size_t kHoldRows = 20;          ///< holds the page "Cargo" shows at most
-constexpr Id kPlayerTable = 300;               ///< + 8 * the row + the column of the players' table
+// The page "Music and sound".
+constexpr Id kSoundMusic = 290;    ///< the music on or off
+constexpr Id kSoundEffects = 291;  ///< the effects on or off
+constexpr Id kMusicLess = 292;
+constexpr Id kMusicSlider = 293;
+constexpr Id kMusicMore = 294;
+constexpr Id kEffectsLess = 295;
+constexpr Id kEffectsSlider = 296;
+constexpr Id kEffectsMore = 297;
+constexpr Id kSoundTest = 298;
+/// A click on "-" or "+" beside a volume: a twentieth of the slider.
+constexpr std::uint32_t kVolumeStep = EditorModel::kVolumeRange / 20;
+constexpr Id kCheckLine = 800;         ///< + the line of the check list (a line that leads somewhere)
+constexpr Id kRecent = 190;            ///< + the object placed lately (the page "Objects")
+constexpr Id kShipCargoPage = 1000;    ///< the selected ship's holds
+constexpr Id kFirstHoldWare = 1010;    ///< + the hold on the page "Cargo": its ware
+constexpr Id kFirstHoldLess = 1030;    ///< + the hold: fewer tons
+constexpr Id kFirstHoldMore = 1050;    ///< + the hold: more tons
+constexpr std::size_t kHoldRows = 20;  ///< holds the page "Cargo" shows at most
+constexpr Id kPlayerTable = 300;       ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
@@ -523,6 +536,9 @@ std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const E
             return std::nullopt;
         case EditorCommand::Keys:
             return EditorRequest{EditorRequest::Kind::ShowKeys};
+        case EditorCommand::Sound:
+            m_page = Page::Sound;
+            return std::nullopt;
     }
     return std::nullopt;
 }
@@ -753,6 +769,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::View:
             layout_view(model);
+            break;
+        case Page::Sound:
+            layout_sound(model);
             break;
         case Page::Check:
             layout_check(model);
@@ -2637,6 +2656,50 @@ void EditorPanel::layout_view(const EditorModel& model) {
     f.button(kBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.back"));
 }
 
+namespace {
+
+/// The slider's place for a volume, and the volume for a place of the knob.
+double volume_position(std::uint32_t volume) noexcept {
+    return std::clamp(static_cast<double>(volume) / EditorModel::kVolumeRange, 0.0, 1.0);
+}
+std::uint32_t volume_at(double position) noexcept {
+    return static_cast<std::uint32_t>(std::lround(std::clamp(position, 0.0, 1.0) * EditorModel::kVolumeRange));
+}
+
+}  // namespace
+
+void EditorPanel::layout_sound(const EditorModel& model) {
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.sound.title"), Align::Left, Tone::Heading);
+    y += 34;
+    // Each part: its switch, then its volume as the brush's size on the page "Terrain" has it
+    // ("-", the slider, "+"), the value above the slider's right end.
+    const auto part = [&](Id on_off, const char* name, bool on, Id less, Id slider, Id more, std::uint32_t volume) {
+        f.check(on_off, Rect{m_x, y, m_w, kButtonH}, ui::tr(name), on);
+        y += kButtonH + kGap;
+        const Tone tone = on ? Tone::Normal : Tone::Dim;
+        const std::uint32_t shown = f.sliding(slider) ? volume_at(*f.sliding(slider)) : volume;
+        f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.sound.volume"), Align::Left, tone);
+        f.label(Rect{m_x, y, m_w, 18},
+                ui::tr("editor.sound.percent",
+                       {count((shown * 100 + EditorModel::kVolumeRange / 2) / EditorModel::kVolumeRange)}),
+                Align::Right, tone);
+        y += 18;
+        constexpr std::int32_t kStep = 30;
+        f.button(less, Rect{m_x, y, kStep, kButtonH}, "-", on && volume > 0);
+        f.slider(slider, Rect{m_x + kStep + 6, y, m_w - 2 * (kStep + 6), kButtonH}, volume_position(volume), on);
+        f.button(more, Rect{m_x + m_w - kStep, y, kStep, kButtonH}, "+", on && volume < EditorModel::kVolumeRange);
+        y += kButtonH + 2 * kGap;
+    };
+    part(kSoundMusic, "editor.sound.music", model.music, kMusicLess, kMusicSlider, kMusicMore, model.music_volume);
+    part(kSoundEffects, "editor.sound.effects", model.effects, kEffectsLess, kEffectsSlider, kEffectsMore,
+         model.effect_volume);
+    f.button(kSoundTest, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.sound.test"), model.effects);
+    y += kButtonH + 2 * kGap;
+    f.button(kBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.back"));
+}
+
 std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept {
     if (line.kind == EditorCheckLine::Kind::Heading) {
         return 2 * 20 + 2;
@@ -2793,6 +2856,19 @@ std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, 
     layout(model);
     const auto id = m_form.mouse(x, y, down, button);
     if (!id) {
+        if (m_page == Page::Sound) {
+            // A volume slider held: heard as it is dragged, saved when it is let go.
+            for (const auto& [slider, index, now] : {std::tuple{kMusicSlider, 0U, model.music_volume},
+                                                     std::tuple{kEffectsSlider, 1U, model.effect_volume}}) {
+                if (const auto at = m_form.sliding(slider); at && volume_at(*at) != now) {
+                    EditorRequest r{EditorRequest::Kind::SoundVolume};
+                    r.index = index;
+                    r.amount = volume_at(*at);
+                    r.held = true;
+                    return r;
+                }
+            }
+        }
         return std::nullopt;
     }
     return press(*id, model, m_form.clicked_with() == ui::MouseButton::Left);
@@ -2883,6 +2959,34 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kBack:
             show_document();
             return std::nullopt;
+        case kSoundMusic:
+        case kSoundEffects: {
+            EditorRequest r{EditorRequest::Kind::SoundSwitch};
+            r.index = *id == kSoundMusic ? 0 : 1;
+            r.amount = (*id == kSoundMusic ? model.music : model.effects) ? 0 : 1;
+            return r;
+        }
+        case kMusicLess:
+        case kMusicMore:
+        case kMusicSlider:
+        case kEffectsLess:
+        case kEffectsMore:
+        case kEffectsSlider: {
+            const bool music = *id == kMusicLess || *id == kMusicMore || *id == kMusicSlider;
+            const std::uint32_t now = music ? model.music_volume : model.effect_volume;
+            EditorRequest r{EditorRequest::Kind::SoundVolume};
+            r.index = music ? 0 : 1;
+            if (*id == kMusicSlider || *id == kEffectsSlider) {
+                r.amount = volume_at(m_form.slid_to());  // let go: saved
+            } else if (*id == kMusicMore || *id == kEffectsMore) {
+                r.amount = std::min(now + kVolumeStep, EditorModel::kVolumeRange);
+            } else {
+                r.amount = now > kVolumeStep ? now - kVolumeStep : 0;
+            }
+            return r;
+        }
+        case kSoundTest:
+            return EditorRequest{EditorRequest::Kind::SoundTest};
         case kCancel:
             show_document();
             return std::nullopt;
