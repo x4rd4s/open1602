@@ -5,6 +5,7 @@
 // and giving a city up (task 0x2E).
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <limits>
 
 #include "ai_engine.hpp"
@@ -315,11 +316,40 @@ const Engine::SiteCounts& Engine::site_counts(std::uint16_t island) {
                                                    (t.ware == ware::kTree || t.ware == ware::kGrass ||
                                                     t.kind == kind::kRuin);
                                         }),
+                              AreaCount(w, h,
+                                        [&](std::int32_t x, std::int32_t y) {
+                                            const Tile t = tile(island, x, y);
+                                            return t.valid() && t.ware == ware::kTree;
+                                        }),
+                              AreaCount(w, h,
+                                        [&](std::int32_t x, std::int32_t y) {
+                                            const Tile t = tile(island, x, y);
+                                            return t.valid() && t.ware == ware::kFish;
+                                        }),
                               AreaCount(w, h, [&](std::int32_t x, std::int32_t y) {
                                   const Tile t = tile(island, x, y);
-                                  return t.valid() && t.ware == ware::kTree;
+                                  return t.valid() && t.prod == prod::kFisher;
                               })});
     return *cached;
+}
+
+bool Engine::fisher_spot(const SiteCounts& counts, std::int32_t x, std::int32_t y) {
+    // As search_fisher: more than 13 shoals within 6 tiles, no other fishing hut within 8.
+    constexpr std::int32_t kFisherShoals = 13;
+    return counts.fish.count(x - 6, y - 6, x + 6, y + 6) > kFisherShoals &&
+           counts.fishers.count(x - 8, y - 8, x + 8, y + 8) == 0;
+}
+
+bool Engine::fisher_room(std::uint16_t island, const SiteCounts& counts, std::int32_t cx, std::int32_t cy) {
+    // The hut wants the Kontor within 13 tiles and a road's end within 7; close to the Kontor,
+    // where the first roads are, the city finds the site from the start.
+    constexpr std::int32_t kNear = 6;
+    for (const auto& [x, y] : area_scan(island).beach) {
+        if (std::abs(x - cx) <= kNear && std::abs(y - cy) <= kNear && fisher_spot(counts, x, y)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Engine::task_settle_site(AiPlayer& p) {
@@ -348,6 +378,19 @@ void Engine::task_settle_site(AiPlayer& p) {
     const SiteCounts& counts = site_counts(island);
     const AreaCount& green = counts.green;
     const AreaCount& trees = counts.trees;
+    // Open1602: on an island with fish, a city's Kontor stands where at least one fishing hut finds
+    // its fish, so that the new town feeds itself from the start. Where no beach of the island has
+    // fish, any site will do, as in the original.
+    bool fish_first = false;
+    if (!classic() && !p.pirates) {
+        // Every beach tile of the island is near itself.
+        for (const auto& [x, y] : area_scan(island).beach) {
+            if (fisher_spot(counts, x, y)) {
+                fish_first = true;
+                break;
+            }
+        }
+    }
     const assets::BuildingType* kontor = by_id(p.pirates ? id::kPirateKontor : id::kKontor1);
     if (kontor == nullptr) {
         return;
@@ -424,6 +467,9 @@ void Engine::task_settle_site(AiPlayer& p) {
                     continue;
                 }
                 if (!experienced && trees.count(cx - 12, cy - 12, cx + 12, cy + 12) <= 60) {
+                    continue;
+                }
+                if (fish_first && !fisher_room(island, counts, cx, cy)) {
                     continue;
                 }
                 const std::int32_t g = green.count(cx - 32, cy - 32, cx + 32, cy + 32);

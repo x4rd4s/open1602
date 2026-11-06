@@ -672,15 +672,22 @@ void Engine::task_fisher(AiPlayer& p) {
     }
     pop(p);
     refund(p);
-    const Search s = p.search;
-    const assets::BuildingType* b = by_id(s.building);
+    const assets::BuildingType* b = by_id(p.search.building);
     if (b == nullptr) {
         return;
     }
-    if (s.best <= 0) {
+    // Open1602: no road's end leads to fish (a town's first roads run inland): a road from the
+    // city's roads or Kontor to the nearest beach with fish.
+    std::vector<BuildItem> path;
+    if (p.search.best <= 0 && (classic() || p.pirates || !fisher_path(p, *b, path))) {
         slot_fail(p, kSlotFisher);
         return;
     }
+    if (!path.empty()) {
+        log(p, "fisher road of %zu tiles to %d,%d", path.size(), p.search.best_x0, p.search.best_y0);
+        build(p, std::move(path), false);
+    }
+    const Search s = p.search;
     if (build(p, {BuildItem{b->id, s.best_x0, s.best_y0, 0, 0}}, true) == 0) {
         slot_fail(p, kSlotFisher);
         return;
