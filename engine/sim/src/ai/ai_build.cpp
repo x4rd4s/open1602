@@ -382,6 +382,33 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
     if (b == nullptr) {
         return;
     }
+    p.search.move_x = -1;
+    p.search.move_y = -1;
+    if (s.move_x >= 0) {
+        // Open1602: a farm with too little room moves to the site found (relocate_farm).
+        if (s.best > 0) {
+            if (s.stub_x >= 0) {
+                build(p, {BuildItem{id::kRoadDirt, s.stub_x, s.stub_y, 0, 0}}, false);
+            }
+            MoveOrder order;
+            order.player = p.player;
+            order.island = p.island;
+            order.from = TilePos{s.move_x, s.move_y};
+            order.x = s.best_x0;
+            order.y = s.best_y0;
+            if (execute(order).accepted) {
+                log(p, "moved farm %u from %d,%d to %d,%d", b->id, s.move_x, s.move_y, s.best_x0, s.best_y0);
+                std::int32_t rings_n = task == kGrainFarm ? 1 : (task == kSheep || task == kWoodcutter) ? 3 : 2;
+                const std::uint8_t field = task == kWoodcutter ? ware::kTree : b->raw_ware;
+                fill_fields(p, s.best_x0, s.best_y0, s.best_x1, s.best_y1, rings_n, field, b->radius);
+                slot_ok(p, s.slot);
+                return;
+            }
+        }
+        // No site it can move to: pulled down as without moving (sweep), its slot builds a new one.
+        demolish_tile(p, s.move_x, s.move_y);
+        return;
+    }
     if (s.best > 0) {
         std::vector<BuildItem> items;
         if (s.stub_x >= 0) {
@@ -1237,6 +1264,115 @@ bool Engine::survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t 
 // ---------------------------------------------------------------------------------------------
 // Maintenance sweep and the Kontor after a fire
 
+bool Engine::demolish_surplus(AiPlayer& p, const City& c, CityPlan& r, const Tile& t, std::int32_t x, std::int32_t y) {
+    if (t.prod < prod::kWorkshop || t.prod > prod::kFisher || t.ware == 0 || t.ware == m_buildings.materials().wood) {
+        return false;
+    }
+    const Production* pr = m_world.production(p.island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y));
+    if (pr == nullptr) {
+        return false;
+    }
+    std::optional<std::uint8_t> slot = counted_slot(t.type->id, m_world.balance().computer_producers);
+    if (!slot) {
+        slot = producer_slot(slots(), t.ware, t.raw, t.type->id);
+    }
+    if (!slot) {
+        slot = package_slot(t.ware);
+    }
+    if (!slot || *slot >= r.slots.size()) {
+        return false;
+    }
+    SlotState& s = r.slots[*slot];
+    const bool idle = !pr->enabled || (t.type->max_idle_cycles != 0 && pr->idle_cycles >= t.type->max_idle_cycles);
+    if (!idle) {
+        return false;
+    }
+    bool spare = false;
+    bool far = false;
+    // A workshop beyond what the producers of its raw material keep busy, with none of it in store.
+    if (const ComputerSlot* k = computer_slot(slots(), *slot);
+        k != nullptr && k->process_from != kNoProducer && (t.raw == 0 || c.stock(t.raw) == 0)) {
+        const std::uint32_t fed = processors_fed(c, r, *k);
+        // One more than that stays: the next producers of the raw material keep it busy.
+        spare = s.count > fed + 1;
+        far = s.count > 2 * fed + 2;
+    }
+    // A producer switched off while its good fills the warehouse, beyond two of its kind.
+    if (!spare && s.count > 2 && stock_full(c, t.ware)) {
+        spare = true;
+        far = c.stock(t.ware) >= c.capacity;
+    }
+    if (!spare ||
+        !worth_demolishing(t.type->idle_cost, build_value(t.type->build_cost), m_sim.rules().refund_share(), far)) {
+        return false;
+    }
+    log(p, "city %u/%u: surplus building %u of slot %u (%u of them)", r.island, r.city, t.type->id, *slot, s.count);
+    if (demolish_tile(p, x, y) == 0) {
+        return false;
+    }
+    if (s.count != 0) {
+        --s.count;
+    }
+    return true;
+}
+
+bool Engine::move_farm_later(AiPlayer& p, const City& c, CityPlan& r, const Tile& t, std::int32_t x, std::int32_t y) {
+    const Moving moving = m_sim.rules().moving;
+    if (moving == Moving::Off || (moving == Moving::Rebuild && !affordable(p, c, *t.type))) {
+        return false;
+    }
+    if (t.raw == ware::kTree) {
+        return false;  // a woodcutter: pulled down, as the original's (trees grow anywhere again)
+    }
+    if ((r.move_x == x && r.move_y == y) || (p.search.move_x == x && p.search.move_y == y)) {
+        return true;  // still waiting for the city's next plan, or for the site
+    }
+    if (r.move_x >= 0) {
+        return false;
+    }
+    std::optional<std::uint8_t> slot = counted_slot(t.type->id, m_world.balance().computer_producers);
+    if (!slot) {
+        slot = producer_slot(slots(), t.ware, t.raw, t.type->id);
+    }
+    if (!slot || *slot >= kSlots || !need_def(slots(), *slot, m_world.balance().computer_producers)) {
+        return false;
+    }
+    r.move_x = x;
+    r.move_y = y;
+    log(p, "city %u/%u: farm %u at %d,%d lacks room, to be moved", r.island, r.city, t.type->id, x, y);
+    return true;
+}
+
+bool Engine::relocate_farm(AiPlayer& p, const City& c, CityPlan& r) {
+    const std::int32_t x = r.move_x;
+    const std::int32_t y = r.move_y;
+    r.move_x = -1;
+    r.move_y = -1;
+    const Tile t = tile(p.island, x, y);
+    if (!t.valid() || t.type == nullptr || !t.origin) {
+        return false;
+    }
+    std::optional<std::uint8_t> slot = counted_slot(t.type->id, m_world.balance().computer_producers);
+    if (!slot) {
+        slot = producer_slot(slots(), t.ware, t.raw, t.type->id);
+    }
+    if (!slot || *slot >= kSlots) {
+        return false;
+    }
+    const auto d = need_def(slots(), *slot, m_world.balance().computer_producers);
+    const Moving moving = m_sim.rules().moving;
+    if (!d || moving == Moving::Off || (moving == Moving::Rebuild && !affordable(p, c, *t.type))) {
+        return false;
+    }
+    if (!plan_building(p, d->task, *t.type, *slot, false, d->from_start)) {
+        return false;
+    }
+    p.search.move_x = x;
+    p.search.move_y = y;
+    log(p, "city %u/%u: searching a site to move farm %u from %d,%d", r.island, r.city, t.type->id, x, y);
+    return true;
+}
+
 void Engine::sweep(AiPlayer& p) {
     CityPlan* r = current_plan(p);
     City* c = current_city(p);
@@ -1305,6 +1441,10 @@ void Engine::sweep(AiPlayer& p) {
             }
             continue;
         }
+        if (!classic() && demolish_surplus(p, *c, *r, t, x, y)) {
+            ++cleared;
+            continue;
+        }
         // Farms need their fields and a road. The stonemason takes its stone like a farm (from the
         // quarry), but it has no fields.
         const bool farm = (t.prod == prod::kFarm || t.prod == prod::kPasture ||
@@ -1333,6 +1473,9 @@ void Engine::sweep(AiPlayer& p) {
                 // farm down; the original demolishes it and its farm task builds the same farm
                 // there again (a woodcutter whose trees were felled went round every 11 seconds).
                 fill_fields(p, x, y, x1, y1, t.type->radius, t.raw, t.type->radius);
+            } else if (road && fields < need && !classic() && move_farm_later(p, *c, *r, t, x, y)) {
+                // Open1602: moved to a site with room when the city plans its next building,
+                // keeping what it has (Rules::moving).
             } else if (fields < need || !road) {
                 demolish_tile(p, x, y);
                 ++cleared;

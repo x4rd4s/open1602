@@ -1302,6 +1302,61 @@ TEST_CASE("ai: a farm leaves the trees of the city's woodcutter standing (S-122)
     CHECK(fields_in_reach() == 0);  // the original plants 39 of them at once
 }
 
+TEST_CASE("ai: a farm without room for its fields moves where moving is allowed (Rules::moving)") {
+    // A tobacco plantation by the Kontor's road, the wood in its reach flooded: the sweep finds no
+    // room for its fields, the wood north of the road has it. Improved computers move it to a site of their farm task;
+    // where moving is off they pull it down as the original's do.
+    const auto plantations = [](sim::Moving moving) {
+        Game g;
+        g.buildings = make_buildings(
+            "  @Nummer: 13\n  Id: 20702\n  Kind: 14\n  Gfx: 40\n  Size: 2, 2\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 2\n    Ware: 6\n    Rohstoff: 46\n    Rohmenge: 1\n"
+            "    Prodmenge: 1\n    Maxlager: 4\n    Interval: 20\n    Radius: 4\n  EndObj\n"
+            "  @Nummer: 14\n  Id: 20703\n  Kind: 10\n  Gfx: 50\n  Size: 1, 1\n  AnimAnz: 4\n  AnimAdd: 1\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 10\n    Interval: 160\n  EndObj\n"
+            "  @Nummer: 15\n  Id: 20704\n  Kind: 10\n  Gfx: 54\n  Size: 1, 1\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 9\n    Ware: 46\n  EndObj\n");
+        g.buildings.by_id(kKontor)->ware = sim::kAllWares;  // farms are placed near a market or Kontor
+        sim::Rules rules;
+        rules.moving = moving;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s, 5'000);  // the Kontor at 44,16, a road west along row 17
+        sim::BuildOrder order;
+        order.player = kComputer;
+        order.island = 1;
+        order.items = {{20702, 41, 18, 0, 0}};
+        REQUIRE(sim::execute_build(g.world, g.buildings, order, {}, nullptr).placed == 1);
+        sim::IslandMap& map = g.world.island(1).map;
+        for (std::uint32_t y = 16; y <= 23; ++y) {
+            for (std::uint32_t x = 37; x <= 45; ++x) {
+                const assets::BuildingType* b = g.buildings.by_sprite(map.top(x, y).sprite);
+                if (b == g.buildings.by_id(kTree)) {
+                    map.set_sprite(x, y, static_cast<std::uint16_t>(g.buildings.by_id(kSea)->gfx));
+                }
+            }
+        }
+        std::vector<sim::TilePos> found;
+        run_until(s, 600'000, [&] {
+            found.clear();
+            for (std::uint32_t y = 0; y < map.height(); ++y) {
+                for (std::uint32_t x = 0; x < map.width(); ++x) {
+                    const sim::TilePos at{static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)};
+                    const auto b = sim::building_at(g.world, g.buildings, 1, at);
+                    if (b && b->type->id == 20702 && b->origin.x == at.x && b->origin.y == at.y) {
+                        found.push_back(at);
+                    }
+                }
+            }
+            return found.size() != 1 || found.front().x != 41 || found.front().y != 18;
+        });
+        return found;
+    };
+    const std::vector<sim::TilePos> moved = plantations(sim::Moving::Free);
+    REQUIRE(moved.size() == 1);
+    CHECK(moved.front().y < 16);  // in the wood north of the road
+    CHECK(plantations(sim::Moving::Off).empty());
+}
+
 TEST_CASE("ai: a computer that finds no island for its city gives its ship to the pirates and leaves") {
     // The big island under water: only the rock is left, too small for a colony (root task
     // Ship op 5 with value 5, then the players' check retires the computer).
@@ -1959,7 +2014,7 @@ TEST_CASE("ai: a package's public building of a kind of its own is planned by th
     const Planned far = planned(true, 30);
     CHECK(own_public(30) > 0xFFFF'FFFFU);
     CHECK((far.flags & own_public(30)) != 0);
-    CHECK(far.version == sim::ComputerPlayers::max_state_version());
+    CHECK(far.version == sim::ai::kStateWithWideFlags);
     CHECK(far.kept);
 }
 

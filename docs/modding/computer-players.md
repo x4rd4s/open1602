@@ -185,6 +185,21 @@ once there is no next stage its growing could hold up. The original's computer p
   on to the main city's orders. The original makes the city with less land a second city that grows
   goods for the other, which on large islands far apart left the first city short of food while its
   land lay empty. A colony's pastures are no longer built for a home city with that much land.
+- *Pulling down what the city has no use for.* The maintenance sweep pulls down a producer that is
+  switched off or out of raw material when the city has no use for it: a workshop more than one
+  above what the producers of its raw material keep busy (above) while none of that is in store, or
+  a producer switched off while its good fills three quarters of the room, beyond two of its kind.
+  It does so only when that pays by the game's refund on demolition: what the building costs to keep
+  while switched off over an hour and what the refund gives back must reach half of what building it
+  again would cost (its gold and its materials at about the trader's prices), a quarter where the
+  city has more than twice what it can use or its room is full. Without refund only buildings that
+  cost enough to keep while switched off go, and the more so the more of them are too many.
+- *Moving farms that lack room.* A farm or plantation (not a woodcutter) with a road but too
+  little room for its fields is moved, as the game's setting for moving buildings allows, when the
+  city plans its next building: to the best site its farm task finds, where its fields are planted.
+  Where moving costs as a new building, only when the city can afford that. Where moving is off, the
+  city cannot afford it or no site is found, it is pulled down as by the original's computers, which
+  then build a new one.
 
 **Towns.** Open1602's computers also lay out their towns with more care:
 

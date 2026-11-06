@@ -172,6 +172,25 @@ inline constexpr std::uint64_t food_way_score(std::uint64_t food, std::uint64_t 
     return food * 4096 / (cost + 1) * 4 / (4 + std::uint64_t{have});
 }
 
+/// Whether pulling down a building the city has no use for pays: what it saves in idle running costs
+/// over kDemolishMinutes and gets back (`refund_percent` of its value, Rules::demolish_refund)
+/// against what building it again would cost, weighed by how likely that is: half its value while
+/// the city may need it again, a quarter where it has far more than it can use (`far_surplus`).
+/// Without any refund, so, only what costs much to keep or is far too much goes.
+inline constexpr std::uint32_t kDemolishMinutes = 60;
+inline constexpr bool worth_demolishing(std::uint64_t idle_cost, std::uint64_t value, std::uint32_t refund_percent,
+                                        bool far_surplus) noexcept {
+    const std::uint64_t gain = idle_cost * kDemolishMinutes + value * refund_percent / 100;
+    return gain * (far_surplus ? 4 : 2) >= value;
+}
+
+/// The value of a building's costs in gold: its gold and its materials at about what the trader asks
+/// for them.
+inline constexpr std::uint64_t build_value(const assets::BuildingType::BuildCost& c) noexcept {
+    return static_cast<std::uint64_t>(std::max<std::int32_t>(c.money, 0)) + std::uint64_t{c.wood} * 40 +
+           std::uint64_t{c.bricks} * 50 + std::uint64_t{c.tools} * 90 + std::uint64_t{c.cannons} * 150;
+}
+
 /// How many workshops `raw_producers` producers of their raw material keep busy: one for every
 /// `per` of them, rounded up, or `max` for each where that is set; one more while `raw_in_stock`
 /// (the raw material comes from elsewhere too).

@@ -134,8 +134,14 @@ bool Engine::accepts(const State& state) const {
         const bool own_public = s.slot > kOwnPublicSlot - kMaxOwnPublic && s.slot <= kOwnPublicSlot;
         if (s.segment < 0 || (s.slot >= kSlots + m_package_needs.size() && !own_public) || s.remaining < -kMaxSpan ||
             s.remaining > kMaxSpan || s.extra < -kMaxSpan || s.extra > kMaxSpan || s.target_x < -1 ||
-            s.target_x > kMaxSpan || s.target_y < -1 || s.target_y > kMaxSpan) {
+            s.target_x > kMaxSpan || s.target_y < -1 || s.target_y > kMaxSpan || s.move_x < -1 || s.move_x > kMaxSpan ||
+            s.move_y < -1 || s.move_y > kMaxSpan) {
             return false;
+        }
+        for (const CityPlan& r : p.plans) {
+            if (r.move_x < -1 || r.move_x > kMaxSpan || r.move_y < -1 || r.move_y > kMaxSpan) {
+                return false;
+            }
         }
     }
     return true;
@@ -737,6 +743,12 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (p.search.move_x >= 0 ||
+            std::any_of(p.plans.begin(), p.plans.end(), [](const ai::CityPlan& r) { return r.move_x >= 0; })) {
+            return static_cast<std::uint16_t>(ai::kStateWithMove);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.search.service > kNarrow) {
             return static_cast<std::uint16_t>(ai::kStateWithWideFlags);
