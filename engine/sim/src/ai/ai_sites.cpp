@@ -52,6 +52,32 @@ bool market_or_kontor(const Tile& t) {
     return t.ware == ware::kAll && (t.prod == prod::kMarket || t.prod == prod::kKontor);
 }
 
+/// Open1602: how much a farm or field site would take from the town. Houses and public buildings
+/// near it and the middle of a market's reach are where the town grows; the original's computers
+/// put their fields there as readily as at the edge, so that grain grew between the houses and the
+/// town had to spread over new markets. Fields are kept for the edge of the market's reach.
+std::int32_t town_cost(const Tile& t, std::int32_t d) {
+    if (!t.origin) {
+        return 0;
+    }
+    if (t.prod == prod::kHouse && d < 5) {
+        return (5 - d) * 24;
+    }
+    if (t.prod >= prod::kPublicFirst && t.prod <= prod::kPublicLast && d < 5) {
+        return (5 - d) * 16;
+    }
+    if (t.ware == ware::kAll && t.prod == prod::kMarket && t.kind == kind::kBuilding && d < 7) {
+        return (7 - d) * 24;
+    }
+    return 0;
+}
+
+/// A site's score less its town_cost(), but a site that scored at all still does: where no other
+/// is left the farm goes into the town rather than nowhere.
+std::int32_t away_from_town(std::int32_t score, std::int32_t cost) {
+    return score > 0 ? std::max(score - cost, 1) : score;
+}
+
 /// A candidate site: a rectangle of island tiles.
 struct Site {
     std::int32_t x0 = 0;
@@ -589,6 +615,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
     // island with little forest), a second round takes a place with a few, whose woodcutter the
     // trees planted about it (task_farm) feed; the original's computer built none and ran out of wood.
     const bool sparse = woodcutter && s.phase == 1;
+    const bool improved = !woodcutter && !classic();
     const auto finished = [&] {
         if (woodcutter && s.best == 0 && s.phase == 0 && !classic()) {
             start_search(p, *b, s.slot, false);
@@ -646,6 +673,9 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                           if (t.origin && t.prod == prod::kHouse && d < 2) {
                               acc.score -= 32 << (2 - d);
                           }
+                          if (improved) {
+                              acc.extra += town_cost(t, d);
+                          }
                           if (t.prod == prod::kShipyard && d <= 3) {
                               acc.score -= 1000;
                           }
@@ -675,7 +705,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                     acc.score += 32;
                 }
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-                const std::int32_t score = parity_penalty(acc.score, parity, 4);
+                const std::int32_t score = away_from_town(parity_penalty(acc.score, parity, 4), acc.extra);
                 const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10) : acc.count >= 19;
                 if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
@@ -703,6 +733,7 @@ bool Engine::search_grain(AiPlayer& p) {
     if (b == nullptr) {
         return true;
     }
+    const bool improved = !classic();
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -745,9 +776,12 @@ bool Engine::search_grain(AiPlayer& p) {
                       if (t.origin && t.ware == ware::kGrain && t.prod != prod::kRipe && d > 1 && d < 9) {
                           acc.score += (8 - d) * 4;
                       }
+                      if (improved) {
+                          acc.extra += town_cost(t, d);
+                      }
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-            const std::int32_t score = (parity & 1) != 0 ? acc.score - 32 : acc.score;
+            const std::int32_t score = away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra);
             if (acc.count >= 9 && acc.road && acc.market && score > s.best &&
                 farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                 s.best = score;
@@ -1087,17 +1121,25 @@ bool Engine::search_public(AiPlayer& p) {
             }
             any = true;
             std::int32_t count = 0;
+            std::int32_t reached = 0;
             for (const House& h : houses) {
-                if (h.island != p.island || h.city != p.city || (h.services & s.service) != 0) {
+                if (h.island != p.island || h.city != p.city) {
                     continue;
                 }
                 const std::int32_t dx = gap(c.x0, c.w(), h.x);
                 const std::int32_t dy = gap(c.y0, c.h(), h.y);
                 if (dy <= b->radius && dx <= circle[static_cast<std::size_t>(dy)]) {
-                    ++count;
+                    ++reached;
+                    count += (h.services & s.service) == 0 ? 1 : 0;
                 }
             }
-            const std::int32_t score = 32 * count;
+            std::int32_t score = 32 * count;
+            if (!classic() && count != 0) {
+                // Open1602: of two sites that serve as many houses, the one amid more of them, where
+                // the town grows on around it; and a little chance, so that not every town looks
+                // alike.
+                score += 4 * (reached - count) + static_cast<std::int32_t>(rng().below(24));
+            }
             if (score > s.best) {
                 s.best = score;
                 s.extra = count;
