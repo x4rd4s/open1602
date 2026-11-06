@@ -473,8 +473,12 @@ assets::GadgetLayout with_goods_line(assets::GadgetLayout info) {
     g.kind = assets::GadgetKind::TextLeft;
     g.colour = {6, 3};  // gold, yellow while pressed
     g.no_select = false;
-    g.pos = {label->pos[0], label->pos[1] + 20};
-    g.size = {190, 25};
+    // The text one line (20) below "Punkte"'s, where its Posoffs puts it. The box that takes the
+    // clicks is moved down over the letters (the label's own box ends above them, its text hangs
+    // below it) and ends right above the list buttons (57031 from 674), which it would cover.
+    g.pos = {label->pos[0], label->pos[1] + 27};
+    g.offset[1] -= 7;
+    g.size = {190, 24};
     for (assets::Gadget& m : info.gadgets) {
         const std::int32_t up = m.id >= kInfoBalanceIcon - 2 && m.id <= kInfoBalanceIcon ? 5
                                 : m.id >= kInfoPoints - 1 && m.id <= kInfoRating         ? 10
