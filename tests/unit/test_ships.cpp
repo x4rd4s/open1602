@@ -324,6 +324,47 @@ TEST_CASE("ships: loading and unloading at the own Kontor in whole tons, nothing
     CHECK(fleet.transfer(sim::CargoTransfer{2, other.id, kWood, true, 10 * kTon}) == 0);
 }
 
+TEST_CASE("ships: with two Kontors in reach the goods go to the one whose window the player uses") {
+    Sea sea(true);
+    // A Kontor of the computer (player 1) just south of the human's, both within the ship's reach.
+    sim::IslandMap& map = sea.world.island(0).map;
+    REQUIRE(map.place(*sea.buildings.by_id(20103), 0, 6, 0, 0, 1, 1).ok());
+    for (std::uint32_t y = 6; y < 10; ++y) {
+        for (std::uint32_t x = 0; x < 6; ++x) {
+            map.set_city(x, y, 1, 1);
+        }
+    }
+    sim::City foreign = *sea.world.city(0, 0);
+    foreign.index = 1;
+    foreign.owner = 1;
+    foreign.name = "Colony";
+    foreign.warehouse_y = 6;
+    foreign.goods.assign(25, 0);
+    foreign.trade[kWood].buy = true;
+    foreign.trade[kWood].buy_price = 20;
+    foreign.trade[kWood].limit = 30 * kTon;
+    sea.world.add_city(foreign);
+    sea.world.diplomacy().relation(0, 1).trade = sim::Treaty::Signed;
+    sea.world.diplomacy().relation(1, 0).trade = sim::Treaty::Signed;
+    sim::Ship& ship = sea.add(38, 26);
+    const std::uint32_t id = ship.id;
+    ship.cargo[0] = sim::CargoSlot{kWood, 20 * kTon, 0};
+    REQUIRE(sim::building_in_reach(sea.world, sea.buildings, 0, 0, 4, 38, 26));
+    REQUIRE(sim::building_in_reach(sea.world, sea.buildings, 0, 0, 6, 38, 26));
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    sim::CargoTransfer sell{0, id, kWood, false, 10 * kTon};
+    sell.kontor_island = 0;
+    sell.kontor_city = 1;
+    const std::int64_t money = sea.world.player(0)->money;
+    CHECK(fleet.transfer(sell) == 10 * kTon);
+    CHECK(sea.world.city(0, 1)->goods[kWood] == 10 * kTon);
+    CHECK(sea.world.city(0, 0)->goods[kWood] == 0);
+    CHECK(sea.world.player(0)->money == money + 200);
+    // Without a window the own Kontor comes first, as before.
+    CHECK(fleet.transfer(sim::CargoTransfer{0, id, kWood, false, 5 * kTon}) == 5 * kTon);
+    CHECK(sea.world.city(0, 0)->goods[kWood] == 5 * kTon);
+}
+
 TEST_CASE("ships: a trade route loads where it should and delivers at the next stop") {
     Sea sea(true);
     sim::City second = *sea.world.city(0, 0);

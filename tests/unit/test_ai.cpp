@@ -48,8 +48,9 @@ constexpr sim::PlayerId kComputer = 1;
 constexpr sim::PlayerId kTrader = 2;
 constexpr sim::PlayerId kNatives = 3;
 
-/// `extra` are further HAUS records, numbered on from the Kontor.
-assets::BuildingTable make_buildings(const std::string& extra = {}) {
+/// `extra` are further HAUS records, numbered on from the Kontor; `kontor` further lines of the
+/// Kontor's HAUS_PRODTYP.
+assets::BuildingTable make_buildings(const std::string& extra = {}, const std::string& kontor = "    Maxlager: 30\n") {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     const auto doc = assets::cod::parse(
         std::string("Objekt: HAUS\n") +
@@ -72,7 +73,9 @@ assets::BuildingTable make_buildings(const std::string& extra = {}) {
             // Kontor I at the beach.
             "  @Nummer: 12\n  Id: 22101\n  Kind: 35\n  Gfx: 20\n  Size: 2, 3\n  Strandflg: 1\n  PlaceFlg: 1\n"
             "  KreuzBase: 12\n  Ausbauflg: 1\n"
-            "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n    Maxlager: 30\n  EndObj\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n" +
+            kontor +
+            "  EndObj\n"
             "  Objekt: HAUS_BAUKOST\n    Werkzeug: 3\n    Holz: 4\n    Money: 100\n  EndObj\n" +
             extra + "EndObj\n",
         types);
@@ -1253,6 +1256,31 @@ TEST_CASE("ai: the computer switches its workshops by their switch first, as the
     CHECK(smith_off);
     run(s, 20'000);
     CHECK(!g.world.productions()[smith].enabled);
+}
+
+TEST_CASE("ai: a computer's Kontor never asks visiting ships for more than its storage room") {
+    // A Kontor of 8 t room that buys four wares: the bricks the computer wants (10 t, plus a
+    // quarter) would not fit. Ships may not sell beyond the room, so the limit stays at it.
+    Game g;
+    g.buildings = make_buildings({}, "    Maxlager: 8\n    Maxware: 4, 4\n");
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    sim::City* city = nullptr;
+    for (const sim::City& c : g.world.cities()) {
+        if (c.owner == kComputer) {
+            city = g.world.city(c.island, c.index);
+        }
+    }
+    REQUIRE(city != nullptr);
+    const std::uint8_t bricks = g.buildings.materials().bricks;
+    REQUIRE(g.world.goods().is_trade(bricks));
+    constexpr std::uint32_t kTon = sim::kStockUnitsPerTon;
+    REQUIRE(run_until(s, 120'000, [&] {
+        const sim::City::Trade* t = city->trade_of(bricks);
+        return city->capacity != 0 && t != nullptr && t->buy;
+    }));
+    CHECK(city->capacity == 8 * kTon);
+    CHECK(city->trade_of(bricks)->limit == city->capacity);
 }
 
 TEST_CASE("ai: a farm leaves the trees of the city's woodcutter standing (S-122)") {

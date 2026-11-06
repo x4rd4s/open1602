@@ -222,10 +222,13 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
             continue;
         }
         // The original writes the limit only when it switches buying on (S-101); Open1602 keeps it
-        // up to date.
-        if (t == nullptr || !t->buy || t->limit != it->limit) {
+        // up to date. The original lets ships sell beyond the storage room (S-075), Open1602 does
+        // not: a limit above the room would show the ware as wanted to visiting ships although
+        // the full Kontor takes none, so it never asks for more than the room.
+        const std::uint32_t limit = c.capacity != 0 ? std::min(it->limit, c.capacity) : it->limit;
+        if (t == nullptr || !t->buy || t->limit != limit) {
             s.mode = TradeSetting::Mode::Buy;
-            s.amount = it->limit;
+            s.amount = limit;
             execute(s);
         }
     }
