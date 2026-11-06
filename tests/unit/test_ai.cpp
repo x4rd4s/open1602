@@ -7,11 +7,14 @@
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "../../engine/sim/src/ai/ai_archive.hpp"
+#include "../../engine/sim/src/ai/ai_engine.hpp"
 #include "../test_framework.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -2163,12 +2166,14 @@ TEST_CASE("ai: a package's public building of a kind of its own is planned by th
     CHECK((planned(false, 0).flags & own_public(0)) == 0);
     const Planned first = planned(true, 0);
     CHECK((first.flags & own_public(0)) != 0);
-    CHECK(first.version == 5);  // within 32 bits: the bytes of version 5
+    // Within 32 bits the flags are the bytes of version 5; the computer's town seed, drawn with its
+    // first town plan, asks for version 8 here all the same.
+    CHECK(first.version == sim::ai::kStateWithTownSeed);
     CHECK(first.kept);
     const Planned far = planned(true, 30);
     CHECK(own_public(30) > 0xFFFF'FFFFU);
     CHECK((far.flags & own_public(30)) != 0);
-    CHECK(far.version == sim::ai::kStateWithWideFlags);
+    CHECK(far.version >= sim::ai::kStateWithWideFlags);
     CHECK(far.kept);
 }
 
@@ -2234,4 +2239,45 @@ TEST_CASE("ai: improved computers settle on a large island another computer hold
     CHECK(!founded(true));
     // A human's city there the original's computers settle beside.
     CHECK(founded(true, sim::PlayerRole::Human));
+}
+
+TEST_CASE("ai: town styles differ by the number drawn for the game, and the same number gives the same style") {
+    using sim::ai::town_style;
+    std::set<std::tuple<std::int32_t, std::int32_t, std::int32_t, std::int32_t>> seen;
+    for (std::uint32_t seed = 1; seed <= 32; ++seed) {
+        const sim::ai::TownStyle a = town_style(seed * 2654435761U, 7, 0);
+        const sim::ai::TownStyle b = town_style(seed * 2654435761U, 7, 0);
+        CHECK(a.room == b.room);
+        CHECK(a.shift == b.shift);
+        CHECK(a.block == b.block);
+        CHECK(a.field_margin == b.field_margin);
+        CHECK(a.room >= 6);
+        CHECK(a.room <= 9);
+        CHECK(a.block >= 6);
+        CHECK(a.block <= 8);
+        CHECK(a.shift >= 0);
+        CHECK(a.shift <= 4);
+        seen.emplace(a.room, a.shift, a.block, a.field_margin);
+    }
+    CHECK(seen.size() >= 16);
+    // Two cities of one computer plan differently too.
+    int differ = 0;
+    for (std::uint8_t city = 1; city <= 8; ++city) {
+        const sim::ai::TownStyle a = town_style(12345, 3, 0);
+        const sim::ai::TownStyle b = town_style(12345, 3, city);
+        differ += a.room != b.room || a.block != b.block || a.shift != b.shift ? 1 : 0;
+    }
+    CHECK(differ >= 4);
+}
+
+TEST_CASE("ai: a site's distance from the town zone") {
+    sim::ai::TownZone z;
+    z.valid = true;
+    z.cx = 20;
+    z.cy = 20;
+    z.radius = 10;
+    CHECK(sim::ai::zone_excess(z, 19, 19, 20, 20) < 0);   // at the middle
+    CHECK(sim::ai::zone_excess(z, 30, 20, 31, 21) == 0);  // at the edge
+    CHECK(sim::ai::zone_excess(z, 40, 20, 41, 21) == 10);
+    CHECK(sim::ai::zone_excess(z, 20, 0, 21, 1) == 9);
 }

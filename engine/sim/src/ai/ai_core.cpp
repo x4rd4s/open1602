@@ -744,6 +744,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
     for (const ai::AiPlayer& p : m_state->players) {
+        if (p.town_seed != 0) {
+            return static_cast<std::uint16_t>(ai::kStateWithTownSeed);
+        }
+    }
+    for (const ai::AiPlayer& p : m_state->players) {
         if (p.search.move_x >= 0 ||
             std::any_of(p.plans.begin(), p.plans.end(), [](const ai::CityPlan& r) { return r.move_x >= 0; })) {
             return static_cast<std::uint16_t>(ai::kStateWithMove);
