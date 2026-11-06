@@ -192,6 +192,10 @@ void io(A& a, CityPlan& r) {
     a(r.doctor);
     a(r.posts);
     a(r.post_cursor);
+    if (a.version() >= kStateWithMove) {
+        a(r.move_x);
+        a(r.move_y);
+    }
 }
 
 template <class A>
@@ -232,6 +236,10 @@ void io(A& a, Search& s) {
     if (a.version() >= 4) {
         a(s.target_x);
         a(s.target_y);
+    }
+    if (a.version() >= kStateWithMove) {
+        a(s.move_x);
+        a(s.move_y);
     }
 }
 

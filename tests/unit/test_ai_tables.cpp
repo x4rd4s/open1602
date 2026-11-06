@@ -240,3 +240,24 @@ TEST_CASE("ai tables: a city short of food weighs a way's food against its upkee
     // A workshop whose raw material is there costs only its own upkeep and comes first.
     CHECK(food_way_score(64, 20, 2) > food_way_score(32, 25, 0));
 }
+
+TEST_CASE("ai tables: a building the city has no use for comes down as the refund rule makes it pay") {
+    o1602::assets::BuildingType::BuildCost weaver;
+    weaver.money = 200;
+    weaver.wood = 3;
+    weaver.tools = 2;
+    CHECK(build_value(weaver) == 200 + 3 * 40 + 2 * 90);
+    o1602::assets::BuildingType::BuildCost odd;
+    odd.money = -5;
+    CHECK(build_value(odd) == 0);
+    // Without refund a building that costs nothing while switched off stays ...
+    CHECK(!worth_demolishing(0, 500, 0, false));
+    CHECK(!worth_demolishing(0, 500, 0, true));
+    // ... unless a refund pays back what building it again may cost.
+    CHECK(worth_demolishing(0, 500, 50, false));
+    CHECK(!worth_demolishing(0, 500, 20, false));
+    CHECK(worth_demolishing(0, 500, 25, true));
+    // Its upkeep while switched off counts too.
+    CHECK(worth_demolishing(5, 500, 0, false));
+    CHECK(!worth_demolishing(1, 500, 0, false));
+}

@@ -767,6 +767,10 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
         return;
     }
+    // Open1602: a farm without room for its fields moves (move_farm_later).
+    if (r.move_x >= 0 && !classic() && relocate_farm(p, c, r)) {
+        return;
+    }
     // Open1602: a second city with land enough for a main city becomes one (see land_rank).
     if ((r.stage == stage::kSecond || r.stage == stage::kSecondLuxury || r.stage == stage::kSecondFarming) &&
         !classic() && r.land >= kGrowFrom) {

@@ -542,6 +542,16 @@ private:
     /// False for a tile that is no building origin of the city (the survey has nothing there).
     bool survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t x, std::uint32_t y, SurveyFinds& finds);
     void sweep(AiPlayer& p);
+    /// Open1602: pulls down the producer at (x, y) if the city has no use for it (more workshops
+    /// than their raw material keeps busy, or one switched off while its good fills the warehouse)
+    /// and that pays by the game's refund rule (worth_demolishing); true if it did.
+    bool demolish_surplus(AiPlayer& p, const City& c, CityPlan& r, const Tile& t, std::int32_t x, std::int32_t y);
+    /// Open1602: notes the farm at (x, y), which has too little room for its fields, to be moved
+    /// (Rules::moving) when the city plans its next building; true if it stays for that.
+    bool move_farm_later(AiPlayer& p, const City& c, CityPlan& r, const Tile& t, std::int32_t x, std::int32_t y);
+    /// Open1602: plans the search for a site to move the farm noted by move_farm_later to; true if
+    /// it was planned.
+    bool relocate_farm(AiPlayer& p, const City& c, CityPlan& r);
     /// Some human still in the game has no peace treaty with the computer.
     [[nodiscard]] bool at_war_with_a_human(const AiPlayer& p) const;
     /// The wall or gate the sweep puts on tile (x, y) of the current city, if any. At war: walls

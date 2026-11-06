@@ -20,11 +20,14 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 6;
+inline constexpr std::uint32_t kStateVersion = 7;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
 inline constexpr std::uint32_t kStateWithWideFlags = 6;
+/// Version 7: the farm a city is to move and the one a search moves (CityPlan::move_x/move_y,
+/// Search::move_x/move_y). Written only while a move is due.
+inline constexpr std::uint32_t kStateWithMove = 7;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -231,6 +234,10 @@ struct CityPlan {
     std::optional<std::pair<std::uint16_t, std::uint16_t>> doctor;  ///< tile of the Klinik
     std::vector<GuardPost> posts;                                   ///< the city's markets
     std::uint8_t post_cursor = 0;
+    /// Open1602: the farm the sweep found without room for its fields, to move when the city plans
+    /// its next building (relocate_farm), its tile; -1 none.
+    std::int32_t move_x = -1;
+    std::int32_t move_y = -1;
 };
 
 /// A straight run of road of the current city (task 7).
@@ -271,6 +278,10 @@ struct Search {
     /// Open1602, task kClaimLand: the tile the new market should bring into the city's land, -1 none.
     std::int32_t target_x = -1;
     std::int32_t target_y = -1;
+    /// Open1602: a farm with too little room for its fields that the found site gets instead of a
+    /// new one (Rules::moving), its tile; -1 none.
+    std::int32_t move_x = -1;
+    std::int32_t move_y = -1;
 };
 
 /// Money and building material taken from a city while a building is planned.
