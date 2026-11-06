@@ -205,11 +205,167 @@ void player_summary(const sim::World& world, const assets::BuildingTable& buildi
     }
 }
 
+/// Per city with houses: how its town is laid out, to compare how well the computers build their
+/// towns. Houses, inhabitants and their class, markets and public buildings, road tiles per house,
+/// fields and pastures within two tiles of a house, houses without a market or without the public
+/// buildings their class needs, and the free ground of the city's land.
+void town_summary(const sim::World& world, const assets::BuildingTable& buildings, bool map_out) {
+    namespace kind = assets::kind;
+    namespace prod = assets::prod;
+    for (const sim::City& c : world.cities()) {
+        const sim::Player* owner = world.player(c.owner);
+        if (owner == nullptr || (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+            continue;
+        }
+        std::size_t houses = 0;
+        std::size_t people = 0;
+        std::size_t no_market = 0;
+        std::size_t lacking = 0;
+        std::array<std::size_t, 6> classes{};
+        const sim::IslandMap& map = world.islands()[c.island].map;
+        const auto w = static_cast<std::int32_t>(map.width());
+        const auto h = static_cast<std::int32_t>(map.height());
+        std::vector<std::uint8_t> house_tile(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), 0);
+        for (const sim::House& hs : world.houses()) {
+            if (hs.island != c.island || hs.city != c.index) {
+                continue;
+            }
+            ++houses;
+            people += hs.inhabitants();
+            ++classes[std::min<std::size_t>(hs.resident_class, classes.size() - 1)];
+            no_market += hs.market ? 0U : 1U;
+            lacking += hs.services_complete ? 0U : 1U;
+            for (std::int32_t dy = -2; dy <= 3; ++dy) {
+                for (std::int32_t dx = -2; dx <= 3; ++dx) {
+                    const std::int32_t x = hs.x + dx;
+                    const std::int32_t y = hs.y + dy;
+                    if (x >= 0 && y >= 0 && x < w && y < h) {
+                        house_tile[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) +
+                                   static_cast<std::size_t>(x)] = 1;
+                    }
+                }
+            }
+        }
+        if (houses == 0) {
+            continue;
+        }
+        std::size_t market_tiles = 0;
+        std::size_t market_size = 1;
+        std::size_t public_tiles = 0;
+        std::size_t roads = 0;
+        std::size_t squares = 0;
+        std::size_t fields = 0;
+        std::size_t fields_in_town = 0;
+        std::size_t free = 0;
+        std::int32_t x0 = w;
+        std::int32_t y0 = h;
+        std::int32_t x1 = -1;
+        std::int32_t y1 = -1;
+        std::string picture;
+        for (std::int32_t y = 0; y < h; ++y) {
+            for (std::int32_t x = 0; x < w; ++x) {
+                const sim::MapCell& cell =
+                    map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                if (cell.city != c.index || cell.owner != c.owner) {
+                    continue;
+                }
+                x0 = std::min(x0, x);
+                y0 = std::min(y0, y);
+                x1 = std::max(x1, x);
+                y1 = std::max(y1, y);
+                const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+                if (b == nullptr) {
+                    continue;
+                }
+                if (b->prod_kind == prod::kMarket) {
+                    ++market_tiles;
+                    market_size = std::max<std::size_t>(b->tile_count(), 1);
+                } else if (b->prod_kind >= prod::kPublicFirst && b->prod_kind <= prod::kPublicLast) {
+                    ++public_tiles;
+                }
+                if (b->kind == kind::kRoad || b->kind == kind::kBridge) {
+                    ++roads;
+                } else if (b->kind == kind::kSquare) {
+                    ++squares;
+                } else if (b->kind == kind::kGround || (b->kind == kind::kForest && b->ware != assets::ware::kTree)) {
+                    ++free;
+                }
+                const bool field = ((b->prod_kind == prod::kRipe || b->prod_kind == prod::kGrowing) &&
+                                    b->ware != assets::ware::kTree && b->kind != kind::kRock) ||
+                                   b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture;
+                if (field) {
+                    ++fields;
+                    fields_in_town +=
+                        house_tile[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)];
+                }
+            }
+        }
+        std::printf("town of player %u island %u #%u: %zu houses, %zu inhabitants, classes %zu/%zu/%zu/%zu/%zu, %zu "
+                    "markets, %zu public tiles, %zu roads (%.2f a house), %zu squares, %zu fields (%zu by houses), "
+                    "%zu houses without market, %zu lacking services, %zu free ground, land %dx%d\n",
+                    static_cast<unsigned>(c.owner), c.island, c.index, houses, people, classes[0], classes[1],
+                    classes[2], classes[3], classes[4], market_tiles / market_size, public_tiles, roads,
+                    static_cast<double>(roads) / static_cast<double>(houses), squares, fields, fields_in_town,
+                    no_market, lacking, free, x1 - x0 + 1, y1 - y0 + 1);
+        if (!map_out || houses < 8) {
+            continue;
+        }
+        // H house, M market, K Kontor, P public building, W workshop, F farm or pasture, f field,
+        // T tree, + road, = square, . free ground, ^ rock or mine, ~ water, o other city or owner.
+        for (std::int32_t y = std::max(y0 - 1, 0); y <= std::min(y1 + 1, h - 1); ++y) {
+            std::string line;
+            for (std::int32_t x = std::max(x0 - 1, 0); x <= std::min(x1 + 1, w - 1); ++x) {
+                const sim::MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+                char ch = ' ';
+                if (b != nullptr) {
+                    const bool mine = cell.city == c.index && cell.owner == c.owner;
+                    if (b->kind == kind::kSea || b->kind == kind::kSurf || b->kind == kind::kRiver ||
+                        b->kind == kind::kRiverCorner || b->kind == kind::kRiverMouth) {
+                        ch = '~';
+                    } else if (b->kind == kind::kRock || b->kind == kind::kMine || b->kind == kind::kSlope) {
+                        ch = '^';
+                    } else if (!mine && cell.city != sim::MapCell::kNoCity) {
+                        ch = 'o';
+                    } else if (b->prod_kind == prod::kHouse) {
+                        ch = 'H';
+                    } else if (b->prod_kind == prod::kMarket) {
+                        ch = 'M';
+                    } else if (b->prod_kind == prod::kKontor) {
+                        ch = 'K';
+                    } else if (b->prod_kind >= prod::kPublicFirst && b->prod_kind <= prod::kPublicLast) {
+                        ch = 'P';
+                    } else if (b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture) {
+                        ch = 'F';
+                    } else if ((b->prod_kind == prod::kRipe || b->prod_kind == prod::kGrowing) &&
+                               b->ware != assets::ware::kTree) {
+                        ch = 'f';
+                    } else if (b->ware == assets::ware::kTree) {
+                        ch = 'T';
+                    } else if (b->kind == kind::kRoad || b->kind == kind::kBridge) {
+                        ch = '+';
+                    } else if (b->kind == kind::kSquare) {
+                        ch = '=';
+                    } else if (b->kind == kind::kBuilding || b->kind == kind::kMill || b->kind == kind::kHarbour) {
+                        ch = 'W';
+                    } else if (b->kind == kind::kGround || b->kind == kind::kForest) {
+                        ch = mine ? '.' : ',';
+                    } else {
+                        ch = '_';
+                    }
+                }
+                line += ch;
+            }
+            std::printf("  %s\n", line.c_str());
+        }
+    }
+}
+
 /// `state` of a .o1602: players, cities with their goods, ships, the computers' producers a package
 /// changed; with `buildings_of_players`, how many buildings of each Id every player owns; with
 /// `summary`, player_summary().
 int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players,
-              bool summary) {
+              bool summary, bool towns, bool town_maps) {
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const sim::Player& p = world.players()[i];
         std::printf("player %zu: role %u, banner %u, money %d %s\n", i, static_cast<unsigned>(p.role),
@@ -262,6 +418,9 @@ int own_state(const sim::World& world, const assets::BuildingTable& buildings, b
     if (summary) {
         player_summary(world, buildings);
     }
+    if (towns || town_maps) {
+        town_summary(world, buildings, town_maps);
+    }
     std::printf("%zu players, %zu cities, %zu ships, %zu soldiers\n", world.players().size(), world.cities().size(),
                 world.ships().size(), world.soldiers().size());
     return 0;
@@ -303,7 +462,8 @@ int cmd_state(const Args& args) {
     }
     const auto mods = args.options.find("--mods");
     if (auto own = read_own_save(fs::path(args.positional[0]), mods != args.options.end() ? &mods->second : nullptr)) {
-        return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"))
+        return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"),
+                                 args.flag("--towns"), args.flag("--town-maps"))
                     : fail(own->error());
     }
     auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
