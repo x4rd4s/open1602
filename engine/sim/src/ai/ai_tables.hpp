@@ -142,6 +142,47 @@ inline constexpr std::uint32_t kGrowMax = 8;
 /// large islands) while the computer earns at least this much gold a minute more than it pays.
 inline constexpr std::int32_t kGrowIncome = 50;
 
+/// Open1602: a city's economy follows what its inhabitants need. Food: with less than kFoodStock
+/// tons in stock, a city whose producers make less than its inhabitants eat and kFoodMargin
+/// sixteenths more (for the next inhabitants) builds food producers first and no new houses.
+inline constexpr std::uint32_t kFoodStock = 20;
+inline constexpr std::uint32_t kFoodMargin = 2;
+/// A producer is not built while its good fills kFullStock sixteenths of the city's room, and an
+/// order's producers grow with the land only while the city has less than kGrowStock tons of it.
+inline constexpr std::uint32_t kFullStock = 12;
+inline constexpr std::uint32_t kGrowStock = 20;
+
+/// Whether a city with `stock` of food (1/32 t) whose producers make `supply` makes too little for
+/// inhabitants who eat `demand` (both 1/32 t per minute).
+inline constexpr bool short_of_food(std::uint32_t stock, std::uint32_t supply, std::uint32_t demand) noexcept {
+    return stock < kFoodStock * kStockUnitsPerTon &&
+           std::uint64_t{supply} * 16 < std::uint64_t{demand} * (16 + kFoodMargin);
+}
+
+/// Whether `stock` of a good (1/32 t) fills a city's room `capacity` so far that more producers of
+/// it would make it for nobody.
+inline constexpr bool full_stock(std::uint32_t stock, std::uint32_t capacity) noexcept {
+    return capacity != 0 && std::uint64_t{stock} * 16 >= std::uint64_t{capacity} * kFullStock;
+}
+
+/// How good a way to more food is: what it adds a minute (`food`) for the gold a minute it costs to
+/// run (`cost`), counting for less the more of its kind a city already has (`have`), so that its
+/// cities do not build one kind only.
+inline constexpr std::uint64_t food_way_score(std::uint64_t food, std::uint64_t cost, std::uint32_t have) noexcept {
+    return food * 4096 / (cost + 1) * 4 / (4 + std::uint64_t{have});
+}
+
+/// How many workshops `raw_producers` producers of their raw material keep busy: one for every
+/// `per` of them, rounded up, or `max` for each where that is set; one more while `raw_in_stock`
+/// (the raw material comes from elsewhere too).
+inline constexpr std::uint32_t workshops_fed(std::uint32_t raw_producers, std::uint32_t per, std::uint32_t max,
+                                             bool raw_in_stock) noexcept {
+    const std::uint32_t fed = max != 0   ? max * raw_producers
+                              : per == 0 ? raw_producers
+                                         : (raw_producers + per - 1) / per;
+    return fed + (raw_in_stock ? 1U : 0U);
+}
+
 /// `n` of an order grown for a city with more than `from` tiles of free land (else `n`), in
 /// sixteenths so that a little more land already adds a little; rounded up, at most kMaxOrderCount.
 inline constexpr std::uint32_t grown_count(std::uint32_t land, std::uint32_t n,

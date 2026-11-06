@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "ai_engine.hpp"
+#include "ai_tables.hpp"
 
 #include "o1602/sim/growth.hpp"
 
@@ -122,6 +123,40 @@ std::uint32_t Engine::demand(const City& c, std::uint8_t w) const {
         }
     }
     return static_cast<std::uint32_t>((sum * 6) >> 8);
+}
+
+std::uint32_t Engine::supply(const City& c, std::uint8_t ware) const {
+    const IslandMap& map = island_of(c.island).map;
+    std::uint64_t sum = 0;
+    for (const Production& pr : m_world.productions()) {
+        if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
+            continue;
+        }
+        const MapCell& cell = map.top(pr.x, pr.y);
+        if (cell.city != c.index || cell.empty()) {
+            continue;
+        }
+        const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
+        if (b == nullptr || b->ware != ware || b->interval == 0 || b->prod_kind == prod::kMarket ||
+            b->prod_kind == prod::kKontor) {
+            continue;
+        }
+        if (pr.elapsed >= 60) {
+            sum += std::uint64_t{pr.produced} * 60 / pr.elapsed;
+        } else {
+            sum += std::uint64_t{b->produce_amount} * 30 / b->interval;
+        }
+    }
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(sum, 0xFFFFFFFFU));
+}
+
+bool Engine::food_short(const City& c) const {
+    const std::uint8_t food = m_buildings.food_ware();
+    return short_of_food(c.stock(food), supply(c, food), demand(c, food));
+}
+
+bool Engine::stock_full(const City& c, std::uint8_t ware) const {
+    return ware != 0 && full_stock(c.stock(ware), c.capacity);
 }
 
 std::int32_t Engine::kontor_size(const City& c) const {
