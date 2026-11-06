@@ -391,6 +391,8 @@ private:
     void apply_editor();
     /// What the panel or a key asked for; a request that would lose changes asks first.
     void editor_request(const EditorRequest& request, bool confirmed = false);
+    /// The page "Music and sound": the game's audio settings changed from the editor.
+    void editor_sound_request(const EditorRequest& request);
     /// The model of the editor's panel for this frame.
     [[nodiscard]] EditorModel editor_model() const;
     /// The files the page "Open" lists: the own scenarios, then the game's.

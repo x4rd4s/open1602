@@ -1829,6 +1829,15 @@ editor.view.title = Einblendungen
 editor.view.owners = Besitz
 editor.view.island_numbers = Inselnummern
 editor.view.coordinates = Koordinaten
+# Die Seite des Editors für Musik und Effekte des Spiels (Menü Ansicht)
+editor.sound.menu = Musik und Sound ...
+editor.sound.title = Musik und Sound
+editor.sound.music = Musik
+editor.sound.effects = Effekte
+editor.sound.volume = Lautstärke
+# {1}: die Lautstärke in Prozent
+editor.sound.percent = {1} %
+editor.sound.test = Testklang
 editor.selection.title = Auswahl
 editor.selection.none = Klicke auf eine Insel, ein Gebäude, ein Schiff oder einen Platzhalter.
 editor.prop.at = {1}, {2}

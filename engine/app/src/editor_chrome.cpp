@@ -217,6 +217,8 @@ const char* EditorChrome::command_text(EditorCommand command) noexcept {
             return "editor.campaign.menu";
         case EditorCommand::Keys:
             return "editor.menu.keys";
+        case EditorCommand::Sound:
+            return "editor.sound.menu";
     }
     return "editor.title";
 }
@@ -246,7 +248,7 @@ std::vector<EditorChrome::MenuEntry> EditorChrome::entries(std::size_t menu, con
                     {EditorCommand::Redo, model.can_redo},
                     {EditorCommand::Find, !model.previewing}};
         case 2:
-            return {{EditorCommand::View, true}};
+            return {{EditorCommand::View, true}, {EditorCommand::Sound, true}};
         case 3:
             return {{EditorCommand::Islands, true},
                     {EditorCommand::WorldSize, true},

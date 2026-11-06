@@ -158,7 +158,10 @@ enum class EditorCommand : std::uint8_t {
     SavePackage,
     Campaign,
     Keys,
+    Sound,  ///< the page "Music and sound": the volumes, as the game's settings have them
 };
+/// How many commands there are (EditorCommand).
+inline constexpr std::size_t kEditorCommands = static_cast<std::size_t>(EditorCommand::Sound) + 1;
 
 /// What a click on the editor's map picked.
 struct EditorPick {
@@ -506,6 +509,13 @@ struct EditorModel {
     bool previewing = false;
     std::uint32_t preview_roll = 0;
     std::size_t preview_islands = 0;
+    /// The page "Music and sound": the game's audio settings. The volumes go from 0 (silent end)
+    /// to kVolumeRange (full), in the settings' unit (1/100 dB above the quietest).
+    static constexpr std::uint32_t kVolumeRange = 4000;
+    bool music = true;
+    bool effects = true;
+    std::uint32_t music_volume = kVolumeRange;
+    std::uint32_t effect_volume = kVolumeRange;
 };
 
 /// What a click or a key asked for.
@@ -602,6 +612,12 @@ struct EditorRequest {
         SavePackage,     ///< saved as the scenario `name` of package `index` (EditorModel::package_folders)
         CampaignAdd,     ///< the scenario as the next part of campaign `name` (a new one if it has none)
         CampaignRemove,  ///< the scenario, the last part of campaign `name`, taken out of it
+        /// The music (`index` 0) or the effects (1) switched on (`amount` 1) or off (0).
+        SoundSwitch,
+        /// The volume of the music (`index` 0) or the effects (1) to `amount` (EditorModel's unit);
+        /// `held`: the slider is still held, the change is heard but not yet saved.
+        SoundVolume,
+        SoundTest,  ///< the test sound of the effects
     };
     Kind kind = Kind::Close;
     std::size_t index = 0;
@@ -624,6 +640,7 @@ struct EditorRequest {
     };
     Trade trade{};
     std::size_t goal = 0;  ///< GoalStep
+    bool held = false;     ///< SoundVolume
 };
 
 class EditorPanel {
@@ -673,7 +690,8 @@ public:
         Packages,
         PackageSave,
         Campaign,
-        Neutrals  ///< the players towards the natives, the pirates and the trader
+        Neutrals,  ///< the players towards the natives, the pirates and the trader
+        Sound      ///< music and effects: on or off, their volumes
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -770,6 +788,7 @@ private:
     void layout_save(const EditorModel& model);
     void layout_selection(const EditorModel& model);
     void layout_view(const EditorModel& model);
+    void layout_sound(const EditorModel& model);
     void layout_check(const EditorModel& model);
     void layout_islands(const EditorModel& model);
     void layout_world_size(const EditorModel& model);

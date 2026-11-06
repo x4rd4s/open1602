@@ -51,7 +51,10 @@ inline constexpr SampleId kWavTest = 57;  ///< "Test" of the effects' volume: th
 /// name that is no file of the original's.
 [[nodiscard]] std::vector<SampleId> samples_named(std::string_view name);
 
-/// Volume in the original's unit, 1/100 dB of attenuation (-4000 .. 0), as a gain.
+/// The quietest volume of the settings (1/100 dB; 0 is the loudest).
+inline constexpr std::int32_t kMinVolume = -4000;
+
+/// Volume in the original's unit, 1/100 dB of attenuation (kMinVolume .. 0), as a gain.
 [[nodiscard]] float gain_of(std::int32_t centibel) noexcept;
 
 /// The kinds of messages the voice and video options switch: 0 (all) and the original's seven of
