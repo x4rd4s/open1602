@@ -72,10 +72,15 @@ std::int32_t town_cost(const Tile& t, std::int32_t d) {
     return 0;
 }
 
-/// A site's score less its town_cost(), but a site that scored at all still does: where no other
-/// is left the farm goes into the town rather than nowhere.
+/// A site's score lessened by its town_cost(): a site that scored at all keeps a part of it, so that
+/// where no other is left the farm goes into the town rather than nowhere, and of two sites in the
+/// town the one that takes less of it still wins.
 std::int32_t away_from_town(std::int32_t score, std::int32_t cost) {
-    return score > 0 ? std::max(score - cost, 1) : score;
+    if (score <= 0) {
+        return score;
+    }
+    const std::int64_t s = static_cast<std::int64_t>(score) * 256 / (256 + static_cast<std::int64_t>(cost));
+    return static_cast<std::int32_t>(std::max<std::int64_t>(s, 1));
 }
 
 /// A candidate site: a rectangle of island tiles.
