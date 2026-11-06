@@ -269,8 +269,7 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
         std::string picture;
         for (std::int32_t y = 0; y < h; ++y) {
             for (std::int32_t x = 0; x < w; ++x) {
-                const sim::MapCell& cell =
-                    map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                const sim::MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
                 if (cell.city != c.index || cell.owner != c.owner) {
                     continue;
                 }
@@ -298,18 +297,19 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
                 const bool field = crop(*b) || b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture;
                 if (field) {
                     ++fields;
-                    fields_in_town +=
-                        house_tile[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)];
+                    fields_in_town += house_tile[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) +
+                                                 static_cast<std::size_t>(x)];
                 }
             }
         }
-        std::printf("town of player %u island %u #%u: %zu houses, %zu inhabitants, classes %zu/%zu/%zu/%zu/%zu, %zu "
-                    "markets, %zu public tiles, %zu roads (%.2f a house), %zu squares, %zu fields (%zu by houses), "
-                    "%zu houses without market, %zu lacking services, %zu free ground, land %dx%d\n",
-                    static_cast<unsigned>(c.owner), c.island, c.index, houses, people, classes[0], classes[1],
-                    classes[2], classes[3], classes[4], market_tiles / market_size, public_tiles, roads,
-                    static_cast<double>(roads) / static_cast<double>(houses), squares, fields, fields_in_town,
-                    no_market, lacking, free, x1 - x0 + 1, y1 - y0 + 1);
+        std::printf(
+            "town of player %u island %u #%u: %zu houses, %zu inhabitants, classes %zu/%zu/%zu/%zu/%zu, %zu "
+            "markets, %zu public tiles, %zu roads (%.2f a house), %zu squares, %zu fields (%zu by houses), "
+            "%zu houses without market, %zu lacking services, %zu free ground, land %dx%d\n",
+            static_cast<unsigned>(c.owner), c.island, c.index, houses, people, classes[0], classes[1], classes[2],
+            classes[3], classes[4], market_tiles / market_size, public_tiles, roads,
+            static_cast<double>(roads) / static_cast<double>(houses), squares, fields, fields_in_town, no_market,
+            lacking, free, x1 - x0 + 1, y1 - y0 + 1);
         if (!map_out || houses < 8) {
             continue;
         }
@@ -366,8 +366,8 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
 /// `state` of a .o1602: players, cities with their goods, ships, the computers' producers a package
 /// changed; with `buildings_of_players`, how many buildings of each Id every player owns; with
 /// `summary`, player_summary().
-int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players,
-              bool summary, bool towns, bool town_maps) {
+int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players, bool summary,
+              bool towns, bool town_maps) {
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const sim::Player& p = world.players()[i];
         std::printf("player %zu: role %u, banner %u, money %d %s\n", i, static_cast<unsigned>(p.role),
@@ -465,7 +465,7 @@ int cmd_state(const Args& args) {
     const auto mods = args.options.find("--mods");
     if (auto own = read_own_save(fs::path(args.positional[0]), mods != args.options.end() ? &mods->second : nullptr)) {
         return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"),
-                                 args.flag("--towns"), args.flag("--town-maps"))
+                                args.flag("--towns"), args.flag("--town-maps"))
                     : fail(own->error());
     }
     auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
