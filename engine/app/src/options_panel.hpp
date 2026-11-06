@@ -45,7 +45,7 @@ struct OptionsEvent {
         Load,           ///< slot `value`
         Quit,           ///< "Ende": leave the game
         Fullscreen,     ///< OptionsModel::fullscreen changed (`value` 1: on)
-        Display,        ///< open the window "Anzeige"
+        Display,        ///< open the window "Einstellungen"
         Audio,          ///< OptionsModel::audio changed (`value` 1: a volume slider is still held,
                         ///< so the change is heard but not yet saved; a final one follows)
         PlayTrack,      ///< play `text` now (and enable it)

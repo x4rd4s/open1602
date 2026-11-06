@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // How the game is shown (engine/app/src/display_settings.hpp, display_menu.hpp): the display.*
-// lines of settings.cfg, the window sizes and interface sizes offered, the window "Anzeige".
+// lines of settings.cfg, the window sizes and interface sizes offered, the window "Einstellungen".
 
 #include <string>
 

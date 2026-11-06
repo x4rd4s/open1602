@@ -208,7 +208,7 @@ TEST_CASE("main menu: the buttons of the main menu answer with their events") {
     CHECK(!menu.back());  // Escape in the main menu: nothing to go back to
 }
 
-TEST_CASE("main menu: the History Edition's Options button opens the window Anzeige, the others count one further") {
+TEST_CASE("main menu: the History Edition's Options button opens the window Einstellungen, the others count one further") {
     Game g("o1602-test-menu-history-base", {}, history_base_layout());
     MainMenu menu(*g.dir, &g.texts);
     REQUIRE(menu.usable());

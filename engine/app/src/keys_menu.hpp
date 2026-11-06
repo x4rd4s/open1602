@@ -4,7 +4,7 @@
 // of the key overview (F1), and an editor page. A click on an action's keys waits for the next key
 // pressed and gives the action that key in place of its keys, a right click adds it to them;
 // Backspace takes every key from the action, Escape keeps what it had. A key another action of the
-// same context had moves over, and the window says so. Opened from the window "Anzeige"; it only
+// same context had moves over, and the window says so. Opened from the window "Einstellungen"; it only
 // edits a KeysModel, the input applies and keeps what changed (keys.cfg).
 #pragma once
 

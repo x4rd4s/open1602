@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// How the game is shown (the window "Anzeige" of the settings): window or full screen, the
+// How the game is shown (the window "Einstellungen" of the settings): window or full screen, the
 // window's size, the size of the interface, the free zoom and how it draws. Kept in settings.cfg
 // as display.* lines. Pure logic: the viewer applies it to the window.
 #pragma once

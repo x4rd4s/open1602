@@ -83,7 +83,7 @@ before a good the people need runs out.
    the foot of each good's icon what came in more than went out per minute over the last 5 game
    minutes of that city, green, or the other way round, red, on a half dark ground; nothing while
    it is below 0.05 t. A click on a good opens its page in the window "Warenbilanz" for the
-   city's island. The trend is a setting of the window "Anzeige" (`display.goods_trend` in
+   city's island. The trend is a setting of the window "Einstellungen" (`display.goods_trend` in
    settings.cfg, on at first), since it adds to the original's picture.
 
 8. **The other tabs.** Beside "Waren" the window has five tabs, all for the scope chosen above:

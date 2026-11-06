@@ -26,7 +26,7 @@ namespace {
 
 // BASE.GAD: the buttons from the top (IDHAUPT + 2 ...). The History Edition has a sixth one,
 // "Options" (its own graphics settings) after Multiplayer, so the ones below it count one further.
-// Open1602 shows its window "Anzeige" for it (display_menu.hpp).
+// Open1602 shows its window "Einstellungen" for it (display_menu.hpp).
 constexpr std::int32_t kSingle = 30002;
 constexpr std::int32_t kMulti = 30003;
 constexpr std::int32_t kCredits = 30004;

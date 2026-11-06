@@ -709,7 +709,7 @@ bool Hud::back() {
         return true;
     }
     if (keys_open()) {
-        m_keys_open = false;  // back to the window "Anzeige"
+        m_keys_open = false;  // back to the window "Einstellungen"
         return true;
     }
     if (m_display_open) {
@@ -885,7 +885,7 @@ ui::Rect Hud::layout(std::int32_t width, std::int32_t height, double ui_scale) {
 
 bool Hud::covers(std::int32_t x, std::int32_t y) const noexcept {
     // The mission's window takes the clicks inside it; the menu and the window
-    // "Anzeige" all of them.
+    // "Einstellungen" all of them.
     // A question takes all of them: nothing behind it answers the mouse.
     if (m_editing && m_chrome && m_chrome->covers(x, y)) {
         return true;

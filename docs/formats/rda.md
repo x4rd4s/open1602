@@ -7,7 +7,7 @@ new renderer. Most files are the same byte for byte; what Open1602 has to know:
 |---|---|---|
 | Files of a language | `Loca/<language>/` (`de-DE`: Text.cod, Editor.cod, ToolGfx/START.BSH, TOOLS.BSH, Editor.bsh, Samples, Speech8, VideoSmk); the English ones in the installation's own folders | `GameDirectory::resolve()` looks there first ([languages.md](../modding/languages.md#the-history-edition)) |
 | Menu art in true colour | START.BSH, five buttons of TOOLS.BSH: record type 13 | [bsh.md](bsh.md#type-13-the-history-editions-true-colour-sprites) |
-| A sixth main menu button (Options), two START.BSH sprites more, five TOOLS.BSH sprites more | `GADDATA/*.GAD`, `TOOLS.INC` (the numbers follow) | the menu counts its buttons by BASE.GAD; Options opens Open1602's window "Anzeige" |
+| A sixth main menu button (Options), two START.BSH sprites more, five TOOLS.BSH sprites more | `GADDATA/*.GAD`, `TOOLS.INC` (the numbers follow) | the menu counts its buttons by BASE.GAD; Options opens Open1602's window "Einstellungen" |
 | Colours with a mark: `COL_RED = 249c` | `TOOLS.INC`, `MARKT.GAD` | [cod.md](cod.md#4-syntax-of-a-line-cod_parseline) |
 | Scenarios named by numbers: `Szenes/[[7]].szs` is "Das Atoll", `[[48]]12.szs` "Endlosspiel12" | `Szenes/` | the names come from texts.xml (below) |
 | Placeholders `[[N]]` in texts | Text.cod, the missions of the scenarios (`AUFTRAG4`: `[[8]]`) | replaced by `GameDirectory::expand()` |

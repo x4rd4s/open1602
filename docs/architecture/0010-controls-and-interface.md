@@ -124,7 +124,7 @@ more. Each template is a small text file in the folder "templates" of the user's
 players can pass them on; they are never part of a savegame or a multiplayer game. Buildings the
 game does not know (a mod not loaded) are left out when a template is taken.
 
-**Settings dialogs** (start dialog of a game, window „Anzeige“)
+**Settings dialogs** (start dialog of a game, window „Einstellungen“)
 
 | Key | Function |
 |---|---|
@@ -227,7 +227,7 @@ The original knows 640 x 480, 800 x 600 and 1024 x 768 and three zoom levels. Op
 - **Full screen at the desktop's resolution** (F11, Alt+Enter, or the settings): no change of the
   screen's mode, so switching is quick and works the same on Windows, macOS, X11 and Wayland, and
   HiDPI screens get their full resolution. The original's three resolution buttons in the settings
-  of the side panel became "Fenster", "Vollbild" and "Anzeige …", the window with the rest.
+  of the side panel became "Fenster", "Vollbild" and "Einstellungen …", the window with the rest.
 - **The interface's size**: automatic (as large as the 1024 x 768 design fits, as before), or a
   percentage of the desktop's scale (100 %: the original's pixels on a normal screen, twice that on
   a HiDPI one), never larger than fits. A smaller interface leaves more of the window to the map;

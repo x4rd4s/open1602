@@ -3255,7 +3255,7 @@ void MapViewer::apply_options() {
                 break;
             case OptionsEvent::Kind::Fullscreen: {
                 // The original's three resolutions became window and full screen (and the window
-                // "Anzeige" for the rest).
+                // "Einstellungen" for the rest).
                 DisplaySettings display = m_app_settings.display;
                 display.fullscreen = e.value != 0;
                 apply_display(display);
@@ -4029,7 +4029,7 @@ void MapViewer::apply_menu() {
         return;
     }
     if (const auto display = m_hud->take_display_change()) {
-        apply_display(*display);  // the window "Anzeige" from the History Edition's "Options"
+        apply_display(*display);  // the window "Einstellungen" from the History Edition's "Options"
     }
     if (m_input) {
         m_input->update_key_settings();
