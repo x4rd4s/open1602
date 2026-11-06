@@ -1502,6 +1502,40 @@ TEST_CASE("ai: a computer short of ships buys one a player at peace offers (Rule
     CHECK(!sim::Rules::original().computers_buy_ships);
 }
 
+TEST_CASE("ai: how many cities a computer founds, four as in the original or scaled to the world") {
+    // Scaled (Open1602's default): the islands of more than the smallest size for each player who
+    // plays, at least four, at most 6, 8, 10 or 12 by the difficulty.
+    const auto limit = [](std::uint32_t islands, std::uint8_t difficulty, const sim::Rules& rules) {
+        Game g(false);  // a big island and a rock: one island counts
+        for (std::uint32_t i = 1; i < islands; ++i) {
+            // The size counts by the header's 31 x 31 (961 tiles: more than the smallest size);
+            // the tiles themselves lie in the open sea.
+            sim::IslandMap map(1, 1);
+            sim::WorldIsland island{assets::IslandHeader{}, std::move(map), i, 85};
+            island.header.number = static_cast<std::uint8_t>(g.world.islands().size());
+            island.header.width = 31;
+            island.header.height = 31;
+            REQUIRE(g.world.add_island(std::move(island)).ok());
+        }
+        sim::World::GameSettings settings = g.world.game_settings();
+        settings.difficulty = difficulty;
+        g.world.set_game_settings(settings);
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        return s.computers().city_limit();
+    };
+    const sim::Rules scaled;
+    CHECK(scaled.computer_cities == sim::ComputerCities::Scaled);
+    CHECK(limit(1, 3, scaled) == 4);   // few islands: as many as the original's
+    CHECK(limit(10, 1, scaled) == 5);  // ten islands for two players
+    CHECK(limit(30, 0, scaled) == 6);  // easy: six at most
+    CHECK(limit(30, 1, scaled) == 8);
+    CHECK(limit(30, 2, scaled) == 10);
+    CHECK(limit(30, 3, scaled) == 12);  // hard: twelve
+    CHECK(limit(20, 3, scaled) == 10);
+    CHECK(sim::Rules::original().computer_cities == sim::ComputerCities::Original);
+    CHECK(limit(30, 3, sim::Rules::original()) == 4);
+}
+
 namespace {
 
 /// Stone walls (a family of straight, curve, T and cross) and a gate, numbered on from the Kontor.

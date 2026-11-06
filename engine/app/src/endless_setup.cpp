@@ -462,6 +462,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::ClimateCrops:
         case SetupItem::BigOreVeins:
         case SetupItem::ShipPurchases:
+        case SetupItem::ComputerCities:
         case SetupItem::Map:
         case SetupItem::Starts:
         case SetupItem::Resources:
@@ -552,6 +553,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return r.big_ore_veins ? 1 : 0;
         case SetupItem::ShipPurchases:
             return r.computers_buy_ships ? 1 : 0;
+        case SetupItem::ComputerCities:
+            return r.computer_cities == sim::ComputerCities::Scaled ? 1 : 0;
         case SetupItem::Ships:
             return nearest(kShips, r.max_ships_per_player);
         case SetupItem::Units:
@@ -733,6 +736,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::ShipPurchases:
             r.computers_buy_ships = choice == 1;
+            break;
+        case SetupItem::ComputerCities:
+            r.computer_cities = choice == 1 ? sim::ComputerCities::Scaled : sim::ComputerCities::Original;
             break;
         case SetupItem::Ships:
             r.max_ships_per_player = kShips[choice];
@@ -1138,6 +1144,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::TradeCarts:
         case SetupItem::FertileFields:
         case SetupItem::ShipPurchases:
+        case SetupItem::ComputerCities:
         case SetupItem::Ships:
         case SetupItem::Units:
         case SetupItem::GameSpeed:
@@ -1217,6 +1224,7 @@ std::string_view setup_label_key(SetupItem item) {
         "setup.ships",
         "setup.units",
         "setup.speed",
+        "setup.computer_cities",
         "setup.fertile_fields",
         "setup.droughts",
         "setup.volcanoes",
@@ -1335,6 +1343,8 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return ui::tr(choice == 1 ? "setup.big_ore_veins.all" : "setup.big_ore_veins.original");
         case SetupItem::ShipPurchases:
             return ui::tr(choice == 1 ? "setup.on" : "setup.off");
+        case SetupItem::ComputerCities:
+            return ui::tr(choice == 1 ? "setup.computer_cities.scaled" : "setup.computer_cities.original");
         case SetupItem::Ships:
             return number_text(kShips[choice]);
         case SetupItem::Units:
@@ -1691,6 +1701,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         if (value == "on" || value == "off") {
             r.computers_buy_ships = value == "on";
         }
+    } else if (key == "computer_cities") {
+        if (value == "scaled" || value == "original") {
+            r.computer_cities = value == "scaled" ? sim::ComputerCities::Scaled : sim::ComputerCities::Original;
+        }
     } else if (key == "large_ship_holds") {
         if (value == "merchant" || value == "original") {
             r.large_ship_holds = value == "merchant";
@@ -1849,6 +1863,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("reveal_resources", r.reveal_resources ? "all" : "original");
     line("ai", r.bugs.classic_ai ? "classic" : "open1602");
     line("ship_purchases", r.computers_buy_ships ? "on" : "off");
+    line("computer_cities", r.computer_cities == sim::ComputerCities::Scaled ? "scaled" : "original");
     line("computers", kComputerNames[std::min<std::size_t>(static_cast<std::size_t>(r.computer_players), 2)]);
     line("pirates", kPirateNames[std::min<std::size_t>(static_cast<std::size_t>(r.pirates), 2)]);
     line("pirate_nests", kPirateNestNames[std::min<std::size_t>(static_cast<std::size_t>(r.pirate_nests), 1)]);

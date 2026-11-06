@@ -52,6 +52,10 @@ public:
     /// Land on `island` became free (a city dissolved, a native village gone): the computers'
     /// cities there search their sites anew (Open1602; not with Rules::bugs.classic_ai).
     void land_freed(std::uint16_t island);
+    /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
+    /// or, scaled, the world's islands of more than the smallest size for each player who plays, at
+    /// least four and at most 6, 8, 10 or 12 by the difficulty.
+    [[nodiscard]] std::uint32_t city_limit() const;
     /// `asker` is about to found a city on `island` (with island order 0x4C): the first
     /// computer with a city there answers if it is at peace with him and the island is not a large
     /// one (DiplomacyNotice::Kind::FoundingProtest, FoundingRefused, FoundingTolerated).

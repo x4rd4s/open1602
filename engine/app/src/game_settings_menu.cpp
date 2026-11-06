@@ -71,7 +71,7 @@ constexpr std::int32_t kRight = kLeft + kGroupW + 16;
 // below the economy.
 constexpr Group kGroups[] = {
     {"setup.group.economy", SetupItem::Refund, SetupItem::TradeCarts, kLeft},
-    {"setup.group.limits", SetupItem::Ships, SetupItem::GameSpeed, kLeft},
+    {"setup.group.limits", SetupItem::Ships, SetupItem::ComputerCities, kLeft},
     {"setup.group.nature", SetupItem::FertileFields, SetupItem::FertileFields, kLeft},
     {"setup.group.world", SetupItem::Map, SetupItem::Resources, kRight},
     {"setup.group.opponents", SetupItem::ComputerPlayers, SetupItem::Reveal, kRight},

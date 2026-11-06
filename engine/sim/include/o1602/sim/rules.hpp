@@ -89,6 +89,14 @@ enum class Computers : std::uint8_t {
     On,    ///< always, whatever the game says
 };
 
+/// How many cities a computer player founds. The original's found further cities only for a
+/// plantation crop that no computer's island grows fully, and at most four.
+enum class ComputerCities : std::uint8_t {
+    Original,  ///< at most four, only for a missing crop, as in the original
+    Scaled,    ///< also for room to grow once their cities run well, as many as the world's islands
+               ///< allow for each player and the difficulty (computer_city_limit)
+};
+
 /// How many nests the pirates found. The original has one for the whole world,
 /// which suits its four players; with more players most of them would never meet a pirate.
 enum class PirateNests : std::uint8_t {
@@ -327,6 +335,9 @@ struct Rules {
     /// nor yard). Off with the original's settings.
     bool computers_buy_ships = true;
 
+    /// How many cities a computer founds: four as in the original, or scaled to the world.
+    ComputerCities computer_cities = ComputerCities::Scaled;
+
     /// Open1602: a player gets more than one trade cart on an island (Shift on the city window's
     /// cart button), one for each of its Kontors and markets there; the original allows one per
     /// player and island. Off with the original's settings.
@@ -397,6 +408,7 @@ struct Rules {
         r.computer_players = Computers::Game;
         r.revised_bread = false;
         r.computers_buy_ships = false;
+        r.computer_cities = ComputerCities::Original;
         r.more_carts = false;
         r.wider_hunting = false;
         r.large_ship_holds = false;

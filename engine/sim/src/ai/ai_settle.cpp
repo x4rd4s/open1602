@@ -808,6 +808,41 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
     return best;
 }
 
+std::uint32_t Engine::city_limit() const {
+    if (m_sim.rules().computer_cities == ComputerCities::Original) {
+        return kOriginalCityLimit;
+    }
+    std::uint32_t islands = 0;
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        islands += island_size(static_cast<std::uint16_t>(i)) >= 1 ? 1U : 0U;
+    }
+    std::uint32_t players = 0;
+    for (const Player& pl : m_world.players()) {
+        players += (pl.role == PlayerRole::Human || pl.role == PlayerRole::Computer) && pl.active() ? 1U : 0U;
+    }
+    const std::uint32_t most = kCityLimitMost[std::min<std::size_t>(difficulty(), kCityLimitMost.size() - 1)];
+    return std::clamp(islands / std::max(players, 1U), kOriginalCityLimit, most);
+}
+
+bool Engine::wants_room(const AiPlayer& p) const {
+    // Not in the original: its computers found cities only for crops. Scaled, one whose towns
+    // reached the citizens and earn well settles on, a city at a time with a pause between.
+    if (m_sim.rules().computer_cities != ComputerCities::Scaled || p.pirates || tutorial()) {
+        return false;
+    }
+    if (p.cities == 0 || p.max_stage < stage::kCitizens || p.settle.active) {
+        return false;
+    }
+    if (now_ms() - p.settle.last_ms < kRoomPauseMs || p.cities >= city_limit()) {
+        return false;
+    }
+    if (p.settle.ship != 0) {
+        return true;  // the ship is being loaded: go on whatever the gold does meanwhile
+    }
+    const auto n = static_cast<std::int32_t>(p.cities);
+    return player(p).money >= kRoomMoney && net_income(p) >= kRoomIncome * n;
+}
+
 bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) {
     // A scenario can forbid further cities.
     if (player(p).scenario.has(scenario_flag::kNoColonies)) {
@@ -820,7 +855,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && player(p).money < 15001) {
         return false;
     }
-    if (p.settle.active || n > 3) {
+    if (p.settle.active || n >= city_limit()) {
         return false;
     }
     std::vector<std::uint8_t> wanted{ware::kWineField};
@@ -839,7 +874,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     for (const std::uint8_t crop : wanted) {
         all = all && crop_available(crop);
     }
-    if (all && !force) {
+    if (all && !force && !wants_room(p)) {
         return false;
     }
     const std::uint32_t ship = colony_ship_candidate(p);

@@ -62,6 +62,7 @@ enum RuleKey : std::uint16_t {
     kEventSpeed = 54,       // no longer read: the speed at events became an option of each computer
     kShipHolds = 55,        // 1: the large merchant ship has 8 holds, the warship 6 (Rules::large_ship_holds)
     kRevealResources = 56,  // 1: every island explored by everyone from the start (Rules::reveal_resources)
+    kComputerCities = 57,   // Rules::computer_cities other than Scaled
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -206,6 +207,10 @@ void write_rules(Writer& out, const Rules& r) {
     // The computers' purchases of ships only when off: on is Open1602's way.
     if (!r.computers_buy_ships) {
         values.emplace_back(kNoShipPurchases, 1U);
+    }
+    // The computers' cities only when as in the original: scaled is Open1602's way.
+    if (r.computer_cities != ComputerCities::Scaled) {
+        values.emplace_back(kComputerCities, static_cast<std::uint32_t>(r.computer_cities));
     }
     // One trade cart per island only when so: more is Open1602's way.
     if (!r.more_carts) {
@@ -376,6 +381,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kNoShipPurchases:
                 r.computers_buy_ships = v == 0;
+                break;
+            case kComputerCities:
+                r.computer_cities = v == 0 ? ComputerCities::Original : ComputerCities::Scaled;
                 break;
             case kOneCart:
                 r.more_carts = v == 0;

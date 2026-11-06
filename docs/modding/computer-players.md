@@ -160,6 +160,16 @@ workshops to feed them. On the original's large islands a city at the aristocrat
 earns at least 50 gold a minute more than it pays grows the same way from 1000 tiles of free land,
 once there is no next stage its growing could hold up. The original's computer players (`Rules::bugs.classic_ai`, `--ai classic`) keep the plain numbers.
 
+**More cities.** The original's computers found further cities only for a plantation crop that no
+computer's island grows fully, and never more than four. With the setting "Cities of computers"
+scaled (`computer_cities`, Open1602's default) the limit is the world's islands of more than the
+smallest size for each human and computer player who plays, at least four and at most 6, 8, 10 or 12
+by the difficulty (easy to hard). Beyond the crops, a computer settles a further island for room to
+grow once one of its cities reached the citizens, it has 20 000 gold and earns at least 100 gold a
+minute per city more than it pays, its home city's orders are done, and ten minutes have passed since
+its last settlement (or failed search). Its fleet grows with its cities up to that limit instead of
+four. "4, as in the original" keeps the original's way.
+
 **Following what the inhabitants need.** Open1602's computers fit their economy to their cities:
 
 - *Food first.* A city with less than 20 t of food whose own producers make less than its

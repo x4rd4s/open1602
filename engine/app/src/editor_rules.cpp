@@ -47,6 +47,8 @@ std::string rule_label(SetupItem item) {
             return ui::tr("editor.rules.label.ship_holds");
         case SetupItem::ShipPurchases:
             return ui::tr("editor.rules.label.ship_purchases");
+        case SetupItem::ComputerCities:
+            return ui::tr("editor.rules.label.computer_cities");
         case SetupItem::Reveal:
             return ui::tr("editor.rules.label.reveal");
         default:

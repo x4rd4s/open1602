@@ -793,7 +793,8 @@ void Engine::update_fleet_target(AiPlayer& p) {
     const auto ships = static_cast<std::int32_t>(own_ships(p).size());
     const auto n = static_cast<std::int32_t>(p.cities);
     p.ships_per_city = n > 1 ? std::max(1, ships / n + 1) : ships;
-    std::int32_t t = std::min(n, 4);
+    // At most four as in the original, or as many as the computer may found (Rules::computer_cities).
+    std::int32_t t = std::min(n, static_cast<std::int32_t>(city_limit()));
     if (p.present[kSlotCannons]) {
         std::vector<std::int32_t> cannons(m_world.players().size(), 0);
         for (const Ship& s : m_world.ships()) {

@@ -268,6 +268,13 @@ int cmd_bench(const Args& args) {
         sim::apply_resident_classes(*buildings, original_buildings, world->resident_classes());
         sim::apply_infra_levels(*buildings, original_buildings, world->infra_levels());
         sim::apply_figure_values(*figures, original_figures, world->balance());
+        // A new world runs Open1602's rules; --computer-cities original keeps the computers to the
+        // original's four cities, to compare.
+        if (const auto it = args.options.find("--computer-cities"); it != args.options.end() && !world->saved_rules()) {
+            sim::Rules r;
+            r.computer_cities = it->second == "original" ? sim::ComputerCities::Original : sim::ComputerCities::Scaled;
+            world->set_saved_rules(r);
+        }
         simulation.emplace(*world, *buildings, *figures);
         std::size_t handed_over = 0;
         for (sim::PlayerId p = sim::first_human_player(*world); p != sim::kNoPlayer;
