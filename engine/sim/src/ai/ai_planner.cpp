@@ -762,6 +762,11 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             }
             m_grow_from = 0;
         }
+        // Open1602: the home city, its orders done, settles a further island for room to grow
+        // (Rules::computer_cities). Only from the home city, where the ship loads.
+        if (&c == home_city(p) && wants_room(p) && want_colony(p, 0, false, true)) {
+            return;
+        }
         nothing_to_do(p);
     };
 

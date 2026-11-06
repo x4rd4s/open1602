@@ -142,6 +142,18 @@ inline constexpr std::uint32_t kGrowMax = 8;
 /// large islands) while the computer earns at least this much gold a minute more than it pays.
 inline constexpr std::int32_t kGrowIncome = 50;
 
+/// Cities of a computer (Rules::computer_cities): the original's at most four. Scaled, the world's
+/// islands of more than the smallest size shared among the players who play, at least four and at
+/// most kCityLimitMost by the difficulty (easy .. hard).
+inline constexpr std::uint32_t kOriginalCityLimit = 4;
+inline constexpr std::array<std::uint32_t, 4> kCityLimitMost{6, 8, 10, 12};
+/// Scaled, a computer founds a city for room to grow (wants_room) once one of its cities reached
+/// the citizens, with kRoomMoney gold and kRoomIncome gold a minute per city above what it pays,
+/// kRoomPauseMs after its last settlement event.
+inline constexpr std::int32_t kRoomMoney = 20'000;
+inline constexpr std::int32_t kRoomIncome = 100;
+inline constexpr std::uint64_t kRoomPauseMs = 600'000;
+
 /// Open1602: a city's economy follows what its inhabitants need. Food: with less than kFoodStock
 /// tons in stock, a city whose producers make less than its inhabitants eat and kFoodMargin
 /// sixteenths more (for the next inhabitants) builds food producers first and no new houses.

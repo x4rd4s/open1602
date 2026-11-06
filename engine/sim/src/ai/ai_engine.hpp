@@ -184,6 +184,10 @@ public:
     /// The producers of the packages' goods the computers build (ai_chains.hpp).
     [[nodiscard]] const std::vector<PackageNeed>& package_needs() const noexcept { return m_package_needs; }
 
+    /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
+    /// or the world's islands shared among its players, by the difficulty.
+    [[nodiscard]] std::uint32_t city_limit() const;
+
 private:
     // ---- ai_core.cpp ----
     void step(AiPlayer& p);
@@ -302,6 +306,9 @@ private:
     [[nodiscard]] Ship* settle_ship(AiPlayer& p);
     [[nodiscard]] std::vector<Ship*> own_ships(const AiPlayer& p);
     bool want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food);
+    /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
+    /// island for room to grow, though every crop it asks for grows already.
+    [[nodiscard]] bool wants_room(const AiPlayer& p) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(std::uint8_t crop) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);

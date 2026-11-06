@@ -68,6 +68,7 @@ enum class SetupItem : std::uint8_t {
     Ships,
     Units,
     GameSpeed,
+    ComputerCities,  ///< Rules::computer_cities
     // Nature
     FertileFields,  ///< Rules::fertile_fields
     // Disasters (a page of their own; disaster_item)
