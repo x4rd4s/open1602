@@ -1283,6 +1283,98 @@ TEST_CASE("ai: a computer's Kontor never asks visiting ships for more than its s
     CHECK(city->trade_of(bricks)->limit == city->capacity);
 }
 
+TEST_CASE("ai: a colony moves its Kontor up to the computer's best one when that is of use") {
+    // The computer's city on the big island is made a colony (balance: too little land for more);
+    // its other city on the islet has a Kontor II. The colony's Kontor follows when a good fills its
+    // warehouse or the computer is rich; the original's computers move up only the main city's.
+    struct Case {
+        std::int32_t money = 10'000;
+        bool full = false;     ///< a good fills the colony's warehouse
+        bool other_ii = true;  ///< the other city has a Kontor II (else a Kontor I)
+        bool classic = false;
+    };
+    static constexpr std::uint32_t kKontor2 = 22103;
+    const auto moved_up = [](const Case& k) {
+        Game g;
+        g.buildings = make_buildings(
+            "  @Nummer: 13\n  Id: 22103\n  Kind: 35\n  Gfx: 30\n  Size: 2, 3\n  Strandflg: 1\n  PlaceFlg: 1\n"
+            "  KreuzBase: 12\n  Ausbauflg: 1\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n    Maxlager: 50\n  EndObj\n"
+            "  Objekt: HAUS_BAUKOST\n    Werkzeug: 2\n    Holz: 6\n    Money: 300\n  EndObj\n");
+        sim::Balance balance;
+        balance.ai_colony_below_land = 1'000'000;
+        g.world.set_balance(balance);
+        sim::Rules rules;
+        rules.bugs.classic_ai = k.classic;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s);
+        sim::City* colony = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                colony = g.world.city(c.island, c.index);
+            }
+        }
+        REQUIRE(colony != nullptr);
+        REQUIRE(colony->warehouse_x.has_value());
+        const std::uint16_t colony_island = colony->island;
+        const std::uint8_t colony_index = colony->index;
+        const std::uint32_t kx = *colony->warehouse_x;
+        const std::uint32_t ky = *colony->warehouse_y;
+
+        // The other city: a Kontor on the islet (island 0).
+        const std::uint32_t other_kontor = k.other_ii ? kKontor2 : kKontor;
+        REQUIRE(g.world.island(0).map.place(*g.buildings.by_id(other_kontor), 0, 0, 0, 0, kComputer, 0).ok());
+        sim::City other;
+        other.island = 0;
+        other.index = 0;
+        other.owner = kComputer;
+        other.warehouse_x = 0;
+        other.warehouse_y = 0;
+        g.world.add_city(other);
+
+        // The colony has the materials; the computer has `money`.
+        colony = g.world.city(colony_island, colony_index);
+        const auto& m = g.buildings.materials();
+        constexpr std::uint32_t kTon = sim::kStockUnitsPerTon;
+        for (const std::uint8_t w : {m.tools, m.wood}) {
+            colony->ensure_ware(w);
+            colony->goods[w] = 10 * kTon;
+        }
+        g.world.player(kComputer)->money = k.money;
+        const auto level = [&] {
+            const sim::City* c = g.world.city(colony_island, colony_index);
+            const assets::BuildingType* b = g.buildings.by_sprite(g.world.island(c->island).map.top(kx, ky).sprite);
+            return b != nullptr ? b->id : 0U;
+        };
+        // Held before every tick: the computer's own goods would fill the warehouse too.
+        const auto hold = [&] {
+            sim::City* c = g.world.city(colony_island, colony_index);
+            for (std::uint32_t& stock : c->goods) {
+                stock = std::min(stock, c->capacity / 2);  // room enough for every good
+            }
+            if (k.full) {
+                c->goods[m.wood] = c->capacity;  // the woodcutters fill the warehouse
+            }
+            g.world.player(kComputer)->money = k.money;
+        };
+        hold();
+        return run_until(s, 180'000, [&] {
+            hold();
+            return level() == kKontor2;
+        });
+    };
+    const auto with = [](auto&& change) {
+        Case k;
+        change(k);
+        return k;
+    };
+    CHECK(moved_up(Case{}));                                                 // a rich computer
+    CHECK(!moved_up(with([](Case& k) { k.money = 5'000; })));                // not so rich, room enough
+    CHECK(moved_up(with([](Case& k) { k.money = 5'000, k.full = true; })));  // not so rich, the warehouse full
+    CHECK(!moved_up(with([](Case& k) { k.other_ii = false; })));             // no better Kontor to follow
+    CHECK(!moved_up(with([](Case& k) { k.classic = true; })));               // the original's computers
+}
+
 TEST_CASE("ai: a farm leaves the trees of the city's woodcutter standing (S-122)") {
     // A woodcutter in the wood west of the Kontor and a tobacco plantation next to it, both on the
     // road the computer lays from its Kontor. The original plants the tobacco over the woodcutter's

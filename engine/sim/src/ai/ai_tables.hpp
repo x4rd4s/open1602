@@ -163,6 +163,12 @@ inline constexpr std::uint32_t kFoodMargin = 2;
 /// order's producers grow with the land only while the city has less than kGrowStock tons of it.
 inline constexpr std::uint32_t kFullStock = 12;
 inline constexpr std::uint32_t kGrowStock = 20;
+/// Open1602: a colony moves its Kontor up to the level of the computer's best Kontor once a good
+/// fills kFullStock sixteenths of its room, or once the computer has kColonyKontorMoney gold, and
+/// keeps kColonyKontorReserve gold after paying for it. The original moves up only the Kontor of
+/// its main city: its colonies keep the small storage and the short trade list of the first one.
+inline constexpr std::int32_t kColonyKontorMoney = 8000;
+inline constexpr std::int32_t kColonyKontorReserve = 2000;
 
 /// Whether a city with `stock` of food (1/32 t) whose producers make `supply` makes too little for
 /// inhabitants who eat `demand` (both 1/32 t per minute).
