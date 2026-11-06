@@ -224,6 +224,15 @@ TEST_CASE("ai tables: a city short of food is one whose producers make less than
     CHECK(!short_of_food(0, 0, 0));  // nobody to feed
 }
 
+TEST_CASE("ai tables: a city with no way to more food builds houses while its stock feeds them a while") {
+    constexpr std::uint32_t kT = o1602::assets::kStockUnitsPerTon;
+    // A town just founded: 15 t from the ship, 40 pioneers eating 0.52 t a minute.
+    CHECK(food_lasts(15 * kT, 16));
+    CHECK(!food_lasts(15 * kT, 33));
+    CHECK(food_lasts(0, 0));  // nobody to feed
+    CHECK(!food_lasts(0, 1));
+}
+
 TEST_CASE("ai tables: a good that fills the warehouse gets no further producers") {
     constexpr std::uint32_t kT = o1602::assets::kStockUnitsPerTon;
     CHECK(full_stock(180 * kT, 180 * kT));

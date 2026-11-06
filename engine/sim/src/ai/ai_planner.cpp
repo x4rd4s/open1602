@@ -765,8 +765,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         nothing_to_do(p);
     };
 
-    // Open1602: a city that cannot feed its inhabitants builds food producers first (a founded city
-    // and the pioneers have them in their orders).
+    // Open1602: a city that cannot feed its inhabitants builds food producers first. A founded city
+    // and the pioneers follow their orders (the fisher before the houses); need_houses asks for
+    // food there.
     if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
         return;
     }
@@ -1316,6 +1317,9 @@ bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
             return;
         }
         Way w{end, end, made_per_minute(c, *b), upkeep(end)};
+        if (w.food == 0) {
+            return;  // the city's own buildings of its kind make nothing here (a fisher by a sea without fish)
+        }
         if (links.size() != 0 && !fed(end)) {
             // A whole new chain; built from the first link whose own raw material is there.
             for (const auto& [slot, per] : links) {
@@ -1513,8 +1517,30 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         return false;
     }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
+    // A city that has no way to more food (no site for a fisher, its farms not yet open to it, as
+    // in a town just founded) builds its houses all the same while its stock lasts, instead of
+    // standing still until the computer gives it up.
     if (!classic() && food_short(*c)) {
-        return false;
+        if (more_food(p, *c, *r)) {
+            return true;
+        }
+        // Counted with every house full, the new one too: houses fill up after they are built.
+        const auto& classes = m_buildings.resident_classes();
+        const auto room = [&](std::uint8_t k) -> std::uint64_t {
+            return k < classes.size() ? classes[k].max_per_house : 0;
+        };
+        std::uint64_t full = room(0);
+        for (const House& h : m_world.houses()) {
+            if (h.island == c->island && h.city == c->index) {
+                full += room(h.resident_class);
+            }
+        }
+        const std::uint64_t people = std::max<std::uint64_t>(population(*c), full);
+        const auto eat = static_cast<std::uint32_t>(
+            std::min<std::uint64_t>((people * m_buildings.food_need() * 6) >> 8, 0xFFFFFFFFU));
+        if (!food_lasts(c->stock(m_buildings.food_ware()), eat)) {
+            return false;
+        }
     }
     if (plan_building(p, kHouses, *b, kSlotHouses, false)) {
         reserve(p, *b);
