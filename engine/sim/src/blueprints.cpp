@@ -95,12 +95,22 @@ std::size_t build(World& world, const assets::BuildingTable& buildings, PlayerId
         }
         by_city[static_cast<std::size_t>(at - cities.begin())].push_back(b);
     }
+    // Roads and walls first, then fields and trees (gold only), then the rest, each in placement order.
+    const auto priority = [&](const Blueprint& b) {
+        const assets::BuildingType* t = buildings.by_id(b.building);
+        return t != nullptr ? build_priority(*t) : 2;
+    };
+    for (std::vector<Blueprint>& group : by_city) {
+        std::ranges::stable_sort(group, {}, priority);
+    }
     std::size_t built = 0;
     for (const std::vector<Blueprint>& group : by_city) {
         BuildOrder order;
         order.player = player;
         order.island = island;
         order.orient_to_road = false;
+        // What the means do not reach waits as a blueprint; what comes after it is still built.
+        order.skip_unpaid = true;
         for (const Blueprint& b : group) {
             order.items.push_back(BuildItem{b.building, b.x, b.y, b.rotation, b.anim_phase});
         }

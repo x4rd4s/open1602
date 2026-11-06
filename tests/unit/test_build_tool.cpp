@@ -385,7 +385,8 @@ TEST_CASE("build tool: the copy tool takes a piece of the own city and builds it
     REQUIRE(order.has_value());
     REQUIRE(order->items.size() == 6);
     CHECK(!order->orient_to_road);
-    CHECK(order->unpaid_as_blueprints);  // what cannot be paid is planned instead
+    CHECK(order->skip_unpaid);  // what cannot be paid is skipped and planned instead
+    CHECK(order->unpaid_as_blueprints);
     CHECK(order->items[4].building == kFarm);
     CHECK(order->items[4].x == 10);
     CHECK(order->items[4].y == 1);

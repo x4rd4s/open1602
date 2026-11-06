@@ -190,6 +190,7 @@ std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, s
         order.player = player;
         order.island = spot.island;
         order.orient_to_road = false;
+        order.skip_unpaid = true;
         order.unpaid_as_blueprints = true;
         const std::int32_t ox = spot.x - (m_layout->width - 1) / 2;
         const std::int32_t oy = spot.y - (m_layout->height - 1) / 2;
@@ -454,13 +455,7 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
             if (order == nullptr) {
                 continue;
             }
-            int group = 2;
-            if (order->prod_kind == sim::prod::kGrowing) {
-                group = 1;
-            } else if (order->kind == sim::kind::kRoad || order->kind == sim::kind::kWall) {
-                group = 0;
-            }
-            found.push_back(Found{order, *at, group});
+            found.push_back(Found{order, *at, sim::build_priority(*order)});
         }
     }
     // Fields and trees only for a building of the piece that harvests them.

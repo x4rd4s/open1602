@@ -1283,6 +1283,16 @@ TEST_CASE("blueprints: built in their order as the means reach; what is built ov
     REQUIRE(island.build({{kRoad, 10, 14, 0, 0}}).placed == 1);
     sim::drop_covered_blueprints(island.world, island.buildings, std::span(island.events).subspan(first));
     CHECK(island.world.blueprints().empty());
+    // One the means do not reach waits, and later ones are still built; roads first.
+    place.items = {{kMarket, 11, 11, 0, 0}, {kHouse, 8, 11, 0, 0}, {kRoad, 12, 14, 0, 0}};
+    REQUIRE(sim::execute_blueprints(island.world, island.buildings, place, island.names, &island.events) == 3);
+    island.world.player(0)->money = 16;  // the road (5) and the house (10), not the market (50)
+    CHECK(sim::execute_blueprints(island.world, island.buildings, build, island.names, &island.events) == 2);
+    CHECK(island.at(12, 14)->id != kGround);
+    CHECK(island.at(8, 11)->id == kHouse);
+    CHECK(island.world.players()[0].money == 1);
+    REQUIRE(island.world.blueprints().size() == 1);
+    CHECK(island.world.blueprints()[0].building == kMarket);
 }
 
 TEST_CASE("blueprints: a copied piece builds what the means reach and plans the rest as blueprints") {
@@ -1302,6 +1312,7 @@ TEST_CASE("blueprints: a copied piece builds what the means reach and plans the 
     CHECK(plain.placed == 1);
     CHECK(plain.items[2].refusal == sim::BuildRefusal::Money);
     // A copied piece goes on after it, and the house becomes a blueprint.
+    order.skip_unpaid = true;
     order.unpaid_as_blueprints = true;
     const sim::BuildPlan copied = sim::plan_build(island.world, island.buildings, order);
     CHECK(copied.placed == 2);

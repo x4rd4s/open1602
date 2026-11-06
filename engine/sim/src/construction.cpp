@@ -1062,7 +1062,7 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
         BuildBill next = bill;
         next.add(ordered_cost(buildings, *type));
         plan.shown.add(ordered_cost(buildings, *type));
-        if (order.unpaid_as_blueprints) {
+        if (order.skip_unpaid) {
             budget = BuildRefusal::None;
         }
         if (budget == BuildRefusal::None) {
@@ -1109,6 +1109,13 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
 }
 
 }  // namespace
+
+int build_priority(const assets::BuildingType& type) noexcept {
+    if (type.kind == kind::kRoad || type.kind == kind::kWall || type.kind == kind::kWallBeach) {
+        return 0;
+    }
+    return type.prod_kind == prod::kGrowing ? 1 : 2;
+}
 
 void plan_build(const World& world, const assets::BuildingTable& buildings, const BuildOrder& order, BuildPlan& plan) {
     plan_order(world, buildings, order, plan, PlanOptions{});
