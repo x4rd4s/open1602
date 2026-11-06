@@ -435,6 +435,8 @@ private:
     [[nodiscard]] bool ship_at_city(const Ship& s, const City& c) const;
     bool ship_idle(AiPlayer& p, const Ship& s);
     void send_to_city(AiPlayer& p, Ship& s, const City& c);
+    /// Stops the ship where it is, its route and job ended.
+    void stop_ship(AiPlayer& p, Ship& s);
     void arm_one(City& c, Ship& s);
     bool yard_service(AiPlayer& p);
     Ship* pick_logistics_ship(AiPlayer& p, bool healthy);

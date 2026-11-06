@@ -562,3 +562,85 @@ TEST_CASE("ai arena: a computer without ships or yard buys the cheapest ship on 
     CHECK(a.world.ship(dear_id)->owner == kSecond);
     CHECK(a.world.player(kSecond)->money == money + 500);
 }
+
+TEST_CASE("ai arena: damaged warships wait for the yard where they are, not by sailing home and out again") {
+    // While the yard repairs one ship, a patrol below half its health goes off duty. Sent home, it
+    // got the next patrol at once and was sent home again, so that in a long war the damaged ships
+    // crowded the home Kontor. Now it stops where it is and no damaged ship gets a patrol.
+    Arena a(true);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    for (int minute = 0; minute < 10 && a.cities_of(kFirst) == 0; ++minute) {
+        run(s, 60'000);
+    }
+    REQUIRE(a.cities_of(kFirst) == 1);
+    run(s, 60'000);
+    std::uint16_t island = 0;
+    std::uint8_t index = 0;
+    for (const sim::City& c : a.world.cities()) {
+        if (c.owner == kFirst) {
+            island = c.island;
+            index = c.index;
+        }
+    }
+    bool weaving = false;
+    for (std::int32_t y = 0; y < 50 && !weaving; ++y) {
+        for (std::int32_t x = 0; x < 50 && !weaving; ++x) {
+            sim::BuildOrder order;
+            order.player = kFirst;
+            order.island = island;
+            order.items.push_back(sim::BuildItem{kWebstube, x, y, 0, 0});
+            const sim::BuildPlan plan = sim::plan_build(a.world, a.buildings, order);
+            if (plan.city == index && plan.items.front().ok()) {
+                weaving = sim::execute_build(a.world, a.buildings, order, {}, nullptr).items.front().ok();
+            }
+        }
+    }
+    REQUIRE(weaving);
+    a.world.erase_ships([](const sim::Ship& ship) { return ship.owner == kFirst; });
+    bool yard = false;
+    for (int minute = 0; minute < 15 && !yard; ++minute) {
+        run(s, 60'000);
+        yard = std::any_of(a.world.cost_buildings().begin(), a.world.cost_buildings().end(),
+                           [&](const sim::CostBuilding& b) {
+                               return b.kind == sim::CostBuilding::Kind::Shipyard && b.island == island;
+                           });
+    }
+    REQUIRE(yard);
+    // Ships of its own, armed, far out at sea: one undamaged, four at 40 % health.
+    a.world.erase_ships([](const sim::Ship& ship) { return ship.owner == kFirst; });
+    const std::uint32_t max_health = a.figures.get(kShipFigure)->ship.max_health;
+    std::vector<std::uint32_t> damaged;
+    for (std::uint32_t k = 0; k < 5; ++k) {
+        sim::Ship ship = sim::make_ship("Ship", 120 + 4 * k, 70, kShipFigure, kFirst, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        ship.health = k == 0 ? max_health : max_health * 2 / 5;
+        a.world.add_ship(ship);
+        if (k != 0) {
+            damaged.push_back(a.world.ships().back().id);
+        }
+    }
+    // Ten minutes: the yard calls the damaged ships one after another; none patrols, and none
+    // sails to the home Kontor.
+    const sim::Target home = sim::Target::city_of(island, index);
+    std::set<std::uint32_t> patrolled;
+    std::set<std::uint32_t> sent_home;
+    for (int k = 0; k < 60; ++k) {
+        run(s, 10'000);
+        for (const std::uint32_t id : damaged) {
+            const sim::Ship* ship = a.world.ship(id);
+            REQUIRE(ship != nullptr);
+            if (ship->health * 2 >= max_health) {
+                continue;  // repaired far enough to take part again
+            }
+            if (ship->route.active) {
+                patrolled.insert(id);
+            }
+            if (ship->order == home) {
+                sent_home.insert(id);
+            }
+        }
+    }
+    CHECK(patrolled.empty());
+    CHECK(sent_home.empty());
+}
