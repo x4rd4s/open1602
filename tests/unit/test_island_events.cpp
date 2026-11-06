@@ -144,8 +144,26 @@ TEST_CASE("drought: ripe fields wither where they bear no more, reserved ones ar
         }
     }
     CHECK(f.at(0, 0)->id == kRipe);
-    // Withered fields have no growth entry.
+    // As in the original every withered field gets a growth entry: it withers stage by stage (the
+    // stage is its picture), then stays withered at its last picture without an entry.
+    const std::size_t withered = f.count(kWithered);
+    CHECK(f.world.growth().entries.size() == withered);
+    for (const auto& e : f.world.growth().entries) {
+        CHECK(e.stage == 0);
+    }
+    const std::uint32_t period = sim::growth_period_ms(f.buildings.by_id(kWithered)->growth_class);
+    for (int stage = 0; stage < 5; ++stage) {
+        CHECK(sim::advance_growth(f.world, f.buildings, period) == 0);
+    }
     CHECK(f.world.growth().entries.empty());
+    CHECK(f.count(kWithered) == withered);
+    for (std::uint32_t y = 0; y < 8; ++y) {
+        for (std::uint32_t x = 0; x < 32; ++x) {
+            if (f.at(x, y)->id == kWithered) {
+                CHECK(f.world.islands()[0].map.top(x, y).anim_phase == 4);
+            }
+        }
+    }
 }
 
 TEST_CASE("drought: when it ends the strength halves and the fields grow again") {
@@ -200,7 +218,7 @@ TEST_CASE("drought: a harvest in the drought withers what does not bear, trees g
     }
     CHECK(withered == 16);
     CHECK(growing == 16);
-    CHECK(f.world.growth().entries.size() == 16);
+    CHECK(f.world.growth().entries.size() == 32);  // the withered fields wither through their stages
 
     Fields trees(kTreeRipe);
     sim::start_drought(trees.world, 0, sim::kDroughtStrength, 600'000, nullptr);

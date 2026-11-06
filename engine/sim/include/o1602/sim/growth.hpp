@@ -7,7 +7,8 @@
 // a growth entry; 32 global clocks, one per growth class, tick every 40 s + 7 s * class, and each
 // tick moves the entries of that class one stage on (the tile's animation phase shows the stage).
 // After AnimAnz stages the tile becomes its ripe record. Harvesting turns it back into the
-// growing record with a new entry.
+// growing record with a new entry. A field that withers in a drought gets an entry as well: it
+// withers through its stages (each a picture of its own) and stays withered at the last one.
 #pragma once
 
 #include <cstdint>
