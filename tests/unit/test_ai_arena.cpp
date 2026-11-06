@@ -174,14 +174,18 @@ assets::FigureTable make_figures() {
 /// 47..49). Players 0 and 1 are computers, each with a ship east of its island; 2 the trader, 3 the
 /// natives. With `yard`, the buildings of make_buildings(true) and on each island a lake (columns
 /// 38..40, rows 18..32) behind the coast, closer to the city's roads than the sea, with a beach on
-/// its east shore (column 41).
+/// its east shore (column 41). Without `fish`, the sea has no fish for a fishing hut; fish_from:
+/// the first row with fish.
 struct Arena {
     bool yard = false;
+    bool fish = true;
+    std::int32_t fish_from = 0;
     assets::BuildingTable buildings;
     assets::FigureTable figures = make_figures();
     sim::World world{150, 80};
 
-    explicit Arena(bool with_yard = false) : yard(with_yard), buildings(make_buildings(with_yard)) {
+    explicit Arena(bool with_yard = false, bool with_fish = true, std::int32_t fish_from_row = 0)
+        : yard(with_yard), fish(with_fish), fish_from(fish_from_row), buildings(make_buildings(with_yard)) {
         add_island(10, 15);
         add_island(90, 15);
         std::vector<sim::Player> players(4);
@@ -207,7 +211,7 @@ struct Arena {
                 } else if (lake_row && x == 41) {
                     id = kBeach;
                 } else if (x > 46) {
-                    id = x >= 48 && y % 2 == 0 ? kShoal : kSea;
+                    id = fish && y >= fish_from && x >= 48 && y % 2 == 0 ? kShoal : kSea;
                 } else if (x == 46) {
                     id = kBeach;
                 } else if (x >= 28 && x <= 37) {
@@ -313,6 +317,45 @@ TEST_CASE("ai arena: two computers found their cities and build them up over hal
             }
             std::printf("\n");
         }
+    }
+}
+
+TEST_CASE("ai arena: a new city without a site for its fishing hut builds its houses while its food lasts") {
+    // No fish in the sea and no other food producer in the tables: the city's own producers never
+    // feed it. It builds houses on what its Kontor holds instead of waiting for food with three
+    // houses until the computer gives it up, but no more than that stock feeds with every house full.
+    Arena a(false, false);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    run(s, 10 * 60'000);
+    for (const sim::PlayerId p : {kFirst, kSecond}) {
+        CHECK(a.cities_of(p) == 1);
+        auto built = a.built(p);
+        CHECK(built[kFisher] == 0);
+        CHECK(a.houses(p) >= 8);
+        CHECK(a.houses(p) <= 60);
+        CHECK(a.inhabitants(p) >= 16);
+        if (a.houses(p) < 8 || a.houses(p) > 60) {
+            std::printf("  player %u: %zu houses, %llu inhabitants\n", static_cast<unsigned>(p), a.houses(p),
+                        static_cast<unsigned long long>(a.inhabitants(p)));
+        }
+    }
+}
+
+TEST_CASE("ai arena: a computer sets its Kontor where a fishing hut finds fish") {
+    // Fish only off the southern part of the coast (rows 24 and on, enough for a hut from row 30);
+    // the computers' Kontor otherwise stands further north (row 16), out of the hut's reach.
+    Arena a(false, true, 24);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    run(s, 10 * 60'000);
+    for (const sim::PlayerId p : {kFirst, kSecond}) {
+        REQUIRE(a.cities_of(p) == 1);
+        for (const sim::City& c : a.world.cities()) {
+            if (c.owner == p) {
+                REQUIRE(c.warehouse_y.has_value());
+                CHECK(*c.warehouse_y >= 22);
+            }
+        }
+        CHECK(a.built(p)[kFisher] >= 1);
     }
 }
 
