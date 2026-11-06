@@ -522,8 +522,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
     }
     if (minutes == 60) {
         // The computers' state version 4 (a search's target); the revised bread chain by default;
-        // a woodcutter where trees are few when no place has many.
-        test::check_golden("arena after an hour", s.state_hash(), 0xcbaef442b933ad81ULL);
+        // a woodcutter where trees are few when no place has many; public buildings amid the houses,
+        // with a little chance.
+        test::check_golden("arena after an hour", s.state_hash(), 0x61d68e5c7d659fb2ULL);
     }
 }
 

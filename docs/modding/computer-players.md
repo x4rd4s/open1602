@@ -186,6 +186,18 @@ once there is no next stage its growing could hold up. The original's computer p
   goods for the other, which on large islands far apart left the first city short of food while its
   land lay empty. A colony's pastures are no longer built for a home city with that much land.
 
+**Towns.** Open1602's computers also lay out their towns with more care:
+
+- *Fields at the edge of the town.* A farm, plantation, pasture or grain farm counts against its site
+  the houses and public buildings within five tiles of it and a market within seven, so that fields
+  go to the edge of the markets' reach and the middle stays for houses. Where no other site is left,
+  the farm still goes into the town.
+- *Public buildings amid the houses.* Of two sites for a chapel, tavern or another public building
+  that serve as many houses without it, the one with more houses in its reach wins, so that the
+  building stands in the middle of the town, where it also serves the houses built later; and a
+  small random part makes towns differ from one another. In test games of three hours the towns
+  reached the next stage sooner and had about a tenth more inhabitants.
+
 The original's computer players keep the original's ways.
 
 ## The producers
