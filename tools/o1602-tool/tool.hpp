@@ -29,7 +29,8 @@ namespace fs = std::filesystem;
 inline constexpr std::string_view kFlags[] = {
     "--buildings",       "--json",    "--no-template", "--original-data", "--original-limits",  "--original-flags",
     "--original-sheets", "--owners",  "--production",  "--sheet",         "--together",         "--via-own",
-    "--summary",         "--walkers", "--wall",        "--wares",         "--without-original",
+    "--summary",         "--towns",   "--town-maps",   "--walkers",       "--wall",             "--wares",
+    "--without-original",
 };
 /// The options whose value is a whole number.
 inline constexpr std::string_view kNumbers[] = {

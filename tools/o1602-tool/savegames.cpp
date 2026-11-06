@@ -212,6 +212,11 @@ void player_summary(const sim::World& world, const assets::BuildingTable& buildi
 void town_summary(const sim::World& world, const assets::BuildingTable& buildings, bool map_out) {
     namespace kind = assets::kind;
     namespace prod = assets::prod;
+    // A field of a farm: a crop growing or ripe, not a tree, meadow or bare ground.
+    const auto crop = [](const assets::BuildingType& b) {
+        return (b.prod_kind == prod::kRipe || b.prod_kind == prod::kGrowing) && b.ware != 0 &&
+               b.ware != assets::ware::kTree && b.ware != assets::ware::kGrass && b.kind != kind::kRock;
+    };
     for (const sim::City& c : world.cities()) {
         const sim::Player* owner = world.player(c.owner);
         if (owner == nullptr || (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
@@ -290,9 +295,7 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
                 } else if (b->kind == kind::kGround || (b->kind == kind::kForest && b->ware != assets::ware::kTree)) {
                     ++free;
                 }
-                const bool field = ((b->prod_kind == prod::kRipe || b->prod_kind == prod::kGrowing) &&
-                                    b->ware != assets::ware::kTree && b->kind != kind::kRock) ||
-                                   b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture;
+                const bool field = crop(*b) || b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture;
                 if (field) {
                     ++fields;
                     fields_in_town +=
@@ -337,8 +340,7 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
                         ch = 'P';
                     } else if (b->prod_kind == prod::kFarm || b->prod_kind == prod::kPasture) {
                         ch = 'F';
-                    } else if ((b->prod_kind == prod::kRipe || b->prod_kind == prod::kGrowing) &&
-                               b->ware != assets::ware::kTree) {
+                    } else if (crop(*b)) {
                         ch = 'f';
                     } else if (b->ware == assets::ware::kTree) {
                         ch = 'T';
