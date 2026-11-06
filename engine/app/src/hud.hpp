@@ -358,6 +358,13 @@ public:
         }
     }
     [[nodiscard]] bool goods_open() const noexcept { return m_goods_open; }
+    /// The game lost the focus: a button held now may be let go elsewhere, so the window
+    /// "Warenbilanz" forgets it (else it would keep the other button from clicking).
+    void release_mouse() noexcept {
+        if (m_goods) {
+            m_goods->cancel_press();
+        }
+    }
     /// Escape in the window "Warenbilanz": a good's page back to the table, else the window closes.
     void goods_back() noexcept {
         if (m_goods_open && !m_goods->back()) {
