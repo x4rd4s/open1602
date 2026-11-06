@@ -12,9 +12,10 @@ namespace o1602::sim::ai {
 
 namespace {
 
-constexpr std::uint32_t kHealthy = 0x5F;               // health * 128 / max above this: at least 75 %
-constexpr std::uint16_t kSpareShipFactor = 0x40;       // a spare ship for half its price
-constexpr std::uint16_t kFullPriceFactor = 128;        // what the yard asks
+constexpr std::uint32_t kHealthy = 0x5F;          // health * 128 / max above this: at least 75 %
+constexpr std::uint32_t kWornPatrol = 64;         // a patrol below half its health goes off duty while the yard repairs
+constexpr std::uint16_t kSpareShipFactor = 0x40;  // a spare ship for half its price
+constexpr std::uint16_t kFullPriceFactor = 128;   // what the yard asks
 constexpr std::int32_t kFirstShipPriceLimit = 100000;  // offers from this price on are not looked at
 
 bool carries_goods(const Ship& s) {
@@ -100,6 +101,17 @@ void Engine::send_to_city(AiPlayer& p, Ship& s, const City& c) {
     order.ship = s.id;
     order.target = Target::city_of(c.island, c.index);
     execute(order);
+    ShipNote& n = note(p, s.id);
+    n.patrol = false;
+    n.mission = 0;
+    n.counter = 0;
+}
+
+void Engine::stop_ship(AiPlayer& p, Ship& s) {
+    ShipOrder stop;
+    stop.player = p.player;
+    stop.ship = s.id;
+    execute(stop);
     ShipNote& n = note(p, s.id);
     n.patrol = false;
     n.mission = 0;
@@ -305,8 +317,14 @@ Ship* Engine::pick_patrol_ship(AiPlayer& p, bool healthy) {
     std::int32_t best_cannons = -1;
     for (Ship* s : ships) {
         ShipNote& n = note(p, s->id);
-        if (n.patrol && (n.counter == 0 || (healthy && health128(*s) < 64))) {
-            if (home != nullptr) {
+        const bool worn = healthy && health128(*s) < kWornPatrol;
+        if (n.patrol && (n.counter == 0 || worn)) {
+            if (n.counter != 0 && !classic() && (home == nullptr || !carries_goods_for(*s, *home))) {
+                // Open1602: a damaged patrol with nothing for home stops where it is and waits there
+                // until the yard calls it. Sent home, it came straight back out on the next patrol and
+                // was sent home again, so that the damaged ships of a long war crowded the home Kontor.
+                stop_ship(p, *s);
+            } else if (home != nullptr) {
                 send_to_city(p, *s, *home);
             }
             continue;
@@ -317,6 +335,9 @@ Ship* Engine::pick_patrol_ship(AiPlayer& p, bool healthy) {
         if (n.cooldown > 0) {
             --n.cooldown;
             continue;
+        }
+        if (worn && !classic()) {
+            continue;  // Open1602: it would be called back at the next look; it waits for the yard
         }
         if (ships.size() == 1 && (home == nullptr ? carries_goods(*s) : carries_goods_for(*s, *home))) {
             continue;
