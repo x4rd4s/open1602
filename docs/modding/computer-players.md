@@ -179,7 +179,8 @@ once there is no next stage its growing could hold up. The original's computer p
 - *A fisher from the start.* On an island with fish, a computer sets its Kontor where a fishing hut
   within 6 tiles finds more than 13 shoals and no other hut; where no beach has that much fish, any
   site will do. When no road's end leads to fish (a town's first roads run inland), the fishing hut
-  gets a road of up to 12 tiles from the city's roads or Kontor to the nearest beach with fish.
+  gets a road of up to 12 tiles from the city's roads or Kontor to the nearest beach with fish
+  (the city's first hut only; later ones wait for the roads).
 - *Workshops by their raw material.* A workshop whose producer waits for another (`after`, such as
   a weaving hut for sheep, or a mill for grain) is built only as often as that other's producers keep
   busy: one for every two (rounded up; two stonemasons for each quarry), and one more while the city

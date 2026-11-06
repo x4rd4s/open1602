@@ -677,9 +677,12 @@ void Engine::task_fisher(AiPlayer& p) {
         return;
     }
     // Open1602: no road's end leads to fish (a town's first roads run inland): a road from the
-    // city's roads or Kontor to the nearest beach with fish.
+    // city's roads or Kontor to the nearest beach with fish, for the city's first fishing hut. Later
+    // ones wait for the roads, so that the city spends on better food than weak huts.
+    const CityPlan* r = current_plan(p);
+    const bool first = r != nullptr && r->slots[kSlotFisher].count == 0;
     std::vector<BuildItem> path;
-    if (p.search.best <= 0 && (classic() || p.pirates || !fisher_path(p, *b, path))) {
+    if (p.search.best <= 0 && (classic() || p.pirates || !first || !fisher_path(p, *b, path))) {
         slot_fail(p, kSlotFisher);
         return;
     }
