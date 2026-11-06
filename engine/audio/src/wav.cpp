@@ -51,7 +51,7 @@ core::Result<Pcm> decode_pcm(const Format& f, std::span<const std::uint8_t> data
     return pcm;
 }
 
-// Step and index tables of IMA ADPCM (Intel/DVI), as Maxsound.dll keeps them.
+// Step and index tables of IMA ADPCM (Intel/DVI), the standard ones.
 constexpr std::array<std::int32_t, 89> kStep = {
     7,    8,     9,     10,    11,    12,    13,    14,    16,    17,    19,    21,    23,    25,   28,
     31,   34,    37,    41,    45,    50,    55,    60,    66,    73,    80,    88,    97,    107,  118,
