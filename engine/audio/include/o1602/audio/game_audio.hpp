@@ -89,7 +89,7 @@ struct AudioSettings {
 /// Samples, Random, Volume (the third value is the mission progress), Song, Speach, Video.
 [[nodiscard]] AudioSettings parse_audio_settings(std::string_view game_dat);
 
-/// Effects at places on the screen (Maxsound.dll's MaxwavePlayOnce): the place is the offset from
+/// Effects at places on the screen, as the original plays them: the place is the offset from
 /// the middle of the view, -1 .. 1 across its width and height. Outside the view a sound is not
 /// played (the original culls by the whole screen around the view's middle, U-015); inside it
 /// pans with x and softens towards the corners (DirectSound3D with the listener half a view behind

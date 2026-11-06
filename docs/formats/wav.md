@@ -29,6 +29,3 @@ value   = clamp(value + diff, −32768, 32767)          (16 bit)
 Unlike the IMA reference code, the rounding term `step >> 3` is missing. With it, the
 theme clips thousands of times and drifts away; without it (as here) it stays clean (checked on the whole "ANNO1602
 Theme", 110 s). Length = data bytes / 22050 s.
-
-`Maxsound.dll` unpacks into a ring buffer during playback (`adpcm_decoder 0x28101220`, tables at
-`0x28105020`/`0x28105060`).
