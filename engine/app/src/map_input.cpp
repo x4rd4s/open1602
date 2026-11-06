@@ -499,7 +499,7 @@ void MapInput::handle_key(int key, int scancode, std::uint16_t mod) {
         return;
     }
     if (m_hud && m_hud->menu_active() && !m_hud->asking() && !m_hud->helping()) {
-        // The menu knows Escape (the window "Anzeige" closed, or a screen back) and the program's
+        // The menu knows Escape (the window "Einstellungen" closed, or a screen back) and the program's
         // keys, nothing of the game.
         if (key == SDLK_ESCAPE) {
             (void)m_hud->back();
@@ -1174,7 +1174,7 @@ void MapInput::handle_event(const SDL_Event& event) {
                 m_left_down = true;
             }
             if (m_hud && m_hud->modal()) {
-                // The question (or the key overview) takes every click; the window "Anzeige" also the
+                // The question (or the key overview) takes every click; the window "Einstellungen" also the
                 // right button (the previous value).
                 if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT) {
                     (void)m_hud->mouse(static_cast<std::int32_t>(event.button.x),
@@ -1265,7 +1265,7 @@ void MapInput::handle_event(const SDL_Event& event) {
                 }
             }
             if (event.button.button == SDL_BUTTON_RIGHT && m_hud) {
-                // Ends a right click on a setting of the menus or the window "Anzeige".
+                // Ends a right click on a setting of the menus or the window "Einstellungen".
                 (void)m_hud->mouse(static_cast<std::int32_t>(event.button.x), static_cast<std::int32_t>(event.button.y),
                                    false, ui::MouseButton::Right);
             }

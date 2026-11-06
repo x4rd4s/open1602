@@ -147,7 +147,7 @@ public:
     /// Applies the key settings file (--keys, else `default_file`) over the defaults, or writes
     /// `default_file` with them.
     void load_key_settings(const std::filesystem::path& default_file);
-    /// The window of the keys (keys_menu.hpp): opens it when the window "Anzeige" asks for it, and
+    /// The window of the keys (keys_menu.hpp): opens it when the window "Einstellungen" asks for it, and
     /// applies and keeps what it changed. Called once a frame.
     void update_key_settings();
 

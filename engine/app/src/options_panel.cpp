@@ -20,7 +20,7 @@ constexpr std::int32_t kPageAnno = 47013;
 constexpr std::int32_t kMonitor = 47014;
 constexpr std::int32_t kMission = 47015;
 constexpr std::int32_t kHistoryGameOptions = 47016;  ///< the History Edition's own settings screen
-/// The original's three resolutions; Open1602: window, full screen and the window "Anzeige".
+/// The original's three resolutions; Open1602: window, full screen and the window "Einstellungen".
 constexpr std::int32_t kResolution = 47021;  ///< + 0..2
 constexpr std::int32_t kResolutionLabel = 47031;
 constexpr std::int32_t kWindowRow = kResolution;

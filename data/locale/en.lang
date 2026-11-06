@@ -79,7 +79,7 @@ keys.heading.groups = Groups and selection
 keys.heading.units = Ships and units selected
 keys.heading.view = Display
 keys.page.editor = Editor
-# The window "Key settings" (keys_menu.cpp), opened from the window "Display"
+# The window "Key settings" (keys_menu.cpp), opened from the window "Settings"
 keys.settings.title = Key settings
 keys.settings.none = No key
 keys.settings.press = Press a key ...
@@ -629,7 +629,7 @@ setup.disasters.one = 1 changed
 setup.disasters.many = {1} changed
 setup.disasters.all_original = All as the original
 setup.title.disasters = Disasters
-setup.hint.disasters = How often disasters strike. "Rare" plagues, fires and eruptions come half as often; fires started by lava or a burning neighbour still spread. Whether they set the game back to normal speed is an option of the window "Display". In a multiplayer game the host decides for everyone.
+setup.hint.disasters = How often disasters strike. "Rare" plagues, fires and eruptions come half as often; fires started by lava or a burning neighbour still spread. Whether they set the game back to normal speed is an option of the window "Settings". In a multiplayer game the host decides for everyone.
 setup.hint.disasters.view = How often disasters strike in this game. A saved game keeps it as it was started.
 setup.on = On
 setup.off = Off
@@ -939,15 +939,15 @@ setup.balance.all_on.tip = All of Open1602's balance changes.
 setup.bugs.all_original.tip = Every bug and exploit as in the original: the game as players know it.
 setup.bugs.all_fixed.tip = Every bug and exploit fixed, as Open1602 plays by default.
 
-# The settings' display rows and the window "Display" (display_menu.cpp)
+# The settings' display rows and the window "Settings" (display_menu.cpp)
 options.window = Window
 options.fullscreen = Full screen
-options.display = Display ...
+options.display = Settings ...
 options.slot.humans = {1} ({2} players)
 options.slot.empty = Empty
 # The voice message switch Open1602 adds below the original's kinds ("Check your trade routes!")
 options.speech.routes = Trade routes
-display.title = Display
+display.title = Settings
 display.mode = Show the game in
 display.window = a window
 display.fullscreen = full screen

@@ -33,7 +33,7 @@ The game executable `open1602` (`Open1602.app` on macOS) and the wiring of all m
   `list_panels.cpp`, `diplomacy_panel.cpp`, `options_panel.*`, `panel_common.*`: the side panel and
   its windows.
 - `display_settings.*`, `display_menu.*`: how the game is shown (window or full screen, the window's
-  size, the interface's size, free zoom; ADR 0010) and the window "Anzeige" that edits it. In
+  size, the interface's size, free zoom; ADR 0010) and the window "Einstellungen" that edits it. In
   `o1602::menus`; the viewer applies them to the window (`MapViewer::apply_display`).
 - `multiplayer.cpp`: connects the game to an `engine/net` session.
 - `chat_window.*`: `ChatWindow`, the chat of a running multiplayer game (lines to everyone or privately

@@ -344,7 +344,7 @@ public:
         constexpr auto n = static_cast<std::int32_t>(kKeyHelpPages);
         m_help_page = static_cast<std::size_t>(((static_cast<std::int32_t>(m_help_page) + delta) % n + n) % n);
     }
-    /// A question, the key overview or the window "Anzeige" or "Warenbilanz" is open: it takes every
+    /// A question, the key overview or the window "Einstellungen" or "Warenbilanz" is open: it takes every
     /// click.
     [[nodiscard]] bool modal() const noexcept {
         return m_question.has_value() || m_help.has_value() || m_display_open || m_goods_open;
@@ -375,7 +375,7 @@ public:
             m_goods->wheel(notches);
         }
     }
-    /// The window "Anzeige" (display_menu.hpp) showing `model`: over the map, or over the main menu
+    /// The window "Einstellungen" (display_menu.hpp) showing `model`: over the map, or over the main menu
     /// (the History Edition's "Options").
     void open_display(DisplayModel model) {
         m_display_model = std::move(model);
@@ -385,10 +385,10 @@ public:
         m_display_changed = false;
     }
     void close_display() noexcept { m_display_open = false; }
-    /// Whether the window "Anzeige" asked for the window of the keys since the last call.
+    /// Whether the window "Einstellungen" asked for the window of the keys since the last call.
     [[nodiscard]] bool take_keys_request() noexcept { return std::exchange(m_keys_requested, false); }
-    /// The window of the keys (keys_menu.hpp) in place of the window "Anzeige", showing `model`;
-    /// closed, the window "Anzeige" is back.
+    /// The window of the keys (keys_menu.hpp) in place of the window "Einstellungen", showing `model`;
+    /// closed, the window "Einstellungen" is back.
     void open_keys(KeysModel model) {
         m_keys_model = std::move(model);
         m_keys_open = m_keys != nullptr && m_display_open;
@@ -416,7 +416,7 @@ public:
     [[nodiscard]] bool display_open() const noexcept { return m_display_open; }
     /// Keeps the window's size the window shows up to date (the player drags the edge meanwhile).
     void set_display_window(WindowSize size) noexcept { m_display_model.window = size; }
-    /// The settings the window "Anzeige" changed since the last call, if it changed any.
+    /// The settings the window "Einstellungen" changed since the last call, if it changed any.
     [[nodiscard]] std::optional<DisplaySettings> take_display_change() {
         if (!std::exchange(m_display_changed, false)) {
             return std::nullopt;
@@ -544,7 +544,7 @@ public:
         if (m_menu) {
             m_menu_active = true;
             m_multiplayer_shown = false;
-            m_display_open = false;  // the game's window "Anzeige" stays behind
+            m_display_open = false;  // the game's window "Einstellungen" stays behind
             m_menu->open();
         }
     }
@@ -702,7 +702,7 @@ private:
     DisplayModel m_display_model;
     bool m_display_open = false;
     bool m_display_changed = false;
-    /// Top left of the window "Anzeige" on the screen (centred on the map).
+    /// Top left of the window "Einstellungen" on the screen (centred on the map).
     [[nodiscard]] ui::Rect display_rect() const;
     [[nodiscard]] ui::Rect keys_rect() const;
     void keys_result(KeysMenu::Result result) noexcept {
@@ -712,7 +712,7 @@ private:
             m_keys_open = false;
         }
     }
-    /// The window "Anzeige" or in its place the window of the keys, at `ox`, `oy`.
+    /// The window "Einstellungen" or in its place the window of the keys, at `ox`, `oy`.
     void draw_display();
     std::unique_ptr<KeysMenu> m_keys;
     KeysModel m_keys_model;

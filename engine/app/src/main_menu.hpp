@@ -110,7 +110,7 @@ struct MenuEvent {
         ContinueLast,  ///< lastgame
         NameEntered,   ///< the name is confirmed (Enter): "Wählt Euer Banner" and the like
         Multiplayer,   ///< the multiplayer menu (Open1602's own, multiplayer_menu.hpp)
-        Display,       ///< the History Edition's "Options": the window "Anzeige" (display_menu.hpp)
+        Display,       ///< the History Edition's "Options": the window "Einstellungen" (display_menu.hpp)
         Mods,          ///< the screen "Mods" opened: its model is due (set_mods)
         ToggleMod,     ///< turn the package `name` (its id, UTF-8) in the folder `path` on or off
         AdoptMod,      ///< copy the received package `name` in the folder `path` into the mods folder
