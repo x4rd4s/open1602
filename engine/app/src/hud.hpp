@@ -129,6 +129,9 @@ public:
         std::optional<std::int64_t> inhabitants;  ///< the city under the mouse (a discovered island)
         std::int32_t shield = -1;                 ///< banner of a human or computer owner, -1 the plain shield
         bool natives = false;                     ///< the city is a native village (the native figure)
+        /// Own city only: the scarcest good whose supply keeps falling (its icon left of the coat of
+        /// arms), 0 for none.
+        std::uint8_t shortage = 0;
     };
     void set_resources(Resources r) { m_resources = std::move(r); }
     /// The local player's points for the info panel, and whether its "Bewertung" may be pressed.
@@ -618,6 +621,8 @@ private:
     /// What the build tool should do in the build mode now.
     [[nodiscard]] std::optional<Action> build_tool_action();
     void draw_resources();
+    /// The sprite of `ware`'s icon in the line at the top of the map (a shortage of the city).
+    [[nodiscard]] std::int32_t shortage_icon(std::uint8_t ware) const;
     void build_minimap(const sim::World& world, const assets::BuildingTable& buildings,
                        const render::BannerTable& banners);
     /// Redraws one island's tiles on the minimap; true if a pixel changed.

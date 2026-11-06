@@ -2537,6 +2537,7 @@ Hud::Resources MapViewer::resources() const {
             r.goods_cost = std::array<std::int64_t, 3>{m_pending_bill->tools >> 5U, m_pending_bill->wood >> 5U,
                                                        m_pending_bill->bricks >> 5U};
         }
+        r.shortage = city->worst_good;
     }
     // Einwohner as the original counts them here:
     // residents plus the workers of the city's buildings, the same figure as the player status,

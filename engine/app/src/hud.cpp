@@ -492,6 +492,10 @@ void Hud::draw_resources() {
             const auto cost = r.goods_cost ? std::optional<std::int64_t>((*r.goods_cost)[i]) : std::nullopt;
             text(with_cost((*r.goods)[i], cost), x + 30);
         }
+        if (r.shortage != 0) {
+            // The good the own city lacks most, left of the coat of arms, as in the original.
+            icon(shortage_icon(r.shortage), 631);
+        }
     }
     if (r.inhabitants) {
         if (r.shield >= 0) {
@@ -523,6 +527,25 @@ void Hud::draw_resources() {
         text(std::to_string(*r.inhabitants), 696);
     }
     m_renderer->draw(items, x0, v.y, s);
+}
+
+std::int32_t Hud::shortage_icon(std::uint8_t ware) const {
+    std::uint8_t shown = ware;
+    if (m_simulation != nullptr) {
+        const assets::Goods& goods = m_simulation->world().goods();
+        // A package's good shows its own icon, or else the icon of the original's good it names.
+        if (const std::string_view picture = goods.picture(ware); !picture.empty()) {
+            if (const auto sprite = ui::package_icon_sprite(picture)) {
+                return *sprite;
+            }
+        }
+        shown = goods.icon(ware);
+    }
+    // The small icons of the consumer goods follow GFXBAUMAT + 21, food first.
+    if (shown >= assets::ware::kFood && shown <= assets::ware::kJewellery) {
+        return m_gfx_baumat + 21 + (shown - assets::ware::kFood);
+    }
+    return m_ctrl.layout().constant("GFXWARE").value_or(192) + shown;
 }
 
 void Hud::draw_unit_arms(const std::vector<UnitArms>& marks, sim::BannerId banner) {
