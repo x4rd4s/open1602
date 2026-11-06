@@ -1696,9 +1696,19 @@ std::uint32_t Fleet::transfer(const CargoTransfer& t) {
             !kontor_open(*m_world, *m_buildings, c)) {
             continue;
         }
-        if (c.owner == ship->owner) {
+        // The Kontor whose window sent the order comes first: with several in reach the goods go
+        // to the one the player trades with, not to another one nearby.
+        const bool window = t.kontor_island && c.island == *t.kontor_island && c.index == t.kontor_city;
+        if (window && (c.owner == ship->owner || may_trade(ship->owner, c.owner))) {
             found = i;
             break;
+        }
+        if (c.owner == ship->owner) {
+            found = i;
+            if (!t.kontor_island) {
+                break;
+            }
+            continue;
         }
         if (!found && may_trade(ship->owner, c.owner)) {
             found = i;

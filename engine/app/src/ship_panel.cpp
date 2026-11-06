@@ -1302,7 +1302,9 @@ private:
         if (t == nullptr || !t->buy) {
             return 0;
         }
-        const std::int64_t n = std::int64_t{t->limit} - city.stock(w) + city.reserved_of(w);
+        // Up to the limit and never above the storage room, as the simulation takes it.
+        const std::int64_t n =
+            std::min<std::int64_t>(std::int64_t{t->limit} - city.stock(w) + city.reserved_of(w), city.free_space(w));
         return n < 32 ? 0 : static_cast<std::uint32_t>(n);
     }
 
