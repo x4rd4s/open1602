@@ -781,6 +781,13 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         return;
     }
 
+    // Open1602: a colony moves its Kontor up when its room or trade list is too small (colony_kontor).
+    if ((r.stage == stage::kColony || r.stage == stage::kSecond || r.stage == stage::kSecondLuxury ||
+         r.stage == stage::kSecondFarming) &&
+        !classic() && colony_kontor(p, c)) {
+        return;
+    }
+
     switch (r.stage) {
         case stage::kFounded: {
             unload_ship(p, c);
@@ -1573,6 +1580,38 @@ bool Engine::need_kontor(AiPlayer& p, std::uint32_t level) {
         reserve(p, *b);
     }
     return true;
+}
+
+bool Engine::colony_kontor(AiPlayer& p, const City& c) {
+    // The level of the computer's best Kontor in another city: its main city's, as a rule.
+    std::uint32_t best = 0;
+    for (const City& o : m_world.cities()) {
+        if (o.owner == p.player && &o != &c) {
+            best = std::max(best, kontor_level(o));
+        }
+    }
+    const std::uint32_t have = kontor_level(c);
+    if (have == 0 || have >= best) {
+        return false;
+    }
+    const assets::BuildingType* b = by_id(id::kontor(have + 1));
+    if (b == nullptr || !unlocked(p, *b) || !affordable(p, c, *b)) {
+        return false;  // no waiting for it: the colony goes on with its order
+    }
+    const std::int64_t money = player(p).money;
+    if (money < std::int64_t{b->build_cost.money} + kColonyKontorReserve) {
+        return false;
+    }
+    // Of use when a good fills the warehouse (more room) or when the computer can well afford it
+    // (more room and more goods on the Kontor's trade list).
+    bool full = false;
+    for (const std::uint32_t stock : c.goods) {
+        full = full || std::uint64_t{stock} * 16 >= std::uint64_t{c.capacity} * kFullStock;
+    }
+    if (c.capacity == 0 || (!full && money < kColonyKontorMoney)) {
+        return false;
+    }
+    return need_kontor(p, have + 1);
 }
 
 bool Engine::need_stone_roads(AiPlayer& p) {

@@ -357,6 +357,8 @@ private:
     bool need_houses(AiPlayer& p, std::uint32_t n);
     bool need_market(AiPlayer& p, std::uint32_t n);
     bool need_kontor(AiPlayer& p, std::uint32_t level);
+    /// Open1602: a colony's Kontor follows the computer's best one when that is of use (kColonyKontorMoney).
+    bool colony_kontor(AiPlayer& p, const City& c);
     bool need_stone_roads(AiPlayer& p);
     bool need_shipyard(AiPlayer& p);
     bool need_tower(AiPlayer& p, std::uint8_t type, std::uint32_t n);
