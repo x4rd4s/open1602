@@ -339,6 +339,8 @@ private:
     /// Open1602: a food producer for a city that makes too little food (food_short), on its own
     /// island before anything else of its order: true if one was planned.
     bool more_food(AiPlayer& p, const City& c, const CityPlan& r);
+    /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
+    [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);

@@ -165,6 +165,13 @@ inline constexpr bool full_stock(std::uint32_t stock, std::uint32_t capacity) no
     return capacity != 0 && std::uint64_t{stock} * 16 >= std::uint64_t{capacity} * kFullStock;
 }
 
+/// How good a way to more food is: what it adds a minute (`food`) for the gold a minute it costs to
+/// run (`cost`), counting for less the more of its kind a city already has (`have`), so that its
+/// cities do not build one kind only.
+inline constexpr std::uint64_t food_way_score(std::uint64_t food, std::uint64_t cost, std::uint32_t have) noexcept {
+    return food * 4096 / (cost + 1) * 4 / (4 + std::uint64_t{have});
+}
+
 /// How many workshops `raw_producers` producers of their raw material keep busy: one for every
 /// `per` of them, rounded up, or `max` for each where that is set; one more while `raw_in_stock`
 /// (the raw material comes from elsewhere too).

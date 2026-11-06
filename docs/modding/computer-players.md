@@ -165,13 +165,18 @@ once there is no next stage its growing could hold up. The original's computer p
 - *Food first.* A city with less than 20 t of food whose own producers make less than its
   inhabitants eat plus an eighth (what the producers made in their statistics window, half the full
   rate for one that has run less than a minute) builds no new houses and plans a food producer
-  before its order: a butcher, bakery or mill where its cattle, mills or grain fields keep one busy,
-  else a pasture, a grain farm where grain grows, or a fisher. So a city feeds itself from its own
-  land before it waits for food from a far island.
+  before its order. It takes the way that brings the most food for the gold it costs to run: a
+  fisher; a butcher or bakery, which costs only its own upkeep where the city's pastures or mills
+  have food for one more, else a new chain with its two pastures, or its two mills and four grain
+  farms where grain grows. What a building makes counts as what the city's own buildings of its
+  kind make, so a fisher by a sea with few fish loses to a pasture. Each way counts for less the
+  more of its kind the city has (four of them halve it), and one of the ways at least two thirds as
+  good as the best is taken at random, so cities build a mix rather than one kind only. So a city
+  feeds itself from its own land before it waits for food from a far island.
 - *Workshops by their raw material.* A workshop whose producer waits for another (`after`, such as
-  a weaving hut for sheep) is built only as often as that other's producers keep busy: one for every
-  two (rounded up; two stonemasons for each quarry), and one more while the city has 20 t of the raw
-  material in stock.
+  a weaving hut for sheep, or a mill for grain) is built only as often as that other's producers keep
+  busy: one for every two (rounded up; two stonemasons for each quarry), and one more while the city
+  has 20 t of the raw material in stock.
 - *No goods for nobody.* No further producer of a good that fills three quarters of the city's
   room, and an order's producers grow with the land (above) only while the city has less than 20 t
   of their good.

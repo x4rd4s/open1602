@@ -231,3 +231,12 @@ TEST_CASE("ai tables: a good that fills the warehouse gets no further producers"
     CHECK(!full_stock(134 * kT, 180 * kT));
     CHECK(!full_stock(0, 0));
 }
+
+TEST_CASE("ai tables: a city short of food weighs a way's food against its upkeep and how many it has") {
+    // A fisher that makes 1 t a minute for 25 gold beats a pasture chain of 2 t for 70 gold ...
+    CHECK(food_way_score(32, 25, 0) > food_way_score(64, 70, 0));
+    // ... but not once the city has eight fishers and no pastures: it builds a mix.
+    CHECK(food_way_score(32, 25, 8) < food_way_score(64, 70, 0));
+    // A workshop whose raw material is there costs only its own upkeep and comes first.
+    CHECK(food_way_score(64, 20, 2) > food_way_score(32, 25, 0));
+}

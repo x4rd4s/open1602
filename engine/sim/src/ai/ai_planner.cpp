@@ -1113,9 +1113,14 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
             wanted = std::min<std::uint32_t>(wanted, 1);
         }
     }
-    // Open1602: workshops only as many as the producers of their raw material keep busy.
-    if (!classic() && d->after != kNoProducer && d->after == slot->process_from) {
-        wanted = std::min(wanted, processors_fed(*c, *r, *slot));
+    // Open1602: workshops only as many as the producers of their raw material keep busy (also a
+    // mill, which the original builds without waiting for grain), unless a package's producer waits
+    // for another or none.
+    if (!classic() && slot->process_from != kNoProducer) {
+        const ComputerProducer* own = producer_change(changes, which);
+        if (own == nullptr || !own->after || *own->after == slot->process_from) {
+            wanted = std::min(wanted, processors_fed(*c, *r, *slot));
+        }
     }
     if (s.count >= wanted || s.attempts >= d->attempts) {
         return false;
@@ -1246,20 +1251,99 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     return true;
 }
 
+std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType& b) const {
+    // What the producers of `b` in the city made in their statistics windows, on average; for none
+    // that has run a minute yet, half the full rate.
+    const std::uint64_t full = b.interval == 0 ? 0 : std::uint64_t{b.produce_amount} * 60 / b.interval;
+    const IslandMap& map = island_of(c.island).map;
+    std::uint64_t sum = 0;
+    std::uint32_t n = 0;
+    for (const Production& pr : m_world.productions()) {
+        if (!pr.used || pr.island != c.island || pr.elapsed < 60 || !map.contains(pr.x, pr.y)) {
+            continue;
+        }
+        const MapCell& cell = map.top(pr.x, pr.y);
+        if (cell.city != c.index || cell.empty() || m_buildings.by_sprite(cell.sprite) != &b) {
+            continue;
+        }
+        sum += std::uint64_t{pr.produced} * 60 / pr.elapsed;
+        ++n;
+    }
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? full / 2 : sum / n, 0xFFFFFFFFU));
+}
+
 bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
     if (classic() || population(c) == 0 || !food_short(c)) {
         return false;
     }
-    const auto planned = [&](std::uint8_t slot) {
-        const std::size_t before = p.stack.size();
-        (void)need(p, slot, std::uint32_t{r.slots[slot].count} + 1);
-        return p.stack.size() > before;
+    const std::vector<ComputerProducer>& changes = m_world.balance().computer_producers;
+    const auto building = [&](std::uint8_t slot) -> const assets::BuildingType* {
+        const auto d = need_def(slots(), slot, changes);
+        return !d ? nullptr : d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
     };
-    // Workshops whose raw material the city makes first (need() keeps them to it), then the farms
-    // and fishers: the city's own land before goods brought from far away.
-    for (const std::uint8_t slot : {kSlotButcher, kSlotBakery, kSlotMill, kSlotCattle, kSlotGrain, kSlotFisher}) {
-        if (planned(slot)) {
-            log(p, "city %u/%u: short of food, more of slot %u", r.island, r.city, slot);
+    const auto upkeep = [&](std::uint8_t slot) -> std::uint64_t {
+        const assets::BuildingType* b = building(slot);
+        return b != nullptr ? b->running_cost : 0;
+    };
+    const auto fed = [&](std::uint8_t slot) {
+        const ComputerSlot* k = computer_slot(slots(), slot);
+        return k != nullptr && r.slots[slot].count < processors_fed(c, r, *k);
+    };
+    // The ways to more food, each by what it adds a minute and what it costs a minute to run: a
+    // workshop whose raw material the city already makes costs only its own upkeep; a new chain
+    // the upkeep of its workshop and of the farms that feed it (one for every two). What a building
+    // makes is what the city's own buildings of its kind make (a fisher by a sea with few fish
+    // makes little), so the computer picks what pays best on this island.
+    struct Way {
+        std::uint8_t slot;       ///< what is built next
+        std::uint8_t end;        ///< what makes the food
+        std::uint64_t food = 0;  ///< 1/32 t a minute
+        std::uint64_t cost = 0;  ///< gold a minute
+    };
+    std::vector<Way> ways;
+    // `end` makes the food; `links` are its raw material's producers, the next first, each with
+    // how many of them one `end` needs.
+    const auto add = [&](std::uint8_t end, std::initializer_list<std::pair<std::uint8_t, std::uint32_t>> links) {
+        const assets::BuildingType* b = building(end);
+        if (b == nullptr) {
+            return;
+        }
+        Way w{end, end, made_per_minute(c, *b), upkeep(end)};
+        if (links.size() != 0 && !fed(end)) {
+            // A whole new chain; built from the first link whose own raw material is there.
+            for (const auto& [slot, per] : links) {
+                w.cost += per * upkeep(slot);
+            }
+            for (const auto& [slot, per] : links) {
+                w.slot = slot;
+                if (fed(slot)) {
+                    break;
+                }
+            }
+        }
+        ways.push_back(w);
+    };
+    add(kSlotFisher, {});
+    add(kSlotButcher, {{kSlotCattle, 2}});
+    add(kSlotBakery, {{kSlotMill, 2}, {kSlotGrain, 4}});
+    // Not only the best on paper: each way counts for less the more of it the city has, and one of
+    // those nearly as good as the best is taken at random, so cities mix fishers, pastures and
+    // fields instead of building one kind only.
+    const auto score = [&](const Way& w) { return food_way_score(w.food, w.cost, r.slots[w.end].count); };
+    std::ranges::stable_sort(ways, [&](const Way& a, const Way& b) { return score(a) > score(b); });
+    std::size_t close = 0;
+    while (close < ways.size() && score(ways[close]) * 3 >= score(ways[0]) * 2) {
+        ++close;
+    }
+    if (close > 1) {
+        std::swap(ways[0], ways[rng().below(static_cast<std::uint32_t>(close))]);
+    }
+    for (const Way& w : ways) {
+        const std::size_t before = p.stack.size();
+        (void)need(p, w.slot, std::uint32_t{r.slots[w.slot].count} + 1);
+        if (p.stack.size() > before) {
+            log(p, "city %u/%u: short of food, slot %u (%llu/min for %llu gold)", r.island, r.city, w.slot,
+                static_cast<unsigned long long>(w.food), static_cast<unsigned long long>(w.cost));
             return true;
         }
     }
