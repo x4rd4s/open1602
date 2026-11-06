@@ -1462,7 +1462,7 @@ public:
                 services_of(city);
             }
         }
-        if (p == prod::kGrowing && !b.withered) {  // a withered field waits for the end of the drought
+        if (p == prod::kGrowing) {  // a withered field withers through its stages, then waits
             GrowthEntry g;
             g.island = m_island;
             g.x = ux;

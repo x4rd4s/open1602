@@ -40,6 +40,20 @@ void swap_record(World& world, std::uint16_t island, std::uint16_t x, std::uint1
     map.set_sprite(x, y, static_cast<std::uint16_t>(to.gfx + (sub < to.tile_count() ? sub : 0)));
 }
 
+/// A new growth entry at stage 0 for a tile that just became `record` (growing or withered).
+void push_growth(World& world, std::uint16_t island, std::uint16_t x, std::uint16_t y,
+                 const assets::BuildingType& record) {
+    GrowthState& g = world.growth();
+    GrowthEntry e;
+    e.island = island;
+    e.x = x;
+    e.y = y;
+    e.growth_class = record.growth_class;  // without the random 0..2 of a newly planted tile
+    e.seen = g.counter[record.growth_class % GrowthState::kClasses];
+    e.stage = 0;
+    g.entries.push_back(e);
+}
+
 }  // namespace
 
 const assets::BuildingType* ripe_record(const assets::BuildingTable& buildings,
@@ -123,7 +137,7 @@ std::size_t advance_growth(World& world, const assets::BuildingTable& buildings,
                         world.island(e.island).map.set_anim_phase(e.x, e.y, 0);
                         ++ripened;
                     }
-                    keep = false;  // withered tiles stay withered
+                    keep = false;  // a withered tile stays at its last stage
                 } else if (b->anim_time == 0) {
                     // The stage is the picture: Gfx + phase * AnimAdd.
                     world.island(e.island).map.set_anim_phase(e.x, e.y, e.stage);
@@ -142,7 +156,12 @@ std::optional<GrowthEntry> missing_growth_entry(const GrowthState& growth, const
                                                 std::uint16_t island, std::uint16_t x, std::uint16_t y,
                                                 const MapCell& cell) {
     const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
-    if (b == nullptr || b->prod_kind != prod::kGrowing || b->withered) {
+    if (b == nullptr || b->prod_kind != prod::kGrowing) {
+        return std::nullopt;
+    }
+    // A withered field withers stage by stage like a growing one and then stays at its last
+    // picture; one that already shows it needs no entry.
+    if (b->withered && (b->anim_time != 0 || cell.anim_phase + 1U >= b->anim_count)) {
         return std::nullopt;
     }
     GrowthEntry e;
@@ -190,29 +209,19 @@ bool harvest_tile(World& world, const assets::BuildingTable& buildings, std::uin
     // During a drought a field that is not fertile at its strength withers. Only fields and
     // plantations have a withered record; the original turned trees and grass on poor ground into
     // the next variant.
+    const assets::BuildingType* next = growing;
     if (world.islands()[island].drought.strength != 0) {
         if (const assets::BuildingType* withered = withered_record(buildings, *ripe);
             withered != nullptr && !tile_fertile(world, buildings, island, ware, x, y)) {
-            swap_record(world, island, x, y, *ripe, *withered);
-            if (withered->anim_time == 0) {
-                world.island(island).map.set_anim_phase(x, y, 0);
-            }
-            return true;
+            next = withered;
         }
     }
-    swap_record(world, island, x, y, *ripe, *growing);
-    if (growing->anim_time == 0) {
+    // A withered field gets an entry too: it withers through its stages and stays at the last one.
+    swap_record(world, island, x, y, *ripe, *next);
+    if (next->anim_time == 0) {
         world.island(island).map.set_anim_phase(x, y, 0);
     }
-    GrowthState& g = world.growth();
-    GrowthEntry e;
-    e.island = island;
-    e.x = x;
-    e.y = y;
-    e.growth_class = growing->growth_class;  // without the random 0..2 of a newly planted tile
-    e.seen = g.counter[growing->growth_class % GrowthState::kClasses];
-    e.stage = 0;
-    g.entries.push_back(e);
+    push_growth(world, island, x, y, *next);
     return true;
 }
 
@@ -255,13 +264,14 @@ bool wither_tile(World& world, const assets::BuildingTable& buildings, std::uint
     if (withered->anim_time == 0) {
         world.island(island).map.set_anim_phase(x, y, 0);
     }
-    // The original gives the withered field a growth entry that ends where it started (a withered
-    // field stays withered); Open1602 keeps none.
     if (forgotten != nullptr) {
         forgotten->push_back({x, y});
     } else {
         forget_growth(world, island, x, y);
     }
+    // As in the original the withered field gets a growth entry: it withers stage by stage (the
+    // stage is its picture) and stays at the last one, where advance_growth drops the entry.
+    push_growth(world, island, x, y, *withered);
     return true;
 }
 
@@ -282,15 +292,7 @@ bool recover_tile(World& world, const assets::BuildingTable& buildings, std::uin
     } else {
         forget_growth(world, island, x, y);
     }
-    GrowthState& g = world.growth();
-    GrowthEntry e;
-    e.island = island;
-    e.x = x;
-    e.y = y;
-    e.growth_class = growing->growth_class;
-    e.seen = g.counter[growing->growth_class % GrowthState::kClasses];
-    e.stage = 0;
-    g.entries.push_back(e);
+    push_growth(world, island, x, y, *growing);
     return true;
 }
 

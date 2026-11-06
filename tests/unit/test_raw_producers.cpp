@@ -189,21 +189,38 @@ TEST_CASE("growth: classes and record chains of crops") {
     CHECK(sim::crop_ware(buildings, *buildings.by_id(kGround)) == 0);
 }
 
+TEST_CASE("growth: a withered field without an entry gets one until it shows its last stage") {
+    const auto buildings = make_buildings();
+    const sim::GrowthState growth;
+    const assets::BuildingType& withered = *buildings.by_id(kWheatWithered);
+    sim::MapCell cell;
+    cell.sprite = static_cast<std::uint16_t>(withered.gfx);
+    cell.anim_phase = 0;
+    const auto entry = sim::missing_growth_entry(growth, buildings, 0, 1, 2, cell);
+    REQUIRE(entry.has_value());
+    CHECK(entry->stage == 0);
+    cell.anim_phase = 4;  // already fully withered
+    CHECK(!sim::missing_growth_entry(growth, buildings, 0, 1, 2, cell).has_value());
+}
+
 TEST_CASE("growth: a field grows stage by stage, ripens and is harvested") {
     Farmland land;
     land.place(kWheatGrowing, 3, 3);
     land.place(kWheatWithered, 4, 3);
     land.finish({});
     sim::World& world = land.world;
-    REQUIRE(world.growth().entries.size() == 1);  // withered tiles do not grow
+    REQUIRE(world.growth().entries.size() == 2);  // the withered tile withers through its stages
     // Five ticks of class 0 (40 s each); the stage shows as the animation phase.
     for (int stage = 1; stage <= 4; ++stage) {
         CHECK(sim::advance_growth(world, land.buildings, 40'000) == 0);
         CHECK(land.tile(3, 3).anim_phase == stage);
+        CHECK(land.tile(4, 3).anim_phase == stage);
     }
     CHECK(sim::advance_growth(world, land.buildings, 39'950) == 0);
     CHECK(sim::advance_growth(world, land.buildings, 50) == 1);
     CHECK(land.id(3, 3) == kWheatRipe);
+    CHECK(land.id(4, 3) == kWheatWithered);  // stays withered at its last stage
+    CHECK(land.tile(4, 3).anim_phase == 4);
     CHECK(world.growth().entries.empty());
     // Harvest: growing again from stage 0; the wrong ware or a growing tile gives nothing.
     CHECK(!sim::harvest_tile(world, land.buildings, 0, 3, 3, kGrass));
