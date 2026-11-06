@@ -1057,10 +1057,14 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
             out.refusal = refusal;
             continue;
         }
-        // Costs in order; once something does not fit, the rest of the order stays unbuilt.
+        // Costs in order; once something does not fit, the rest of the order stays unbuilt (a
+        // copied piece goes on with what still fits).
         BuildBill next = bill;
         next.add(ordered_cost(buildings, *type));
         plan.shown.add(ordered_cost(buildings, *type));
+        if (order.skip_unpaid) {
+            budget = BuildRefusal::None;
+        }
         if (budget == BuildRefusal::None) {
             if (counted(type->infra) && placed_limited[type->infra - kInfraCastle] >= limit) {
                 budget = BuildRefusal::Limit;
@@ -1105,6 +1109,13 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
 }
 
 }  // namespace
+
+int build_priority(const assets::BuildingType& type) noexcept {
+    if (type.kind == kind::kRoad || type.kind == kind::kWall || type.kind == kind::kWallBeach) {
+        return 0;
+    }
+    return type.prod_kind == prod::kGrowing ? 1 : 2;
+}
 
 void plan_build(const World& world, const assets::BuildingTable& buildings, const BuildOrder& order, BuildPlan& plan) {
     plan_order(world, buildings, order, plan, PlanOptions{});

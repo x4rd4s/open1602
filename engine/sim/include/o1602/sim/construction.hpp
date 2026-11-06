@@ -105,7 +105,23 @@ struct BuildOrder {
     /// The editor's order (ADR 0013): nothing is paid, no building is locked or limited, and a
     /// treasure under a building stays in the ground. Everything else is checked as for a player.
     bool free = false;
+    /// An item the gold or goods do not reach is left out without stopping the rest of the order
+    /// (otherwise everything after it stays unbuilt): copied pieces and blueprints being built.
+    bool skip_unpaid = false;
+    /// A copied piece of a city: the simulation places what the gold or goods did not reach as
+    /// the player's blueprints (Simulation::execute).
+    bool unpaid_as_blueprints = false;
 };
+
+/// The order in which a piece of many items is paid where the means may not reach all of it:
+/// 0 roads and walls, 1 fields and trees (both gold only), 2 everything else.
+[[nodiscard]] int build_priority(const assets::BuildingType& type) noexcept;
+
+/// Whether only the gold or the goods are missing for an item.
+[[nodiscard]] constexpr bool short_of_means(BuildRefusal refusal) noexcept {
+    return refusal == BuildRefusal::Money || refusal == BuildRefusal::Tools || refusal == BuildRefusal::Wood ||
+           refusal == BuildRefusal::Bricks || refusal == BuildRefusal::Cannons;
+}
 
 /// What becomes of one item.
 struct PlannedBuild {

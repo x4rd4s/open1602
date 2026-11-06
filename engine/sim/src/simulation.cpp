@@ -552,6 +552,21 @@ CommandResult Simulation::execute(const Command& command) {
     const std::size_t first = m_construction_events.size();
     if (const auto* build = std::get_if<BuildOrder>(&command)) {
         result.build = execute_build(*m_world, *m_buildings, *build, m_city_names, m_construction_events.sink());
+        if (build->unpaid_as_blueprints) {
+            // What the gold or goods did not reach is planned, to be built once they suffice.
+            BlueprintOrder unpaid;
+            unpaid.player = build->player;
+            unpaid.kind = BlueprintOrder::Kind::Place;
+            unpaid.island = build->island;
+            for (std::size_t i = 0; i < result.build->items.size() && i < build->items.size(); ++i) {
+                if (short_of_means(result.build->items[i].refusal)) {
+                    unpaid.items.push_back(build->items[i]);
+                }
+            }
+            if (!unpaid.items.empty()) {
+                (void)execute_blueprints(*m_world, *m_buildings, unpaid, m_city_names, nullptr);
+            }
+        }
     } else if (const auto* demolish = std::get_if<DemolishOrder>(&command)) {
         const DemolishResult d =
             execute_demolish(*m_world, *m_buildings, *demolish, m_construction_events.sink(), m_rules.refund_share());

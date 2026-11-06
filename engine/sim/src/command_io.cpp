@@ -67,6 +67,8 @@ void io(A& a, T& t)
     a(t.items);
     a(t.ship);
     a(t.orient_to_road);
+    a(t.skip_unpaid);
+    a(t.unpaid_as_blueprints);
 }
 
 template <class A, class T>

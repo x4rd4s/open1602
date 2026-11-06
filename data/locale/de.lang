@@ -432,6 +432,7 @@ build.tool.demolish = Abreißen
 build.tool.copy = Bereich kopieren
 build.copy.select = Bereich über die eigene Stadt ziehen oder ein Gebäude anklicken
 build.copy.cost = {1} von {2} Teilen werden gebaut, {3} Gold
+build.copy.planned = {1} als Blaupausen
 build.tool.blueprint = Blaupausen planen an/aus
 build.tool.move = Gebäude verschieben
 build.tool.templates = Vorlagen

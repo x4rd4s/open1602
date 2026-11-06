@@ -31,6 +31,8 @@ std::vector<sim::Command> every_kind() {
     build.items = {{20501, 7, -2, 3, 1}, {20401, 9, 4, 0, 0}};
     build.ship = 12;
     build.orient_to_road = true;
+    build.skip_unpaid = true;
+    build.unpaid_as_blueprints = true;
     all.emplace_back(build);
     all.emplace_back(sim::DemolishOrder{2, 4, {5, 6}, {7, 8}});
     sim::ShipOrder ship;
@@ -160,6 +162,8 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     REQUIRE(build.items.size() == 2);
     CHECK(build.items[0].y == -2);
     CHECK(build.orient_to_road);
+    CHECK(build.skip_unpaid);
+    CHECK(build.unpaid_as_blueprints);
     const auto rename = round_trip<sim::PlayerRename>(all);
     CHECK(rename.name == "Merlin");
     sim::ShipCommand mount;
