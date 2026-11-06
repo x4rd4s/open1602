@@ -1285,6 +1285,46 @@ TEST_CASE("blueprints: built in their order as the means reach; what is built ov
     CHECK(island.world.blueprints().empty());
 }
 
+TEST_CASE("blueprints: a copied piece builds what the means reach and plans the rest as blueprints") {
+    Island island;
+    island.found();
+    assets::FigureTable figures;
+    sim::Simulation simulation(island.world, island.buildings, figures);
+    simulation.set_city_names(island.names);
+    island.world.player(0)->money = 12;  // two roads, not the house between them
+    sim::BuildOrder order;
+    order.player = 0;
+    order.island = 0;
+    order.orient_to_road = false;
+    order.items = {{kRoad, 8, 15, 0, 0}, {kHouse, 8, 13, 0, 0}, {kRoad, 9, 15, 0, 0}};
+    // A plain order stops at the house: the second road stays unbuilt.
+    const sim::BuildPlan plain = sim::plan_build(island.world, island.buildings, order);
+    CHECK(plain.placed == 1);
+    CHECK(plain.items[2].refusal == sim::BuildRefusal::Money);
+    // A copied piece goes on after it, and the house becomes a blueprint.
+    order.unpaid_as_blueprints = true;
+    const sim::BuildPlan copied = sim::plan_build(island.world, island.buildings, order);
+    CHECK(copied.placed == 2);
+    CHECK(copied.items[1].refusal == sim::BuildRefusal::Money);
+    CHECK(copied.items[2].ok());
+    simulation.submit(order);
+    simulation.tick();
+    CHECK(island.at(8, 15)->id == kRoad);
+    CHECK(island.at(9, 15)->id != kGround);
+    CHECK(island.at(8, 13)->id == kGround);
+    CHECK(island.world.players()[0].money == 2);
+    REQUIRE(island.world.blueprints().size() == 1);
+    CHECK(island.world.blueprints()[0].building == kHouse);
+    CHECK(island.world.blueprints()[0].x == 8);
+    CHECK(island.world.blueprints()[0].y == 13);
+    // Only what lacks the means is planned: a piece on the sea is left out.
+    island.world.player(0)->money = 0;
+    order.items = {{kRoad, 1, 15, 0, 0}};
+    simulation.submit(order);
+    simulation.tick();
+    CHECK(island.world.blueprints().size() == 1);
+}
+
 TEST_CASE("blueprints: a city builds them by itself, demolishing clears them, the game keeps them") {
     Island island;
     island.found();

@@ -105,7 +105,17 @@ struct BuildOrder {
     /// The editor's order (ADR 0013): nothing is paid, no building is locked or limited, and a
     /// treasure under a building stays in the ground. Everything else is checked as for a player.
     bool free = false;
+    /// A copied piece of a city: an item the gold or goods do not reach is left out without
+    /// stopping the rest of the order (otherwise everything after it stays unbuilt), and the
+    /// simulation places the left out as the player's blueprints (Simulation::execute).
+    bool unpaid_as_blueprints = false;
 };
+
+/// Whether only the gold or the goods are missing for an item.
+[[nodiscard]] constexpr bool short_of_means(BuildRefusal refusal) noexcept {
+    return refusal == BuildRefusal::Money || refusal == BuildRefusal::Tools || refusal == BuildRefusal::Wood ||
+           refusal == BuildRefusal::Bricks || refusal == BuildRefusal::Cannons;
+}
 
 /// What becomes of one item.
 struct PlannedBuild {

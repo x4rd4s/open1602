@@ -184,11 +184,13 @@ std::optional<sim::BuildOrder> BuildTool::build_order(const sim::World& world, s
             return std::nullopt;
         }
         // The layout hangs at the mouse by its middle; it keeps its own rotations (no turning
-        // towards a road), and what does not fit or cannot be paid stays unbuilt.
+        // towards a road). What does not fit stays unbuilt; what cannot be paid becomes a blueprint
+        // and the rest is still built.
         sim::BuildOrder order;
         order.player = player;
         order.island = spot.island;
         order.orient_to_road = false;
+        order.unpaid_as_blueprints = true;
         const std::int32_t ox = spot.x - (m_layout->width - 1) / 2;
         const std::int32_t oy = spot.y - (m_layout->height - 1) / 2;
         order.items.reserve(m_layout->items.size());
@@ -426,7 +428,7 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
     struct Found {
         const assets::BuildingType* order = nullptr;
         sim::BuildingAt at;
-        int group = 0;  // 0 roads and walls, 1 buildings, 2 fields and trees
+        int group = 0;  // 0 roads and walls, 1 fields and trees, 2 buildings
     };
     std::vector<Found> found;
     std::vector<sim::TilePos> seen;
@@ -452,9 +454,9 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
             if (order == nullptr) {
                 continue;
             }
-            int group = 1;
+            int group = 2;
             if (order->prod_kind == sim::prod::kGrowing) {
-                group = 2;
+                group = 1;
             } else if (order->kind == sim::kind::kRoad || order->kind == sim::kind::kWall) {
                 group = 0;
             }
@@ -465,11 +467,12 @@ BuildTool::Layout BuildTool::copy_layout(const sim::World& world, sim::PlayerId 
     const auto harvested = [&](const assets::BuildingType& crop) {
         const std::uint8_t ware = sim::crop_ware(*m_buildings, crop);
         return ware != 0 &&
-               std::ranges::any_of(found, [&](const Found& f) { return f.group == 1 && f.at.type->raw_ware == ware; });
+               std::ranges::any_of(found, [&](const Found& f) { return f.group == 2 && f.at.type->raw_ware == ware; });
     };
-    std::erase_if(found, [&](const Found& f) { return f.group == 2 && !harvested(*f.order); });
-    // Roads and walls first (gold only, so a lack of goods does not leave the buildings without
-    // them), then the buildings, then the fields: what the means do not reach is the end of the order.
+    std::erase_if(found, [&](const Found& f) { return f.group == 1 && !harvested(*f.order); });
+    // Roads and walls first, then fields and trees (these cost gold only, so a lack of goods does
+    // not leave the buildings without them), then the buildings. What the means do not reach is
+    // left out and the rest still built; the simulation plans the left out as blueprints.
     std::stable_sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.group < b.group; });
     if (found.size() > sim::kMaxCommandItems) {
         found.resize(sim::kMaxCommandItems);

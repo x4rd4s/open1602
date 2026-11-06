@@ -1057,10 +1057,14 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
             out.refusal = refusal;
             continue;
         }
-        // Costs in order; once something does not fit, the rest of the order stays unbuilt.
+        // Costs in order; once something does not fit, the rest of the order stays unbuilt (a
+        // copied piece goes on with what still fits).
         BuildBill next = bill;
         next.add(ordered_cost(buildings, *type));
         plan.shown.add(ordered_cost(buildings, *type));
+        if (order.unpaid_as_blueprints) {
+            budget = BuildRefusal::None;
+        }
         if (budget == BuildRefusal::None) {
             if (counted(type->infra) && placed_limited[type->infra - kInfraCastle] >= limit) {
                 budget = BuildRefusal::Limit;

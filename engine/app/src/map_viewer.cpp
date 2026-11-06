@@ -1656,14 +1656,18 @@ void MapViewer::render() {
                         }
                     } else if (m_tool.mode() == BuildTool::Mode::Copy) {
                         // A copied piece rarely fits whole: how much of it would be built, its price
-                        // and, where the means run out, what is missing.
+                        // and, where the means run out, how much becomes blueprints and what is missing.
+                        const auto unpaid = static_cast<std::size_t>(std::ranges::count_if(
+                            plan.items,
+                            [](const sim::PlannedBuild& item) { return sim::short_of_means(item.refusal); }));
                         m_tool_status =
                             ui::tr("build.copy.cost", {std::to_string(plan.placed), std::to_string(order->items.size()),
                                                        std::to_string(plan.bill.money)});
+                        if (unpaid > 0) {
+                            m_tool_status += ", " + ui::tr("build.copy.planned", {std::to_string(unpaid)});
+                        }
                         for (const sim::PlannedBuild& item : plan.items) {
-                            if (item.refusal == sim::BuildRefusal::Money || item.refusal == sim::BuildRefusal::Tools ||
-                                item.refusal == sim::BuildRefusal::Wood || item.refusal == sim::BuildRefusal::Bricks ||
-                                item.refusal == sim::BuildRefusal::Cannons) {
+                            if (sim::short_of_means(item.refusal)) {
                                 m_tool_status += " - " + refusal_text(item.refusal);
                                 break;
                             }

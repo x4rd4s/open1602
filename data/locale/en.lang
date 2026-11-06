@@ -459,6 +459,7 @@ build.tool.demolish = Demolish
 build.tool.copy = Copy an area
 build.copy.select = Drag over a piece of your city or click a building
 build.copy.cost = {1} of {2} pieces will be built, {3} gold
+build.copy.planned = {1} as blueprints
 build.tool.blueprint = Plan blueprints on/off
 build.tool.move = Move buildings
 build.tool.templates = Templates
