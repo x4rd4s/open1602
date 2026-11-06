@@ -113,6 +113,26 @@ struct Acc {
     std::int32_t extra = 0;  ///< [6]
 };
 
+/// Open1602: how a computer plans a town, different for each player, island and city
+/// (town_style()).
+struct TownStyle {
+    std::int32_t room = 7;          ///< tiles of the town zone a house wants, roads and the like included
+    std::int32_t shift = 0;         ///< tiles the zone's middle lies inland of the first market
+    std::int32_t block = 7;         ///< length of the roads that open new blocks
+    std::int32_t field_margin = 0;  ///< tiles fields keep beyond the zone
+};
+/// Open1602: the town zone of a city (Engine::town_zone()).
+struct TownZone {
+    bool valid = false;
+    std::int32_t cx = 0;  ///< the middle: of the market nearest the Kontor, else of the Kontor
+    std::int32_t cy = 0;
+    std::int32_t radius = 0;  ///< houses within it, fields outside
+};
+/// How far the middle of a site lies outside the town zone (negative: inside, by so much).
+[[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                       std::int32_t y1);
+[[nodiscard]] TownStyle town_style(std::uint32_t seed, std::uint16_t island, std::uint8_t city);
+
 /// Which tiles a ring iterator visits.
 enum class RingFilter : std::uint8_t {
     Own,       ///< tiles of the current city
@@ -647,6 +667,14 @@ private:
     };
     [[nodiscard]] bool defenceless(std::uint16_t island, std::uint8_t city);
     std::vector<Defences> m_defences;  ///< by island
+    /// Open1602: where a city's houses go. A disc about the market nearest the Kontor, as large as
+    /// the room its houses and the next ones need (with roads and public buildings), on the island's
+    /// free and town land; kept while the island's tiles stay the same, and found again from them
+    /// alone after a game is loaded.
+    const TownZone& town_zone(AiPlayer& p);
+    /// The town style of the current city, drawing the computer's AiPlayer::town_seed first if it
+    /// has none yet.
+    TownStyle town_style_of(AiPlayer& p);
     /// What the whole-island scans of a city found, kept while the island's tiles stay the same
     /// (TB-11): the building origins of the last survey (the next one visits only them, in the
     /// same order) and the road segments of the last layout.
@@ -657,6 +685,8 @@ private:
         std::vector<std::pair<std::uint16_t, std::uint16_t>> survey_tiles;
         std::uint64_t layout_revision = 0;
         std::vector<Segment> segments;
+        std::uint64_t zone_revision = 0;
+        TownZone zone;
     };
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
     std::vector<CityScans> m_city_scans;
