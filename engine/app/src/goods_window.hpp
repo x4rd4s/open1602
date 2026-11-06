@@ -80,10 +80,13 @@ public:
     void set_scale(double scale) { m_form.set_scale(scale); }
     [[nodiscard]] double scale() const noexcept { return m_form.scale(); }
 
-    /// Opens on the table (the island and time chosen before stay).
+    /// Opens on the table (the island and time chosen before stay). A button still held from
+    /// before is forgotten: its release may have gone elsewhere while the window was closed, and
+    /// it would otherwise keep the other button from clicking.
     void open() noexcept {
         m_detail.reset();
         m_scroll = 0;
+        m_form.cancel_press();
     }
     /// Opens on the page of `ware` for the player's cities on `island` (a click on the good in a
     /// Kontor's stock).
@@ -92,7 +95,10 @@ public:
         m_detail = ware;
         m_island = island;
         m_scroll = 0;
+        m_form.cancel_press();
     }
+    /// Forgets the button held (the game lost the focus: its release may never come).
+    void cancel_press() noexcept { m_form.cancel_press(); }
     /// Escape: from a good's page back to the table; false on the table (the window closes).
     bool back() noexcept {
         if (!m_detail) {

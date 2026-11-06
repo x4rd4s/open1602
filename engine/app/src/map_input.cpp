@@ -1144,6 +1144,13 @@ void MapInput::handle_event(const SDL_Event& event) {
                 m_hud->type_text(utf8_to_cp1252(event.text.text));
             }
             break;
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+            // A button held now is let go in another window: its release never comes here.
+            m_left_down = false;
+            if (m_hud) {
+                m_hud->release_mouse();
+            }
+            break;
         case SDL_EVENT_MOUSE_MOTION:
             m_mouse_x = static_cast<double>(event.motion.x);
             m_mouse_y = static_cast<double>(event.motion.y);

@@ -585,3 +585,28 @@ TEST_CASE("side panel player status: the list buttons, the rating and the goods 
     (void)i.panel.mouse(x, y, false);
     CHECK(!i.panel.panel().selected(57040));
 }
+
+TEST_CASE("info panel: the line \"Warenbilanz\" takes clicks on all of its letters, not on the list buttons") {
+    // "Punkte" and the diplomacy list button where INFO.GAD has them: the label's text hangs
+    // below its box (Posoffs 40 in a box 25 high); the goods line's letters at 1024x768 cover
+    // the rows 661 to 673.
+    assets::TextTable texts = assets::TextTable::parse("[GAME]\n");
+    const std::string label = "Kind: 5\n  Blocknr: 0\n  Pos: 15, 623\n  Size: 198, 25\n  Posoffs: 0, 40\n";
+    const assets::GadgetLayout gad = assets::parse_gad(
+        "Objekt: GADGET\n  @Nummer: 0\n  Id: 57026\n  " + label +
+        "  @Nummer: 1\n  Id: 57031\n  Kind: 2\n  Gfxnr: 3\n  Pos: 175, 674\n  Size: 67, 85\nEndObj\n");
+    InfoPanel panel{gad, &texts};
+    const auto click = [&](std::int32_t x, std::int32_t y) {
+        (void)panel.mouse(x, y, true);
+        const auto list = panel.mouse(x, y, false);
+        return std::make_pair(panel.take_goods(), list);
+    };
+    for (const std::int32_t y : {661, 667, 668, 673}) {
+        CHECK(click(100, y).first);
+        CHECK(click(200, y).first);
+    }
+    // Right below the letters the list button "Diplomatie" still answers.
+    const auto below = click(200, 674);
+    CHECK(!below.first);
+    CHECK(below.second == app::Selection::Kind::Diplomacy);
+}

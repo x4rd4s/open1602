@@ -379,3 +379,28 @@ TEST_CASE("goods window: the tab \"Routes\" lists the player's ships on trade ro
     (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
     CHECK(w.route_ships().size() == 2);
 }
+
+TEST_CASE("goods window: a button still held when it closed does not keep the other from clicking") {
+    // The right button pressed in the window, the window closed with it held (its release goes
+    // elsewhere): opened again, the left button clicks as before.
+    sim::World world = make_world();
+    GoodsWindow w(app::GoodsStyle{}, names(25), 192);
+    w.open();
+    (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    (void)w.mouse(5, 5, true, ui::MouseButton::Right);
+    w.open();
+    (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    click(w, kTab + static_cast<ui::Form::Id>(GoodsWindow::Tab::Producers));
+    CHECK(w.tab() == GoodsWindow::Tab::Producers);
+    // The same from a good of a Kontor's stock, and after the game lost the focus.
+    (void)w.mouse(5, 5, true, ui::MouseButton::Right);
+    w.open_ware(kWood, 0);
+    (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    click(w, kBack);
+    CHECK(!w.detail().has_value());
+    (void)w.mouse(5, 5, true, ui::MouseButton::Right);
+    w.cancel_press();
+    (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    click(w, kTab + static_cast<ui::Form::Id>(GoodsWindow::Tab::Trade));
+    CHECK(w.tab() == GoodsWindow::Tab::Trade);
+}
