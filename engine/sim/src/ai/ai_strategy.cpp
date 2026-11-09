@@ -23,8 +23,6 @@ constexpr std::uint32_t kMinStrategyMs = 10'000;
 constexpr std::uint64_t kWarCheckMs = 600'000;   // a war plan is looked at every ten minutes
 constexpr std::uint8_t kWarFails = 3;            // ... and given up after three looks without progress
 constexpr std::uint64_t kWarRestMs = 1'800'000;  // half an hour of peace before the next war
-constexpr std::int32_t kWarMoney = 3000;         // gold in hand to start a war
-constexpr std::uint32_t kWarUnits = 6;           // an army of six swordsmen's strength at least
 constexpr std::uint64_t kGoalHoldMs = 600'000;   // a goal holds ten minutes, unless debt or a threat end it
 
 const char* goal_name(std::uint8_t g) {
@@ -200,11 +198,12 @@ void Engine::plan_strategy(AiPlayer& p) {
     for (const CityPlan& r : p.plans) {
         aristocrats_near = aristocrats_near || r.stage >= stage::kMerchants2;
     }
-    const bool broke = money < 0 || net_income(p) < 0;
+    // In debt, or losing gold with little left.
+    const bool broke = money < 0 || (net_income(p) < 0 && money < 2000);
     war_plan(p, broke);
     if (broke) {
         g = goal::kEconomy;
-    } else if (threat || st.war_target != kNoPlayer || (pressing && st.character == character::kConqueror)) {
+    } else if (threat || st.war_target != kNoPlayer || st.war_arming) {
         g = goal::kMilitary;
     } else if (aristocrats_near && !p.present[kSlotGoldMine]) {
         g = goal::kGold;
@@ -284,17 +283,18 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         }
         return;
     }
+    // First it arms (the goal military), from its main city on; the war comes once the army and
+    // the gold are there.
+    st.war_arming = false;
     const bool willing =
         st.character == character::kConqueror || (st.character == character::kSettler && level >= 2) || level >= 3;
-    if (!willing || broke || player(p).money < kWarMoney || p.max_stage < stage::kMain2 ||
+    if (!willing || broke || p.max_stage < stage::kMain ||
         (st.war_ended_ms != 0 && now_ms() - st.war_ended_ms < kWarRestMs) ||
         player(p).scenario.has(scenario_flag::kPassive)) {
         return;
     }
+    const Balance& bal = m_world.balance();
     const std::uint32_t own = strength(p.player);
-    if (own < kWarUnits * unit_weights()[0]) {
-        return;
-    }
     PlayerId best = kNoPlayer;
     std::uint64_t best_ratio = 0;
     for (std::size_t bi = 0; bi < st.stances.size(); ++bi) {
@@ -310,6 +310,10 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         }
     }
     if (best == kNoPlayer) {
+        return;
+    }
+    if (own < bal.ai_war_units * unit_weights()[0] || player(p).money < static_cast<std::int64_t>(bal.ai_war_money)) {
+        st.war_arming = true;
         return;
     }
     st.war_target = best;

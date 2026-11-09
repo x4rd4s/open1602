@@ -744,3 +744,13 @@ TEST_CASE("balance: the improved computers' strategy is [computer_strategy], sav
     REQUIRE(loaded.ok());
     CHECK(loaded->balance() == balance);
 }
+
+TEST_CASE("balance: the improved computers' war plans are [computer_strategy], saved in BALA version 8") {
+    sim::Balance balance;
+    CHECK(balance.ai_war_units == 6);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "eager", "[computer_strategy]\nwar_units = 0\nwar_money = 0\n", warnings);
+    CHECK(warnings.empty());
+    CHECK(balance.ai_war_units == 0);
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithWar);
+}

@@ -432,6 +432,7 @@ struct Strategy {
     std::uint8_t war_fails = 0;
     std::uint32_t war_measure = 0;
     std::uint64_t war_ended_ms = 0;  ///< when its last war ended: no new one for a while
+    bool war_arming = false;         ///< it arms for a war (not saved: the next look sets it again)
 };
 
 struct AiPlayer {

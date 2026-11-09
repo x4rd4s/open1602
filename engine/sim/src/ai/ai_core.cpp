@@ -547,6 +547,7 @@ void Engine::init_player(AiPlayer& p) {
     const std::uint64_t fleet_ms = p.fleet_ms;
     const std::int32_t fleet_target = p.fleet_target;
     std::vector<std::pair<std::uint16_t, std::uint64_t>> left = std::move(p.left_islands);
+    Strategy strategy = std::move(p.strategy);  // its character, goal and war plan stay
     if (!classic()) {
         kept = std::move(p.plans);
     }
@@ -595,6 +596,7 @@ void Engine::init_player(AiPlayer& p) {
         p.fleet_ms = fleet_ms;
         p.fleet_target = fleet_target;
         p.left_islands = std::move(left);
+        p.strategy = std::move(strategy);
     }
     choose_home(p);
     const std::size_t ships = own_ships(p).size();

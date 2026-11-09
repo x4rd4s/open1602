@@ -479,9 +479,9 @@ The stances and the goal steer the army, the colonies and the peace offers.
 
 **Wars.** An improved computer plans a war on a rival it presses: a conqueror on any level, a
 settler from the third level on, a trader only on the hardest; humans are spared on the easiest.
-It needs a home city past its second stage, 3000 gold in hand, an army of six swordsmen's strength
-and half an hour of peace since its last war. It declares war, arms (its goal is military while
-the war lasts), and attacks the rival's cities as it attacks a human's: its ships land troops, its
+From its main city on, with half an hour of peace since its last war, it first arms (its goal
+is military); once it has an army of six swordsmen's strength (`war_units`) and 1500 gold in hand
+(`war_money`), it declares war, keeps arming while the war lasts, and attacks the rival's cities as it attacks a human's: its ships land troops, its
 soldiers on an island fight the enemy's and take its Kontor and houses. It makes no peace with its
 target and offers no trade while the war lasts. Every ten minutes it looks whether the war gets
 anywhere: the target has lost a twentieth of its inhabitants (a city counts as fifty). After three
