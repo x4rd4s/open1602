@@ -49,6 +49,21 @@ std::optional<Coast> coast_of(std::uint32_t id) {
     return std::nullopt;  // ground, forest, mountains
 }
 
+bool weighted_one_of(std::uint32_t id, std::span<const ids::WeightedId> list) {
+    return std::any_of(list.begin(), list.end(), [&](const auto& w) { return w.weight > 0 && w.id == id; });
+}
+
+/// Dry land of the climate: its dry grass, desert floor and marks.
+bool dry_ground(std::uint8_t climate, std::uint32_t id) {
+    const ids::DryLand& dry = ids::dry_land(climate);
+    return weighted_one_of(id, dry.grass) || weighted_one_of(id, dry.floor) || weighted_one_of(id, dry.scattered);
+}
+
+/// Ground of the climate: its meadows and dry land.
+bool climate_ground(std::uint8_t climate, std::uint32_t id) {
+    return weighted_one_of(id, ids::meadow(climate)) || dry_ground(climate, id);
+}
+
 int footprint(std::uint32_t id) {
     if (one_of(id, ids::kBigMountain) || id == ids::kVolcanoMountain) {
         return ids::kBigMountainSize;
@@ -448,10 +463,8 @@ TEST_CASE("island shapes: mountains in a ring of slopes turned to them, ground o
         if (footprint(t.cod_id()) > 1 && !one_of(t.cod_id(), ids::kRiverBend)) {
             mountains.push_back(&t);
         }
-        const bool ground = std::any_of(ids::kGroundMix.begin(), ids::kGroundMix.end(),
-                                        [&](const auto& g) { return g.id == t.cod_id(); });
-        if (ground) {
-            ++grounds[t.cod_id() == ids::kGround ? 0 : 1];
+        if (climate_ground(0, t.cod_id())) {
+            ++grounds[t.cod_id() == ids::kMeadowNorth[0].id ? 0 : 1];
         }
     }
     REQUIRE(mountains.size() == 5);
@@ -506,15 +519,63 @@ TEST_CASE("island shapes: the forest of the climate, or of the trees a climate o
     CHECK(count(own, [&](std::uint32_t id) { return id == r.trees[0] || id == r.trees[1]; }) == trees);
 }
 
+TEST_CASE("island shapes: dry land in patches, as much as the climate's templates have, desert in the south") {
+    for (std::uint8_t climate = 0; climate < 2; ++climate) {
+        sim::shapes::ShapeRequest r;
+        r.width = 160;
+        r.height = 140;
+        r.size = 4;
+        r.climate = climate;
+        r.seed = 21U + climate;
+        const assets::Island island = sim::shapes::make_island(r);
+        const int w = island.header.width;
+        std::vector<std::uint32_t> id(static_cast<std::size_t>(w * island.header.height), 0);
+        std::size_t ground = 0;
+        std::size_t dry = 0;
+        std::size_t floor = 0;
+        std::size_t other_climate = 0;
+        for (const assets::IslandTile& t : island.layers[0]) {
+            id[static_cast<std::size_t>(t.y * w + t.x)] = t.cod_id();
+            if (climate_ground(climate, t.cod_id())) {
+                ++ground;
+                dry += dry_ground(climate, t.cod_id()) ? 1U : 0U;
+                floor += weighted_one_of(t.cod_id(), ids::dry_land(climate).floor) ? 1U : 0U;
+            } else if (climate_ground(1U - climate, t.cod_id())) {
+                ++other_climate;  // the swamp of the south, the desert floor
+            }
+        }
+        REQUIRE(ground > 2000);
+        CHECK(other_climate == 0);
+        // As much dry land as the climate's templates, to a tile.
+        const std::size_t share = ids::dry_land(climate).share;
+        CHECK(dry == ground * share / 1000);
+        // The south's patches have a heart of desert, the north's none.
+        CHECK((climate == 0 ? floor == 0 : floor > 0));
+        // In patches: most dry tiles have dry land beside them, where the templates scatter it.
+        std::size_t joined = 0;
+        for (int y = 1; y + 1 < island.header.height; ++y) {
+            for (int x = 1; x + 1 < w; ++x) {
+                const auto at = [&](int ax, int ay) { return id[static_cast<std::size_t>(ay * w + ax)]; };
+                if (!dry_ground(climate, at(x, y))) {
+                    continue;
+                }
+                const int beside =
+                    (dry_ground(climate, at(x + 1, y)) ? 1 : 0) + (dry_ground(climate, at(x - 1, y)) ? 1 : 0) +
+                    (dry_ground(climate, at(x, y + 1)) ? 1 : 0) + (dry_ground(climate, at(x, y - 1)) ? 1 : 0);
+                joined += beside >= 2 ? 1U : 0U;
+            }
+        }
+        CHECK(joined * 10 >= dry * 7);
+    }
+}
+
 TEST_CASE("island shapes: the ground a climate of a package names, in the same places") {
     sim::shapes::ShapeRequest r;
     r.width = 60;
     r.height = 50;
     r.size = 3;
     r.seed = 7;
-    const auto mixed = [](std::uint32_t id) {
-        return std::any_of(ids::kGroundMix.begin(), ids::kGroundMix.end(), [&](const auto& g) { return g.id == id; });
-    };
+    const auto mixed = [](std::uint32_t id) { return climate_ground(0, id); };
     const auto count = [](const assets::Island& island, auto&& is) {
         std::size_t n = 0;
         for (const assets::IslandTile& t : island.layers[0]) {

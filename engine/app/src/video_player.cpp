@@ -33,9 +33,9 @@ std::optional<std::filesystem::path> find_video(const assets::GameDirectory& gam
 }
 
 template <typename V>
-constexpr bool kIsBink = std::is_same_v<V, video::Bink>;
+constexpr bool kIsBink = std::is_same_v<V, annokit::video::Bink>;
 template <typename V>
-constexpr bool kIsSmacker = std::is_same_v<V, video::Smacker>;
+constexpr bool kIsSmacker = std::is_same_v<V, annokit::video::Smacker>;
 
 std::uint64_t frame_us(const VideoPlayer::Clip& clip) {
     return std::visit(
@@ -62,19 +62,19 @@ bool next(VideoPlayer::Clip& clip) {
 }
 
 /// Opens the file and decodes the sound of the chosen tracks (bit i = track i, 0 = all).
-core::Result<VideoPlayer::Clip> open_clip(const std::filesystem::path& file, std::uint8_t tracks,
-                                          std::vector<std::shared_ptr<const audio::Pcm>>& sound) {
+annokit::core::Result<VideoPlayer::Clip> open_clip(const std::filesystem::path& file, std::uint8_t tracks,
+                                                   std::vector<std::shared_ptr<const annokit::audio::Pcm>>& sound) {
     const auto wanted = [tracks](std::size_t t) { return tracks == 0 || (t < 8 && (tracks & (1U << t)) != 0); };
-    const auto add = [&sound](core::Result<audio::Pcm> pcm) {
+    const auto add = [&sound](annokit::core::Result<annokit::audio::Pcm> pcm) {
         if (pcm && !pcm->samples.empty()) {
-            sound.push_back(std::make_shared<const audio::Pcm>(std::move(*pcm)));
+            sound.push_back(std::make_shared<const annokit::audio::Pcm>(std::move(*pcm)));
         }
     };
     std::string extension = file.extension().string();
     std::ranges::transform(extension, extension.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (extension == ".bk2") {
-        auto video = video::Bink::open_file(file);
+        auto video = annokit::video::Bink::open_file(file);
         if (!video) {
             return video.error();
         }
@@ -86,7 +86,7 @@ core::Result<VideoPlayer::Clip> open_clip(const std::filesystem::path& file, std
         return VideoPlayer::Clip{std::move(*video)};
     }
     if (extension == ".webm") {
-        auto video = video::Webm::open_file(file);
+        auto video = annokit::video::Webm::open_file(file);
         if (!video) {
             return video.error();
         }
@@ -97,11 +97,11 @@ core::Result<VideoPlayer::Clip> open_clip(const std::filesystem::path& file, std
         }
         return VideoPlayer::Clip{std::move(*video)};
     }
-    auto video = video::Smacker::open_file(file);
+    auto video = annokit::video::Smacker::open_file(file);
     if (!video) {
         return video.error();
     }
-    for (std::size_t t = 0; t < video::kSmackerTracks; ++t) {
+    for (std::size_t t = 0; t < annokit::video::kSmackerTracks; ++t) {
         if (video->info().tracks[t].present && wanted(t)) {
             add(video->audio(t));
         }
@@ -115,7 +115,7 @@ struct VideoPlayer::Loading {
     std::mutex mutex;
     bool done = false;
     std::optional<Clip> video;
-    std::vector<std::shared_ptr<const audio::Pcm>> audio;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> audio;
     std::string error;
 };
 
@@ -167,7 +167,7 @@ bool VideoPlayer::start(std::uint16_t number, bool loop, std::uint8_t tracks) {
     // they are shown, only the sound is decoded whole.
     std::thread([state, file = *path, tracks] {
         std::optional<Clip> video;
-        std::vector<std::shared_ptr<const audio::Pcm>> sound;
+        std::vector<std::shared_ptr<const annokit::audio::Pcm>> sound;
         std::string error;
         if (auto opened = open_clip(file, tracks, sound); !opened) {
             error = opened.error().message;

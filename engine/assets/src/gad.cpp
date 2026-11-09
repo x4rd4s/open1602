@@ -4,8 +4,9 @@
 #include <algorithm>
 #include <cctype>
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::assets {
 
@@ -175,13 +176,13 @@ GadgetLayout parse_gad(std::string_view text,
     return layout;
 }
 
-core::Result<GadgetLayout> load_gad(const GameDirectory& game, std::string_view name) {
+annokit::core::Result<GadgetLayout> load_gad(const GameDirectory& game, std::string_view name) {
     const std::string relative = "GADDATA/" + std::string(name);
     const auto path = game.resolve(relative);
     if (!path) {
-        return core::make_error(core::ErrorCode::NotFound, relative + " not found");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, relative + " not found");
     }
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     if (!bytes) {
         return bytes.error();
     }
@@ -190,7 +191,7 @@ core::Result<GadgetLayout> load_gad(const GameDirectory& game, std::string_view 
         if (!p) {
             return std::nullopt;
         }
-        auto b = core::read_file(*p);
+        auto b = annokit::core::read_file(*p);
         return b ? std::optional<std::string>(std::string(b->begin(), b->end())) : std::nullopt;
     };
     return parse_gad(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), include);

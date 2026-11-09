@@ -12,8 +12,9 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/world.hpp"
@@ -48,8 +49,9 @@ bool refuse_second_city(const sim::World& world, const sim::BuildOrder& order, s
 /// Takes the building covering `tile` of island `island` away, as its owner demolishes it: the
 /// ground comes back, land it held is checked again. A Kontor goes only once its city has no other
 /// building. Fails (NotFound) without a building there and (Unsupported) where it cannot go.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world,
-                                                                       const assets::BuildingTable& buildings,
-                                                                       std::uint16_t island, sim::TilePos tile);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world,
+                                                                                const assets::BuildingTable& buildings,
+                                                                                std::uint16_t island,
+                                                                                sim::TilePos tile);
 
 }  // namespace o1602::editor

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// enet_initialize() once for everything of the process that uses ENet (transports, LAN search).
+// enet_initialize() once for the LAN search of this module (annokit::net counts its own transports;
+// ENet starts and stops the socket library per call on Windows, so the two counts do not clash).
 #pragma once
 
 #include <enet/enet.h>

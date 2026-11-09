@@ -7,7 +7,8 @@
 
 #include "banner_graphic.hpp"
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/sim/game_data.hpp"
 #include "o1602/ui/localization.hpp"
 #include "o1602/ui/package_icons.hpp"

@@ -28,6 +28,22 @@ constexpr std::int32_t kRings = 16;
 constexpr std::int32_t kSearchPositions = 32;
 /// Open1602: the trees next to a woodcutter enough where no place has the usual 10 (search_farm).
 constexpr std::int32_t kSparseWoodTrees = 4;
+/// Open1602, town_zone(): houses beyond those there are that the zone has room for, and its
+/// smallest and largest radius.
+constexpr std::int32_t kZoneSpareHouses = 12;
+constexpr std::int32_t kZoneMinRadius = 8;
+constexpr std::int32_t kZoneMaxRadius = 30;
+/// Open1602: the houses a city has before its town zone is planned.
+constexpr std::int32_t kZoneFirstHouses = 12;
+/// Open1602: added to the score of a site on the right side of the town zone, so that any such site
+/// wins over any on the wrong side, which is taken only where none is left.
+constexpr std::int32_t kZoneTier = 1 << 16;
+/// Open1602: tiles inside the town zone's edge a workshop may stand without taking house land.
+constexpr std::int32_t kZoneWorkshopDepth = 4;
+/// Open1602: rings between a market in the town zone and the city's other markets and its Kontor.
+constexpr std::int32_t kTownMarketSpacing = 12;
+/// Open1602: unclaimed tiles about a market site from which it counts as claiming land.
+constexpr std::int32_t kMarketClaim = 150;
 /// Island rows the wide quarry and mine search scans per step (TB-15).
 constexpr std::int32_t kMineRows = 8;
 
@@ -167,6 +183,20 @@ Site gen_sized(const Segment& s, std::int32_t cx, std::int32_t cy, std::int32_t 
 
 }  // namespace
 
+namespace {
+
+/// Open1602: a farm's or a workshop's score, raised above every site deeper in the town zone when
+/// its middle lies more than `margin` tiles beyond the zone's edge (a negative margin: less than so
+/// many inside it).
+std::int32_t outside_zone(const TownZone* zone, std::int32_t margin, const Site& c, std::int32_t score) {
+    if (zone == nullptr || score <= 0) {
+        return score;
+    }
+    return zone_excess(*zone, c.x0, c.y0, c.x1, c.y1) > margin ? score + kZoneTier : score;
+}
+
+}  // namespace
+
 // ---------------------------------------------------------------------------------------------
 // Road runs (task 7)
 
@@ -295,6 +325,161 @@ void Engine::build_segments(AiPlayer& p) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// The town zone (Open1602)
+
+namespace {
+
+std::int32_t isqrt32(std::int64_t v) {
+    if (v <= 0) {
+        return 0;
+    }
+    std::int64_t r = 0;
+    std::int64_t bit = std::int64_t{1} << 40;
+    while (bit > v) {
+        bit >>= 2;
+    }
+    while (bit != 0) {
+        if (v >= r + bit) {
+            v -= r + bit;
+            r = (r >> 1) + bit;
+        } else {
+            r >>= 1;
+        }
+        bit >>= 2;
+    }
+    return static_cast<std::int32_t>(r);
+}
+
+}  // namespace
+
+TownStyle town_style(std::uint32_t seed, std::uint16_t island, std::uint8_t city) {
+    // From the computer's number drawn for this game, the island and the city: two computers, and
+    // two cities of one, plan their towns differently, the same computer differently in another
+    // game, and the same city the same way after a game is loaded.
+    std::uint64_t h = (static_cast<std::uint64_t>(seed) << 24) ^ (static_cast<std::uint64_t>(island) << 8) ^ city;
+    h += 0x9E3779B97F4A7C15ULL;
+    h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    h = (h ^ (h >> 27)) * 0x94D049BB133111EBULL;
+    h ^= h >> 31;
+    TownStyle t;
+    t.room = 6 + static_cast<std::int32_t>(h % 4);              // 6 (close) to 9 (spacious) tiles a house
+    t.shift = static_cast<std::int32_t>((h >> 8) % 5);          // 0 to 4 tiles away from the Kontor
+    t.block = 7 + static_cast<std::int32_t>((h >> 16) % 3);     // roads every 8 to 10 tiles
+    t.field_margin = static_cast<std::int32_t>((h >> 24) % 4);  // fields 0 to 3 tiles further out
+    return t;
+}
+
+TownStyle Engine::town_style_of(AiPlayer& p) {
+    if (p.town_seed == 0) {
+        p.town_seed = rng().below(0xFFFFFFFFU) + 1;
+    }
+    return town_style(p.town_seed, p.island, p.city);
+}
+
+std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1) {
+    const std::int64_t dx = static_cast<std::int64_t>(x0 + x1) - 2 * z.cx;
+    const std::int64_t dy = static_cast<std::int64_t>(y0 + y1) - 2 * z.cy;
+    return isqrt32(dx * dx + dy * dy) / 2 - z.radius;
+}
+
+const TownZone& Engine::town_zone(AiPlayer& p) {
+    CityScans& known = city_scans(p.island, p.city);
+    const std::uint64_t revision = island_revision(p.island);
+    if (known.zone_revision == revision) {
+        return known.zone;
+    }
+    known.zone_revision = revision;
+    TownZone& z = known.zone;
+    z = TownZone{};
+    const City* c = current_city(p);
+    if (c == nullptr || !c->warehouse_x || !c->warehouse_y) {
+        return z;
+    }
+    // A new city is founded as in the original: its first houses go next to its market, which keeps
+    // it on time for the settlers; the town is planned once it has outgrown them.
+    std::int32_t houses = 0;
+    for (const House& hs : m_world.houses()) {
+        houses += hs.island == p.island && hs.city == p.city ? 1 : 0;
+    }
+    if (houses < kZoneFirstHouses) {
+        return z;
+    }
+    const IslandMap& map = island_of(p.island).map;
+    const auto w = static_cast<std::int32_t>(map.width());
+    const auto h = static_cast<std::int32_t>(map.height());
+    const std::int32_t kx = *c->warehouse_x + 1;
+    const std::int32_t ky = *c->warehouse_y + 1;
+    // The middle: the market nearest the Kontor, else the Kontor.
+    std::int32_t mx = kx;
+    std::int32_t my = ky;
+    std::int64_t nearest = -1;
+    for (std::int32_t y = 0; y < h; ++y) {
+        for (std::int32_t x = 0; x < w; ++x) {
+            if (map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)).city != p.city) {
+                continue;
+            }
+            const Tile t = tile(p.island, x, y);
+            if (!t.origin || t.prod != prod::kMarket || t.type->destroyed) {
+                continue;
+            }
+            const std::int32_t cx = x + static_cast<std::int32_t>(t.type->size_x) / 2;
+            const std::int32_t cy = y + static_cast<std::int32_t>(t.type->size_y) / 2;
+            const std::int64_t d = std::int64_t{cx - kx} * (cx - kx) + std::int64_t{cy - ky} * (cy - ky);
+            if (nearest < 0 || d < nearest) {
+                nearest = d;
+                mx = cx;
+                my = cy;
+            }
+        }
+    }
+    const TownStyle style = town_style_of(p);
+    // Some towns lie a little further inland from the Kontor than others.
+    if (style.shift != 0 && (mx != kx || my != ky)) {
+        const std::int32_t len =
+            std::max(1, isqrt32(std::int64_t{mx - kx} * (mx - kx) + std::int64_t{my - ky} * (my - ky)));
+        mx += (mx - kx) * style.shift / len;
+        my += (my - ky) * style.shift / len;
+    }
+    // As large as the room of the houses there are and a dozen more.
+    const std::int64_t wanted = static_cast<std::int64_t>(houses + kZoneSpareHouses) * style.room;
+    std::int64_t room = 0;
+    std::int32_t r = kZoneMinRadius;
+    std::vector<std::int64_t> by_ring(static_cast<std::size_t>(kZoneMaxRadius) + 1, 0);
+    for (std::int32_t y = std::max(0, my - kZoneMaxRadius); y <= std::min(h - 1, my + kZoneMaxRadius); ++y) {
+        for (std::int32_t x = std::max(0, mx - kZoneMaxRadius); x <= std::min(w - 1, mx + kZoneMaxRadius); ++x) {
+            const std::int32_t d = isqrt32(std::int64_t{x - mx} * (x - mx) + std::int64_t{y - my} * (y - my));
+            if (d > kZoneMaxRadius) {
+                continue;
+            }
+            const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            if (cell.city != p.city && cell.city != MapCell::kNoCity) {
+                continue;
+            }
+            const Tile t = tile(p.island, x, y);
+            const bool land =
+                t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin || t.kind == kind::kRoad ||
+                t.kind == kind::kSquare ||
+                (t.kind == kind::kBuilding && (t.prod == prod::kHouse || t.prod == prod::kMarket ||
+                                               (t.prod >= prod::kPublicFirst && t.prod <= prod::kPublicLast)));
+            if (land) {
+                ++by_ring[static_cast<std::size_t>(d)];
+            }
+        }
+    }
+    for (r = 0; r <= kZoneMaxRadius; ++r) {
+        room += by_ring[static_cast<std::size_t>(r)];
+        if (r >= kZoneMinRadius && room >= wanted) {
+            break;
+        }
+    }
+    z.valid = true;
+    z.cx = mx;
+    z.cy = my;
+    z.radius = std::min(r, kZoneMaxRadius);
+    return z;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Search state and walking along the runs
 
 void Engine::start_search(AiPlayer& p, const assets::BuildingType& b, std::uint8_t slot, bool from_start) {
@@ -386,6 +571,10 @@ bool Engine::search_houses(AiPlayer& p) {
     if (b == nullptr) {
         return true;
     }
+    const TownZone* zone = classic() ? nullptr : &town_zone(p);
+    if (zone != nullptr && !zone->valid) {
+        zone = nullptr;
+    }
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -467,7 +656,12 @@ bool Engine::search_houses(AiPlayer& p) {
                       }
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-            const std::int32_t score = parity_penalty(acc.score, parity, 8);
+            std::int32_t score = parity_penalty(acc.score, parity, 8);
+            if (zone != nullptr && score > 0) {
+                // Open1602: houses in the town zone first, the nearer its middle the better.
+                const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
+                score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
+            }
             if (acc.market && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -492,6 +686,7 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
         return true;
     }
     const std::uint8_t raw = b->raw_ware;
+    const TownZone* zone = !classic() && town_zone(p).valid ? &town_zone(p) : nullptr;
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -536,7 +731,9 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
                       }
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-            const std::int32_t score = cannons ? acc.score : parity_penalty(acc.score, parity, 4);
+            std::int32_t score = cannons ? acc.score : parity_penalty(acc.score, parity, 4);
+            // Open1602: workshops at the edge of the town zone or outside, not on its house land.
+            score = outside_zone(zone, -kZoneWorkshopDepth, c, score);
             if (acc.market && acc.road && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -616,6 +813,8 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
     // trees planted about it (task_farm) feed; the original's computer built none and ran out of wood.
     const bool sparse = woodcutter && s.phase == 1;
     const bool improved = !woodcutter && !classic();
+    const TownZone* zone = improved && town_zone(p).valid ? &town_zone(p) : nullptr;
+    const std::int32_t margin = improved ? town_style_of(p).field_margin : 0;
     const auto finished = [&] {
         if (woodcutter && s.best == 0 && s.phase == 0 && !classic()) {
             start_search(p, *b, s.slot, false);
@@ -708,7 +907,8 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                     acc.score += 32;
                 }
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-                const std::int32_t score = away_from_town(parity_penalty(acc.score, parity, 4), acc.extra);
+                const std::int32_t score =
+                    outside_zone(zone, margin, c, away_from_town(parity_penalty(acc.score, parity, 4), acc.extra));
                 const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10) : acc.count >= 19;
                 if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
@@ -737,6 +937,8 @@ bool Engine::search_grain(AiPlayer& p) {
         return true;
     }
     const bool improved = !classic();
+    const TownZone* zone = improved && town_zone(p).valid ? &town_zone(p) : nullptr;
+    const std::int32_t margin = improved ? town_style_of(p).field_margin : 0;
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -784,7 +986,8 @@ bool Engine::search_grain(AiPlayer& p) {
                       }
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-            const std::int32_t score = away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra);
+            const std::int32_t score = outside_zone(
+                zone, margin, c, away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra));
             if (acc.count >= 9 && acc.road && acc.market && score > s.best &&
                 farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                 s.best = score;
@@ -870,6 +1073,10 @@ bool Engine::search_market(AiPlayer& p) {
         return true;
     }
     const std::int32_t min_dist = r->slots[kSlotMarket].count == 0 ? 5 : 8;
+    // Open1602: in the town zone, where a market serves houses rather than claims land, markets keep
+    // 12 rings apart, three quarters of their reach; the original's 8 gave a town of a hundred houses
+    // a dozen markets on its house land.
+    const TownZone* zone = !classic() && town_zone(p).valid ? &town_zone(p) : nullptr;
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -910,7 +1117,11 @@ bool Engine::search_market(AiPlayer& p) {
             if (c.w() == static_cast<std::int32_t>(b->size_x)) {
                 score += 16;
             }
-            if (acc.market && acc.road && nearest > min_dist && free > 40 && nearest >= s.extra && score >= s.best) {
+            const std::int32_t spacing = min_dist == 8 && zone != nullptr && free < kMarketClaim &&
+                                                 zone_excess(*zone, c.x0, c.y0, c.x1, c.y1) <= 0
+                                             ? kTownMarketSpacing
+                                             : min_dist;
+            if (acc.market && acc.road && nearest > spacing && free > 40 && nearest >= s.extra && score >= s.best) {
                 s.best = std::max(score, 1);
                 s.extra = nearest;
                 s.best_x0 = c.x0;

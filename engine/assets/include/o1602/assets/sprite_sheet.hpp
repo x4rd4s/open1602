@@ -5,9 +5,10 @@
 #include <filesystem>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/palette.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -39,8 +40,8 @@ struct SpriteInfo {
 /// Sprites are decoded lazily on request; the sheet only keeps the compressed file in memory.
 class SpriteSheet {
 public:
-    static core::Result<SpriteSheet> from_chunk_file(ChunkFile file);
-    static core::Result<SpriteSheet> load(const std::filesystem::path& path);
+    static annokit::core::Result<SpriteSheet> from_chunk_file(ChunkFile file);
+    static annokit::core::Result<SpriteSheet> load(const std::filesystem::path& path);
 
     [[nodiscard]] std::size_t size() const noexcept { return m_infos.size(); }
     [[nodiscard]] const SpriteInfo& info(std::size_t index) const { return m_infos.at(index); }
@@ -49,11 +50,11 @@ public:
     /// transparent image.
     /// `extra_width` widens the image to keep pixels right of the record's width (font glyphs
     /// overhang into the next one).
-    [[nodiscard]] core::Result<IndexedImage> decode(std::size_t index, std::uint32_t extra_width = 0) const;
+    [[nodiscard]] annokit::core::Result<IndexedImage> decode(std::size_t index, std::uint32_t extra_width = 0) const;
 
 private:
-    [[nodiscard]] core::Result<IndexedImage> decode_true_colour(std::size_t index, const SpriteInfo& info,
-                                                                IndexedImage image) const;
+    [[nodiscard]] annokit::core::Result<IndexedImage> decode_true_colour(std::size_t index, const SpriteInfo& info,
+                                                                         IndexedImage image) const;
 
     ChunkFile m_file;
     Chunk m_chunk;  // stored by value so the sheet stays safely copyable/movable

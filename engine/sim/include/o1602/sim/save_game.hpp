@@ -15,10 +15,11 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::sim {
@@ -63,23 +64,26 @@ struct SaveInfo {
 
 /// The whole file. With the running `simulation` its clocks and figures are saved too, so the game
 /// continues exactly; without one, a world loaded but not yet run keeps those it was loaded with.
-[[nodiscard]] core::Result<core::Bytes> write_game(const World& world, const assets::BuildingTable& buildings,
-                                                   const Simulation* simulation = nullptr,
-                                                   const SaveOptions& options = {});
+[[nodiscard]] annokit::core::Result<annokit::core::Bytes> write_game(const World& world,
+                                                                     const assets::BuildingTable& buildings,
+                                                                     const Simulation* simulation = nullptr,
+                                                                     const SaveOptions& options = {});
 
 /// write_game in two steps, so that the second can run on another thread while the game goes on
 /// (a multiplayer host packing the game for a computer that joins, TB-26): the sections, unpacked,
 /// as they are now (refused if the game is too large to read back), and the file around them.
 /// pack_game reads nothing but `sections`, so any thread may call it.
-[[nodiscard]] core::Result<core::Bytes> encode_game(const World& world, const assets::BuildingTable& buildings,
-                                                    const Simulation* simulation = nullptr);
-[[nodiscard]] core::Result<core::Bytes> pack_game(const core::Bytes& sections, const SaveOptions& options = {});
+[[nodiscard]] annokit::core::Result<annokit::core::Bytes> encode_game(const World& world,
+                                                                      const assets::BuildingTable& buildings,
+                                                                      const Simulation* simulation = nullptr);
+[[nodiscard]] annokit::core::Result<annokit::core::Bytes> pack_game(const annokit::core::Bytes& sections,
+                                                                    const SaveOptions& options = {});
 
 /// The header of a savegame and its META section (checks magic and version, not the data; unpacks
 /// only the head of the sections).
-[[nodiscard]] core::Result<SaveInfo> save_info(std::span<const std::uint8_t> bytes);
+[[nodiscard]] annokit::core::Result<SaveInfo> save_info(std::span<const std::uint8_t> bytes);
 /// The same from the head of a file of `file_size` bytes (kSaveInfoHead bytes are enough).
-[[nodiscard]] core::Result<SaveInfo> save_info(std::span<const std::uint8_t> head, std::uint64_t file_size);
+[[nodiscard]] annokit::core::Result<SaveInfo> save_info(std::span<const std::uint8_t> head, std::uint64_t file_size);
 /// How much of a savegame save_info needs: the header and the packed head of the sections.
 inline constexpr std::size_t kSaveInfoHead = 64 * 1024;
 /// The description of a scenario (SCNI) whole, with its briefings, from the start of its file
@@ -93,8 +97,9 @@ inline constexpr std::size_t kScenarioHead = 1024 * 1024;
 /// the `figures` it also fails if the state of the running game cannot be read
 /// (Simulation::state_readable); without them, the Simulation finds that out when it starts and
 /// begins afresh (Simulation::state_damaged).
-[[nodiscard]] core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
-                                            std::vector<std::string>* warnings = nullptr,
-                                            const assets::FigureTable* figures = nullptr);
+[[nodiscard]] annokit::core::Result<World> read_game(std::span<const std::uint8_t> bytes,
+                                                     const assets::BuildingTable& buildings,
+                                                     std::vector<std::string>* warnings = nullptr,
+                                                     const assets::FigureTable* figures = nullptr);
 
 }  // namespace o1602::sim

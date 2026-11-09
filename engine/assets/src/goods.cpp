@@ -5,10 +5,11 @@
 #include <charconv>
 #include <optional>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/localized_names.hpp"
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::assets {
 
@@ -79,9 +80,9 @@ void Goods::list(std::uint8_t number) {
     m_trade.insert(std::upper_bound(m_trade.begin(), m_trade.end(), number), number);
 }
 
-core::Result<std::uint8_t> Goods::add(OwnGood good) {
+annokit::core::Result<std::uint8_t> Goods::add(OwnGood good) {
     if (own(std::string_view(good.id)) != nullptr) {
-        return core::make_error(core::ErrorCode::Unsupported, good.id + " is there already");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, good.id + " is there already");
     }
     for (std::uint32_t w = ware::kFirstOwn; w <= ware::kLastOwn; ++w) {
         if (own(w) == nullptr) {
@@ -92,20 +93,20 @@ core::Result<std::uint8_t> Goods::add(OwnGood good) {
             return number;
         }
     }
-    return core::make_error(core::ErrorCode::Unsupported, "no ware number is free: a game has at most " +
-                                                              std::to_string(ware::kLastOwn - ware::kFirstOwn + 1) +
-                                                              " goods of packages");
+    return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                     "no ware number is free: a game has at most " +
+                                         std::to_string(ware::kLastOwn - ware::kFirstOwn + 1) + " goods of packages");
 }
 
-core::Status Goods::restore(OwnGood good) {
+annokit::core::Status Goods::restore(OwnGood good) {
     if (good.number < ware::kFirstOwn || own(good.number) != nullptr || own(std::string_view(good.id)) != nullptr ||
         good.id.empty() || good.price == 0 || good.price > kMaxPrice || !is_trade_ware(good.icon)) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "a good that cannot be: " + good.id);
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "a good that cannot be: " + good.id);
     }
     const std::uint8_t number = good.number;
     m_own.push_back(std::move(good));
     list(number);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::optional<std::uint8_t> ware_of(const Goods& goods, std::string_view id) {
@@ -135,12 +136,12 @@ std::optional<std::uint8_t> ware_of(const Goods& goods, std::string_view id) {
 void apply_goods_file(Goods& goods, std::string_view package, std::string_view utf8, std::vector<std::string>& warnings,
                       std::span<const PackageIcon> icons) {
     const std::string where = std::string(package) + "/" + std::string(kGoodsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: a good's name holds only lower case letters, digits and '_'");
@@ -153,7 +154,7 @@ void apply_goods_file(Goods& goods, std::string_view package, std::string_view u
             continue;
         }
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "price") {
                 const std::int64_t* n = e.value.integer();
@@ -185,7 +186,7 @@ void apply_goods_file(Goods& goods, std::string_view package, std::string_view u
                     warnings.push_back(field + "is a text");
                     ok = false;
                 } else {
-                    good.names.emplace_back(language, core::utf8_to_cp1252(*e.value.string()));
+                    good.names.emplace_back(language, annokit::core::utf8_to_cp1252(*e.value.string()));
                 }
             } else {
                 warnings.push_back(field + "is no field of a good and is passed over");

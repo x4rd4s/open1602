@@ -5,7 +5,7 @@
 #include <cctype>
 #include <utility>
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
 
 namespace o1602::ui {
 
@@ -375,7 +375,7 @@ std::vector<std::string> KeyBindings::read_text(std::string_view text, const Key
     };
     std::vector<Seen> seen;
     std::size_t line_no = 0;
-    text = core::skip_utf8_bom(text);
+    text = annokit::core::skip_utf8_bom(text);
     while (!text.empty()) {
         const std::size_t nl = text.find('\n');
         std::string_view line = text.substr(0, nl);

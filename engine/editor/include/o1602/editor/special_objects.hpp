@@ -11,8 +11,9 @@
 #include <memory>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/world.hpp"
@@ -62,10 +63,11 @@ enum class SpecialRefusal : std::uint8_t {
 
 /// `piece` turned by `rotation` placed with its top-left corner at `origin`, without owner and
 /// city; a growing field starts growing from its stage. An error if it does not fit.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> place_special(const sim::World& world,
-                                                                     const assets::BuildingTable& buildings,
-                                                                     std::uint16_t island, sim::TilePos origin,
-                                                                     const SpecialPiece& piece, std::uint8_t rotation);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> place_special(const sim::World& world,
+                                                                              const assets::BuildingTable& buildings,
+                                                                              std::uint16_t island, sim::TilePos origin,
+                                                                              const SpecialPiece& piece,
+                                                                              std::uint8_t rotation);
 
 /// The name of a refusal for messages and logs.
 [[nodiscard]] const char* refusal_name(SpecialRefusal refusal) noexcept;

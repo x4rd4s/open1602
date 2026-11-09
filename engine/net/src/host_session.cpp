@@ -68,7 +68,7 @@ struct HostSession::Peer {
         Loading,   ///< its game is on the way or loading
         Playing,
     };
-    LinkId link = 0;
+    annokit::net::LinkId link = 0;
     std::string address;  ///< as the transport sees it, for the others if this one hosts next
     State state = State::Greeting;
     bool gone = false;  ///< dropped; removed at the end of the update
@@ -94,7 +94,7 @@ struct HostSession::Peer {
     std::deque<FrameHash> hashes;     ///< reported ahead of the host, not compared yet
 };
 
-HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& simulation,
+HostSession::HostSession(std::unique_ptr<annokit::net::Transport> transport, sim::Simulation& simulation,
                          const assets::BuildingTable& buildings, Seat seat, std::string name, std::uint64_t content,
                          SessionConfig config)
     : Session(std::move(transport), std::move(config)),
@@ -131,7 +131,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, sim::Simulation& 
     init_lobby();
 }
 
-HostSession::HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat seat, std::string name,
+HostSession::HostSession(std::unique_ptr<annokit::net::Transport> transport, Lobby lobby, Seat seat, std::string name,
                          std::uint64_t content, SessionConfig config)
     : Session(std::move(transport), std::move(config)),
       m_simulation(nullptr),
@@ -161,7 +161,7 @@ HostSession::HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat
     init_lobby();
 }
 
-HostSession::HostSession(std::unique_ptr<Transport> transport, ClientSession& client,
+HostSession::HostSession(std::unique_ptr<annokit::net::Transport> transport, ClientSession& client,
                          const assets::BuildingTable& buildings)
     : Session(std::move(transport), client.m_config),
       m_simulation(client.m_simulation),
@@ -350,21 +350,21 @@ void HostSession::tell_dropped() {
 void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick) {
     m_incoming.clear();
     m_transport->poll(m_incoming);
-    for (TransportEvent& e : m_incoming) {
+    for (annokit::net::TransportEvent& e : m_incoming) {
         switch (e.kind) {
-            case TransportEvent::Kind::Connected: {
+            case annokit::net::TransportEvent::Kind::Connected: {
                 auto peer = std::make_unique<Peer>();
                 peer->link = e.link;
                 peer->address = m_transport->address(e.link);
                 m_peers.push_back(std::move(peer));
                 break;
             }
-            case TransportEvent::Kind::Disconnected:
+            case annokit::net::TransportEvent::Kind::Disconnected:
                 if (Peer* p = peer_of(e.link)) {
                     drop(*p, std::nullopt);
                 }
                 break;
-            case TransportEvent::Kind::Received:
+            case annokit::net::TransportEvent::Kind::Received:
                 receive(e.link, e.data);
                 break;
         }
@@ -432,13 +432,13 @@ void HostSession::update(std::uint32_t real_ms, const sim::Simulation::BeforeTic
     m_transport->flush();
 }
 
-HostSession::Peer* HostSession::peer_of(LinkId link) {
+HostSession::Peer* HostSession::peer_of(annokit::net::LinkId link) {
     const auto it =
         std::find_if(m_peers.begin(), m_peers.end(), [link](const auto& p) { return !p->gone && p->link == link; });
     return it == m_peers.end() ? nullptr : it->get();
 }
 
-void HostSession::receive(LinkId link, std::span<const std::uint8_t> bytes) {
+void HostSession::receive(annokit::net::LinkId link, std::span<const std::uint8_t> bytes) {
     Peer* peer = peer_of(link);
     if (peer == nullptr) {
         return;
@@ -1227,7 +1227,7 @@ void HostSession::refresh_roster() {
     m_roster.clear();
     m_roster_links.clear();
     m_roster.push_back(Member{m_seat, m_name, Member::State::Playing, true, 100});
-    m_roster_links.push_back(LinkId{});  // the host itself: never sent away
+    m_roster_links.push_back(annokit::net::LinkId{});  // the host itself: never sent away
     for (const auto& p : m_peers) {
         if (p->gone || !p->welcomed) {
             continue;

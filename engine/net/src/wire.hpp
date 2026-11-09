@@ -10,7 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "o1602/core/byte_reader.hpp"
+#include "annokit/core/byte_reader.hpp"
+
 #include "o1602/net/protocol.hpp"
 #include "o1602/sim/command_io.hpp"
 
@@ -24,7 +25,7 @@ public:
     [[nodiscard]] bool ok() const noexcept { return m_ok; }
     [[nodiscard]] bool at_end() const noexcept { return m_reader.at_end(); }
     void fail() noexcept { m_ok = false; }
-    core::ByteReader& reader() noexcept { return m_reader; }
+    annokit::core::ByteReader& reader() noexcept { return m_reader; }
 
     std::uint8_t u8() { return take(m_reader.u8()); }
     std::uint16_t u16() { return take(m_reader.u16()); }
@@ -81,7 +82,7 @@ private:
         return *v;
     }
 
-    core::ByteReader m_reader;
+    annokit::core::ByteReader m_reader;
     bool m_ok = true;
 };
 

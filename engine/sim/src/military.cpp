@@ -592,16 +592,17 @@ void Military::regenerate() {
     std::erase_if(list, [](const BuildingDamage& d) { return d.damage == 0; });
 }
 
-void Military::save(core::ByteWriter& out) const {
+void Military::save(annokit::core::ByteWriter& out) const {
     out.u32(m_regen_ms);
     out.u32(m_castle_ms);
     out.u32(m_native_ticks);
     out.u32(m_first_id);
 }
 
-core::Status Military::load(core::ByteReader& reader, std::uint16_t version) {
+annokit::core::Status Military::load(annokit::core::ByteReader& reader, std::uint16_t version) {
     if (version < 1 || version > kStateVersion) {
-        return core::make_error(core::ErrorCode::Unsupported, "MILI: version " + std::to_string(version));
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "MILI: version " + std::to_string(version));
     }
     // Read whole first, then taken over: a failed load leaves the clocks as they were.
     StateIn in(reader);
@@ -610,13 +611,13 @@ core::Status Military::load(core::ByteReader& reader, std::uint16_t version) {
     const std::uint32_t native_ticks = version >= 3 ? in.u32() : m_native_ticks;
     const std::uint32_t first_id = version >= 4 ? in.u32() : kNoUnit;
     if (!in.ok()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "MILI: cut off");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "MILI: cut off");
     }
     m_regen_ms = regen % kRegenEpochMs;
     m_castle_ms = castle_ms;
     m_native_ticks = native_ticks;
     m_first_id = first_id;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace o1602::sim

@@ -6,9 +6,10 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/island.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/player.hpp"
 
 namespace o1602::sim {
@@ -94,19 +95,20 @@ public:
     /// order. Previous content of the covered tiles moves to the ground layer (demolishing restores
     /// it from there, so former river tiles stay water - S-009).
     /// Fails (without changes) if the rotated footprint leaves the island.
-    core::Status place(const assets::BuildingType& building, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                       std::uint8_t anim_phase, PlayerId owner = kNoPlayer, std::uint8_t city = MapCell::kNoCity);
+    annokit::core::Status place(const assets::BuildingType& building, std::int32_t x, std::int32_t y,
+                                std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner = kNoPlayer,
+                                std::uint8_t city = MapCell::kNoCity);
 
     /// A building the player builds: like place(), but the ground layer stays as it is
     /// (it keeps the island's original terrain, which demolishing restores).
-    core::Status build(const assets::BuildingType& building, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                       std::uint8_t anim_phase, PlayerId owner, std::uint8_t city);
+    annokit::core::Status build(const assets::BuildingType& building, std::int32_t x, std::int32_t y,
+                                std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner, std::uint8_t city);
 
     /// A tile of a saved island (INSELHAUS): written on top like the original's loader;
     /// with `to_ground` it also becomes the tile's ground. Nothing moves down.
-    core::Status load(const assets::BuildingType& building, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                      std::uint8_t anim_phase, PlayerId owner, std::uint8_t city, bool to_ground,
-                      std::uint8_t random = 0);
+    annokit::core::Status load(const assets::BuildingType& building, std::int32_t x, std::int32_t y,
+                               std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner, std::uint8_t city,
+                               bool to_ground, std::uint8_t random = 0);
 
     /// Takes the current picture as the original terrain of every tile (the ground layer the
     /// original keeps).
@@ -144,8 +146,8 @@ public:
 
     /// Replaces the building whose footprint lies at (x, y) by another one of the same size in
     /// place (a house changing class, ruins): owner, city and the ground below stay.
-    core::Status replace(const assets::BuildingType& building, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                         std::uint8_t anim_phase);
+    annokit::core::Status replace(const assets::BuildingType& building, std::int32_t x, std::int32_t y,
+                                  std::uint8_t rotation, std::uint8_t anim_phase);
 
     /// Inverse of place() for one tile: building and placement origin.
     [[nodiscard]] SubTile sub_tile(const assets::BuildingTable& buildings, std::uint32_t x, std::uint32_t y) const;
@@ -188,8 +190,9 @@ public:
 
 private:
     enum class Mode : std::uint8_t { Place, Replace, Build, Load, LoadGround };
-    core::Status write(const assets::BuildingType& building, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                       std::uint8_t anim_phase, PlayerId owner, std::uint8_t city, Mode mode, std::uint8_t random = 0);
+    annokit::core::Status write(const assets::BuildingType& building, std::int32_t x, std::int32_t y,
+                                std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner, std::uint8_t city,
+                                Mode mode, std::uint8_t random = 0);
     [[nodiscard]] std::size_t index(std::uint32_t x, std::uint32_t y) const { return std::size_t{y} * m_width + x; }
     /// A new revision for the block of tile (x, y) (block_revision()).
     void touch(std::uint32_t x, std::uint32_t y) {

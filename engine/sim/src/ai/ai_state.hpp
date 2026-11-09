@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 7;
+inline constexpr std::uint32_t kStateVersion = 8;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -28,6 +28,8 @@ inline constexpr std::uint32_t kStateWithWideFlags = 6;
 /// Version 7: the farm a city is to move and the one a search moves (CityPlan::move_x/move_y,
 /// Search::move_x/move_y). Written only while a move is due.
 inline constexpr std::uint32_t kStateWithMove = 7;
+/// Version 8: the number a computer's town plans are drawn from (AiPlayer::town_seed).
+inline constexpr std::uint32_t kStateWithTownSeed = 8;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -416,6 +418,9 @@ struct AiPlayer {
     // Own shipyard
     bool yard_valid = false;
     bool yard_wanted = false;  ///< Open1602 (GB-2): the 10-s logistics asked for a yard (state 3)
+    /// Open1602: drawn at random once per game and computer, how it plans its towns (town_style());
+    /// 0 until the first town plan draws it (state 8).
+    std::uint32_t town_seed = 0;
     std::uint16_t yard_island = 0;
     std::uint16_t yard_x = 0;
     std::uint16_t yard_y = 0;

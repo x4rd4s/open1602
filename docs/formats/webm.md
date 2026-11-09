@@ -2,7 +2,7 @@
 
 Not a format of the original: the modern, royalty-free video format content packages may use for
 the videos of their messages, besides Smacker (`.smk`, [smk.md](smk.md)) and Bink 2 (`.bk2`,
-[bk2.md](bk2.md)). Code: `engine/video/include/o1602/video/webm.hpp`, `engine/video/src/webm.cpp`.
+[bk2.md](bk2.md)). Code: `modules/video/include/annokit/video/webm.hpp` of annokit, `modules/video/src/webm.cpp` of annokit.
 
 ## What is played
 

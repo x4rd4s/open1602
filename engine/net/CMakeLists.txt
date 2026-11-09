@@ -1,13 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Multiplayer: lockstep through the host over ENet (ADR 0011). Depends on sim only, never on
-# platform, render, audio or ui, so that a dedicated server can run headless.
+# Multiplayer: lockstep through the host over annokit::net's ENet transport (ADR 0011). Depends on
+# sim only, never on platform, render, audio or ui, so that a dedicated server can run headless.
 
 add_library(o1602_net
     src/client_session.cpp
-    src/enet_transport.cpp
     src/host_session.cpp
     src/lan.cpp
-    src/loopback.cpp
     src/protocol.cpp
     src/session.cpp
 )
@@ -15,7 +13,8 @@ add_library(o1602::net ALIAS o1602_net)
 
 target_include_directories(o1602_net PUBLIC include)
 find_package(Threads REQUIRED)  # host names are looked up beside the game (lan.cpp)
-target_link_libraries(o1602_net PUBLIC o1602::sim PRIVATE o1602_enet Threads::Threads)
+# The LAN search uses ENet's sockets directly (lan.cpp).
+target_link_libraries(o1602_net PUBLIC o1602::sim annokit::net PRIVATE annokit_enet Threads::Threads)
 o1602_set_warnings(o1602_net)
 if(WIN32)
     # enet.h pulls in windows.h: no min/max macros, and only what sockets need.

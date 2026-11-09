@@ -7,12 +7,18 @@
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "../../engine/sim/src/ai/ai_archive.hpp"
+#include "../../engine/sim/src/ai/ai_engine.hpp"
 #include "../test_framework.hpp"
+
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
 
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
@@ -21,8 +27,6 @@
 #include "o1602/assets/goods.hpp"
 #include "o1602/assets/own_buildings.hpp"
 #include "o1602/assets/resident_classes.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/ai.hpp"
 #include "o1602/sim/balance.hpp"
 #include "o1602/sim/computer_orders.hpp"
@@ -244,7 +248,7 @@ bool remembers(const sim::World& world, sim::PlayerId who, sim::DiplomacyEventTy
 }
 
 std::vector<std::uint8_t> saved(const sim::ComputerPlayers& ai) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     ai.save(out);
     return out.take();
 }
@@ -488,8 +492,9 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
     // The wider hunter's hut by default. The military's state version 4 (the unit that goes first).
-    // Improved computers without the original's gifts, setting their own taxes.
-    constexpr std::uint64_t kExpected = 0x7ee22dd53eabbf76ULL;
+    // Up to 16 cities on an island by default (only the rules' bytes); improved computers without
+    // the original's gifts, setting their own taxes.
+    constexpr std::uint64_t kExpected = 0xe0c82c0ce37f9e5fULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -549,7 +554,7 @@ TEST_CASE("ai: a saved state with values out of range is refused, not run") {
     const std::vector<std::uint8_t> bytes = saved(s.computers());
     sim::ai::State good;
     {
-        core::ByteReader in(bytes);
+        annokit::core::ByteReader in(bytes);
         sim::StateIn reader(in);
         sim::ai::Loader loader(reader, s.computers().state_version());
         loader(good);
@@ -557,11 +562,11 @@ TEST_CASE("ai: a saved state with values out of range is refused, not run") {
         REQUIRE(!good.players.empty());
     }
     const auto loads = [&](sim::ai::State state) {
-        core::ByteWriter out;
+        annokit::core::ByteWriter out;
         sim::ai::Saver saver(out);
         saver(state);
         const std::vector<std::uint8_t> data = out.take();
-        core::ByteReader in(data);
+        annokit::core::ByteReader in(data);
         sim::ComputerPlayers computers(s);
         return computers.load(in, sim::ComputerPlayers::max_state_version());
     };
@@ -593,19 +598,19 @@ TEST_CASE("ai: a state of version 1 loads and goes on as the same state") {
     const std::vector<std::uint8_t> now = saved(s.computers());
     sim::ai::State state;
     {
-        core::ByteReader in(now);
+        annokit::core::ByteReader in(now);
         sim::StateIn reader(in);
         sim::ai::Loader loader(reader, s.computers().state_version());
         loader(state);
         REQUIRE(reader.ok());
     }
     // As version 1 wrote it: with an (empty) list of attack plans and a state byte per island.
-    core::ByteWriter old;
+    annokit::core::ByteWriter old;
     sim::ai::Saver saver(old, 1);
     saver(state);
     const std::vector<std::uint8_t> v1 = old.take();
     CHECK(v1 != now);
-    core::ByteReader in(v1);
+    annokit::core::ByteReader in(v1);
     sim::ComputerPlayers computers(s);
     REQUIRE(computers.load(in, 1));
     CHECK(saved(computers) == now);
@@ -618,7 +623,7 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     sim::ai::State state;
     {
         const std::vector<std::uint8_t> now = saved(s.computers());
-        core::ByteReader in(now);
+        annokit::core::ByteReader in(now);
         sim::StateIn reader(in);
         sim::ai::Loader loader(reader, s.computers().state_version());
         loader(state);
@@ -628,11 +633,11 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     for (sim::ai::AiPlayer& p : state.players) {
         p.yard_wanted = true;  // version 2 has no room for it
     }
-    core::ByteWriter old;
+    annokit::core::ByteWriter old;
     sim::ai::Saver saver(old, 2);
     saver(state);
     const std::vector<std::uint8_t> v2 = old.take();
-    core::ByteReader in(v2);
+    annokit::core::ByteReader in(v2);
     sim::ComputerPlayers computers(s);
     REQUIRE(computers.load(in, 2));
     // Saved again as the newest version: one byte more per computer, and no request (version 3),
@@ -644,7 +649,7 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     }
     CHECK(again.size() == v2.size() + state.players.size() * (1 + 2 * sizeof(std::int32_t) + sizeof(std::uint32_t)) +
                               plans * sizeof(std::uint32_t));
-    core::ByteReader back(again);
+    annokit::core::ByteReader back(again);
     sim::StateIn reader(back);
     sim::ai::State loaded;
     sim::ai::Loader loader(reader, computers.state_version());
@@ -666,7 +671,7 @@ TEST_CASE("ai: land freed on its island lets a computer's city search its sites 
         sim::ai::State state;
         {
             const std::vector<std::uint8_t> now = saved(s.computers());
-            core::ByteReader in(now);
+            annokit::core::ByteReader in(now);
             sim::StateIn reader(in);
             sim::ai::Loader loader(reader, s.computers().state_version());
             loader(state);
@@ -684,11 +689,11 @@ TEST_CASE("ai: land freed on its island lets a computer's city search its sites 
             }
         }
         REQUIRE(island.has_value());
-        core::ByteWriter out;
+        annokit::core::ByteWriter out;
         sim::ai::Saver saver(out);
         saver(state);
         const std::vector<std::uint8_t> bytes = out.take();
-        core::ByteReader in(bytes);
+        annokit::core::ByteReader in(bytes);
         sim::ComputerPlayers computers(s);
         REQUIRE(computers.load(in, sim::ComputerPlayers::max_state_version()));
         const auto given_up = [&](bool expected) {
@@ -754,7 +759,7 @@ TEST_CASE("ai: the state of the computers goes to bytes and back whole") {
     run(s, 20'000);
     const auto bytes = saved(s.computers());
     sim::ComputerPlayers copy(s);
-    core::ByteReader in(bytes);
+    annokit::core::ByteReader in(bytes);
     REQUIRE(copy.load(in, s.computers().state_version()));
     CHECK(in.at_end());
     CHECK(same(copy.view(), s.computers().view()));
@@ -775,7 +780,7 @@ TEST_CASE("ai: damaged state is refused and leaves the computers as they were") 
     sim::ComputerPlayers copy(s);
     {
         const auto earlier = saved(t.computers());
-        core::ByteReader in(earlier);
+        annokit::core::ByteReader in(earlier);
         REQUIRE(copy.load(in, t.computers().state_version()));
     }
     const auto before = saved(copy);
@@ -784,7 +789,7 @@ TEST_CASE("ai: damaged state is refused and leaves the computers as they were") 
     // Every truncation of the good state.
     std::size_t accepted = 0;
     for (std::size_t n = 0; n < bytes.size(); ++n) {
-        core::ByteReader in(std::span(bytes.data(), n));
+        annokit::core::ByteReader in(std::span(bytes.data(), n));
         accepted += copy.load(in, s.computers().state_version()) ? 1U : 0U;
     }
     CHECK(accepted == 0);
@@ -792,13 +797,13 @@ TEST_CASE("ai: damaged state is refused and leaves the computers as they were") 
 
     // An unknown version, and garbage after the right one.
     {
-        core::ByteReader in(bytes);
+        annokit::core::ByteReader in(bytes);
         CHECK(!copy.load(in, 0x63));
     }
     for (const std::uint8_t fill : {std::uint8_t{0xFF}, std::uint8_t{0x7F}, std::uint8_t{0x01}}) {
         std::vector<std::uint8_t> garbage(4096, fill);
         std::copy_n(bytes.begin(), 4, garbage.begin());
-        core::ByteReader in(garbage);
+        annokit::core::ByteReader in(garbage);
         CHECK(!copy.load(in, s.computers().state_version()));
     }
     CHECK(saved(copy) == before);
@@ -1021,7 +1026,7 @@ TEST_CASE("ai: a computer answers a ship that is about to found a city on its is
         sim::ai::State state;
         {
             const std::vector<std::uint8_t> now = saved(ai);
-            core::ByteReader in(now);
+            annokit::core::ByteReader in(now);
             sim::StateIn reader(in);
             sim::ai::Loader loader(reader, ai.state_version());
             loader(state);
@@ -1032,11 +1037,11 @@ TEST_CASE("ai: a computer answers a ship that is about to found a city on its is
             p.home_valid = k.home;
             p.home_island = 1;
         }
-        core::ByteWriter out;
+        annokit::core::ByteWriter out;
         sim::ai::Saver saver(out, sim::ComputerPlayers::max_state_version());
         saver(state);
         const std::vector<std::uint8_t> bytes = out.take();
-        core::ByteReader in(bytes);
+        annokit::core::ByteReader in(bytes);
         REQUIRE(ai.load(in, sim::ComputerPlayers::max_state_version()));
         (void)g.world.diplomacy().take_notices();
         ai.founding_query(k.asker, k.island);
@@ -2170,7 +2175,7 @@ TEST_CASE("ai: a package's public building of a kind of its own is planned by th
         Planned out{view[0].plans[0].flags, s.computers().state_version()};
         const auto bytes = saved(s.computers());
         sim::ComputerPlayers copy(s);
-        core::ByteReader in(bytes);
+        annokit::core::ByteReader in(bytes);
         out.kept = copy.load(in, out.version) && in.at_end() && same(copy.view(), view);
         return out;
     };
@@ -2178,12 +2183,14 @@ TEST_CASE("ai: a package's public building of a kind of its own is planned by th
     CHECK((planned(false, 0).flags & own_public(0)) == 0);
     const Planned first = planned(true, 0);
     CHECK((first.flags & own_public(0)) != 0);
-    CHECK(first.version == 5);  // within 32 bits: the bytes of version 5
+    // Within 32 bits the flags are the bytes of version 5; the computer's town seed, drawn with its
+    // first town plan, asks for version 8 here all the same.
+    CHECK(first.version == sim::ai::kStateWithTownSeed);
     CHECK(first.kept);
     const Planned far = planned(true, 30);
     CHECK(own_public(30) > 0xFFFF'FFFFU);
     CHECK((far.flags & own_public(30)) != 0);
-    CHECK(far.version == sim::ai::kStateWithWideFlags);
+    CHECK(far.version >= sim::ai::kStateWithWideFlags);
     CHECK(far.kept);
 }
 
@@ -2249,6 +2256,47 @@ TEST_CASE("ai: improved computers settle on a large island another computer hold
     CHECK(!founded(true));
     // A human's city there the original's computers settle beside.
     CHECK(founded(true, sim::PlayerRole::Human));
+}
+
+TEST_CASE("ai: town styles differ by the number drawn for the game, and the same number gives the same style") {
+    using sim::ai::town_style;
+    std::set<std::tuple<std::int32_t, std::int32_t, std::int32_t, std::int32_t>> seen;
+    for (std::uint32_t seed = 1; seed <= 32; ++seed) {
+        const sim::ai::TownStyle a = town_style(seed * 2654435761U, 7, 0);
+        const sim::ai::TownStyle b = town_style(seed * 2654435761U, 7, 0);
+        CHECK(a.room == b.room);
+        CHECK(a.shift == b.shift);
+        CHECK(a.block == b.block);
+        CHECK(a.field_margin == b.field_margin);
+        CHECK(a.room >= 6);
+        CHECK(a.room <= 9);
+        CHECK(a.block >= 7);
+        CHECK(a.block <= 9);
+        CHECK(a.shift >= 0);
+        CHECK(a.shift <= 4);
+        seen.emplace(a.room, a.shift, a.block, a.field_margin);
+    }
+    CHECK(seen.size() >= 16);
+    // Two cities of one computer plan differently too.
+    int differ = 0;
+    for (std::uint8_t city = 1; city <= 8; ++city) {
+        const sim::ai::TownStyle a = town_style(12345, 3, 0);
+        const sim::ai::TownStyle b = town_style(12345, 3, city);
+        differ += a.room != b.room || a.block != b.block || a.shift != b.shift ? 1 : 0;
+    }
+    CHECK(differ >= 4);
+}
+
+TEST_CASE("ai: a site's distance from the town zone") {
+    sim::ai::TownZone z;
+    z.valid = true;
+    z.cx = 20;
+    z.cy = 20;
+    z.radius = 10;
+    CHECK(sim::ai::zone_excess(z, 19, 19, 20, 20) < 0);   // at the middle
+    CHECK(sim::ai::zone_excess(z, 30, 20, 31, 21) == 0);  // at the edge
+    CHECK(sim::ai::zone_excess(z, 40, 20, 41, 21) == 10);
+    CHECK(sim::ai::zone_excess(z, 20, 0, 21, 1) == 9);
 }
 
 TEST_CASE("ai: a computer's growing home city builds a castle, the original's only behind a human") {

@@ -17,10 +17,11 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/package_islands.hpp"
 #include "o1602/sim/world.hpp"
@@ -66,8 +67,9 @@ private:
 
 /// The island `index` fertile for exactly the wares of `fertility` (bit ware - 45); an error if
 /// there is no such island or nothing changes.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_fertility(const sim::World& world, std::size_t index,
-                                                                     std::uint32_t fertility);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_fertility(const sim::World& world,
+                                                                              std::size_t index,
+                                                                              std::uint32_t fertility);
 
 // Placeholders: the islands of a world plan (sim::PlannedIslands), made when a game of the world
 // starts. Only a world that has a plan has them (a scenario of the original that makes its islands).
@@ -108,13 +110,14 @@ private:
 
 /// A new placeholder of `climate` (0 north, 1 south, 2 by its place) and size class `size` at
 /// (x, y), with a free island number and a template drawn when the game starts.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_placeholder(const sim::World& world, std::uint8_t climate,
-                                                                       std::uint8_t size, std::uint32_t x,
-                                                                       std::uint32_t y);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_placeholder(const sim::World& world,
+                                                                                std::uint8_t climate, std::uint8_t size,
+                                                                                std::uint32_t x, std::uint32_t y);
 /// The placeholder `index` as `changed` (its place, climate or size).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> change_placeholder(const sim::World& world, std::size_t index,
-                                                                          const assets::ScenarioPlan::Island& changed);
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_placeholder(const sim::World& world, std::size_t index);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> change_placeholder(
+    const sim::World& world, std::size_t index, const assets::ScenarioPlan::Island& changed);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_placeholder(const sim::World& world,
+                                                                                   std::size_t index);
 
 /// About how much memory a world holds: the map's cells and the islands' tiles.
 [[nodiscard]] std::size_t world_memory(const sim::World& world) noexcept;
@@ -138,10 +141,10 @@ struct NewIsland {
 /// The island of `request` at (0, 0), numbered `number`: a template's tiles (the original's need
 /// the original's `game`, a package's its file), or one of its own shape as large as the size class's templates. It
 /// grows grain, grass, trees and fish and has no deposits yet.
-[[nodiscard]] core::Result<sim::WorldIsland> make_island(const NewIsland& request, std::uint16_t number,
-                                                         const assets::BuildingTable& buildings,
-                                                         const assets::GameDirectory* game,
-                                                         std::vector<std::string>* warnings = nullptr);
+[[nodiscard]] annokit::core::Result<sim::WorldIsland> make_island(const NewIsland& request, std::uint16_t number,
+                                                                  const assets::BuildingTable& buildings,
+                                                                  const assets::GameDirectory* game,
+                                                                  std::vector<std::string>* warnings = nullptr);
 
 /// Whether a rectangle of `w` x `h` tiles at (x, y) lies in the map on open sea (or on the island
 /// `except`, the one being moved): where the editor shows a place as free.
@@ -157,49 +160,53 @@ struct NewIsland {
 // Document::perform(); an error, and the world unchanged, where sim::World refuses it.
 
 /// `island` added at (x, y) as the last island (a new number if its number is taken).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_island(const sim::World& world, sim::WorldIsland island,
-                                                                  std::uint32_t x, std::uint32_t y,
-                                                                  const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_island(const sim::World& world,
+                                                                           sim::WorldIsland island, std::uint32_t x,
+                                                                           std::uint32_t y,
+                                                                           const assets::BuildingTable& buildings);
 /// The island `index` grown by tiles of open sea on each side, every tile keeping its place on the
 /// map (sim::World::grow_island): where land painted at its edge goes on.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> grow_island(const sim::World& world, std::size_t index,
-                                                                   std::uint32_t left, std::uint32_t top,
-                                                                   std::uint32_t right, std::uint32_t bottom,
-                                                                   const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> grow_island(const sim::World& world, std::size_t index,
+                                                                            std::uint32_t left, std::uint32_t top,
+                                                                            std::uint32_t right, std::uint32_t bottom,
+                                                                            const assets::BuildingTable& buildings);
 /// Island `other` joined into island `keep` (sim::World::merge_islands): land painted from one
 /// island to another makes one island of them.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> merge_islands(const sim::World& world, std::size_t keep,
-                                                                     std::size_t other,
-                                                                     const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> merge_islands(const sim::World& world, std::size_t keep,
+                                                                              std::size_t other,
+                                                                              const assets::BuildingTable& buildings);
 /// A new island of only open sea, `width` x `height` tiles at (x, y), of `climate` (0 north, 1
 /// south): where land painted on the open sea goes.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_sea_island(const sim::World& world, std::uint32_t x,
-                                                                      std::uint32_t y, std::uint32_t width,
-                                                                      std::uint32_t height, std::uint8_t climate,
-                                                                      const assets::BuildingTable& buildings);
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> move_island(const sim::World& world, std::size_t index,
-                                                                   std::uint32_t x, std::uint32_t y,
-                                                                   const assets::BuildingTable& buildings);
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> rotate_island(const sim::World& world, std::size_t index,
-                                                                     const assets::BuildingTable& buildings);
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> copy_island(const sim::World& world, std::size_t index,
-                                                                   std::uint32_t x, std::uint32_t y,
-                                                                   const assets::BuildingTable& buildings);
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_island(const sim::World& world, std::size_t index,
-                                                                     const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_sea_island(const sim::World& world, std::uint32_t x,
+                                                                               std::uint32_t y, std::uint32_t width,
+                                                                               std::uint32_t height,
+                                                                               std::uint8_t climate,
+                                                                               const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> move_island(const sim::World& world, std::size_t index,
+                                                                            std::uint32_t x, std::uint32_t y,
+                                                                            const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> rotate_island(const sim::World& world,
+                                                                              std::size_t index,
+                                                                              const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> copy_island(const sim::World& world, std::size_t index,
+                                                                            std::uint32_t x, std::uint32_t y,
+                                                                            const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_island(const sim::World& world,
+                                                                              std::size_t index,
+                                                                              const assets::BuildingTable& buildings);
 /// The island `index` alone as a file: an Open1602 world as large as the island, which
 /// load_island() reads back. Only an island no city, building or unit of a game is on.
-[[nodiscard]] core::Result<core::Bytes> save_island(const sim::World& world, std::size_t index,
-                                                    const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<annokit::core::Bytes> save_island(const sim::World& world, std::size_t index,
+                                                                      const assets::BuildingTable& buildings);
 
 /// The island of an island file at (0, 0): one save_island() wrote (the first island of an
 /// Open1602 world), or one of the original's island files (.scp), which takes the `climate` of
 /// the folder it came from (0 north, 1 south): the file does not tell. Who knew it and a drought go.
-[[nodiscard]] core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes,
-                                                         const assets::BuildingTable& buildings,
-                                                         const assets::GameDirectory* game,
-                                                         std::vector<std::string>* warnings = nullptr,
-                                                         std::uint8_t climate = 0);
+[[nodiscard]] annokit::core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes,
+                                                                  const assets::BuildingTable& buildings,
+                                                                  const assets::GameDirectory* game,
+                                                                  std::vector<std::string>* warnings = nullptr,
+                                                                  std::uint8_t climate = 0);
 
 /// The smallest map (width, height) that holds the islands, ships, land units and markers, at
 /// least 1 x 1: how far resize_world() can cut.
@@ -207,8 +214,8 @@ struct NewIsland {
 
 /// The map made `width` x `height` tiles large, growing or cut at the right and the bottom
 /// (sim::World::resize()).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> resize_world(const sim::World& world, std::uint32_t width,
-                                                                    std::uint32_t height,
-                                                                    const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> resize_world(const sim::World& world,
+                                                                             std::uint32_t width, std::uint32_t height,
+                                                                             const assets::BuildingTable& buildings);
 
 }  // namespace o1602::editor

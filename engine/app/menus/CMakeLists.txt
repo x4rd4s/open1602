@@ -6,9 +6,10 @@
 # window's strip and open offers, the window "Warenbilanz", the gestures on the map, and the
 # windows of what the player selects (buildings, ships, units, lists, diplomacy, options), the build
 # menu, the player status of the side panel and the texts over the production buildings. Built
-# without the game too, so that the tests have them. Also the command line of the program.
+# without the game too, so that the tests have them. Also the command line and the icon of the program.
 
 add_library(o1602_menus
+    ../src/app_icon.cpp
     ../src/app_settings.cpp
     ../src/blueprint_window.cpp
     ../src/build_tool.cpp
@@ -66,3 +67,7 @@ add_library(o1602::menus ALIAS o1602_menus)
 target_include_directories(o1602_menus PUBLIC ../src)
 target_link_libraries(o1602_menus PUBLIC o1602::assets o1602::audio o1602::net o1602::render o1602::sim o1602::ui)
 o1602_set_warnings(o1602_menus)
+# The window icon (title bar, task bar, macOS dock), rendered by tools/make_icons.py (app_icon.hpp).
+annokit_embed_files(o1602_menus o1602::app::icons
+    "${PROJECT_SOURCE_DIR}/data/icons/window/open1602-64.bmp"
+    "${PROJECT_SOURCE_DIR}/data/icons/window/open1602-128.bmp")

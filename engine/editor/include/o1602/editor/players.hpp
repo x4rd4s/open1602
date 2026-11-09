@@ -11,7 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -57,19 +58,20 @@ struct PlayerValues {
 /// one, as on the colour screen. Fails (NotFound) for no human or computer, (InvalidFormat) for a
 /// name a player could not give, a role that is neither, a banner no player can have, money out
 /// of range or a faction not of slot_factions() (other than the one it has).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world, sim::PlayerId player,
-                                                                  const PlayerValues& values);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world,
+                                                                           sim::PlayerId player,
+                                                                           const PlayerValues& values);
 
 /// A new computer player in the next slot (sim::player_slot), with the first free banner, the money
 /// of the first computer and nothing else: without a city or a ship it is out of the game (defeated)
 /// as soon as it starts, unless the scenario gives it one; at peace with everyone. The relations
 /// of the others stay. Fails (LimitExceeded) with sim::kMaxPlayers players.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world);
 
 /// Takes the last player slot away (the highest of player_slots()), and the empty slots before it
 /// that only held its place. Fails (Unsupported) for the first four slots, which every scenario
 /// has, and (Unsupported) while the player owns a city, ship or soldier.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world);
 
 /// The slot the neutral buildings' player takes (sim::FactionBehaviour::Neutral): behind the slots
 /// of every human and computer, so that adding and taking them away leaves it where it is.
@@ -87,7 +89,7 @@ inline constexpr sim::BannerId kNeutralBanner = 5;
 sim::PlayerId add_neutral_player(sim::World& world);
 
 /// add_neutral_player() as a step of its own. Fails (Unsupported) if the world has one already.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world);
 
 /// How two players stand at the start: at peace or at war, with a trade treaty or without.
 struct Relations {
@@ -102,8 +104,8 @@ struct Relations {
 /// `a` and `b`, both humans or computers, standing as `r` towards each other when the game starts,
 /// both sides alike, offers and memories (tribute, trade, damage) cleared. Fails (NotFound) for no
 /// human or computer and (InvalidFormat) for a player with himself or a trade treaty at war.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a,
-                                                                     sim::PlayerId b, Relations r);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a,
+                                                                              sim::PlayerId b, Relations r);
 
 /// The parties of their own behaviour a scenario sets the start towards: the natives, the pirates
 /// and the free trader.
@@ -147,8 +149,9 @@ struct NeutralRelations {
 /// Fails (NotFound) for no human or computer or a party the world does not have, (InvalidFormat)
 /// for a trade with the natives at war, a war with the trader, a lasting peace other than with the
 /// pirates or at war, or a goodwill above sim::kMaxNativeGoodwill.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world,
-                                                                             sim::PlayerId player, Neutral party,
-                                                                             const NeutralRelations& r);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world,
+                                                                                      sim::PlayerId player,
+                                                                                      Neutral party,
+                                                                                      const NeutralRelations& r);
 
 }  // namespace o1602::editor

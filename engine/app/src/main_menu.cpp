@@ -13,9 +13,10 @@
 #include "high_score_file.hpp"
 #include "multiplayer_menu.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/ui/list_scroll.hpp"
 #include "o1602/ui/localization.hpp"
@@ -194,7 +195,7 @@ std::vector<MenuScenario> scenario_list(const std::filesystem::path& folder, con
     std::map<std::string, MenuScenario> by_name;
     std::error_code ec;
     for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
-        if (!entry.is_regular_file(ec) || lower(core::path_to_utf8(entry.path().extension())) != ".szs") {
+        if (!entry.is_regular_file(ec) || lower(annokit::core::path_to_utf8(entry.path().extension())) != ".szs") {
             continue;
         }
         // The names in the list in the fonts' Windows-1252, whatever the file system uses.
@@ -232,9 +233,10 @@ std::vector<MenuScenario> scenario_list(const std::filesystem::path& folder, con
         // FindFirstFile gives them (alphabetical): the last file's header counts. Pirata1 has no
         // campaign of its own, Pirata3 has it.
         const auto last = std::max_element(s.files.begin(), s.files.end(), [](const auto& a, const auto& b) {
-            return lower(core::path_to_utf8(a.second.filename())) < lower(core::path_to_utf8(b.second.filename()));
+            return lower(annokit::core::path_to_utf8(a.second.filename())) <
+                   lower(annokit::core::path_to_utf8(b.second.filename()));
         });
-        if (auto bytes = core::read_file(last->second)) {
+        if (auto bytes = annokit::core::read_file(last->second)) {
             if (auto file = assets::ChunkFile::from_bytes(std::move(bytes).value())) {
                 s.header = assets::load_scenario_header(*file);
             }
@@ -284,7 +286,7 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
     // Its high scores beside the others, by a name no scenario of the game folder has.
     const auto base_of = [](std::string id) {
         std::replace(id.begin(), id.end(), ':', '_');
-        return core::path_from_utf8(id);
+        return annokit::core::path_from_utf8(id);
     };
     for (const assets::PackageCampaign& c : campaigns) {
         MenuScenario s;
@@ -331,7 +333,7 @@ std::vector<MenuScenario> own_scenario_list(const std::filesystem::path& folder,
     }
     // Games saved by Open1602 (and, later, maps of its own editor): one entry per file.
     for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
-        if (!entry.is_regular_file(ec) || lower(core::path_to_utf8(entry.path().extension())) != ".o1602") {
+        if (!entry.is_regular_file(ec) || lower(annokit::core::path_to_utf8(entry.path().extension())) != ".o1602") {
             continue;
         }
         const std::u8string u8 = entry.path().stem().u8string();
@@ -370,11 +372,12 @@ std::vector<MenuScenario> own_scenario_list(const std::filesystem::path& folder,
     // A scenario of the editor shows the name, stars and introduction of its description (SCNI) in
     // the player's language, where it has them; it is still found by its file's name.
     for (MenuScenario& s : out) {
-        if (s.files.size() != 1 || lower(core::path_to_utf8(s.files.front().second.extension())) != ".o1602") {
+        if (s.files.size() != 1 || lower(annokit::core::path_to_utf8(s.files.front().second.extension())) != ".o1602") {
             continue;
         }
-        const auto head = core::read_file_head(s.files.front().second, sim::kSaveInfoHead);
-        const auto info = head ? sim::save_info(head->bytes, head->size) : core::Result<sim::SaveInfo>(head.error());
+        const auto head = annokit::core::read_file_head(s.files.front().second, sim::kSaveInfoHead);
+        const auto info =
+            head ? sim::save_info(head->bytes, head->size) : annokit::core::Result<sim::SaveInfo>(head.error());
         if (!info || !info->meta || !info->meta->scenario) {
             continue;
         }
@@ -411,11 +414,11 @@ std::optional<CampaignPart> campaign_part_of(const std::filesystem::path& file) 
 }
 
 std::optional<sim::Rules> scenario_rules_of(const std::filesystem::path& file) {
-    if (lower(core::path_to_utf8(file.extension())) != ".o1602") {
+    if (lower(annokit::core::path_to_utf8(file.extension())) != ".o1602") {
         return std::nullopt;
     }
     // Only the head of the file: the settings come right after its first section.
-    const auto head = core::read_file_head(file, sim::kSaveInfoHead);
+    const auto head = annokit::core::read_file_head(file, sim::kSaveInfoHead);
     if (!head) {
         return std::nullopt;
     }
@@ -570,7 +573,7 @@ void MainMenu::load_scenarios() {
     // Read again every time: a won game may have opened a mission since.
     m_progress = {};
     if (!m_progress_file.empty()) {
-        if (auto bytes = core::read_file(m_progress_file)) {
+        if (auto bytes = annokit::core::read_file(m_progress_file)) {
             m_progress =
                 assets::parse_progress(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
         }
@@ -599,7 +602,7 @@ void MainMenu::load_scenarios() {
         for (const std::string& name : skipped) {
             std::fprintf(stderr,
                          "warning: own scenario \"%s\" left out: the list has a scenario of that name already\n",
-                         core::cp1252_to_utf8(name).c_str());
+                         annokit::core::cp1252_to_utf8(name).c_str());
         }
         m_own_skipped = std::move(skipped);
     }
@@ -643,7 +646,8 @@ bool MainMenu::open_mission(std::string_view name) {
     load_scenarios();
     for (std::size_t i = 0; i < m_scenarios.size(); ++i) {
         const MenuScenario& s = m_scenarios[i];
-        if (!s.separator && (lower(s.name) == lower(name) || lower(core::path_to_utf8(s.base)) == lower(name))) {
+        if (!s.separator &&
+            (lower(s.name) == lower(name) || lower(annokit::core::path_to_utf8(s.base)) == lower(name))) {
             select_scenario(i);
             m_screen = Screen::Mission;
             return true;
@@ -677,16 +681,16 @@ void MainMenu::load_details() {
     }
     // A scenario of the editor: the introduction of its description, read whole (the list read
     // only the head of the file).
-    if (m_briefing.empty() && lower(core::path_to_utf8(chosen_file().extension())) == ".o1602") {
-        if (const auto head = core::read_file_head(chosen_file(), sim::kScenarioHead)) {
+    if (m_briefing.empty() && lower(annokit::core::path_to_utf8(chosen_file().extension())) == ".o1602") {
+        if (const auto head = annokit::core::read_file_head(chosen_file(), sim::kScenarioHead)) {
             if (const auto info = sim::scenario_info_of(head->bytes, head->size)) {
                 m_briefing = utf8_to_cp1252(sim::scenario_text(info->briefings, ui::current_language()));
             }
         }
     }
-    std::optional<core::Bytes> map_bytes;
-    if (m_briefing.empty() && lower(core::path_to_utf8(chosen_file().extension())) != ".o1602") {
-        if (auto read = core::read_file(chosen_file())) {
+    std::optional<annokit::core::Bytes> map_bytes;
+    if (m_briefing.empty() && lower(annokit::core::path_to_utf8(chosen_file().extension())) != ".o1602") {
+        if (auto read = annokit::core::read_file(chosen_file())) {
             map_bytes = std::move(read).value();
         }
     }
@@ -725,9 +729,9 @@ void MainMenu::load_details() {
         }
         const std::filesystem::path hss = s.files.front().second.parent_path() / name;
         const std::filesystem::path own = m_score_folder / name;
-        auto bytes = m_score_folder.empty() ? core::read_file(hss) : core::read_file(own);
+        auto bytes = m_score_folder.empty() ? annokit::core::read_file(hss) : annokit::core::read_file(own);
         if (!bytes && !m_score_folder.empty()) {
-            bytes = core::read_file(hss);
+            bytes = annokit::core::read_file(hss);
         }
         if (bytes) {
             m_scores = assets::parse_high_scores(

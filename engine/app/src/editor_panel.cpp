@@ -6,9 +6,10 @@
 #include <cmath>
 #include <tuple>
 
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/package_scenarios.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/limits.hpp"
 #include "o1602/sim/scenario_data.hpp"
 #include "o1602/sim/simulation.hpp"
@@ -2484,7 +2485,7 @@ void EditorPanel::layout_package_save(const EditorModel& model) {
     const std::string& package = model.package_folders[m_package];
     f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.package_save.package"));
     y += kLine;
-    f.cycle_button(kPackageChoice, Rect{m_x, y, m_w, kButtonH}, core::utf8_to_cp1252(package), n > 1);
+    f.cycle_button(kPackageChoice, Rect{m_x, y, m_w, kButtonH}, annokit::core::utf8_to_cp1252(package), n > 1);
     y += kButtonH + kGap;
     f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.package_save.name"));
     y += kLine;
@@ -2494,9 +2495,10 @@ void EditorPanel::layout_package_save(const EditorModel& model) {
     const std::string id = package + ":" + m_text;
     const bool taken = valid && std::find(model.package_scenarios.begin(), model.package_scenarios.end(), id) !=
                                     model.package_scenarios.end();
-    const std::string note = !valid  ? ui::tr("editor.package_save.bad_name")
-                             : taken ? ui::tr("editor.package_save.taken", {core::utf8_to_cp1252(id)})
-                                     : ui::tr("editor.package_save.where", {core::utf8_to_cp1252(package), m_text});
+    const std::string note =
+        !valid  ? ui::tr("editor.package_save.bad_name")
+        : taken ? ui::tr("editor.package_save.taken", {annokit::core::utf8_to_cp1252(id)})
+                : ui::tr("editor.package_save.where", {annokit::core::utf8_to_cp1252(package), m_text});
     f.paragraph(Rect{m_x, y, m_w, kNote}, note, valid ? Tone::Dim : Tone::Warning, 20);
     y += kNote + 4;
     f.button(kStore, Rect{m_x, y, half, kButtonH}, ui::tr(taken ? "editor.save.replace" : "editor.save"), valid);
@@ -2526,9 +2528,10 @@ void EditorPanel::layout_campaign(const EditorModel& model) {
     m_new_campaign = m_campaign == n;
     f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.campaign.campaign"));
     y += kLine;
-    f.cycle_button(
-        kCampaignChoice, Rect{m_x, y, m_w, kButtonH},
-        m_new_campaign ? ui::tr("editor.campaign.new") : core::utf8_to_cp1252(model.campaigns[m_campaign].name), n > 0);
+    f.cycle_button(kCampaignChoice, Rect{m_x, y, m_w, kButtonH},
+                   m_new_campaign ? ui::tr("editor.campaign.new")
+                                  : annokit::core::utf8_to_cp1252(model.campaigns[m_campaign].name),
+                   n > 0);
     y += kButtonH + kGap;
     const bool taken = std::any_of(model.campaigns.begin(), model.campaigns.end(),
                                    [&](const EditorModel::Campaign& c) { return c.name == m_text; });
@@ -2549,7 +2552,7 @@ void EditorPanel::layout_campaign(const EditorModel& model) {
     for (std::size_t i = 0; i < parts.size(); ++i) {
         const std::string& id = parts[i];
         const bool own = id == model.package_scenario;
-        const std::string name = core::utf8_to_cp1252(id.substr(id.find(':') + 1));
+        const std::string name = annokit::core::utf8_to_cp1252(id.substr(id.find(':') + 1));
         f.label(Rect{m_x + 8, y, m_w - 8, kLine},
                 ui::tr(own ? "editor.campaign.part_this" : "editor.campaign.part", {count(i + 1), name}), Align::Left,
                 own ? Tone::Normal : Tone::Dim);

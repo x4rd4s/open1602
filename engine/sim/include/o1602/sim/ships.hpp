@@ -19,11 +19,12 @@
 #include <string>
 #include <vector>
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/rules.hpp"
@@ -483,9 +484,9 @@ public:
     /// so that a game of up to four players keeps the bytes of the versions before them.
     [[nodiscard]] std::uint16_t state_version() const noexcept;
     /// State that is not in the world (clocks, the trader's tools), for Open1602's savegame.
-    void save(core::ByteWriter& out) const;
+    void save(annokit::core::ByteWriter& out) const;
     /// Restores what save() of `version` wrote; an error if the data is damaged (nothing changed).
-    core::Status load(core::ByteReader& in, std::uint16_t version);
+    annokit::core::Status load(annokit::core::ByteReader& in, std::uint16_t version);
 
 private:
     struct Decision;

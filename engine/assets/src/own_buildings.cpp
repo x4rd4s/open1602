@@ -5,12 +5,13 @@
 #include <limits>
 #include <optional>
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/building_looks.hpp"
 #include "o1602/assets/original_names.hpp"
 #include "o1602/assets/package_graphics.hpp"
 #include "o1602/assets/resident_classes.hpp"
 #include "o1602/assets/unlock_levels.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -48,13 +49,13 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
                               std::span<const OwnFigure> own_figures, std::span<const PackageSound> sounds,
                               std::span<const std::string> services) {
     const std::string where = std::string(package) + "/" + std::string(kOwnBuildingsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
     std::size_t added = 0;
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         // ["<package>:<name>"]: the building of an earlier package, replaced by this one's.
         const bool replacing = t.name.find(':') != std::string::npos;
@@ -96,7 +97,7 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
         const PackageImage* image = nullptr;
         bool service = false;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "like") {
                 if (e.value.string() == nullptr) {
@@ -278,13 +279,13 @@ void apply_own_buildings_file(BuildingTable& table, std::vector<OwnBuilding>& ow
 
 void own_services(std::vector<std::string>& services, std::string_view package, std::string_view utf8,
                   std::vector<std::string>& warnings) {
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         return;  // apply_own_buildings_file reports it
     }
     const std::string where = std::string(package) + "/" + std::string(kOwnBuildingsFile);
-    for (const core::DataTable& t : *tables) {
-        const auto service = std::find_if(t.entries.begin(), t.entries.end(), [](const core::DataEntry& e) {
+    for (const annokit::core::DataTable& t : *tables) {
+        const auto service = std::find_if(t.entries.begin(), t.entries.end(), [](const annokit::core::DataEntry& e) {
             return e.key == "service" && e.value.boolean() != nullptr && *e.value.boolean();
         });
         if (service == t.entries.end() || t.name.empty()) {

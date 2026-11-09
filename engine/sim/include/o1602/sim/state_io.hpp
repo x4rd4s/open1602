@@ -10,8 +10,9 @@
 #include <string>
 #include <vector>
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/pool.hpp"
 
@@ -20,7 +21,7 @@ namespace o1602::sim {
 /// Reader that yields 0 after the data ran out and remembers that it did.
 class StateIn {
 public:
-    explicit StateIn(core::ByteReader& r) noexcept : m_r(r) {}
+    explicit StateIn(annokit::core::ByteReader& r) noexcept : m_r(r) {}
 
     [[nodiscard]] bool ok() const noexcept { return m_ok; }
     [[nodiscard]] std::size_t remaining() const noexcept { return m_r.remaining(); }
@@ -99,24 +100,24 @@ private:
         }
         return *v;
     }
-    core::ByteReader& m_r;
+    annokit::core::ByteReader& m_r;
     bool m_ok = true;
 };
 
-inline void put_real(core::ByteWriter& out, double v) {
+inline void put_real(annokit::core::ByteWriter& out, double v) {
     out.u64(std::bit_cast<std::uint64_t>(v));
 }
-inline void put_tile(core::ByteWriter& out, TilePos t) {
+inline void put_tile(annokit::core::ByteWriter& out, TilePos t) {
     out.i32(t.x);
     out.i32(t.y);
 }
-inline void put_maybe_tile(core::ByteWriter& out, const std::optional<TilePos>& t) {
+inline void put_maybe_tile(annokit::core::ByteWriter& out, const std::optional<TilePos>& t) {
     out.boolean(t.has_value());
     if (t) {
         put_tile(out, *t);
     }
 }
-inline void put_handle(core::ByteWriter& out, Handle h) {
+inline void put_handle(annokit::core::ByteWriter& out, Handle h) {
     out.u32(h.index);
     out.u32(h.generation);
 }

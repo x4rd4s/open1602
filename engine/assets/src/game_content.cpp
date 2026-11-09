@@ -10,10 +10,10 @@
 #include <system_error>
 #include <utility>
 
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/hash.hpp"
-#include "o1602/core/zip_archive.hpp"
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/hash.hpp"
+#include "annokit/core/zip_archive.hpp"
 
 namespace o1602::assets {
 
@@ -25,7 +25,7 @@ using fs_iterator = std::filesystem::directory_iterator;
 constexpr std::uint64_t kUnreadable = 0x9E3779B97F4A7C15ULL;
 
 std::uint64_t hash_text(std::string_view text, std::uint64_t seed) {
-    return core::xxh64(std::span(reinterpret_cast<const std::uint8_t*>(text.data()), text.size()), seed);
+    return annokit::core::xxh64(std::span(reinterpret_cast<const std::uint8_t*>(text.data()), text.size()), seed);
 }
 
 std::uint64_t hash_number(std::uint64_t value, std::uint64_t seed) {
@@ -33,7 +33,7 @@ std::uint64_t hash_number(std::uint64_t value, std::uint64_t seed) {
     for (std::size_t i = 0; i < bytes.size(); ++i) {
         bytes[i] = static_cast<std::uint8_t>(value >> (8 * i));
     }
-    return core::xxh64(bytes, seed);
+    return annokit::core::xxh64(bytes, seed);
 }
 
 /// The numbers of a valid version.
@@ -92,7 +92,7 @@ bool valid_package_id(std::string_view id) noexcept {
 
 /// Whether `path` names a package that is a zip archive.
 bool is_archive(const std::filesystem::path& path) {
-    std::string extension = core::path_to_utf8(path.extension());
+    std::string extension = annokit::core::path_to_utf8(path.extension());
     std::transform(extension.begin(), extension.end(), extension.begin(),
                    [](char c) { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; });
     return extension == kPackageArchiveExtension && !path.stem().empty();
@@ -104,7 +104,7 @@ std::uint64_t files_hash(std::span<const PackageFile> files) {
     for (const PackageFile& f : files) {
         h = hash_text(f.path, h);
         h = hash_number(f.bytes.size(), h);
-        h = core::xxh64(f.bytes, h);
+        h = annokit::core::xxh64(f.bytes, h);
     }
     return h;
 }
@@ -132,12 +132,12 @@ std::uint64_t content_fingerprint(const GameDirectory& game) {
     std::uint64_t h = 0;
     for (const char* file : {"haeuser.cod", "figuren.cod"}) {
         if (const auto path = game.resolve(file)) {
-            if (const auto bytes = core::read_file(*path)) {
-                h = core::xxh64(*bytes, h);
+            if (const auto bytes = annokit::core::read_file(*path)) {
+                h = annokit::core::xxh64(*bytes, h);
                 continue;
             }
         }
-        h = core::xxh64({}, h ^ kUnreadable);  // a missing file is not an empty one
+        h = annokit::core::xxh64({}, h ^ kUnreadable);  // a missing file is not an empty one
     }
     return h;
 }
@@ -149,10 +149,10 @@ std::vector<ModPackage> mod_packages(const std::filesystem::path& mods) {
     for (const auto& entry : std::filesystem::directory_iterator(mods, ec)) {
         ModPackage package;
         if (entry.is_directory(ec)) {
-            package.id = core::path_to_utf8(entry.path().filename());
+            package.id = annokit::core::path_to_utf8(entry.path().filename());
             package.folder = entry.path();
         } else if (entry.is_regular_file(ec) && is_archive(entry.path())) {
-            package.id = core::path_to_utf8(entry.path().stem());
+            package.id = annokit::core::path_to_utf8(entry.path().stem());
             package.archive = entry.path();
         } else {
             continue;
@@ -173,38 +173,38 @@ std::filesystem::path unpacked_packages_folder(const std::filesystem::path& mods
     return mods.parent_path() / "mods-unpacked";
 }
 
-core::Status unpack_package(ModPackage& package, const std::filesystem::path& unpacked) {
+annokit::core::Status unpack_package(ModPackage& package, const std::filesystem::path& unpacked) {
     const std::string name = package.id + std::string(kPackageArchiveExtension);
     const auto fail = [&](const std::string& why) {
-        return core::make_error(core::ErrorCode::InvalidFormat, name + ": " + why);
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, name + ": " + why);
     };
     if (!valid_package_id(package.id)) {
         return fail("a name that cannot be a package's");
     }
-    auto bytes = core::read_file(package.archive);
+    auto bytes = annokit::core::read_file(package.archive);
     if (!bytes) {
         return fail(bytes.error().message);
     }
-    auto entries = core::read_zip(*bytes);
+    auto entries = annokit::core::read_zip(*bytes);
     if (!entries) {
         return fail(entries.error().message);
     }
-    bytes = core::Bytes{};  // the archive's bytes are not needed any more
-    std::erase_if(*entries, [](const core::ZipEntry& e) { return e.path.starts_with("__MACOSX/"); });
+    bytes = annokit::core::Bytes{};  // the archive's bytes are not needed any more
+    std::erase_if(*entries, [](const annokit::core::ZipEntry& e) { return e.path.starts_with("__MACOSX/"); });
     // Packed with its folder ("lighthouse/mod.toml"): the folder's files are the package's.
     if (!entries->empty()) {
         const std::size_t slash = entries->front().path.find('/');
         const std::string top = slash == std::string::npos ? std::string() : entries->front().path.substr(0, slash + 1);
         if (!top.empty() && std::all_of(entries->begin(), entries->end(),
-                                        [&](const core::ZipEntry& e) { return e.path.starts_with(top); })) {
-            for (core::ZipEntry& e : *entries) {
+                                        [&](const annokit::core::ZipEntry& e) { return e.path.starts_with(top); })) {
+            for (annokit::core::ZipEntry& e : *entries) {
                 e.path.erase(0, top.size());
             }
         }
     }
     std::vector<PackageFile> files;
     files.reserve(entries->size());
-    for (core::ZipEntry& e : *entries) {
+    for (annokit::core::ZipEntry& e : *entries) {
         if (!safe_package_path(e.path)) {
             return fail("\"" + e.path + "\" is no path inside the package");
         }
@@ -226,7 +226,7 @@ core::Status unpack_package(ModPackage& package, const std::filesystem::path& un
         }
     }
     package.folder = folder;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 bool valid_version(std::string_view version) noexcept {
@@ -343,20 +343,20 @@ bool version_meets(std::string_view version, std::string_view requirement) noexc
     });
 }
 
-core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vector<std::string>& warnings) {
-    auto tables = core::parse_data_file(utf8);
+annokit::core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vector<std::string>& warnings) {
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
-        return core::make_error(tables.error().code,
-                                package.id + "/" + std::string(kManifestFile) + " " + tables.error().message);
+        return annokit::core::make_error(tables.error().code,
+                                         package.id + "/" + std::string(kManifestFile) + " " + tables.error().message);
     }
     ModPackage read = package;
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (!table.name.empty()) {
             warnings.push_back(where(package, table.line) + "a manifest has no tables; [" + table.name +
                                "] is passed over");
             continue;
         }
-        for (const core::DataEntry& e : table.entries) {
+        for (const annokit::core::DataEntry& e : table.entries) {
             const std::string* text = e.value.string();
             const std::string at = where(package, e.value.line);
             if (e.key == "name" || e.key == "description") {
@@ -394,7 +394,7 @@ core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vect
         }
     }
     package = std::move(read);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::uint64_t package_hash(const std::filesystem::path& folder) {
@@ -402,9 +402,9 @@ std::uint64_t package_hash(const std::filesystem::path& folder) {
     std::uint64_t h = hash_number(files.size(), 0);
     for (const auto& [relative, path] : files) {
         h = hash_text(relative, h);
-        if (const auto bytes = core::read_file(path)) {
+        if (const auto bytes = annokit::core::read_file(path)) {
             h = hash_number(bytes->size(), h);
-            h = core::xxh64(*bytes, h);
+            h = annokit::core::xxh64(*bytes, h);
         } else {
             h = hash_number(kUnreadable, h);
         }
@@ -439,8 +439,9 @@ std::vector<ModPackage> read_mod_packages(const std::filesystem::path& mods, std
         const std::filesystem::path manifest = package.folder / kManifestFile;
         std::error_code ec;
         if (std::filesystem::exists(manifest, ec)) {
-            const auto bytes = core::read_file(manifest);
-            core::Status read = bytes ? core::Status(core::Ok{}) : core::Status(bytes.error());
+            const auto bytes = annokit::core::read_file(manifest);
+            annokit::core::Status read =
+                bytes ? annokit::core::Status(annokit::core::Ok{}) : annokit::core::Status(bytes.error());
             if (bytes) {
                 read = read_manifest(
                     package, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), warnings);
@@ -457,7 +458,7 @@ std::vector<ModPackage> read_mod_packages(const std::filesystem::path& mods, std
     std::vector<std::filesystem::path> unused;
     for (fs_iterator it(unpacked, ec), last; !ec && it != last; it.increment(ec)) {
         const std::filesystem::path name = it->path().filename();
-        std::string text = core::path_to_utf8(name);
+        std::string text = annokit::core::path_to_utf8(name);
         if (text.ends_with(".incoming")) {
             text.resize(text.size() - 9);
         }
@@ -760,10 +761,10 @@ bool safe_package_path(std::string_view path) noexcept {
     });
 }
 
-core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder) {
+annokit::core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder) {
     std::vector<PackageFile> out;
     for (const auto& [relative, path] : files_of(folder)) {
-        auto bytes = core::read_file(path);
+        auto bytes = annokit::core::read_file(path);
         if (!bytes) {
             return bytes.error();
         }
@@ -784,17 +785,19 @@ std::uint64_t package_size(const std::filesystem::path& folder) {
 
 std::filesystem::path cached_package_folder(const std::filesystem::path& cache, const ContentPackage& package) {
     const std::string name = package.id + "-" + hex16(package.hash);
-    return cache / core::path_from_utf8(name);
+    return cache / annokit::core::path_from_utf8(name);
 }
 
-core::Result<ModPackage> store_package(const std::filesystem::path& cache, const ContentPackage& package,
-                                       std::span<const PackageFile> files) {
+annokit::core::Result<ModPackage> store_package(const std::filesystem::path& cache, const ContentPackage& package,
+                                                std::span<const PackageFile> files) {
     if (!valid_package_id(package.id)) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "a package id that cannot name a folder");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "a package id that cannot name a folder");
     }
     for (const PackageFile& f : files) {
         if (!safe_package_path(f.path)) {
-            return core::make_error(core::ErrorCode::InvalidFormat, package.id + ": a file outside the package");
+            return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                             package.id + ": a file outside the package");
         }
     }
     const std::filesystem::path folder = cached_package_folder(cache, package);
@@ -805,12 +808,13 @@ core::Result<ModPackage> store_package(const std::filesystem::path& cache, const
     const auto fail = [&](std::string message) {
         std::error_code ignored;
         std::filesystem::remove_all(incoming, ignored);
-        return core::make_error(core::ErrorCode::InvalidFormat, package.id + ": " + std::move(message));
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         package.id + ": " + std::move(message));
     };
     for (const PackageFile& f : files) {
-        const std::filesystem::path path = incoming / core::path_from_utf8(f.path);
+        const std::filesystem::path path = incoming / annokit::core::path_from_utf8(f.path);
         std::filesystem::create_directories(path.parent_path(), ec);
-        if (const auto written = core::write_file(path, f.bytes); !written) {
+        if (const auto written = annokit::core::write_file(path, f.bytes); !written) {
             return fail(written.error().message);
         }
     }
@@ -827,7 +831,7 @@ core::Result<ModPackage> store_package(const std::filesystem::path& cache, const
     out.id = package.id;
     out.folder = folder;
     out.name = package.id;
-    if (const auto bytes = core::read_file(folder / kManifestFile)) {
+    if (const auto bytes = annokit::core::read_file(folder / kManifestFile)) {
         std::vector<std::string> ignored;
         (void)read_manifest(out, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()),
                             ignored);
@@ -849,10 +853,11 @@ std::vector<ModPackage> cached_packages(const std::filesystem::path& cache, std:
         package.name = package.id;
         package.hash = package_hash(folder.folder);
         if (hex16(package.hash) != folder.id.substr(dash + 1)) {
-            warnings.push_back(core::path_to_utf8(folder.folder) + ": its files changed since it was received");
+            warnings.push_back(annokit::core::path_to_utf8(folder.folder) +
+                               ": its files changed since it was received");
             continue;
         }
-        if (const auto bytes = core::read_file(folder.folder / kManifestFile)) {
+        if (const auto bytes = annokit::core::read_file(folder.folder / kManifestFile)) {
             const auto read = read_manifest(
                 package, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), warnings);
             if (!read) {
@@ -864,15 +869,19 @@ std::vector<ModPackage> cached_packages(const std::filesystem::path& cache, std:
     return out;
 }
 
-core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods, const ModPackage& cached) {
+annokit::core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods,
+                                                           const ModPackage& cached) {
     if (!valid_package_id(cached.id)) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "a package id that cannot name a folder");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "a package id that cannot name a folder");
     }
-    const std::filesystem::path target = mods / core::path_from_utf8(cached.id);
+    const std::filesystem::path target = mods / annokit::core::path_from_utf8(cached.id);
     std::error_code ec;
     if (std::filesystem::exists(target, ec) ||
-        std::filesystem::exists(mods / core::path_from_utf8(cached.id + std::string(kPackageArchiveExtension)), ec)) {
-        return core::make_error(core::ErrorCode::Unsupported, cached.id + ": the mods folder has this package already");
+        std::filesystem::exists(mods / annokit::core::path_from_utf8(cached.id + std::string(kPackageArchiveExtension)),
+                                ec)) {
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         cached.id + ": the mods folder has this package already");
     }
     std::filesystem::path incoming = target;
     incoming += ".incoming";
@@ -885,7 +894,8 @@ core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& m
     if (ec) {
         std::error_code ignored;
         std::filesystem::remove_all(incoming, ignored);
-        return core::make_error(core::ErrorCode::IoError, cached.id + ": cannot be copied: " + ec.message());
+        return annokit::core::make_error(annokit::core::ErrorCode::IoError,
+                                         cached.id + ": cannot be copied: " + ec.message());
     }
     return target;
 }

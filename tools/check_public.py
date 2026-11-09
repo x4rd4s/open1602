@@ -35,7 +35,8 @@ ADDRESS = re.compile(r"\b0x00[4-6][0-9A-Fa-f]{5}\b"
                      r"|\b0x28[01][0-9A-Fa-f]{5}\b")
 MEMORY_OFFSET = re.compile(r"\b(?:runtime(?: player| island| city)?|city|island|player|ship) ?\+ ?0x[0-9A-Fa-f]+"
                            r"|\b[PC]\+0x[0-9A-Fa-f]+")
-FUNCTION_NAME = re.compile(r"\b(?!SDL_|SDLK_|LUA_)[A-Z][a-z][A-Za-z]*_[A-Z][a-z][A-Za-z0-9]*\b")
+# SDL, Lua and CMake (FetchContent_Declare) have names of that shape too.
+FUNCTION_NAME = re.compile(r"\b(?!SDL_|SDLK_|LUA_|FetchContent_)[A-Z][a-z][A-Za-z]*_[A-Z][a-z][A-Za-z0-9]*\b")
 # Names of that shape that are not functions of the original program.
 ALLOWED_NAMES = {"Endlos_Laufend"}
 OPCODE = re.compile(r"\bops? (?:0x[0-9A-Fa-f]+|\d+ sub\b)|\bsub 0x[0-9A-Fa-f]+", re.IGNORECASE)

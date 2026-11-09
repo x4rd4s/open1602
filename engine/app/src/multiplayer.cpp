@@ -10,11 +10,12 @@
 
 #include "map_viewer.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
-#include "o1602/platform/window.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -63,15 +64,16 @@ void MapViewer::close_lobby() {
     }
 }
 
-core::Status MapViewer::start_multiplayer() {
+annokit::core::Status MapViewer::start_multiplayer() {
     const ViewerOptions::Multiplayer& mp = *m_options.multiplayer;
     if (mp.role == ViewerOptions::Multiplayer::Role::Host) {
-        auto transport = net::enet_listen(mp.port);
+        auto transport = annokit::net::enet_listen(mp.port);
         if (!transport) {
             return transport.error();
         }
         if (m_local_player == sim::kNoPlayer) {
-            return core::make_error(core::ErrorCode::Unsupported, "the game has no human player to host with");
+            return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                             "the game has no human player to host with");
         }
         // Hosting from the command line without --name: the menu's name, else "Nameless".
         std::string name = mp.name.empty() ? m_app_settings.player_name : mp.name;
@@ -88,7 +90,7 @@ core::Status MapViewer::start_multiplayer() {
         m_command_sink.submit(sim::PlayerRename{m_local_player, name});
         std::fprintf(stderr, "multiplayer: hosting on UDP port %u as player %u\n", static_cast<unsigned>(mp.port),
                      static_cast<unsigned>(m_local_player));
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
     std::fprintf(stderr, "multiplayer: joining %s:%u\n", mp.address.c_str(), static_cast<unsigned>(mp.port));
     return join_game(mp.address, mp.port, mp.password);
@@ -105,14 +107,15 @@ net::ClientSession::Finish MapViewer::prepare_host_game(std::vector<std::uint8_t
     // the program goes on and keeps the connection. It only reads the game's tables, which change
     // only when a game starts on the game thread (make_state), not before this one is finished.
     auto warnings = std::make_shared<std::vector<std::string>>();
-    auto world =
-        std::make_shared<core::Result<sim::World>>(sim::read_game(save, m_buildings, warnings.get(), &m_figures));
+    auto world = std::make_shared<annokit::core::Result<sim::World>>(
+        sim::read_game(save, m_buildings, warnings.get(), &m_figures));
     save = {};  // the bytes are no longer needed: freed here, not on the game thread
     // The rest on the game thread, where the game starts.
     return [this, world, warnings] { return start_host_game(std::move(*world), *warnings); };
 }
 
-sim::Simulation* MapViewer::start_host_game(core::Result<sim::World> world, const std::vector<std::string>& warnings) {
+sim::Simulation* MapViewer::start_host_game(annokit::core::Result<sim::World> world,
+                                            const std::vector<std::string>& warnings) {
     if (!world) {
         std::fprintf(stderr, "multiplayer: the host's game cannot be loaded: %s\n", world.error().message.c_str());
         return nullptr;
@@ -149,7 +152,7 @@ std::string MapViewer::seat_names(const std::vector<sim::PlayerId>& seats) const
 }
 
 void MapViewer::chat_line(const net::SessionEvent& e) {
-    ChatLine line{e.name, e.text, e.seat, platform::ticks_ms(), false, {}};
+    ChatLine line{e.name, e.text, e.seat, annokit::platform::ticks_ms(), false, {}};
     const sim::PlayerId me = m_session ? m_session->local_seat() : sim::kNoPlayer;
     if (!e.everyone) {
         line.whisper = true;
@@ -197,7 +200,7 @@ void MapViewer::session_line(std::string text, std::string_view log, sim::Player
         std::fprintf(stderr, "multiplayer: %.*s\n", static_cast<int>(log.size()), log.data());
     }
     add_chat_line(m_hud ? &m_hud->multiplayer_model().chat : nullptr,
-                  ChatLine{{}, std::move(text), seat, platform::ticks_ms(), false, {}}, false);
+                  ChatLine{{}, std::move(text), seat, annokit::platform::ticks_ms(), false, {}}, false);
 }
 
 void MapViewer::session_line(MpText id, std::string_view value, sim::PlayerId seat) {
@@ -249,7 +252,7 @@ void MapViewer::apply_session_events() {
                 if (m_migrating) {
                     m_migrating = false;
                     session_line(MpText::HostMoved, m_successor_name);
-                    m_events.notify(mp_text(MpText::HostMoved, m_successor_name), {}, platform::ticks_ms());
+                    m_events.notify(mp_text(MpText::HostMoved, m_successor_name), {}, annokit::platform::ticks_ms());
                 }
                 std::fprintf(stderr, "multiplayer: game from the host loaded at frame %llu\n",
                              static_cast<unsigned long long>(e.frame));
@@ -302,7 +305,8 @@ void MapViewer::apply_session_events() {
                 session_line(MpText::SpeedRefused);
                 break;
             case net::SessionEvent::Kind::PackageKept:
-                session_line(MpText::PackageKept, core::utf8_to_cp1252(assets::package_label(e.packages.at(0))));
+                session_line(MpText::PackageKept,
+                             annokit::core::utf8_to_cp1252(assets::package_label(e.packages.at(0))));
                 break;
         }
     }
@@ -333,7 +337,7 @@ bool MapViewer::migrate() {
     std::string successor;  // the value of the text, if it has one
     MpText text = MpText::HostMovedYou;
     if (client->hosts_next()) {
-        auto transport = net::enet_listen(m_host_port);
+        auto transport = annokit::net::enet_listen(m_host_port);
         if (!transport) {
             std::fprintf(stderr, "multiplayer: cannot host the game on: %s\n", transport.error().message.c_str());
             return false;
@@ -353,17 +357,18 @@ bool MapViewer::migrate() {
         std::fprintf(stderr, "multiplayer: the host left; following %s:%u\n", address.c_str(),
                      static_cast<unsigned>(port));
         m_successor_name = client->successor_name();
-        m_session = std::make_unique<net::ClientSession>(*client, [address, port]() -> std::unique_ptr<net::Transport> {
-            auto transport = net::enet_connect(address, port);
-            return transport ? std::move(transport).value() : nullptr;
-        });
+        m_session = std::make_unique<net::ClientSession>(*client,
+                                                         [address, port]() -> std::unique_ptr<annokit::net::Transport> {
+                                                             auto transport = annokit::net::enet_connect(address, port);
+                                                             return transport ? std::move(transport).value() : nullptr;
+                                                         });
         m_migrating = true;
         text = MpText::HostMoving;
         successor = m_successor_name;
     }
     m_command_sink.set_session(m_session.get());
     session_line(text, successor);
-    m_events.notify(successor.empty() ? mp_text(text) : mp_text(text, successor), {}, platform::ticks_ms());
+    m_events.notify(successor.empty() ? mp_text(text) : mp_text(text, successor), {}, annokit::platform::ticks_ms());
     return true;
 }
 
@@ -384,12 +389,12 @@ void MapViewer::save_after_host_left() {
     for (sim::Player* p : others) {
         p->role = sim::PlayerRole::Human;
     }
-    const std::string file = utf8_to_cp1252(core::path_to_utf8(path.filename()));
+    const std::string file = utf8_to_cp1252(annokit::core::path_to_utf8(path.filename()));
     // error_text() logs what went wrong in English.
     const std::string text = status ? mp_text(MpText::HostLeftSaved, file)
                                     : ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")});
     session_line(text, status ? mp_log(MpText::HostLeftSaved, file) : std::string("notice.save_failed"));
-    m_events.notify(text, {}, platform::ticks_ms());
+    m_events.notify(text, {}, annokit::platform::ticks_ms());
 }
 
 // --- The menu ---
@@ -427,7 +432,7 @@ void MapViewer::apply_multiplayer_menu() {
     if (menu == nullptr) {
         return;
     }
-    const std::uint64_t now = platform::ticks_ms();
+    const std::uint64_t now = annokit::platform::ticks_ms();
     const auto delta = static_cast<std::uint32_t>(std::min<std::uint64_t>(now - m_lan_update_ms, 1000));
     m_lan_update_ms = now;
 
@@ -633,12 +638,12 @@ void MapViewer::leave_session(std::string notice) {
 
 // --- Hosting ---
 
-core::Status MapViewer::host_lobby(const HostSetup& setup) {
+annokit::core::Status MapViewer::host_lobby(const HostSetup& setup) {
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "a multiplayer game runs already");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "a multiplayer game runs already");
     }
     net::Lobby lobby;
     lobby.title = setup.title;
@@ -679,7 +684,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
             lobby.seats.push_back(std::move(seat));
         }
         if (lobby.seats.empty()) {
-            return core::make_error(core::ErrorCode::Unsupported, "the game has no player slots");
+            return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "the game has no player slots");
         }
         // A scenario's players may change colours before it begins; a savegame's keep theirs.
         if (setup.kind == HostSetup::Kind::Scenario) {
@@ -724,7 +729,7 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
     config.spectators_chat = setup.spectators_chat;
     config.computer_takes_over = setup.computer_takes_over;
     config.host_controls_speed = setup.host_controls_speed;
-    auto transport = net::enet_listen(setup.port);
+    auto transport = annokit::net::enet_listen(setup.port);
     if (!transport) {
         return transport.error();
     }
@@ -750,13 +755,13 @@ core::Status MapViewer::host_lobby(const HostSetup& setup) {
         m_hud->multiplayer_model().chat.clear();
         m_hud->multiplayer()->show_lobby();
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status MapViewer::start_hosted_game() {
+annokit::core::Status MapViewer::start_hosted_game() {
     net::HostSession* host = host_session();
     if (host == nullptr || host->started() || !m_hosted) {
-        return core::make_error(core::ErrorCode::Unsupported, "no lobby to start");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "no lobby to start");
     }
     const HostSetup& setup = *m_hosted;
     const net::Lobby lobby = host->lobby();
@@ -809,7 +814,7 @@ core::Status MapViewer::start_hosted_game() {
         world = std::move(*m_hosted_world);
         m_hosted_world.reset();
     } else {
-        return core::make_error(core::ErrorCode::NotFound, "the game of the lobby is gone");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "the game of the lobby is gone");
     }
     // The slots as the lobby has them. Nobody plays an open slot yet: the computer plays it, and
     // when people may come into the running game, the host hands it to whoever comes.
@@ -868,20 +873,20 @@ core::Status MapViewer::start_hosted_game() {
     if (!host->starting()) {
         close_lobby();  // else once every player has the game (Started)
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 // --- Joining ---
 
-core::Status MapViewer::join_game(const std::string& address, std::uint16_t port, const std::string& password,
-                                  bool fetch_packages) {
+annokit::core::Status MapViewer::join_game(const std::string& address, std::uint16_t port, const std::string& password,
+                                           bool fetch_packages) {
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "a multiplayer game runs already");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "a multiplayer game runs already");
     }
-    auto transport = net::enet_connect(address, port);
+    auto transport = annokit::net::enet_connect(address, port);
     if (!transport) {
         return transport.error();
     }
@@ -924,8 +929,8 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
     client->load_in_background([this](std::vector<std::uint8_t> save) { return prepare_host_game(std::move(save)); });
     // A broken connection: back to this host first; only if it cannot be reached, on to the
     // successor (MS-2).
-    client->reconnect_with([address, port]() -> std::unique_ptr<net::Transport> {
-        auto again = net::enet_connect(address, port);
+    client->reconnect_with([address, port]() -> std::unique_ptr<annokit::net::Transport> {
+        auto again = annokit::net::enet_connect(address, port);
         return again ? std::move(again).value() : nullptr;
     });
     // Packages the host sends, which the person agreed to: into the cache, before the game that uses
@@ -948,7 +953,7 @@ core::Status MapViewer::join_game(const std::string& address, std::uint16_t port
         m_hud->multiplayer_model().chat.clear();
         m_hud->multiplayer()->show_connecting(address + ":" + std::to_string(port));
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 // --- Packages a host sends ---

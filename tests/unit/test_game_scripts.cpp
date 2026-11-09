@@ -14,9 +14,10 @@
 #include "../test_framework.hpp"
 #include "test_support.hpp"
 
+#include "annokit/script/sandbox.hpp"
+
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/script/game_scripts.hpp"
-#include "o1602/script/sandbox.hpp"
 #include "o1602/sim/savegame_extension.hpp"
 #include "o1602/sim/simulation.hpp"
 
@@ -77,23 +78,26 @@ bool has_error(const std::vector<script::ScriptNote>& notes, const std::string& 
 }  // namespace
 
 TEST_CASE("script: the game's functions take and give values and tables") {
-    script::Sandbox sandbox;
-    std::vector<script::Value> seen;
-    REQUIRE(sandbox
-                .add_function("game", "echo",
-                              [&seen](std::span<const script::Value> args) -> core::Result<script::Value> {
-                                  seen.assign(args.begin(), args.end());
-                                  return script::make_table({{"name", std::string("fleet")}},
-                                                            {script::Value{std::int64_t{7}}});
-                              })
-                .ok());
-    REQUIRE(sandbox
-                .add_function("game", "refuse",
-                              [](std::span<const script::Value>) -> core::Result<script::Value> {
-                                  return core::make_error(core::ErrorCode::ScriptError, "not now");
-                              })
-                .ok());
-    REQUIRE(sandbox.add_value("game", "package", script::Value{std::string("lighthouse")}).ok());
+    annokit::script::Sandbox sandbox;
+    std::vector<annokit::script::Value> seen;
+    REQUIRE(
+        sandbox
+            .add_function(
+                "game", "echo",
+                [&seen](std::span<const annokit::script::Value> args) -> annokit::core::Result<annokit::script::Value> {
+                    seen.assign(args.begin(), args.end());
+                    return annokit::script::make_table({{"name", std::string("fleet")}},
+                                                       {annokit::script::Value{std::int64_t{7}}});
+                })
+            .ok());
+    REQUIRE(
+        sandbox
+            .add_function("game", "refuse",
+                          [](std::span<const annokit::script::Value>) -> annokit::core::Result<annokit::script::Value> {
+                              return annokit::core::make_error(annokit::core::ErrorCode::ScriptError, "not now");
+                          })
+            .ok());
+    REQUIRE(sandbox.add_value("game", "package", annokit::script::Value{std::string("lighthouse")}).ok());
     REQUIRE(sandbox
                 .run("t",
                      "local r = game.echo(1, 'two', {b = true, a = 2.5, 'x', 'y'})\n"
@@ -102,7 +106,7 @@ TEST_CASE("script: the game's functions take and give values and tables") {
     REQUIRE(seen.size() == 3);
     CHECK(std::get<std::int64_t>(seen[0]) == 1);
     CHECK(std::get<std::string>(seen[1]) == "two");
-    const auto& table = *std::get<std::shared_ptr<const script::Table>>(seen[2]);
+    const auto& table = *std::get<std::shared_ptr<const annokit::script::Table>>(seen[2]);
     REQUIRE(table.fields.size() == 2);
     CHECK(table.fields[0].first == "a");  // sorted by name
     CHECK(std::get<double>(table.fields[0].second) == 2.5);
@@ -127,14 +131,14 @@ TEST_CASE("script: a saved table comes back with its values, keys in a fixed ord
         "state[3] = 0.25\n"
         "state.nested = {list = {1, 2, 3}, deep = {deeper = {'bottom'}}}\n"
         "state.skipped = print\n";
-    script::Sandbox first;
+    annokit::script::Sandbox first;
     REQUIRE(first.run("a", source).ok());
     const auto bytes = first.save_table("state");
     REQUIRE(bytes.ok());
     REQUIRE(!bytes->empty());
 
     // The same table built in another order gives the same bytes.
-    script::Sandbox second;
+    annokit::script::Sandbox second;
     REQUIRE(second
                 .run("b",
                      "state = {nested = {deep = {deeper = {'bottom'}}, list = {1, 2, 3}}, [3] = 0.25}\n"
@@ -144,7 +148,7 @@ TEST_CASE("script: a saved table comes back with its values, keys in a fixed ord
                 .ok());
     CHECK(*second.save_table("state") == *bytes);
 
-    script::Sandbox loaded;
+    annokit::script::Sandbox loaded;
     REQUIRE(loaded.load_table("state", *bytes).ok());
     REQUIRE(loaded
                 .run("c",
@@ -162,7 +166,7 @@ TEST_CASE("script: a saved table comes back with its values, keys in a fixed ord
     CHECK(std::get<std::string>(*loaded.call("result")) == "43yes0.25bottomnil");
 
     // No table, no bytes; no bytes, nothing changes.
-    script::Sandbox empty;
+    annokit::script::Sandbox empty;
     CHECK(empty.save_table("state")->empty());
     REQUIRE(empty.load_table("state", {}).ok());
     REQUIRE(empty.run("d", "function result() return type(state) end").ok());
@@ -181,7 +185,7 @@ TEST_CASE("script: scripts start at the first tick and hear the seconds") {
     REQUIRE(states.size() == 1);
     CHECK(states[0].package == "quests");
 
-    script::Sandbox check;
+    annokit::script::Sandbox check;
     REQUIRE(check.load_table("state", states[0].data).ok());
     REQUIRE(check.run("c", "function result() return state.started * 100 + state.seconds end").ok());
     CHECK(std::get<std::int64_t>(*check.call("result")) == 2);
@@ -274,7 +278,7 @@ TEST_CASE("script: the state and random numbers go on after a save, the same as 
     Game first;
     auto first_scripts = first.run(one("dice", source));
     first.ticks(60);
-    const core::Bytes chunk = sim::encode_extension(first.world, first.buildings, &first.simulation, {});
+    const annokit::core::Bytes chunk = sim::encode_extension(first.world, first.buildings, &first.simulation, {});
     Game second;
     REQUIRE(sim::apply_extension(second.world, second.buildings, chunk, {}).ok());
     REQUIRE(second.world.script_states().size() == 1);
@@ -356,7 +360,7 @@ TEST_CASE("script: the state of the scripts goes through the savegame section") 
     state.random = sim::Random(7, 9);
     state.data = {1, 6, 0, 0, 0, 0};
     game.world.set_script_states({state});
-    const core::Bytes chunk = sim::encode_extension(game.world, game.buildings, nullptr, {});
+    const annokit::core::Bytes chunk = sim::encode_extension(game.world, game.buildings, nullptr, {});
     sim::World loaded(64, 64);
     REQUIRE(sim::apply_extension(loaded, game.buildings, chunk, {}).ok());
     REQUIRE(loaded.script_states().size() == 1);

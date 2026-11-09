@@ -9,9 +9,10 @@
 #include <filesystem>
 #include <thread>
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/data_fixes.hpp"
 #include "o1602/assets/package_sounds.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::audio {
 
@@ -227,7 +228,7 @@ void Effects::flush() {
             if (!place) {
                 continue;
             }
-            std::shared_ptr<const Pcm> sound;
+            std::shared_ptr<const annokit::audio::Pcm> sound;
             if (r.id >= assets::kFirstPackageSound) {
                 const std::size_t slot = r.id - assets::kFirstPackageSound;
                 sound = slot < m_package.size() ? m_package[slot] : nullptr;
@@ -240,16 +241,16 @@ void Effects::flush() {
                 continue;
             }
             // As in the History Edition: a sound still playing is not started again.
-            std::vector<Mixer::VoiceId>& voices = m_playing[sound.get()];
-            std::erase_if(voices, [this](Mixer::VoiceId v) { return !m_mixer->playing(v); });
+            std::vector<annokit::audio::Mixer::VoiceId>& voices = m_playing[sound.get()];
+            std::erase_if(voices, [this](annokit::audio::Mixer::VoiceId v) { return !m_mixer->playing(v); });
             if (voices.size() >= m_copies) {
                 continue;
             }
-            PlayOptions o;
+            annokit::audio::PlayOptions o;
             o.volume = place->first * m_gain;
             o.pan = place->second;
-            const Mixer::VoiceId voice = m_mixer->play(sound, o);
-            if (voice != Mixer::kNoVoice) {
+            const annokit::audio::Mixer::VoiceId voice = m_mixer->play(sound, o);
+            if (voice != annokit::audio::Mixer::kNoVoice) {
                 voices.push_back(voice);
             }
         }
@@ -257,7 +258,7 @@ void Effects::flush() {
     m_queue.clear();
     // Sounds that play no more are forgotten, so replaced or reloaded sounds do not pile up.
     std::erase_if(m_playing, [this](auto& kv) {
-        std::erase_if(kv.second, [this](Mixer::VoiceId v) { return !m_mixer->playing(v); });
+        std::erase_if(kv.second, [this](annokit::audio::Mixer::VoiceId v) { return !m_mixer->playing(v); });
         return kv.second.empty();
     });
 }
@@ -331,7 +332,7 @@ bool Voices::queue(std::uint16_t base, std::uint8_t count) {
     return false;
 }
 
-bool Voices::queue(std::shared_ptr<const Pcm> sound) {
+bool Voices::queue(std::shared_ptr<const annokit::audio::Pcm> sound) {
     for (std::size_t i = 0; i < kSlots; ++i) {
         Slot& slot = m_queue[(m_cursor + i) % kSlots];
         if (slot.free()) {
@@ -350,7 +351,7 @@ void Voices::update() {
     if (m_mixer->playing(m_voice)) {
         return;
     }
-    m_voice = Mixer::kNoVoice;
+    m_voice = annokit::audio::Mixer::kNoVoice;
     for (std::size_t i = 0; i < kSlots; ++i) {
         const std::size_t at = (m_cursor + i) % kSlots;
         if (m_queue[at].free()) {
@@ -360,8 +361,8 @@ void Voices::update() {
         m_cursor = (at + 1) % kSlots;
         auto pcm = slot.sound ? std::move(slot.sound) : m_bank->load("Speech8/" + std::to_string(slot.number) + ".wav");
         if (pcm) {
-            PlayOptions o;
-            o.group = Group::Speech;
+            annokit::audio::PlayOptions o;
+            o.group = annokit::audio::Group::Speech;
             // Voices are a quarter less attenuated than the effects.
             o.volume = gain_of(m_settings.effect_volume - m_settings.effect_volume / 4);
             m_voice = m_mixer->play(std::move(pcm), o);
@@ -374,7 +375,7 @@ void Voices::update() {
 void Voices::stop_all() {
     m_queue.fill(Slot{});
     m_mixer->stop(m_voice);
-    m_voice = Mixer::kNoVoice;
+    m_voice = annokit::audio::Mixer::kNoVoice;
 }
 
 std::size_t Voices::waiting() const noexcept {
@@ -384,8 +385,8 @@ std::size_t Voices::waiting() const noexcept {
 
 // ---- Music ---------------------------------------------------------------------------------------
 
-Music::Music(Mixer& mixer, SoundBank& bank, std::vector<std::string> tracks, std::vector<std::string> fights,
-             std::uint32_t seed, std::vector<MusicTrack> own)
+Music::Music(annokit::audio::Mixer& mixer, SoundBank& bank, std::vector<std::string> tracks,
+             std::vector<std::string> fights, std::uint32_t seed, std::vector<MusicTrack> own)
     : m_mixer(&mixer), m_bank(&bank), m_tracks(std::move(tracks)), m_fights(std::move(fights)), m_random(seed) {
     // A package's track with the title of one of MUSIC8 is left out: the title names one track.
     for (MusicTrack& t : own) {
@@ -423,7 +424,7 @@ void Music::scan(const assets::GameDirectory& game, std::vector<std::string>& tr
         return;
     }
     for (const auto& entry : std::filesystem::directory_iterator(*dir, ec)) {
-        const std::string name = core::path_to_utf8(entry.path().filename());
+        const std::string name = annokit::core::path_to_utf8(entry.path().filename());
         if (name.size() < 5 || lower(name.substr(name.size() - 4)) != ".wav") {
             continue;
         }
@@ -449,7 +450,7 @@ void Music::set_settings(const AudioSettings& s) {
     if (!s.music || (playing_disabled && !m_battle)) {
         // Off, or the track playing was switched off in the list: it stops at once.
         m_mixer->stop(m_voice);
-        m_voice = Mixer::kNoVoice;
+        m_voice = annokit::audio::Mixer::kNoVoice;
         m_title.clear();
     } else if (!m_fading) {
         m_mixer->set_volume(m_voice, gain_of(s.music_volume), 0.0F);
@@ -473,7 +474,7 @@ void Music::shot(float x, float y, float view_width_px, float view_height_px, st
 void Music::stop() {
     m_loading.reset();
     m_mixer->stop(m_voice);
-    m_voice = Mixer::kNoVoice;
+    m_voice = annokit::audio::Mixer::kNoVoice;
     m_fading = false;
     m_title.clear();
 }
@@ -561,7 +562,8 @@ void Music::start(const std::string& title) {
         return;
     }
     // The thread gets its own copy of the path: it may outlive the bank (the program ends).
-    std::packaged_task<core::Result<Pcm>()> task([file = *path] { return SoundBank::decode_file(file); });
+    std::packaged_task<annokit::core::Result<annokit::audio::Pcm>()> task(
+        [file = *path] { return SoundBank::decode_file(file); });
     m_loading = Loading{title, task.get_future()};
     std::thread(std::move(task)).detach();
 }
@@ -580,10 +582,10 @@ void Music::take_loaded(bool wait) {
         std::fprintf(stderr, "music: %s\n", pcm.error().message.c_str());
         return;
     }
-    PlayOptions o;
-    o.group = Group::Music;
+    annokit::audio::PlayOptions o;
+    o.group = annokit::audio::Group::Music;
     o.volume = gain_of(m_settings.music_volume);
-    m_voice = m_mixer->play(std::make_shared<const Pcm>(std::move(pcm).value()), o);
+    m_voice = m_mixer->play(std::make_shared<const annokit::audio::Pcm>(std::move(pcm).value()), o);
     m_title = loading.title;
 }
 
@@ -610,7 +612,7 @@ void Music::update(std::uint64_t game_ms, std::uint32_t real_ms) {
         const std::int64_t now = v - (v + 8000) * m_fade_ms * kFadeRate / 128000;
         if (now <= -8000 || !m_mixer->playing(m_voice)) {
             m_mixer->stop(m_voice);
-            m_voice = Mixer::kNoVoice;
+            m_voice = annokit::audio::Mixer::kNoVoice;
             m_fading = false;
             m_title.clear();
         } else {
@@ -621,7 +623,7 @@ void Music::update(std::uint64_t game_ms, std::uint32_t real_ms) {
     if (m_mixer->playing(m_voice)) {
         return;
     }
-    m_voice = Mixer::kNoVoice;
+    m_voice = annokit::audio::Mixer::kNoVoice;
     m_title.clear();
     if (!m_settings.music) {
         return;

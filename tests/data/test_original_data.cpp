@@ -20,6 +20,8 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/chunk_writer.hpp"
@@ -34,7 +36,6 @@
 #include "o1602/assets/savegame.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/render/ambient.hpp"
 #include "o1602/render/animation_clock.hpp"
 #include "o1602/render/island_renderer.hpp"
@@ -134,7 +135,7 @@ assets::cod::Document parse_original_cod(const assets::GameDirectory& game, cons
                                          std::span<const assets::CodPredefinedSymbol> predefined) {
     const auto path = game.resolve(file);
     REQUIRE(path.has_value());
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     REQUIRE(bytes.ok());
     return assets::cod::parse(assets::decode_cod(*bytes), predefined);
 }
@@ -618,7 +619,7 @@ TEST_CASE("data: savegames of the installation (if any) load like scenarios") {
     if (!dat) {
         SKIP("no Game.dat (game never started)");
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     REQUIRE(bytes.ok());
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     auto buildings = assets::BuildingTable::load(game);
@@ -717,7 +718,7 @@ TEST_CASE("data: logistics of a savegame keep their books balanced") {
     if (!dat) {
         SKIP("no Game.dat (game never started)");
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     REQUIRE(bytes.ok());
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     const auto slots = assets::parse_savegame_slots(text);
@@ -806,7 +807,7 @@ TEST_CASE("data: growth classes, growing tiles and deposits of a savegame") {
     if (!dat) {
         SKIP("no Game.dat (game never started)");
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     REQUIRE(bytes.ok());
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     std::optional<std::filesystem::path> path;
@@ -890,7 +891,7 @@ TEST_CASE("data: consumption of a savegame matches the original's numbers") {
     if (!dat) {
         SKIP("no Game.dat (game never started)");
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     REQUIRE(bytes.ok());
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     std::optional<std::filesystem::path> path;
@@ -951,7 +952,7 @@ TEST_CASE("data: houses of a savegame add up to the cities' inhabitants") {
     if (!dat) {
         SKIP("no Game.dat (game never started)");
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     REQUIRE(bytes.ok());
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     std::optional<std::filesystem::path> path;
@@ -1254,7 +1255,7 @@ std::optional<std::filesystem::path> first_savegame(const assets::GameDirectory&
     if (!dat) {
         return std::nullopt;
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     if (!bytes) {
         return std::nullopt;
     }
@@ -2191,7 +2192,7 @@ TEST_CASE("data: a game saved in Open1602 continues exactly as if it had not sto
     CHECK(warnings.empty());
     sim::Simulation b(*loaded, *buildings, *figures);
     b.set_speed(8);
-    const auto report = [](const core::Bytes& one, const core::Bytes& two) {
+    const auto report = [](const annokit::core::Bytes& one, const annokit::core::Bytes& two) {
         auto fa = assets::ChunkFile::from_bytes(one);
         auto fb = assets::ChunkFile::from_bytes(two);
         for (std::size_t k = 0; k < std::min(fa->chunks().size(), fb->chunks().size()); ++k) {
@@ -2413,7 +2414,7 @@ TEST_CASE("data: Open1602's chunk is left out when the original's chunks changed
     }
     auto saved = sim::write_savegame(world, *buildings, &a);
     REQUIRE(saved.ok());
-    const auto load = [&](const core::Bytes& bytes, std::vector<std::string>& warnings) {
+    const auto load = [&](const annokit::core::Bytes& bytes, std::vector<std::string>& warnings) {
         auto file = assets::ChunkFile::from_bytes(bytes);
         REQUIRE(file.ok());
         auto w = sim::load_world(*file, *buildings, game, &warnings);
@@ -2436,7 +2437,7 @@ TEST_CASE("data: Open1602's chunk is left out when the original's chunks changed
     REQUIRE(own != nullptr);
     {
         // Another tool changed a byte of the original's chunks (one the original ignores).
-        core::Bytes changed = *saved;
+        annokit::core::Bytes changed = *saved;
         changed[timers->offset + 0x10] ^= 0x5A;
         std::vector<std::string> warnings;
         const sim::World w = load(changed, warnings);
@@ -2447,7 +2448,8 @@ TEST_CASE("data: Open1602's chunk is left out when the original's chunks changed
     }
     {
         // A damaged chunk: cut off in the middle.
-        core::Bytes cut(saved->begin(), saved->begin() + static_cast<std::ptrdiff_t>(own->offset + own->size / 2));
+        annokit::core::Bytes cut(saved->begin(),
+                                 saved->begin() + static_cast<std::ptrdiff_t>(own->offset + own->size / 2));
         const auto size = static_cast<std::uint32_t>(own->size / 2);
         for (std::size_t k = 0; k < 4; ++k) {
             cut[own->offset - 4 + k] = static_cast<std::uint8_t>(size >> (8 * k));

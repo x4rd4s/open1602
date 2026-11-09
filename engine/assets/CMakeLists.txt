@@ -42,7 +42,7 @@ add_library(o1602_assets
 add_library(o1602::assets ALIAS o1602_assets)
 
 target_include_directories(o1602_assets PUBLIC include)
-target_link_libraries(o1602_assets PUBLIC o1602::core)
+target_link_libraries(o1602_assets PUBLIC annokit::core)
 if(WIN32)
     target_link_libraries(o1602_assets PRIVATE advapi32)  # GOG's registry entries (game_directory.cpp)
 endif()

@@ -189,8 +189,8 @@ public:
     /// world to try, without running a tick, so that a loader can refuse a damaged file before the game starts.
     /// Building the parts may normalise the world as a load does (ships of older files get their
     /// health), so it must leave a world of a running game as it is.
-    [[nodiscard]] static core::Status state_readable(World& world, const assets::BuildingTable& buildings,
-                                                     const assets::FigureTable& figures);
+    [[nodiscard]] static annokit::core::Status state_readable(World& world, const assets::BuildingTable& buildings,
+                                                              const assets::FigureTable& figures);
 
     /// Advances by `real_ms` of real time at the current speed; runs whole ticks and keeps the rest,
     /// at most kMaxTicksPerAdvance and only while `before_tick` agrees. Time owed beyond one more
@@ -339,7 +339,7 @@ public:
     [[nodiscard]] std::vector<DisasterEvent> take_disaster_events() { return m_disaster_events.take(); }
     /// Clocks and figures for Open1602's own savegame chunk (savegame_extension.hpp). A Simulation
     /// built on a world that carries such state continues from it.
-    void save_state(core::ByteWriter& out) const;
+    void save_state(annokit::core::ByteWriter& out) const;
     /// The world carried a state of the running game that could not be read (damaged, or of a
     /// newer Open1602): the game starts from the world alone, as after loading an original
     /// savegame, and so does not continue exactly as it was saved. Worth telling the player.
@@ -386,8 +386,8 @@ private:
     bool control_player(const PlayerControl& order);
     bool gate_order(const GateOrder& order);
     bool cheat(const CheatOrder& order);
-    core::Status restore_state(const std::vector<std::uint8_t>& state);
-    core::Status restore_legacy_state(core::ByteReader& reader, std::uint16_t version);
+    annokit::core::Status restore_state(const std::vector<std::uint8_t>& state);
+    annokit::core::Status restore_legacy_state(annokit::core::ByteReader& reader, std::uint16_t version);
     void handle(const std::vector<ConstructionEvent>& events, std::size_t first);
 
     /// A step of tick(); see tick_steps() for the order and why.

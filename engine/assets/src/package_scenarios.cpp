@@ -8,12 +8,13 @@
 #include <system_error>
 #include <utility>
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::assets {
 
@@ -52,7 +53,7 @@ std::optional<std::filesystem::path> package_file(const ModPackage& package, con
     if (!safe_package_path(relative)) {
         return std::nullopt;
     }
-    std::filesystem::path path = package.folder / core::path_from_utf8(relative);
+    std::filesystem::path path = package.folder / annokit::core::path_from_utf8(relative);
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec)) {
         return std::nullopt;
@@ -61,7 +62,7 @@ std::optional<std::filesystem::path> package_file(const ModPackage& package, con
 }
 
 /// A whole number from `min` to `max`, else nothing.
-std::optional<std::int64_t> number(const core::DataValue& value, std::int64_t min, std::int64_t max) {
+std::optional<std::int64_t> number(const annokit::core::DataValue& value, std::int64_t min, std::int64_t max) {
     const std::int64_t* n = value.integer();
     if (n == nullptr || *n < min || *n > max) {
         return std::nullopt;
@@ -91,12 +92,12 @@ std::string PackageScenario::briefing(std::string_view language) const {
 void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPackage& package, std::string_view utf8,
                          std::vector<std::string>& warnings) {
     const std::string where = package.id + "/" + std::string(kScenariosFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name +
@@ -107,16 +108,17 @@ void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPacka
         s.id = package.id + ":" + t.name;
         s.package = package.id;
         bool ok = true;
-        const auto refuse = [&](const core::DataEntry& e, const std::string& what) {
+        const auto refuse = [&](const annokit::core::DataEntry& e, const std::string& what) {
             warnings.push_back(line_of(where, e.value.line) + "'" + e.key + "' " + what);
             ok = false;
         };
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string* text = e.value.string();
             if (e.key == "file") {
-                const std::string ending = text != nullptr
-                                               ? lower(core::path_to_utf8(core::path_from_utf8(*text).extension()))
-                                               : std::string();
+                const std::string ending =
+                    text != nullptr
+                        ? lower(annokit::core::path_to_utf8(annokit::core::path_from_utf8(*text).extension()))
+                        : std::string();
                 const auto path = text != nullptr ? package_file(package, *text) : std::nullopt;
                 if (!path || (ending != ".szs" && ending != ".szm" && ending != ".o1602")) {
                     refuse(e, "names no map of the package (a .szs, .szm or .o1602 file in its folder)");
@@ -146,13 +148,13 @@ void read_scenarios_file(std::vector<PackageScenario>& scenarios, const ModPacka
                 if (text == nullptr || text->empty()) {
                     refuse(e, "is a text");
                 } else {
-                    s.names.emplace_back(language, core::utf8_to_cp1252(*text));
+                    s.names.emplace_back(language, annokit::core::utf8_to_cp1252(*text));
                 }
             } else if (const std::string_view b = text_key_language(e.key, "briefing"); !b.empty()) {
                 if (text == nullptr) {
                     refuse(e, "is a text");
                 } else {
-                    s.briefings.emplace_back(b, core::utf8_to_cp1252(*text));
+                    s.briefings.emplace_back(b, annokit::core::utf8_to_cp1252(*text));
                 }
             } else if (e.key.starts_with("slot.")) {
                 // slot.3 = "corsairs": the package's faction; "anno1602:natives": another's.
@@ -265,13 +267,13 @@ std::optional<std::string> package_text(const ModPackage& package, std::string_v
     if (!std::filesystem::is_regular_file(path, ec)) {
         return std::nullopt;
     }
-    const auto bytes = core::read_file(path);
+    const auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         warnings.push_back(package.id + "/" + std::string(name) + ": " + bytes.error().message);
         return std::nullopt;
     }
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-    return std::string(core::skip_utf8_bom(text));
+    return std::string(annokit::core::skip_utf8_bom(text));
 }
 
 }  // namespace
@@ -305,12 +307,12 @@ void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPacka
                          std::span<const PackageScenario> scenarios, std::string_view utf8,
                          std::vector<std::string>& warnings) {
     const std::string where = package.id + "/" + std::string(kCampaignsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name +
@@ -322,11 +324,11 @@ void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPacka
         c.package = package.id;
         std::vector<std::string> parts(kMaxCampaignParts);
         bool ok = true;
-        const auto refuse = [&](const core::DataEntry& e, const std::string& what) {
+        const auto refuse = [&](const annokit::core::DataEntry& e, const std::string& what) {
             warnings.push_back(line_of(where, e.value.line) + "'" + e.key + "' " + what);
             ok = false;
         };
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string* text = e.value.string();
             if (e.key == "stars") {
                 if (const auto n = number(e.value, 0, kMaxStars)) {
@@ -359,13 +361,13 @@ void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPacka
                 if (text == nullptr || text->empty()) {
                     refuse(e, "is a text");
                 } else {
-                    c.names.emplace_back(language, core::utf8_to_cp1252(*text));
+                    c.names.emplace_back(language, annokit::core::utf8_to_cp1252(*text));
                 }
             } else if (const std::string_view b = text_key_language(e.key, "briefing"); !b.empty()) {
                 if (text == nullptr) {
                     refuse(e, "is a text");
                 } else {
-                    c.briefings.emplace_back(b, core::utf8_to_cp1252(*text));
+                    c.briefings.emplace_back(b, annokit::core::utf8_to_cp1252(*text));
                 }
             } else {
                 refuse(e, "is no field of a campaign and is passed over");
@@ -421,11 +423,11 @@ std::filesystem::path campaign_carry_file(std::string_view campaign, std::size_t
     name += '.';
     name += std::to_string(part + 1);
     name += ".carry";
-    return core::path_from_utf8(name);
+    return annokit::core::path_from_utf8(name);
 }
 
 std::vector<std::uint8_t> write_campaign_carry(const CampaignCarry& carry) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.u32(kCarryMagic);
     out.u8(kCarryVersion);
     out.i64(carry.money);
@@ -434,7 +436,7 @@ std::vector<std::uint8_t> write_campaign_carry(const CampaignCarry& carry) {
 }
 
 std::optional<CampaignCarry> read_campaign_carry(std::span<const std::uint8_t> bytes) {
-    core::ByteReader in(bytes);
+    annokit::core::ByteReader in(bytes);
     const auto magic = in.u32();
     const auto version = in.u8();
     const auto money = in.u64();

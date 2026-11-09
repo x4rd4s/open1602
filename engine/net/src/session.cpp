@@ -97,7 +97,7 @@ const char* describe(RefuseReason reason) noexcept {
     return "";
 }
 
-Session::Session(std::unique_ptr<Transport> transport, SessionConfig config)
+Session::Session(std::unique_ptr<annokit::net::Transport> transport, SessionConfig config)
     : m_transport(std::move(transport)), m_config(std::move(config)) {
     m_config.hash_interval = std::max<std::uint32_t>(m_config.hash_interval, 1);
     m_config.min_lead = std::max<std::uint16_t>(m_config.min_lead, 1);
@@ -188,12 +188,12 @@ std::uint64_t Session::work_share(std::uint32_t players) noexcept {
     return std::max<std::uint64_t>(1, kFrameWork / std::max(players, 1U));
 }
 
-void Session::send(LinkId link, const Message& message) {
+void Session::send(annokit::net::LinkId link, const Message& message) {
     send_bytes(link, encode(message));
 }
 
-void Session::send_bytes(LinkId link, std::span<const std::uint8_t> bytes) {
-    if (bytes.size() <= kMaxPacketBytes) {
+void Session::send_bytes(annokit::net::LinkId link, std::span<const std::uint8_t> bytes) {
+    if (bytes.size() <= annokit::net::kMaxPacketBytes) {
         m_transport->send(link, bytes);
         return;
     }

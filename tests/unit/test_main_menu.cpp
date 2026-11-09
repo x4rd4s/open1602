@@ -140,7 +140,7 @@ struct Game {
                 assets::ChunkWriter w;
                 const std::array<std::uint8_t, 4> endless = {1, 0, 0, 0};
                 w.add("SZENE_MISSNR", endless);
-                const core::Bytes& b = w.bytes();
+                const annokit::core::Bytes& b = w.bytes();
                 write(root / "Szenes" / s, std::string(b.begin(), b.end()));
             } else {
                 write(root / "Szenes" / s, "not a scenario");  // no header: an adventure without stars
@@ -276,7 +276,7 @@ TEST_CASE("main menu: a campaign takes the header of its last part, whatever ord
         const std::array<std::uint8_t, 4> r = {part, 0, 0, 0};
         w.add("SZENE_KAMPAGNE", c);
         w.add("SZENE_RANKING", r);
-        const core::Bytes& b = w.bytes();
+        const annokit::core::Bytes& b = w.bytes();
         std::ofstream(folder / file, std::ios::binary)
             .write(reinterpret_cast<const char*>(b.data()), static_cast<std::streamsize>(b.size()));
     };
@@ -485,7 +485,7 @@ TEST_CASE("main menu: campaigns by stars then number, each by the header of its 
             w.add("SZENE_KAMPAGNE", word(campaign));
         }
         w.add("SZENE_RANKING", word(ranking));
-        const core::Bytes& b = w.bytes();
+        const annokit::core::Bytes& b = w.bytes();
         write(folder / file, std::string(b.begin(), b.end()));
     };
     scenario("Alpha0.szs", 1, 1);
@@ -512,7 +512,7 @@ TEST_CASE("main menu: the own scenario folder under its heading, in name order, 
         assets::ChunkWriter w;
         const std::array<std::uint8_t, 4> r = {static_cast<std::uint8_t>(ranking), 0, 0, 0};
         w.add("SZENE_RANKING", r);
-        const core::Bytes& b = w.bytes();
+        const annokit::core::Bytes& b = w.bytes();
         write(folder / file, std::string(b.begin(), b.end()));
     };
     scenario("Zwei Inseln0.szs", 1);

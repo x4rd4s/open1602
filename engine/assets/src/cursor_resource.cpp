@@ -14,8 +14,8 @@ constexpr std::uint32_t kTypeGroupCursor = 12;
 constexpr std::uint32_t kSubdirectory = 0x80000000U;
 constexpr std::size_t kMaxSide = 256;
 
-core::Error damaged(const char* what) {
-    return core::make_error(core::ErrorCode::InvalidFormat, std::string("cursor resource: ") + what);
+annokit::core::Error damaged(const char* what) {
+    return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, std::string("cursor resource: ") + what);
 }
 
 /// Bounds-checked little-endian reads; nothing past the end.
@@ -49,7 +49,7 @@ class Resources {
 public:
     explicit Resources(std::span<const std::uint8_t> pe) : m_bytes{pe} {}
 
-    core::Status open() {
+    annokit::core::Status open() {
         const auto lfanew = m_bytes.u32(0x3C);
         if (m_bytes.u16(0) != std::uint16_t{0x5A4D} || !lfanew || m_bytes.u32(*lfanew) != std::uint32_t{0x4550}) {
             return damaged("not a PE file");
@@ -86,7 +86,7 @@ public:
             return damaged("resources outside the sections");
         }
         m_root = *root;
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
 
     /// The data of resource type/id (the first language), as a span of the file.
@@ -157,7 +157,7 @@ private:
 
 }  // namespace
 
-core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uint16_t group) {
+annokit::core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uint16_t group) {
     Resources res(pe);
     if (auto opened = res.open(); !opened) {
         return opened.error();
@@ -165,7 +165,8 @@ core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uin
     // The group: reserved, type 2, count, then 14 bytes per image (w, h, planes, bits, size, id).
     const auto dir = res.find(kTypeGroupCursor, group);
     if (!dir) {
-        return core::make_error(core::ErrorCode::NotFound, "cursor resource " + std::to_string(group) + " missing");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "cursor resource " + std::to_string(group) + " missing");
     }
     const Bytes g{*dir};
     const auto count = g.u16(4);
@@ -190,7 +191,8 @@ core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uin
         return damaged("cursor header cut off");
     }
     if (*bits != 1) {
-        return core::make_error(core::ErrorCode::Unsupported, "cursor resource: only black-and-white cursors");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "cursor resource: only black-and-white cursors");
     }
     const std::uint32_t height = *double_height / 2;
     if (*width == 0 || height == 0 || *width > kMaxSide || height > kMaxSide || *hot_x >= *width || *hot_y >= height) {

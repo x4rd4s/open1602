@@ -20,7 +20,7 @@ add_executable(open1602
     src/video_controller.cpp
     src/video_player.cpp
 )
-target_link_libraries(open1602 PRIVATE o1602::sim o1602::render_sdl o1602::platform o1602::audio o1602::ui o1602::video o1602::net o1602::menus o1602::script o1602::editor)
+target_link_libraries(open1602 PRIVATE o1602::sim o1602::render_sdl annokit::platform o1602::audio o1602::ui annokit::video o1602::net o1602::menus o1602::script o1602::editor)
 o1602_set_warnings(open1602)
 target_compile_definitions(open1602 PRIVATE O1602_VERSION="${PROJECT_VERSION}")  # the log's first line
 o1602_set_output_dir(open1602)
@@ -72,8 +72,8 @@ if(UNIX AND NOT APPLE)
         DESTINATION share/icons/hicolor/scalable/apps RENAME ${app_id}.svg)
 endif()
 # The licences of the libraries built into the program (MIT and BSD ask for their notices to go along).
-install(FILES ${PROJECT_SOURCE_DIR}/third_party/enet/LICENSE DESTINATION share/doc/open1602/licenses RENAME enet.txt)
-install(FILES ${PROJECT_SOURCE_DIR}/third_party/lua/LICENSE DESTINATION share/doc/open1602/licenses RENAME lua.txt)
-install(FILES ${PROJECT_SOURCE_DIR}/third_party/dav1d/COPYING DESTINATION share/doc/open1602/licenses RENAME dav1d.txt)
-install(FILES ${PROJECT_SOURCE_DIR}/third_party/opus/COPYING DESTINATION share/doc/open1602/licenses RENAME opus.txt)
+install(FILES ${annokit_SOURCE_DIR}/third_party/enet/LICENSE DESTINATION share/doc/open1602/licenses RENAME enet.txt)
+install(FILES ${annokit_SOURCE_DIR}/third_party/lua/LICENSE DESTINATION share/doc/open1602/licenses RENAME lua.txt)
+install(FILES ${annokit_SOURCE_DIR}/third_party/dav1d/COPYING DESTINATION share/doc/open1602/licenses RENAME dav1d.txt)
+install(FILES ${annokit_SOURCE_DIR}/third_party/opus/COPYING DESTINATION share/doc/open1602/licenses RENAME opus.txt)
 install(FILES ${PROJECT_SOURCE_DIR}/LICENSE DESTINATION share/doc/open1602)

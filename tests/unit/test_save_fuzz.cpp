@@ -19,10 +19,11 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/compress.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/compress.hpp"
 #include "o1602/sim/random.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_extension.hpp"
@@ -133,22 +134,22 @@ struct Section {
     std::uint32_t size = 0;
 };
 
-std::uint32_t get_u32(const core::Bytes& b, std::size_t at) {
+std::uint32_t get_u32(const annokit::core::Bytes& b, std::size_t at) {
     return static_cast<std::uint32_t>(b[at]) | static_cast<std::uint32_t>(b[at + 1]) << 8U |
            static_cast<std::uint32_t>(b[at + 2]) << 16U | static_cast<std::uint32_t>(b[at + 3]) << 24U;
 }
-void put_u16(core::Bytes& b, std::size_t at, std::uint16_t v) {
+void put_u16(annokit::core::Bytes& b, std::size_t at, std::uint16_t v) {
     b[at] = static_cast<std::uint8_t>(v);
     b[at + 1] = static_cast<std::uint8_t>(v >> 8U);
 }
-void put_u32(core::Bytes& b, std::size_t at, std::uint32_t v) {
+void put_u32(annokit::core::Bytes& b, std::size_t at, std::uint32_t v) {
     for (std::size_t i = 0; i < 4; ++i) {
         b[at + i] = static_cast<std::uint8_t>(v >> (8 * i));
     }
 }
 
 /// The sections of an uncompressed savegame, as far as their headers hold.
-std::vector<Section> sections_of(const core::Bytes& file) {
+std::vector<Section> sections_of(const annokit::core::Bytes& file) {
     std::vector<Section> out;
     std::size_t at = kHeader;
     while (at + kSectionHeader <= file.size()) {
@@ -173,19 +174,19 @@ const Section* find(const std::vector<Section>& sections, std::string_view tag) 
 }
 
 /// Makes the header fit the (changed) uncompressed sections again: size and checksum.
-void reseal(core::Bytes& file) {
+void reseal(annokit::core::Bytes& file) {
     const auto body = std::span<const std::uint8_t>(file).subspan(kHeader);
     for (std::size_t i = 0; i < 8; ++i) {
         file[16 + i] = static_cast<std::uint8_t>(static_cast<std::uint64_t>(body.size()) >> (8 * i));
     }
-    put_u32(file, 24, core::crc32(body));
+    put_u32(file, 24, annokit::core::crc32(body));
     put_u32(file, 28, static_cast<std::uint32_t>(body.size()));
 }
 
 /// A section of its own: tag, version, flags, size, body.
-core::Bytes make_section(std::string_view tag, std::uint16_t version, std::uint16_t flags,
-                         const std::vector<std::uint8_t>& body) {
-    core::ByteWriter out;
+annokit::core::Bytes make_section(std::string_view tag, std::uint16_t version, std::uint16_t flags,
+                                  const std::vector<std::uint8_t>& body) {
+    annokit::core::ByteWriter out;
     out.bytes(std::span(reinterpret_cast<const std::uint8_t*>(tag.data()), 4));
     out.u16(version);
     out.u16(flags);
@@ -199,7 +200,7 @@ struct Game {
     assets::BuildingTable buildings = make_buildings();
     assets::FigureTable figures;
     sim::World world = make_world(buildings);
-    core::Bytes file;
+    annokit::core::Bytes file;
 
     Game() {
         sim::Simulation simulation(world, buildings, figures);
@@ -218,7 +219,7 @@ std::uint32_t env_or(const char* name, std::uint32_t fallback) {
 }
 
 /// One random change of the sections; returns what it did, for the report of a failure.
-std::string mutate(core::Bytes& file, sim::Random& random) {
+std::string mutate(annokit::core::Bytes& file, sim::Random& random) {
     const std::vector<Section> sections = sections_of(file);
     REQUIRE(!sections.empty());
     const Section& s = sections[random.below(static_cast<std::uint32_t>(sections.size()))];
@@ -275,14 +276,14 @@ std::string mutate(core::Bytes& file, sim::Random& random) {
             return s.tag + ": left out";
         }
         case 6: {  // the section twice
-            const core::Bytes copy(file.begin() + static_cast<std::ptrdiff_t>(s.at),
-                                   file.begin() + static_cast<std::ptrdiff_t>(body + size));
+            const annokit::core::Bytes copy(file.begin() + static_cast<std::ptrdiff_t>(s.at),
+                                            file.begin() + static_cast<std::ptrdiff_t>(body + size));
             file.insert(file.end(), copy.begin(), copy.end());
             return s.tag + ": twice";
         }
         case 7: {  // the section moved to the end
-            const core::Bytes copy(file.begin() + static_cast<std::ptrdiff_t>(s.at),
-                                   file.begin() + static_cast<std::ptrdiff_t>(body + size));
+            const annokit::core::Bytes copy(file.begin() + static_cast<std::ptrdiff_t>(s.at),
+                                            file.begin() + static_cast<std::ptrdiff_t>(body + size));
             file.erase(file.begin() + static_cast<std::ptrdiff_t>(s.at),
                        file.begin() + static_cast<std::ptrdiff_t>(body + size));
             file.insert(file.end(), copy.begin(), copy.end());
@@ -306,7 +307,7 @@ TEST_CASE("save fuzz: mutated sections with a correct checksum load nothing or a
     for (std::uint32_t i = 0; i < iterations; ++i) {
         const std::uint32_t seed = first_seed + i;
         sim::Random random(seed, 0xF022);
-        core::Bytes file = game.file;
+        annokit::core::Bytes file = game.file;
         std::string what = mutate(file, random);
         if (random.below(4) == 0) {
             what += ", " + mutate(file, random);
@@ -345,23 +346,23 @@ TEST_CASE("save fuzz: mutated sections with a correct checksum load nothing or a
 }
 
 TEST_CASE("save fuzz: random damage to a packed file never gets past the checks") {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         SKIP("no zlib");
     }
     Game game;
     sim::World world = game.world;
     auto packed = sim::write_game(world, game.buildings);
     REQUIRE(packed.ok());
-    const auto unpack = [](const core::Bytes& file) {
+    const auto unpack = [](const annokit::core::Bytes& file) {
         const auto size = static_cast<std::size_t>(get_u32(file, 16));
-        return core::zlib_inflate(std::span<const std::uint8_t>(file).subspan(kHeader), size);
+        return annokit::core::zlib_inflate(std::span<const std::uint8_t>(file).subspan(kHeader), size);
     };
     const auto sections = unpack(*packed);
     REQUIRE(sections.ok());
     sim::Random random(7, 0xF022);
     std::uint32_t refused = 0;
     for (std::uint32_t i = 0; i < 200; ++i) {
-        core::Bytes file = *packed;
+        annokit::core::Bytes file = *packed;
         const std::uint32_t n = 1 + random.below(4);
         for (std::uint32_t k = 0; k < n; ++k) {
             const auto value = static_cast<std::uint8_t>(1 + random.below(255));
@@ -402,7 +403,7 @@ TEST_CASE("save fuzz: the writer marks the sections the game cannot do without a
 TEST_CASE("save fuzz: a section of a later version is skipped and reported, a required one refuses the file") {
     Game game;
     const std::vector<Section> sections = sections_of(game.file);
-    const auto load = [&](const core::Bytes& file, std::vector<std::string>* warnings) {
+    const auto load = [&](const annokit::core::Bytes& file, std::vector<std::string>* warnings) {
         return sim::read_game(file, game.buildings, warnings, &game.figures);
     };
     const auto mentions = [](const std::vector<std::string>& warnings, std::string_view text) {
@@ -411,8 +412,8 @@ TEST_CASE("save fuzz: a section of a later version is skipped and reported, a re
     };
 
     // An unknown optional section: loaded, reported.
-    core::Bytes extra = game.file;
-    const core::Bytes xtra = make_section("XTRA", 1, 0, {1, 2, 3, 4});
+    annokit::core::Bytes extra = game.file;
+    const annokit::core::Bytes xtra = make_section("XTRA", 1, 0, {1, 2, 3, 4});
     extra.insert(extra.end(), xtra.begin(), xtra.end());
     reseal(extra);
     std::vector<std::string> warnings;
@@ -422,19 +423,19 @@ TEST_CASE("save fuzz: a section of a later version is skipped and reported, a re
     CHECK(loaded->ships().size() == game.world.ships().size());
 
     // The same section required: nothing loaded, the message names it.
-    core::Bytes required = game.file;
-    const core::Bytes xtra_required = make_section("XTRA", 1, 1, {1, 2, 3, 4});
+    annokit::core::Bytes required = game.file;
+    const annokit::core::Bytes xtra_required = make_section("XTRA", 1, 1, {1, 2, 3, 4});
     required.insert(required.end(), xtra_required.begin(), xtra_required.end());
     reseal(required);
     auto refused = load(required, nullptr);
     REQUIRE(!refused.ok());
-    CHECK(refused.error().code == core::ErrorCode::Unsupported);
+    CHECK(refused.error().code == annokit::core::ErrorCode::Unsupported);
     CHECK(refused.error().message.find("XTRA") != std::string::npos);
 
     // A known section in a later version that is not required: skipped, the rest loads.
     const Section* stances = find(sections, "STNC");
     REQUIRE(stances != nullptr);
-    core::Bytes later = game.file;
+    annokit::core::Bytes later = game.file;
     put_u16(later, stances->at + 4, 2);
     put_u16(later, stances->at + 6, 0);
     reseal(later);
@@ -450,11 +451,11 @@ TEST_CASE("save fuzz: a section of a later version is skipped and reported, a re
     reseal(later);
     refused = load(later, nullptr);
     REQUIRE(!refused.ok());
-    CHECK(refused.error().code == core::ErrorCode::Unsupported);
+    CHECK(refused.error().code == annokit::core::ErrorCode::Unsupported);
     CHECK(refused.error().message.find("STNC") != std::string::npos);
 
     // Files written before the flags existed have 0 there: they load as before, without warnings.
-    core::Bytes old = game.file;
+    annokit::core::Bytes old = game.file;
     for (const Section& s : sections) {
         put_u16(old, s.at + 6, 0);
     }
@@ -473,8 +474,8 @@ TEST_CASE("save fuzz: a section that does not match the size of the one it compl
     const auto emptied = [&](std::string_view tag) {
         const Section* s = find(sections, tag);
         REQUIRE(s != nullptr);
-        core::Bytes file(game.file.begin(), game.file.begin() + static_cast<std::ptrdiff_t>(s->at));
-        const core::Bytes empty = make_section(tag, s->version, s->flags, {0, 0, 0, 0});
+        annokit::core::Bytes file(game.file.begin(), game.file.begin() + static_cast<std::ptrdiff_t>(s->at));
+        const annokit::core::Bytes empty = make_section(tag, s->version, s->flags, {0, 0, 0, 0});
         file.insert(file.end(), empty.begin(), empty.end());
         file.insert(file.end(), game.file.begin() + static_cast<std::ptrdiff_t>(s->at + kSectionHeader + s->size),
                     game.file.end());
@@ -502,7 +503,7 @@ TEST_CASE("save fuzz: a missing core section, a section twice or bytes left over
         const Section* s = find(sections, tag);
         REQUIRE(s != nullptr);
         const auto [from, to] = span_of(*s);
-        core::Bytes file(game.file.begin(), from);
+        annokit::core::Bytes file(game.file.begin(), from);
         file.insert(file.end(), to, game.file.end());
         reseal(file);
         return file;
@@ -511,7 +512,7 @@ TEST_CASE("save fuzz: a missing core section, a section twice or bytes left over
         const Section* s = find(sections, tag);
         REQUIRE(s != nullptr);
         const auto [from, to] = span_of(*s);
-        core::Bytes file(game.file.begin(), to);
+        annokit::core::Bytes file(game.file.begin(), to);
         file.insert(file.end(), from, to);
         file.insert(file.end(), to, game.file.end());
         reseal(file);
@@ -521,7 +522,7 @@ TEST_CASE("save fuzz: a missing core section, a section twice or bytes left over
         const Section* s = find(sections, tag);
         REQUIRE(s != nullptr);
         const auto [from, to] = span_of(*s);
-        core::Bytes file(game.file.begin(), to);
+        annokit::core::Bytes file(game.file.begin(), to);
         file.push_back(0);
         file.insert(file.end(), to, game.file.end());
         put_u32(file, s->at + 8, s->size + 1);
@@ -546,7 +547,7 @@ TEST_CASE("save fuzz: a file promising more than its world can hold is refused b
     Game game;
     auto packed = sim::write_game(game.world, game.buildings, nullptr, sim::SaveOptions{true});
     REQUIRE(packed.ok());
-    core::Bytes file = std::move(packed).value();
+    annokit::core::Bytes file = std::move(packed).value();
     REQUIRE(sim::read_game(file, game.buildings).ok());
     // The head is enough for the list of savegames.
     const auto info =
@@ -567,27 +568,27 @@ TEST_CASE("save fuzz: a file promising more than its world can hold is refused b
 TEST_CASE("save fuzz: the chunk in a .GAM refuses a required section of a later version, unchanged world") {
     Game game;
     const std::vector<std::uint8_t> before = {'s', 'o', 'm', 'e', ' ', 'c', 'h', 'u', 'n', 'k', 's'};
-    const core::Bytes payload = sim::encode_extension(game.world, game.buildings, nullptr, before);
+    const annokit::core::Bytes payload = sim::encode_extension(game.world, game.buildings, nullptr, before);
     sim::World target = make_world(game.buildings);
     std::vector<std::string> warnings;
     REQUIRE(sim::apply_extension(target, game.buildings, payload, before, &warnings).ok());
     CHECK(warnings.empty());
 
-    core::Bytes optional = payload;
-    const core::Bytes xtra = make_section("XTRA", 3, 0, {9});
+    annokit::core::Bytes optional = payload;
+    const annokit::core::Bytes xtra = make_section("XTRA", 3, 0, {9});
     optional.insert(optional.end(), xtra.begin(), xtra.end());
     REQUIRE(sim::apply_extension(target, game.buildings, optional, before, &warnings).ok());
     REQUIRE(warnings.size() == 1);
     CHECK(warnings[0].find("XTRA (version 3)") != std::string::npos);
 
-    core::Bytes required = payload;
-    const core::Bytes xtra_required = make_section("XTRA", 3, 1, {9});
+    annokit::core::Bytes required = payload;
+    const annokit::core::Bytes xtra_required = make_section("XTRA", 3, 1, {9});
     required.insert(required.end(), xtra_required.begin(), xtra_required.end());
     sim::World untouched = make_world(game.buildings);
     untouched.ships()[0].name = "Untouched";
     const auto status = sim::apply_extension(untouched, game.buildings, required, before);
     REQUIRE(!status.ok());
-    CHECK(status.error().code == core::ErrorCode::Unsupported);
+    CHECK(status.error().code == annokit::core::ErrorCode::Unsupported);
     CHECK(untouched.ships()[0].name == "Untouched");
 }
 
@@ -699,21 +700,21 @@ TEST_CASE("save fuzz: the runs of a compact map column must cover it exactly (DS
     REQUIRE(found != 0);
     const std::uint32_t first = get_u32(game.file, found + 5);
     {
-        core::Bytes file = game.file;
+        annokit::core::Bytes file = game.file;
         reseal(file);
         CHECK(sim::read_game(file, game.buildings).ok());  // the scan found the column, not the damage
     }
     for (const std::uint32_t length : {first - 1, first + 1, 0U, 0xFFFFFFFFU}) {
-        core::Bytes file = game.file;
+        annokit::core::Bytes file = game.file;
         put_u32(file, found + 5, length);
         reseal(file);
         CHECK(!sim::read_game(file, game.buildings).ok());
     }
-    core::Bytes more = game.file;  // one run more than the bytes and the column hold
+    annokit::core::Bytes more = game.file;  // one run more than the bytes and the column hold
     put_u32(more, found + 1, get_u32(more, found + 1) + 1);
     reseal(more);
     CHECK(!sim::read_game(more, game.buildings).ok());
-    core::Bytes mode = game.file;  // a column of neither kind
+    annokit::core::Bytes mode = game.file;  // a column of neither kind
     mode[found] = 2;
     reseal(mode);
     CHECK(!sim::read_game(mode, game.buildings).ok());

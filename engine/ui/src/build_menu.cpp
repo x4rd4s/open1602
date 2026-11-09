@@ -6,11 +6,12 @@
 #include <system_error>
 #include <utility>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/ui/package_icons.hpp"
 #include "o1602/ui/panel.hpp"
 
@@ -188,9 +189,9 @@ void remove_building(BuildMenuDefinition& menu, std::uint32_t id) {
 }
 
 /// One table of build_menu.toml applied to `menu`; a message why not, else empty.
-std::string apply_table(BuildMenuDefinition& menu, const core::DataTable& table, const assets::BuildingTable& buildings,
-                        std::span<const assets::OwnBuilding> own, const std::string& at,
-                        std::vector<std::string>& warnings) {
+std::string apply_table(BuildMenuDefinition& menu, const annokit::core::DataTable& table,
+                        const assets::BuildingTable& buildings, std::span<const assets::OwnBuilding> own,
+                        const std::string& at, std::vector<std::string>& warnings) {
     std::optional<std::int64_t> id;
     std::optional<std::int64_t> category;
     std::optional<std::int64_t> row;
@@ -199,7 +200,7 @@ std::string apply_table(BuildMenuDefinition& menu, const core::DataTable& table,
     std::optional<std::string> picture;
     std::optional<std::string> name;
     bool remove = false;
-    for (const core::DataEntry& e : table.entries) {
+    for (const annokit::core::DataEntry& e : table.entries) {
         const std::string field = line_of(at, e.value.line) + "'" + e.key + "' ";
         const std::int64_t* n = e.value.integer();
         if (const std::string* icon_id = e.value.string(); e.key == "icon" && icon_id != nullptr) {
@@ -234,7 +235,7 @@ std::string apply_table(BuildMenuDefinition& menu, const core::DataTable& table,
             if (e.value.string() == nullptr) {
                 return field + "is a string";
             }
-            name = core::utf8_to_cp1252(*e.value.string());
+            name = annokit::core::utf8_to_cp1252(*e.value.string());
         } else if (e.key == "remove") {
             if (e.value.boolean() == nullptr) {
                 return field + "is true or false";
@@ -330,15 +331,16 @@ void set_build_menu(BuildMenuDefinition menu) {
     current_build_menu() = std::move(menu);
 }
 
-core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_view package, std::string_view utf8,
-                                      const assets::BuildingTable& buildings, std::vector<std::string>& warnings,
-                                      std::span<const assets::OwnBuilding> own) {
+annokit::core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_view package,
+                                               std::string_view utf8, const assets::BuildingTable& buildings,
+                                               std::vector<std::string>& warnings,
+                                               std::span<const assets::OwnBuilding> own) {
     const std::string where = std::string(package) + "/" + std::string(kBuildMenuFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
-        return core::make_error(tables.error().code, where + " " + tables.error().message);
+        return annokit::core::make_error(tables.error().code, where + " " + tables.error().message);
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [building] belong to none and are passed over");
@@ -348,7 +350,7 @@ core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_vie
             warnings.push_back(std::move(problem) + "; [" + table.name + "] is passed over");
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu, std::span<const assets::ModPackage> packages,
@@ -356,7 +358,7 @@ BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu, std::s
                                          std::span<const assets::OwnBuilding> own) {
     BuildMenuDefinition out = menu;
     for (const assets::ModPackage& package : packages) {
-        const auto bytes = core::read_file(package.folder / kBuildMenuFile);
+        const auto bytes = annokit::core::read_file(package.folder / kBuildMenuFile);
         if (!bytes) {
             continue;  // a package that leaves the menu as it is
         }

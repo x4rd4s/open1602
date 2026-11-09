@@ -3,10 +3,11 @@
 
 #include <algorithm>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/package_sounds.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::audio {
 
@@ -21,18 +22,18 @@ std::string line_of(const std::string& where, std::size_t line) {
 void apply_music_file(std::vector<MusicTrack>& tracks, std::string_view package, const std::filesystem::path& folder,
                       std::string_view utf8, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kMusicFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         MusicTrack track;
         track.title = t.name;
         std::string file;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             const std::string* s = e.value.string();
             if (e.key == "file") {
@@ -75,7 +76,7 @@ void apply_music_file(std::vector<MusicTrack>& tracks, std::string_view package,
             warnings.push_back(at + "[" + t.name + "] needs a 'file'");
             continue;
         }
-        track.file = folder / core::path_from_utf8(file);
+        track.file = folder / annokit::core::path_from_utf8(file);
         if (!assets::is_sound_file(track.file)) {
             warnings.push_back(at + file + " is missing or no WAV, Ogg Vorbis or FLAC file");
             continue;

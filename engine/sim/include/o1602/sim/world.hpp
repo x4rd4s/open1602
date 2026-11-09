@@ -12,6 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/game_content.hpp"
@@ -20,13 +22,14 @@
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/own_buildings.hpp"
 #include "o1602/assets/scenario.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/balance.hpp"
 #include "o1602/sim/diplomacy.hpp"
 #include "o1602/sim/goods_ledger.hpp"
 #include "o1602/sim/id_index.hpp"
 #include "o1602/sim/island_map.hpp"
+#include "o1602/sim/limits.hpp"
 #include "o1602/sim/mission.hpp"
+#include "o1602/sim/original_limits.hpp"
 #include "o1602/sim/player.hpp"
 #include "o1602/sim/production.hpp"
 #include "o1602/sim/random.hpp"
@@ -491,7 +494,7 @@ public:
     /// Adds an island at its header position. Fails if it leaves the world or overlaps another one;
     /// with `buildings` the rectangles may overlap where one of the two islands has sea (a tile
     /// there belongs to the island with land, else to the one added first).
-    core::Status add_island(WorldIsland island, const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status add_island(WorldIsland island, const assets::BuildingTable* buildings = nullptr);
 
     // Islands changed by the editor (ADR 0013). Each fails without a change; `buildings` decides,
     // as for add_island(), which tiles of overlapping rectangles are sea.
@@ -503,41 +506,42 @@ public:
     [[nodiscard]] IslandUse island_use(std::size_t index) const;
     /// Moves island `index` so that its tile (0,0) lies at (x, y). Fails if it leaves the map,
     /// overlaps another island, lands on a ship, units stand on it or a game is running.
-    core::Status move_island(std::size_t index, std::uint32_t x, std::uint32_t y,
-                             const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status move_island(std::size_t index, std::uint32_t x, std::uint32_t y,
+                                      const assets::BuildingTable* buildings = nullptr);
     /// Turns island `index` a quarter clockwise about its centre (as near as the tiles allow,
     /// inside the map): every tile with its picture, deposits, craters, deer, animals and growing
     /// tiles go with it. Only an island without use (island_use()).
-    core::Status rotate_island(std::size_t index, const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status rotate_island(std::size_t index, const assets::BuildingTable* buildings = nullptr);
     /// A copy of island `index` with the number `number` at (x, y), added as the last island:
     /// its tiles, deposits (nobody knows them), craters, deer, animals and growing tiles, but
     /// nobody has discovered it. Only an island without use.
-    core::Status copy_island(std::size_t index, std::uint32_t x, std::uint32_t y, std::uint16_t number,
-                             const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status copy_island(std::size_t index, std::uint32_t x, std::uint32_t y, std::uint16_t number,
+                                      const assets::BuildingTable* buildings = nullptr);
     /// Takes island `index` out with its animals and growing tiles; the islands after it move
     /// one place forward, and everything that names them follows. Only an island without use.
-    core::Status remove_island(std::size_t index, const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status remove_island(std::size_t index, const assets::BuildingTable* buildings = nullptr);
     /// Island `index` grown by `left`, `top`, `right` and `bottom` tiles of open sea (`sea`, in the
     /// phase of the world's open sea at its place), keeping every tile where it is on the map: its
     /// deposits, craters, deer, animals and growing tiles move with its tiles. Fails if it would
     /// leave the map or reach over another island's land, or grow beyond kMaxIslandSide. Only an
     /// island without use (island_use()).
-    core::Status grow_island(std::size_t index, std::uint32_t left, std::uint32_t top, std::uint32_t right,
-                             std::uint32_t bottom, const assets::BuildingType& sea,
-                             const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status grow_island(std::size_t index, std::uint32_t left, std::uint32_t top, std::uint32_t right,
+                                      std::uint32_t bottom, const assets::BuildingType& sea,
+                                      const assets::BuildingTable* buildings = nullptr);
     /// Island `other` joined into island `keep`: `keep` grows by open sea (`sea`) to the rectangle
     /// of both, takes the tiles of `other` where it has open sea itself, and its deposits, craters,
     /// deer, animals and growing tiles; then `other` is taken out (remove_island(), so `keep`
     /// moves one place forward if it came after it). `keep` keeps its number, climate and header.
     /// Only islands without use; on failure the world is as it was.
-    core::Status merge_islands(std::size_t keep, std::size_t other, const assets::BuildingType& sea,
-                               const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status merge_islands(std::size_t keep, std::size_t other, const assets::BuildingType& sea,
+                                        const assets::BuildingTable* buildings = nullptr);
     /// The smallest island number no island has, nothing if all are taken.
     [[nodiscard]] std::optional<std::uint16_t> free_island_number() const;
     /// The map made `width` x `height` tiles large (at least 1, at most kMaxSide), growing or cut
     /// at the right and the bottom: everything keeps its place. Fails if an island, a ship, a
     /// land unit, a marker or an island of the world plan would lie outside.
-    core::Status resize(std::uint32_t width, std::uint32_t height, const assets::BuildingTable* buildings = nullptr);
+    annokit::core::Status resize(std::uint32_t width, std::uint32_t height,
+                                 const assets::BuildingTable* buildings = nullptr);
 
     [[nodiscard]] const std::vector<Player>& players() const noexcept { return m_players; }
     [[nodiscard]] const std::vector<Ship>& ships() const noexcept { return m_ships; }
@@ -755,7 +759,7 @@ public:
     void set_package_scenario(std::string id) noexcept { m_package_scenario = std::move(id); }
     /// A part of a package's campaign (docs/modding/scenarios.md#campaigns): the campaign, the part
     /// counted from 0 and what the part before left to it (the table `campaign` of its script,
-    /// script::Sandbox::save_table), kept with the savegame (section CAMP).
+    /// annokit::script::Sandbox::save_table), kept with the savegame (section CAMP).
     struct CampaignPart {
         std::string campaign;  ///< "<package>:<name>"
         std::uint8_t part = 0;
@@ -812,6 +816,10 @@ public:
     /// above.
     [[nodiscard]] bool fertile_fields() const noexcept { return m_fertile_fields; }
     void set_fertile_fields(bool on) noexcept { m_fertile_fields = on; }
+    /// The most cities one island holds (Rules::cities_per_island), set like the bugs above; a
+    /// world no game runs keeps the original's.
+    [[nodiscard]] std::uint32_t cities_per_island() const noexcept { return m_cities_per_island; }
+    void set_cities_per_island(std::uint32_t most) noexcept { m_cities_per_island = most; }
 
     /// Eruptions, lava in flight and the time of the next eruption (volcanoes.hpp).
     [[nodiscard]] const VolcanoState& volcanoes() const noexcept { return m_volcanoes; }
@@ -898,11 +906,11 @@ private:
     void index_cities();
     /// Sets the cells of the map anew from the islands, in their order (add_island()'s rule for
     /// overlapping rectangles); fails if two islands' land overlaps.
-    core::Status place_islands(const assets::BuildingTable* buildings);
+    annokit::core::Status place_islands(const assets::BuildingTable* buildings);
     /// Where island `index` would take the cells; an error if it leaves the map or its land
     /// overlaps another island's.
-    core::Status claim_cells(const WorldIsland& island, const assets::BuildingTable* buildings,
-                             std::vector<bool>& taken) const;
+    annokit::core::Status claim_cells(const WorldIsland& island, const assets::BuildingTable* buildings,
+                                      std::vector<bool>& taken) const;
     std::vector<Animal> m_animals;
     std::vector<Soldier> m_soldiers;
     std::uint32_t m_next_soldier_id = 1;
@@ -942,6 +950,7 @@ private:
     std::optional<PlannedIslands> m_planned_islands;
     OriginalBugs m_original_bugs;
     bool m_fertile_fields = false;
+    std::uint32_t m_cities_per_island = original::kMaxCitiesPerIsland;
     std::vector<CostBuilding> m_cost_buildings;
     std::unordered_map<std::uint64_t, std::uint32_t> m_house_index;       ///< key: island, y, x
     std::unordered_map<std::uint64_t, std::uint32_t> m_production_index;  ///< key: island, y, x
@@ -986,8 +995,8 @@ void take_player(World& world, PlayerId own, std::uint64_t owner);
 /// placed are skipped. A scenario that makes its islands at the start (the endless games) gets
 /// them as `start` says (world_generator.hpp); the world's source is then that scenario with
 /// the islands made. With WorldStart::keep_plan it keeps the plan instead and has no islands.
-core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
-                               const assets::GameDirectory& game, std::vector<std::string>* warnings = nullptr,
-                               const WorldStart& start = {});
+annokit::core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
+                                        const assets::GameDirectory& game, std::vector<std::string>* warnings = nullptr,
+                                        const WorldStart& start = {});
 
 }  // namespace o1602::sim

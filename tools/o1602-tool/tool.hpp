@@ -17,8 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/palette.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::tool {
 
@@ -108,13 +109,13 @@ struct Args {
 };
 
 /// Prints "error: <message>" and returns exit code 1.
-int fail(const core::Error& error);
+int fail(const annokit::core::Error& error);
 
 /// Prints the usage and returns exit code 2.
 int usage();
 
 /// The palette of --palette, or $ANNO1602_DIR/TOOLGFX/STADTFLD.COL.
-core::Result<assets::Palette> load_palette(const Args& args);
+annokit::core::Result<assets::Palette> load_palette(const Args& args);
 
 // bench.cpp
 int cmd_bench(const Args& args);

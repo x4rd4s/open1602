@@ -292,7 +292,7 @@ stage asks (land rank, colonies first), which the orders of computers.toml alrea
 the game only through commands, with its state in the savegame. Scripts also post the mods'
 messages.
 
-Part 1 done on 2026-10-27 ([scripts.md](scripts.md)): Lua 5.4.8 in `third_party/lua` with a fixed
+Part 1 done on 2026-10-27 ([scripts.md](scripts.md)): Lua 5.4.8 in annokit's `third_party/lua` with a fixed
 string hash seed, and `script::Sandbox` in `engine/script`: no io, os, package and debug libraries,
 no loading of files or binary chunks, no addresses in texts, no finalizers and weak tables,
 `math.random` from the game's generator, and limits on memory and on the instructions of each call.
@@ -404,6 +404,16 @@ lie in a ring of slopes turned to them, as every mountain of the templates (the 
 slopes), the ground mixes the templates' fifteen most common kinds of ground tile by tile, and two
 of three mountains send a river from a spring on their slopes straight out to a river mouth on a
 beach that faces its way.
+
+Dry land, done on 2026-11-09: islands of their own shape mix the meadows of their climate's
+templates (every kind of at least 5 in 10 000 ground tiles, grazed meadow and the south's swamp
+among them) and lay dry land in patches about the size of the forest's, as much of the ground as
+the climate's templates have (north 10.9 %, south 7.4 %). A patch is drier towards its heart: its
+ten kinds of dry grass (crops grow there at 25 to 75 % of the island's fertility, as on the
+templates) follow each other from the edge in, with frayed bands. In the north the patches are
+fallow land with a few stones; in the south their heart is desert (sand, cacti on sand, steppe)
+and cacti, rocks and bones lie about it. A climate of a package that names its own `ground` keeps
+its kinds, each as often, without dry land.
 
 Part 5 done on 2026-11-01: volcanoes on islands of their own shape. A volcano is the big ore mountain
 21108; the big mountains of islands of their own shape are now

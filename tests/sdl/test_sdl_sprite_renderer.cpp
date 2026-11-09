@@ -9,7 +9,8 @@
 #include "../unit/test_support.hpp"
 #include "sdl_support.hpp"
 
-#include "o1602/platform/window.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/render/sdl_sprite_renderer.hpp"
 #include "o1602/render/sprite_atlas.hpp"
 
@@ -236,9 +237,10 @@ TEST_CASE("sdl sprite renderer: uploading another atlas replaces the previous on
 
 TEST_CASE("sdl sprite renderer: after the window's renderer is made again a new one draws the sprites") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 32, .height = 32, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 32, .height = 32, .vsync = false});
     REQUIRE(window.ok());
     const auto atlas = test_atlas();
     test::Pixels pixels;

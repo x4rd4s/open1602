@@ -21,13 +21,16 @@
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
 // Limits of the original (section 7, original_limits.hpp).
 using original::kMaxCities;
+using original::kMaxCitiesPerIsland;
+/// The island record's owner slots, one per city number of three bits; the last means no city.
+constexpr std::uint8_t kIslandCitySlots = kMaxCitiesPerIsland + 1;
 using original::kMaxDeposits;
 using original::kMaxIslands;
 /// Island coordinates are one byte in the original's records (INSELHAUS, SIEDLER, KONTOR2, HIRSCH2,
@@ -62,11 +65,11 @@ constexpr std::size_t kShipSize = 0x1B4;
 constexpr std::size_t kSoldierSize = 0x44;
 constexpr std::size_t kTimersSize = 0x298;
 
-void put16(core::Bytes& d, std::size_t o, std::uint32_t v) {
+void put16(annokit::core::Bytes& d, std::size_t o, std::uint32_t v) {
     d[o] = static_cast<std::uint8_t>(v);
     d[o + 1] = static_cast<std::uint8_t>(v >> 8);
 }
-void put32(core::Bytes& d, std::size_t o, std::uint32_t v) {
+void put32(annokit::core::Bytes& d, std::size_t o, std::uint32_t v) {
     for (std::size_t k = 0; k < 4; ++k) {
         d[o + k] = static_cast<std::uint8_t>(v >> (8 * k));
     }
@@ -137,9 +140,9 @@ private:
 };
 
 /// A record started from the source one, or zeros.
-core::Bytes start(const std::unordered_map<std::uint64_t, std::span<const std::uint8_t>>& raw, std::uint64_t key,
-                  std::size_t size) {
-    core::Bytes r(size, 0);
+annokit::core::Bytes start(const std::unordered_map<std::uint64_t, std::span<const std::uint8_t>>& raw,
+                           std::uint64_t key, std::size_t size) {
+    annokit::core::Bytes r(size, 0);
     if (const auto it = raw.find(key); it != raw.end()) {
         std::copy(it->second.begin(), it->second.end(), r.begin());
     }
@@ -151,7 +154,7 @@ public:
     Writer(const World& world, const assets::BuildingTable& buildings)
         : m_world(world), m_buildings(buildings), m_source(world.source().get()) {}
 
-    core::Result<std::vector<SavedChunk>> run() {
+    annokit::core::Result<std::vector<SavedChunk>> run() {
         if (auto status = check(); !status) {
             return status.error();
         }
@@ -182,9 +185,11 @@ private:
     Source m_source;
     std::vector<SavedChunk> m_out;
 
-    void add(std::string name, core::Bytes data) { m_out.push_back(SavedChunk{std::move(name), std::move(data)}); }
+    void add(std::string name, annokit::core::Bytes data) {
+        m_out.push_back(SavedChunk{std::move(name), std::move(data)});
+    }
 
-    core::Status check() const {
+    annokit::core::Status check() const {
         // A world of the original's size keeps the original's limits, so that the original can
         // load the file; a larger one is Open1602's own (O1602MAP) and only bound by the format.
         const bool original = m_world.width() == World::kOriginalWidth && m_world.height() == World::kOriginalHeight;
@@ -229,6 +234,14 @@ private:
         if (m_world.width() > 0xFFFF || m_world.height() > 0xFFFF) {
             return make_error(ErrorCode::LimitExceeded, "the world is too large for the file format");
         }
+        for (const City& c : m_world.cities()) {
+            // The island record and the tiles keep a city's number in three bits.
+            if (c.index >= kMaxCitiesPerIsland) {
+                return make_error(ErrorCode::LimitExceeded,
+                                  "more than " + std::to_string(kMaxCitiesPerIsland) + " cities on island " +
+                                      std::to_string(m_world.islands()[c.island].header.number));
+            }
+        }
         if (original && m_world.cities().size() > kMaxCities) {
             return make_error(ErrorCode::LimitExceeded, "more than 75 cities");
         }
@@ -244,7 +257,7 @@ private:
         if (m_world.towers().size() > kMaxTowers) {
             return make_error(ErrorCode::LimitExceeded, "more than 350 towers");
         }
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
 
     /// The island's number in the original's one byte (check() refused numbers above it).
@@ -315,7 +328,7 @@ private:
             [&](std::uint32_t i, std::uint16_t slot) { m_tower_slots[i] = slot; });
     }
     /// A reference that still names the same target stays as stored.
-    void put_ref(core::Bytes& r, std::size_t o, const Target& t) const { put32(r, o, ref_of(t)); }
+    void put_ref(annokit::core::Bytes& r, std::size_t o, const Target& t) const { put32(r, o, ref_of(t)); }
     [[nodiscard]] std::uint8_t ship_kind(const Ship& s) const {
         if (s.trader) {
             return 2;
@@ -389,7 +402,7 @@ private:
     /// even when empty (a new endless game has no trader and no towers).
     void passthrough(std::string_view name, bool always = false) {
         if (const auto c = m_source.chunk(name)) {
-            add(std::string(name), core::Bytes(c->begin(), c->end()));
+            add(std::string(name), annokit::core::Bytes(c->begin(), c->end()));
         } else if (always) {
             add(std::string(name), {});
         }
@@ -433,10 +446,10 @@ private:
         }
     }
 
-    core::Bytes island_header(std::uint16_t i) const {
+    annokit::core::Bytes island_header(std::uint16_t i) const {
         const WorldIsland& island = m_world.islands()[i];
         const assets::IslandHeader& h = island.header;
-        core::Bytes r(kIslandHeaderSize, 0);
+        annokit::core::Bytes r(kIslandHeaderSize, 0);
         if (!h.raw.empty()) {
             std::copy_n(h.raw.begin(), std::min(h.raw.size(), r.size()), r.begin());
         } else {
@@ -465,7 +478,7 @@ private:
         r[8] = static_cast<std::uint8_t>((r[8] & ~3U) | (island.deer_phase & 3U));
         r[0x0A] = static_cast<std::uint8_t>((r[0x0A] & ~7U) | (island.last_phase & 7U));
         // Owners of the eight city slots.
-        for (std::uint8_t c = 0; c < kCitySlotsPerIsland; ++c) {
+        for (std::uint8_t c = 0; c < kIslandCitySlots; ++c) {
             const City* city = m_world.city(i, c);
             r[0x0C + c] = city != nullptr ? owner_byte(city->owner) : kNoOwner;
         }
@@ -523,11 +536,11 @@ private:
 
     /// Layer 1 (`ground`): every building of the ground layer, of no city and no owner. Layer 2:
     /// the buildings on top that differ from the ground, with their city and owner.
-    core::Bytes island_layer(std::uint16_t i, bool top_layer,
-                             const std::unordered_map<std::uint32_t, assets::IslandTile>& source) const {
+    annokit::core::Bytes island_layer(std::uint16_t i, bool top_layer,
+                                      const std::unordered_map<std::uint32_t, assets::IslandTile>& source) const {
         const WorldIsland& island = m_world.islands()[i];
         const IslandMap& map = island.map;
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (std::uint32_t y = 0; y < map.height(); ++y) {
             for (std::uint32_t x = 0; x < map.width(); ++x) {
                 const MapCell& cell = top_layer ? map.top(x, y) : map.ground(x, y);
@@ -543,7 +556,7 @@ private:
                 if (top_layer && same_as_ground(map, x, y)) {
                     continue;
                 }
-                const std::uint8_t city = top_layer && cell.city != MapCell::kNoCity ? cell.city : 7;
+                const std::uint8_t city = top_layer && cell.city != MapCell::kNoCity ? cell.city : kMaxCitiesPerIsland;
                 const std::uint8_t owner =
                     top_layer && cell.city != MapCell::kNoCity ? owner_byte(cell.owner) : kNoOwner;
                 std::uint32_t phase = cell.anim_phase;
@@ -591,15 +604,15 @@ private:
         return a != nullptr && b != nullptr && (a->kind == kind::kSea || a->ware == ware::kGrass) && a->ware == b->ware;
     }
 
-    core::Bytes deer(std::uint16_t i) const {
+    annokit::core::Bytes deer(std::uint16_t i) const {
         const WorldIsland& island = m_world.islands()[i];
         const auto raw = m_source.by_key("HIRSCH2", kDeerSize, [](auto r) { return key3(r[0], r[1], r[2]); });
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const DeerSpot& s : island.deer_spots) {
             if (!s.used) {
                 continue;
             }
-            core::Bytes r = start(raw, key3(island.header.number, s.x, s.y), kDeerSize);
+            annokit::core::Bytes r = start(raw, key3(island.header.number, s.x, s.y), kDeerSize);
             r[0] = static_cast<std::uint8_t>(island.header.number);
             r[1] = static_cast<std::uint8_t>(s.x);  // fits: check()
             r[2] = static_cast<std::uint8_t>(s.y);
@@ -613,13 +626,13 @@ private:
 
     void production() {
         const auto raw = m_source.by_key("PRODLIST2", kProductionSize, [](auto r) { return key3(r[0], r[1], r[2]); });
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const Production& p : m_world.productions()) {
             if (!p.used) {
                 continue;
             }
             const std::uint8_t n = number(p.island);
-            core::Bytes r = start(raw, key3(n, p.x, p.y), kProductionSize);
+            annokit::core::Bytes r = start(raw, key3(n, p.x, p.y), kProductionSize);
             r[0] = n;
             r[1] = static_cast<std::uint8_t>(p.x);
             r[2] = static_cast<std::uint8_t>(p.y);
@@ -640,13 +653,13 @@ private:
 
     void cost_buildings(CostBuilding::Kind kind, const char* name, std::size_t size) {
         const auto raw = m_source.by_key(name, size, [](auto r) { return key3(r[0], r[1], r[2]); });
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const CostBuilding& b : m_world.cost_buildings()) {
             if (b.kind != kind) {
                 continue;
             }
             const std::uint8_t n = number(b.island);
-            core::Bytes r = start(raw, key3(n, b.x, b.y), size);
+            annokit::core::Bytes r = start(raw, key3(n, b.x, b.y), size);
             if (raw.find(key3(n, b.x, b.y)) == raw.end() && kind == CostBuilding::Kind::Shipyard) {
                 r[6] = 0xFF;  // no ship under construction
             }
@@ -692,10 +705,10 @@ private:
         const auto raw = m_source.by_key("SIEDLER", kHouseSize, [](auto r) { return key3(r[0], r[1], r[2]); });
         // Runtime word bits 2..10 -> dword 2 bits.
         constexpr std::array<std::uint8_t, 9> kServiceBits = {30, 23, 24, 28, 25, 26, 29, 31, 27};
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const House& h : m_world.houses()) {
             const std::uint8_t n = number(h.island);
-            core::Bytes r = start(raw, key3(n, h.x, h.y), kHouseSize);
+            annokit::core::Bytes r = start(raw, key3(n, h.x, h.y), kHouseSize);
             std::uint32_t d0 = get32(r, 0);
             std::uint32_t d1 = get32(r, 4);
             std::uint32_t d2 = get32(r, 8);
@@ -753,10 +766,10 @@ private:
                 }
             }
         }
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const GrowthEntry& e : entries) {
             const std::uint8_t n = number(e.island);
-            core::Bytes r = start(raw, key3(n, e.x, e.y), kGrowthSize);
+            annokit::core::Bytes r = start(raw, key3(n, e.x, e.y), kGrowthSize);
             r[0] = n;
             r[1] = static_cast<std::uint8_t>(e.x);
             r[2] = static_cast<std::uint8_t>(e.y);
@@ -788,9 +801,9 @@ private:
             m_source.by_key("KONTOR2", kWarehouseSize, [](auto r) { return key3(r[0], (r[3] & 0xFU), 0); });
         const auto raw_market =
             m_source.by_key("MARKT2", kConsumptionSize, [](auto r) { return key3(r[0], (r[1] & 0xFU), 0); });
-        core::Bytes cities;
-        core::Bytes stores;
-        core::Bytes markets;
+        annokit::core::Bytes cities;
+        annokit::core::Bytes stores;
+        annokit::core::Bytes markets;
         // The original keeps its cities in a table of 75; Open1602 writes them in its own order.
         for (const City& c : m_world.cities()) {
             if (!c.warehouse_x || !c.warehouse_y) {
@@ -798,7 +811,7 @@ private:
             }
             const std::uint8_t n = number(c.island);
             const std::uint64_t key = key3(n, c.index, 0);
-            core::Bytes r = start(raw_city, key, kCitySize);
+            annokit::core::Bytes r = start(raw_city, key, kCitySize);
             r[0] = n;
             r[1] = c.index;
             r[2] = owner_byte(c.owner);
@@ -831,7 +844,7 @@ private:
             }
             cities.insert(cities.end(), r.begin(), r.end());
 
-            core::Bytes s = start(raw_store, key, kWarehouseSize);
+            annokit::core::Bytes s = start(raw_store, key, kWarehouseSize);
             put32(s, 0,
                   (get32(s, 0) & 0xF0000000U) | n | std::uint32_t{*c.warehouse_x & 0xFFU} << 8 |
                       std::uint32_t{*c.warehouse_y & 0xFFU} << 16 | std::uint32_t{c.index & 0xFU} << 24);
@@ -854,7 +867,7 @@ private:
             }
             stores.insert(stores.end(), s.begin(), s.end());
 
-            core::Bytes m = start(raw_market, key, kConsumptionSize);
+            annokit::core::Bytes m = start(raw_market, key, kConsumptionSize);
             put32(m, 0, (get32(m, 0) & 0xFFFFF000U) | n | std::uint32_t{c.index & 0xFU} << 8);
             for (std::uint8_t w = 14; w <= 24; ++w) {
                 const std::size_t o = 4 + 16 * std::size_t{w - 14U};
@@ -900,9 +913,9 @@ private:
 
     void players() {
         const auto raw = m_source.records("PLAYER4", kPlayerSize);
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (std::size_t p = 0; p < assets::kOriginalPlayerSlots; ++p) {
-            core::Bytes r(kPlayerSize, 0);
+            annokit::core::Bytes r(kPlayerSize, 0);
             if (p < raw.size()) {
                 std::copy(raw[p].begin(), raw[p].end(), r.begin());
             }
@@ -1005,7 +1018,7 @@ private:
     /// AUFTRAG4: the first four missions; a slot is written if it has goals, slot 0
     /// also if it has a text (the endless games).
     void missions() {
-        core::Bytes out;
+        annokit::core::Bytes out;
         const auto& missions = m_world.missions();
         for (std::size_t i = 0; i < missions.size() && i < kOriginalMissionSlots; ++i) {
             if (missions[i].goals != 0 || (i == 0 && !missions[i].text.empty())) {
@@ -1021,13 +1034,13 @@ private:
         constexpr std::size_t kSize = 0x25C;
         constexpr std::size_t kGoods = 50;
         const auto raw = m_source.records("HANDLER", kSize);
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const Ship& s : m_world.ships()) {
             const auto record = m_trader_records.find(s.id);
             if (record == m_trader_records.end()) {
                 continue;
             }
-            core::Bytes r(kSize, 0);
+            annokit::core::Bytes r(kSize, 0);
             bool from_source = false;
             for (const auto& old : raw) {
                 if (old[0] != 0 && get16(old, 1) == s.source_slot) {
@@ -1059,9 +1072,9 @@ private:
         for (std::size_t k = 0; k < raw.size(); ++k) {
             by_slot.emplace(static_cast<std::uint16_t>(get16(raw[k], 0x46)), k);
         }
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const Ship& s : m_world.ships()) {
-            core::Bytes r(kShipSize, 0);
+            annokit::core::Bytes r(kShipSize, 0);
             const std::uint16_t slot = m_ship_slots.at(s.id);
             const auto source = s.source_slot != 0xFFFF ? by_slot.find(s.source_slot) : by_slot.end();
             if (source != by_slot.end()) {
@@ -1155,12 +1168,12 @@ private:
         for (std::size_t k = 0; k < raw.size(); ++k) {
             by_slot.emplace(static_cast<std::uint16_t>(get16(raw[k], 8)), k);
         }
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (const Soldier& s : m_world.soldiers()) {
             if (s.dying()) {
                 continue;  // the original does not save dying units
             }
-            core::Bytes r(kSoldierSize, 0);
+            annokit::core::Bytes r(kSoldierSize, 0);
             const auto source = s.source_slot != 0xFFFF ? by_slot.find(s.source_slot) : by_slot.end();
             if (source != by_slot.end()) {
                 std::copy(raw[source->second].begin(), raw[source->second].end(), r.begin());
@@ -1196,13 +1209,13 @@ private:
         for (std::size_t k = 0; k < raw.size(); ++k) {
             by_slot.emplace(static_cast<std::uint16_t>(get16(raw[k], 8)), k);
         }
-        core::Bytes out;
+        annokit::core::Bytes out;
         for (std::size_t i = 0; i < m_world.towers().size(); ++i) {
             const Tower& t = m_world.towers()[i];
             if (t.island >= m_world.islands().size()) {
                 continue;
             }
-            core::Bytes r(kTowerSize, 0);
+            annokit::core::Bytes r(kTowerSize, 0);
             const auto source = t.source_slot != 0xFFFF ? by_slot.find(t.source_slot) : by_slot.end();
             if (source != by_slot.end()) {
                 std::copy(raw[source->second].begin(), raw[source->second].end(), r.begin());
@@ -1228,7 +1241,7 @@ private:
     // ---- Timers ----------------------------------------------------------------------------------
 
     void timers() {
-        core::Bytes r(kTimersSize, 0);
+        annokit::core::Bytes r(kTimersSize, 0);
         if (const auto c = m_source.chunk("TIMERS")) {
             std::copy_n(c->begin(), std::min(c->size(), r.size()), r.begin());
         }
@@ -1295,7 +1308,8 @@ private:
 
 }  // namespace
 
-core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world, const assets::BuildingTable& buildings) {
+annokit::core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world,
+                                                               const assets::BuildingTable& buildings) {
     const bool more_levels =
         world.infra_levels().size() > std::size_t{infra::kMaxLevel} + 1 ||
         std::any_of(world.players().begin(), world.players().end(), [](const Player& p) {
@@ -1305,15 +1319,15 @@ core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world, const 
         world.resident_classes().size() > assets::kResidentClasses || more_levels) {
         // The original's records have no room for them (docs/modding/goods.md, own-buildings.md,
         // own-figures.md, classes.md, levels.md).
-        return core::make_error(core::ErrorCode::Unsupported,
-                                "a game with goods, buildings, figures, classes or levels of "
-                                "packages cannot be saved for the original");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "a game with goods, buildings, figures, classes or levels of "
+                                         "packages cannot be saved for the original");
     }
     return Writer(world, buildings).run();
 }
 
-core::Result<core::Bytes> write_savegame(const World& world, const assets::BuildingTable& buildings,
-                                         const Simulation* simulation) {
+annokit::core::Result<annokit::core::Bytes> write_savegame(const World& world, const assets::BuildingTable& buildings,
+                                                           const Simulation* simulation) {
     auto chunks = savegame_chunks(world, buildings);
     if (!chunks) {
         return chunks.error();
@@ -1326,7 +1340,7 @@ core::Result<core::Bytes> write_savegame(const World& world, const assets::Build
     if (world.width() != World::kOriginalWidth || world.height() != World::kOriginalHeight) {
         out.add(kMapChunk, encode_map_size(world.width(), world.height()));  // after WIFF: Open1602 only
     }
-    const core::Bytes extension = encode_extension(world, buildings, simulation, out.bytes());
+    const annokit::core::Bytes extension = encode_extension(world, buildings, simulation, out.bytes());
     out.add(kExtensionChunk, extension);
     return out.take();
 }

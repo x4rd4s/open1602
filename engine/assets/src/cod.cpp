@@ -3,8 +3,8 @@
 
 #include <string_view>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
 
 namespace o1602::assets {
 
@@ -24,12 +24,12 @@ std::vector<std::uint8_t> encode_cod(std::string_view plain) {
     return out;
 }
 
-core::Result<std::string> load_cod_utf8(const std::filesystem::path& path) {
-    auto bytes = core::read_file(path);
+annokit::core::Result<std::string> load_cod_utf8(const std::filesystem::path& path) {
+    auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         return bytes.error();
     }
-    return core::cp1252_to_utf8(decode_cod(*bytes));
+    return annokit::core::cp1252_to_utf8(decode_cod(*bytes));
 }
 
 }  // namespace o1602::assets

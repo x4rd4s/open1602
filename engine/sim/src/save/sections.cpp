@@ -21,8 +21,8 @@
 
 namespace o1602::sim::save {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -350,7 +350,7 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
 
 /// Writes a section: tag, version, flags, size, payload.
 template <class Fn>
-void section(core::ByteWriter& out, std::uint32_t id, Fn&& body, Need need = Need::Required,
+void section(annokit::core::ByteWriter& out, std::uint32_t id, Fn&& body, Need need = Need::Required,
              std::uint16_t version = 1) {
     out.u32(id);
     out.u16(version);
@@ -382,8 +382,9 @@ using Body = std::span<const std::uint8_t>;
 /// skipped and reported in `warnings`, or fails the load if it is required (kRequired). A section
 /// that comes twice fails the load: no writer makes one, and which of the two counts is a guess.
 template <class Fn>
-core::Status for_each_section(std::span<const std::uint8_t> data, std::vector<std::string>* warnings, Fn&& fn) {
-    core::ByteReader reader(data);
+annokit::core::Status for_each_section(std::span<const std::uint8_t> data, std::vector<std::string>* warnings,
+                                       Fn&& fn) {
+    annokit::core::ByteReader reader(data);
     std::vector<std::uint32_t> seen;
     while (!reader.at_end()) {
         const auto id = reader.u32();
@@ -416,7 +417,7 @@ core::Status for_each_section(std::span<const std::uint8_t> data, std::vector<st
             return make_error(ErrorCode::InvalidFormat, "O1602: damaged section " + tag_name(*id));
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 /// SCNI: stars, flags (bit 0 the original's limits), the names, author, version and the briefings
@@ -575,14 +576,15 @@ void read_planned_islands(Reader& in, PlannedIslands& planned) {
 
 }  // namespace
 
-core::Bytes encode_sections(const World& world, const assets::BuildingTable& buildings, const Simulation* simulation,
-                            TileMode tiles, std::span<const std::uint8_t> before, Origin origin) {
-    core::ByteWriter out;
+annokit::core::Bytes encode_sections(const World& world, const assets::BuildingTable& buildings,
+                                     const Simulation* simulation, TileMode tiles, std::span<const std::uint8_t> before,
+                                     Origin origin) {
+    annokit::core::ByteWriter out;
     encode_sections(out, world, buildings, simulation, tiles, before, origin);
     return out.take();
 }
 
-void encode_sections(core::ByteWriter& out, const World& world, const assets::BuildingTable& buildings,
+void encode_sections(annokit::core::ByteWriter& out, const World& world, const assets::BuildingTable& buildings,
                      const Simulation* simulation, TileMode tiles, std::span<const std::uint8_t> before, Origin origin,
                      std::vector<std::vector<BlockHash>>* block_hashes) {
     if (tiles == TileMode::Full) {
@@ -1096,7 +1098,7 @@ void encode_sections(core::ByteWriter& out, const World& world, const assets::Bu
 }
 
 std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
-    core::ByteReader reader(sections);
+    annokit::core::ByteReader reader(sections);
     const auto id = reader.u32();
     const auto version = reader.u16();
     (void)reader.u16();  // flags
@@ -1108,7 +1110,7 @@ std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
     if (!body) {
         return std::nullopt;
     }
-    core::ByteReader sr(*body);
+    annokit::core::ByteReader sr(*body);
     StateIn in(sr);
     SaveMeta meta;
     meta.width = in.u32();
@@ -1138,7 +1140,7 @@ std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
     if (next && *next == kScenarioRules && next_size) {
         const auto rules_body = reader.bytes(*next_size);
         if (rules_body && next_version && *next_version <= max_version(kScenarioRules)) {
-            core::ByteReader rr(*rules_body);
+            annokit::core::ByteReader rr(*rules_body);
             StateIn rules_state(rr);
             Reader rules_in(rules_state);
             const Rules r = read_rules(rules_in);
@@ -1153,7 +1155,7 @@ std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
     }
     if (next && *next == kScenarioInfo && next_size) {
         const auto rest = sections.subspan(sections.size() - reader.remaining());
-        core::ByteReader ir(rest.subspan(0, std::min<std::size_t>(rest.size(), *next_size)));
+        annokit::core::ByteReader ir(rest.subspan(0, std::min<std::size_t>(rest.size(), *next_size)));
         StateIn info_in(ir);
         Reader info(info_in);
         ScenarioInfo summary;
@@ -1189,12 +1191,13 @@ std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
     return meta;
 }
 
-core::Result<World> world_from_sections(std::span<const std::uint8_t> sections, const assets::BuildingTable& buildings,
-                                        std::vector<std::string>* warnings) {
-    std::optional<core::Result<World>> world;
+annokit::core::Result<World> world_from_sections(std::span<const std::uint8_t> sections,
+                                                 const assets::BuildingTable& buildings,
+                                                 std::vector<std::string>* warnings) {
+    std::optional<annokit::core::Result<World>> world;
     bool meta_ok = true;
     const auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::uint16_t version, Body body) {
-        core::ByteReader sr(body);
+        annokit::core::ByteReader sr(body);
         StateIn in(sr);
         if (id == kMeta) {
             in.u32();
@@ -1223,12 +1226,12 @@ core::Result<World> world_from_sections(std::span<const std::uint8_t> sections, 
     return std::move(*world);
 }
 
-core::Status apply_sections(World& world, const assets::BuildingTable& buildings,
-                            std::span<const std::uint8_t> sections, std::vector<std::string>* warnings) {
+annokit::core::Status apply_sections(World& world, const assets::BuildingTable& buildings,
+                                     std::span<const std::uint8_t> sections, std::vector<std::string>* warnings) {
     Decoded d;
     bool damaged = false;
     auto status = for_each_section(sections, warnings, [&](std::uint32_t id, std::uint16_t version, Body body) {
-        core::ByteReader sr(body);
+        annokit::core::ByteReader sr(body);
         StateIn state(sr);
         Reader in(state);
         switch (id) {

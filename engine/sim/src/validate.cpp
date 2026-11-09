@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "o1602/sim/limits.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/soldier.hpp"
 #include "o1602/sim/target.hpp"
@@ -15,8 +16,8 @@ namespace o1602::sim {
 
 namespace {
 
-core::Status bad(const std::string& what) {
-    return core::make_error(core::ErrorCode::InvalidFormat, "game: " + what);
+annokit::core::Status bad(const std::string& what) {
+    return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "game: " + what);
 }
 
 class Check {
@@ -76,7 +77,7 @@ template <typename List>
 
 }  // namespace
 
-core::Status validate(const World& w) {
+annokit::core::Status validate(const World& w) {
     const Check c(w);
     if (w.players().size() > kMaxPlayerCount) {
         return bad("more than " + std::to_string(kMaxPlayerCount) + " players");
@@ -119,6 +120,10 @@ core::Status validate(const World& w) {
     for (const City& city : w.cities()) {
         if (!c.island(city.island) || !c.owner(city.owner)) {
             return bad("city " + city.name + " on an unknown island or of an unknown player");
+        }
+        if (city.index >= kCitySlotsPerIsland) {
+            return bad("city " + city.name + " has number " + std::to_string(city.index) +
+                       ", more than an island holds");
         }
     }
     for (const Ship& ship : w.ships()) {
@@ -175,7 +180,7 @@ core::Status validate(const World& w) {
     if (v.last && !c.island(v.last->island)) {
         return bad("last eruption on an unknown island");
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace o1602::sim

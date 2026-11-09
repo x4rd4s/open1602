@@ -16,7 +16,8 @@
 #include "multiplayer_menu.hpp"
 #include "multiplayer_texts.hpp"
 
-#include "o1602/net/loopback.hpp"
+#include "annokit/net/loopback.hpp"
+
 #include "o1602/render/banner.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -321,7 +322,7 @@ TEST_CASE("multiplayer menu: the mouse wheel scrolls the scenarios of a game bei
 }
 
 TEST_CASE("multiplayer menu: the mouse wheel scrolls the lobby's chat, which holds still for new lines") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.game = "Endless game";
@@ -388,7 +389,7 @@ TEST_CASE("multiplayer menu: the mouse wheel scrolls the lobby's chat, which hol
 }
 
 TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.game = "Endless game";
@@ -443,7 +444,7 @@ TEST_CASE("multiplayer menu: the host's lobby: slots, chat and the start") {
 
 TEST_CASE("multiplayer menu: joining, the lobby shows how far the game on its way has come") {
     using Stage = net::ClientSession::JoinStage;
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.seats.resize(4);
@@ -498,7 +499,7 @@ TEST_CASE("multiplayer menu: joining, the lobby shows how far the game on its wa
 }
 
 TEST_CASE("multiplayer menu: a lobby without a title is the host's game, in this computer's language") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.seats.resize(4);
     net::HostSession host(network.listen(), lobby, 0, "Anna", 1);
@@ -518,7 +519,7 @@ TEST_CASE("multiplayer menu: a lobby without a title is the host's game, in this
 }
 
 TEST_CASE("multiplayer menu: the host sends a spectator away") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.game = "Endless game";
@@ -568,7 +569,7 @@ TEST_CASE("multiplayer menu: four to twelve players, the factions' slots left ou
     CHECK(events[0].setup.file_name.find("6 players") != std::string::npos);
 
     // Six players: slots 0-3 and 7-8; the free trader's, pirates' and natives' are not shown.
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.seats = app::endless_seats(6);
     lobby.setup = app::lobby_setup(app::EndlessSetup::defaults(app::SetupScope::MultiplayerEndless),
@@ -591,7 +592,7 @@ TEST_CASE("multiplayer menu: four to twelve players, the factions' slots left ou
 }
 
 TEST_CASE("multiplayer menu: only a new endless game blocks slots") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.seats.resize(4);
@@ -702,7 +703,7 @@ TEST_CASE("multiplayer menu: a banner for every player, each slot its own") {
 }
 
 TEST_CASE("multiplayer menu: choosing a banner in the lobby") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.seats = app::endless_seats(6);
@@ -784,7 +785,7 @@ TEST_CASE("multiplayer menu: choosing a banner in the lobby") {
 }
 
 TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their colour") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.seats = app::endless_seats(4);
@@ -849,7 +850,7 @@ TEST_CASE("multiplayer menu: the lobby's chat shows each player's name in their 
 }
 
 TEST_CASE("multiplayer menu: a long line in the lobby's chat is wrapped, not cut") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.seats = app::endless_seats(4);
@@ -949,7 +950,7 @@ struct PreviewAsked {
 
 app::GameSettingsMenu::PreviewMaker recording_maker(const std::shared_ptr<PreviewAsked>& asked) {
     return [asked](const app::EndlessSetup& setup, std::uint8_t level,
-                   const app::GameSettingsMenu::PreviewStop& /*stop*/) -> core::Result<sim::WorldPreview> {
+                   const app::GameSettingsMenu::PreviewStop& /*stop*/) -> annokit::core::Result<sim::WorldPreview> {
         {
             const std::lock_guard lock(asked->mutex);
             asked->worlds.emplace_back(setup.world_seed, level);
@@ -1019,7 +1020,7 @@ TEST_CASE("multiplayer menu: in the lobby everyone's preview shows the host's wo
     CHECK(app::read_lobby_level(bytes) == 3);
     CHECK(app::read_lobby_level({}) == 1);
 
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.game = "Endless game";
@@ -1078,7 +1079,7 @@ TEST_CASE("multiplayer menu: the host chooses the settings of the game") {
 }
 
 TEST_CASE("multiplayer menu: in the lobby the host changes the settings, the others look") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     net::Lobby lobby;
     lobby.title = "Abend";
     lobby.game = "Endless game";
@@ -1117,7 +1118,7 @@ TEST_CASE("multiplayer menu: in the lobby the host changes the settings, the oth
 TEST_CASE("multiplayer menu: while the game starts, everyone in it with how far they are, scrolled when many") {
     // A computer in a started lobby of twelve players and two spectators, whose host still waits
     // for some of them (net::Roster::starting).
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     auto host = network.listen();
     net::Hello hello;
     hello.name = "P1";
@@ -1141,13 +1142,13 @@ TEST_CASE("multiplayer menu: while the game starts, everyone in it with how far 
     }
     roster.members.push_back(net::Member{sim::kNoPlayer, "W1", net::Member::State::Loading, false, 10});
     roster.members.push_back(net::Member{sim::kNoPlayer, "W2", net::Member::State::Playing, false, 100});
-    std::optional<net::LinkId> link;
+    std::optional<annokit::net::LinkId> link;
     for (int i = 0; i < 20; ++i) {
         network.advance(16);
-        std::vector<net::TransportEvent> events;
+        std::vector<annokit::net::TransportEvent> events;
         host->poll(events);
         for (const auto& e : events) {
-            if (e.kind == net::TransportEvent::Kind::Received && !link) {
+            if (e.kind == annokit::net::TransportEvent::Kind::Received && !link) {
                 link = e.link;
                 host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 7}));
                 host->send(e.link, net::encode(lobby));

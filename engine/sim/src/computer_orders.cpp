@@ -7,9 +7,10 @@
 
 #include "ai/ai_state.hpp"
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/original_names.hpp"
 #include "o1602/assets/own_buildings.hpp"
-#include "o1602/core/data_file.hpp"
 #include "o1602/sim/computer_slots.hpp"
 
 namespace o1602::sim {
@@ -607,7 +608,7 @@ std::optional<std::uint32_t> building_of(std::string_view id, std::span<const as
 }
 
 /// Reads [producer.<name>] into `producers`, the fields over those an earlier package gave.
-void read_producer(const core::DataTable& table, std::string_view name, const std::string& where,
+void read_producer(const annokit::core::DataTable& table, std::string_view name, const std::string& where,
                    std::vector<ComputerProducer>& producers, std::span<const assets::OwnBuilding> own,
                    std::vector<std::string>& warnings) {
     const auto slot = slot_of(kProducers, name);
@@ -621,7 +622,7 @@ void read_producer(const core::DataTable& table, std::string_view name, const st
     if (const ComputerProducer* before = producer_change(producers, *slot)) {
         p = *before;
     }
-    for (const core::DataEntry& e : table.entries) {
+    for (const annokit::core::DataEntry& e : table.entries) {
         const std::string field = line_of(where, e.value.line) + "[" + table.name + "] '" + e.key + "' ";
         const std::string* text = e.value.string();
         const std::int64_t* n = e.value.integer();
@@ -767,12 +768,12 @@ void apply_computers_file(std::vector<ComputerOrder>& orders, std::string_view p
     const std::span<const ComputerSlot> slots =
         game_slots != nullptr ? std::span<const ComputerSlot>(*game_slots) : std::span<const ComputerSlot>{};
     const std::string where = std::string(package) + "/" + std::string(kComputersFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [table] belong to none and are passed over");
@@ -792,7 +793,7 @@ void apply_computers_file(std::vector<ComputerOrder>& orders, std::string_view p
         const auto list = static_cast<ComputerList>(name - kComputerListNames.begin());
         const std::span<const ComputerNeed> before = order_of(orders, list);
         std::vector<ComputerNeed> needs(before.begin(), before.end());
-        for (const core::DataEntry& e : table.entries) {
+        for (const annokit::core::DataEntry& e : table.entries) {
             const std::string at = line_of(where, e.value.line);
             const std::string* text = e.value.string();
             if (e.key != "order" && e.key != "append") {

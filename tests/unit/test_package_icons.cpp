@@ -13,13 +13,14 @@
 #include "banner_graphic.hpp"
 #include "message_table.hpp"
 
+#include "annokit/core/compress.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/goods.hpp"
 #include "o1602/assets/package_arms.hpp"
 #include "o1602/assets/package_graphics.hpp"
-#include "o1602/core/compress.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
 #include "o1602/render/package_sprites.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/world.hpp"
@@ -31,7 +32,7 @@ using namespace o1602;
 namespace {
 
 void need_zlib() {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         SKIP("this build has no zlib");
     }
 }
@@ -55,7 +56,7 @@ std::filesystem::path package_folder(
     for (const auto& [file, size] : files) {
         const std::filesystem::path path = folder / file;
         std::filesystem::create_directories(path.parent_path());
-        REQUIRE(core::write_png_rgba(path, size.first, size.second, plain(size.first, size.second, 200)).ok());
+        REQUIRE(annokit::core::write_png_rgba(path, size.first, size.second, plain(size.first, size.second, 200)).ok());
     }
     return folder;
 }
@@ -173,7 +174,7 @@ TEST_CASE("icons: the picture of an icon at the interface's smaller art") {
     rgba[(1 * 4 + 3) * 4 + 3] = 255;
     const std::filesystem::path folder = test::temp_path("o1602-test-icon-pixels");
     std::filesystem::create_directories(folder);
-    REQUIRE(core::write_png_rgba(folder / "i.png", 4, 2, rgba).ok());
+    REQUIRE(annokit::core::write_png_rgba(folder / "i.png", 4, 2, rgba).ok());
     assets::PackageIcon icon;
     icon.file = folder / "i.png";
 

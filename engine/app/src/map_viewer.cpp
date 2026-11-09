@@ -22,11 +22,16 @@
 #include <tuple>
 #include <utility>
 
+#include "app_icon.hpp"
 #include "diagnostics.hpp"
 #include "endless_setup.hpp"
 #include "fertility_view.hpp"
 #include "mod_rules.hpp"
 #include "tile_status.hpp"
+
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+#include "annokit/core/text.hpp"
 
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/cursor_resource.hpp"
@@ -40,9 +45,6 @@
 #include "o1602/assets/text_table.hpp"
 #include "o1602/assets/unlock_levels.hpp"
 #include "o1602/audio/package_music.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
@@ -225,8 +227,8 @@ std::vector<sim::PackageIsland> logged_islands(std::span<const assets::ModPackag
 
 }  // namespace
 
-core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDirectory& game,
-                                                           const ViewerOptions& options) {
+annokit::core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDirectory& game,
+                                                                    const ViewerOptions& options) {
     auto buildings = assets::BuildingTable::load(game);
     if (!buildings) {
         return buildings.error();
@@ -238,7 +240,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     // settings.cfg as it was left: how the window opens (the rest is read with load_options()) and
     // whether the original's data is corrected, before anything draws from the tables.
     AppSettings remembered;
-    if (auto bytes = core::read_file(data_folder() / "settings.cfg")) {
+    if (auto bytes = annokit::core::read_file(data_folder() / "settings.cfg")) {
         remembered = parse_settings(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()), {});
     }
     const bool data_fixes = remembered.data_fixes && !options.original_data;
@@ -272,7 +274,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         }
     }
     ModRules rules = logged_mod_rules(packages, *buildings, *figures);
-    core::Result<sim::World> world = core::make_error(core::ErrorCode::NotFound, "no game");
+    annokit::core::Result<sim::World> world = annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no game");
     const bool joining = options.multiplayer && options.multiplayer->role == ViewerOptions::Multiplayer::Role::Join;
     if (options.menu || joining) {
         world = sim::World(500, 350);  // the sea behind the menu until a game is chosen or comes from the host
@@ -302,7 +304,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
             world->set_infra_levels(rules.levels);
         }
     } else {
-        auto bytes = core::read_file(options.scenario);
+        auto bytes = annokit::core::read_file(options.scenario);
         if (!bytes) {
             return bytes.error();
         }
@@ -352,7 +354,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     std::fprintf(stderr, "%zu islands, %zu ships\n", world->islands().size(), world->ships().size());
     const auto palette_path = game.resolve(render::kTerrainPalettePath);
     if (!palette_path) {
-        return core::make_error(core::ErrorCode::NotFound, "toolgfx/stadtfld.col not found");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "toolgfx/stadtfld.col not found");
     }
     auto palette = assets::Palette::load(*palette_path);
     if (!palette) {
@@ -404,7 +406,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     }
     viewer->m_soldiers.reset(viewer->m_state->world, viewer->m_buildings, viewer->m_figures);
     viewer->m_show_owners = options.show_owners;
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init({"Open1602", O1602_VERSION, "org.open1602.Open1602"});
     if (!sdl) {
         return sdl.error();
     }
@@ -412,13 +414,16 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
     // The window opens as it was left; --size wins over the size remembered.
     viewer->m_app_settings.display = remembered.display;
     const DisplaySettings& display = viewer->m_app_settings.display;
-    platform::WindowConfig config;
+    annokit::platform::WindowConfig config;
     config.title = "Open1602";
+    const app::AppIcon icon = app::app_icon();
+    config.icon_bmp = icon.bmp;
+    config.icon_bmp_large = icon.bmp_large;
     config.width = options.width > 0 ? options.width : (display.window_width > 0 ? display.window_width : 1280);
     config.height = options.height > 0 ? options.height : (display.window_height > 0 ? display.window_height : 800);
     config.fullscreen = display.fullscreen && options.width <= 0;
     config.vsync = display.vsync;
-    auto window = platform::Window::create(config);
+    auto window = annokit::platform::Window::create(config);
     if (!window) {
         return window.error();
     }
@@ -447,7 +452,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
             }
             // Started now, not in the first frame: an Escape scripted for frame 0 already skips
             // them. Only the intro: a --video may belong in the minimap, which is not there yet.
-            viewer->m_video->frame(platform::ticks_ms(), false);
+            viewer->m_video->frame(annokit::platform::ticks_ms(), false);
         }
         if (options.video) {
             const std::uint16_t n = *options.video;
@@ -499,7 +504,7 @@ core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets::GameDir
         if (self->m_hud) {
             // The icon in the colour of the player the message is about (a rival's new city).
             const sim::Player* p = self->m_state->world.player(about.value_or(self->m_local_player));
-            self->m_hud->message(message, p != nullptr ? p->banner : 0, tile, platform::ticks_ms(), text);
+            self->m_hud->message(message, p != nullptr ? p->banner : 0, tile, annokit::platform::ticks_ms(), text);
         }
     });
     viewer->m_input->load_key_settings(data_folder() / "keys.cfg");
@@ -658,19 +663,19 @@ void MapViewer::start_preloading() {
     m_preloader->request(render::preload_order(m_camera.view().zoom));
 }
 
-core::Status MapViewer::ensure_graphics(render::Zoom zoom) {
+annokit::core::Status MapViewer::ensure_graphics(render::Zoom zoom) {
     if (m_graphics[static_cast<std::size_t>(zoom)]) {
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
     // Wanted before the background has it: the frames stand still until it is there, the sound
     // goes on.
-    const std::uint64_t start = platform::real_ticks_ms();
+    const std::uint64_t start = annokit::platform::real_ticks_ms();
     auto prepared = m_preloader->take(zoom, [this] {
         if (m_sound) {
             m_sound->prefill();
         }
     });
-    if (const std::uint64_t waited = platform::real_ticks_ms() - start; waited > 0) {
+    if (const std::uint64_t waited = annokit::platform::real_ticks_ms() - start; waited > 0) {
         std::fprintf(stderr, "%s: waited %llu ms for it\n", zoom_name(zoom), static_cast<unsigned long long>(waited));
     }
     if (!prepared) {
@@ -702,10 +707,10 @@ void MapViewer::adopt_preloaded_graphics() {
     }
 }
 
-core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGraphics prepared) {
+annokit::core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGraphics prepared) {
     auto& slot = m_graphics[static_cast<std::size_t>(zoom)];
     const std::uint32_t made_ms = prepared.ms;
-    const std::uint64_t start = platform::real_ticks_ms();
+    const std::uint64_t start = annokit::platform::real_ticks_ms();
     slot.emplace(ZoomGraphics{std::move(prepared.graphics), nullptr, std::move(prepared.hit_mask)});
     slot->renderer = std::make_unique<render::SdlSpriteRenderer>(m_window->sdl_renderer());
     if (auto status = slot->renderer->upload(slot->graphics.atlas); !status) {
@@ -717,8 +722,8 @@ core::Status MapViewer::install_graphics(render::Zoom zoom, render::PreparedGrap
                  "%s: %zu sprites in %zu page(s) of %u px, figure masks %zu KB, made in %u ms, upload %llu ms\n",
                  zoom_name(zoom), slot->graphics.atlas.sprite_count(), slot->graphics.atlas.pages().size(),
                  slot->graphics.atlas.page_size(), slot->hit_mask.bytes() / 1024, made_ms,
-                 static_cast<unsigned long long>(platform::real_ticks_ms() - start));
-    return core::Ok{};
+                 static_cast<unsigned long long>(annokit::platform::real_ticks_ms() - start));
+    return annokit::core::Ok{};
 }
 
 void MapViewer::quit() {
@@ -737,20 +742,20 @@ void MapViewer::quit() {
 }
 
 int MapViewer::run() {
-    std::uint64_t last = platform::ticks_ms();
-    const std::uint64_t run_start = platform::real_ticks_ms();
+    std::uint64_t last = annokit::platform::ticks_ms();
+    const std::uint64_t run_start = annokit::platform::real_ticks_ms();
     std::uint64_t fps_start = last;
     std::uint32_t fps_frames = 0;
     std::uint32_t frames = 0;
     if (!m_options.save.empty()) {
         // A .gam the original cannot take (more than 7 players, a world too large) is told now, not
         // only after the game, when nothing can be done about it any more.
-        std::string ending = core::path_to_utf8(m_options.save.extension());
+        std::string ending = annokit::core::path_to_utf8(m_options.save.extension());
         std::transform(ending.begin(), ending.end(), ending.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ending == ".gam") {
             if (auto bytes = sim::write_savegame(m_state->world, m_buildings, &m_state->simulation); !bytes) {
-                std::fprintf(stderr, "error: --save %s: %s\n", core::path_to_utf8(m_options.save).c_str(),
+                std::fprintf(stderr, "error: --save %s: %s\n", annokit::core::path_to_utf8(m_options.save).c_str(),
                              bytes.error().message.c_str());
                 return 1;
             }
@@ -823,8 +828,8 @@ int MapViewer::run() {
                     break;
             }
         }
-        platform::advance_fixed_clock();  // a run of N frames: the same step every frame
-        const std::uint64_t now = platform::ticks_ms();
+        annokit::platform::advance_fixed_clock();  // a run of N frames: the same step every frame
+        const std::uint64_t now = annokit::platform::ticks_ms();
         const auto delta = static_cast<std::uint32_t>(std::min<std::uint64_t>(now - last, 1000));
         last = now;
         // A video that starts now plays in the minimap's window only while one is on screen.
@@ -902,7 +907,7 @@ int MapViewer::run() {
     }
     finish_autosave();
     if (m_options.max_frames != 0) {
-        const std::uint64_t elapsed = std::max<std::uint64_t>(platform::real_ticks_ms() - run_start, 1);
+        const std::uint64_t elapsed = std::max<std::uint64_t>(annokit::platform::real_ticks_ms() - run_start, 1);
         std::fprintf(stderr, "%u frames in %llu ms (%.1f fps), %zu sprites in %zu batches in the last frame\n", frames,
                      static_cast<unsigned long long>(elapsed), frames * 1000.0 / static_cast<double>(elapsed),
                      m_sprites_drawn, m_batches_drawn);
@@ -912,7 +917,7 @@ int MapViewer::run() {
             std::fprintf(stderr, "error: %s\n", status.error().message.c_str());
             return 1;
         }
-        std::fprintf(stderr, "game saved: %s\n", core::path_to_utf8(m_options.save).c_str());
+        std::fprintf(stderr, "game saved: %s\n", annokit::core::path_to_utf8(m_options.save).c_str());
     }
     if (!m_options.screenshot.empty()) {
         // Read back a complete frame.
@@ -940,14 +945,14 @@ void MapViewer::handle_event(const SDL_Event& original) {
     SDL_ConvertEventToRenderCoordinates(m_window->sdl_renderer(), &event);
     // SDL_EVENT_RENDER_TARGETS_RESET needs nothing: the map's canvas is drawn anew every frame.
     switch (m_window->render_reset(event)) {
-        case platform::RenderReset::Textures:
+        case annokit::platform::RenderReset::Textures:
             std::fprintf(stderr, "the render device was reset: textures are made again\n");
             recreate_textures();
             return;
-        case platform::RenderReset::Renderer:
+        case annokit::platform::RenderReset::Renderer:
             recreate_renderer();
             return;
-        case platform::RenderReset::None:
+        case annokit::platform::RenderReset::None:
             break;
     }
     switch (event.type) {
@@ -1064,7 +1069,7 @@ void MapViewer::update(std::uint32_t delta_ms) {
     // soldiers and walkers are kept so that they move smoothly between ticks. A computer too slow
     // for the speed runs the game slower instead of stalling (review point 20). Under a fixed clock
     // (--frames N) every tick owed runs, however long it takes: the frames do not hang on the computer.
-    const bool budget = !platform::fixed_clock();
+    const bool budget = !annokit::platform::fixed_clock();
     const auto frame_end = std::chrono::steady_clock::now() + std::chrono::milliseconds(kTickBudgetMs);
     bool first = true;
     const auto before_tick = [&] {
@@ -1124,12 +1129,12 @@ namespace {
 
 /// Writes a packed savegame; a failed write (a full disk) never leaves half a file in place of
 /// the last good one. Touches nothing but the file: any thread may call it.
-core::Status write_save_file(const std::filesystem::path& target, std::span<const std::uint8_t> bytes) {
+annokit::core::Status write_save_file(const std::filesystem::path& target, std::span<const std::uint8_t> bytes) {
     if (target.has_parent_path()) {
         std::error_code ec;
         std::filesystem::create_directories(target.parent_path(), ec);
     }
-    return core::write_file_atomic(target, bytes);
+    return annokit::core::write_file_atomic(target, bytes);
 }
 
 }  // namespace
@@ -1153,7 +1158,7 @@ void MapViewer::autosave_if_due() {
     const auto started = std::chrono::steady_clock::now();
     const auto target = prepare_save(slot_file(save_folder(), kLastGameSlot));
     auto sections = target ? sim::encode_game(m_state->world, m_buildings, &m_state->simulation)
-                           : core::Result<core::Bytes>(target.error());
+                           : annokit::core::Result<annokit::core::Bytes>(target.error());
     if (!sections) {
         std::fprintf(stderr, "autosave: %s\n", sections.error().message.c_str());
         return;
@@ -1164,14 +1169,14 @@ void MapViewer::autosave_if_due() {
     job.started = started;
     job.capture_us = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count());
-    job.written =
-        std::async(std::launch::async, [file = *target, bytes = std::move(sections).value()]() -> core::Status {
-            auto packed = sim::pack_game(bytes, sim::SaveOptions{.compress = true, .fast = true});
-            if (!packed) {
-                return packed.error();
-            }
-            return write_save_file(file, *packed);
-        });
+    job.written = std::async(std::launch::async,
+                             [file = *target, bytes = std::move(sections).value()]() -> annokit::core::Status {
+                                 auto packed = sim::pack_game(bytes, sim::SaveOptions{.compress = true, .fast = true});
+                                 if (!packed) {
+                                     return packed.error();
+                                 }
+                                 return write_save_file(file, *packed);
+                             });
     m_autosave_job = std::move(job);
 }
 
@@ -1184,12 +1189,12 @@ void MapViewer::finish_autosave(bool wait) {
     }
     AutosaveJob job = std::move(*m_autosave_job);
     m_autosave_job.reset();
-    core::Status status = core::Ok{};
+    annokit::core::Status status = annokit::core::Ok{};
     try {
         status = job.written.get();
     } catch (const std::exception& e) {
-        status = core::make_error(core::ErrorCode::PlatformError,
-                                  std::string("the savegame could not be written: ") + e.what());
+        status = annokit::core::make_error(annokit::core::ErrorCode::PlatformError,
+                                           std::string("the savegame could not be written: ") + e.what());
     }
     if (!status) {
         std::fprintf(stderr, "autosave: %s\n", status.error().message.c_str());
@@ -1538,7 +1543,7 @@ void MapViewer::render() {
                         }
                     }
                     const bool multi = m_tool.multi_drag();
-                    const bool blink_off = (platform::ticks_ms() / kShortOfMeansBlinkMs) % 2 == 1;
+                    const bool blink_off = (annokit::platform::ticks_ms() / kShortOfMeansBlinkMs) % 2 == 1;
                     for (const sim::PlannedBuild& item : plan.items) {
                         // What only lacks gold or goods blinks, on unmarked ground; anything else that
                         // cannot be built only shows its ground, marked (it might stand over a building
@@ -1881,7 +1886,7 @@ void MapViewer::render() {
         for (std::size_t i = 0; i < 4; ++i) {
             corners[i] = m_camera.point_at_screen(screen[i].first, screen[i].second);
         }
-        const std::uint64_t now = platform::ticks_ms();
+        const std::uint64_t now = annokit::platform::ticks_ms();
         if (const std::string* notice = m_events.notice(now);
             notice != nullptr && (!m_tool.active() || now < m_notice_over_tool_until)) {
             m_hud->set_status(*notice);
@@ -2156,7 +2161,7 @@ void MapViewer::toggle_fertility() {
 }
 
 void MapViewer::notify(std::string text, std::string_view log) {
-    m_events.notify(std::move(text), log, platform::ticks_ms());
+    m_events.notify(std::move(text), log, annokit::platform::ticks_ms());
 }
 
 void MapViewer::toggle_pause_video() {
@@ -2310,7 +2315,7 @@ void MapViewer::draw_map(ZoomGraphics& graphics) {
     m_window->output_size(w, h);
     // O1602_MAP_CANVAS=N: N times the window's pixels instead (to try it on a GPU, 0: no limit).
     static const std::optional<std::int64_t> wanted = [] {
-        const auto value = core::environment_variable("O1602_MAP_CANVAS");
+        const auto value = annokit::core::environment_variable("O1602_MAP_CANVAS");
         return value ? std::optional<std::int64_t>(std::strtoll(value->c_str(), nullptr, 10)) : std::nullopt;
     }();
     const std::int64_t times = wanted ? std::max<std::int64_t>(*wanted, 0) : (m_software_renderer ? 1 : 2);
@@ -2705,9 +2710,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
             }
             if (next && menu != nullptr) {
                 const std::filesystem::path path = menu->tutorial_file(*next);
-                const core::Status status =
-                    path.empty() ? core::Status(core::make_error(core::ErrorCode::NotFound, "no such chapter"))
-                                 : load_game(path);
+                const annokit::core::Status status = path.empty()
+                                                         ? annokit::core::Status(annokit::core::make_error(
+                                                               annokit::core::ErrorCode::NotFound, "no such chapter"))
+                                                         : load_game(path);
                 if (status) {
                     break;
                 }
@@ -2740,7 +2746,7 @@ void MapViewer::apply_game_events() {
     show_notices(
         m_events.diplomacy_notices(m_state->world, m_local_player, m_state->simulation.take_diplomacy_notices()));
     show_notices(m_events.game_events(m_state->world, m_local_player, m_state->simulation.take_game_events(),
-                                      platform::ticks_ms()));
+                                      annokit::platform::ticks_ms()));
     apply_script_output();
 }
 
@@ -2753,9 +2759,9 @@ void MapViewer::apply_script_output() {
         if (note.error) {
             // A scenario's own script is no mod's; its errors name it already ("scenario:7: ...").
             const bool own = note.package == script::kScenarioScript;
-            const std::string text = core::utf8_to_cp1252(own ? note.text : note.package + ": " + note.text);
+            const std::string text = annokit::core::utf8_to_cp1252(own ? note.text : note.package + ": " + note.text);
             m_events.notify(ui::tr(own ? "error.scenario_script" : "error.script", {text}),
-                            "error.script " + note.package, platform::ticks_ms());
+                            "error.script " + note.package, annokit::platform::ticks_ms());
         }
     }
     for (const script::ScriptMessage& message : m_state->scripts->take_messages()) {
@@ -2764,7 +2770,7 @@ void MapViewer::apply_script_output() {
         }
         std::vector<std::pair<std::string, std::string>> values;
         for (const auto& [name, value] : message.args) {
-            values.emplace_back(name, core::utf8_to_cp1252(value));
+            values.emplace_back(name, annokit::core::utf8_to_cp1252(value));
         }
         MessageArgs args;
         for (const auto& [name, value] : values) {
@@ -2774,8 +2780,8 @@ void MapViewer::apply_script_output() {
                       message.about != sim::kNoPlayer ? std::optional<sim::PlayerId>(message.about) : std::nullopt)) {
             std::fprintf(stderr, "script: no message \"%s\" (messages.toml)\n", message.id.c_str());
             // On the screen too: a script's maker finds the typing error where it shows.
-            m_events.notify(ui::tr("error.script_message", {core::utf8_to_cp1252(message.id)}),
-                            "error.script_message " + message.id, platform::ticks_ms());
+            m_events.notify(ui::tr("error.script_message", {annokit::core::utf8_to_cp1252(message.id)}),
+                            "error.script_message " + message.id, annokit::platform::ticks_ms());
         }
     }
 }
@@ -2814,7 +2820,7 @@ std::string MapViewer::debug_title(double fps) {
             const auto& island = m_state->world.islands()[cell.island];
             const sim::MapCell& top = island.map.top(cell.local_x, cell.local_y);
             if (const sim::City* city = m_state->world.city(cell.island, top.city)) {
-                title += ", " + core::cp1252_to_utf8(city->name);
+                title += ", " + annokit::core::cp1252_to_utf8(city->name);
             }
             if (const sim::Player* p = m_state->world.player(top.owner)) {
                 title += ", " + player_label(*p, top.owner, m_banners, m_state->world);
@@ -2845,7 +2851,7 @@ std::string MapViewer::debug_title(double fps) {
                                          ? m_state->world.ship(units.units().front().id)
                                          : nullptr;
     if (const sim::Ship* ship = selected_ship) {
-        title += " | ship " + core::cp1252_to_utf8(ship->name);
+        title += " | ship " + annokit::core::cp1252_to_utf8(ship->name);
         if (const sim::Player* p = m_state->world.player(ship->owner)) {
             title += " (" + player_label(*p, ship->owner, m_banners, m_state->world) + ")";
         }
@@ -2890,9 +2896,9 @@ std::string MapViewer::game_title() const {
     // The game's own name, the same on every computer of a multiplayer game; else its file.
     // The History Edition writes a placeholder ("[[48]]" for "Endlosspiel").
     if (const std::string name = sim::game_identity(m_state->world).name; !name.empty()) {
-        return core::cp1252_to_utf8(m_game.expand(name));
+        return annokit::core::cp1252_to_utf8(m_game.expand(name));
     }
-    return core::path_to_utf8(m_options.scenario.stem());
+    return annokit::core::path_to_utf8(m_options.scenario.stem());
 }
 
 void MapViewer::update_title(double fps) {
@@ -2909,8 +2915,8 @@ void MapViewer::update_title(double fps) {
     if (m_editor && !m_debug_title) {
         // The editor's world does not run: its map's name and whether it has unsaved changes.
         m_title_real_ms = 0;
-        const std::string name =
-            m_editor->source_name.empty() ? ui::tr("editor.untitled") : core::cp1252_to_utf8(m_editor->source_name);
+        const std::string name = m_editor->source_name.empty() ? ui::tr("editor.untitled")
+                                                               : annokit::core::cp1252_to_utf8(m_editor->source_name);
         m_window->set_title(ui::tr("title.editor", {name}) + (m_editor->document.modified() ? " *" : ""));
         return;
     }
@@ -2927,7 +2933,7 @@ void MapViewer::update_title(double fps) {
     }
     // A computer too slow for the speed lets the game run slower (Simulation::behind()): the speed
     // reached since the last title.
-    const std::uint64_t now = platform::ticks_ms();
+    const std::uint64_t now = annokit::platform::ticks_ms();
     const std::uint64_t game_ms = m_state->simulation.game_time_ms();
     // A multiplayer game that ended or waits for a player stands still on purpose (the title says
     // why), not because this computer is too slow.
@@ -2966,7 +2972,7 @@ std::string MapViewer::session_title() const {
 std::filesystem::path MapViewer::data_folder() {
     std::filesystem::path folder;
     if (char* pref = SDL_GetPrefPath(nullptr, "Open1602")) {
-        folder = core::path_from_utf8(pref);
+        folder = annokit::core::path_from_utf8(pref);
         SDL_free(pref);
     } else {
         // Never the working folder: started from the installation, the game would write into it.
@@ -2975,7 +2981,7 @@ std::filesystem::path MapViewer::data_folder() {
         static bool warned = false;
         if (!std::exchange(warned, true)) {
             std::fprintf(stderr, "warning: no user data folder (%s), using %s\n", SDL_GetError(),
-                         core::path_to_utf8(folder).c_str());
+                         annokit::core::path_to_utf8(folder).c_str());
         }
     }
     return folder;
@@ -3016,7 +3022,7 @@ std::filesystem::path MapViewer::save_folder() {
     return data_folder() / "saves";
 }
 
-core::Result<std::filesystem::path> MapViewer::prepare_save(const std::filesystem::path& path) {
+annokit::core::Result<std::filesystem::path> MapViewer::prepare_save(const std::filesystem::path& path) {
     // The installation stays as it is: no savegame goes into it (nor into Game.dat). A path that
     // cannot be resolved is not written either.
     std::error_code ec;
@@ -3025,13 +3031,14 @@ core::Result<std::filesystem::path> MapViewer::prepare_save(const std::filesyste
     std::error_code root_ec;
     const std::filesystem::path root = std::filesystem::weakly_canonical(m_game.root(), root_ec);
     if (ec || root_ec || target.empty() || root.empty()) {
-        return core::make_error(core::ErrorCode::NotFound,
-                                "cannot check the savegame's path " + core::path_to_utf8(path) +
-                                    " against the installation: " + (ec ? ec : root_ec).message());
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "cannot check the savegame's path " + annokit::core::path_to_utf8(path) +
+                                             " against the installation: " + (ec ? ec : root_ec).message());
     }
     if (inside_folder(target, root)) {
-        return core::make_error(core::ErrorCode::Unsupported,
-                                "will not write into the game's installation: " + core::path_to_utf8(target));
+        return annokit::core::make_error(
+            annokit::core::ErrorCode::Unsupported,
+            "will not write into the game's installation: " + annokit::core::path_to_utf8(target));
     }
     // The groups of this computer's player go with the game (the original forgets them).
     if (m_local_player != sim::kNoPlayer && m_input) {
@@ -3040,7 +3047,7 @@ core::Result<std::filesystem::path> MapViewer::prepare_save(const std::filesyste
     return target;
 }
 
-core::Status MapViewer::save_game(const std::filesystem::path& path) {
+annokit::core::Status MapViewer::save_game(const std::filesystem::path& path) {
     finish_autosave();  // its file must not land after this one
     const auto target = prepare_save(path);
     if (!target) {
@@ -3048,7 +3055,7 @@ core::Status MapViewer::save_game(const std::filesystem::path& path) {
     }
     // Open1602's own savegame, or with the ending .gam one the original loads (as long as the game
     // fits its limits; without the file the game came from, the fields Open1602 does not keep are 0).
-    std::string ending = core::path_to_utf8(target->extension());
+    std::string ending = annokit::core::path_to_utf8(target->extension());
     std::transform(ending.begin(), ending.end(), ending.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     auto bytes = ending == ".gam" ? sim::write_savegame(m_state->world, m_buildings, &m_state->simulation)
@@ -3068,12 +3075,12 @@ std::uint8_t MapViewer::human_players() const {
     return humans;
 }
 
-core::Status MapViewer::save_slot(std::size_t slot, std::string name) {
+annokit::core::Status MapViewer::save_slot(std::size_t slot, std::string name) {
     if (auto status = save_game(slot_file(save_folder(), slot)); !status) {
         return status;
     }
     remember_slot(slot, std::move(name), human_players());
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 void MapViewer::remember_slot(std::size_t slot, std::string name, std::uint8_t humans) {
@@ -3088,8 +3095,8 @@ void MapViewer::remember_slot(std::size_t slot, std::string name, std::uint8_t h
     }
     const std::string text = write_slots(m_slots);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto written =
-            core::write_file_atomic(save_folder() / "slots.cfg", std::span<const std::uint8_t>(data, text.size()));
+    if (auto written = annokit::core::write_file_atomic(save_folder() / "slots.cfg",
+                                                        std::span<const std::uint8_t>(data, text.size()));
         !written) {
         std::fprintf(stderr, "slots: %s\n", written.error().message.c_str());
     }
@@ -3101,7 +3108,7 @@ void MapViewer::load_options() {
         m_app_settings.audio = m_sound->settings();
     }
     const std::filesystem::path settings = data_folder() / "settings.cfg";
-    if (auto bytes = core::read_file(settings)) {
+    if (auto bytes = annokit::core::read_file(settings)) {
         m_app_settings = parse_settings(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()),
                                         m_app_settings);
         // What the command line switched off stays off for this run only: GameSound applies it,
@@ -3112,7 +3119,7 @@ void MapViewer::load_options() {
     }
     apply_language();
     m_ambient.set_config(ambient_config());
-    if (auto bytes = core::read_file(save_folder() / "slots.cfg")) {
+    if (auto bytes = annokit::core::read_file(save_folder() / "slots.cfg")) {
         m_slots = parse_slots(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     }
     find_last_game(m_slots, save_folder());
@@ -3164,14 +3171,15 @@ void MapViewer::apply_language() {
 void MapViewer::remember_player_id(std::uint64_t id) {
     const std::filesystem::path path = data_folder() / "settings.cfg";
     std::string text;
-    if (auto bytes = core::read_file(path)) {
+    if (auto bytes = annokit::core::read_file(path)) {
         text.assign(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     }
     text = set_setting_line(text, "player_id", player_id_text(id));
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+    if (auto status = annokit::core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size()));
+        !status) {
         std::fprintf(stderr, "settings: %s\n", status.error().message.c_str());
     }
 }
@@ -3182,7 +3190,8 @@ void MapViewer::save_settings() {
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+    if (auto status = annokit::core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size()));
+        !status) {
         std::fprintf(stderr, "settings: %s\n", status.error().message.c_str());
     }
 }
@@ -3219,7 +3228,7 @@ void MapViewer::apply_options() {
                 const auto status = save_slot(e.value, name);
                 if (!status) {
                     m_events.notify(ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}),
-                                    "notice.save_failed", platform::ticks_ms());
+                                    "notice.save_failed", annokit::platform::ticks_ms());
                     break;
                 }
                 // The voice confirms it (voice 0x79, 2: files 121 or 123).
@@ -3239,9 +3248,9 @@ void MapViewer::apply_options() {
                 }
                 if (const auto status = load_game(path); !status) {
                     m_events.notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}),
-                                    "notice.load_failed", platform::ticks_ms());
+                                    "notice.load_failed", annokit::platform::ticks_ms());
                 } else {
-                    std::fprintf(stderr, "game loaded: %s\n", core::path_to_utf8(path).c_str());
+                    std::fprintf(stderr, "game loaded: %s\n", annokit::core::path_to_utf8(path).c_str());
                 }
                 break;
             }
@@ -3300,13 +3309,14 @@ void MapViewer::apply_options() {
     }
 }
 
-core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::Rules* rules) {
+annokit::core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::Rules* rules) {
     finish_autosave();  // "continue" right after an autosave loads the file it wrote
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "no other game while a multiplayer game runs");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "no other game while a multiplayer game runs");
     }
     if (m_sound) {
         m_sound->prefill();  // the frames stand still while the game loads
@@ -3340,13 +3350,13 @@ core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::
         } else {
             finish_pending_load(0);
         }
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
     if (auto replaced = replace_world(std::move(world).value(), path, rules); !replaced) {
         return replaced;
     }
     report_load_problems(warnings);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::vector<sim::PlayerId> MapViewer::player_choice(const sim::World& world) const {
@@ -3372,16 +3382,16 @@ void MapViewer::finish_pending_load(std::size_t option) {
     if (auto replaced = replace_world(std::move(load.world), load.path, load.rules ? &*load.rules : nullptr);
         !replaced) {
         m_events.notify(ui::tr("notice.load_failed", {ui::error_text(replaced.error(), "load")}), "notice.load_failed",
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
         return;
     }
     report_load_problems(load.warnings);
     std::fprintf(stderr, "game loaded as player %u: %s\n", static_cast<unsigned>(chosen),
-                 core::path_to_utf8(load.path).c_str());
+                 annokit::core::path_to_utf8(load.path).c_str());
     if (m_load_problems == 0) {
-        const std::string file = core::path_to_utf8(load.path.filename());
+        const std::string file = annokit::core::path_to_utf8(load.path.filename());
         m_events.notify(ui::tr("notice.game_loaded", {utf8_to_cp1252(file)}), "notice.game_loaded " + file,
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
     }
 }
 
@@ -3394,14 +3404,15 @@ void MapViewer::load_package_scenarios() {
     }
 }
 
-core::Status MapViewer::start_package_scenario(const std::string& id, const sim::Rules* rules,
-                                               const std::string& campaign, std::uint8_t part) {
+annokit::core::Status MapViewer::start_package_scenario(const std::string& id, const sim::Rules* rules,
+                                                        const std::string& campaign, std::uint8_t part) {
     const assets::PackageScenario* scenario = assets::find_scenario(m_package_scenarios, id);
     if (scenario == nullptr) {
-        return core::make_error(core::ErrorCode::NotFound, "no scenario " + id);
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no scenario " + id);
     }
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "no other game while a multiplayer game runs");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "no other game while a multiplayer game runs");
     }
     std::size_t warning_count = 0;
     auto world = read_world(scenario->file, &warning_count);
@@ -3431,7 +3442,7 @@ core::Status MapViewer::start_package_scenario(const std::string& id, const sim:
         if (part > 0) {
             const std::filesystem::path file =
                 data_folder() / "campaigns" / assets::campaign_carry_file(c->id, std::size_t{part} - 1);
-            if (auto bytes = core::read_file(file)) {
+            if (auto bytes = annokit::core::read_file(file)) {
                 carry = assets::read_campaign_carry(*bytes);
             }
         }
@@ -3460,7 +3471,7 @@ core::Status MapViewer::start_package_scenario(const std::string& id, const sim:
         return replaced;
     }
     report_load_problems(warning_count + warnings.size());
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 void MapViewer::give_mod_content(sim::World& world) const {
@@ -3538,7 +3549,8 @@ void MapViewer::use_game_packages(bool again) {
             names += (names.empty() ? "" : ", ") + assets::package_label(p);
         }
         if (!names.empty()) {
-            m_events.notify(ui::tr("notice.packages", {names}), "notice.packages " + names, platform::ticks_ms());
+            m_events.notify(ui::tr("notice.packages", {names}), "notice.packages " + names,
+                            annokit::platform::ticks_ms());
         }
     }
 }
@@ -3560,9 +3572,9 @@ ModsModel MapViewer::mods_model() const {
         ModsModel::Entry e;
         e.id = p.id;
         e.folder = p.folder;
-        e.name = core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
-        e.version = core::utf8_to_cp1252(p.version);
-        e.description = core::utf8_to_cp1252(p.description);
+        e.name = annokit::core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
+        e.version = annokit::core::utf8_to_cp1252(p.version);
+        e.description = annokit::core::utf8_to_cp1252(p.description);
         e.wanted = std::find(off.begin(), off.end(), p.id) == off.end();
         const auto problem = std::find_if(problems.begin(), problems.end(),
                                           [&](const assets::PackageProblem& m) { return m.package == p.id; });
@@ -3587,13 +3599,13 @@ ModsModel MapViewer::mods_model() const {
         ModsModel::Entry e;
         e.id = p.id;
         e.folder = p.folder;
-        e.name = core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
-        e.version = core::utf8_to_cp1252(p.version);
-        e.description = core::utf8_to_cp1252(p.description);
+        e.name = annokit::core::utf8_to_cp1252(p.name.empty() ? p.id : p.name);
+        e.version = annokit::core::utf8_to_cp1252(p.version);
+        e.description = annokit::core::utf8_to_cp1252(p.description);
         e.state = State::Received;
         std::error_code ec;
-        e.adoptable = !std::filesystem::exists(mods / core::path_from_utf8(p.id), ec) &&
-                      !std::filesystem::exists(mods / core::path_from_utf8(p.id + ".zip"), ec);
+        e.adoptable = !std::filesystem::exists(mods / annokit::core::path_from_utf8(p.id), ec) &&
+                      !std::filesystem::exists(mods / annokit::core::path_from_utf8(p.id + ".zip"), ec);
         model.entries.push_back(std::move(e));
     }
     return model;
@@ -3671,13 +3683,14 @@ void MapViewer::reload_mods(bool again) {
 void MapViewer::reload_packages() {
     if (m_session) {
         // Each computer of the game must draw on the same rules and scripts.
-        m_events.notify(ui::tr("notice.reload_multiplayer"), "notice.reload_multiplayer", platform::ticks_ms());
+        m_events.notify(ui::tr("notice.reload_multiplayer"), "notice.reload_multiplayer",
+                        annokit::platform::ticks_ms());
         return;
     }
     std::fprintf(stderr, "mods: reading the packages again\n");
     reload_mods(true);
     use_game_packages(true);
-    m_events.notify(ui::tr("notice.packages_reloaded"), "notice.packages_reloaded", platform::ticks_ms());
+    m_events.notify(ui::tr("notice.packages_reloaded"), "notice.packages_reloaded", annokit::platform::ticks_ms());
 }
 
 std::string MapViewer::toggle_mod(const std::string& id) {
@@ -3690,7 +3703,7 @@ std::string MapViewer::toggle_mod(const std::string& id) {
             const auto p = std::find_if(installed.begin(), installed.end(),
                                         [&](const assets::ModPackage& m) { return m.id == other; });
             const std::string& name = p != installed.end() && !p->name.empty() ? p->name : other;
-            list += (list.empty() ? "" : ", ") + core::utf8_to_cp1252(name);
+            list += (list.empty() ? "" : ", ") + annokit::core::utf8_to_cp1252(name);
         }
         return list;
     };
@@ -3727,7 +3740,7 @@ std::string MapViewer::adopt_mod(const std::filesystem::path& folder) {
     if (cached == m_cached_packages.end()) {
         return {};
     }
-    const std::string name = core::utf8_to_cp1252(cached->name.empty() ? cached->id : cached->name);
+    const std::string name = annokit::core::utf8_to_cp1252(cached->name.empty() ? cached->id : cached->name);
     const auto adopted = assets::adopt_package(data_folder() / "mods", *cached);
     if (!adopted) {
         std::fprintf(stderr, "mods: %s\n", adopted.error().message.c_str());
@@ -3750,7 +3763,8 @@ void MapViewer::report_load_problems(std::size_t warnings) {
     m_load_problems = warnings + (m_state->simulation.state_damaged() ? 1 : 0);
     if (m_load_problems != 0) {
         const std::string count = std::to_string(m_load_problems);
-        m_events.notify(ui::tr("notice.load_problems", {count}), "notice.load_problems " + count, platform::ticks_ms());
+        m_events.notify(ui::tr("notice.load_problems", {count}), "notice.load_problems " + count,
+                        annokit::platform::ticks_ms());
     }
 }
 
@@ -3760,14 +3774,15 @@ void MapViewer::log_world_notes(const std::vector<std::string>& notes) {
     }
 }
 
-core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path, std::size_t* warning_count) const {
-    auto bytes = core::read_file(path);
+annokit::core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path,
+                                                        std::size_t* warning_count) const {
+    auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         return bytes.error();
     }
     std::vector<std::string> warnings;
     std::vector<std::string> world_notes;
-    core::Result<sim::World> world = core::make_error(core::ErrorCode::NotFound, "no game");
+    annokit::core::Result<sim::World> world = annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no game");
     if (sim::is_open1602_save(*bytes)) {
         world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
         if (world && world->planned_islands()) {
@@ -3815,7 +3830,8 @@ std::unique_ptr<GameState> MapViewer::make_state(sim::World world, const sim::Ru
     return std::make_unique<GameState>(std::move(world), m_buildings, m_figures, rules);
 }
 
-core::Status MapViewer::replace_world(sim::World world, const std::filesystem::path& source, const sim::Rules* rules) {
+annokit::core::Status MapViewer::replace_world(sim::World world, const std::filesystem::path& source,
+                                               const sim::Rules* rules) {
     // The new game is built whole before anything of the old one goes: if memory runs out on the
     // way, the old game goes on.
     std::unique_ptr<GameState> next;
@@ -3837,13 +3853,14 @@ core::Status MapViewer::replace_world(sim::World world, const std::filesystem::p
         next = make_state(std::move(world), rules != nullptr ? *rules : m_options.rules);
     } catch (const std::bad_alloc&) {
         keep_old();
-        return core::make_error(core::ErrorCode::PlatformError, "not enough memory for the game");
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError, "not enough memory for the game");
     } catch (const std::exception& e) {
         keep_old();
-        return core::make_error(core::ErrorCode::PlatformError, std::string("the game could not start: ") + e.what());
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError,
+                                         std::string("the game could not start: ") + e.what());
     }
     adopt_state(std::move(next), source);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 void MapViewer::adopt_state(std::unique_ptr<GameState> next, const std::filesystem::path& source) {
@@ -3948,7 +3965,7 @@ GameSettingsMenu::PreviewMaker MapViewer::preview_maker(bool multiplayer) const 
          multiplayer](const EndlessSetup& setup, std::uint8_t level, GameSettingsMenu::PreviewStop stop) {
             auto texts = assets::TextTable::load(game);
             if (!texts) {
-                return core::Result<sim::WorldPreview>(texts.error());
+                return annokit::core::Result<sim::WorldPreview>(texts.error());
             }
             sim::NewGameOptions o;
             o.difficulty = std::min<std::uint8_t>(level, sim::NewGameOptions::kDifficulties - 1);
@@ -3959,13 +3976,14 @@ GameSettingsMenu::PreviewMaker MapViewer::preview_maker(bool multiplayer) const 
         };
 }
 
-core::Status MapViewer::start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
-                                      const EndlessSetup& setup) {
+annokit::core::Status MapViewer::start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
+                                               const EndlessSetup& setup) {
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "no other game while a multiplayer game runs");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "no other game while a multiplayer game runs");
     }
     auto texts = assets::TextTable::load(m_game);
     if (!texts) {
@@ -4046,7 +4064,8 @@ void MapViewer::apply_menu() {
         m_slots_shown = m_slots_revision;
     }
     for (const MenuEvent& e : m_hud->take_menu_events()) {
-        core::Status started = core::make_error(core::ErrorCode::NotFound, "nothing started");
+        annokit::core::Status started =
+            annokit::core::make_error(annokit::core::ErrorCode::NotFound, "nothing started");
         switch (e.kind) {
             case MenuEvent::Kind::Quit:
                 // The original quits at once (U-036).
@@ -4164,12 +4183,12 @@ void MapViewer::load_cursors() {
         std::fprintf(stderr, "cursors: Language.dll is missing\n");
         return;
     }
-    const auto bytes = core::read_file(*dll);
+    const auto bytes = annokit::core::read_file(*dll);
     if (!bytes) {
         std::fprintf(stderr, "cursors: %s\n", bytes.error().message.c_str());
         return;
     }
-    using Shape = platform::MouseCursors::Shape;
+    using Shape = annokit::platform::MouseCursors::Shape;
     for (const auto& [shape, id] :
          {std::pair{Shape::Arrow, assets::kArrowCursor}, std::pair{Shape::Target, assets::kTargetCursor}}) {
         const auto image = assets::read_cursor(*bytes, id);
@@ -4182,7 +4201,7 @@ void MapViewer::load_cursors() {
 }
 
 void MapViewer::update_cursor(bool video_full_screen) {
-    using Shape = platform::MouseCursors::Shape;
+    using Shape = annokit::platform::MouseCursors::Shape;
     // The arrow, the target in the modes where a window waits for a
     // click on the map, none while a video plays.
     Shape shape = Shape::Arrow;
@@ -4202,13 +4221,13 @@ void MapViewer::present() {
             m_screenshot_error = status.error().message;
         }
         if (request->notify) {
-            const std::string file = core::path_to_utf8(request->path.filename());
+            const std::string file = annokit::core::path_to_utf8(request->path.filename());
             if (status) {
                 m_events.notify(ui::tr("notice.screenshot_saved", {utf8_to_cp1252(file)}),
-                                "notice.screenshot_saved " + file, platform::ticks_ms());
+                                "notice.screenshot_saved " + file, annokit::platform::ticks_ms());
             } else {
                 m_events.notify(ui::tr("notice.screenshot_failed", {ui::error_text(status.error(), "screenshot")}),
-                                "notice.screenshot_failed", platform::ticks_ms());
+                                "notice.screenshot_failed", annokit::platform::ticks_ms());
             }
         }
     }
@@ -4225,13 +4244,13 @@ void MapViewer::quick_save() {
     }
     const std::filesystem::path path = save_folder() / ("quicksave" + std::string(sim::kSaveExtension));
     const auto status = save_game(path);
-    const std::string file = core::path_to_utf8(path.filename());
+    const std::string file = annokit::core::path_to_utf8(path.filename());
     if (status) {
         m_events.notify(ui::tr("notice.game_saved", {utf8_to_cp1252(file)}), "notice.game_saved " + file,
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
     } else {
         m_events.notify(ui::tr("notice.save_failed", {ui::error_text(status.error(), "save")}), "notice.save_failed",
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
     }
 }
 
@@ -4240,12 +4259,12 @@ void MapViewer::quick_load() {
     const auto status = load_game(path);
     if (!status) {
         m_events.notify(ui::tr("notice.load_failed", {ui::error_text(status.error(), "load")}), "notice.load_failed",
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
     } else if (m_load_problems == 0 && !m_pending_load) {  // else the note says what went wrong while loading
         // (or the game waits for its player: finish_pending_load says so)
-        const std::string file = core::path_to_utf8(path.filename());
+        const std::string file = annokit::core::path_to_utf8(path.filename());
         m_events.notify(ui::tr("notice.game_loaded", {utf8_to_cp1252(file)}), "notice.game_loaded " + file,
-                        platform::ticks_ms());
+                        annokit::platform::ticks_ms());
     }
 }
 
@@ -4269,15 +4288,15 @@ std::filesystem::path MapViewer::next_screenshot_path() {
     return path;
 }
 
-core::Status MapViewer::save_screenshot(const std::filesystem::path& path) {
+annokit::core::Status MapViewer::save_screenshot(const std::filesystem::path& path) {
     SDL_Surface* surface = SDL_RenderReadPixels(m_window->sdl_renderer(), nullptr);
     if (surface == nullptr) {
-        return platform::sdl_error("SDL_RenderReadPixels");
+        return annokit::platform::sdl_error("SDL_RenderReadPixels");
     }
     SDL_Surface* rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
     SDL_DestroySurface(surface);
     if (rgba == nullptr) {
-        return platform::sdl_error("SDL_ConvertSurface");
+        return annokit::platform::sdl_error("SDL_ConvertSurface");
     }
     const auto width = static_cast<std::uint32_t>(rgba->w);
     const auto height = static_cast<std::uint32_t>(rgba->h);
@@ -4296,7 +4315,7 @@ core::Status MapViewer::save_screenshot(const std::filesystem::path& path) {
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
     }
-    return core::write_png_rgba(path, width, height, pixels);
+    return annokit::core::write_png_rgba(path, width, height, pixels);
 }
 
 sim::GameOutcome MapViewer::local_outcome() const {
@@ -4376,7 +4395,7 @@ void MapViewer::preview_move(const BuildTool::Spot& spot,
     const bool short_of_means = item.refusal == sim::BuildRefusal::Money || item.refusal == sim::BuildRefusal::Tools ||
                                 item.refusal == sim::BuildRefusal::Wood || item.refusal == sim::BuildRefusal::Bricks ||
                                 item.refusal == sim::BuildRefusal::Cannons;
-    const bool blink_off = (platform::ticks_ms() / kShortOfMeansBlinkMs) % 2 == 1;
+    const bool blink_off = (annokit::platform::ticks_ms() / kShortOfMeansBlinkMs) % 2 == 1;
     std::uint32_t w = 1;
     std::uint32_t h = 1;
     sim::rotated_size(*item.type, item.rotation, w, h);
@@ -4542,7 +4561,7 @@ void MapViewer::update_template_window() {
                     if (store.add(r.name, *layout)) {
                         notify(ui::tr("template.saved", {r.name}), "template saved");
                         // Said over the copy tool's costs, which the status line shows meanwhile.
-                        m_notice_over_tool_until = platform::ticks_ms() + kNoticeOverToolMs;
+                        m_notice_over_tool_until = annokit::platform::ticks_ms() + kNoticeOverToolMs;
                     } else {
                         notify(ui::tr("template.failed"), "template not saved");
                     }
@@ -4623,11 +4642,11 @@ void MapViewer::update_high_scores(sim::PlayerId defeated) {
     }
     // Open1602's own list in the data folder; the first line starts from the original's (only read).
     const std::filesystem::path own = data_folder() / "scores" / name;
-    auto bytes = core::read_file(own);
+    auto bytes = annokit::core::read_file(own);
     if (!bytes) {
         const std::u8string relative = (std::filesystem::path(u8"Szenes") / name).generic_u8string();
         if (const auto original = m_game.resolve(std::string(relative.begin(), relative.end()))) {
-            bytes = core::read_file(*original);
+            bytes = annokit::core::read_file(*original);
         }
     }
     std::vector<assets::HighScore> scores;
@@ -4656,7 +4675,8 @@ void MapViewer::update_high_scores(sim::PlayerId defeated) {
     std::filesystem::create_directories(own.parent_path(), ec);
     const std::string text = assets::write_high_scores(scores);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file_atomic(own, std::span<const std::uint8_t>(data, text.size())); !status) {
+    if (auto status = annokit::core::write_file_atomic(own, std::span<const std::uint8_t>(data, text.size()));
+        !status) {
         std::fprintf(stderr, "high scores: %s\n", status.error().message.c_str());
     }
 }
@@ -4669,7 +4689,7 @@ void MapViewer::record_progress() {
     // Open1602 keeps it in its own file instead of Game.dat.
     const std::filesystem::path file = data_folder() / "progress.cfg";
     assets::CampaignProgress progress;
-    if (auto bytes = core::read_file(file)) {
+    if (auto bytes = annokit::core::read_file(file)) {
         progress =
             assets::parse_progress(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     }
@@ -4683,7 +4703,8 @@ void MapViewer::record_progress() {
     if (progress.record_win(game.campaign, game.ranking, game.mission_number) || m_state->world.campaign_part()) {
         const std::string text = assets::write_progress(progress);
         const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-        if (auto status = core::write_file_atomic(file, std::span<const std::uint8_t>(data, text.size())); !status) {
+        if (auto status = annokit::core::write_file_atomic(file, std::span<const std::uint8_t>(data, text.size()));
+            !status) {
             std::fprintf(stderr, "progress: %s\n", status.error().message.c_str());
         }
     }
@@ -4707,7 +4728,7 @@ void MapViewer::record_campaign_part(assets::CampaignProgress& progress, const s
         data_folder() / "campaigns" / assets::campaign_carry_file(part.campaign, part.part);
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(), ec);
-    if (auto status = core::write_file_atomic(file, assets::write_campaign_carry(carry)); !status) {
+    if (auto status = annokit::core::write_file_atomic(file, assets::write_campaign_carry(carry)); !status) {
         std::fprintf(stderr, "campaign: %s\n", status.error().message.c_str());
     }
 }

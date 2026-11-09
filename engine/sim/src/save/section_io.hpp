@@ -16,8 +16,9 @@
 
 #include "archive.hpp"
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::sim::save {
@@ -266,7 +267,7 @@ struct Decoded {
     Queues soldier_queues;
     Stances ship_stances;
     Stances soldier_stances;
-    core::Bytes origin;  ///< ORIG
+    annokit::core::Bytes origin;  ///< ORIG
 };
 
 // ---- Records more than one section has ------------------------------------------------------------
@@ -366,7 +367,8 @@ void write_map(Writer& out, const World& w, const assets::BuildingTable& buildin
 /// island of the world) and taken again only where a block changed.
 void write_map_fingerprint(Writer& out, const World& w, const assets::BuildingTable& buildings,
                            std::vector<std::vector<BlockHash>>& hashes);
-[[nodiscard]] core::Result<World> read_map(Reader& in, const assets::BuildingTable& buildings, std::uint16_t version);
+[[nodiscard]] annokit::core::Result<World> read_map(Reader& in, const assets::BuildingTable& buildings,
+                                                    std::uint16_t version);
 void write_tiles(Writer& out, const World& w, const assets::BuildingTable& buildings,
                  std::span<const std::uint8_t> before);
 [[nodiscard]] std::vector<Decoded::TileOverride> read_tiles(Reader& in, const assets::BuildingTable& buildings);
@@ -476,6 +478,6 @@ void read_stances(Reader& in, Decoded::Stances& ships, Decoded::Stances& soldier
 // apply.cpp
 /// Checks everything decoded against the world and applies it; the world stays as it was if a
 /// check fails.
-core::Status apply_decoded(World& world, Decoded& d);
+annokit::core::Status apply_decoded(World& world, Decoded& d);
 
 }  // namespace o1602::sim::save

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Pictures of a package's own: the PNG reader (engine/core/include/o1602/core/png_reader.hpp),
+// Pictures of a package's own: the PNG reader (annokit: modules/core/include/annokit/core/png_reader.hpp),
 // graphics.toml (engine/assets/include/o1602/assets/package_graphics.hpp), buildings that draw an
 // image and the sprites the atlas gets from it (engine/render/include/o1602/render/
 // package_sprites.hpp; docs/modding/graphics.md).
@@ -11,13 +11,14 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/compress.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_reader.hpp"
+#include "annokit/core/png_writer.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/own_buildings.hpp"
 #include "o1602/assets/package_graphics.hpp"
-#include "o1602/core/compress.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_reader.hpp"
-#include "o1602/core/png_writer.hpp"
 #include "o1602/render/package_sprites.hpp"
 
 using namespace o1602;
@@ -35,7 +36,7 @@ void put_chunk(std::vector<std::uint8_t>& out, std::string_view type, const std:
     std::vector<std::uint8_t> typed(type.begin(), type.end());
     typed.insert(typed.end(), data.begin(), data.end());
     out.insert(out.end(), typed.begin(), typed.end());
-    put_u32(out, core::crc32(typed));
+    put_u32(out, annokit::core::crc32(typed));
 }
 
 /// A PNG of the rows given (each with its filter byte), as a test writes what the encoder of
@@ -53,14 +54,14 @@ std::vector<std::uint8_t> make_png(std::uint32_t width, std::uint32_t height, st
     for (const auto& [type, data] : extra) {
         put_chunk(png, type, data);
     }
-    auto packed = core::zlib_deflate(rows);
+    auto packed = annokit::core::zlib_deflate(rows);
     REQUIRE(packed.ok());
     put_chunk(png, "IDAT", *packed);
     put_chunk(png, "IEND", {});
     return png;
 }
 
-std::vector<std::uint8_t> pixel(const core::PngImage& image, std::uint32_t x, std::uint32_t y) {
+std::vector<std::uint8_t> pixel(const annokit::core::PngImage& image, std::uint32_t x, std::uint32_t y) {
     const auto at = image.rgba.begin() + static_cast<std::ptrdiff_t>((std::size_t{y} * image.width + x) * 4);
     return {at, at + 4};
 }
@@ -70,7 +71,7 @@ std::vector<std::uint8_t> px(std::uint8_t r, std::uint8_t g, std::uint8_t b, std
 }
 
 void need_zlib() {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         SKIP("this build has no zlib");
     }
 }
@@ -100,7 +101,7 @@ std::filesystem::path package_folder(const std::string& name,
     for (const auto& [file, bytes] : files) {
         const std::filesystem::path path = folder / file;
         std::filesystem::create_directories(path.parent_path());
-        REQUIRE(core::write_file(path, bytes).ok());
+        REQUIRE(annokit::core::write_file(path, bytes).ok());
     }
     return folder;
 }
@@ -113,13 +114,13 @@ TEST_CASE("png: an image of the writer comes back as it was") {
     for (std::size_t i = 0; i < rgba.size(); ++i) {
         rgba[i] = static_cast<std::uint8_t>(i * 7);
     }
-    const auto png = core::encode_png_rgba(5, 3, rgba);
-    const auto image = core::decode_png(png);
+    const auto png = annokit::core::encode_png_rgba(5, 3, rgba);
+    const auto image = annokit::core::decode_png(png);
     REQUIRE(image.ok());
     CHECK(image->width == 5);
     CHECK(image->height == 3);
     CHECK(image->rgba == rgba);
-    const auto size = core::png_size(std::span(png).first(33));
+    const auto size = annokit::core::png_size(std::span(png).first(33));
     REQUIRE(size.ok());
     CHECK(size->width == 5);
     CHECK(size->rgba.empty());
@@ -132,7 +133,7 @@ TEST_CASE("png: every filter, palettes, grey and transparency") {
                                            2, 1,  1,  1,  1, 1, 1,   // Up: (11,21,31) (16,26,36)
                                            3, 10, 10, 10, 3, 3, 3,   // Average: (15,20,25) (18,26,33)
                                            4, 1,  1,  1,  0, 0, 0};  // Paeth: (16,21,26) (18,26,33)
-    const auto image = core::decode_png(make_png(2, 4, 8, 2, rgb));
+    const auto image = annokit::core::decode_png(make_png(2, 4, 8, 2, rgb));
     REQUIRE(image.ok());
     CHECK(pixel(*image, 1, 0) == px(15, 25, 35, 255));
     CHECK(pixel(*image, 1, 1) == px(16, 26, 36, 255));
@@ -143,19 +144,21 @@ TEST_CASE("png: every filter, palettes, grey and transparency") {
 
     // A palette of 2 bits with three colours, the first transparent; an index beyond them is refused.
     const std::vector<std::uint8_t> three = {0, 0, 0, 255, 0, 0, 0, 255, 0};
-    CHECK(!core::decode_png(make_png(4, 1, 2, 3, {0, 0b00011011}, {{"PLTE", three}})).ok());
-    const auto pal3 = core::decode_png(make_png(3, 1, 2, 3, {0, 0b00011000}, {{"PLTE", three}, {"tRNS", {0}}}));
+    CHECK(!annokit::core::decode_png(make_png(4, 1, 2, 3, {0, 0b00011011}, {{"PLTE", three}})).ok());
+    const auto pal3 =
+        annokit::core::decode_png(make_png(3, 1, 2, 3, {0, 0b00011000}, {{"PLTE", three}, {"tRNS", {0}}}));
     REQUIRE(pal3.ok());
     CHECK(pixel(*pal3, 0, 0) == px(0, 0, 0, 0));
     CHECK(pixel(*pal3, 1, 0) == px(255, 0, 0, 255));
     CHECK(pixel(*pal3, 2, 0) == px(0, 255, 0, 255));
 
     // Grey of 16 bits, one value transparent; grey of 4 bits scaled to 8.
-    const auto grey = core::decode_png(make_png(2, 1, 16, 0, {0, 0x12, 0x34, 0xAB, 0xCD}, {{"tRNS", {0x12, 0x34}}}));
+    const auto grey =
+        annokit::core::decode_png(make_png(2, 1, 16, 0, {0, 0x12, 0x34, 0xAB, 0xCD}, {{"tRNS", {0x12, 0x34}}}));
     REQUIRE(grey.ok());
     CHECK(pixel(*grey, 0, 0)[3] == 0);
     CHECK(pixel(*grey, 1, 0) == px(0xAB, 0xAB, 0xAB, 255));
-    const auto grey4 = core::decode_png(make_png(2, 1, 4, 0, {0, 0xF5}));
+    const auto grey4 = annokit::core::decode_png(make_png(2, 1, 4, 0, {0, 0xF5}));
     REQUIRE(grey4.ok());
     CHECK(pixel(*grey4, 0, 0)[0] == 255);
     CHECK(pixel(*grey4, 1, 0)[0] == 85);
@@ -164,23 +167,23 @@ TEST_CASE("png: every filter, palettes, grey and transparency") {
 TEST_CASE("png: a damaged or unsupported file is refused") {
     need_zlib();
     auto png = make_png(1, 1, 8, 6, {0, 1, 2, 3, 4});
-    CHECK(core::decode_png(png).ok());
+    CHECK(annokit::core::decode_png(png).ok());
     auto broken = png;
     broken[40] ^= 0xFF;  // in IDAT: its CRC no longer fits
-    CHECK(!core::decode_png(broken).ok());
-    CHECK(!core::decode_png(std::span(png).first(png.size() - 12)).ok());         // no IEND
-    CHECK(!core::decode_png(make_png(1, 1, 8, 6, {5, 1, 2, 3, 4})).ok());         // filter 5
-    CHECK(!core::decode_png(make_png(1, 1, 8, 6, {0, 1, 2})).ok());               // too few pixels
-    CHECK(!core::decode_png(make_png(1, 1, 8, 6, {0, 1, 2, 3, 4}, {}, 1)).ok());  // interlaced
-    CHECK(!core::decode_png(make_png(1, 1, 3, 6, {0, 1, 2, 3, 4})).ok());         // 3 bits
-    CHECK(!core::png_size(make_png(core::kMaxPngSide + 1, 1, 8, 6, {})).ok());    // too wide
+    CHECK(!annokit::core::decode_png(broken).ok());
+    CHECK(!annokit::core::decode_png(std::span(png).first(png.size() - 12)).ok());                // no IEND
+    CHECK(!annokit::core::decode_png(make_png(1, 1, 8, 6, {5, 1, 2, 3, 4})).ok());                // filter 5
+    CHECK(!annokit::core::decode_png(make_png(1, 1, 8, 6, {0, 1, 2})).ok());                      // too few pixels
+    CHECK(!annokit::core::decode_png(make_png(1, 1, 8, 6, {0, 1, 2, 3, 4}, {}, 1)).ok());         // interlaced
+    CHECK(!annokit::core::decode_png(make_png(1, 1, 3, 6, {0, 1, 2, 3, 4})).ok());                // 3 bits
+    CHECK(!annokit::core::png_size(make_png(annokit::core::kMaxPngSide + 1, 1, 8, 6, {})).ok());  // too wide
 }
 
 TEST_CASE("graphics: graphics.toml numbers the images of the packages") {
     need_zlib();
-    const auto large = core::encode_png_rgba(4 * 64, 2 * 32, grid(4, 2, 64, 32));  // 8 sprites
-    const auto medium = core::encode_png_rgba(4 * 32, 2 * 16, grid(4, 2, 32, 16));
-    const auto small = core::encode_png_rgba(2 * 32, 16, grid(2, 1, 32, 16));  // 2 sprites
+    const auto large = annokit::core::encode_png_rgba(4 * 64, 2 * 32, grid(4, 2, 64, 32));  // 8 sprites
+    const auto medium = annokit::core::encode_png_rgba(4 * 32, 2 * 16, grid(4, 2, 32, 16));
+    const auto small = annokit::core::encode_png_rgba(2 * 32, 16, grid(2, 1, 32, 16));  // 2 sprites
     const auto folder = package_folder("o1602-test-graphics",
                                        {{"gfx/tower.png", large}, {"gfx/tower_m.png", medium}, {"small.png", small}});
     std::vector<assets::PackageImage> images;
@@ -221,8 +224,8 @@ TEST_CASE("graphics: graphics.toml numbers the images of the packages") {
 
 TEST_CASE("graphics: a table that is wrong is passed over with a warning") {
     need_zlib();
-    const auto large = core::encode_png_rgba(4 * 64, 32, grid(4, 1, 64, 32));
-    const auto small = core::encode_png_rgba(32, 16, grid(1, 1, 32, 16));
+    const auto large = annokit::core::encode_png_rgba(4 * 64, 32, grid(4, 1, 64, 32));
+    const auto small = annokit::core::encode_png_rgba(32, 16, grid(1, 1, 32, 16));
     const auto folder = package_folder("o1602-test-graphics-bad", {{"tower.png", large}, {"small.png", small}});
     std::vector<assets::PackageImage> images;
     std::vector<std::string> warnings;
@@ -263,7 +266,7 @@ TEST_CASE("graphics: a building of a package draws an image of a package") {
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
     const auto folder = package_folder("o1602-test-graphics-building",
-                                       {{"tower.png", core::encode_png_rgba(4 * 64, 32, grid(4, 1, 64, 32))}});
+                                       {{"tower.png", annokit::core::encode_png_rgba(4 * 64, 32, grid(4, 1, 64, 32))}});
     std::vector<assets::PackageImage> images;
     std::vector<std::string> warnings;
     assets::apply_graphics_file(images, "lights", folder,
@@ -293,7 +296,7 @@ TEST_CASE("graphics: a building of a package draws an image of a package") {
 TEST_CASE("graphics: the sprites of an image at the three zoom levels") {
     need_zlib();
     const auto folder = package_folder("o1602-test-graphics-sprites",
-                                       {{"tower.png", core::encode_png_rgba(2 * 4, 8, grid(2, 1, 4, 8))}});
+                                       {{"tower.png", annokit::core::encode_png_rgba(2 * 4, 8, grid(2, 1, 4, 8))}});
     assets::PackageImage image;
     image.id = "lights:tower";
     image.first = assets::kFirstPackageSprite;

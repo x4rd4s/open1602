@@ -128,5 +128,5 @@ presentation only: they never change the game. A game shows the messages of the 
 ([packages.md](packages.md#which-packages-a-game-uses)), on every computer of a multiplayer game the
 same.
 
-The data file format is read by `core::parse_data_file` (`engine/core/include/o1602/core/data_file.hpp`),
+The data file format is read by `core::parse_data_file` (`modules/core/include/annokit/core/data_file.hpp` of annokit),
 meant for every data file of content packages.

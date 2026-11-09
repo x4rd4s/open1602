@@ -10,8 +10,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 using Kind = RandomElement::Kind;
 
 namespace {
@@ -92,8 +92,8 @@ std::vector<RandomElement> random_elements(const sim::World& world, const assets
     return out;
 }
 
-core::Result<std::unique_ptr<Operation>> set_random_count(const sim::World& world, Kind kind, std::size_t slot,
-                                                          std::uint32_t count) {
+annokit::core::Result<std::unique_ptr<Operation>> set_random_count(const sim::World& world, Kind kind, std::size_t slot,
+                                                                   std::uint32_t count) {
     if (!world.planned_islands()) {
         return make_error(ErrorCode::NotFound, "the world has no plan");
     }

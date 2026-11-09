@@ -7,17 +7,17 @@
 
 namespace o1602::render {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
-core::Result<SpriteAtlas> SpriteAtlas::build(const assets::SpriteSheet& sheet, const assets::Palette& palette,
-                                             std::uint32_t page_size) {
+annokit::core::Result<SpriteAtlas> SpriteAtlas::build(const assets::SpriteSheet& sheet, const assets::Palette& palette,
+                                                      std::uint32_t page_size) {
     const assets::SpriteSheet* sheets[] = {&sheet};
     return build(sheets, palette, page_size);
 }
 
-core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const assets::SpriteSheet* const> sheets,
-                                             const assets::Palette& palette, std::uint32_t page_size) {
+annokit::core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const assets::SpriteSheet* const> sheets,
+                                                      const assets::Palette& palette, std::uint32_t page_size) {
     std::vector<SheetSource> sources;
     sources.reserve(sheets.size());
     for (const assets::SpriteSheet* sheet : sheets) {
@@ -30,8 +30,8 @@ core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const assets::SpriteSheet
     return build(std::span<const SpriteSource* const>(pointers), page_size);
 }
 
-core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const> sources, std::uint32_t page_size,
-                                             const std::atomic<bool>* cancel) {
+annokit::core::Result<SpriteAtlas> SpriteAtlas::build(std::span<const SpriteSource* const> sources,
+                                                      std::uint32_t page_size, const std::atomic<bool>* cancel) {
     constexpr std::uint32_t kPad = 1;
     if (page_size == 0 || page_size > 0xFFFF) {
         return make_error(ErrorCode::OutOfRange, "invalid atlas page size");

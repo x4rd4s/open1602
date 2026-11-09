@@ -2157,7 +2157,7 @@ std::uint16_t Fleet::state_version() const noexcept {
     return m_trader_choices != 0 || !m_trader_chosen.empty() ? 5 : 4;
 }
 
-void Fleet::save(core::ByteWriter& out) const {
+void Fleet::save(annokit::core::ByteWriter& out) const {
     const bool trader_choices = state_version() == 5;
     out.u32(m_trader_ms);
     out.u32(m_yard_ms);
@@ -2200,9 +2200,10 @@ void Fleet::save(core::ByteWriter& out) const {
     }
 }
 
-core::Status Fleet::load(core::ByteReader& reader, std::uint16_t version) {
+annokit::core::Status Fleet::load(annokit::core::ByteReader& reader, std::uint16_t version) {
     if (version < 1 || version > kMaxStateVersion) {
-        return core::make_error(core::ErrorCode::Unsupported, "FLET: version " + std::to_string(version));
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "FLET: version " + std::to_string(version));
     }
     StateIn in(reader);
     const std::uint32_t trader = in.u32();
@@ -2251,7 +2252,7 @@ core::Status Fleet::load(core::ByteReader& reader, std::uint16_t version) {
         });
     }
     if (!in.ok()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "FLET: cut off");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "FLET: cut off");
     }
     m_pirate_ms = pirate_ms;
     m_pirate_spawn_ms = pirate_spawn_ms;
@@ -2275,7 +2276,7 @@ core::Status Fleet::load(core::ByteReader& reader, std::uint16_t version) {
     m_tools_given = tools;
     m_tools_quota = quota;
     m_name_index = name;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace o1602::sim

@@ -6,20 +6,21 @@
 #include <optional>
 #include <span>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/embedded_file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/original_names.hpp"
 #include "o1602/assets/own_buildings.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/embedded_file.hpp"
 #include "o1602/sim/rules.hpp"
 
 namespace o1602::sim {
 
 // data/balance/*.toml, compiled in by o1602_embed_files (engine/sim/CMakeLists.txt).
 namespace presets {
-extern const core::EmbeddedFile kEmbeddedFiles[];
+extern const annokit::core::EmbeddedFile kEmbeddedFiles[];
 extern const std::size_t kEmbeddedFileCount;
 }  // namespace presets
 
@@ -71,7 +72,7 @@ std::optional<assets::OriginalName> table_numbers(std::string_view after, std::s
 /// building a package added (`own`): each entry's field looked up in `fields` and handed to `set`
 /// with each number the table stands for, if it lies within the field's limits.
 template <typename Info, std::size_t N, typename Set>
-void apply_value_table(const core::DataTable& table, const std::string& where, std::string_view what,
+void apply_value_table(const annokit::core::DataTable& table, const std::string& where, std::string_view what,
                        std::span<const assets::OriginalName> names, std::span<const assets::OwnBuilding> own,
                        const std::array<Info, N>& fields, std::vector<std::string>& warnings, const Set& set) {
     const std::size_t colon = table.name.find(':');
@@ -93,7 +94,7 @@ void apply_value_table(const core::DataTable& table, const std::string& where, s
                            std::string(what) + " (anno1602:<number or name>) and none a package added");
         return;
     }
-    for (const core::DataEntry& e : table.entries) {
+    for (const annokit::core::DataEntry& e : table.entries) {
         const std::string at = line_of(where, e.value.line);
         const auto field = std::find_if(fields.begin(), fields.end(), [&](const Info& f) { return f.key == e.key; });
         const std::int64_t* n = e.value.integer();
@@ -110,7 +111,7 @@ void apply_value_table(const core::DataTable& table, const std::string& where, s
     }
 }
 
-void apply_building_table(Balance& balance, const core::DataTable& table, const std::string& where,
+void apply_building_table(Balance& balance, const annokit::core::DataTable& table, const std::string& where,
                           std::span<const assets::OwnBuilding> own, std::vector<std::string>& warnings) {
     apply_value_table(table, where, "buildings", assets::original_building_names(), own, kBuildingFields, warnings,
                       [&](std::uint32_t id, BuildingField field, std::uint32_t value) {
@@ -123,12 +124,12 @@ template <typename ApplyTable>
 void apply_table_file(std::string_view package, std::string_view file, std::string_view utf8,
                       std::vector<std::string>& warnings, const ApplyTable& apply_table) {
     const std::string where = std::string(package) + "/" + std::string(file);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [table] belong to none and are passed over");
@@ -233,7 +234,7 @@ void add_figure_values(Balance& balance, const std::vector<FigureValue>& under) 
 void apply_buildings_file(Balance& balance, std::string_view package, std::string_view utf8,
                           std::vector<std::string>& warnings, std::span<const assets::OwnBuilding> own) {
     apply_table_file(package, kBuildingsFile, utf8, warnings,
-                     [&](const core::DataTable& table, const std::string& where) {
+                     [&](const annokit::core::DataTable& table, const std::string& where) {
                          apply_building_table(balance, table, where, own, warnings);
                      });
 }
@@ -247,7 +248,7 @@ void apply_figures_file(Balance& balance, std::string_view package, std::string_
         named.push_back(assets::OwnBuilding{f.id, f.number});
     }
     apply_table_file(
-        package, kFiguresFile, utf8, warnings, [&](const core::DataTable& table, const std::string& where) {
+        package, kFiguresFile, utf8, warnings, [&](const annokit::core::DataTable& table, const std::string& where) {
             apply_value_table(table, where, "figures", assets::original_figure_names(), named, kFigureFields, warnings,
                               [&](std::uint32_t number, FigureField field, std::uint32_t value) {
                                   set_figure_value(balance, FigureValue{number, field, value});
@@ -258,12 +259,12 @@ void apply_figures_file(Balance& balance, std::string_view package, std::string_
 void apply_balance_file(Balance& balance, std::string_view package, std::string_view utf8,
                         std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kBalanceFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [table] belong to none and are passed over");
@@ -278,7 +279,7 @@ void apply_balance_file(Balance& balance, std::string_view package, std::string_
             warnings.push_back(line_of(where, table.line) + "there is no table [" + table.name + "]");
             continue;
         }
-        for (const core::DataEntry& e : table.entries) {
+        for (const annokit::core::DataEntry& e : table.entries) {
             const std::string at = line_of(where, e.value.line);
             const auto field = std::find_if(kBalanceFields.begin(), kBalanceFields.end(), [&](const BalanceField& f) {
                 return f.table == table.name && f.key == e.key;

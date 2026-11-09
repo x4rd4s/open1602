@@ -22,9 +22,10 @@
 #include <unordered_set>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/disasters.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/pathfinding.hpp"
@@ -246,10 +247,10 @@ public:
     /// The version save() writes, the section LOGI of the running game's state (DS-3).
     static constexpr std::uint16_t kStateVersion = 2;
     /// The figures, their reservations and the statistics, for a savegame of Open1602.
-    void save(core::ByteWriter& out) const;
+    void save(annokit::core::ByteWriter& out) const;
     /// Restores what save() of `version` wrote (1: before shipyards had pack donkeys); an error if
     /// the data is damaged, and then nothing changed.
-    core::Status load(core::ByteReader& in, std::uint16_t version = kStateVersion);
+    annokit::core::Status load(annokit::core::ByteReader& in, std::uint16_t version = kStateVersion);
     [[nodiscard]] const LogisticsStats& stats() const noexcept { return m_stats; }
 
     /// Tiles per tick of a figure on a tile of Wegspeed class `walk_speed` (units of 1/65536).

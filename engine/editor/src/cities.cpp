@@ -10,12 +10,12 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
-core::Result<std::unique_ptr<Operation>> no_city(std::uint16_t island, std::uint8_t city) {
+annokit::core::Result<std::unique_ptr<Operation>> no_city(std::uint16_t island, std::uint8_t city) {
     return make_error(ErrorCode::NotFound,
                       "no city " + std::to_string(city) + " on island " + std::to_string(island + 1));
 }
@@ -26,8 +26,8 @@ std::unique_ptr<Operation> edit(sim::World after, const char* name) {
 
 }  // namespace
 
-core::Result<std::unique_ptr<Operation>> rename_city(const sim::World& world, std::uint16_t island, std::uint8_t city,
-                                                     std::string_view name) {
+annokit::core::Result<std::unique_ptr<Operation>> rename_city(const sim::World& world, std::uint16_t island,
+                                                              std::uint8_t city, std::string_view name) {
     if (world.city(island, city) == nullptr) {
         return no_city(island, city);
     }
@@ -46,9 +46,10 @@ std::uint32_t city_room(const sim::World& world, const assets::BuildingTable& bu
     return it == capacities.end() ? 0 : it->second;
 }
 
-core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world, const assets::BuildingTable& buildings,
-                                                        std::uint16_t island, std::uint8_t city, std::uint8_t ware,
-                                                        std::uint32_t amount) {
+annokit::core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world,
+                                                                 const assets::BuildingTable& buildings,
+                                                                 std::uint16_t island, std::uint8_t city,
+                                                                 std::uint8_t ware, std::uint32_t amount) {
     if (world.city(island, city) == nullptr) {
         return no_city(island, city);
     }
@@ -62,9 +63,10 @@ core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world,
     return edit(std::move(after), "city_goods");
 }
 
-core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world, const assets::BuildingTable& buildings,
-                                                        std::uint16_t island, std::uint8_t city,
-                                                        const sim::TradeSetting& setting) {
+annokit::core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world,
+                                                                 const assets::BuildingTable& buildings,
+                                                                 std::uint16_t island, std::uint8_t city,
+                                                                 const sim::TradeSetting& setting) {
     const std::uint32_t room = city_room(world, buildings, island, city);
     if (world.city(island, city) == nullptr || room == 0) {
         return no_city(island, city);
@@ -86,8 +88,8 @@ core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world,
     return edit(std::move(after), "city_trade");
 }
 
-core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world, std::uint16_t island,
-                                                          std::uint8_t city) {
+annokit::core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world, std::uint16_t island,
+                                                                   std::uint8_t city) {
     if (world.city(island, city) == nullptr) {
         return no_city(island, city);
     }
@@ -104,8 +106,8 @@ core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& worl
     return edit(std::move(after), "city_trade");
 }
 
-core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world, std::uint16_t island,
-                                                           std::uint8_t city, sim::PlayerId owner) {
+annokit::core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world, std::uint16_t island,
+                                                                    std::uint8_t city, sim::PlayerId owner) {
     const sim::City* c = world.city(island, city);
     if (c == nullptr) {
         return no_city(island, city);

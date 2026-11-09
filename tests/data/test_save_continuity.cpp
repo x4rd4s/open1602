@@ -46,7 +46,7 @@ Data data_or_skip() {
                 std::move(text).value()};
 }
 
-core::Bytes save(const sim::World& world, const Data& d, const sim::Simulation& simulation) {
+annokit::core::Bytes save(const sim::World& world, const Data& d, const sim::Simulation& simulation) {
     auto bytes = sim::write_game(world, d.buildings, &simulation, sim::SaveOptions{false});
     REQUIRE(bytes.ok());
     return std::move(bytes).value();
@@ -62,10 +62,10 @@ void check_continuity(const char* what, const sim::World& start, const Data& d, 
     for (std::uint32_t i = 0; i < ticks; ++i) {
         a.tick();
     }
-    const core::Bytes expected = save(straight, d, a);
+    const annokit::core::Bytes expected = save(straight, d, a);
 
     sim::World world = start;
-    core::Bytes actual;
+    annokit::core::Bytes actual;
     for (std::uint32_t done = 0; done < ticks;) {
         {
             sim::Simulation b(world, d.buildings, d.figures);

@@ -18,7 +18,8 @@
 #include <variant>
 #include <vector>
 
-#include "o1602/net/transport.hpp"
+#include "annokit/net/transport.hpp"
+
 #include "o1602/sim/simulation.hpp"
 
 namespace o1602::net {
@@ -27,6 +28,9 @@ namespace o1602::net {
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
 inline constexpr std::uint16_t kProtocolVersion = 28;
+
+/// The port Open1602 hosts on unless told otherwise (annokit::net::enet_listen).
+inline constexpr std::uint16_t kDefaultPort = 16020;
 
 /// Upper limits a decoded message must keep; more comes from damaged or hostile data.
 inline constexpr std::size_t kMaxNameLength = sim::PlayerRename::kMaxNameLength;
@@ -38,13 +42,13 @@ inline constexpr std::uint32_t kMaxRosterMembers = 256;
 inline constexpr std::uint32_t kMaxMembers = kMaxRosterMembers - 1;
 /// A whole game, packed: a fresh world of 4000 x 4000 tiles is about 35 MiB, a played one more.
 inline constexpr std::uint32_t kMaxSnapshotBytes = 128U << 20;
-static_assert(kMaxSnapshotBytes + (64U << 10) <= kMaxMessageBytes, "a game must fit into one message");
+static_assert(kMaxSnapshotBytes + (64U << 10) <= annokit::net::kMaxMessageBytes, "a game must fit into one message");
 /// The largest message a computer sends the host (its commands and reports; the host refuses more).
 inline constexpr std::size_t kMaxMessageToHost = 1U << 20;
-static_assert(kMaxMessageToHost < kMaxPacketBytes, "a computer's messages travel whole");
+static_assert(kMaxMessageToHost < annokit::net::kMaxPacketBytes, "a computer's messages travel whole");
 /// The bytes of a message in one Part.
 inline constexpr std::size_t kPartBytes = 256U << 10;
-static_assert(kPartBytes + 64 < kMaxPacketBytes);
+static_assert(kPartBytes + 64 < annokit::net::kMaxPacketBytes);
 /// Spectators a host takes at most (MS-12), beyond the players.
 inline constexpr std::uint32_t kDefaultMaxSpectators = 8;
 inline constexpr std::size_t kMaxPasswordLength = 64;
@@ -63,7 +67,7 @@ inline constexpr std::uint32_t kMaxPackages = 1024;
 /// The bytes of a package's files in one PackageFiles message: a package travels in as many as it
 /// needs, and a single file larger than this not at all.
 inline constexpr std::uint32_t kMaxPackageFilesBytes = 16U << 20;
-static_assert(kMaxPackageFilesBytes + (64U << 10) <= kMaxMessageBytes);
+static_assert(kMaxPackageFilesBytes + (64U << 10) <= annokit::net::kMaxMessageBytes);
 /// Files of a package in one PackageFiles message.
 inline constexpr std::uint32_t kMaxPackageFiles = 4096;
 

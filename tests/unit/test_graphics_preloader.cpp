@@ -14,9 +14,10 @@
 
 #include "../test_framework.hpp"
 
-#include "o1602/core/compress.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
+#include "annokit/core/compress.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+
 #include "o1602/render/graphics_preloader.hpp"
 
 using namespace o1602;
@@ -99,7 +100,7 @@ TEST_CASE("graphics preloader: the shown level first, then its neighbours, small
 TEST_CASE("graphics preloader: without background a level is made when it is taken") {
     Log log;
     render::GraphicsPreloader preloader(
-        [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
+        [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> annokit::core::Result<render::PreparedGraphics> {
             log.add(zoom);
             return stand_in(zoom);
         },
@@ -121,7 +122,7 @@ TEST_CASE("graphics preloader: levels are made once each on another thread, in t
     Log log;
     {
         render::GraphicsPreloader preloader(
-            [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
+            [&log](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> annokit::core::Result<render::PreparedGraphics> {
                 log.add(zoom);
                 return stand_in(zoom);
             },
@@ -153,7 +154,7 @@ TEST_CASE("graphics preloader: a level wanted now goes first, the wait keeps cal
     std::promise<void> entered;
     Gate gate;
     render::GraphicsPreloader preloader(
-        [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
+        [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> annokit::core::Result<render::PreparedGraphics> {
             if (zoom == Zoom::Large) {
                 entered.set_value();
                 gate.wait();
@@ -187,12 +188,13 @@ TEST_CASE("graphics preloader: a level wanted now goes first, the wait keeps cal
 }
 
 TEST_CASE("graphics preloader: failures and lack of memory come back as errors") {
-    const auto prepare = [](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
+    const auto prepare = [](Zoom zoom,
+                            const std::atomic<bool>& /*cancel*/) -> annokit::core::Result<render::PreparedGraphics> {
         if (zoom == Zoom::Medium) {
             throw std::bad_alloc();
         }
         if (zoom == Zoom::Small) {
-            return core::make_error(core::ErrorCode::NotFound, "sgfx/stadtfld.bsh not found");
+            return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "sgfx/stadtfld.bsh not found");
         }
         return stand_in(zoom);
     };
@@ -217,7 +219,7 @@ TEST_CASE("graphics preloader: the end waits for the level being made and drops 
     std::promise<void> entered;
     {
         render::GraphicsPreloader preloader(
-            [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> core::Result<render::PreparedGraphics> {
+            [&](Zoom zoom, const std::atomic<bool>& /*cancel*/) -> annokit::core::Result<render::PreparedGraphics> {
                 if (made.fetch_add(1) == 0) {
                     entered.set_value();
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -236,7 +238,7 @@ TEST_CASE("graphics preloader: the end cancels the level being made") {
     std::promise<void> entered;
     {
         render::GraphicsPreloader preloader(
-            [&](Zoom /*zoom*/, const std::atomic<bool>& cancel) -> core::Result<render::PreparedGraphics> {
+            [&](Zoom /*zoom*/, const std::atomic<bool>& cancel) -> annokit::core::Result<render::PreparedGraphics> {
                 entered.set_value();
                 // A long level: it ends only when the preloader gives it up (or after 10 s).
                 const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(10);
@@ -244,7 +246,7 @@ TEST_CASE("graphics preloader: the end cancels the level being made") {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 }
                 cancelled = cancel.load();
-                return core::make_error(core::ErrorCode::Unsupported, "cancelled");
+                return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "cancelled");
             },
             true);
         preloader.request(render::preload_order(Zoom::Large));
@@ -288,11 +290,11 @@ TEST_CASE("graphics preloader: a level is made from the sheets of a folder, with
     const auto bsh = bsh_file();
     for (const char* name : {"gfx/stadtfld.bsh", "gfx/ship.bsh", "sgfx/stadtfld.bsh", "mgfx/ship.bsh"}) {
         std::filesystem::create_directories((root / name).parent_path());
-        REQUIRE(core::write_file(root / name, bsh).ok());
+        REQUIRE(annokit::core::write_file(root / name, bsh).ok());
     }
     for (const char* name : {"haeuser.cod", "figuren.cod", "toolgfx/stadtfld.col"}) {
         std::filesystem::create_directories((root / name).parent_path());
-        REQUIRE(core::write_file(root / name, std::vector<std::uint8_t>{0}).ok());
+        REQUIRE(annokit::core::write_file(root / name, std::vector<std::uint8_t>{0}).ok());
     }
     auto game = assets::GameDirectory::open(root);
     REQUIRE(game.ok());
@@ -332,7 +334,7 @@ TEST_CASE("graphics preloader: a level is made from the sheets of a folder, with
 }
 
 TEST_CASE("graphics preloader: the packages' images join the terrain at their sprite numbers") {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         SKIP("this build has no zlib");
     }
     const auto root = test::temp_path("o1602-preload-images");
@@ -340,11 +342,11 @@ TEST_CASE("graphics preloader: the packages' images join the terrain at their sp
     const auto bsh = bsh_file();
     for (const char* name : {"gfx/stadtfld.bsh", "gfx/ship.bsh"}) {
         std::filesystem::create_directories((root / name).parent_path());
-        REQUIRE(core::write_file(root / name, bsh).ok());
+        REQUIRE(annokit::core::write_file(root / name, bsh).ok());
     }
     for (const char* name : {"haeuser.cod", "figuren.cod", "toolgfx/stadtfld.col"}) {
         std::filesystem::create_directories((root / name).parent_path());
-        REQUIRE(core::write_file(root / name, std::vector<std::uint8_t>{0}).ok());
+        REQUIRE(annokit::core::write_file(root / name, std::vector<std::uint8_t>{0}).ok());
     }
     // Two sprites of 4 x 4, the second without any opaque pixel.
     std::vector<std::uint8_t> rgba(8 * 4 * 4, 0);
@@ -353,7 +355,7 @@ TEST_CASE("graphics preloader: the packages' images join the terrain at their sp
             rgba[(y * 8 + x) * 4 + 3] = 255;
         }
     }
-    REQUIRE(core::write_file(root / "tower.png", core::encode_png_rgba(8, 4, rgba)).ok());
+    REQUIRE(annokit::core::write_file(root / "tower.png", annokit::core::encode_png_rgba(8, 4, rgba)).ok());
     auto game = assets::GameDirectory::open(root);
     REQUIRE(game.ok());
     assets::PackageImage image;

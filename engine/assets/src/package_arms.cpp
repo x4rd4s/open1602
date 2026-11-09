@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-#include "o1602/core/data_file.hpp"
+#include "annokit/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -33,12 +33,12 @@ const PackageArms* find_package_arms(std::span<const PackageArms> arms, std::str
 void apply_arms_file(std::vector<PackageArms>& arms, std::string_view package, std::string_view utf8,
                      std::span<const PackageIcon> icons, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kArmsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_banner_id(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: names no banner (\"anno1602:red\", \"open1602:orange\", ...)");
@@ -46,7 +46,7 @@ void apply_arms_file(std::vector<PackageArms>& arms, std::string_view package, s
         }
         std::string icon;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "icon") {
                 const std::string* s = e.value.string();

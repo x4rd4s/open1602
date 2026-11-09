@@ -3,9 +3,10 @@
 
 #include <string_view>
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/unlock_levels.hpp"
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/sim/climates.hpp"
 #include "o1602/sim/computer_orders.hpp"
 #include "o1602/ui/package_icons.hpp"
@@ -16,7 +17,7 @@ std::vector<assets::PackageIcon> load_package_icons(std::span<const assets::ModP
                                                     std::vector<std::string>& problems) {
     std::vector<assets::PackageIcon> icons = ui::builtin_icons();  // Open1602's own first
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kIconsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kIconsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_icons_file(icons, package.id, package.folder, text, problems);
         }
@@ -29,7 +30,7 @@ std::vector<assets::PackageArms> load_package_arms(std::span<const assets::ModPa
                                                    std::vector<std::string>& problems) {
     std::vector<assets::PackageArms> arms;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kArmsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kArmsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_arms_file(arms, package.id, text, icons, problems);
         }
@@ -42,7 +43,7 @@ std::vector<assets::InterfaceSprite> load_package_interface(std::span<const asse
                                                             bool history_edition, std::vector<std::string>& problems) {
     std::vector<assets::InterfaceSprite> sprites;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kInterfaceFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kInterfaceFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_interface_file(sprites, package.id, text, icons, problems);
         }
@@ -55,7 +56,7 @@ std::vector<sim::PackageLandscape> load_package_landscapes(std::span<const asset
                                                            std::vector<std::string>& problems) {
     std::vector<sim::PackageLandscape> presets;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kLandscapesFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kLandscapesFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_landscapes_file(presets, package.id, text, problems);
         }
@@ -72,7 +73,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     std::vector<std::string> ignored;
     const std::vector<assets::PackageIcon> icons = load_package_icons(packages, ignored);
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kGoodsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kGoodsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_goods_file(rules.goods, package.id, text, problems, icons);
         }
@@ -80,7 +81,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     // The public buildings of a kind of their own, which the classes may need.
     std::vector<std::string> services;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kOwnBuildingsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kOwnBuildingsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::own_services(services, package.id, text, problems);
         }
@@ -89,7 +90,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     std::vector<assets::ResidentClass> classes = buildings.resident_classes();
     bool classes_changed = false;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kClassesFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kClassesFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             classes_changed |= assets::apply_classes_file(classes, package.id, text, problems, rules.goods, services);
         }
@@ -101,7 +102,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     std::vector<assets::InfraLevel> levels = buildings.infra_levels();
     bool levels_changed = false;
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kLevelsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kLevelsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             levels_changed |= assets::apply_levels_file(levels, package.id, text, problems, classes);
         }
@@ -111,27 +112,27 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     }
     // Then the images the buildings draw.
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kGraphicsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kGraphicsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_graphics_file(rules.images, package.id, package.folder, text, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / assets::kFigureImagesFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kFigureImagesFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_figure_images_file(rules.looks, package.id, text, rules.images, figures, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / assets::kBuildingImagesFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kBuildingImagesFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_building_images_file(rules.redirects, package.id, text, rules.images, buildings, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / assets::kFlagsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kFlagsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_flags_file(rules.flags, package.id, text, rules.images, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / audio::kMusicFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / audio::kMusicFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             audio::apply_music_file(rules.music, package.id, package.folder, text, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / assets::kSoundsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kSoundsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             const std::size_t before = rules.sounds.size();
             assets::apply_sounds_file(rules.sounds, package.id, package.folder, text, problems);
@@ -147,7 +148,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     }
     // Then the figures, with the images they draw, which the buildings may name as their workers.
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kOwnFiguresFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kOwnFiguresFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_own_figures_file(figures, rules.own_figures, package.id, text, problems, rules.images,
                                            rules.sounds, &rules.own_units, &rules.own_ships);
@@ -166,40 +167,40 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
         }
     }
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / assets::kOwnBuildingsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / assets::kOwnBuildingsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             assets::apply_own_buildings_file(buildings, rules.own, package.id, text, problems, rules.goods, classes,
                                              levels, rules.images, &figures, rules.own_figures, rules.sounds, services);
         }
     }
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kFactionFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kFactionFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_faction_file(rules.factions, package.id, text, problems, &rules.faction_replacements);
         }
-        if (const auto bytes = core::read_file(package.folder / sim::kBalanceFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kBalanceFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_balance_file(rules.balance, package.id, text, problems);
         }
-        if (const auto bytes = core::read_file(package.folder / sim::kBuildingsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kBuildingsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_buildings_file(rules.balance, package.id, text, problems, rules.own);
         }
-        if (const auto bytes = core::read_file(package.folder / sim::kFiguresFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kFiguresFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_figures_file(rules.balance, package.id, text, problems, rules.own_figures);
         }
     }
     // The computers' slots before their orders, which may name the public buildings they add.
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kSlotsFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kSlotsFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_slots_file(rules.balance.computer_slots, package.id, text, problems, rules.goods, rules.own,
                                   &buildings);
         }
     }
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kComputersFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kComputersFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_computers_file(rules.balance.computer_orders, package.id, text, problems, rules.goods,
                                       &rules.balance.computer_producers, rules.own, &rules.balance.computer_slots);
@@ -207,7 +208,7 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
     }
     // Climates after the buildings, whose trees their forest may name.
     for (const assets::ModPackage& package : packages) {
-        if (const auto bytes = core::read_file(package.folder / sim::kClimatesFile)) {
+        if (const auto bytes = annokit::core::read_file(package.folder / sim::kClimatesFile)) {
             const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
             sim::apply_climates_file(rules.balance.climates, package.id, text, problems, &buildings, rules.own);
         }

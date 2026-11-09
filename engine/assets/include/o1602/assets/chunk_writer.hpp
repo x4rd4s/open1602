@@ -9,7 +9,7 @@
 #include <span>
 #include <string_view>
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
 
 namespace o1602::assets {
 
@@ -21,11 +21,11 @@ public:
     void add_checksum();
     /// Sum of the payload words so far (whole 32-bit words of each payload, little-endian).
     [[nodiscard]] std::uint32_t checksum() const noexcept { return m_sum; }
-    [[nodiscard]] const core::Bytes& bytes() const noexcept { return m_data; }
-    [[nodiscard]] core::Bytes take() noexcept { return std::move(m_data); }
+    [[nodiscard]] const annokit::core::Bytes& bytes() const noexcept { return m_data; }
+    [[nodiscard]] annokit::core::Bytes take() noexcept { return std::move(m_data); }
 
 private:
-    core::Bytes m_data;
+    annokit::core::Bytes m_data;
     std::uint32_t m_sum = 0;
 };
 

@@ -38,9 +38,10 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/net/transport.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/net/protocol.hpp"
-#include "o1602/net/transport.hpp"
 #include "o1602/sim/simulation.hpp"
 
 namespace o1602::net {
@@ -246,7 +247,7 @@ public:
     [[nodiscard]] std::vector<SessionEvent> take_events();
 
 protected:
-    Session(std::unique_ptr<Transport> transport, SessionConfig config);
+    Session(std::unique_ptr<annokit::net::Transport> transport, SessionConfig config);
 
     /// Frames the time asks for now (at most Simulation::kMaxTicksPerAdvance); ran() books those run.
     std::uint32_t frames_due(std::uint32_t real_ms, const sim::Simulation& simulation);
@@ -255,9 +256,9 @@ protected:
     std::optional<FrameHash> run_frame(sim::Simulation& simulation, std::span<const sim::Command> commands);
     void event(SessionEvent e) { m_events.push_back(std::move(e)); }
     void end(EndReason reason);
-    void send(LinkId link, const Message& message);
+    void send(annokit::net::LinkId link, const Message& message);
     /// An encoded message: whole, or in Parts if it is larger than a transport carries (MS-7).
-    void send_bytes(LinkId link, std::span<const std::uint8_t> bytes);
+    void send_bytes(annokit::net::LinkId link, std::span<const std::uint8_t> bytes);
     void chat_event(const Chat& chat);
     void lobby_event();
     /// Commands each of `players` players may put into one frame: the configured limit or an equal
@@ -266,9 +267,9 @@ protected:
     /// Work each of `players` players may put into one frame: an equal share of kFrameWork.
     [[nodiscard]] static std::uint64_t work_share(std::uint32_t players) noexcept;
 
-    std::unique_ptr<Transport> m_transport;
+    std::unique_ptr<annokit::net::Transport> m_transport;
     SessionConfig m_config;
-    std::vector<TransportEvent> m_incoming;  ///< reused by every poll
+    std::vector<annokit::net::TransportEvent> m_incoming;  ///< reused by every poll
     Seat m_seat = sim::kNoPlayer;
     std::uint64_t m_frames = 0;
     std::uint32_t m_pending_ms = 0;
@@ -290,18 +291,19 @@ class ClientSession;
 class HostSession final : public Session {
 public:
     /// A game that runs at once on the world the host has; the computers get its free human slots.
-    HostSession(std::unique_ptr<Transport> transport, sim::Simulation& simulation,
+    HostSession(std::unique_ptr<annokit::net::Transport> transport, sim::Simulation& simulation,
                 const assets::BuildingTable& buildings, Seat seat, std::string name, std::uint64_t content,
                 SessionConfig config = {});
     /// A lobby first: `lobby` has the slots of the game to come (the host's own `seat` becomes
     /// Human); start() begins the game.
-    HostSession(std::unique_ptr<Transport> transport, Lobby lobby, Seat seat, std::string name, std::uint64_t content,
-                SessionConfig config = {});
+    HostSession(std::unique_ptr<annokit::net::Transport> transport, Lobby lobby, Seat seat, std::string name,
+                std::uint64_t content, SessionConfig config = {});
     /// Host migration: carries on the game of `client`, whose host left and named this computer its
     /// successor (client.hosts_next()). The game goes on from where this computer's is, with the
     /// frames the old host closed beyond it, the slots and tokens it handed over, the same password
     /// and options; the old host's slot goes to the computer. The others come back with their tokens.
-    HostSession(std::unique_ptr<Transport> transport, ClientSession& client, const assets::BuildingTable& buildings);
+    HostSession(std::unique_ptr<annokit::net::Transport> transport, ClientSession& client,
+                const assets::BuildingTable& buildings);
     ~HostSession() override;
 
     void submit(sim::Command command) override;
@@ -362,7 +364,7 @@ private:
         std::vector<sim::Command> commands;
     };
 
-    void receive(LinkId link, std::span<const std::uint8_t> bytes);
+    void receive(annokit::net::LinkId link, std::span<const std::uint8_t> bytes);
     void hello(Peer& peer, const Hello& m);
     void commands(Peer& peer, CommandBatch& m);
     void progress(Peer& peer, const Progress& m);
@@ -450,7 +452,7 @@ private:
     [[nodiscard]] Seat seat_of_token(const Hello& m);
     /// Tells the successor what it needs to carry the game on, if that changed (Standby).
     void hand_over();
-    [[nodiscard]] Peer* peer_of(LinkId link);
+    [[nodiscard]] Peer* peer_of(annokit::net::LinkId link);
     /// A slot for a computer that comes in: `wanted` if it is free, else the first free one,
     /// leaving those of other people (owner_of) to them while another is free.
     [[nodiscard]] Seat free_seat(Seat wanted, std::uint64_t owner = 0) const;
@@ -499,7 +501,7 @@ private:
     /// large game, runs on a worker while the game goes on (TB-26). The computers it is for wait
     /// with Peer::packing set; the frames from `frame` on are kept for them.
     struct Packing {
-        std::future<core::Result<std::vector<std::uint8_t>>> file;
+        std::future<annokit::core::Result<std::vector<std::uint8_t>>> file;
         std::uint64_t frame = 0;
         std::uint32_t speed = 1;
         bool paused = false;
@@ -525,11 +527,11 @@ private:
     std::vector<std::pair<Seat, std::uint32_t>> m_reserved;
     std::uint64_t m_compared = 0;
     std::uint64_t m_matched = 0;
-    std::vector<LinkId> m_roster_links;    ///< the link of each roster() entry (unused for the host's own)
-    std::vector<std::string> m_banned;     ///< addresses of computers kicked: not taken in again (MS-12)
-    std::vector<std::uint64_t> m_kicked;   ///< owners of slots kicked: not back into them by their ID
-    std::optional<LinkId> m_standby_link;  ///< the successor, as last told
-    Standby m_standby;                     ///< what it was told
+    std::vector<annokit::net::LinkId> m_roster_links;  ///< the link of each roster() entry (unused for the host's own)
+    std::vector<std::string> m_banned;                 ///< addresses of computers kicked: not taken in again (MS-12)
+    std::vector<std::uint64_t> m_kicked;               ///< owners of slots kicked: not back into them by their ID
+    std::optional<annokit::net::LinkId> m_standby_link;  ///< the successor, as last told
+    Standby m_standby;                                   ///< what it was told
     bool m_standby_changed = true;
     bool m_roster_changed = true;
     /// Only how far computers are with the game on its way changed: the roster goes out with the
@@ -552,13 +554,14 @@ public:
     using Finish = std::function<sim::Simulation*()>;
     using Prepare = std::function<Finish(std::vector<std::uint8_t> save)>;
     /// A connection to the successor (nullptr if none can be made now).
-    using Connect = std::function<std::unique_ptr<Transport>()>;
+    using Connect = std::function<std::unique_ptr<annokit::net::Transport>()>;
     /// Keeps a package the host sent (its files, in package_hash order): false if it cannot, which
     /// ends the session (LoadFailed).
     using KeepPackage =
         std::function<bool(const assets::ContentPackage& package, std::span<const assets::PackageFile> files)>;
 
-    ClientSession(std::unique_ptr<Transport> transport, Hello hello, Loader load, SessionConfig config = {});
+    ClientSession(std::unique_ptr<annokit::net::Transport> transport, Hello hello, Loader load,
+                  SessionConfig config = {});
     /// Host migration: follows `old`, whose host left, to the successor: the same name and slot (its
     /// token), the game anew from there. Connects with `connect`, again and again until it is taken
     /// in, for SessionConfig::migration_ms; then it ends with ConnectFailed.
@@ -626,7 +629,7 @@ private:
 
     void receive(std::span<const std::uint8_t> bytes);
     /// One event of the transport, as update() takes them in turn.
-    void handle(TransportEvent& e);
+    void handle(annokit::net::TransportEvent& e);
     void load(Snapshot& m);
     /// The game of `head` (Snapshot without its bytes) is loaded as `simulation` (nullptr: it could not be).
     void loaded(sim::Simulation* simulation, const Snapshot& head);
@@ -646,7 +649,7 @@ private:
     /// Players in the game as the roster has them (the host's own too).
     [[nodiscard]] std::uint32_t players() const noexcept;
 
-    static constexpr LinkId kHost = 0;
+    static constexpr annokit::net::LinkId kHost = 0;
     Hello m_hello;
     Loader m_load;
     Prepare m_prepare;  ///< load_in_background()

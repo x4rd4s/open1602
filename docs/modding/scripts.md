@@ -4,7 +4,7 @@ Content packages bring Lua scripts that react to what happens in a game, and lat
 the game's commands ([ADR 0007](../architecture/0007-extensibility-and-modding.md) section 6, item
 6 of [open-work.md](open-work.md)).
 
-**Status:** Done on 2026-10-27: Lua 5.4.8 is built in (`third_party/lua`), every package may bring a
+**Status:** Done on 2026-10-27: Lua 5.4.8 is built in (annokit's `third_party/lua`), every package may bring a
 `script.lua`, which the game runs in a sandbox at the end of every tick with what happened in it, a
 script reads the players and posts the package's messages, and its table `state` is saved with the
 game. Since 2026-10-31 a script also gives and takes money and goods and decides who wins and who

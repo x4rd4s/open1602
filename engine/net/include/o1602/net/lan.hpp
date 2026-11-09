@@ -13,8 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "o1602/core/result.hpp"
-#include "o1602/net/enet_transport.hpp"
+#include "annokit/core/result.hpp"
+#include "annokit/net/enet_transport.hpp"
+
 #include "o1602/net/protocol.hpp"
 
 namespace o1602::net {
@@ -53,7 +54,7 @@ class LanBeacon {
 public:
     /// Listens on `port` of every address; an error if the port is taken (another host on this
     /// computer: its game can still be joined by address).
-    [[nodiscard]] static core::Result<std::unique_ptr<LanBeacon>> open(std::uint16_t port = kDiscoveryPort);
+    [[nodiscard]] static annokit::core::Result<std::unique_ptr<LanBeacon>> open(std::uint16_t port = kDiscoveryPort);
     virtual ~LanBeacon() = default;
 
     virtual void set_info(GameInfo info) = 0;
@@ -76,7 +77,7 @@ struct FoundGame {
 class LanBrowser {
 public:
     /// Asks hosts on their discovery port `port`.
-    [[nodiscard]] static core::Result<std::unique_ptr<LanBrowser>> open(std::uint16_t port = kDiscoveryPort);
+    [[nodiscard]] static annokit::core::Result<std::unique_ptr<LanBrowser>> open(std::uint16_t port = kDiscoveryPort);
     virtual ~LanBrowser() = default;
 
     /// Asks the local network, and the hosts at `addresses` (names or IPv4 addresses).

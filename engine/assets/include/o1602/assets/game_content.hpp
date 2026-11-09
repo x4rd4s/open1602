@@ -13,8 +13,9 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -82,7 +83,7 @@ inline constexpr std::string_view kPackageArchiveExtension = ".zip";
 /// The unpacked package has the hash its files have as a folder (package_hash). Refused, and the
 /// folder is not set, for a damaged archive, a path outside the package (safe_package_path) or a
 /// path given twice.
-core::Status unpack_package(ModPackage& package, const std::filesystem::path& unpacked);
+annokit::core::Status unpack_package(ModPackage& package, const std::filesystem::path& unpacked);
 
 /// Whether `version` is one a manifest may give: one to four numbers of at most nine digits,
 /// separated by dots ("1", "1.2", "0.10.3").
@@ -102,7 +103,7 @@ core::Status unpack_package(ModPackage& package, const std::filesystem::path& un
 /// Reads the manifest text of `package` (the contents of its mod.toml) into it. What is wrong is
 /// passed over with a warning that names the file and the line; a file that cannot be read at all
 /// is an error and changes nothing.
-core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vector<std::string>& warnings);
+annokit::core::Status read_manifest(ModPackage& package, std::string_view utf8, std::vector<std::string>& warnings);
 
 /// One number for every file of a package's folder and its subfolders: their paths relative to the
 /// folder (UTF-8, '/' between folders, ordered by their bytes), sizes and bytes. Equal on every
@@ -201,7 +202,7 @@ inline constexpr std::size_t kMaxPackagePathLength = 255;
 [[nodiscard]] bool safe_package_path(std::string_view path) noexcept;
 
 /// The bytes of every file of a package's folder (as package_hash counts them, in its order).
-[[nodiscard]] core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder);
+[[nodiscard]] annokit::core::Result<std::vector<PackageFile>> read_package_files(const std::filesystem::path& folder);
 /// The bytes of every file of a package's folder together.
 [[nodiscard]] std::uint64_t package_size(const std::filesystem::path& folder);
 
@@ -211,8 +212,9 @@ inline constexpr std::size_t kMaxPackagePathLength = 255;
 /// Writes the files of `package` into the cache (cached_package_folder) and reads it back as a
 /// package: refused, and nothing is left behind, when a path is not safe_package_path, the id is
 /// no package id, or the files written do not have the package's hash.
-[[nodiscard]] core::Result<ModPackage> store_package(const std::filesystem::path& cache, const ContentPackage& package,
-                                                     std::span<const PackageFile> files);
+[[nodiscard]] annokit::core::Result<ModPackage> store_package(const std::filesystem::path& cache,
+                                                              const ContentPackage& package,
+                                                              std::span<const PackageFile> files);
 /// The packages in the cache, each with its manifest and hash; a folder whose files no longer have
 /// the hash its name gives is passed over with a warning. Ordered by id and hash.
 [[nodiscard]] std::vector<ModPackage> cached_packages(const std::filesystem::path& cache,
@@ -220,7 +222,7 @@ inline constexpr std::size_t kMaxPackagePathLength = 255;
 /// Copies a received package from the cache into `mods`, as <mods>/<id>, where it is a package of
 /// this computer's own from then on: refused when `mods` has a package with that id already, as a
 /// folder or an archive.
-[[nodiscard]] core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods,
-                                                                const ModPackage& cached);
+[[nodiscard]] annokit::core::Result<std::filesystem::path> adopt_package(const std::filesystem::path& mods,
+                                                                         const ModPackage& cached);
 
 }  // namespace o1602::assets

@@ -99,7 +99,7 @@ constexpr Group kBugGroups[] = {
 
 // Open1602's changes to the balance, each on its own.
 constexpr Group kBalanceGroups[] = {
-    {"setup.group.balance", SetupItem::BalanceBread, SetupItem::BalanceShips, kLeft},
+    {"setup.group.balance", SetupItem::BalanceBread, SetupItem::CitiesPerIsland, kLeft},
 };
 
 // The disasters and how often they come.
@@ -191,7 +191,7 @@ void GameSettingsMenu::update_preview() {
             m_preview = std::move(made).value();
             m_preview_error.clear();
             picture(*m_preview);
-        } else if (made.error().code == core::ErrorCode::Cancelled) {
+        } else if (made.error().code == annokit::core::ErrorCode::Cancelled) {
             m_preview_key.clear();  // the last one shown stays until the next is made
         } else {
             m_preview.reset();

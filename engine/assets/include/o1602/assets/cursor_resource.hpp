@@ -9,7 +9,7 @@
 #include <span>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -30,6 +30,6 @@ struct CursorImage {
 
 /// The cursor `group` (RT_GROUP_CURSOR) of a PE file (32 or 64 bit). Only black-and-white images,
 /// as the original has.
-[[nodiscard]] core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uint16_t group);
+[[nodiscard]] annokit::core::Result<CursorImage> read_cursor(std::span<const std::uint8_t> pe, std::uint16_t group);
 
 }  // namespace o1602::assets

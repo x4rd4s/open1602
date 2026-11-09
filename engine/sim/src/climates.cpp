@@ -4,11 +4,12 @@
 #include <algorithm>
 #include <array>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/original_names.hpp"
 #include "o1602/assets/own_buildings.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/world_plan.hpp"
 
@@ -119,12 +120,12 @@ void apply_climates_file(std::vector<Climate>& climates, std::string_view packag
                          std::vector<std::string>& warnings, const assets::BuildingTable* buildings,
                          std::span<const assets::OwnBuilding> own) {
     const std::string where = std::string(package) + "/" + std::string(kClimatesFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: a climate's name holds only lower case letters, digits and '_'");
@@ -142,7 +143,7 @@ void apply_climates_file(std::vector<Climate>& climates, std::string_view packag
             return;
         }
         // `like` first, wherever it stands: the crops and the forest start from it.
-        const core::DataValue* like = t.find("like");
+        const annokit::core::DataValue* like = t.find("like");
         const std::string* like_text = like != nullptr ? like->string() : nullptr;
         if (like_text != nullptr && *like_text == "north") {
             c.like = climate::kNorth;
@@ -154,7 +155,7 @@ void apply_climates_file(std::vector<Climate>& climates, std::string_view packag
             continue;
         }
         c.crops = original_climate_crops(c.like);
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             const std::string* s = e.value.string();
             if (e.key == "like") {
@@ -165,7 +166,7 @@ void apply_climates_file(std::vector<Climate>& climates, std::string_view packag
                     warnings.push_back(field + "is a text of 1 to 64 bytes");
                 } else {
                     c.names.insert_or_assign(e.key == "name" ? std::string() : e.key.substr(5),
-                                             core::utf8_to_cp1252(*s));
+                                             annokit::core::utf8_to_cp1252(*s));
                 }
             } else if (e.key == "crops") {
                 if (s == nullptr) {

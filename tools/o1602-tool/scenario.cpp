@@ -12,9 +12,10 @@
 
 #include "tool.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/editor/document.hpp"
 #include "o1602/editor/operations.hpp"
 #include "o1602/editor/original_check.hpp"
@@ -41,7 +42,7 @@ int info(const Args& args) {
     if (args.positional.size() != 2) {
         return scenario_usage();
     }
-    auto bytes = core::read_file(fs::path(args.positional[1]));
+    auto bytes = annokit::core::read_file(fs::path(args.positional[1]));
     if (!bytes) {
         return fail(bytes.error());
     }
@@ -76,7 +77,7 @@ struct GameData {
     assets::BuildingTable buildings;
 };
 
-core::Result<GameData> game_data() {
+annokit::core::Result<GameData> game_data() {
     auto game = assets::GameDirectory::from_environment();
     if (!game) {
         return game.error();
@@ -88,8 +89,8 @@ core::Result<GameData> game_data() {
     return GameData{std::move(game).value(), std::move(buildings).value()};
 }
 
-core::Result<editor::Document> open(const GameData& data, std::string_view path) {
-    auto bytes = core::read_file(fs::path(path));
+annokit::core::Result<editor::Document> open(const GameData& data, std::string_view path) {
+    auto bytes = annokit::core::read_file(fs::path(path));
     if (!bytes) {
         return bytes.error();
     }
@@ -147,7 +148,7 @@ int convert(const Args& args) {
     if (!bytes) {
         return fail(bytes.error());
     }
-    if (auto status = core::write_file_atomic(fs::path(args.positional[2]), *bytes); !status) {
+    if (auto status = annokit::core::write_file_atomic(fs::path(args.positional[2]), *bytes); !status) {
         return fail(status.error());
     }
     std::printf("-> %s (%zu bytes)\n", std::string(args.positional[2]).c_str(), bytes->size());

@@ -7,7 +7,7 @@ small framework of its own ([test_framework.hpp](test_framework.hpp)).
 - `unit/`: unit tests. They need no original game data and run everywhere, including CI.
 - `data/`: tests against the original game data and real savegames. Their names start with `data:`.
   They skip themselves when the data is missing.
-- `sdl/`: tests of `engine/platform` and `engine/render/sdl` (`o1602_sdl_tests`), see
+- `sdl/`: tests of the window on `annokit::platform` and of `engine/render/sdl` (`o1602_sdl_tests`), see
   [below](#tests-of-the-sdl-layer).
 
 ## Running the tests

@@ -3,13 +3,13 @@
 The History Edition ships the game's videos as Bink 2 files (RAD Game Tools) where the
 Königsedition has Smacker files ([smk.md](smk.md)): `VideoSmk/<number>.bk2` in English and
 `Loca/<language>/VideoSmk/<number>.bk2` in the other languages, with the same numbers. Open1602
-plays them with its own decoder, `video::Bink` (`engine/video/src/bink.cpp`), without a library:
+plays them with its own decoder, `video::Bink` (`modules/video/src/bink.cpp` of annokit), without a library:
 
 - the picture is a port of Librempeg's Bink 2 decoder (`libavcodec/bink2.c`, `bink2g.h`;
   GPL-3.0-or-later, Konstantin Shishkov and Paul B Mahol), only its half for the revisions `g` on
-  (`engine/video/src/bink2_video*.cpp`);
+  (`modules/video/src/bink2_video*.cpp` of annokit);
 - the sound is a port of FFmpeg's Bink Audio decoder (`binkaudio.c`, `dct.c`, `rdft.c`;
-  LGPL-2.1-or-later) (`engine/video/src/bink_audio.cpp`).
+  LGPL-2.1-or-later) (`modules/video/src/bink_audio.cpp` of annokit).
 
 The video player takes a `.smk` before a `.bk2` of the same number.
 

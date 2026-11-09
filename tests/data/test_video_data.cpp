@@ -7,9 +7,10 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/video/smacker.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/video/smacker.hpp"
 
 using namespace o1602;
 
@@ -29,11 +30,11 @@ TEST_CASE("data: a video decodes completely, read whole or frame by frame, its s
     if (!path) {
         SKIP("no Smacker video in the game directory");
     }
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     REQUIRE(bytes.ok());
-    auto video = video::Smacker::open(std::move(*bytes));
+    auto video = annokit::video::Smacker::open(std::move(*bytes));
     REQUIRE(video.ok());
-    auto streamed = video::Smacker::open_file(*path);  // FB-14: the same frames, read as needed
+    auto streamed = annokit::video::Smacker::open_file(*path);  // FB-14: the same frames, read as needed
     REQUIRE(streamed.ok());
     const auto& info = video->info();
     CHECK(info.version == 2);
@@ -54,7 +55,7 @@ TEST_CASE("data: a video decodes completely, read whole or frame by frame, its s
     }
     CHECK(palettes >= 1);
     CHECK(lit > 0);
-    for (std::size_t t = 0; t < video::kSmackerTracks; ++t) {
+    for (std::size_t t = 0; t < annokit::video::kSmackerTracks; ++t) {
         if (!info.tracks[t].present) {
             continue;
         }

@@ -6,8 +6,9 @@
 
 #include "names.hpp"
 
+#include "annokit/core/text.hpp"
+
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -167,8 +168,8 @@ std::string crops_text(const sim::WorldIsland& island, std::span<const sim::Clim
 
 void add_chat_line(std::deque<ChatLine>* chat, ChatLine line, bool echo) {
     if (echo && !line.name.empty()) {
-        std::fprintf(stderr, "multiplayer: chat from %s (%zu bytes)\n", core::cp1252_to_utf8(line.name).c_str(),
-                     line.text.size());
+        std::fprintf(stderr, "multiplayer: chat from %s (%zu bytes)\n",
+                     annokit::core::cp1252_to_utf8(line.name).c_str(), line.text.size());
     }
     if (chat == nullptr) {
         return;

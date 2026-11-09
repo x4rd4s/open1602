@@ -10,9 +10,10 @@
 #include <span>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/render/sprite_source.hpp"
 
@@ -32,18 +33,19 @@ class SpriteAtlas {
 public:
     /// Decodes every sprite and packs them with a shelf packer (tallest first) into square pages
     /// of `page_size` pixels. One pixel of padding keeps linear filtering from bleeding.
-    static core::Result<SpriteAtlas> build(const assets::SpriteSheet& sheet, const assets::Palette& palette,
-                                           std::uint32_t page_size = 2048);
+    static annokit::core::Result<SpriteAtlas> build(const assets::SpriteSheet& sheet, const assets::Palette& palette,
+                                                    std::uint32_t page_size = 2048);
 
     /// Several sheets in one atlas (e.g. STADTFLD.BSH and SHIP.BSH), so sprites of all of them can
     /// be drawn in one batch. Sprite i of sheet k has the index sheet_base(k) + i.
-    static core::Result<SpriteAtlas> build(std::span<const assets::SpriteSheet* const> sheets,
-                                           const assets::Palette& palette, std::uint32_t page_size = 2048);
+    static annokit::core::Result<SpriteAtlas> build(std::span<const assets::SpriteSheet* const> sheets,
+                                                    const assets::Palette& palette, std::uint32_t page_size = 2048);
 
     /// General form: sprites from any sources (original sheets, reduced sheets, mod images). Stops
     /// with an error once `cancel` is set.
-    static core::Result<SpriteAtlas> build(std::span<const SpriteSource* const> sources, std::uint32_t page_size = 2048,
-                                           const std::atomic<bool>* cancel = nullptr);
+    static annokit::core::Result<SpriteAtlas> build(std::span<const SpriteSource* const> sources,
+                                                    std::uint32_t page_size = 2048,
+                                                    const std::atomic<bool>* cancel = nullptr);
 
     /// First sprite index of a sheet given to build().
     [[nodiscard]] std::uint32_t sheet_base(std::size_t sheet) const noexcept {

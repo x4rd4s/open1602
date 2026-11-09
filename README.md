@@ -86,6 +86,9 @@ itself, **SDL 3** and **zlib** (savegames and screenshots are compressed with it
 tests and tools also build without zlib, but then cannot read or write compressed savegames. CI
 builds with GCC 13, Clang 18, AppleClang 15 and MSVC from Visual Studio 2026; older compilers may
 work but are not tested. 32-bit platforms are not supported.
+The first configure downloads [annokit](https://github.com/x4rd4s/annokit), the engine's shared
+library, at the commit `CMakeLists.txt` names (git and an internet connection are needed once; for
+a build without network pass `-DFETCHCONTENT_SOURCE_DIR_ANNOKIT=<annokit clone>`).
 
 The `release` and `vcpkg` presets build the game; every other preset builds only the libraries, the
 tests and `o1602-tool` unless you add `-DO1602_BUILD_GAME=ON`. Configure says at the end whether the
@@ -260,7 +263,7 @@ Without arguments `o1602-tool` lists every command with its options.
 
 | Folder | Contents |
 |---|---|
-| `engine/` | Engine modules: `core`, `assets`, `sim`, `net`, `render`, `platform`, `audio`, `video`, `ui`, `app`; each has a README |
+| `engine/` | Engine modules: `assets`, `sim`, `net`, `render`, `audio`, `ui`, `script`, `editor`, `app`; each has a README. The game-independent modules (`core`, sound decoding and mixing, `video`, transports, the Lua sandbox, `platform`) come from [annokit](https://github.com/x4rd4s/annokit), fetched at build time ([ADR 0005](docs/architecture/0005-module-structure.md)) |
 | `tools/` | `o1602-tool` (C++, one file per command group) and `make_icons.py` (renders the [application icon](data/icons/README.md)) |
 | `tests/` | Unit tests and tests against the original data ([how to run them](tests/README.md)) |
 | `docs/` | [Plan](docs/00-plan.md), [status](docs/status.md), [file formats](docs/formats/README.md), [architecture decisions](docs/architecture/README.md), [languages](docs/modding/languages.md), [packages](docs/modding/packages.md), [messages](docs/modding/messages.md), [build menu](docs/modding/build-menu.md), [data limits](docs/modding/data-limits.md) and [open work](docs/modding/open-work.md) for modding |

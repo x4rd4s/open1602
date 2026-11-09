@@ -124,10 +124,10 @@ Recolour text_recolour(const assets::Palette& palette, std::size_t index, std::u
     return r;
 }
 
-core::Result<Font> Font::load(const assets::GameDirectory& game, std::string_view file) {
+annokit::core::Result<Font> Font::load(const assets::GameDirectory& game, std::string_view file) {
     const auto path = game.resolve(file);
     if (!path) {
-        return core::make_error(core::ErrorCode::NotFound, std::string(file) + " not found");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, std::string(file) + " not found");
     }
     auto sheet = assets::SpriteSheet::load(*path);
     if (!sheet) {
@@ -136,7 +136,7 @@ core::Result<Font> Font::load(const assets::GameDirectory& game, std::string_vie
     return from_sheet(*sheet);
 }
 
-core::Result<Font> Font::from_sheet(const assets::SpriteSheet& sheet) {
+annokit::core::Result<Font> Font::from_sheet(const assets::SpriteSheet& sheet) {
     Font font;
     font.m_glyphs.reserve(sheet.size());
     for (std::size_t i = 0; i < sheet.size(); ++i) {
@@ -151,7 +151,7 @@ core::Result<Font> Font::from_sheet(const assets::SpriteSheet& sheet) {
         font.m_glyphs.push_back(std::move(g));
     }
     if (font.m_glyphs.empty()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "font without glyphs");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "font without glyphs");
     }
     // The middle of the digits' ink, which every font has, above the bottom of the cell.
     double drops = 0.0;

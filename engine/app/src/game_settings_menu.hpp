@@ -28,7 +28,8 @@
 
 #include "endless_setup.hpp"
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/sim/new_game.hpp"
 #include "o1602/ui/form.hpp"
 
@@ -49,8 +50,8 @@ public:
     /// Makes the world of a setup for the preview, `level` the difficulty (0..3); called on a thread
     /// of its own, one call at a time. Once `stop` is set it may give up with ErrorCode::Cancelled
     /// (sim::WorldStart::stop).
-    using PreviewMaker =
-        std::function<core::Result<sim::WorldPreview>(const EndlessSetup& setup, std::uint8_t level, PreviewStop stop)>;
+    using PreviewMaker = std::function<annokit::core::Result<sim::WorldPreview>(const EndlessSetup& setup,
+                                                                                std::uint8_t level, PreviewStop stop)>;
     /// Palette colours of the preview: one per sim::WorldPreview::Tile, then the ships' starts.
     using PreviewColours = std::array<std::uint8_t, sim::WorldPreview::kTiles + 1>;
 
@@ -165,7 +166,7 @@ private:
     std::uint8_t m_level = 0;
     bool m_reroll = true;
     std::string m_preview_key;  ///< the setup of the preview made or being made
-    std::future<core::Result<sim::WorldPreview>> m_pending;
+    std::future<annokit::core::Result<sim::WorldPreview>> m_pending;
     std::shared_ptr<std::atomic<bool>> m_stop;  ///< of the preview being made
     std::optional<sim::WorldPreview> m_preview;
     std::string m_preview_error;

@@ -20,7 +20,8 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/audio/mixer.hpp"
+#include "annokit/audio/mixer.hpp"
+
 #include "o1602/audio/package_music.hpp"
 #include "o1602/audio/sound_bank.hpp"
 
@@ -100,17 +101,21 @@ inline constexpr std::size_t kSoundCopies = 1;
 
 class Effects {
 public:
-    Effects(Mixer& mixer, SoundBank& bank, std::size_t per_frame = 10)
+    Effects(annokit::audio::Mixer& mixer, SoundBank& bank, std::size_t per_frame = 10)
         : m_mixer(&mixer), m_bank(&bank), m_limit(per_frame) {}
 
     void set_enabled(bool on) noexcept { m_enabled = on; }
     void set_volume(std::int32_t centibel) noexcept { m_gain = gain_of(centibel); }
     /// The sounds of the packages by their numbers from assets::kFirstPackageSound
     /// (package_sounds.hpp); nullptr for one that could not be decoded.
-    void set_package_sounds(std::vector<std::shared_ptr<const Pcm>> sounds) { m_package = std::move(sounds); }
+    void set_package_sounds(std::vector<std::shared_ptr<const annokit::audio::Pcm>> sounds) {
+        m_package = std::move(sounds);
+    }
     /// Sounds of packages in place of the original's, by the original's numbers (sounds.toml
     /// `replaces`); nullptr where the original's plays.
-    void set_replaced_sounds(std::vector<std::shared_ptr<const Pcm>> by_id) { m_replaced = std::move(by_id); }
+    void set_replaced_sounds(std::vector<std::shared_ptr<const annokit::audio::Pcm>> by_id) {
+        m_replaced = std::move(by_id);
+    }
     /// Queues a sound at (x, y) of the view: one of the original's, or of a package.
     void request(SampleId id, float x, float y);
     /// Plays what was queued since the last call. A sound already playing `copies` times is
@@ -131,7 +136,7 @@ private:
         float x = 0.0F;
         float y = 0.0F;
     };
-    Mixer* m_mixer;
+    annokit::audio::Mixer* m_mixer;
     SoundBank* m_bank;
     std::size_t m_limit;
     std::size_t m_copies = kSoundCopies;
@@ -139,9 +144,9 @@ private:
     float m_gain = 1.0F;
     std::vector<Request> m_queue;
     /// The voices each sound plays on; finished ones are let go when the sound is asked for again.
-    std::map<const Pcm*, std::vector<Mixer::VoiceId>> m_playing;
-    std::vector<std::shared_ptr<const Pcm>> m_package;
-    std::vector<std::shared_ptr<const Pcm>> m_replaced;
+    std::map<const annokit::audio::Pcm*, std::vector<annokit::audio::Mixer::VoiceId>> m_playing;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> m_package;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> m_replaced;
 };
 
 /// The original's game view at 1024 x 768 (768 x 734 pixels): it hears its scenery (birds and
@@ -204,7 +209,7 @@ struct MessagePlayback {
     std::uint8_t voices = 0;
     std::uint16_t video_base = 0;  ///< VideoSmk numbers video_base, video_base + 1, ...
     std::uint8_t videos = 0;
-    std::shared_ptr<const Pcm> sound;  ///< own sound, spoken instead of the Speech8 voices
+    std::shared_ptr<const annokit::audio::Pcm> sound;  ///< own sound, spoken instead of the Speech8 voices
 
     /// The playback of an original message.
     [[nodiscard]] static MessagePlayback of(const MessageAudio& m) {
@@ -216,7 +221,7 @@ struct MessagePlayback {
 /// off. A message that finds no room, or has no voice, sounds event.wav.
 class Voices {
 public:
-    Voices(Mixer& mixer, SoundBank& bank, Effects& effects, std::uint32_t seed = 1602)
+    Voices(annokit::audio::Mixer& mixer, SoundBank& bank, Effects& effects, std::uint32_t seed = 1602)
         : m_mixer(&mixer), m_bank(&bank), m_effects(&effects), m_random(seed) {}
 
     void set_settings(const AudioSettings& s) noexcept { m_settings = s; }
@@ -247,14 +252,14 @@ private:
     /// A waiting voice: a Speech8 file number or a sound of its own.
     struct Slot {
         std::uint16_t number = 0;  ///< 0 and no sound: free
-        std::shared_ptr<const Pcm> sound;
+        std::shared_ptr<const annokit::audio::Pcm> sound;
         [[nodiscard]] bool free() const noexcept { return number == 0 && !sound; }
     };
     /// One of `count` files from `base` (every second number) into a free slot.
     bool queue(std::uint16_t base, std::uint8_t count);
     /// An own sound into a free slot.
-    bool queue(std::shared_ptr<const Pcm> sound);
-    Mixer* m_mixer;
+    bool queue(std::shared_ptr<const annokit::audio::Pcm> sound);
+    annokit::audio::Mixer* m_mixer;
     SoundBank* m_bank;
     Effects* m_effects;
     std::mt19937 m_random;
@@ -263,7 +268,7 @@ private:
     std::optional<std::uint16_t> m_video;
     std::array<Slot, kSlots> m_queue{};
     std::size_t m_cursor = 0;
-    Mixer::VoiceId m_voice = Mixer::kNoVoice;
+    annokit::audio::Mixer::VoiceId m_voice = annokit::audio::Mixer::kNoVoice;
 };
 
 // ---- Music ---------------------------------------------------------------------------------------
@@ -275,8 +280,8 @@ private:
 /// (package_music.hpp).
 class Music {
 public:
-    Music(Mixer& mixer, SoundBank& bank, std::vector<std::string> tracks, std::vector<std::string> fights,
-          std::uint32_t seed = 1602, std::vector<MusicTrack> own = {});
+    Music(annokit::audio::Mixer& mixer, SoundBank& bank, std::vector<std::string> tracks,
+          std::vector<std::string> fights, std::uint32_t seed = 1602, std::vector<MusicTrack> own = {});
 
     /// Titles of the MUSIC8 files (without ".wav"), sorted: normal tracks and the Fight tracks.
     static void scan(const assets::GameDirectory& game, std::vector<std::string>& tracks,
@@ -307,7 +312,7 @@ private:
     void fade_out();
     [[nodiscard]] std::optional<std::string> pick(std::uint64_t game_ms);
 
-    Mixer* m_mixer;
+    annokit::audio::Mixer* m_mixer;
     SoundBank* m_bank;
     std::vector<std::string> m_tracks;
     std::vector<std::string> m_fights;
@@ -317,7 +322,7 @@ private:
     std::vector<bool> m_enabled;
     std::mt19937 m_random;
     AudioSettings m_settings;
-    Mixer::VoiceId m_voice = Mixer::kNoVoice;
+    annokit::audio::Mixer::VoiceId m_voice = annokit::audio::Mixer::kNoVoice;
     std::string m_title;
     std::vector<std::string> m_history;  ///< last tracks played, newest last
     std::optional<std::size_t> m_current;
@@ -329,7 +334,7 @@ private:
     /// own (a future of a packaged_task does not wait for it).
     struct Loading {
         std::string title;
-        std::future<core::Result<Pcm>> pcm;
+        std::future<annokit::core::Result<annokit::audio::Pcm>> pcm;
     };
     std::optional<Loading> m_loading;
 };

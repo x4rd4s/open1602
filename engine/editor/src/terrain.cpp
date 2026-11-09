@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <deque>
+#include <span>
 #include <utility>
 
 #include "o1602/assets/game_data.hpp"
@@ -14,8 +15,8 @@ namespace o1602::editor {
 
 namespace {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 constexpr std::uint64_t tile_key(std::uint32_t x, std::uint32_t y) noexcept {
     return std::uint64_t{x} << 32 | y;
@@ -1149,7 +1150,8 @@ std::optional<TerrainPiece> terrain_at(const sim::World& world, const assets::Bu
 namespace {
 
 /// The record of a piece of one tile, or an error.
-core::Result<const assets::BuildingType*> single_piece(const assets::BuildingTable& buildings, TerrainPiece piece) {
+annokit::core::Result<const assets::BuildingType*> single_piece(const assets::BuildingTable& buildings,
+                                                                TerrainPiece piece) {
     const assets::BuildingType* b = buildings.by_id(piece.id);
     if (b == nullptr || !is_terrain(buildings, *b)) {
         return make_error(ErrorCode::NotFound, "no terrain " + std::to_string(piece.id));
@@ -1160,7 +1162,7 @@ core::Result<const assets::BuildingType*> single_piece(const assets::BuildingTab
     return b;
 }
 
-core::Result<std::unique_ptr<Operation>> stroke_result(TerrainStroke& stroke, std::string_view kind) {
+annokit::core::Result<std::unique_ptr<Operation>> stroke_result(TerrainStroke& stroke, std::string_view kind) {
     const TerrainStroke::Refusal refused = stroke.first_refusal();
     if (std::unique_ptr<Operation> op = stroke.finish(kind)) {
         return op;
@@ -1173,8 +1175,9 @@ core::Result<std::unique_ptr<Operation>> stroke_result(TerrainStroke& stroke, st
 
 }  // namespace
 
-core::Result<std::unique_ptr<Operation>> fill_terrain(sim::World& world, const assets::BuildingTable& buildings,
-                                                      std::uint32_t x, std::uint32_t y, TerrainPiece piece) {
+annokit::core::Result<std::unique_ptr<Operation>> fill_terrain(sim::World& world,
+                                                               const assets::BuildingTable& buildings, std::uint32_t x,
+                                                               std::uint32_t y, TerrainPiece piece) {
     auto b = single_piece(buildings, piece);
     if (!b) {
         return b.error();
@@ -1227,8 +1230,10 @@ core::Result<std::unique_ptr<Operation>> fill_terrain(sim::World& world, const a
     return stroke_result(stroke, "terrain_fill");
 }
 
-core::Result<std::unique_ptr<Operation>> replace_terrain(sim::World& world, const assets::BuildingTable& buildings,
-                                                         std::uint32_t x, std::uint32_t y, TerrainPiece piece) {
+annokit::core::Result<std::unique_ptr<Operation>> replace_terrain(sim::World& world,
+                                                                  const assets::BuildingTable& buildings,
+                                                                  std::uint32_t x, std::uint32_t y,
+                                                                  TerrainPiece piece) {
     auto b = single_piece(buildings, piece);
     if (!b) {
         return b.error();
@@ -1327,11 +1332,19 @@ std::optional<TerrainPiece> random_piece(const assets::BuildingTable& buildings,
     };
     std::vector<std::pair<const assets::BuildingType*, std::uint32_t>> choice;
     if (group == TerrainGroup::Ground) {
-        for (const auto& w : ids::kGroundMix) {
-            if (const auto* b = buildings.by_id(w.id); b != nullptr && one_tile(*b)) {
-                choice.emplace_back(b, w.weight);
+        // The climate's meadows and dry land, as often as its islands have them.
+        const auto add = [&](std::span<const ids::WeightedId> weighted) {
+            for (const auto& w : weighted) {
+                if (const auto* b = buildings.by_id(w.id); b != nullptr && one_tile(*b) && w.weight > 0) {
+                    choice.emplace_back(b, w.weight);
+                }
             }
-        }
+        };
+        const ids::DryLand& dry = ids::dry_land(climate & 1U);
+        add(ids::meadow(climate & 1U));
+        add(dry.grass);
+        add(dry.scattered);
+        add(dry.floor);
     } else if (group == TerrainGroup::Forest) {
         const auto& forest = (climate & 1U) == 0 ? ids::kForestNorth : ids::kForestSouth;
         for (const std::uint32_t id : forest) {

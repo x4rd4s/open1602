@@ -14,8 +14,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 namespace goal = sim::goal;
 namespace loss = sim::loss;
 
@@ -407,7 +407,8 @@ void step_goal(const sim::World& world, sim::Mission& m, GoalField field, bool f
     }
 }
 
-core::Result<std::unique_ptr<Operation>> set_mission(const sim::World& world, std::size_t index, sim::Mission mission) {
+annokit::core::Result<std::unique_ptr<Operation>> set_mission(const sim::World& world, std::size_t index,
+                                                              sim::Mission mission) {
     std::vector<sim::Mission> missions = world.missions();
     if (index > missions.size()) {
         return make_error(ErrorCode::NotFound, "no mission " + std::to_string(index));
@@ -428,7 +429,7 @@ core::Result<std::unique_ptr<Operation>> set_mission(const sim::World& world, st
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "mission_change"));
 }
 
-core::Result<std::unique_ptr<Operation>> remove_mission(const sim::World& world, std::size_t index) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_mission(const sim::World& world, std::size_t index) {
     std::vector<sim::Mission> missions = world.missions();
     if (index >= missions.size()) {
         return make_error(ErrorCode::NotFound, "no mission " + std::to_string(index));
@@ -446,8 +447,8 @@ core::Result<std::unique_ptr<Operation>> remove_mission(const sim::World& world,
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "mission_remove"));
 }
 
-core::Result<std::unique_ptr<Operation>> set_mission_holder(const sim::World& world, sim::PlayerId player,
-                                                            sim::MissionId mission) {
+annokit::core::Result<std::unique_ptr<Operation>> set_mission_holder(const sim::World& world, sim::PlayerId player,
+                                                                     sim::MissionId mission) {
     const sim::Player* p = world.player(player);
     if (p == nullptr || !playing(*p)) {
         return make_error(ErrorCode::NotFound, "no human or computer in slot " + std::to_string(player));
