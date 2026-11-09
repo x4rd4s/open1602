@@ -702,6 +702,9 @@ void Engine::mission_end(AiPlayer& p, Ship& s, ShipNote& n) {
         n.counter = 0;
         return;
     }
+    if (n.mission >= 5 && n.mission <= 9) {
+        log(p, "ship %u calls its attack off (mission %u, %u soldiers aboard)", s.id, n.mission, soldiers_aboard(s));
+    }
     if (City* home = home_city(p)) {
         ship_send(p, s, Target::city_of(home->island, home->index), 2, 0);
         return;
@@ -820,6 +823,7 @@ void Engine::missions(AiPlayer& p) {
             case 9: {
                 const PlayerId owner = static_cast<PlayerId>(n.param & 0xFF);
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
+                    log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
                     UnloadOrder order;
                     order.player = p.player;
                     order.ship = s->id;

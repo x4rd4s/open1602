@@ -312,7 +312,10 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     if (best == kNoPlayer) {
         return;
     }
-    if (own < bal.ai_war_units * unit_weights()[0] || player(p).money < static_cast<std::int64_t>(bal.ai_war_money)) {
+    // An army of soldiers, not the cannons of its ships: the war is won on land.
+    const auto counts = army_counts(p.player);
+    const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
+    if (units < bal.ai_war_units || player(p).money < static_cast<std::int64_t>(bal.ai_war_money)) {
         st.war_arming = true;
         return;
     }
@@ -321,7 +324,8 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     st.war_check_ms = now_ms() + kWarCheckMs;
     st.war_fails = 0;
     st.war_measure = war_measure(best);
-    log(p, "declares war on player %u (war plan, strength %u against %u)", best, own, threat_of(best));
+    log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
+        threat_of(best));
     if (m_world.diplomacy().relation(p.player, best).peace != Treaty::None) {
         DiplomacyOrder o;
         o.player = p.player;

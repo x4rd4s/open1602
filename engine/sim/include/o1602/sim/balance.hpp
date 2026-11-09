@@ -178,7 +178,7 @@ struct Balance {
     std::uint32_t ai_land_colony_money = 2000;      ///< gold in hand for a colony while the goal is land or gold
     std::uint32_t ai_pressure_percent = 150;        ///< a rival is pressed by a computer this many times as strong
     std::uint32_t ai_human_threat_percent = 15;  ///< humans count as stronger by this much per level above the second
-    std::uint32_t ai_war_units = 6;              ///< a war is declared with an army of so many swordsmen's strength ...
+    std::uint32_t ai_war_units = 6;              ///< a war is declared with an army of so many soldiers ...
     std::uint32_t ai_war_money = 1500;           ///< ... and so much gold in hand
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
