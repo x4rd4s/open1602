@@ -127,11 +127,19 @@ TEST_CASE("multiplayer menu: searching, joining by address and back") {
     found.ping_ms = 12;
     model.found.push_back(found);
     CHECK(click(menu, model, "Annas Spiel").empty());
-    auto events = click(menu, model, app::mp_text(MpText::Join));
+    // Only to watch, or to play.
+    auto events = click_at(menu, model, 480, 712);  // "Zuschauen" under the list
+    REQUIRE(events.size() == 1);
+    CHECK(events[0].kind == MultiplayerEvent::Kind::Join);
+    CHECK(events[0].address == "192.168.1.20");
+    CHECK(events[0].watch);
+    menu.open();  // still chosen
+    events = click(menu, model, app::mp_text(MpText::Join));
     REQUIRE(events.size() == 1);
     CHECK(events[0].kind == MultiplayerEvent::Kind::Join);
     CHECK(events[0].address == "192.168.1.20");
     CHECK(events[0].port == net::kDefaultPort);
+    CHECK(!events[0].watch);
 
     // An address typed in, with a password; Enter connects.
     CHECK(click_at(menu, model, 800, 166).empty());  // the address field
