@@ -15,7 +15,6 @@ namespace {
 
 constexpr std::uint32_t kHealthy = 0x5F;          // health * 128 / max above this: at least 75 %
 constexpr std::uint32_t kWornPatrol = 64;         // a patrol below half its health goes off duty while the yard repairs
-constexpr std::int64_t kShipReserve = 1000;       // improved computers: gold kept beyond a ship's price
 constexpr std::uint64_t kFleetHoldMs = 600'000;   // improved computers: a fleet target holds 10 min
 constexpr std::uint16_t kSpareShipFactor = 0x40;  // a spare ship for half its price
 constexpr std::uint16_t kFullPriceFactor = 128;   // what the yard asks
@@ -1119,9 +1118,9 @@ void Engine::order_ship(AiPlayer& p) {
         const assets::FigureType* f =
             m_sim.m_figures->get(package_ship != 0 ? package_ship : figure::ship_figure(type));
         const std::int64_t price = f != nullptr ? f->ship.price : 0;
-        // Open1602: an improved computer pays for a ship only with the price and a reserve in hand,
-        // as a player keeps gold for the running costs; the original's orders with half the price.
-        const std::int64_t needed = classic() ? price / 2 : price + kShipReserve;
+        // Open1602: an improved computer pays for a ship only with the price in hand; the original's
+        // orders with half of it and may run into debt.
+        const std::int64_t needed = classic() ? price / 2 : price;
         if (std::int64_t{player(p).money} > needed) {
             ShipyardOrder order;
             order.player = p.player;
