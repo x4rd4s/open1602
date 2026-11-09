@@ -343,8 +343,14 @@ private:
     bool m_left_down = false;     ///< the left mouse button, for the frame's buttons
     bool m_right_stroke = false;  ///< the editor's right button draws a stroke (land and water swapped)
     bool m_editor = false;        ///< the editor runs (set_editor)
-    float m_wheel_rest = 0.0F;    ///< wheel notches begun (touchpads) the goods window did not scroll yet
-    bool m_text_input = false;    ///< the platform's text input is on (a name is typed)
+    /// The speed the last + or - asked for and when: in a multiplayer game the order comes back
+    /// from the host a moment later, and a second press meanwhile goes on from the speed asked.
+    std::uint32_t m_asked_speed = 0;
+    std::uint64_t m_asked_speed_ms = 0;
+    /// The speed a press of + or - goes on from: the one asked for a moment ago, else the game's.
+    [[nodiscard]] std::uint32_t speed_base();
+    float m_wheel_rest = 0.0F;  ///< wheel notches begun (touchpads) the goods window did not scroll yet
+    bool m_text_input = false;  ///< the platform's text input is on (a name is typed)
 };
 
 }  // namespace o1602::app

@@ -626,6 +626,8 @@ private:
     void build_minimap(const sim::World& world, const assets::BuildingTable& buildings,
                        const render::BannerTable& banners);
     /// Redraws one island's tiles on the minimap; true if a pixel changed.
+    /// The editor's open placeholders as the minimap draws them (x, y, width, height).
+    [[nodiscard]] static std::vector<std::array<std::uint32_t, 4>> minimap_plan(const sim::World& world);
     bool refresh_minimap_island(const sim::World& world, const assets::BuildingTable& buildings,
                                 const render::BannerTable& banners, std::size_t island);
     [[nodiscard]] ui::Rect minimap_rect() const;
@@ -695,6 +697,8 @@ private:
     bool m_minimap_upload = true;    ///< the texture must be uploaded again
     bool m_minimap_changed = false;  ///< pixels changed since the last upload
     std::size_t m_minimap_islands = 0;
+    /// The editor's placeholders on the minimap (x, y, width, height), as drawn last.
+    std::vector<std::array<std::uint32_t, 4>> m_minimap_plan;
     std::size_t m_minimap_next = 0;  ///< the island refreshed next
     std::uint32_t m_world_w = 0;
     std::uint32_t m_world_h = 0;
