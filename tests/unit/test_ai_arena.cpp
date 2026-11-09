@@ -602,7 +602,7 @@ TEST_CASE("ai arena: improved computers that like each other become allies, the 
         bool allied = false;
         for (int minute = 0; minute < 10 && !allied; ++minute) {
             // Gifts keep them fond of each other.
-            for (const auto [x, y] : {std::pair{kFirst, kSecond}, std::pair{kSecond, kFirst}}) {
+            for (const auto& [x, y] : {std::pair{kFirst, kSecond}, std::pair{kSecond, kFirst}}) {
                 a.world.diplomacy().relation(x, y).tribute = 20'000;
             }
             run(s, 60'000);
