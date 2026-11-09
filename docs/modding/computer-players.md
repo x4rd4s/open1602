@@ -489,6 +489,10 @@ of its landed since the last look. After three
 looks without progress, in debt, or once the target is gone, it offers peace; the other side signs
 it as long as its mood is above -20. The original's computers never fight each other.
 
+More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
+disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
+10 t of its ware in stock until the stock is down to 4 t.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
