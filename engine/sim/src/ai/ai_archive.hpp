@@ -407,6 +407,14 @@ void io(A& a, AiPlayer& p) {
         a(p.strategy.goal_ms);
         a(p.strategy.stances);
     }
+    if (a.version() >= kStateWithWarPlan) {
+        a(p.strategy.war_target);
+        a(p.strategy.war_since_ms);
+        a(p.strategy.war_check_ms);
+        a(p.strategy.war_fails);
+        a(p.strategy.war_measure);
+        a(p.strategy.war_ended_ms);
+    }
 }
 
 template <class A>

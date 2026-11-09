@@ -493,6 +493,29 @@ void Engine::recruit(AiPlayer& p) {
     if (cities.empty()) {
         return;
     }
+    // Open1602: an improved computer deep in debt with its gold still falling disbands a soldier
+    // every few seconds, as a player cuts the army's upkeep, down to half its inhabitants' army.
+    if (rivals() && player(p).money < -1000 && net_income(p) < 0) {
+        const auto counts = army_counts(p.player);
+        const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
+        const Balance& bal = m_world.balance();
+        const std::uint32_t keep =
+            bal.ai_inhabitants_per_unit != 0 ? total_population(p.player) / bal.ai_inhabitants_per_unit / 2 : 0;
+        if (units > keep) {
+            for (const Soldier& s : m_world.soldiers()) {
+                if (s.owner == p.player && !s.away() && !s.dying()) {
+                    SoldierCommand cmd;
+                    cmd.player = p.player;
+                    cmd.soldier = s.id;
+                    cmd.op = SoldierCommand::Op::Disband;
+                    execute(cmd);
+                    log(p, "disbands a soldier in debt (%u left, gold %d)", units - 1, player(p).money);
+                    break;
+                }
+            }
+        }
+        return;
+    }
     City* c = nullptr;
     for (std::size_t n = 0; n < cities.size(); ++n) {
         p.recruit_cursor = static_cast<std::uint32_t>((p.recruit_cursor + 1) % cities.size());
@@ -702,6 +725,9 @@ void Engine::mission_end(AiPlayer& p, Ship& s, ShipNote& n) {
         n.counter = 0;
         return;
     }
+    if (n.mission >= 5 && n.mission <= 9) {
+        log(p, "ship %u calls its attack off (mission %u, %u soldiers aboard)", s.id, n.mission, soldiers_aboard(s));
+    }
     if (City* home = home_city(p)) {
         ship_send(p, s, Target::city_of(home->island, home->index), 2, 0);
         return;
@@ -806,6 +832,7 @@ void Engine::missions(AiPlayer& p) {
                     n.mission = 6;
                     plan_landing(p, *s, n);
                 } else if (aboard != 0 && home != nullptr) {
+                    log(p, "ship %u calls its attack off (too few soldiers: %u aboard)", s->id, aboard);
                     ship_send(p, *s, Target::city_of(home->island, home->index), 2, 0);  // S-101: home, not a stray ref
                 } else {
                     mission_end(p, *s, n);
@@ -820,6 +847,10 @@ void Engine::missions(AiPlayer& p) {
             case 9: {
                 const PlayerId owner = static_cast<PlayerId>(n.param & 0xFF);
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
+                    log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
+                    if (p.strategy.war_target == owner) {
+                        p.strategy.war_fails = 0;  // a landing is progress: the fight takes its time
+                    }
                     UnloadOrder order;
                     order.player = p.player;
                     order.ship = s->id;
@@ -1044,6 +1075,12 @@ void Engine::start_attack(AiPlayer& p, const City& t) {
     if (home == nullptr) {
         return;
     }
+    // Open1602: an improved computer sends one attack at a time, and gathers its soldiers at the
+    // Kontor for the ship to take them on board.
+    if (rivals() && std::any_of(p.ships.begin(), p.ships.end(),
+                                [](const ShipNote& n) { return n.mission >= 5 && n.mission <= 9; })) {
+        return;
+    }
     const Target ref = Target::city_of(home->island, home->index);
     Ship* ship = best_armed_ship(p, ref, 1);
     if (ship == nullptr) {
@@ -1052,6 +1089,24 @@ void Engine::start_attack(AiPlayer& p, const City& t) {
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
     ship_send(p, *ship, ref, 5, city_param(t));
     note(p, ship->id).counter = 80;
+    if (rivals() && home->warehouse_x && home->warehouse_y) {
+        const WorldIsland& isl = island_of(home->island);
+        SoldierOrder gather;
+        gather.player = p.player;
+        gather.target = Target::spot(2 * (isl.x + *home->warehouse_x) + 1, 2 * (isl.y + *home->warehouse_y) + 1);
+        for (const Soldier& s : m_world.soldiers()) {
+            if (gather.soldiers.size() >= 8) {
+                break;
+            }
+            if (s.owner == p.player && s.island == home->island && !s.away() &&
+                (s.target.empty() || s.target.kind == Target::Kind::Position)) {
+                gather.soldiers.push_back(s.id);
+            }
+        }
+        if (!gather.soldiers.empty()) {
+            execute(gather);
+        }
+    }
 }
 
 void Engine::raid_outpost(AiPlayer& p, const City& t) {
@@ -1116,6 +1171,11 @@ void Engine::target_scan(AiPlayer& p) {
         ok = attack_ok(p, t);
     } else if (m_world.behaviour(*o) == FactionBehaviour::Natives && !at_peace) {
         ok = attack_ok(p, t);
+    } else if (rivals() && o->role == PlayerRole::Computer && m_world.behaviour(*o) == FactionBehaviour::Settlers &&
+               !at_peace && p.strategy.war_target == t.owner) {
+        // Open1602: an improved computer attacks another computer it wages its war on, as a human;
+        // after the war, while the peace is not signed yet, it leaves it alone.
+        ok = attack_ok(p, t);
     }
     if (ok) {
         start_attack(p, t);
@@ -1131,7 +1191,10 @@ std::vector<PlayerId> Engine::island_enemies(const AiPlayer& a, std::uint16_t is
     for (std::size_t b = 0; b < m_world.players().size(); ++b) {
         const Player& pl = m_world.players()[b];
         const auto pb = static_cast<PlayerId>(b);
-        if ((pl.role != PlayerRole::Human && m_world.behaviour(pl) != FactionBehaviour::Natives) ||
+        // Open1602: for improved computers, another computer at war with them too.
+        const bool rival_computer = rivals() && pl.role == PlayerRole::Computer && pb != a.player &&
+                                    m_world.behaviour(pl) == FactionBehaviour::Settlers;
+        if ((pl.role != PlayerRole::Human && m_world.behaviour(pl) != FactionBehaviour::Natives && !rival_computer) ||
             m_world.diplomacy().relation(a.player, pb).peace == Treaty::Signed) {
             continue;
         }
@@ -1662,20 +1725,23 @@ void Engine::diplomacy(AiPlayer& p) {
             // Open1602's improved computers offer peace to a computer they do not mind (mood not
             // below 0 and not falling) and sign one unless they are angry (war among computers
             // comes with their war plans).
-            if (rel.trade == Treaty::None) {
+            // Improved computers at war trade only once the war is over.
+            const bool at_war = rivals() && rel.peace == Treaty::None;
+            if (rel.trade == Treaty::None && !at_war) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
-            } else if (rel.trade == Treaty::Received) {
+            } else if (rel.trade == Treaty::Received && !at_war) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Signed);
             }
             if (rivals() && m_world.player(b) != nullptr && m_world.player(b)->status == PlayerStatus::Playing) {
                 const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
                 const std::int32_t prev = p.previous_mood[bi];
                 const std::uint8_t st = stance_of(p, b);
-                if (rel.peace == Treaty::None && m >= prev && m >= 0 && st != stance::kPressure &&
+                const bool waging = p.strategy.war_target == b;  // its own war plan: no peace
+                if (!waging && rel.peace == Treaty::None && m >= prev && m >= 0 && st != stance::kPressure &&
                     st != stance::kHostile) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                     log(p, "offers peace to computer %u (mood %d)", b, m);
-                } else if (rel.peace == Treaty::Received && m > -20) {
+                } else if (!waging && rel.peace == Treaty::Received && m > -20) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
                     log(p, "signs peace with computer %u (mood %d)", b, m);
                 }
@@ -1688,9 +1754,10 @@ void Engine::diplomacy(AiPlayer& p) {
         }
         const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
         const std::int32_t prev = p.previous_mood[bi];
+        const bool waging = rivals() && p.strategy.war_target == b;  // its own war plan: no peace
         switch (rel.peace) {
             case Treaty::None:
-                if (m >= prev && m > 20) {
+                if (m >= prev && m > 20 && !waging) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                 }
                 break;
@@ -1721,7 +1788,7 @@ void Engine::diplomacy(AiPlayer& p) {
                 }
                 break;
             case Treaty::Received:
-                if (m > -20) {
+                if (m > -20 && !waging) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
                     // Ships on missions against b come home.
                     for (ShipNote& n : p.ships) {

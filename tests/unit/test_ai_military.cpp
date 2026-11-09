@@ -330,6 +330,29 @@ TEST_CASE("ai military: at war, soldiers go for the Kontor and the houses of an 
     CHECK(map.top(70, 8).empty() || map.top(70, 8).owner != kHuman);  // the Kontor has fallen
 }
 
+TEST_CASE("ai military: at war with another computer, improved soldiers take its city, the original's leave it") {
+    const auto taken = [](bool classic) {
+        Island a;
+        a.world.player(kHuman)->role = sim::PlayerRole::Computer;  // a second computer
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kKontor, 70, 8, kHuman, 1);
+        a.build(kHouse, 66, 4, kHuman, 1);
+        a.build(kHouse, 66, 12, kHuman, 1);
+        for (std::int32_t k = 0; k < 8; ++k) {
+            a.add(kComputer, 30, 22 + 2 * k);
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 5 * 60'000);
+        const sim::IslandMap& map = a.world.islands()[0].map;
+        return map.top(70, 8).empty() || map.top(70, 8).owner != kHuman;
+    };
+    CHECK(taken(false));
+    CHECK(!taken(true));
+}
+
 TEST_CASE("ai military: at peace, soldiers beside the Kontor of a colony are sent to guard its market") {
     Island a;
     a.build(kKontor, 10, 8, kComputer, 0);
