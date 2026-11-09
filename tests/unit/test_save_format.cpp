@@ -1038,6 +1038,31 @@ TEST_CASE("save format: who played each player comes back (version 4 of PSTA)") 
     CHECK(bare.players()[0].owner == 0);
 }
 
+TEST_CASE("save format: alliances come back (version 2 of DIPL)") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings, false);
+    const annokit::core::Bytes before = save(world, buildings);
+    world.diplomacy().relation(1, 2).alliance = sim::Treaty::Offered;
+    world.diplomacy().relation(2, 1).alliance = sim::Treaty::Received;
+    world.diplomacy().relation(0, 3).alliance = sim::Treaty::Signed;
+    world.diplomacy().relation(3, 0).alliance = sim::Treaty::Signed;
+    const annokit::core::Bytes bytes = save(world, buildings);
+    CHECK(bytes != before);
+    auto loaded = sim::read_game(bytes, buildings, nullptr);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->diplomacy() == world.diplomacy());
+    CHECK(loaded->diplomacy().allied(0, 3));
+    CHECK(loaded->diplomacy().relation(2, 1).alliance == sim::Treaty::Received);
+    CHECK(save(*loaded, buildings) == bytes);
+
+    // Without one, DIPL keeps the bytes of version 1.
+    world.diplomacy().relation(1, 2).alliance = sim::Treaty::None;
+    world.diplomacy().relation(2, 1).alliance = sim::Treaty::None;
+    world.diplomacy().relation(0, 3).alliance = sim::Treaty::None;
+    world.diplomacy().relation(3, 0).alliance = sim::Treaty::None;
+    CHECK(save(world, buildings) == before);
+}
+
 TEST_CASE("save format: closed city gates come back (version 3 of PSTA)") {
     const auto buildings = make_buildings();
     for (const bool wide : {false, true}) {

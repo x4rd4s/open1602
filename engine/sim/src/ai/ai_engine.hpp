@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -592,6 +593,12 @@ private:
     /// The war plan: starts a war on a rival it presses, looks every ten minutes whether it gets
     /// anywhere and makes peace when it does not.
     void war_plan(AiPlayer& p, bool broke);
+    /// Declares war on `target` with a war plan (its checks and its end).
+    void start_war(AiPlayer& p, PlayerId target);
+    /// Alliances: offers, answers and ends them; asks allies for help and helps them.
+    void alliances(AiPlayer& p, std::uint64_t every_ms, bool broke);
+    /// For the log: the events a remembers of b.
+    [[nodiscard]] std::string event_text(PlayerId a, PlayerId b) const;
     void end_war(AiPlayer& p, const char* why);
     [[nodiscard]] std::uint32_t war_measure(PlayerId target) const;
     /// The armies and the fleets' cannons of `owner`, weighted as stronger() does.

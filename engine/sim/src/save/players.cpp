@@ -191,9 +191,12 @@ void io_city_clock(A& a, C& c) {
 }
 
 template <class A, class R>
-void io_relation(A& a, R& r) {
+void io_relation(A& a, R& r, std::uint16_t version) {
     a.u8_masked(r.peace, 3U);
     a.u8_masked(r.trade, 3U);
+    if (version >= kDiplomacyAlliances) {
+        a.u8_masked(r.alliance, 3U);
+    }
     a.u64(r.war_time_ms);
     a.u32(r.tribute);
     a.u32(r.trade_mood);
@@ -214,7 +217,7 @@ void io_event(A& a, E& e) {
 
 /// The relations of every pair of players, then each player's events and who it blames.
 template <class A, class D>
-void io_diplomacy(A& a, D& d) {
+void io_diplomacy(A& a, D& d, std::uint16_t version) {
     std::uint32_t n = static_cast<PlayerId>(d.size());  // players are numbered by PlayerId
     a.u32(n);
     if constexpr (A::kReading) {
@@ -227,7 +230,7 @@ void io_diplomacy(A& a, D& d) {
     for (std::uint32_t i = 0; i < n && a.ok(); ++i) {
         const auto pa = static_cast<PlayerId>(i);
         for (std::uint32_t k = 0; k < n; ++k) {
-            io_relation(a, d.relation(pa, static_cast<PlayerId>(k)));
+            io_relation(a, d.relation(pa, static_cast<PlayerId>(k)), version);
         }
         std::array<DiplomacyEvent, Diplomacy::kEvents> events = d.events(pa);
         for (DiplomacyEvent& e : events) {
@@ -363,13 +366,25 @@ Decoded::ScorePart read_scores(Reader& in, std::uint16_t version) {
     return part;
 }
 
-void write_diplomacy(Writer& out, const World& w) {
-    io_diplomacy(out, w.diplomacy());
+std::uint16_t diplomacy_version(const World& w) {
+    const Diplomacy& d = w.diplomacy();
+    for (std::size_t a = 0; a < d.size(); ++a) {
+        for (std::size_t b = 0; b < d.size(); ++b) {
+            if (d.relation(static_cast<PlayerId>(a), static_cast<PlayerId>(b)).alliance != Treaty::None) {
+                return kDiplomacyAlliances;
+            }
+        }
+    }
+    return 1;
 }
 
-Diplomacy read_diplomacy(Reader& in) {
+void write_diplomacy(Writer& out, const World& w, std::uint16_t version) {
+    io_diplomacy(out, w.diplomacy(), version);
+}
+
+Diplomacy read_diplomacy(Reader& in, std::uint16_t version) {
     Diplomacy d;
-    io_diplomacy(in, d);
+    io_diplomacy(in, d, version);
     return d;
 }
 

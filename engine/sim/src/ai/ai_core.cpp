@@ -623,6 +623,10 @@ void Engine::city_founded(std::uint16_t island, std::uint8_t index) {
         if (m_world.diplomacy().relation(p.player, founder).peace != Treaty::Signed) {
             continue;
         }
+        // Open1602: an ally shares the islands.
+        if (m_world.diplomacy().allied(p.player, founder)) {
+            continue;
+        }
         for (const City& c : m_world.cities()) {
             if (c.owner == p.player && c.island == island && population(c) < 10) {
                 m_world.diplomacy().add_event(p.player, founder, DiplomacyEventType::Settled, now_ms());

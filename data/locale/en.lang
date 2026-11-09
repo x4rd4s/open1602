@@ -429,6 +429,11 @@ diplomacy.offer.peace = {1} offers you a peace treaty
 diplomacy.offer.both = {1} offers you a trade treaty and a peace treaty
 diplomacy.wars = {1} is at war with {2}
 diplomacy.no_wars = {1} is at peace with everyone
+diplomacy.alliance.offer = Offer alliance
+diplomacy.alliance.withdraw = Withdraw offer
+diplomacy.alliance.accept = Accept alliance
+diplomacy.alliance.end = End alliance
+diplomacy.alliance.help = Alliance: allies help each other in war
 
 # Trade route editor: the row below the stops (copy a route, show the stops {1} as 1-4 or 5-8),
 # and the help line of the stop the ship sails to now ({1}: the original's help line)
@@ -1171,6 +1176,10 @@ message.won.purple = The purple player has fulfilled their task!
 message.won.brown = The brown player has fulfilled their task!
 message.rival_war = War: {1} against {2}
 message.rival_peace = Peace: {1} and {2}
+message.alliance_offered = {1} offers you an alliance
+message.alliance_signed = {1} is now your ally
+message.alliance_ended = {1} ends the alliance with you
+message.help_asked = Your ally {1} asks for help against {2}
 message.ship_bought = {1} has bought your ship {2} for {3} gold
 
 # The game's folder, asked for at the start when none is found (in the system's dialogs, which may

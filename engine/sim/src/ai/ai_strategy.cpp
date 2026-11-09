@@ -23,7 +23,13 @@ constexpr std::uint32_t kMinStrategyMs = 10'000;
 constexpr std::uint64_t kWarCheckMs = 600'000;   // a war plan is looked at every ten minutes
 constexpr std::uint8_t kWarFails = 3;            // ... and given up after three looks without progress
 constexpr std::uint64_t kWarRestMs = 1'800'000;  // half an hour of peace before the next war
-constexpr std::uint64_t kGoalHoldMs = 600'000;   // a goal holds ten minutes, unless debt or a threat end it
+// Alliances: offered from this mood on (accepted from half of it), ended below kAllianceEndMood;
+// two allies at most; an ally joins a war declared on its partner within half an hour.
+constexpr std::int32_t kAllianceMood = 40;
+constexpr std::int32_t kAllianceEndMood = -10;
+constexpr std::uint32_t kMaxAllies = 2;
+constexpr std::uint64_t kHelpMs = 1'800'000;
+constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unless debt or a threat end it
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -189,7 +195,9 @@ void Engine::plan_strategy(AiPlayer& p) {
             }
         }
         std::uint8_t s = stance::kNeutral;
-        if (mood < kHostileMood) {
+        if (d.allied(p.player, b)) {
+            s = stance::kPartner;  // an ally is neither pressed nor fought
+        } else if (mood < kHostileMood) {
             s = stance::kHostile;
         } else if (mood > kPartnerMood ||
                    (rel.trade == Treaty::Signed && mood >= 0 && st.character == character::kTrader)) {
@@ -220,6 +228,7 @@ void Engine::plan_strategy(AiPlayer& p) {
     // In debt, or losing gold with little left.
     const bool broke = money < 0 || (net_income(p) < 0 && money < 2000);
     war_plan(p, broke);
+    alliances(p, st.next_ms - now_ms(), broke);
     if (broke) {
         g = goal::kEconomy;
     } else if (threat || st.war_target != kNoPlayer || st.war_arming) {
@@ -352,20 +361,143 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         st.war_arming = true;
         return;
     }
-    st.war_target = best;
+    log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
+        threat_of(best));
+    start_war(p, best);
+}
+
+void Engine::start_war(AiPlayer& p, PlayerId target) {
+    Strategy& st = p.strategy;
+    st.war_target = target;
     st.war_since_ms = now_ms();
     st.war_check_ms = now_ms() + kWarCheckMs;
     st.war_fails = 0;
-    st.war_measure = war_measure(best);
-    log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
-        threat_of(best));
-    if (m_world.diplomacy().relation(p.player, best).peace != Treaty::None) {
+    st.war_measure = war_measure(target);
+    if (m_world.diplomacy().relation(p.player, target).peace != Treaty::None) {
         DiplomacyOrder o;
         o.player = p.player;
-        o.partner = best;
+        o.partner = target;
         o.kind = DiplomacyOrder::Kind::Peace;
         o.value = Treaty::None;
         execute(o);
+    }
+}
+
+std::string Engine::event_text(PlayerId a, PlayerId b) const {
+    // For the log: what a remembers of b, as type:value pairs.
+    std::string out;
+    const std::uint64_t now = now_ms();
+    for (const DiplomacyEvent& e : m_world.diplomacy().events(a)) {
+        if (e.type == DiplomacyEventType::None || e.partner != b) {
+            continue;
+        }
+        const std::int32_t v = diplomacy_event_value(e.type, now >= e.time_ms ? now - e.time_ms : 0);
+        out += (out.empty() ? "" : " ") + std::to_string(static_cast<int>(e.type)) + ":" + std::to_string(v);
+    }
+    return out.empty() ? "none" : out;
+}
+
+void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
+    // Alliances with a partner it likes well, two at most; one ends when the mood falls. Attacked,
+    // it asks its allies for help; an ally joins a war declared on its partner unless it fights
+    // one already, is short of gold or is allied with the enemy too.
+    Strategy& st = p.strategy;
+    const Diplomacy& d = m_world.diplomacy();
+    const std::uint64_t now = now_ms();
+    const auto order = [&](PlayerId b, DiplomacyOrder::Kind kind, Treaty value, PlayerId target) {
+        DiplomacyOrder o;
+        o.player = p.player;
+        o.partner = b;
+        o.kind = kind;
+        o.value = value;
+        o.target = target;
+        execute(o);
+    };
+    const auto settler = [&](PlayerId b) {
+        const Player* pl = m_world.player(b);
+        return pl != nullptr && pl->status == PlayerStatus::Playing &&
+               (pl->role == PlayerRole::Human || pl->role == PlayerRole::Computer) &&
+               m_world.behaviour(*pl) == FactionBehaviour::Settlers;
+    };
+    // Whether x declared war on a within `within` and the war goes on.
+    const auto declared_on = [&](PlayerId a, PlayerId x, std::uint64_t within) {
+        if (d.relation(a, x).peace != Treaty::None) {
+            return false;
+        }
+        for (const DiplomacyEvent& e : d.events(a)) {
+            if (e.type == DiplomacyEventType::WarDeclared && e.partner == x && e.time_ms <= now &&
+                now - e.time_ms < within) {
+                return true;
+            }
+        }
+        return false;
+    };
+    const bool resting = st.war_ended_ms != 0 && now - st.war_ended_ms < kWarRestMs;
+    const std::size_t players = m_world.players().size();
+    std::uint32_t allies = 0;
+    for (std::size_t bi = 0; bi < players; ++bi) {
+        allies += d.allied(p.player, static_cast<PlayerId>(bi)) ? 1U : 0U;
+    }
+    for (std::size_t bi = 0; bi < players; ++bi) {
+        const auto b = static_cast<PlayerId>(bi);
+        if (b == p.player || !settler(b)) {
+            continue;
+        }
+        const Relation& rel = d.relation(p.player, b);
+        const std::int32_t mood = d.mood(m_world, p.player, b, 0, now);
+        switch (rel.alliance) {
+            case Treaty::Signed:
+                if (mood < kAllianceEndMood || st.war_target == b) {
+                    log(p, "ends the alliance with player %u (mood %d, damage %u, tribute %u, events %s)", b, mood,
+                        rel.damage, rel.tribute, event_text(p.player, b).c_str());
+                    order(b, DiplomacyOrder::Kind::Alliance, Treaty::None, kNoPlayer);
+                    --allies;
+                }
+                break;
+            case Treaty::Offered:
+                if (mood < kAllianceMood / 2) {
+                    order(b, DiplomacyOrder::Kind::Alliance, Treaty::None, kNoPlayer);  // withdrawn
+                }
+                break;
+            case Treaty::Received:
+                if (allies < kMaxAllies && mood >= kAllianceMood / 2 && st.war_target != b) {
+                    log(p, "accepts an alliance with player %u (mood %d)", b, mood);
+                    order(b, DiplomacyOrder::Kind::Alliance, Treaty::Signed, kNoPlayer);
+                    ++allies;
+                }
+                break;
+            case Treaty::None:
+                if (allies < kMaxAllies && stance_of(p, b) == stance::kPartner && mood >= kAllianceMood &&
+                    rel.peace == Treaty::Signed && st.war_target != b) {
+                    log(p, "offers an alliance to player %u (mood %d)", b, mood);
+                    order(b, DiplomacyOrder::Kind::Alliance, Treaty::Offered, kNoPlayer);
+                }
+                break;
+        }
+    }
+    for (std::size_t ai = 0; ai < players; ++ai) {
+        const auto a = static_cast<PlayerId>(ai);
+        if (!d.allied(p.player, a)) {
+            continue;
+        }
+        for (std::size_t xi = 0; xi < players; ++xi) {
+            const auto x = static_cast<PlayerId>(xi);
+            if (x == p.player || x == a || !settler(x)) {
+                continue;
+            }
+            // Attacked since its last look: it asks each ally once.
+            if (declared_on(p.player, x, every_ms)) {
+                log(p, "asks its ally %u for help against player %u", a, x);
+                order(a, DiplomacyOrder::Kind::AskHelp, Treaty::None, x);
+            }
+            // Its ally was attacked within the last half hour: it joins that war, unless it rests
+            // after a war of its own (as before a war plan).
+            if (st.war_target == kNoPlayer && !broke && !resting && !d.allied(p.player, x) &&
+                d.relation(p.player, x).peace != Treaty::None && declared_on(a, x, kHelpMs)) {
+                log(p, "joins its ally %u in the war on player %u", a, x);
+                start_war(p, x);
+            }
+        }
     }
 }
 

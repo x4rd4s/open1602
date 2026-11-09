@@ -206,6 +206,10 @@ bool Diplomacy::hostile(PlayerId a, PlayerId b) const noexcept {
     return relation(a, b).peace != Treaty::Signed;
 }
 
+bool Diplomacy::allied(PlayerId a, PlayerId b) const noexcept {
+    return a != b && a < m_count && b < m_count && relation(a, b).alliance == Treaty::Signed;
+}
+
 bool Diplomacy::may_trade(PlayerId a, PlayerId b) const noexcept {
     if (a == b) {
         return true;
@@ -250,6 +254,12 @@ bool Diplomacy::set_peace(const World& world, PlayerId a, PlayerId b, Treaty v, 
             if (acts_diplomatically(ra) && ab.peace == Treaty::Signed) {
                 m_notices.push({DiplomacyNotice::Kind::PeaceBroken, b, a});
             }
+            // Open1602: no alliance without peace; an offer goes with it.
+            if (ab.alliance == Treaty::Signed) {
+                m_notices.push({DiplomacyNotice::Kind::AllianceEnded, b, a});
+            }
+            ab.alliance = Treaty::None;
+            ba.alliance = Treaty::None;
             // Fix S-113: withdrawing one's own offer goes back to the war there was; the original
             // sends the same value as a declaration of war and b remembers one.
             if (ab.peace != Treaty::Offered) {
@@ -313,6 +323,44 @@ bool Diplomacy::set_trade(const World& world, PlayerId a, PlayerId b, Treaty v, 
             m_notices.push({DiplomacyNotice::Kind::TradeSigned, b, a});
             ab.trade = Treaty::Signed;
             ba.trade = Treaty::Signed;
+            break;
+        case Treaty::Received:
+            break;
+    }
+    return true;
+}
+
+bool Diplomacy::set_alliance(const World& world, PlayerId a, PlayerId b, Treaty v, std::uint64_t now_ms) {
+    if (a == b || a >= m_count || b >= m_count || relation(a, b).alliance == v || v == Treaty::Received) {
+        return false;
+    }
+    if (!acts_diplomatically(behaviour_of(world, a)) || !acts_diplomatically(behaviour_of(world, b))) {
+        return false;  // only settlers make alliances
+    }
+    Relation& ab = relation(a, b);
+    Relation& ba = relation(b, a);
+    if (v != Treaty::None && (ab.peace != Treaty::Signed || ba.peace != Treaty::Signed)) {
+        return false;  // allies are at peace
+    }
+    switch (v) {
+        case Treaty::None:
+            if (ab.alliance == Treaty::Signed) {
+                m_notices.push({DiplomacyNotice::Kind::AllianceEnded, b, a});
+                add_event(b, a, DiplomacyEventType::HostileGesture, now_ms);
+            }
+            ab.alliance = Treaty::None;
+            ba.alliance = Treaty::None;
+            break;
+        case Treaty::Offered:
+            m_notices.push({DiplomacyNotice::Kind::AllianceOffered, b, a});
+            add_event(b, a, DiplomacyEventType::FriendlyGesture, now_ms);
+            ab.alliance = Treaty::Offered;
+            ba.alliance = Treaty::Received;
+            break;
+        case Treaty::Signed:
+            m_notices.push({DiplomacyNotice::Kind::AllianceSigned, b, a});
+            ab.alliance = Treaty::Signed;
+            ba.alliance = Treaty::Signed;
             break;
         case Treaty::Received:
             break;
@@ -505,12 +553,14 @@ std::int32_t Diplomacy::mood(const World& world, PlayerId a, PlayerId b, std::ui
             }
             // A city of b only counts on a small island of a; troops of b on any island of a, as
             // in the original and the History Edition.
-            if (b_city && small(c) && (cities_a <= 2 || empty)) {
+            // Open1602: an ally's cities and troops are welcome (it shares the islands and comes to help).
+            const bool ally = allied(a, b);
+            if (b_city && small(c) && (cities_a <= 2 || empty) && !ally) {
                 settle_penalty = 200;
             }
             const bool b_troops = (seen & kBTroops) != 0;
             const bool a_troops = (seen & kATroops) != 0;
-            if (b_troops) {
+            if (b_troops && !ally) {
                 troop_penalty = std::max(troop_penalty, a_troops && b_city ? 60 : 200);
             }
         }
@@ -650,6 +700,22 @@ bool apply_diplomacy(World& world, const DiplomacyOrder& order) {
         case DiplomacyOrder::Kind::Trade:
             return allowed(d.relation(order.player, order.partner).trade, order.value) &&
                    d.set_trade(world, order.player, order.partner, order.value, now);
+        case DiplomacyOrder::Kind::Alliance:
+            return allowed(d.relation(order.player, order.partner).alliance, order.value) &&
+                   d.set_alliance(world, order.player, order.partner, order.value, now);
+        case DiplomacyOrder::Kind::AskHelp: {
+            // Only an ally, against someone the player is at war with who is not the ally's ally too.
+            const Player* enemy = world.player(order.target);
+            if (!d.allied(order.player, order.partner) || enemy == nullptr || order.target == order.player ||
+                order.target == order.partner || !acts_diplomatically(world.behaviour(*enemy)) ||
+                d.relation(order.player, order.target).peace == Treaty::Signed) {
+                return false;
+            }
+            DiplomacyNotice n{DiplomacyNotice::Kind::HelpAsked, order.partner, order.player};
+            n.against = order.target;
+            d.notify(n);
+            return true;
+        }
         case DiplomacyOrder::Kind::Gesture:
             d.add_event(order.partner, order.player,
                         order.friendly ? DiplomacyEventType::FriendlyGesture : DiplomacyEventType::HostileGesture, now);
@@ -741,8 +807,8 @@ bool operator==(const Diplomacy& a, const Diplomacy& b) noexcept {
     for (std::size_t i = 0; i < a.m_pairs.size(); ++i) {
         const Relation& x = a.m_pairs[i];
         const Relation& y = b.m_pairs[i];
-        if (x.peace != y.peace || x.trade != y.trade || x.war_time_ms != y.war_time_ms || x.tribute != y.tribute ||
-            x.trade_mood != y.trade_mood || x.damage != y.damage) {
+        if (x.peace != y.peace || x.trade != y.trade || x.alliance != y.alliance || x.war_time_ms != y.war_time_ms ||
+            x.tribute != y.tribute || x.trade_mood != y.trade_mood || x.damage != y.damage) {
             return false;
         }
     }
