@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace o1602::assets {
 
@@ -479,8 +480,8 @@ inline constexpr std::array<std::uint32_t, 15> kRuins{kRuin,      kRuin + 9,  kR
 /// The ripe fields the original's plans place (Endlosspiel<D><V>.szs), in their order.
 inline constexpr std::array<std::uint32_t, 6> kPlanCrops{21336, 21342, 21340, 21332, 21344, 21338};
 /// The tiles of islands of their own shape (sim/island_shapes.hpp): the variants the templates use
-/// for each tile of the coast, ground (IDWEIDE+21), the forests of north and south, and the ore
-/// mountains (big 4 x 4, small 3 x 3).
+/// for each tile of the coast, the ground (meadow and dry land of each climate), the forests of north and south, and
+/// the ore mountains (big 4 x 4, small 3 x 3).
 namespace island_shape {
 inline constexpr std::array<std::uint32_t, 5> kOpenSea{21201, 21202, 21203, 21204, 21209};
 /// The sea by its depth, from the coast out: light (Hell), the edge from light to middle
@@ -527,27 +528,84 @@ inline constexpr std::array<std::uint32_t, 2> kRiverBend{20904, 20905};
 inline constexpr std::uint8_t kRiverBendSize = 2;
 inline constexpr std::uint32_t kRiverMouth = 21071;
 inline constexpr std::uint32_t kMouthSurf = 21208;
-/// The kinds of ground the templates mix, tile by tile (patches of one or two tiles), with how
-/// often they lay them, in thousands of tiles over all templates; any rotation.
+/// A building id with how often it is laid among others.
 struct WeightedId {
     std::uint32_t id = 0;
     std::uint32_t weight = 0;
 };
-inline constexpr std::array<WeightedId, 15> kGroundMix{{{22722, 51},
-                                                        {22728, 47},
-                                                        {22736, 29},
-                                                        {22738, 11},
-                                                        {22724, 10},
-                                                        {22734, 9},
-                                                        {22730, 6},
-                                                        {22748, 6},
-                                                        {22726, 6},
-                                                        {22732, 5},
-                                                        {22744, 4},
-                                                        {22752, 3},
-                                                        {22740, 3},
-                                                        {22746, 2},
-                                                        {22742, 2}}};
+/// The meadows the templates of a climate mix, tile by tile (patches of one or two tiles), with
+/// how often they lay them, in tiles per 10 000 tiles of ground of the climate's templates (those
+/// of at least 5); any rotation. Grazed meadow (the odd ids, which grow back) is among them as in
+/// the templates, and in the south a little swamp.
+inline constexpr std::array<WeightedId, 31> kMeadowNorth{{
+    {22702, 2356}, {22728, 1389}, {22722, 1130}, {22736, 1078}, {22701, 492}, {22734, 360}, {22738, 348}, {22724, 298},
+    {22730, 195},  {22748, 184},  {22726, 164},  {22744, 130},  {22732, 123}, {22721, 95},  {22746, 81},  {22752, 81},
+    {22727, 72},   {22740, 69},   {22742, 55},   {22704, 43},   {22735, 37},  {22723, 18},  {22737, 18},  {22729, 12},
+    {22750, 12},   {22725, 9},    {22733, 9},    {22703, 6},    {22706, 6},   {22731, 6},   {22751, 5},
+}};
+inline constexpr std::array<WeightedId, 30> kMeadowSouth{{
+    {22702, 2171}, {22722, 2008}, {22728, 1581}, {22736, 778}, {22701, 356}, {22738, 334}, {22724, 315}, {22734, 230},
+    {22748, 215},  {22730, 208},  {22726, 192},  {22732, 184}, {22744, 110}, {22740, 103}, {22752, 88},  {22746, 70},
+    {22742, 68},   {22727, 59},   {22721, 35},   {22735, 27},  {22737, 13},  {22750, 13},  {22704, 12},  {22723, 12},
+    {22725, 10},   {20187, 6},    {22706, 6},    {22729, 6},   {22733, 6},   {22731, 5},
+}};
+/// Dry land of a climate: the dry grass (crops grow on it at 25 to 75 percent of the island's), from
+/// the least to the most dry, with how often the climate's templates lay it (per 10 000 tiles of
+/// ground); the desert floor the heart of a patch of dry land gets; and the marks scattered on
+/// dry land as single tiles (cacti, stones, rocks, bones).
+struct DryLand {
+    std::uint16_t share = 0;  ///< per mille of the ground that is dry land (the templates')
+    std::uint16_t heart = 0;  ///< per mille of the dry land, the driest, that is desert floor
+    std::uint16_t marks = 0;  ///< per mille of the other dry land that is a mark
+    std::array<WeightedId, 10> grass{};
+    std::array<WeightedId, 3> floor{};  ///< the heart's; weight 0: none
+    std::array<WeightedId, 8> scattered{};
+};
+/// The north: patches of dry grass (fallow land), drier towards their heart, with a few stones.
+inline constexpr DryLand kDryNorth{
+    109,
+    0,
+    33,
+    {{{22782, 328},
+      {22784, 236},
+      {22786, 195},
+      {22788, 124},
+      {22790, 73},
+      {22792, 31},
+      {22794, 51},
+      {22796, 10},
+      {22798, 1},
+      {22800, 3}}},
+    {},
+    {{{22764, 10}, {22762, 6}, {22770, 5}, {22766, 4}, {22772, 4}, {22768, 3}, {22774, 2}, {22776, 2}}},
+};
+/// The south: patches of dry grass with a heart of desert (sand, cacti on sand and steppe), and
+/// cacti, rocks and bones about it.
+inline constexpr DryLand kDrySouth{
+    74,
+    150,
+    80,
+    {{{22782, 246},
+      {22784, 137},
+      {22786, 124},
+      {22788, 73},
+      {22790, 54},
+      {22792, 12},
+      {22794, 21},
+      {22796, 5},
+      {22798, 4},
+      {22800, 4}}},
+    {{{22780, 4}, {22778, 3}, {22768, 3}}},
+    {{{22772, 9}, {22764, 8}, {22762, 7}, {22770, 7}, {22774, 7}, {22766, 5}, {22776, 4}}},
+};
+/// The meadows of climate 0 (north) or 1 (south).
+[[nodiscard]] constexpr std::span<const WeightedId> meadow(std::uint8_t climate) noexcept {
+    return climate == 0 ? std::span<const WeightedId>(kMeadowNorth) : std::span<const WeightedId>(kMeadowSouth);
+}
+/// The dry land of climate 0 (north) or 1 (south).
+[[nodiscard]] constexpr const DryLand& dry_land(std::uint8_t climate) noexcept {
+    return climate == 0 ? kDryNorth : kDrySouth;
+}
 }  // namespace island_shape
 /// The list the original keeps after the build menu's, named from Text.cod
 /// [LANDSCHAFT]: the natives' and pirates' buildings and a few others.

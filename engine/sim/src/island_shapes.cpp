@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
-#include <numeric>
 #include <optional>
 #include <span>
 #include <utility>
@@ -174,6 +173,90 @@ std::vector<std::uint8_t> sea_depth(const LandMap& map, Random& random) {
 template <std::size_t N>
 std::uint32_t pick(Random& random, const std::array<std::uint32_t, N>& ids) {
     return ids[random.below(static_cast<std::uint32_t>(N))];
+}
+
+/// One of `ids` drawn by its weight; 0 when all weights are 0.
+std::uint32_t weighted(Random& random, std::span<const ids::WeightedId> ids) {
+    std::uint32_t total = 0;
+    for (const auto& w : ids) {
+        total += w.weight;
+    }
+    if (total == 0) {
+        return 0;
+    }
+    std::uint32_t roll = random.below(total);
+    for (const auto& w : ids) {
+        if (roll < w.weight) {
+            return w.id;
+        }
+        roll -= w.weight;
+    }
+    return 0;
+}
+
+/// The ground on the tiles `open` (indexes into `cover`, a map `width` tiles wide): the meadows
+/// of the climate mixed tile by tile as its templates mix them, and dry land in patches about the
+/// size of the forest's (`patch`), as much of it as the climate's templates have. A patch is
+/// drier towards its heart, its bands frayed tile by tile; in the south its heart is desert. The
+/// marks (cacti, stones, rocks, bones) lie on the dry land as single tiles.
+void lay_ground(std::vector<std::uint32_t>& cover, std::span<const std::size_t> open, int width, int height,
+                std::uint8_t climate, int patch, Random& random) {
+    const ids::DryLand& dry = ids::dry_land(climate);
+    const Noise noise(random, width, height, patch);
+    const Noise fray(random, width, height, std::max(2, patch / 3));
+    // Every tile of ground by its dryness, the driest first.
+    std::vector<std::pair<int, std::size_t>> tiles;
+    tiles.reserve(open.size());
+    for (const std::size_t i : open) {
+        const int x = static_cast<int>(i % static_cast<std::size_t>(width));
+        const int y = static_cast<int>(i / static_cast<std::size_t>(width));
+        tiles.emplace_back((2 * noise.at(x, y) + fray.at(x, y)) / 3, i);
+    }
+    const auto driest_first = [](const auto& a, const auto& b) {
+        return a.first != b.first ? a.first > b.first : a.second < b.second;
+    };
+    std::sort(tiles.begin(), tiles.end(), driest_first);
+    const std::size_t dry_count = tiles.size() * dry.share / 1000;
+    std::size_t heart = 0;
+    if (std::any_of(dry.floor.begin(), dry.floor.end(), [](const auto& f) { return f.weight > 0; })) {
+        heart = dry_count * dry.heart / 1000;
+        for (std::size_t k = 0; k < heart; ++k) {
+            cover[tiles[k].second] = weighted(random, dry.floor);
+        }
+    }
+    // The dry grass about it, the driest kinds nearest the heart; a random shift of up to a few
+    // steps of the noise frays the bands, so that the kinds mix at their edges as on the templates.
+    constexpr int kJitter = 48;
+    const auto rest_begin = tiles.begin() + static_cast<std::ptrdiff_t>(heart);
+    const auto rest_end = tiles.begin() + static_cast<std::ptrdiff_t>(dry_count);
+    for (auto it = rest_begin; it != rest_end; ++it) {
+        it->first += static_cast<int>(random.below(2 * kJitter + 1)) - kJitter;
+    }
+    std::sort(rest_begin, rest_end, driest_first);
+    std::uint32_t grass_total = 0;
+    for (const auto& g : dry.grass) {
+        grass_total += g.weight;
+    }
+    const std::size_t rest = dry_count - heart;
+    std::size_t kind = dry.grass.size();  // from the driest kind
+    std::uint64_t reached = 0;            // weight of the kinds laid so far, scaled by `rest`
+    for (std::size_t k = 0; k < rest; ++k) {
+        // Next kind once its share of the dry grass is full.
+        while (kind > 0 &&
+               (dry.grass[kind - 1].weight == 0 || static_cast<std::uint64_t>(k) * grass_total >=
+                                                       reached + std::uint64_t{dry.grass[kind - 1].weight} * rest)) {
+            reached += std::uint64_t{dry.grass[kind - 1].weight} * rest;
+            --kind;
+        }
+        const std::size_t i = (rest_begin + static_cast<std::ptrdiff_t>(k))->second;
+        const std::uint32_t mark = random.below(1000) < dry.marks ? weighted(random, dry.scattered) : 0;
+        cover[i] = mark != 0 ? mark : dry.grass[kind > 0 ? kind - 1 : 0].id;
+    }
+    // Meadow everywhere else.
+    const std::span<const ids::WeightedId> meadow = ids::meadow(climate);
+    for (auto it = rest_end; it != tiles.end(); ++it) {
+        cover[it->second] = weighted(random, meadow);
+    }
 }
 
 /// Land blocks of 2 x 2 tiles: noise plus a falloff from the centre, as much land as `share`
@@ -1145,35 +1228,41 @@ assets::Island make_island(const ShapeRequest& request) {
     constexpr std::array<int, 3> kForestShift = {130, 0, -130};  // Little, Normal, Much
     const int forest_line = (request.climate == 0 ? 470 : 580) + kForestShift[static_cast<std::size_t>(request.forest)];
     const auto& trees = request.climate == 0 ? ids::kForestNorth : ids::kForestSouth;
-    // The ground of many kinds, as the templates mix it tile by tile.
-    const std::uint32_t ground_total = std::accumulate(ids::kGroundMix.begin(), ids::kGroundMix.end(), std::uint32_t{0},
-                                                       [](std::uint32_t sum, const auto& g) { return sum + g.weight; });
-    const auto ground = [&]() {
-        if (!request.ground.empty()) {
-            return request.ground[random.below(static_cast<std::uint32_t>(request.ground.size()))];
-        }
-        std::uint32_t roll = random.below(ground_total);
-        for (const auto& g : ids::kGroundMix) {
-            if (roll < g.weight) {
-                return g.id;
-            }
-            roll -= g.weight;
-        }
-        return ids::kGround;
-    };
+    // What every free tile of land gets: forest, or ground (0 until it is drawn).
+    std::vector<std::uint32_t> cover(taken.size(), 0);
+    std::vector<std::size_t> open;                      // the tiles of ground, row by row
+    std::vector<std::uint8_t> ground(taken.size(), 0);  // 1: the tile is ground
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             if (taken[at(x, y)] != 0 || !map.land(x, y)) {
                 continue;
             }
             if ((2 * forest.at(x, y) + fray.at(x, y)) / 3 >= forest_line) {
-                lay(request.trees.empty()
-                        ? pick(random, trees)
-                        : request.trees[random.below(static_cast<std::uint32_t>(request.trees.size()))],
-                    x, y, 0, 0);
+                cover[at(x, y)] = request.trees.empty()
+                                      ? pick(random, trees)
+                                      : request.trees[random.below(static_cast<std::uint32_t>(request.trees.size()))];
             } else {
-                lay(ground(), x, y, static_cast<std::uint8_t>(random.below(4)), 0);
+                open.push_back(at(x, y));
+                ground[at(x, y)] = 1;
             }
+        }
+    }
+    if (!request.ground.empty()) {
+        // A climate of a package: its kinds of ground, each as often.
+        for (const std::size_t i : open) {
+            cover[i] = request.ground[random.below(static_cast<std::uint32_t>(request.ground.size()))];
+        }
+    } else {
+        lay_ground(cover, open, width, height, request.climate & 1U, patch, random);
+    }
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            const std::uint32_t id = cover[at(x, y)];
+            if (id == 0) {
+                continue;
+            }
+            // Meadow and dry land in any rotation, as the templates; the forest as it grows.
+            lay(id, x, y, ground[at(x, y)] != 0 ? static_cast<std::uint8_t>(random.below(4)) : std::uint8_t{0}, 0);
         }
     }
     island.layers.push_back(std::move(tiles));

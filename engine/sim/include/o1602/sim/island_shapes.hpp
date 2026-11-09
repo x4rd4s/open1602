@@ -47,7 +47,8 @@ struct ShapeRequest {
     std::uint8_t climate = 0;  ///< 0 north, 1 south: the forest
     /// The trees of the forest (building Ids); none: the climate's (ids::kForestNorth, kForestSouth).
     std::vector<std::uint32_t> trees;
-    /// The ground (building Ids), each as often; none: the templates' mix (ids::kGroundMix).
+    /// The ground (building Ids), each as often; none: the climate's meadows and dry land in
+    /// patches, as its templates have them (ids::meadow, ids::dry_land).
     std::vector<std::uint32_t> ground;
     std::uint8_t size = 0;             ///< size class 0 lit .. 4 lar, for the header
     std::uint8_t number = 0;           ///< island number, kept in every tile
