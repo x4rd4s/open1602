@@ -41,7 +41,7 @@ script defines when something happens:
 | `on_drought(e)` | `e.kind` (`"started"`, `"over"`), `e.island` |
 | `on_ship(e)` | something happened to a ship: `e.kind` (below), `e.ship` (its id, as `game.ships` has it), `e.player` (its owner) |
 | `on_military(e)` | `e.kind` (below), `e.player` (who acted), `e.owner` (whom it happened to) |
-| `on_diplomacy(e)` | a treaty changed or was offered: `e.kind` (`"peace_offered"`, `"peace_signed"`, `"peace_broken"`, `"trade_offered"`, `"trade_signed"`, `"trade_ended"`), `e.from` (who acted), `e.to` |
+| `on_diplomacy(e)` | a treaty changed or was offered: `e.kind` (`"peace_offered"`, `"peace_signed"`, `"peace_broken"`, `"trade_offered"`, `"trade_signed"`, `"trade_ended"`, `"alliance_offered"`, `"alliance_signed"`, `"alliance_ended"`, `"help_asked"` with `e.against`, the enemy), `e.from` (who acted), `e.to` |
 
 The kinds of `on_city`:
 
@@ -113,7 +113,7 @@ ware number.
 | `game.goods(island, city, good)` | the whole tons of `good` in the city's warehouses; nil for no such city |
 | `game.city(island, city)` | the city as `game.cities` gives it, and `inhabitants` (in all) and `classes` (a list of its inhabitants per class, the first class first); nil for no such city |
 | `game.ships(player)` | the ships of `player` (nil: all), a list of tables: `id`, `name`, `player` (nil without an owner), `figure` (its number in `figuren.cod`), `x`, `y` (the world tile it is on), `cannons`, `trader` (the free trader's) |
-| `game.relation(a, b)` | the treaties between players `a` and `b`: `peace` and `trade`, each `"signed"`, `"none"` (war, or no trade treaty), `"offered"` (by `a`) or `"received"` (from `b`), and `hostile` (their units fight); nil for no such players or the same player twice |
+| `game.relation(a, b)` | the treaties between players `a` and `b`: `peace`, `trade` and `alliance` (Open1602, only with improved computers), each `"signed"`, `"none"` (war, or no trade treaty), `"offered"` (by `a`) or `"received"` (from `b`), and `hostile` (their units fight); nil for no such players or the same player twice |
 | `game.units(player)` | the land units of `player` (nil: all), a list of tables: `id`, `player`, `figure` (its number in `figuren.cod`), `x`, `y` (the world tile it stands on), `island` (nil off the islands) and `health` (hit points left) |
 | `game.markers()` | the markers of the scenario made in the editor, a list of tables: `name`, `shape` (`"point"` or `"area"`), `x`, `y` (the world tile at its top left), `width`, `height` (1 for a point) |
 | `game.marker(name)` | the marker of that name as `game.markers` gives it; nil for none |

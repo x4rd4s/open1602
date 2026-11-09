@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Diplomacy: treaties, events and the mood that follows from them.
 
+#include <algorithm>
+
 #include "../test_framework.hpp"
 
 #include "o1602/sim/diplomacy.hpp"
@@ -302,4 +304,64 @@ TEST_CASE("diplomacy: a computer minds others' cities on its small islands and t
     // Edition): there the computer has none, so 200.
     unit(1, 0);
     CHECK(mood() == -400);
+}
+
+TEST_CASE("diplomacy: alliances between players at peace, ended by war (Open1602)") {
+    sim::World world(64, 64);
+    world.set_players(original_players());
+    using Order = sim::DiplomacyOrder;
+    using Kind = sim::DiplomacyNotice::Kind;
+    sim::Diplomacy& d = world.diplomacy();
+    // Only settlers, only at peace, accepting needs an offer.
+    CHECK(!sim::apply_diplomacy(world, Order{0, 4, Order::Kind::Alliance, Treaty::Offered}));
+    CHECK(!sim::apply_diplomacy(world, Order{0, 1, Order::Kind::Alliance, Treaty::Signed}));
+    CHECK(sim::apply_diplomacy(world, Order{0, 1, Order::Kind::Alliance, Treaty::Offered}));
+    CHECK(d.relation(1, 0).alliance == Treaty::Received);
+    CHECK(sim::apply_diplomacy(world, Order{1, 0, Order::Kind::Alliance, Treaty::Signed}));
+    CHECK(d.allied(0, 1));
+    CHECK(d.allied(1, 0));
+    CHECK(!d.allied(0, 2));
+    auto notices = d.take_notices();
+    REQUIRE(notices.size() == 2);
+    CHECK(notices[0].kind == Kind::AllianceOffered);
+    CHECK(notices[0].to == 1);
+    CHECK(notices[1].kind == Kind::AllianceSigned);
+    CHECK(notices[1].to == 0);
+
+    // Help is asked of an ally, against someone at war with the asker.
+    CHECK(!sim::apply_diplomacy(world, [] {
+        Order o{0, 1, Order::Kind::AskHelp};
+        o.target = 2;  // at peace with 2
+        return o;
+    }()));
+    CHECK(sim::apply_diplomacy(world, Order{2, 0, Order::Kind::Peace, Treaty::None}));
+    (void)d.take_notices();
+    Order ask{0, 1, Order::Kind::AskHelp};
+    ask.target = 2;
+    CHECK(sim::apply_diplomacy(world, ask));
+    ask.partner = 3;  // not an ally
+    CHECK(!sim::apply_diplomacy(world, ask));
+    notices = d.take_notices();
+    REQUIRE(notices.size() == 1);
+    CHECK(notices[0].kind == Kind::HelpAsked);
+    CHECK(notices[0].to == 1);
+    CHECK(notices[0].from == 0);
+    CHECK(notices[0].against == 2);
+
+    // War between allies ends the alliance; no alliance at war.
+    CHECK(sim::apply_diplomacy(world, Order{1, 0, Order::Kind::Peace, Treaty::None}));
+    CHECK(!d.allied(0, 1));
+    CHECK(d.relation(0, 1).alliance == Treaty::None);
+    notices = d.take_notices();
+    CHECK(std::any_of(notices.begin(), notices.end(), [](const sim::DiplomacyNotice& n) {
+        return n.kind == Kind::AllianceEnded && n.to == 0 && n.from == 1;
+    }));
+    CHECK(!sim::apply_diplomacy(world, Order{0, 1, Order::Kind::Alliance, Treaty::Offered}));
+
+    // Ending an alliance leaves the peace.
+    CHECK(sim::apply_diplomacy(world, Order{0, 3, Order::Kind::Alliance, Treaty::Offered}));
+    CHECK(sim::apply_diplomacy(world, Order{3, 0, Order::Kind::Alliance, Treaty::Signed}));
+    CHECK(sim::apply_diplomacy(world, Order{3, 0, Order::Kind::Alliance, Treaty::None}));
+    CHECK(!d.allied(0, 3));
+    CHECK(d.relation(0, 3).peace == Treaty::Signed);
 }

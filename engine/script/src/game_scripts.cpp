@@ -652,6 +652,7 @@ void GameScripts::add_api(Package& package) {
             return annokit::script::make_table({
                 {"peace", std::string(treaty_name(relation.peace))},
                 {"trade", std::string(treaty_name(relation.trade))},
+                {"alliance", std::string(treaty_name(relation.alliance))},
                 {"hostile", diplomacy.hostile(pa, pb)},
             });
         });
@@ -1310,13 +1311,17 @@ void GameScripts::dispatch_more(Package& package, const sim::TickEvents& events)
     }
     for (const sim::DiplomacyNotice& e : events.diplomacy) {
         using K = sim::DiplomacyNotice::Kind;
-        const char* kind = e.kind == K::PeaceBroken    ? "peace_broken"
-                           : e.kind == K::PeaceOffered ? "peace_offered"
-                           : e.kind == K::PeaceSigned  ? "peace_signed"
-                           : e.kind == K::TradeEnded   ? "trade_ended"
-                           : e.kind == K::TradeOffered ? "trade_offered"
-                           : e.kind == K::TradeSigned  ? "trade_signed"
-                                                       : nullptr;
+        const char* kind = e.kind == K::PeaceBroken       ? "peace_broken"
+                           : e.kind == K::PeaceOffered    ? "peace_offered"
+                           : e.kind == K::PeaceSigned     ? "peace_signed"
+                           : e.kind == K::TradeEnded      ? "trade_ended"
+                           : e.kind == K::TradeOffered    ? "trade_offered"
+                           : e.kind == K::TradeSigned     ? "trade_signed"
+                           : e.kind == K::AllianceOffered ? "alliance_offered"
+                           : e.kind == K::AllianceSigned  ? "alliance_signed"
+                           : e.kind == K::AllianceEnded   ? "alliance_ended"
+                           : e.kind == K::HelpAsked       ? "help_asked"
+                                                          : nullptr;
         if (kind == nullptr) {
             continue;
         }
@@ -1324,6 +1329,7 @@ void GameScripts::dispatch_more(Package& package, const sim::TickEvents& events)
             {"kind", std::string(kind)},
             {"from", player_or_nil(e.from)},
             {"to", player_or_nil(e.to)},
+            {"against", player_or_nil(e.against)},
         })};
         call(package, "on_diplomacy", args);
     }

@@ -59,6 +59,9 @@ struct DiplomacyEvent {
 struct Relation {
     Treaty peace = Treaty::Signed;
     Treaty trade = Treaty::None;
+    /// Open1602: an alliance (only with improved computers, not Rules::bugs.classic_ai). Allies are
+    /// at peace; breaking the peace ends it.
+    Treaty alliance = Treaty::None;
     /// The original's +0xF4: when war was last declared on a. As in the original, only a's own
     /// entry relation(a, a) is written; the pair entries keep what a savegame brought. Nothing
     /// reads it; it is kept for the savegame round trip.
@@ -81,12 +84,19 @@ struct DiplomacyNotice {
         FoundingProtest,    ///< 0x49 „Euer Gegner protestiert gegen Bauvorhaben unter Kriegsandrohung!“
         FoundingRefused,    ///< 0x4A „Euer Gegner toleriert Stadtgründung zu diesem Zeitpunkt nicht!“
         FoundingTolerated,  ///< 0x4B „Euer Gegner würde die Stadtgründung tolerieren.“
+        // Open1602's alliances:
+        AllianceOffered,
+        AllianceSigned,
+        AllianceEnded,
+        /// An ally asks `to` for help against `against`.
+        HelpAsked,
     };
     Kind kind = Kind::PeaceOffered;
     PlayerId to = kNoPlayer;    ///< the player who gets the message
     PlayerId from = kNoPlayer;  ///< the player who acted
     std::uint16_t island = 0;   ///< the founding answers: the computer's city on the island
     std::uint8_t city = 0;
+    PlayerId against = kNoPlayer;  ///< HelpAsked: the enemy
 };
 
 class Diplomacy {
@@ -108,6 +118,8 @@ public:
     /// Whether units of a fight units of b: anything but a signed peace (war or a pending offer).
     /// Nobody fights himself or "nobody".
     [[nodiscard]] bool hostile(PlayerId a, PlayerId b) const noexcept;
+    /// Whether a and b are allies (Open1602).
+    [[nodiscard]] bool allied(PlayerId a, PlayerId b) const noexcept;
     /// Whether ships of a may trade at Kontors of b.
     [[nodiscard]] bool may_trade(PlayerId a, PlayerId b) const noexcept;
 
@@ -126,6 +138,8 @@ public:
     bool set_peace(const World& world, PlayerId a, PlayerId b, Treaty v, std::uint64_t now_ms);
     /// Trade treaty, same values.
     bool set_trade(const World& world, PlayerId a, PlayerId b, Treaty v, std::uint64_t now_ms);
+    /// Open1602: alliance, same values; only between players at peace.
+    bool set_alliance(const World& world, PlayerId a, PlayerId b, Treaty v, std::uint64_t now_ms);
     /// Adds an event to a's memory about b.
     void add_event(PlayerId a, PlayerId b, DiplomacyEventType type, std::uint64_t now_ms);
     /// Damage player `victim` received from `attacker` (hits on ships, soldiers, buildings).
@@ -171,6 +185,10 @@ struct DiplomacyOrder {
         /// „Kontor gründen“ with `ship` by an island (island order 0x4C): a computer with a city there
         /// answers whether it tolerates the founding (Simulation, ComputerPlayers::founding_query).
         AskFounding,
+        /// Open1602: `value` as for Peace, an alliance (not with Rules::bugs.classic_ai).
+        Alliance,
+        /// Open1602: ask the ally `partner` for help against `target`, with whom the player is at war.
+        AskHelp,
     };
     PlayerId player = kNoPlayer;
     PlayerId partner = kNoPlayer;

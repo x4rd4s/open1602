@@ -57,8 +57,9 @@ std::vector<Offer> open_offers(const sim::World& world, sim::PlayerId local) {
             continue;
         }
         const sim::Relation& r = d.relation(local, b);
-        Offer o{b, r.trade == sim::Treaty::Received, r.peace == sim::Treaty::Received};
-        if (o.trade || o.peace) {
+        Offer o{b, r.trade == sim::Treaty::Received, r.peace == sim::Treaty::Received,
+                r.alliance == sim::Treaty::Received};
+        if (o.trade || o.peace || o.alliance) {
             out.push_back(o);
         }
     }
@@ -94,6 +95,9 @@ std::string wars_text(const sim::World& world, sim::PlayerId player) {
 }
 
 std::string offer_text(const Offer& offer, const std::string& name) {
+    if (!offer.trade && !offer.peace) {
+        return ui::tr("message.alliance_offered", {name});
+    }
     if (offer.trade && offer.peace) {
         return ui::tr("diplomacy.offer.both", {name});
     }

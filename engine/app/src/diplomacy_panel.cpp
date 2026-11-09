@@ -57,7 +57,9 @@ std::int32_t mood_pose(std::int32_t mood) {
 class DiplomacyPanel final : public SelectionPanel {
 public:
     DiplomacyPanel(assets::GadgetLayout vertrag, assets::GadgetLayout tribut)
-        : m_vertrag(std::move(vertrag), 1.0), m_tribut(tribut, 1.0), m_strip(strip_layout(std::move(tribut)), 1.0) {
+        : m_vertrag(std::move(vertrag), 1.0),
+          m_tribut(with_alliance(tribut), 1.0),
+          m_strip(with_alliance(strip_layout(std::move(tribut))), 1.0) {
         // The code adds the state to the sprites the layout gives.
         const assets::GadgetLayout& l = m_vertrag.layout();
         const auto gfx = [&](std::int32_t id, std::int32_t fallback) {
@@ -213,6 +215,8 @@ public:
         }
         if (m_tribute || m_strip_shown) {
             switch (id) {
+                case kAlliance:
+                    return ui::tr("diplomacy.alliance.help");
                 case kTributeTrade:
                     return treaty_line(m_partner, true);
                 case kTributePeace:
@@ -273,6 +277,8 @@ private:
     static constexpr std::int32_t kLess = 64022;
     static constexpr std::int32_t kMore = 64023;
     static constexpr std::int32_t kSlider = 64024;
+    /// Open1602: the alliance's line below the treaties, on the tribute page and the strip.
+    static constexpr std::int32_t kAlliance = 64099;
     // The strip (Open1602), added to a copy of TRIBUT: + place 0..kStripPlaces - 1
     static constexpr std::int32_t kStripArms = 64101;
     static constexpr std::int32_t kStripFrame = kStripArms + 256;
@@ -314,6 +320,72 @@ private:
             layout.gadgets.push_back(frame);
         }
         return layout;
+    }
+
+    /// TRIBUT.GAD (or the strip) with a line of text for the alliance: below the trade and peace
+    /// treaties, centred under the partner's name, in the name's font and height. The text is drawn
+    /// with its foot at the gadget's foot, so the click area and the text are the same.
+    static assets::GadgetLayout with_alliance(assets::GadgetLayout layout) {
+        const assets::Gadget* name = layout.find(kTributeName);
+        if (name == nullptr) {
+            return layout;
+        }
+        std::int32_t below = name->pos[1] + name->size[1];
+        for (const std::int32_t id : {kTributeTrade, kTributePeace}) {
+            if (const assets::Gadget* t = layout.find(id)) {
+                below = std::max(below, t->pos[1] + t->size[1]);
+            }
+        }
+        const std::int32_t height = std::max<std::int32_t>(name->size[1], 16);
+        assets::Gadget g;
+        g.id = kAlliance;
+        g.kind = assets::GadgetKind::TextCentre;
+        g.block = name->block;
+        g.colour = {ui::kTextInk, ui::kTextInkGreen};
+        g.pos = {name->pos[0], below + 4};
+        g.size = {name->size[0], height};
+        g.offset = {static_cast<std::int16_t>(name->size[0] / 2), static_cast<std::int16_t>(height - 2)};
+        // The tribute's controls below the treaties move down where the line would touch them (the
+        // strip, whose treaties sit lower).
+        const std::int32_t free_from = g.pos[1] + g.size[1] + 4;
+        std::int32_t first = free_from;
+        for (const assets::Gadget& c : layout.gadgets) {
+            if (c.id > kTributeHand && c.id < kAlliance && c.pos[1] >= below) {
+                first = std::min<std::int32_t>(first, c.pos[1]);
+            }
+        }
+        for (assets::Gadget& c : layout.gadgets) {
+            if (c.id > kTributeHand && c.id < kAlliance && c.pos[1] >= below) {
+                c.pos[1] += free_from - first;
+            }
+        }
+        layout.gadgets.push_back(g);
+        return layout;
+    }
+
+    /// Whether this game has alliances (improved computers, not the original's).
+    static bool alliances(const PanelContext& c) { return !c.simulation.rules().bugs.classic_ai; }
+
+    static sim::Treaty alliance_of(const PanelContext& c, sim::PlayerId b) {
+        const sim::Diplomacy& d = c.world().diplomacy();
+        return c.local < d.size() && b < d.size() ? d.relation(c.local, b).alliance : sim::Treaty::None;
+    }
+
+    /// The alliance's line: what a click does, or nothing at war (allies are at peace).
+    void refresh_alliance(ui::Panel& page, const PanelContext& c) const {
+        const sim::Diplomacy& d = c.world().diplomacy();
+        const bool peace =
+            c.local < d.size() && m_partner < d.size() && d.relation(c.local, m_partner).peace == sim::Treaty::Signed;
+        const sim::Treaty now = alliance_of(c, m_partner);
+        const bool shown = alliances(c) && (peace || now != sim::Treaty::None);
+        page.set_visible(kAlliance, shown);
+        if (!shown) {
+            return;
+        }
+        static constexpr std::array<const char*, 4> kKeys = {"diplomacy.alliance.offer", "diplomacy.alliance.withdraw",
+                                                             "diplomacy.alliance.accept", "diplomacy.alliance.end"};
+        page.set_text(kAlliance, ui::tr(kKeys[static_cast<std::size_t>(now)]));
+        page.set_selected(kAlliance, now == sim::Treaty::Signed);
     }
 
     /// The other humans and computers, by player number.
@@ -411,6 +483,7 @@ private:
             page.set_graphic(kTributeHand, m_hand + 2 * pose(c, m_partner, m_amount), 0);
         }
         page.set_text(kPayLabel, c.text("GAME", 78));
+        refresh_alliance(page, c);
         page.set_text(kAmount, std::to_string(m_amount));
         if (page.held() != kSlider) {
             page.set_slider(kSlider, 0, static_cast<std::int32_t>(m_amount), static_cast<std::int32_t>(kMaxTribute));
@@ -435,6 +508,16 @@ private:
             case kTributeTrade:
             case kTributePeace:
                 out.emplace_back(treaty_order(c, m_partner, e.id == kTributeTrade));
+                break;
+            case kAlliance:
+                if (alliances(c)) {
+                    sim::DiplomacyOrder o;
+                    o.player = c.local;
+                    o.partner = m_partner;
+                    o.kind = sim::DiplomacyOrder::Kind::Alliance;
+                    o.value = next_step(alliance_of(c, m_partner));
+                    out.emplace_back(o);
+                }
                 break;
             case kLess:
                 m_amount -= std::min(m_amount, kTributeStep);
