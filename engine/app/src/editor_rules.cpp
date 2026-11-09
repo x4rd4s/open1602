@@ -97,7 +97,9 @@ void MapViewer::editor_rules_model(EditorModel& m) const {
     EndlessSetup setup = EndlessSetup::defaults(SetupScope::Scenario);
     setup.rules = own.value_or(m_app_settings.scenario.rules);
     for (const SetupItem item : scenario_items()) {
-        m.rules.push_back(EditorRule{rule_label(item), setup_value(setup, item), setup_item_used(setup, item)});
+        // The start dialog's explanation of the setting, as its tooltip.
+        m.rules.push_back(EditorRule{rule_label(item), setup_value(setup, item), setup_item_used(setup, item),
+                                     ui::tr(std::string(setup_label_key(item)) + ".tip")});
     }
     for (const editor::RandomElement& e : editor::random_elements(m_editor->document.world(), m_buildings)) {
         m.randoms.push_back(EditorRandom{random_label(e), e.random, e.fixed});

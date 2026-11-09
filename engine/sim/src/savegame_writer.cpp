@@ -925,13 +925,22 @@ private:
                 // No record of a source file (a game loaded from Open1602's own savegame or made
                 // new): controller, colour and name from the player.
                 // As a new game sets them: in the session, nobody blamed, no mission.
-                r[4] = static_cast<std::uint8_t>(original_kind(*player));
+                // A slot that only holds a place is written as one: as a human it would be read
+                // back as a human without anything, whom the game could take for its player.
+                const bool placeholder = player->status == PlayerStatus::Absent && player->role != PlayerRole::Neutral;
+                r[4] = static_cast<std::uint8_t>(placeholder ? assets::PlayerKind::Absent : original_kind(*player));
                 r[6] = 1;
                 r[0x0C] = 0xFF;
                 std::fill_n(r.begin() + 0x3C, 4, std::uint8_t{0xFF});
                 r[7] = static_cast<std::uint8_t>(std::min<BannerId>(player->banner, assets::kPlayerColourCount - 1));
                 const std::size_t n = std::min<std::size_t>(player->name.size(), 0x3F);
                 std::copy_n(player->name.begin(), n, r.begin() + 0x3C0);
+            }
+            if (player == nullptr && p >= raw.size()) {
+                // A slot the world does not have (a map of fewer players): empty, not a human.
+                r[4] = static_cast<std::uint8_t>(assets::PlayerKind::Absent);
+                r[0x0C] = 0xFF;
+                std::fill_n(r.begin() + 0x3C, 4, std::uint8_t{0xFF});
             }
             if (player != nullptr && p < raw.size() && player->status == PlayerStatus::Playing &&
                 (player->role == PlayerRole::Human || player->role == PlayerRole::Computer)) {

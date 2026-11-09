@@ -676,6 +676,14 @@ void fit_goodwill(World& world) {
 PlayerId first_human_player(const World& world) noexcept {
     const auto& players = world.players();
     for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
+        // Not a slot that only holds a place (an empty slot of the file, or one before the further
+        // players): its role is the default, nobody plays it.
+        if (players[i].role == PlayerRole::Human && players[i].status != PlayerStatus::Absent) {
+            return static_cast<PlayerId>(i);
+        }
+    }
+    // Only absent humans (a game loaded whose player had lost everything): the first of them.
+    for (std::size_t i = 0; i < players.size() && i < kNoPlayer; ++i) {
         if (players[i].role == PlayerRole::Human) {
             return static_cast<PlayerId>(i);
         }

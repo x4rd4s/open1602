@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <memory>
 #include <optional>
@@ -13,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "catchment_view.hpp"
 #include "map_input.hpp"
 #include "map_viewer.hpp"
 #include "names.hpp"
@@ -136,11 +138,28 @@ std::string special_refusal(editor::SpecialRefusal refusal) {
     return {};
 }
 
+/// The natives and the pirates a map can still get (editor::can_add_party): their slots stand in
+/// the list of owners before the world has them.
+constexpr std::array<editor::Neutral, 2> kParties = {editor::Neutral::Natives, editor::Neutral::Pirates};
+
+/// The party whose slot `owner` is while the world lacks it, if it is one.
+std::optional<editor::Neutral> missing_party(const sim::World& world, sim::PlayerId owner) {
+    for (const editor::Neutral party : kParties) {
+        if (owner == editor::party_slot(party) && editor::can_add_party(world, party)) {
+            return party;
+        }
+    }
+    return std::nullopt;
+}
+
 /// The players a building, ship or unit can be placed for: humans and computers, then the natives
-/// and the pirates; for a ship the free trader last, else the neutral buildings' player last (its
-/// slot, editor::kNeutralSlot, while the world has none: it comes with the first choice of it,
-/// MapViewer::editor_neutral_owner). A trade cart only for humans and computers.
-std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false, bool cart = false) {
+/// and the pirates; for a ship the free trader last, else the neutral buildings' player last. The
+/// natives, the pirates and the neutral buildings' player stand there by their slots while the
+/// world has none of them (a map of open sea): they come with the first choice of them,
+/// MapViewer::editor_neutral_owner. A trade cart only for humans and computers; `existing` only
+/// players the world has.
+std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false, bool cart = false,
+                                         bool existing = false) {
     std::vector<sim::PlayerId> owners;
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const auto p = static_cast<sim::PlayerId>(i);
@@ -153,13 +172,24 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
     if (cart) {
         return owners;
     }
+    // The natives and the pirates by slot, those to come where they will stand: choosing one
+    // keeps its place in the list.
+    std::vector<sim::PlayerId> parties;
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const auto p = static_cast<sim::PlayerId>(i);
         if (world.players()[i].role == sim::PlayerRole::Neutral &&
             (world.acts_as(p, sim::FactionBehaviour::Natives) || world.acts_as(p, sim::FactionBehaviour::Pirates))) {
-            owners.push_back(p);
+            parties.push_back(p);
         }
     }
+    // The parties to come only beside a human or computer, whom they stand towards.
+    for (const editor::Neutral party : kParties) {
+        if (!owners.empty() && !existing && editor::can_add_party(world, party)) {
+            parties.push_back(editor::party_slot(party));
+        }
+    }
+    std::sort(parties.begin(), parties.end());
+    owners.insert(owners.end(), parties.begin(), parties.end());
     if (ship) {
         const sim::PlayerId trader = world.first_of(sim::FactionBehaviour::Trader);
         if (trader != sim::kNoPlayer) {
@@ -167,7 +197,9 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
         }
     } else if (!owners.empty()) {
         const sim::PlayerId neutral = editor::neutral_player(world);
-        owners.push_back(neutral != sim::kNoPlayer ? neutral : editor::kNeutralSlot);
+        if (neutral != sim::kNoPlayer || !existing) {
+            owners.push_back(neutral != sim::kNoPlayer ? neutral : editor::kNeutralSlot);
+        }
     }
     return owners;
 }
@@ -182,6 +214,13 @@ bool neutral_owner(const sim::World& world, sim::PlayerId owner) {
 std::string owner_label(const sim::World& world, sim::PlayerId owner) {
     if (neutral_owner(world, owner)) {
         return ui::tr("editor.objects.owner_neutral");
+    }
+    const std::optional<editor::Neutral> missing = missing_party(world, owner);
+    if (world.acts_as(owner, sim::FactionBehaviour::Natives) || missing == editor::Neutral::Natives) {
+        return ui::tr("editor.objects.owner_natives");
+    }
+    if (world.acts_as(owner, sim::FactionBehaviour::Pirates) || missing == editor::Neutral::Pirates) {
+        return ui::tr("editor.objects.owner_pirates");
     }
     const sim::Player* p = world.player(owner);
     return p != nullptr ? MapViewer::editor_player_label(*p) : std::string("-");
@@ -384,6 +423,39 @@ void MapViewer::editor_object_model(EditorModel& m) const {
     }
 }
 
+std::optional<render::TileLighting> MapViewer::editor_lighting() const {
+    const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
+    if (m_editor->objects.tool != EditorObjects::Tool::Build || panel == nullptr ||
+        panel->page() != EditorPanel::Page::Objects || m_editor->placing) {
+        return std::nullopt;
+    }
+    const assets::BuildingType* b = editor_object_piece();
+    if (b == nullptr || special_group(m_editor->objects.group)) {
+        return std::nullopt;
+    }
+    const sim::World& world = m_editor->document.world();
+    const auto owners = object_owners(world);
+    if (owners.empty()) {
+        return std::nullopt;
+    }
+    const sim::PlayerId owner = owners[m_editor->objects.owner % owners.size()];
+    if (world.player(owner) == nullptr || neutral_owner(world, owner)) {
+        return std::nullopt;  // the neutral buildings have no land of their own
+    }
+    render::TileLighting l = render::TileLighting::territory(owner);
+    const auto tile = m_input->tile_at_mouse();
+    if (tile && shows_catchment(*b) && world.contains(tile->x, tile->y) &&
+        !m_hud->covers(static_cast<std::int32_t>(m_input->mouse_x()), static_cast<std::int32_t>(m_input->mouse_y()))) {
+        const sim::World::Cell& c = world.cell(tile->x, tile->y);
+        if (c.island != sim::World::kSea) {
+            l.outline(world_catchment(c.island, sim::catchment_of(*b, m_editor->objects.rotation,
+                                                                  sim::TilePos{static_cast<std::int32_t>(c.local_x),
+                                                                               static_cast<std::int32_t>(c.local_y)})));
+        }
+    }
+    return l;
+}
+
 const sim::City* MapViewer::editor_picked_city() const {
     if (!m_editor || m_editor->pick.kind != EditorPick::Kind::Building) {
         return nullptr;
@@ -550,7 +622,7 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
         }
     } else if (request.kind == Kind::CityOwner) {
         // The next player, the natives or the pirates that can take the city, forward or back.
-        const auto owners = object_owners(world);
+        const auto owners = object_owners(world, false, false, true);
         const auto now = std::find(owners.begin(), owners.end(), c->owner);
         const std::size_t start = now == owners.end() ? 0 : static_cast<std::size_t>(now - owners.begin());
         for (std::size_t step = 1; step < owners.size(); ++step) {
@@ -585,6 +657,16 @@ void MapViewer::editor_objects_request(const EditorRequest& request) {
 void MapViewer::editor_neutral_owner() {
     const sim::World& world = m_editor->document.world();
     const sim::PlayerId owner = editor_object_owner();
+    // The natives or the pirates chosen on a map without them: the world gets their slot.
+    if (const std::optional<editor::Neutral> party = missing_party(world, owner)) {
+        auto op = editor::add_party(world, *party);
+        if (!op) {
+            editor_notice(op.error().message, true, op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        return;
+    }
     if (owner != editor::kNeutralSlot || world.player(owner) != nullptr) {
         return;
     }

@@ -155,3 +155,12 @@ TEST_CASE("diplomacy strip: the status bar names who offers what") {
     CHECK(diplomacy::offer_text({3, true, false}, "Bertram") == "Bertram bietet Euch einen Handelsvertrag an");
     ui::set_language("en");
 }
+
+TEST_CASE("diplomacy strip: a spectator, who is none of the players, sees all twelve") {
+    sim::World world(10, 10);
+    world.set_players(twelve_players());
+    const auto all = diplomacy::partners(world, sim::kNoPlayer);
+    CHECK(all.size() == sim::kMaxPlayers);
+    CHECK(diplomacy::kStripPlaces >= all.size());
+    CHECK(diplomacy::partners(world, 0).size() == diplomacy::kMaxPartners);
+}

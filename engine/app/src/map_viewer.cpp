@@ -1269,6 +1269,13 @@ std::optional<render::TileLighting> MapViewer::building_lighting(const Selection
 }
 
 render::TileLighting MapViewer::tile_lighting() const {
+    if (m_editor) {
+        render::TileLighting l = editor_lighting().value_or(render::TileLighting{});
+        if (!m_app_settings.display.classic_graphics && l.active()) {
+            l.foreign_borders();
+        }
+        return l;
+    }
     const Selection* clicked =
         m_hud && m_hud->selection().kind == Selection::Kind::Building ? &m_hud->selection() : nullptr;
     const bool building = m_tool.places() || (m_hud && m_hud->mode() == Hud::kModeBuild);
