@@ -47,6 +47,7 @@ void put(annokit::core::ByteWriter& out, const Hello& m) {
     out.boolean(m.returning);
     put_packages(out, m.packages);
     out.boolean(m.fetch_packages);
+    out.boolean(m.watch);
 }
 
 void put(annokit::core::ByteWriter& out, const CommandBatch& m) {
@@ -240,6 +241,7 @@ Hello get_hello(In& in) {
     m.returning = in.boolean();
     m.packages = get_packages(in);
     m.fetch_packages = in.boolean();
+    m.watch = in.boolean();
     return m;
 }
 

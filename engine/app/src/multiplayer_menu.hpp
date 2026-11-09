@@ -142,6 +142,7 @@ struct MultiplayerEvent {
     std::string address{};
     std::uint16_t port = net::kDefaultPort;
     std::string password{};
+    bool watch = false;  ///< (Join) only to watch, without a slot
     HostSetup setup{};
     sim::PlayerId seat = sim::kNoPlayer;
     std::size_t member = 0;
@@ -269,7 +270,7 @@ private:
         const net::FoundGame* game = nullptr;
     };
     [[nodiscard]] std::vector<BrowseRow> browse_rows(const MultiplayerModel& model) const;
-    std::optional<MultiplayerEvent> join_event(const std::string& address) const;
+    std::optional<MultiplayerEvent> join_event(const std::string& address, bool watch = false) const;
     [[nodiscard]] std::string state_text(const net::GameInfo& info) const;
 
     ui::Form m_form;

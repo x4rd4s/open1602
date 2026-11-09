@@ -159,9 +159,22 @@ TEST_CASE("editor goals: what no game can meet, or meets at once, is found befor
     sim::Mission m;
     std::vector<sim::Mission> missions{m};
     world.set_missions(missions);
+    // An empty mission nobody holds is an unused slot, as new maps keep them: nothing to warn of.
     auto problems = editor::goal_problems(world);
-    CHECK(has(problems, GoalProblem::Kind::NobodyHolds));
+    CHECK(problems.empty());
+    // Held, it never ends the game; with goals but no holder, nobody plays it.
+    std::vector<sim::Player> holding = world.players();
+    holding[0].mission = 0;
+    world.set_players(holding);
+    problems = editor::goal_problems(world);
     CHECK(has(problems, GoalProblem::Kind::NoGoals));
+    CHECK(!has(problems, GoalProblem::Kind::NobodyHolds));
+    holding[0].mission = sim::kNoMission;
+    world.set_players(holding);
+    missions[0].goals = sim::goal::kBalance;
+    world.set_missions(missions);
+    problems = editor::goal_problems(world);
+    CHECK(has(problems, GoalProblem::Kind::NobodyHolds));
 
     // A monopoly on tobacco without an island for it is met at once; too many to defeat; the
     // player to defeat gone; the protected player without the cities the losses ask for.

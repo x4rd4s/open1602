@@ -27,7 +27,7 @@ namespace o1602::net {
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
-inline constexpr std::uint16_t kProtocolVersion = 29;
+inline constexpr std::uint16_t kProtocolVersion = 30;
 
 /// The port Open1602 hosts on unless told otherwise (annokit::net::enet_listen).
 inline constexpr std::uint16_t kDefaultPort = 16020;
@@ -95,6 +95,9 @@ struct Hello {
     /// The person agreed to download the packages it lacks (Refused::share_bytes): the host sends
     /// them (PackageFiles) before it takes the computer in.
     bool fetch_packages = false;
+    /// Only to watch: no slot, not even a free one or the one this person played before, if the
+    /// game lets computers watch (else it joins as any other).
+    bool watch = false;
     /// The player ID of the installation (random, kept in its settings; 0: none). The host gives
     /// the person the slot they played before in this game (Player::owner, player_verifier()),
     /// even after a restart of the program or a change of host.

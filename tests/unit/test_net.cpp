@@ -133,8 +133,10 @@ struct Computer {
 
     Computer(annokit::net::LoopbackNetwork& network, std::string name, std::uint64_t token = 0,
              std::uint64_t content = kContent, net::SessionConfig config = {}, std::string password = {},
-             std::vector<assets::ContentPackage> packages = {}, bool fetch_packages = false, std::uint64_t player = 0) {
+             std::vector<assets::ContentPackage> packages = {}, bool fetch_packages = false, std::uint64_t player = 0,
+             bool watch = false) {
         net::Hello hello;
+        hello.watch = watch;
         hello.player = player;
         hello.content = content;
         hello.packages = std::move(packages);
@@ -1086,6 +1088,33 @@ TEST_CASE("net: a connection that never says hello is let go") {
     silent->poll(events);
     CHECK(std::any_of(events.begin(), events.end(),
                       [](const auto& e) { return e.kind == annokit::net::TransportEvent::Kind::Disconnected; }));
+}
+
+TEST_CASE("net: a computer that asks only to watch gets no slot, even a free one in a running game") {
+    annokit::net::LoopbackNetwork network(5, 0);
+    Host host(network);
+    Computer a(network, "Anna");
+    run_for(network, host, {&a}, 2000);
+    // The game runs; slot 2 is the computer's, free for whoever comes.
+    Computer w(network, "Wilma", 0, kContent, {}, {}, {}, false, 0, true);
+    run_for(network, host, {&a, &w}, 1500);
+    REQUIRE(w.session->playing());
+    CHECK(w.session->local_seat() == sim::kNoPlayer);
+    // Who asks to play takes the slot left free.
+    Computer b(network, "Bernd");
+    run_for(network, host, {&a, &w, &b}, 1500);
+    REQUIRE(b.session->playing());
+    CHECK(b.session->local_seat() == 2);
+
+    // Where nobody may watch, the computer joins as any other.
+    net::SessionConfig closed;
+    closed.spectators = false;
+    annokit::net::LoopbackNetwork network2(5, 0);
+    Host host2(network2, closed);
+    Computer v(network2, "Vera", 0, kContent, {}, {}, {}, false, 0, true);
+    run_for(network2, host2, {&v}, 1500);
+    REQUIRE(v.session->playing());
+    CHECK(v.session->local_seat() != sim::kNoPlayer);
 }
 
 TEST_CASE("net: without a free slot a computer watches; other data or versions are refused") {

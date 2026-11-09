@@ -75,7 +75,8 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    one, and the host's own slot takes none. A token never takes a slot from a connection that is
    still there: the newcomer is refused (`Taken`) and may come again once that connection has ended. In a game hosted while it runs (`--host`), the computer
    players' slots are open as well: the computer plays such a slot until someone takes it and again
-   after he leaves. Without a free slot it watches. A slot that a person left stands empty for
+   after he leaves. Without a free slot it watches; with `Hello::watch` ("Watch" in the search,
+   protocol version 30) it watches even with one, if the game lets computers watch. A slot that a person left stands empty for
    60 s (time to come back after a broken connection) and no newcomer gets it in that time, nor while
    a host migration may still bring its player back (MS-5, MS-14); then the computer plays it on under
    the player's name (`PlayerControl` from the host, announced in the chat), until the player or

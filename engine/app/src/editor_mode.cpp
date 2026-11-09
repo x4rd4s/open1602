@@ -1889,8 +1889,11 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
         lines.push_back(Line{goal_problem_text(world, p), Line::Kind::Warning, Line::Target::Goals, p.mission});
     }
     if (goal_problems.empty()) {
-        lines.push_back(Line{ui::tr(world.missions().empty() ? "editor.check.no_missions" : "editor.check.goals_fine"),
-                             Line::Kind::Fine});
+        const bool any_goals = std::any_of(world.missions().begin(), world.missions().end(), [](const sim::Mission& m) {
+            return (m.goals & ~sim::goal::kComputers) != 0;
+        });
+        lines.push_back(
+            Line{ui::tr(any_goals ? "editor.check.goals_fine" : "editor.check.no_missions"), Line::Kind::Fine});
     }
     // What each player finds around its start, and what is uneven between them.
     const auto areas = editor::start_areas(world, m_buildings);

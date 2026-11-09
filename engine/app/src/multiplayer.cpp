@@ -525,7 +525,7 @@ void MapViewer::handle_multiplayer(const MultiplayerEvent& e) {
             break;
         case MultiplayerEvent::Kind::Join:
             keep_name();
-            if (auto status = join_game(e.address, e.port, e.password); !status) {
+            if (auto status = join_game(e.address, e.port, e.password, false, e.watch); !status) {
                 menu->open(mp_text(MpText::CannotConnect, status.error().message));
             }
             break;
@@ -880,7 +880,7 @@ annokit::core::Status MapViewer::start_hosted_game() {
 // --- Joining ---
 
 annokit::core::Status MapViewer::join_game(const std::string& address, std::uint16_t port, const std::string& password,
-                                           bool fetch_packages) {
+                                           bool fetch_packages, bool watch) {
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
     }
@@ -905,6 +905,8 @@ annokit::core::Status MapViewer::join_game(const std::string& address, std::uint
     hello.content = content_fingerprint();
     hello.packages = assets::content_of(known_packages());  // the host asks for those of its game
     hello.fetch_packages = fetch_packages;
+    hello.watch = watch;
+    m_join_watch = watch;
     m_fetching_packages = fetch_packages;
     m_join_password = password;
     // The name typed in the menu; joining from the command line, the one given there.
@@ -915,7 +917,7 @@ annokit::core::Status MapViewer::join_game(const std::string& address, std::uint
     hello.name = name.empty() ? ui::tr("menu.default_name") : name;
     hello.password = password;
     hello.player = m_app_settings.player_id;  // the host knows the slot this person played before
-    if (m_rejoin && m_rejoin->address == address && m_rejoin->port == port) {
+    if (!watch && m_rejoin && m_rejoin->address == address && m_rejoin->port == port) {
         // Back to the host this computer played at: its own slot, not the next free one (MS-4).
         hello.seat = m_rejoin->seat;
         hello.token = m_rejoin->token;
@@ -962,7 +964,7 @@ annokit::core::Status MapViewer::join_game(const std::string& address, std::uint
 void MapViewer::offer_packages(std::span<const assets::ContentPackage> packages, std::uint64_t bytes,
                                std::string refusal) {
     end_session();
-    m_fetch_offer = FetchOffer{m_host_address, m_host_port, m_join_password, std::move(refusal)};
+    m_fetch_offer = FetchOffer{m_host_address, m_host_port, m_join_password, std::move(refusal), m_join_watch};
     m_hud->ask(mp_package_offer(packages, bytes));
 }
 
@@ -971,7 +973,7 @@ void MapViewer::answer_package_offer(bool yes) {
     m_fetch_offer.reset();
     if (!yes) {
         leave_session(offer.refusal);
-    } else if (auto status = join_game(offer.address, offer.port, offer.password, true); !status) {
+    } else if (auto status = join_game(offer.address, offer.port, offer.password, true, offer.watch); !status) {
         leave_session(mp_text(MpText::CannotConnect, status.error().message));
     }
 }
