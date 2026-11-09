@@ -493,6 +493,11 @@ More than 1000 gold in debt with a falling purse, an improved computer cuts its 
 disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
 10 t of its ware in stock until the stock is down to 4 t.
 
+In debt, an improved computer locks the building material of a city (the city window's switch)
+while the city has less than 1 t of food, or of a good its merchants or higher classes want and
+it does not make enough of itself: houses that rise without their goods only lose their people again. The lock holds until the goods are
+back or the gold is above 3000.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
