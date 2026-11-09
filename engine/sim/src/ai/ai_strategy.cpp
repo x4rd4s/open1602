@@ -131,6 +131,25 @@ void Engine::plan_strategy(AiPlayer& p) {
     const std::uint64_t every_ms = std::uint64_t{bal.ai_strategy_seconds} * 1000U;
     st.next_ms = now_ms() + std::max<std::uint64_t>(kMinStrategyMs, every_ms > level_ms ? every_ms - level_ms : 0);
 
+    if (player(p).money < 0) {
+        // In debt: how each city fares, for the log only.
+        for (const City& c : m_world.cities()) {
+            if (c.owner != p.player) {
+                continue;
+            }
+            std::string line;
+            for (std::size_t k = 0; k < c.inhabitants.size(); ++k) {
+                if (c.inhabitants[k] != 0) {
+                    line += " class " + std::to_string(k) + ": " + std::to_string(c.inhabitants[k]) + " at " +
+                            std::to_string(k < c.satisfaction.size() ? c.satisfaction[k] : 0) + "% tax " +
+                            std::to_string(k < c.tax_rate.size() ? c.tax_rate[k] : 0) + ";";
+                }
+            }
+            log(p, "in debt, city %u/%u:%s stock food %u cloth %u alcohol %u tobacco %u spices %u", c.island, c.index,
+                line.c_str(), c.stock(ware::kFood) / kTon, c.stock(ware::kCloth) / kTon, c.stock(ware::kAlcohol) / kTon,
+                c.stock(ware::kTobaccoGoods) / kTon, c.stock(ware::kSpices) / kTon);
+        }
+    }
     const std::size_t players = m_world.players().size();
     st.stances.resize(players, stance::kNeutral);
     const Diplomacy& d = m_world.diplomacy();
