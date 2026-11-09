@@ -569,8 +569,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // a woodcutter where trees are few when no place has many; public buildings amid the houses,
         // with a little chance. The military's state version 4 (the unit that goes first); chasing
         // leaves half the way searches of a tick to units with a way to go; up to 16 cities on an island
-        // by default (only the rules' bytes); town zones and styles (state version 8).
-        test::check_golden("arena after an hour", s.state_hash(), 0xb0bbb8907164f7d6ULL);
+        // by default (only the rules' bytes); town zones and styles (state version 8); improved
+        // computers without the original's gifts, setting their own taxes, moving on with less gold.
+        test::check_golden("arena after an hour", s.state_hash(), 0x2f7bca8a23e391aaULL);
     }
 }
 

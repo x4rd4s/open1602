@@ -403,6 +403,10 @@ bool Engine::rivals() const {
     return !classic();
 }
 
+bool Engine::gifts() const {
+    return classic();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Root task
 

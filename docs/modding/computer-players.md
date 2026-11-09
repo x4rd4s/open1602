@@ -75,6 +75,20 @@ given up, how many farms and fields a colony lays out, when the settlers start o
 luxury, and the luxury goods in stock and Kontor levels the later stages wait for. A game keeps them
 (savegame `BALA` version 3, version 4 for those from `colony_buildings` on).
 
+The gold the stages ask for is what the original's computers hoard with the money they get from
+nowhere. Improved computers (not `classic_ai`) live from what they earn and move on with a share of
+it, `rival_money_percent` (25 by default): a city that waits for 8001 gold moves on with 2000. The
+share also counts for the build orders that wait for 4000, 5000 or 8000 gold. A game keeps it with
+its other balance values (savegame `BALA` version 6).
+
+## Taxes
+
+The original's computers keep every class at the normal tax rate. Improved computers set the taxes
+as a player does: each class pays as much as it bears while it stays fully content, with a step to
+spare, so that its houses go on growing. A class short of goods pays less while the computer has
+4000 gold or more. A computer almost out of gold and earning less than it spends raises the taxes
+of every class to where its inhabitants are just content enough to stay.
+
 ## In which order
 
 Each stage of a city (task 5) goes through its lists of what it needs, in
@@ -379,6 +393,11 @@ castle_inhabitants = 0
 A game keeps them with its other balance values (section `BALA` version 5 of the savegame).
 
 ## What they get from nowhere
+
+Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
+from nowhere. Improved computers live from their taxes and trade, as a player does: no steady money,
+no founding money or bricks, no subsidy, droughts as long as on a player's island, and no small
+veins of ore kept for them.
 
 The original gives its computer players money and goods on every difficulty: steady money while
 they are poor, money and bricks for a new city, and money, wood, tools, food and bricks while they are

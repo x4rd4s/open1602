@@ -706,3 +706,22 @@ TEST_CASE("balance: a game keeps its figure values in the savegame") {
     REQUIRE(damaged.ok());
     CHECK(!sim::read_game(*damaged, buildings).ok());
 }
+
+TEST_CASE("balance: the improved computers' share of the stages' gold is [computer_stages], saved in BALA version 6") {
+    sim::Balance balance;
+    CHECK(balance.ai_rival_money_percent == 25);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "hoarders", "[computer_stages]\nrival_money_percent = 100\n", warnings);
+    CHECK(warnings.empty());
+    CHECK(balance.ai_rival_money_percent == 100);
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithRivalEconomy);
+
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+}

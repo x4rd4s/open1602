@@ -50,6 +50,7 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computer_stages` | `colony_animal_tiles`, `colony_animals` | 120, 6 | 1–1000000, 0–1000 | a colony on an island without crops: a sheep farm or cattle farm for every so many tiles of free land, at most the second number |
 | `computer_stages` | `colony_luxury_tiles` | 120 | 1–1000000 | a colony on an island with crops: a luxury field for every so many tiles |
 | `computer_stages` | `grown_income` | 11 | 0–100000 | grown, the settlers also move on when every city of the computer earns at least so much gold a minute |
+| `computer_stages` | `rival_money_percent` | 25 | 0–1000 | improved computers (not `classic_ai`) move on with this share of the gold the stages above ask for; the original's computers with all of it |
 | `computer_stages` | `settlers_luxury_settlers`, `settlers_luxury_fields` | 135, 4 | 0–1000000, 0–1000 | settlers that have not grown yet build workshops and up to the second number of luxury fields once they are so many |
 | `computer_stages` | `main_idle_money` | 4000 | 0–10000000 | the main city with nothing to do grows on with so much gold |
 | `computer_stages` | `citizens_luxury`, `citizens_kontor` | 1, 2 | 0–100, 0–4 | on to the citizens also only with more luxury goods in stock than the first number or a Kontor above the second level |
