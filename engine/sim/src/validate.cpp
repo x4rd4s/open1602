@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "o1602/sim/limits.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/soldier.hpp"
 #include "o1602/sim/target.hpp"
@@ -119,6 +120,10 @@ annokit::core::Status validate(const World& w) {
     for (const City& city : w.cities()) {
         if (!c.island(city.island) || !c.owner(city.owner)) {
             return bad("city " + city.name + " on an unknown island or of an unknown player");
+        }
+        if (city.index >= kCitySlotsPerIsland) {
+            return bad("city " + city.name + " has number " + std::to_string(city.index) +
+                       ", more than an island holds");
         }
     }
     for (const Ship& ship : w.ships()) {

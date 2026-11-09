@@ -449,6 +449,31 @@ TEST_CASE("editor original limits: a world of the original's size passes, more i
     REQUIRE(!sizes.empty());
     CHECK(sizes[0].kind == editor::LimitProblem::Kind::MapSize);
     CHECK(sizes[0].width == 600);
+
+    // More than seven cities on an island, or a number beyond the seventh, is Open1602's only.
+    sim::World crowded = make_world(buildings);
+    REQUIRE(!crowded.islands().empty());
+    for (std::uint8_t i = 0; i < 7; ++i) {
+        sim::City c;
+        c.island = 0;
+        c.index = i;
+        c.owner = 0;
+        crowded.add_city(std::move(c));
+    }
+    CHECK(editor::check_original_limits(crowded).empty());
+    sim::City eighth;
+    eighth.island = 0;
+    eighth.index = 9;
+    eighth.owner = 0;
+    crowded.add_city(std::move(eighth));
+    const auto cities = editor::original_limit_problems(crowded);
+    REQUIRE(cities.size() == 1);
+    CHECK(cities[0].kind == editor::LimitProblem::Kind::IslandCities);
+    CHECK(cities[0].island == 0);
+    CHECK(cities[0].count == 10);  // the numbers up to 9
+    CHECK(cities[0].limit == 7);
+    CHECK(editor::describe(cities[0], crowded).find("has 10 cities, the original's hold at most 7") !=
+          std::string::npos);
 }
 
 TEST_CASE("editor document: edits a world kept elsewhere, which stays where it is when the document moves") {

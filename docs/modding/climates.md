@@ -38,7 +38,7 @@ share."seas:atolls" = 0
 | `name`, `name.<language>` | 1 to 64 bytes | what the status line names it, in every language or in one (`de`, `en`); without one the id |
 | `crops` | a list of `tobacco`, `spices`, `sugar`, `cotton`, `wine`, `cocoa` | the crops its islands grow; without it the like's three |
 | `forest` | a list of up to 16 trees, `anno1602:<name or number>` ([names](values.md#names)) or `<package>:<name>` ([own-buildings.md](own-buildings.md)) | the trees of the forest of its islands of their own shape; without it the like's |
-| `ground` | a list of up to 16 kinds of ground, named as the trees | the ground of its islands of their own shape, each kind as often; without it the original's mix |
+| `ground` | a list of up to 16 kinds of ground, named as the trees | the ground of its islands of their own shape, each kind as often; without it the meadows and dry land of the like (as the like's templates mix them) |
 | `share` | 0 to 100 | percent of the islands of `like` that take this climate in a new own world, not the players' home islands; 0 without it |
 | `share.<kind>` | 0 to 100 | the percent in a world of islands of their own shape of one kind of island world instead of `share`: Open1602's `varied`, `archipelago`, `continents`, `giants`, `even`, or a package's preset as `share."<package>:<name>"` ([landscapes.md](landscapes.md)); up to 32 |
 

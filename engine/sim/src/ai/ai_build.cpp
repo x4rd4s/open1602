@@ -1015,6 +1015,8 @@ void Engine::task_roads(AiPlayer& p) {
         }
         return;
     }
+    // Open1602: roads of the town style's length, so that towns have blocks of different sizes.
+    const std::int32_t block = classic() ? 7 : town_style_of(p).block;
     std::int32_t best = -1;
     std::size_t best_index = 0;
     std::int32_t bx = 0;
@@ -1058,8 +1060,8 @@ void Engine::task_roads(AiPlayer& p) {
         return;
     }
     const Segment g = p.segments[best_index];
-    const std::int32_t placed =
-        road_three(p, bx, by, g.dir, std::min(b_right, 7), std::min(b_left, 7), std::min(b_back, 7), g.length > 3);
+    const std::int32_t placed = road_three(p, bx, by, g.dir, std::min(b_right, block), std::min(b_left, block),
+                                           std::min(b_back, block), g.length > 3);
     if (placed == 0 && best_index < p.segments.size()) {
         p.segments[best_index].open = false;
     }

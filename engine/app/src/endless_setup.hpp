@@ -77,9 +77,10 @@ enum class SetupItem : std::uint8_t {
     Plagues,  ///< Rules::plagues
     Fires,    ///< Rules::fires
     // Open1602's changes to the balance (a page of their own; balance_item), each on its own
-    BalanceBread,    ///< Rules::revised_bread
-    BalanceHunting,  ///< Rules::wider_hunting
-    BalanceShips,    ///< Rules::large_ship_holds
+    BalanceBread,     ///< Rules::revised_bread
+    BalanceHunting,   ///< Rules::wider_hunting
+    BalanceShips,     ///< Rules::large_ship_holds
+    CitiesPerIsland,  ///< Rules::cities_per_island
     // World
     Map,
     WorldSize,
@@ -162,7 +163,7 @@ enum class SetupItem : std::uint8_t {
 [[nodiscard]] std::string disasters_summary(const sim::Rules& rules);
 /// Whether an item is on the page of the balance changes.
 [[nodiscard]] constexpr bool balance_item(SetupItem item) noexcept {
-    return item >= SetupItem::BalanceBread && item <= SetupItem::BalanceShips;
+    return item >= SetupItem::BalanceBread && item <= SetupItem::CitiesPerIsland;
 }
 /// The rules of the page of the balance changes as in the original (all off), the others as in `rules`.
 [[nodiscard]] sim::Rules original_balance(sim::Rules rules) noexcept;

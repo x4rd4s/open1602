@@ -405,6 +405,16 @@ slopes), the ground mixes the templates' fifteen most common kinds of ground til
 of three mountains send a river from a spring on their slopes straight out to a river mouth on a
 beach that faces its way.
 
+Dry land, done on 2026-11-09: islands of their own shape mix the meadows of their climate's
+templates (every kind of at least 5 in 10 000 ground tiles, grazed meadow and the south's swamp
+among them) and lay dry land in patches about the size of the forest's, as much of the ground as
+the climate's templates have (north 10.9 %, south 7.4 %). A patch is drier towards its heart: its
+ten kinds of dry grass (crops grow there at 25 to 75 % of the island's fertility, as on the
+templates) follow each other from the edge in, with frayed bands. In the north the patches are
+fallow land with a few stones; in the south their heart is desert (sand, cacti on sand, steppe)
+and cacti, rocks and bones lie about it. A climate of a package that names its own `ground` keeps
+its kinds, each as often, without dry land.
+
 Part 5 done on 2026-11-01: volcanoes on islands of their own shape. A volcano is the big ore mountain
 21108; the big mountains of islands of their own shape are now
 always 21109, and a volcano is laid only where it is asked for (`ShapeRequest::volcano`), first, in

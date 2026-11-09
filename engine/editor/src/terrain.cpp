@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <deque>
+#include <span>
 #include <utility>
 
 #include "o1602/assets/game_data.hpp"
@@ -1331,11 +1332,19 @@ std::optional<TerrainPiece> random_piece(const assets::BuildingTable& buildings,
     };
     std::vector<std::pair<const assets::BuildingType*, std::uint32_t>> choice;
     if (group == TerrainGroup::Ground) {
-        for (const auto& w : ids::kGroundMix) {
-            if (const auto* b = buildings.by_id(w.id); b != nullptr && one_tile(*b)) {
-                choice.emplace_back(b, w.weight);
+        // The climate's meadows and dry land, as often as its islands have them.
+        const auto add = [&](std::span<const ids::WeightedId> weighted) {
+            for (const auto& w : weighted) {
+                if (const auto* b = buildings.by_id(w.id); b != nullptr && one_tile(*b) && w.weight > 0) {
+                    choice.emplace_back(b, w.weight);
+                }
             }
-        }
+        };
+        const ids::DryLand& dry = ids::dry_land(climate & 1U);
+        add(ids::meadow(climate & 1U));
+        add(dry.grass);
+        add(dry.scattered);
+        add(dry.floor);
     } else if (group == TerrainGroup::Forest) {
         const auto& forest = (climate & 1U) == 0 ? ids::kForestNorth : ids::kForestSouth;
         for (const std::uint32_t id : forest) {

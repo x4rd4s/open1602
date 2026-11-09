@@ -744,6 +744,20 @@ TEST_CASE("save game: a scenario's own settings come back, and the head of the f
     REQUIRE(loaded->scenario_info().has_value());
     CHECK(loaded->scenario_info()->rules == info.rules);
     CHECK(!loaded->saved_rules().has_value());  // not the settings of a game played
+    CHECK(loaded->scenario_info()->rules->cities_per_island == 7);
+
+    // An extended scenario's own number of cities per island comes back; one beyond what an island
+    // holds loads as the most.
+    for (const auto& [given, read] : {std::pair{24U, 24U}, std::pair{16U, 16U}, std::pair{200U, 31U}}) {
+        rules.cities_per_island = given;
+        info.rules = rules;
+        world.set_scenario_info(info);
+        bytes = sim::write_game(world, buildings);
+        REQUIRE(bytes.ok());
+        loaded = sim::read_game(*bytes, buildings);
+        REQUIRE(loaded.ok());
+        CHECK(loaded->scenario_info()->rules->cities_per_island == read);
+    }
 
     // Without them the file has none.
     info.rules.reset();

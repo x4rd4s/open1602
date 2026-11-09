@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "o1602/sim/limits.hpp"
 #include "o1602/sim/player.hpp"
 #include "o1602/sim/victory.hpp"
 #include "o1602/ui/localization.hpp"
@@ -32,6 +33,7 @@ using Roughness = sim::shapes::Roughness;
 constexpr std::array<std::uint8_t, 3> kRefundPercents = {25, 50, 75};  // between none and full
 constexpr std::array<std::uint32_t, 4> kShips = {33, 100, 200, 0};     // 0: unlimited
 constexpr std::array<std::uint32_t, 4> kUnits = {100, 250, 500, 0};
+constexpr std::array<std::uint32_t, 5> kCitiesPerIsland = {7, 12, 16, 24, sim::kMaxCitiesPerIsland};
 constexpr std::array<std::uint32_t, 2> kSpeeds = {4, 8};
 /// Map sizes: smaller than the original's, its 500 x 350, then larger ones of the same shape, then
 /// the generator's largest (sim::WorldSettings::kMaxSide).
@@ -396,6 +398,8 @@ std::size_t setup_choices(SetupItem item) noexcept {
             return kShips.size();
         case SetupItem::Units:
             return kUnits.size();
+        case SetupItem::CitiesPerIsland:
+            return kCitiesPerIsland.size();
         case SetupItem::GameSpeed:
             return kSpeeds.size();
         case SetupItem::Cheats:
@@ -563,6 +567,8 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
             return nearest(kShips, r.max_ships_per_player);
         case SetupItem::Units:
             return nearest(kUnits, r.max_army);
+        case SetupItem::CitiesPerIsland:
+            return nearest(kCitiesPerIsland, r.cities_per_island);
         case SetupItem::GameSpeed:
             return nearest(kSpeeds, r.max_game_speed);
         case SetupItem::Cheats:
@@ -751,6 +757,9 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
             break;
         case SetupItem::Units:
             r.max_army = kUnits[choice];
+            break;
+        case SetupItem::CitiesPerIsland:
+            r.cities_per_island = kCitiesPerIsland[choice];
             break;
         case SetupItem::GameSpeed:
             r.max_game_speed = kSpeeds[choice];
@@ -1025,6 +1034,7 @@ sim::Rules original_balance(sim::Rules rules) noexcept {
     rules.revised_bread = original.revised_bread;
     rules.wider_hunting = original.wider_hunting;
     rules.large_ship_holds = original.large_ship_holds;
+    rules.cities_per_island = original.cities_per_island;
     return rules;
 }
 
@@ -1033,16 +1043,18 @@ sim::Rules open1602_balance(sim::Rules rules) noexcept {
     rules.revised_bread = open1602.revised_bread;
     rules.wider_hunting = open1602.wider_hunting;
     rules.large_ship_holds = open1602.large_ship_holds;
+    rules.cities_per_island = open1602.cities_per_island;
     return rules;
 }
 
 std::string balance_summary(const sim::Rules& rules) {
     const sim::Rules original = original_balance(rules);
     const std::size_t total =
-        static_cast<std::size_t>(SetupItem::BalanceShips) - static_cast<std::size_t>(SetupItem::BalanceBread) + 1;
+        static_cast<std::size_t>(SetupItem::CitiesPerIsland) - static_cast<std::size_t>(SetupItem::BalanceBread) + 1;
     const std::size_t n = (rules.revised_bread != original.revised_bread ? 1U : 0U) +
                           (rules.wider_hunting != original.wider_hunting ? 1U : 0U) +
-                          (rules.large_ship_holds != original.large_ship_holds ? 1U : 0U);
+                          (rules.large_ship_holds != original.large_ship_holds ? 1U : 0U) +
+                          (rules.cities_per_island != original.cities_per_island ? 1U : 0U);
     if (n == 0) {
         return ui::tr("setup.balance.original");
     }
@@ -1155,6 +1167,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::ComputerCities:
         case SetupItem::Ships:
         case SetupItem::Units:
+        case SetupItem::CitiesPerIsland:
         case SetupItem::GameSpeed:
         case SetupItem::Cheats:
         case SetupItem::Droughts:
@@ -1243,6 +1256,7 @@ std::string_view setup_label_key(SetupItem item) {
         "setup.balance.bread",
         "setup.balance.hunting",
         "setup.balance.ships",
+        "setup.cities_per_island",
         "setup.map",
         "setup.size",
         "setup.players",
@@ -1361,6 +1375,8 @@ std::string setup_value(SetupItem item, std::size_t choice) {
             return number_text(kShips[choice]);
         case SetupItem::Units:
             return number_text(kUnits[choice]);
+        case SetupItem::CitiesPerIsland:
+            return std::to_string(kCitiesPerIsland[choice]);
         case SetupItem::GameSpeed:
             return ui::tr("setup.speed.value", {std::to_string(kSpeeds[choice])});
         case SetupItem::Cheats: {
@@ -1546,6 +1562,11 @@ std::optional<std::string> custom_value(const EndlessSetup& setup, SetupItem ite
         case SetupItem::Units:
             if (!offered(kUnits, r.max_army)) {
                 return number_text(r.max_army);
+            }
+            break;
+        case SetupItem::CitiesPerIsland:
+            if (!offered(kCitiesPerIsland, r.cities_per_island)) {
+                return std::to_string(r.cities_per_island);
             }
             break;
         case SetupItem::GameSpeed:
@@ -1736,6 +1757,10 @@ bool read_setup_line(EndlessSetup& setup, std::string_view key, std::string_view
         r.max_ships_per_player = n.value_or(r.max_ships_per_player);
     } else if (key == "units") {
         r.max_army = n.value_or(r.max_army);
+    } else if (key == "cities_per_island") {
+        if (n && *n >= 1 && *n <= sim::kMaxCitiesPerIsland) {
+            r.cities_per_island = *n;
+        }
     } else if (key == "game_speed") {
         if (n && *n >= 1 && *n <= 64) {
             r.max_game_speed = *n;
@@ -1868,6 +1893,7 @@ std::string write_setup(const EndlessSetup& setup, std::string_view prefix) {
     line("big_ore_veins", r.big_ore_veins ? "all" : "original");
     line("ships", std::to_string(r.max_ships_per_player));
     line("units", std::to_string(r.max_army));
+    line("cities_per_island", std::to_string(r.cities_per_island));
     line("game_speed", std::to_string(r.max_game_speed));
     line("droughts", kDroughtNames[std::min<std::size_t>(static_cast<std::size_t>(r.droughts), 4)]);
     line("volcanoes", kVolcanoNames[enum_choice(r.volcanoes, kVolcanoNames.size())]);

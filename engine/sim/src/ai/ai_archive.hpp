@@ -393,6 +393,9 @@ void io(A& a, AiPlayer& p) {
     if (a.version() >= 3) {
         a(p.yard_wanted);
     }
+    if (a.version() >= kStateWithTownSeed) {
+        a(p.town_seed);
+    }
 }
 
 template <class A>

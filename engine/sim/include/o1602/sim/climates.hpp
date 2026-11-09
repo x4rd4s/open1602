@@ -48,7 +48,7 @@ struct Climate {
     /// The trees of the forest of its islands of their own shape (building Ids); none: the like's.
     std::vector<std::uint32_t> forest;
     /// The ground of its islands of their own shape (building Ids, kind::kGround), each as often;
-    /// none: the original's mix (ids::kGroundMix).
+    /// none: the like's meadows and dry land (ids::meadow, ids::dry_land).
     std::vector<std::uint32_t> ground;
     /// Percent of the islands of `like` in a new own world that take this climate (not the homes).
     std::uint8_t share = 0;

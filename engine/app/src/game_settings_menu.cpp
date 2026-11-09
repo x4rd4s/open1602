@@ -99,7 +99,7 @@ constexpr Group kBugGroups[] = {
 
 // Open1602's changes to the balance, each on its own.
 constexpr Group kBalanceGroups[] = {
-    {"setup.group.balance", SetupItem::BalanceBread, SetupItem::BalanceShips, kLeft},
+    {"setup.group.balance", SetupItem::BalanceBread, SetupItem::CitiesPerIsland, kLeft},
 };
 
 // The disasters and how often they come.
