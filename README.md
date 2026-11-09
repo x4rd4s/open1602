@@ -14,7 +14,7 @@ stable multiplayer and room for new features, quality-of-life improvements and m
 ## Download
 
 Ready-built packages for Windows (64-bit), macOS (11 or newer, Apple silicon and Intel) and Linux
-(x86-64, glibc 2.39 or newer) are on the [releases page](https://github.com/x4rd4s/open1602/releases).
+(x86-64 and ARM64, glibc 2.39 or newer) are on the [releases page](https://github.com/x4rd4s/open1602/releases).
 They hold only the engine; the original game data comes from your own installation (below). The macOS
 app is not notarised: start it the first time with a right click on `Open1602.app` > Open. The packages
 are built by [.github/workflows/release.yml](.github/workflows/release.yml), which publishes a release

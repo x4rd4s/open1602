@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds the game for players on Linux, Windows and macOS and publishes it as a GitHub release.
+# Builds the game for players on Linux (x86-64 and ARM64), Windows and macOS and publishes it as a GitHub release.
 # The packages hold only Open1602 itself: the original Anno 1602 data is never part of them, the
 # player points the game at their own installation.
 #
@@ -99,12 +99,13 @@ jobs:
           CHOICE: ${{ github.event_name == 'pull_request' && 'without-macos' || inputs.platforms || 'all' }}
         run: |
           linux='{"name":"Linux","os":"ubuntu-24.04","platform":"linux-x64"}'
+          linux_arm='{"name":"Linux ARM","os":"ubuntu-24.04-arm","platform":"linux-arm64"}'
           windows='{"name":"Windows","os":"windows-2025","platform":"windows-x64"}'
           macos='{"name":"macOS","os":"macos-15","platform":"macos-universal"}'
           case "$CHOICE" in
-            without-macos) matrix="[$linux,$windows]" ;;
+            without-macos) matrix="[$linux,$linux_arm,$windows]" ;;
             macos-only)    matrix="[$macos]" ;;
-            *)             matrix="[$linux,$windows,$macos]" ;;
+            *)             matrix="[$linux,$linux_arm,$windows,$macos]" ;;
           esac
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           echo "Platforms ($CHOICE): $matrix"
@@ -381,6 +382,7 @@ jobs:
           | Windows 10/11 (64-bit) | \`Open1602-${TAG#v}-windows-x64.zip\` | unpack, start \`open1602.exe\` |
           | macOS 11 or newer (Apple silicon and Intel) | \`Open1602-${TAG#v}-macos-universal.zip\` | unpack, right click \`Open1602.app\` > Open (the app is not notarised) |
           | Linux x86-64 (glibc 2.39+: Ubuntu 24.04, Debian 13, Fedora 40, Arch) | \`Open1602-${TAG#v}-linux-x64.tar.gz\` | unpack, start \`bin/open1602\` |
+          | Linux ARM64 (glibc 2.39+, as above) | \`Open1602-${TAG#v}-linux-arm64.tar.gz\` | unpack, start \`bin/open1602\` |
 
           SHA-256 checksums are in \`SHA256SUMS.txt\`.
           EOF
