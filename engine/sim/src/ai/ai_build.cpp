@@ -20,6 +20,7 @@ namespace {
 namespace hs = house_service;
 
 constexpr std::array<std::array<std::int32_t, 2>, 4> kStep{{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}};
+constexpr std::uint32_t kTowerRings = 12;  // improved computers: rings a tower search goes out
 
 bool is_workshop_task(std::uint8_t task) {
     switch (task) {
@@ -434,7 +435,15 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
             slot_ok(p, kSlotMarket);
             return;
         }
-        return;  // the build failed: no failure counted (as the original)
+        // The build failed. The original counts no failure and searches the same site again at
+        // once, over and over; Open1602's improved computers count it, so that the slot rests
+        // after a few tries instead of holding up the city.
+        if (!classic()) {
+            log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, b->id, s.best_x0,
+                s.best_y0);
+            slot_fail(p, s.slot);
+        }
+        return;
     }
     if (slot_fail(p, s.slot) == 0) {
         push(p, kRoads, true);
@@ -471,6 +480,11 @@ void Engine::task_workshop(AiPlayer& p) {
             slot_built(p, s.slot);
             slot_ok(p, s.slot);
             slot_ok(p, kSlotMarket);
+        } else if (!classic()) {
+            // As for the farms: an improved computer counts a build that failed.
+            log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, b->id, s.best_x0,
+                s.best_y0);
+            slot_fail(p, s.slot);
         }
         return;
     }
@@ -555,6 +569,10 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
     if (s.best < 1 || s.extra < def->min_houses) {
         if (s.best == 0 && slot_fail(p, def->slot) == 0 && def->roads_on_fail) {
             push(p, kRoads, true);
+        } else if (s.best != 0 && !classic()) {
+            // Open1602: a site with too few houses around counts as a failure for an improved
+            // computer; the original searched again at once, several times a second.
+            slot_fail(p, def->slot);
         }
         return;
     }
@@ -562,6 +580,9 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
         slot_built(p, def->slot);
         slot_ok(p, def->slot);
         slot_ok(p, kSlotMarket);
+    } else if (!classic()) {
+        log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, def->id, s.best_x0, s.best_y0);
+        slot_fail(p, def->slot);
     }
 }
 
@@ -582,6 +603,8 @@ void Engine::task_market(AiPlayer& p) {
             0) {
             slot_built(p, kSlotMarket);
             slot_ok(p, kSlotMarket);
+        } else if (!classic()) {
+            slot_fail(p, kSlotMarket);  // Open1602: a failed build counts, as for the farms
         }
         return;
     }
@@ -978,14 +1001,23 @@ void Engine::task_towers(AiPlayer& p) {
             if (build(p, {BuildItem{b->id, x, y, 0, 0}}, false) != 0) {
                 ++r->slots[p.search.slot].count;
                 p.present[p.search.slot] = true;
+            } else if (!classic()) {
+                slot_fail(p, p.search.slot);  // Open1602: a failed build counts, as for the farms
             }
             return;
         }
     }
     refund(p);
     r->tower_ring = static_cast<std::uint16_t>(r->tower_ring + 1);
-    if (r->tower_ring > map.width()) {
+    // Open1602: an improved computer gives a tower up after kTowerRings rings without a site; the
+    // original searches ring after ring, round the island and again, every step.
+    const std::uint32_t last = classic() ? map.width() : std::min<std::uint32_t>(map.width(), kTowerRings);
+    if (r->tower_ring > last) {
         r->tower_ring = 0;
+        if (!classic()) {
+            log(p, "city %u/%u: no site for a tower", r->island, r->city);
+            slot_fail(p, p.search.slot);
+        }
     }
 }
 

@@ -343,7 +343,9 @@ void Engine::tax_rates(AiPlayer& p, City& c) {
     constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
     const auto& classes = m_buildings.resident_classes();
     const std::int64_t money = player(p).money;
-    const bool broke = money < 1000 && net_income(p) < 0;
+    // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
+    // and with little gold but no debt it kept that rate for hours.
+    const bool broke = money < 0 && net_income(p) < 0;
     for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
         if (c.inhabitants[k] == 0) {
             continue;
@@ -938,10 +940,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 // A first colony before the city grows on (the original waits for it forever if no
                 // island is found, S-097; Open1602 goes on once the search has failed). Not if the
                 // scenario forbids colonies.
-                if (kontor_level(c) == 1 && p.cities < 2 && (!p.colony_failed || classic()) &&
-                    !player(p).scenario.has(scenario_flag::kNoColonies)) {
-                    want_colony(p, 1, true, true);
-                } else if (has(at.ai_grown_money) || incomes_ok(p, static_cast<std::int32_t>(at.ai_grown_income))) {
+                const bool colony_first = kontor_level(c) == 1 && p.cities < 2 && (!p.colony_failed || classic()) &&
+                                          !player(p).scenario.has(scenario_flag::kNoColonies);
+                // Open1602: an improved computer that cannot found its first colony yet (it has not
+                // the gold) does not wait for it with its city at the settlers' houses; it moves on
+                // and founds the colony later (the main city asks for one too).
+                const bool waits = colony_first && (want_colony(p, 1, true, true) || classic() || p.settle.active);
+                if (!waits &&
+                    (has(at.ai_grown_money) || incomes_ok(p, static_cast<std::int32_t>(at.ai_grown_income)))) {
                     const std::int32_t rank = land_rank(p);
                     if (rank == 0) {
                         set_stage(p, r, stage::kSecond);
