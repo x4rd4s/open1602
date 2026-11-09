@@ -64,6 +64,8 @@ Simulation::Simulation(World& world, const assets::BuildingTable& buildings, con
     }
     world.set_original_bugs(m_rules.bugs);
     world.set_fertile_fields(m_rules.fertile_fields);
+    m_rules.cities_per_island = std::clamp<std::uint32_t>(m_rules.cities_per_island, 1, kMaxCitiesPerIsland);
+    world.set_cities_per_island(m_rules.cities_per_island);
 }
 
 Simulation::Simulation(World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,

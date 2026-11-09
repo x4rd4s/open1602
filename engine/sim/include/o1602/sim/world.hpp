@@ -26,7 +26,9 @@
 #include "o1602/sim/goods_ledger.hpp"
 #include "o1602/sim/id_index.hpp"
 #include "o1602/sim/island_map.hpp"
+#include "o1602/sim/limits.hpp"
 #include "o1602/sim/mission.hpp"
+#include "o1602/sim/original_limits.hpp"
 #include "o1602/sim/player.hpp"
 #include "o1602/sim/production.hpp"
 #include "o1602/sim/random.hpp"
@@ -812,6 +814,10 @@ public:
     /// above.
     [[nodiscard]] bool fertile_fields() const noexcept { return m_fertile_fields; }
     void set_fertile_fields(bool on) noexcept { m_fertile_fields = on; }
+    /// The most cities one island holds (Rules::cities_per_island), set like the bugs above; a
+    /// world no game runs keeps the original's.
+    [[nodiscard]] std::uint32_t cities_per_island() const noexcept { return m_cities_per_island; }
+    void set_cities_per_island(std::uint32_t most) noexcept { m_cities_per_island = most; }
 
     /// Eruptions, lava in flight and the time of the next eruption (volcanoes.hpp).
     [[nodiscard]] const VolcanoState& volcanoes() const noexcept { return m_volcanoes; }
@@ -942,6 +948,7 @@ private:
     std::optional<PlannedIslands> m_planned_islands;
     OriginalBugs m_original_bugs;
     bool m_fertile_fields = false;
+    std::uint32_t m_cities_per_island = original::kMaxCitiesPerIsland;
     std::vector<CostBuilding> m_cost_buildings;
     std::unordered_map<std::uint64_t, std::uint32_t> m_house_index;       ///< key: island, y, x
     std::unordered_map<std::uint64_t, std::uint32_t> m_production_index;  ///< key: island, y, x

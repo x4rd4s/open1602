@@ -15,9 +15,12 @@
 #include "o1602/sim/blueprints.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
+#include "o1602/sim/original_limits.hpp"
 #include "o1602/sim/save_game.hpp"
+#include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/simulation.hpp"
+#include "o1602/sim/validate.hpp"
 
 using namespace o1602;
 
@@ -285,6 +288,55 @@ TEST_CASE("construction: the first Kontor at the coast founds a city, paid from 
     // One city per player and island.
     const sim::BuildPlan again = island.build({{kKontor, 5, 20, 0, 0}}, 0);
     CHECK(again.items[0].refusal == sim::BuildRefusal::CityLimit);
+}
+
+TEST_CASE("construction: an island holds as many cities as the rules allow, beyond the original's seven") {
+    Island island;
+    // Nine cities of others hold the numbers 0 to 8 (their land lies elsewhere).
+    for (std::uint8_t i = 0; i < 9; ++i) {
+        sim::City other;
+        other.island = 0;
+        other.index = i;
+        other.owner = 1;
+        other.name = "Stadt " + std::to_string(i);
+        island.world.add_city(std::move(other));
+    }
+    // A world no game runs keeps the original's seven.
+    CHECK(island.world.cities_per_island() == sim::original::kMaxCitiesPerIsland);
+    CHECK(island.build({{kKontor, 5, 10, 0, 0}}, 0).items[0].refusal == sim::BuildRefusal::CityLimit);
+    // The limit counts the cities, whatever their numbers.
+    island.world.set_cities_per_island(9);
+    CHECK(island.build({{kKontor, 5, 10, 0, 0}}, 0).items[0].refusal == sim::BuildRefusal::CityLimit);
+    // The game's rules give the island room: the city takes the first free number, 9, and its land.
+    const assets::FigureTable figures;
+    const sim::Simulation game(island.world, island.buildings, figures, sim::Rules{});
+    CHECK(island.world.cities_per_island() == 16);
+    const sim::BuildPlan plan = island.build({{kKontor, 5, 10, 0, 0}}, 0);
+    REQUIRE(plan.placed == 1);
+    const sim::City* city = island.world.city(0, 9);
+    REQUIRE(city != nullptr);
+    CHECK(city->owner == 0);
+    CHECK(island.city_at(5, 10) == 9);
+    CHECK(island.city_at(13, 11) == 9);
+    // A road inside its land is built there: the city's bit in the masks of its land holds.
+    CHECK(island.build({{kRoad, 8, 10, 0, 0}}).placed == 1);
+    CHECK(island.city_at(8, 10) == 9);
+    // The tile word of the original keeps three bits: the export refuses rather than cut the number.
+    const auto chunks = sim::savegame_chunks(island.world, island.buildings);
+    REQUIRE(!chunks.ok());
+    CHECK(chunks.error().code == core::ErrorCode::LimitExceeded);
+    CHECK(chunks.error().message.find("more than 7 cities") != std::string::npos);
+    // Open1602's own file keeps it.
+    const auto bytes = sim::write_game(island.world, island.buildings, nullptr, sim::SaveOptions{false});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, island.buildings);
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded->city(0, 9) != nullptr);
+    CHECK(loaded->islands()[0].map.top(5, 10).city == 9);
+    // A number beyond the masks' bits is a damaged world.
+    CHECK(sim::validate(*loaded).ok());
+    loaded->city(0, 9)->index = sim::kCitySlotsPerIsland;
+    CHECK(!sim::validate(*loaded).ok());
 }
 
 TEST_CASE("construction: a Kontor needs the coast along its long side and a ship nearby") {

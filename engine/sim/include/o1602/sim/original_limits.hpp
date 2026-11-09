@@ -22,6 +22,9 @@ inline constexpr std::uint32_t kMaxIslandSide = 255;
 /// Deposits in an island's record.
 inline constexpr std::size_t kMaxDeposits = 2;
 inline constexpr std::size_t kMaxCities = 75;
+/// Cities of one island: the island record's city number has three bits, and the eighth value
+/// means "no city".
+inline constexpr std::uint32_t kMaxCitiesPerIsland = 7;
 inline constexpr std::size_t kMaxShips = 150;
 inline constexpr std::size_t kMaxSoldiers = 400;
 inline constexpr std::size_t kMaxTowers = 350;

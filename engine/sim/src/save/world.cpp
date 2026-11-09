@@ -9,6 +9,8 @@
 
 #include "section_io.hpp"
 
+#include "o1602/sim/limits.hpp"
+#include "o1602/sim/original_limits.hpp"
 #include "o1602/sim/simulation.hpp"
 
 namespace o1602::sim::save {
@@ -63,6 +65,7 @@ enum RuleKey : std::uint16_t {
     kShipHolds = 55,        // 1: the large merchant ship has 8 holds, the warship 6 (Rules::large_ship_holds)
     kRevealResources = 56,  // 1: every island explored by everyone from the start (Rules::reveal_resources)
     kComputerCities = 57,   // Rules::computer_cities other than Scaled
+    kCitiesPerIsland = 58,  // Rules::cities_per_island other than the original's 7 (7 when missing)
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -160,7 +163,7 @@ void write_rules(Writer& out, const Rules& r) {
     // Room for every key up front: the optional ones below then never reallocate (GCC 13 also
     // misreads that reallocation as an overflow).
     std::vector<std::pair<RuleKey, std::uint32_t>> values;
-    values.reserve(48);
+    values.reserve(64);
     const std::pair<RuleKey, std::uint32_t> always[] = {
         {kRefund, static_cast<std::uint32_t>(r.demolish_refund)},
         {kRefundPercent, r.refund_percent},
@@ -211,6 +214,11 @@ void write_rules(Writer& out, const Rules& r) {
     // The computers' cities only when as in the original: scaled is Open1602's way.
     if (r.computer_cities != ComputerCities::Scaled) {
         values.emplace_back(kComputerCities, static_cast<std::uint32_t>(r.computer_cities));
+    }
+    // The cities of an island only when not the original's: the games of the versions before the
+    // setting, which have no key, kept to it (read_rules).
+    if (r.cities_per_island != original::kMaxCitiesPerIsland) {
+        values.emplace_back(kCitiesPerIsland, r.cities_per_island);
     }
     // One trade cart per island only when so: more is Open1602's way.
     if (!r.more_carts) {
@@ -295,9 +303,10 @@ Rules read_rules(Reader& in) {
     Rules r;
     // Without its key a game plays the original's bread chain, as the versions before the key did.
     r.revised_bread = false;
-    r.wider_hunting = false;      // the same for the hunter's hut
-    r.large_ship_holds = false;   // and for the large ships' holds
-    bool rare_eruptions = false;  // applies to the game's way only, whichever key comes first
+    r.wider_hunting = false;                              // the same for the hunter's hut
+    r.large_ship_holds = false;                           // and for the large ships' holds
+    r.cities_per_island = original::kMaxCitiesPerIsland;  // and for the cities of an island
+    bool rare_eruptions = false;                          // applies to the game's way only, whichever key comes first
     const std::uint32_t n = in.in().count(6);
     for (std::uint32_t i = 0; i < n; ++i) {
         const std::uint16_t key = in.in().u16();
@@ -384,6 +393,9 @@ Rules read_rules(Reader& in) {
                 break;
             case kComputerCities:
                 r.computer_cities = v == 0 ? ComputerCities::Original : ComputerCities::Scaled;
+                break;
+            case kCitiesPerIsland:
+                r.cities_per_island = std::clamp<std::uint32_t>(v, 1, kMaxCitiesPerIsland);
                 break;
             case kOneCart:
                 r.more_carts = v == 0;

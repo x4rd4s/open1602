@@ -46,6 +46,21 @@ std::vector<LimitProblem> original_limit_problems(const sim::World& world) {
             problems.push_back(p);
         }
     }
+    // The cities of each island: the original numbers them in three bits. A gap left by a city that
+    // is gone counts as well, since the numbers stay.
+    std::vector<std::size_t> island_cities(world.islands().size(), 0);
+    for (const sim::City& c : world.cities()) {
+        if (c.island < island_cities.size()) {
+            island_cities[c.island] = std::max<std::size_t>({island_cities[c.island] + 1, std::size_t{c.index} + 1});
+        }
+    }
+    for (std::size_t i = 0; i < island_cities.size(); ++i) {
+        if (island_cities[i] > original::kMaxCitiesPerIsland) {
+            LimitProblem p{Kind::IslandCities, island_cities[i], original::kMaxCitiesPerIsland};
+            p.island = i;
+            problems.push_back(p);
+        }
+    }
     at_most(problems, Kind::Cities, world.cities().size(), original::kMaxCities);
     at_most(problems, Kind::Ships, world.ships().size(), original::kMaxShips);
     at_most(problems, Kind::Soldiers, world.soldiers().size(), original::kMaxSoldiers);
@@ -107,6 +122,8 @@ std::string describe(const LimitProblem& p, const sim::World& world) {
                    n(p.limit) + " a side";
         case Kind::Deposits:
             return island + " has " + n(p.count) + " deposits, the original's have at most " + n(p.limit);
+        case Kind::IslandCities:
+            return island + " has " + n(p.count) + " cities, the original's hold at most " + n(p.limit);
         case Kind::PackageContent:
             return "buildings, figures or goods of a content package";
         case Kind::PackageClasses:

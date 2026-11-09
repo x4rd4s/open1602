@@ -208,7 +208,7 @@ TEST_CASE("endless setup: the values reach the rules and the world") {
     CHECK(!s.rules.large_ship_holds);
     CHECK(s.rules.revised_bread);
     CHECK(s.rules.wider_hunting);
-    CHECK(app::balance_summary(s.rules) == ui::tr("setup.balance.some", {"2", "3"}));
+    CHECK(app::balance_summary(s.rules) == ui::tr("setup.balance.some", {"3", "4"}));
     CHECK(app::write_setup(s).find("endless.large_ship_holds = original\n") != std::string::npos);
     app::read_setup(read, app::write_setup(s));
     CHECK(!read.rules.large_ship_holds);
@@ -221,6 +221,20 @@ TEST_CASE("endless setup: the values reach the rules and the world") {
     CHECK(app::write_setup(s).find("endless.hunting = wider\n") != std::string::npos);
     app::choose(s, SetupItem::BalanceHunting, 0);
     CHECK(!s.rules.wider_hunting);
+    // The cities of an island: 16 by default, the original's 7, or as many as the dialog offers.
+    CHECK(s.rules.cities_per_island == 16);
+    CHECK(sim::Rules::original().cities_per_island == 7);
+    CHECK(value_of(s, SetupItem::CitiesPerIsland) == "16");
+    CHECK(app::setup_choices(SetupItem::CitiesPerIsland) == 5);
+    app::choose(s, SetupItem::CitiesPerIsland, 4);
+    CHECK(s.rules.cities_per_island == sim::kMaxCitiesPerIsland);
+    CHECK(app::write_setup(s).find("endless.cities_per_island = 31\n") != std::string::npos);
+    CHECK(app::read_setup_line(read, "cities_per_island", "12"));
+    CHECK(read.rules.cities_per_island == 12);
+    CHECK(app::read_setup_line(read, "cities_per_island", "40"));  // beyond what an island holds: unchanged
+    CHECK(read.rules.cities_per_island == 12);
+    app::choose(s, SetupItem::CitiesPerIsland, 0);
+    CHECK(s.rules.cities_per_island == 7);
     CHECK(app::balance_summary(s.rules) == ui::tr("setup.balance.original"));
     s.rules = app::open1602_balance(s.rules);
     CHECK(s.rules.revised_bread);
@@ -1410,7 +1424,7 @@ TEST_CASE("game setup: the page of the balance changes, each on its own") {
                 }
                 if (d.text.size() > 20 && hint.compare(0, 20, d.text, 0, 20) == 0) {
                     hint_y = std::min(hint_y, d.y);
-                } else if (d.text == app::setup_label(SetupItem::BalanceShips)) {
+                } else if (d.text == app::setup_label(SetupItem::CitiesPerIsland)) {
                     lowest = std::max(lowest, d.y);
                 }
             }
@@ -1418,7 +1432,7 @@ TEST_CASE("game setup: the page of the balance changes, each on its own") {
             CHECK(lowest < hint_y);
 
             CHECK(menu.back());
-            const std::string some = ui::tr("setup.balance.open", {ui::tr("setup.balance.some", {"1", "3"})});
+            const std::string some = ui::tr("setup.balance.open", {ui::tr("setup.balance.some", {"2", "4"})});
             CHECK(find_text(menu, some).has_value());
             (void)click(menu, some);
             REQUIRE(menu.balance_page());

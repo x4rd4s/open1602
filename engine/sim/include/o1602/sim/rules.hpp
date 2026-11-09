@@ -285,6 +285,10 @@ struct Rules {
     /// L-008: units per player (on land, in castles, on board). 0 = unlimited; the original allows 100,
     /// Open1602 250.
     std::uint32_t max_army = 250;
+    /// Cities one island holds at most, each of another owner (a player founds one city per
+    /// island). The original allows 7, too few for twelve players to share an island; Open1602 16.
+    /// 1..kMaxCitiesPerIsland (limits.hpp); a scenario's own rules may give its own number.
+    std::uint32_t cities_per_island = 16;
 
     /// S-019: random worlds contain at least one deposit of every resource that a building needs
     /// (the original can generate endless games without gold).
@@ -391,6 +395,7 @@ struct Rules {
         Rules r;
         r.max_ships_per_player = 33;
         r.max_army = 100;
+        r.cities_per_island = 7;
         r.guarantee_resources = false;
         r.reveal_resources = false;
         r.max_game_speed = 4;
