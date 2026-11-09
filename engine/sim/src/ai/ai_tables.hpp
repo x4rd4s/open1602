@@ -159,6 +159,9 @@ inline constexpr std::uint64_t kRoomPauseMs = 600'000;
 /// sixteenths more (for the next inhabitants) builds food producers first and no new houses.
 inline constexpr std::uint32_t kFoodStock = 20;
 inline constexpr std::uint32_t kFoodMargin = 2;
+/// A city short of food with no way to more food (no site for a fisher, its farms not yet open to
+/// it) builds houses all the same while its stock feeds its inhabitants for kFoodMinutes minutes.
+inline constexpr std::uint32_t kFoodMinutes = 15;
 /// A producer is not built while its good fills kFullStock sixteenths of the city's room, and an
 /// order's producers grow with the land only while the city has less than kGrowStock tons of it.
 inline constexpr std::uint32_t kFullStock = 12;
@@ -175,6 +178,12 @@ inline constexpr std::int32_t kColonyKontorReserve = 2000;
 inline constexpr bool short_of_food(std::uint32_t stock, std::uint32_t supply, std::uint32_t demand) noexcept {
     return stock < kFoodStock * kStockUnitsPerTon &&
            std::uint64_t{supply} * 16 < std::uint64_t{demand} * (16 + kFoodMargin);
+}
+
+/// Whether a city's `stock` of food (1/32 t) feeds inhabitants who eat `demand` (1/32 t per minute)
+/// for kFoodMinutes minutes more.
+inline constexpr bool food_lasts(std::uint32_t stock, std::uint32_t demand) noexcept {
+    return std::uint64_t{stock} >= std::uint64_t{demand} * kFoodMinutes;
 }
 
 /// Whether `stock` of a good (1/32 t) fills a city's room `capacity` so far that more producers of
