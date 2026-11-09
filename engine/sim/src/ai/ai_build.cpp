@@ -500,6 +500,13 @@ void Engine::task_houses(AiPlayer& p) {
         slot_built(p, kSlotHouses);
         slot_ok(p, kSlotHouses);
         slot_ok(p, kSlotMarket);
+        // Open1602: a founded or pioneers' city that still builds houses is still growing; the time
+        // after which the computer gives it up (balance.toml [computer_stages]) counts from its
+        // last new house, not from the start of the stage.
+        if (CityPlan* r = current_plan(p);
+            r != nullptr && !classic() && (r->stage == stage::kFounded || r->stage == stage::kPioneers)) {
+            r->stage_ms = now_ms();
+        }
         // What the new house lacks opens the public building again.
         if (CityPlan* r = current_plan(p)) {
             const assets::ServiceBits sv = house_services(p.island, s.best_x0, s.best_y0);

@@ -863,7 +863,10 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                               if (raw_producer(t.ware) && d < 4) {
                                   acc.score -= 64 << (4 - d);
                               }
-                              if (t.ware == ware::kTree && d < 2) {
+                              // The trees next to the hut (the original's); Open1602 counts all
+                              // in the woodcutter's reach, so that it does not stand in a clearing
+                              // with a few trees beside a wood.
+                              if (t.ware == ware::kTree && d < (classic() ? 2 : 4)) {
                                   ++acc.count;
                                   acc.score += t.growth;
                               }
