@@ -566,8 +566,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
     if (minutes == 60) {
         // The computers' state version 4 (a search's target); the revised bread chain by default;
         // a woodcutter where trees are few when no place has many; public buildings amid the houses,
-        // with a little chance; up to 16 cities on an island by default (only the rules' bytes).
-        test::check_golden("arena after an hour", s.state_hash(), 0x368742654df2b637ULL);
+        // with a little chance. The military's state version 4 (the unit that goes first); chasing
+        // leaves half the way searches of a tick to units with a way to go; up to 16 cities on an island by default (only the rules' bytes).
+        test::check_golden("arena after an hour", s.state_hash(), 0xb19e4a955f380c6aULL);
     }
 }
 

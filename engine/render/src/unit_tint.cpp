@@ -61,6 +61,7 @@ constexpr double kHorseMinBrownChroma = 20.0;
 constexpr double kHorseMinBrownCosine = 0.7;
 constexpr double kHorseMaxDarkLuminance = 70.0;
 constexpr double kHorseMaxYellowLuminance = 130.0;
+constexpr std::uint8_t kMinMountedClothMatches = 3;  // variants showing their colour on a horse's cloth
 
 /// Variant images aligned at their bottom centre in a frame of `width` x `height`.
 class Aligned {
@@ -239,7 +240,10 @@ void unit_template(std::span<const RgbaView> variants, std::span<const assets::R
     }
     if (riders) {
         // Close the gaps between the horse pixels found and fill the enclosed rest (saddle, legs);
-        // enclosed pixels where the body variant shows its own colour are its rider.
+        // enclosed pixels where the body variant shows its own colour are its rider. Cloth on the
+        // horse shows in three variants at least: where only two show their colour there, it is the
+        // horse's own brown (red's reddish, yellow's dark brown counting for yellow), and taken from
+        // the base variant it was a white speck that took on the player colour.
         std::vector<std::uint8_t> closed = close_mask(horse, width, height, 2);
         for (std::size_t p = 0; p < n; ++p) {
             closed[p] = closed[p] != 0 || horse[p] != 0 ? 1 : 0;  // the erosion eats the border
@@ -248,7 +252,8 @@ void unit_template(std::span<const RgbaView> variants, std::span<const assets::R
         for (std::size_t p = 0; p < n; ++p) {
             const bool base_opaque = aligned.at(options.base, static_cast<std::int64_t>(p % width),
                                                 static_cast<std::int64_t>(p / width)) != nullptr;
-            const bool keep = closed[p] != 0 && base_opaque && matches[p] < 2 && (horse[p] != 0 || body_shows[p] == 0);
+            const bool keep = closed[p] != 0 && base_opaque && matches[p] < kMinMountedClothMatches &&
+                              (horse[p] != 0 || body_shows[p] == 0);
             horse[p] = keep ? 1 : 0;
         }
     }

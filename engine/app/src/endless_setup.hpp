@@ -144,6 +144,8 @@ enum class SetupItem : std::uint8_t {
     BugRemoteRepair,
     BugSmallYardWarships,
     BugNativeLand,
+    BugLandBehindWalls,
+    BugShipShots,
     Count,
 };
 

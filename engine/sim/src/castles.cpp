@@ -494,10 +494,12 @@ bool Military::unload(const UnloadOrder& o) {
         return false;
     }
     // Land within 6 tiles of the ship (Balance::castle_unload_range): the nearest cell
-    // soldiers can stand on.
+    // soldiers can stand on. Open1602: not behind a wall of another player that stands between
+    // the ship and the cell; the original lands them there too (OriginalBugs::land_behind_walls).
     const auto range = static_cast<std::int32_t>(m_world->balance().castle_unload_range);
     const std::int32_t sx = 2 * ship->x + 1;
     const std::int32_t sy = 2 * ship->y + 1;
+    const bool over_walls = m_world->original_bugs().land_behind_walls;
     std::optional<std::pair<std::int32_t, std::int32_t>> landing;
     std::int32_t best = 0;
     for (std::int32_t cy = sy - 2 * range; cy <= sy + 2 * range; ++cy) {
@@ -506,7 +508,8 @@ bool Military::unload(const UnloadOrder& o) {
                 continue;
             }
             const std::int32_t d = sea_distance(cx - sx, cy - sy);
-            if (d <= 2 * range && (!landing || d < best)) {
+            if (d <= 2 * range && (!landing || d < best) &&
+                (over_walls || !m_combat->land().wall_between(sx, sy, cx, cy, ship->owner))) {
                 landing = std::pair{cx, cy};
                 best = d;
             }

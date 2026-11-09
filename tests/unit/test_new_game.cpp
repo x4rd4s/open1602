@@ -726,9 +726,10 @@ TEST_CASE("new game: an own world with six players: the plan's size and starts, 
     }
     CHECK(!a.state_damaged());
     // And the same on every platform (golden hash, DS-2): a planned world, five computers.
-    // The computers' state version 5 (the slots counted); the revised bread chain by default; up to
-    // 16 cities on an island by default (only the rules' bytes).
-    test::check_golden("six players after 60 s", a.state_hash(), 0xe79f91db6b938a3dULL);
+    // The computers' state version 5 (the slots counted); the revised bread chain by default; the
+    // military's state version 4 (the unit that goes first); up to 16 cities on an island by default (only the rules'
+    // bytes).
+    test::check_golden("six players after 60 s", a.state_hash(), 0x2f5cc85492b906a2ULL);
 }
 
 TEST_CASE("new game: an own world gives a package's climate its share of the islands of its like") {
