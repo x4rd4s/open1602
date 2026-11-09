@@ -424,10 +424,13 @@ Improved computers weigh the way at sea:
   what lasts until it is back, up to half its holds per ware.
 - **Fleet.** One ship guards each city; on top come as many ships as the supply takes: a ship per
   two wares the home city lacks, half a ship more per ten minutes of a ware's round trip, at most
-  four, and in all at most two per city and one more. They are ordered at the yard or bought as
-  before.
+  four, and in all at most two per city and one more; none while it is in debt. The target falls
+  only after ten minutes of lower needs. A ship is ordered at the yard once the gold covers its
+  price (the original's computers order with half of it), or bought as before.
 - **Colonies.** The island search of a computer with a home city looks at the islands nearest to
-  it first, so that its colonies lie within reach of its ships.
+  it first, so that its colonies lie within reach of its ships. It founds one only with 3000 gold
+  in hand, passes over an island it gave a city up on for 45 minutes, and a young colony (before
+  its settlers) no longer makes the older city a second city.
 - **Hourly new start.** The original's computers start again every hour and walk every city
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.

@@ -936,7 +936,8 @@ void Engine::update_fleet_target(AiPlayer& p) {
         // supply takes, by how much it lacks and how far it sails for it. The ships carry rather
         // than circle their islands.
         p.ships_per_city = 1;
-        if (const City* home = home_city(p)) {
+        // In debt it wants no ships beyond its guards.
+        if (const City* home = home_city(p); home != nullptr && player(p).money >= 0) {
             supply = supply_ships_wanted(p, *home);
         }
         t = std::min(t + supply, 2 * std::max(n, 1) + 1);
