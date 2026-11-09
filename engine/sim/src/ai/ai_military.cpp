@@ -493,6 +493,29 @@ void Engine::recruit(AiPlayer& p) {
     if (cities.empty()) {
         return;
     }
+    // Open1602: an improved computer deep in debt with its gold still falling disbands a soldier
+    // every few seconds, as a player cuts the army's upkeep, down to half its inhabitants' army.
+    if (rivals() && player(p).money < -1000 && net_income(p) < 0) {
+        const auto counts = army_counts(p.player);
+        const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
+        const Balance& bal = m_world.balance();
+        const std::uint32_t keep =
+            bal.ai_inhabitants_per_unit != 0 ? total_population(p.player) / bal.ai_inhabitants_per_unit / 2 : 0;
+        if (units > keep) {
+            for (const Soldier& s : m_world.soldiers()) {
+                if (s.owner == p.player && !s.away() && !s.dying()) {
+                    SoldierCommand cmd;
+                    cmd.player = p.player;
+                    cmd.soldier = s.id;
+                    cmd.op = SoldierCommand::Op::Disband;
+                    execute(cmd);
+                    log(p, "disbands a soldier in debt (%u left, gold %d)", units - 1, player(p).money);
+                    break;
+                }
+            }
+        }
+        return;
+    }
     City* c = nullptr;
     for (std::size_t n = 0; n < cities.size(); ++n) {
         p.recruit_cursor = static_cast<std::uint32_t>((p.recruit_cursor + 1) % cities.size());
@@ -1149,8 +1172,9 @@ void Engine::target_scan(AiPlayer& p) {
     } else if (m_world.behaviour(*o) == FactionBehaviour::Natives && !at_peace) {
         ok = attack_ok(p, t);
     } else if (rivals() && o->role == PlayerRole::Computer && m_world.behaviour(*o) == FactionBehaviour::Settlers &&
-               !at_peace) {
-        // Open1602: an improved computer attacks another computer it is at war with, as a human.
+               !at_peace && p.strategy.war_target == t.owner) {
+        // Open1602: an improved computer attacks another computer it wages its war on, as a human;
+        // after the war, while the peace is not signed yet, it leaves it alone.
         ok = attack_ok(p, t);
     }
     if (ok) {
