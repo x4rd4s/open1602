@@ -505,6 +505,7 @@ build.refusal.bricks = nicht genug Ziegel
 build.refusal.cannons = nicht genug Kanonen
 build.refusal.ship_too_far = das Schiff ist zu weit entfernt
 build.refusal.neutral = kein Kontor und kein Markt für die neutralen Gebäude
+build.refusal.enemy_near = ein feindlicher Soldat ist zu nah
 
 # Why a file could not be loaded or saved
 error.io = die Datei ließ sich nicht lesen oder schreiben
@@ -824,6 +825,9 @@ setup.bug.land_behind_walls.original = Möglich
 setup.bug.ship_shots_through_walls = Schiffe gegen Mauern
 setup.bug.ship_shots_through_walls.fixed = Mauern schützen
 setup.bug.ship_shots_through_walls.original = Schuss durch Mauern
+setup.bug.towers_near_enemies = Türme neben Feinden
+setup.bug.towers_near_enemies.fixed = Nicht möglich
+setup.bug.towers_near_enemies.original = Möglich
 setup.bug.classic_ai = Computergegner
 setup.bug.classic_ai.fixed = Verbessert
 setup.bug.classic_ai.original = Wie im Original
@@ -906,6 +910,7 @@ setup.bug.small_yard_warships.tip = Im Original baut die kleine Werft auch groß
 setup.bug.native_land.tip = Im Original behalten die Ruinen eines zerstörten Eingeborenendorfs oder einer Computerstadt ihr Land, und niemand kann dort bauen. Behoben wird das Land frei.
 setup.bug.land_behind_walls.tip = Im Original setzt ein Schiff seine Soldaten auf dem nächsten freien Feld im Umkreis von sechs Feldern ab, auch hinter den Mauern eines anderen Spielers; eine Mauer an der Küste hält niemanden ab. Behoben landen sie nicht hinter einer fremden Mauer, die zwischen Schiff und Feld steht.
 setup.bug.ship_shots_through_walls.tip = Im Original schießen Schiffe ohne Sichtlinie, auch durch Mauern; eine Mauer an der Küste schützt nichts dahinter. Behoben halten Mauern die Kanonenkugeln der Schiffe ab.
+setup.bug.towers_near_enemies.tip = Im Original lässt sich ein Wachturm direkt neben feindlichen Soldaten bauen, auch mitten im Kampf. Behoben geht das nicht, solange ein feindlicher Soldat in seiner Reichweite und zwei Felder darüber hinaus steht.
 setup.island_page.tip = Die Seite einer eigenen Welt: Inselformen, Land, Größen und Rohstoffe, mit einer Vorschau der Welt.
 setup.disasters.tip = Die Seite der Katastrophen: Dürren, Vulkane, Pest und Feuer.
 setup.balance.tip = Die Seite der Änderungen von Open1602 an den Zahlen des Originals, jede für sich.

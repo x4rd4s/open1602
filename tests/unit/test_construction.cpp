@@ -106,6 +106,7 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 22\n  Id: 22543\n  Kind: 5\n  Gfx: 80\n  Size: 1, 1\n  Rotate: 1\n  KreuzBase: 20\n"
         // Tower and beach tower, a gate, the pier.
         "  @Nummer: 23\n  Id: 20305\n  Kind: 6\n  Gfx: 84\n  Size: 1, 1\n  Rotate: 1\n  Strandoff: 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 16\n    Radius: 8\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 40\n  EndObj\n"
         "  @Nummer: 24\n  Id: 20306\n  Kind: 7\n  Gfx: 88\n  Size: 1, 1\n  Rotate: 1\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 40\n  EndObj\n"
@@ -1165,6 +1166,32 @@ TEST_CASE("construction: a soldier on the footprint stops a building, one beside
     CHECK(plan.items[0].refusal == sim::BuildRefusal::UnitInTheWay);
     CHECK(plan.items[1].refusal == sim::BuildRefusal::None);
     CHECK(plan.placed == 1);
+}
+
+TEST_CASE("construction: no watchtower within its range and two tiles of an enemy soldier") {
+    Island island;
+    island.found();
+    const auto soldier = [&](std::int32_t tx, std::int32_t ty) {
+        sim::Soldier s;
+        s.place_cell(2 * (10 + tx), 2 * (10 + ty));  // the island lies at world tile (10, 10)
+        s.owner = 1;
+        s.island = 0;
+        island.world.add_soldier(s);
+    };
+    soldier(8, 20);  // 10 tiles below the tower at (8, 10): its range of 8 and 2 more
+    sim::Relation& war = island.world.diplomacy().relation(0, 1);
+    war.peace = sim::Treaty::None;
+    island.world.diplomacy().relation(1, 0).peace = sim::Treaty::None;
+    REQUIRE(island.world.diplomacy().hostile(0, 1));
+    CHECK(island.build({{kTower, 8, 10, 0, 0}}).items[0].refusal == sim::BuildRefusal::EnemyNear);
+    // At peace, or as in the original: it may be built.
+    sim::OriginalBugs bugs;
+    bugs.towers_near_enemies = true;
+    island.world.set_original_bugs(bugs);
+    CHECK(island.build({{kTower, 8, 10, 0, 0}}).placed == 1);
+    island.world.set_original_bugs(sim::OriginalBugs{});
+    // Beyond the range and the two tiles it may be built.
+    CHECK(island.build({{kTower, 8, 7, 0, 0}}).items[0].refusal == sim::BuildRefusal::None);
 }
 
 TEST_CASE("construction: the key \"plant all farm fields\" plants the farm's open ground, the nearest first") {

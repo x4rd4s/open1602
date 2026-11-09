@@ -100,6 +100,7 @@ rules" bring all of them back.
 | Opponents | land of razed villages and towns (`native_land`) | a native village without its chief's house, market and huts keeps its land: the ruins hold it like a destroyed Kontor, nobody can build there; the same for a computer player's town without Kontor, market, tower and houses (fixed: the computer gives it up) | 43 |
 | Opponents | landing behind walls (`land_behind_walls`) | soldiers unloaded from a ship land on the nearest free cell within six tiles, behind another player's walls too, so a wall along the coast keeps nobody out (fixed: not behind another player's wall between the ship and the cell) | 58 |
 | Opponents | ships and walls (`ship_shots_through_walls`) | ships fire without a line of sight, through walls too, so a wall along the coast protects nothing behind it (fixed: walls stop cannon balls) | 59 |
+| Opponents | towers near enemies (`towers_near_enemies`) | watchtowers can be built right beside enemy soldiers, even in the middle of a fight (fixed: not while an enemy soldier stands within the tower's range and two tiles more) | 61 |
 | Opponents | computer players (`classic_ai`, S-097 to S-099) | settling, counting and site search with the original's bugs, so they stall after about two hours | 10 (always written) |
 
 The start dialog has a group "More" below the disasters whose second row ("Original settings",
@@ -116,7 +117,7 @@ interface reaches (S-005, S-012, S-013) read them from `World::original_bugs()`,
 simulation sets from its rules.
 
 A new bug of this kind is a bool in `OriginalBugs` (and in `OriginalBugs::kAll`), the place in
-`engine/sim` that reads it, a `SetupItem` after `BugShipShots` with an entry in `kBugEntries`
+`engine/sim` that reads it, a `SetupItem` after `BugTowersNearEnemies` with an entry in `kBugEntries`
 (`engine/app/src/endless_setup.cpp`), its group on the page, its label and values in
 `data/locale/*.lang` (`setup.bug.<name>`, `.fixed`, `.original`) and a `RULE` key in `kBugKeys`.
 
