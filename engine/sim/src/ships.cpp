@@ -398,6 +398,77 @@ void Fleet::add_cargo(Ship& ship, std::uint8_t ware, std::uint32_t amount, std::
     }
 }
 
+std::uint32_t Fleet::space_in(const Ship& ship, std::uint8_t ware, std::span<const std::uint8_t> order) const {
+    std::uint32_t space = 0;
+    const std::uint32_t capacity = hold_capacity(ship);
+    const std::size_t n = holds(ship);
+    for (const std::uint8_t i : order) {
+        if (i >= n) {
+            continue;
+        }
+        const CargoSlot& c = ship.cargo[i];
+        if (c.ware == 0) {
+            space += capacity;
+        } else if (c.ware == ware && c.amount < capacity) {
+            space += capacity - c.amount;
+        }
+    }
+    return space;
+}
+
+void Fleet::add_cargo_in(Ship& ship, std::uint8_t ware, std::uint32_t amount, std::uint16_t price,
+                         std::span<const std::uint8_t> order) {
+    const std::size_t n = holds(ship);
+    const std::uint32_t capacity = hold_capacity(ship);
+    for (const std::uint8_t i : order) {
+        if (amount == 0) {
+            break;
+        }
+        if (i >= n) {
+            continue;
+        }
+        CargoSlot& c = ship.cargo[i];
+        if (c.ware != 0 && c.ware != ware) {
+            continue;
+        }
+        const std::uint32_t room = capacity > c.amount ? capacity - c.amount : 0U;
+        const std::uint32_t put = std::min(room, amount);
+        if (put == 0) {
+            continue;
+        }
+        if (c.ware == 0) {
+            c = CargoSlot{ware, put, price};
+        } else {
+            const std::uint64_t value = std::uint64_t{c.price} * c.amount + std::uint64_t{price} * put;
+            c.amount += put;
+            c.price = static_cast<std::uint16_t>(value / c.amount);
+        }
+        amount -= put;
+    }
+}
+
+std::uint32_t Fleet::remove_cargo_in(Ship& ship, std::uint8_t ware, std::uint32_t amount,
+                                     std::span<const std::uint8_t> order) {
+    std::uint32_t taken = 0;
+    const std::size_t n = holds(ship);
+    for (const std::uint8_t i : order) {
+        if (taken >= amount) {
+            break;
+        }
+        if (i >= n || ship.cargo[i].ware != ware) {
+            continue;
+        }
+        CargoSlot& c = ship.cargo[i];
+        const std::uint32_t t = std::min(c.amount, amount - taken);
+        c.amount -= t;
+        taken += t;
+        if (c.amount == 0) {
+            c = CargoSlot{};
+        }
+    }
+    return taken;
+}
+
 std::uint32_t Fleet::cheat_cargo(std::uint32_t id, std::uint8_t ware, std::uint32_t amount) {
     Ship* ship = m_world->ship(id);
     if (ship == nullptr) {
@@ -1541,7 +1612,9 @@ bool Fleet::may_trade(PlayerId ship_owner, PlayerId city_owner) const {
 }
 
 std::uint32_t Fleet::move_goods(Ship& ship, City& city, std::uint8_t ware, bool to_ship, std::uint32_t amount,
-                                std::uint8_t hold, bool limits, std::uint16_t price) {
+                                std::uint8_t hold, bool limits, std::uint16_t price,
+                                std::span<const std::uint8_t> order) {
+    const bool ordered = !order.empty();
     // The city side and the ship side in one step: the ship's room is
     // checked before anything leaves the Kontor, so no goods are lost and nobody pays for what does
     // not fit (S-073).
@@ -1559,7 +1632,7 @@ std::uint32_t Fleet::move_goods(Ship& ship, City& city, std::uint8_t ware, bool 
             const std::uint32_t keep = trade->keep + city.reserved_of(ware);
             avail = avail > keep ? avail - keep : 0;
         }
-        n = std::min({avail, amount, space_for(ship, ware, hold)});
+        n = std::min({avail, amount, ordered ? space_in(ship, ware, order) : space_for(ship, ware, hold)});
         if (natives && limits) {
             // Natives give goods for goodwill: a ton costs about a third of the base price. A
             // player without goodwill there gets nothing.
@@ -1597,13 +1670,19 @@ std::uint32_t Fleet::move_goods(Ship& ship, City& city, std::uint8_t ware, bool 
         }
         city.goods[ware] -= n;
         city.book(ware, ship.owner == city.owner ? GoodsFlow::ShippedOut : GoodsFlow::Sold, n);
-        add_cargo(ship, ware, n, price);
+        if (ordered) {
+            add_cargo_in(ship, ware, n, price, order);
+        } else {
+            add_cargo(ship, ware, n, price);
+        }
     } else {
         const std::uint32_t have = [&] {
             std::uint32_t h = 0;
             const std::size_t holds_n = holds(ship);
             for (std::size_t i = 0; i < holds_n; ++i) {
-                if (ship.cargo[i].ware == ware && (hold == 0xFF || i == hold)) {
+                const bool listed = ordered ? std::ranges::find(order, static_cast<std::uint8_t>(i)) != order.end()
+                                            : hold == 0xFF || i == hold;
+                if (ship.cargo[i].ware == ware && listed) {
                     h += ship.cargo[i].amount;
                 }
             }
@@ -1652,7 +1731,11 @@ std::uint32_t Fleet::move_goods(Ship& ship, City& city, std::uint8_t ware, bool 
                 city.goodwill[ship.owner] + std::uint64_t{m_world->goods().price(ware)} * n / kTon;
             city.goodwill[ship.owner] = static_cast<std::uint32_t>(std::min<std::uint64_t>(raised, kMaxNativeGoodwill));
         }
-        remove_cargo(ship, ware, n, hold);
+        if (ordered) {
+            remove_cargo_in(ship, ware, n, order);
+        } else {
+            remove_cargo(ship, ware, n, hold);
+        }
         city.goods[ware] += n;
         city.book(ware, ship.owner == city.owner ? GoodsFlow::ShippedIn : GoodsFlow::Bought, n);
     }
@@ -1894,6 +1977,88 @@ void Fleet::route_next_stop(Ship& ship) {
     ship.motion.failures = 0;
 }
 
+// A route's entry k is its stop's ware for hold k (the editor shows one entry per hold). The goods
+// keep to those holds, so that a part load or a part delivery never pushes one ware into the hold
+// of another: once set up, a route keeps its holds round after round, and holds that got mixed up
+// before sort themselves out as they empty.
+
+namespace {
+
+/// The ware the stop loads into hold `h` (0 = none).
+std::uint8_t loads_into(const RouteStop& stop, std::size_t h, std::size_t entries) {
+    return h < entries && !stop.entries[h].unload ? stop.entries[h].ware : 0;
+}
+
+/// Whether any stop of the route loads `ware` (`same`) or another ware (`!same`) into hold `h`.
+bool route_loads_into(const TradeRoute& route, std::size_t h, std::size_t entries, std::uint8_t ware, bool same) {
+    return std::ranges::any_of(route.stops, [&](const RouteStop& s) {
+        const std::uint8_t w = s.target.empty() ? 0 : loads_into(s, h, entries);
+        return w != 0 && (w == ware) == same;
+    });
+}
+
+}  // namespace
+
+std::vector<std::uint8_t> Fleet::route_load_order(const Ship& ship, const RouteStop& stop, std::uint8_t ware) const {
+    const std::size_t n = std::min<std::size_t>(holds(ship), 0xFF);
+    const std::size_t entries = std::min(n, usable_route_entries(ship, *m_figures));
+    const std::uint32_t capacity = hold_capacity(ship);
+    // Best first: the ware's own holds with room, its free own holds at this stop, then at other
+    // stops, other holds of the ware this stop names for nothing, free holds no stop names, and last
+    // free holds other stops name for other wares (a computer's cart loads more than one hold of a
+    // ware). Holds this stop names for another ware are left to that ware.
+    constexpr std::size_t kRanks = 6;
+    std::array<std::vector<std::uint8_t>, kRanks> ranks;
+    for (std::size_t h = 0; h < n; ++h) {
+        const CargoSlot& c = ship.cargo[h];
+        const std::uint8_t here = loads_into(stop, h, entries);
+        std::size_t rank = kRanks;
+        if (c.ware == ware && c.amount < capacity) {
+            if (here == ware || (here == 0 && route_loads_into(ship.route, h, entries, ware, true))) {
+                rank = 0;
+            } else if (here == 0) {
+                rank = 3;
+            }  // else not topped up: the hold empties at a delivery and goes back to its own ware
+        } else if (c.ware == 0) {
+            if (here == ware) {
+                rank = 1;
+            } else if (here != 0) {
+                rank = kRanks;  // kept free for the ware this stop loads into it
+            } else if (route_loads_into(ship.route, h, entries, ware, true)) {
+                rank = 2;
+            } else if (!route_loads_into(ship.route, h, entries, ware, false)) {
+                rank = 4;
+            } else {
+                rank = 5;
+            }
+        }
+        if (rank < kRanks) {
+            ranks[rank].push_back(static_cast<std::uint8_t>(h));
+        }
+    }
+    std::vector<std::uint8_t> order;
+    for (const auto& r : ranks) {
+        order.insert(order.end(), r.begin(), r.end());
+    }
+    return order;
+}
+
+std::vector<std::uint8_t> Fleet::route_unload_order(const Ship& ship, std::uint8_t ware) const {
+    const std::size_t n = std::min<std::size_t>(holds(ship), 0xFF);
+    const std::size_t entries = std::min(n, usable_route_entries(ship, *m_figures));
+    // Holds the ware does not belong in empty first, so that its own keep what stays on board.
+    std::vector<std::uint8_t> misplaced;
+    std::vector<std::uint8_t> own;
+    for (std::size_t h = 0; h < n; ++h) {
+        if (ship.cargo[h].ware == ware) {
+            (route_loads_into(ship.route, h, entries, ware, true) ? own : misplaced)
+                .push_back(static_cast<std::uint8_t>(h));
+        }
+    }
+    misplaced.insert(misplaced.end(), own.begin(), own.end());
+    return misplaced;
+}
+
 bool Fleet::route_city_stop(Ship& ship, const RouteStop& stop) {
     City* city = m_world->city(stop.target.island, stop.target.city);
     if (city == nullptr || !may_trade(ship.owner, city->owner)) {
@@ -1920,11 +2085,13 @@ bool Fleet::route_city_stop(Ship& ship, const RouteStop& stop) {
                 }
             }
             const std::uint32_t have = ship.load(entry.ware);
+            const std::vector<std::uint8_t> order =
+                unload ? route_unload_order(ship, entry.ware) : route_load_order(ship, stop, entry.ware);
             std::uint32_t request = 0;
             if (unload) {
                 request = std::min(amount, have);  // deliver up to the amount
             } else {
-                request = amount > have ? std::min(amount - have, space_for(ship, entry.ware)) : 0U;  // fill up
+                request = amount > have ? std::min(amount - have, space_in(ship, entry.ware, order)) : 0U;  // fill up
             }
             if (request < kTon) {
                 // Already full or empty enough: not a problem of the route (the original warns, S-076).
@@ -1936,7 +2103,8 @@ bool Fleet::route_city_stop(Ship& ship, const RouteStop& stop) {
             if (foreign) {
                 price = trade == nullptr ? 0 : (unload ? trade->buy_price : trade->sell_price);
             }
-            const std::uint32_t moved = move_goods(ship, *city, entry.ware, !unload, request, 0xFF, foreign, price);
+            const std::uint32_t moved =
+                move_goods(ship, *city, entry.ware, !unload, request, 0xFF, foreign, price, order);
             if (moved == 0) {
                 ship.route.problem = true;
                 m_events.push_back(
