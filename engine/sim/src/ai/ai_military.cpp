@@ -1052,6 +1052,12 @@ void Engine::start_attack(AiPlayer& p, const City& t) {
     if (home == nullptr) {
         return;
     }
+    // Open1602: an improved computer sends one attack at a time, and gathers its soldiers at the
+    // Kontor for the ship to take them on board.
+    if (rivals() && std::any_of(p.ships.begin(), p.ships.end(),
+                                [](const ShipNote& n) { return n.mission >= 5 && n.mission <= 9; })) {
+        return;
+    }
     const Target ref = Target::city_of(home->island, home->index);
     Ship* ship = best_armed_ship(p, ref, 1);
     if (ship == nullptr) {
@@ -1060,6 +1066,24 @@ void Engine::start_attack(AiPlayer& p, const City& t) {
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
     ship_send(p, *ship, ref, 5, city_param(t));
     note(p, ship->id).counter = 80;
+    if (rivals() && home->warehouse_x && home->warehouse_y) {
+        const WorldIsland& isl = island_of(home->island);
+        SoldierOrder gather;
+        gather.player = p.player;
+        gather.target = Target::spot(2 * (isl.x + *home->warehouse_x) + 1, 2 * (isl.y + *home->warehouse_y) + 1);
+        for (const Soldier& s : m_world.soldiers()) {
+            if (gather.soldiers.size() >= 8) {
+                break;
+            }
+            if (s.owner == p.player && s.island == home->island && !s.away() &&
+                (s.target.empty() || s.target.kind == Target::Kind::Position)) {
+                gather.soldiers.push_back(s.id);
+            }
+        }
+        if (!gather.soldiers.empty()) {
+            execute(gather);
+        }
+    }
 }
 
 void Engine::raid_outpost(AiPlayer& p, const City& t) {

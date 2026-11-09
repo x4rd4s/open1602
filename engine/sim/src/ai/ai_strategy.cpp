@@ -234,6 +234,20 @@ void Engine::end_war(AiPlayer& p, const char* why) {
     log(p, "ends the war on player %u: %s", b, why);
     st.war_target = kNoPlayer;
     st.war_ended_ms = now_ms();
+    // Ships on their way against it are called back.
+    for (ShipNote& n : p.ships) {
+        if (n.mission < 5 || n.mission > 9) {
+            continue;
+        }
+        const City* c = city(static_cast<std::uint16_t>(n.param >> 8), static_cast<std::uint8_t>(n.param & 0xFF));
+        const PlayerId against =
+            n.mission <= 6 ? (c != nullptr ? c->owner : kNoPlayer) : static_cast<PlayerId>(n.param & 0xFF);
+        if (against == b) {
+            if (Ship* s = m_world.ship(n.id)) {
+                mission_end(p, *s, n);
+            }
+        }
+    }
     if (m_world.player(b) != nullptr && m_world.diplomacy().relation(p.player, b).peace == Treaty::None) {
         DiplomacyOrder o;
         o.player = p.player;
