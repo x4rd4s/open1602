@@ -7,6 +7,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
+#include "o1602/assets/game_data.hpp"
 #include "o1602/core/byte_reader.hpp"
 #include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/diplomacy.hpp"
@@ -407,6 +408,111 @@ TEST_CASE("ships: a trade route loads where it should and delivers at the next s
     CHECK(sea.world.city(1, 0)->goods[kWood] >= 20 * kTon);
     CHECK(sea.world.city(0, 0)->goods[kWood] <= 10 * kTon);
     CHECK(sea.world.ship(id)->route.active);
+}
+
+TEST_CASE("ships: a route keeps each ware in the holds its entries name, round after round") {
+    // A ship of six holds: holds 1+2 spices, 3+4 cocoa, 5+6 cloth, loaded at one city and delivered
+    // at another. Part loads (little spice) and part deliveries (a small store) must never push a
+    // ware into another's hold, and the route must not warn.
+    using assets::ware::kCloth;
+    using assets::ware::kCocoa;
+    using assets::ware::kSpices;
+    Sea sea(true);
+    sim::City second = *sea.world.city(0, 0);
+    sim::IslandMap map(4, 4);
+    for (std::int32_t y = 0; y < 4; ++y) {
+        for (std::int32_t x = 0; x < 4; ++x) {
+            REQUIRE(map.place(*sea.buildings.by_id(20101), x, y, 0, 0).ok());
+        }
+    }
+    REQUIRE(map.place(*sea.buildings.by_id(20103), 0, 1, 0, 0, 0, 0).ok());
+    REQUIRE(sea.world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 90, 30}).ok());
+    second.island = 1;
+    second.warehouse_x = 0;
+    second.warehouse_y = 1;
+    second.goods.assign(25, 0);
+    second.capacity = 40 * kTon;  // takes less than a full hold of each ware per visit
+    sea.world.add_city(second);
+    sea.world.city(0, 0)->capacity = 400 * kTon;
+    const std::uint32_t id = sea.add(30, 25, 29).id;
+    REQUIRE(sea.world.ship(id)->cargo.size() == 6);
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    using Op = sim::RouteEdit::Op;
+    const std::array<std::uint8_t, 6> wares{kSpices, kSpices, kCocoa, kCocoa, kCloth, kCloth};
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 0)}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 1, 0, sim::Target::city_of(1, 0)}));
+    for (std::uint8_t h = 0; h < 6; ++h) {
+        REQUIRE(fleet.edit_route(
+            sim::RouteEdit{0, id, Op::SetEntry, 0, h, {}, sim::RouteEntry{wares[h], false, 50 * kTon}}));
+        REQUIRE(fleet.edit_route(
+            sim::RouteEdit{0, id, Op::SetEntry, 1, h, {}, sim::RouteEntry{wares[h], true, 50 * kTon}}));
+    }
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::Start}));
+    std::vector<sim::ShipEvent> events;
+    std::uint32_t delivered = 0;
+    bool mixed = false;
+    for (std::uint32_t t = 0; t < 600000; t += 50) {
+        // The first city makes a little spice and plenty of the rest; the second uses up all.
+        sim::City& home = *sea.world.city(0, 0);
+        home.goods[kSpices] = std::max(home.goods[kSpices], 30 * kTon);
+        home.goods[kCocoa] = 200 * kTon;
+        home.goods[kCloth] = 200 * kTon;
+        sim::City& market = *sea.world.city(1, 0);
+        for (const std::uint8_t w : {kSpices, kCocoa, kCloth}) {
+            delivered += market.goods[w];
+            market.goods[w] = 0;
+        }
+        sea.world.set_time_ms(sea.world.time_ms() + 50);
+        fleet.tick(50);
+        for (const auto& e : fleet.take_events()) {
+            events.push_back(e);
+        }
+        const sim::Ship& ship = *sea.world.ship(id);
+        for (std::size_t h = 0; h < 6; ++h) {
+            mixed = mixed || (ship.cargo[h].ware != 0 && ship.cargo[h].ware != wares[h]);
+        }
+    }
+    CHECK(!mixed);
+    CHECK(count(events, sim::ShipEvent::Kind::RouteWarning) == 0);
+    CHECK(delivered > 500 * kTon);  // it kept going
+    CHECK(sea.world.ship(id)->route.active);
+}
+
+TEST_CASE("ships: a route sorts holds that got mixed up back into place as they empty") {
+    using assets::ware::kCocoa;
+    using assets::ware::kSpices;
+    Sea sea(true);
+    sim::City& city = *sea.world.city(0, 0);
+    city.capacity = 400 * kTon;
+    city.goods[kSpices] = 200 * kTon;
+    city.goods[kCocoa] = 200 * kTon;
+    sim::Ship& ship = sea.add(38, 25);
+    const std::uint32_t id = ship.id;
+    // Holds 1+2 cocoa, 3+4 spices by the route; from earlier, cocoa also lies in hold 3.
+    ship.cargo[0] = sim::CargoSlot{kCocoa, 30 * kTon, 0};
+    ship.cargo[2] = sim::CargoSlot{kCocoa, 20 * kTon, 0};
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    using Op = sim::RouteEdit::Op;
+    const std::array<std::uint8_t, 4> wares{kCocoa, kCocoa, kSpices, kSpices};
+    // First 20 t of cocoa ashore, which empties the hold it does not belong in; then all loaded.
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 0)}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetEntry, 0, 0, {}, sim::RouteEntry{kCocoa, true, 20 * kTon}}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 0)}));
+    for (std::uint8_t h = 0; h < 4; ++h) {
+        REQUIRE(fleet.edit_route(
+            sim::RouteEdit{0, id, Op::SetEntry, 1, h, {}, sim::RouteEntry{wares[h], false, 50 * kTon}}));
+    }
+    sim::RouteEdit one_way{0, id, Op::OneWay};
+    one_way.on = true;
+    REQUIRE(fleet.edit_route(one_way));  // ends after the loading stop
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::Start}));
+    (void)run(fleet, sea.world, 30000);
+    CHECK(!sea.world.ship(id)->route.active);
+    const sim::Ship& after = *sea.world.ship(id);
+    for (std::size_t h = 0; h < 4; ++h) {
+        CHECK(after.cargo[h].ware == wares[h]);
+        CHECK(after.cargo[h].amount == 50 * kTon);
+    }
 }
 
 TEST_CASE("ships: a route uses all eight stops, and another ship of the owner can take its stops") {
