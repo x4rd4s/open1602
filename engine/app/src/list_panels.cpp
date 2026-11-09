@@ -238,21 +238,21 @@ private:
         }
         // Cities of humans and computers: the player's own and those of trade partners. Open1602
         // adds the pirates' nests the player has discovered, while their Kontor stands (the
-        // original lists no pirates).
+        // original lists no pirates). A spectator (no player of its own) sees every city.
+        const bool watching = c.local == sim::kNoPlayer;
         for (const sim::City& city : w.cities()) {
             const sim::Player* owner = w.player(city.owner);
             if (owner == nullptr || city.island >= w.islands().size()) {
                 continue;
             }
             if (w.behaviour(*owner) == sim::FactionBehaviour::Pirates) {
-                if (c.local == sim::kNoPlayer || !w.islands()[city.island].discovered_by(c.local) ||
+                if ((!watching && !w.islands()[city.island].discovered_by(c.local)) ||
                     !sim::kontor_open(w, c.buildings, city)) {
                     continue;
                 }
             } else if (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer) {
                 continue;
-            } else if (city.owner != c.local &&
-                       (c.local == sim::kNoPlayer || !w.diplomacy().may_trade(c.local, city.owner))) {
+            } else if (city.owner != c.local && !watching && !w.diplomacy().may_trade(c.local, city.owner)) {
                 continue;
             }
             const sim::WorldIsland& island = w.islands()[city.island];
