@@ -18,6 +18,7 @@ namespace o1602::sim::ai {
 namespace {
 
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
+constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
 
 }  // namespace
 
@@ -389,6 +390,10 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     const std::uint32_t cap = c.capacity;
     const auto& m = m_buildings.materials();
     std::vector<std::pair<std::uint32_t, bool>> changes;  // production index, on; in the original's order
+    // Deep in debt an improved computer also saves the running costs of its stores: whatever has
+    // 10 t of its ware in stock goes off and stays off until the stock is down to 4 t.
+    const bool lean = rivals() && player(p).money < kLeanMoney && net_income(p) < 0;
+    std::uint32_t saved = 0;
     for (std::size_t i = 0; i < m_world.productions().size(); ++i) {
         const Production& pr = m_world.productions()[i];
         if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
@@ -405,7 +410,11 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         }
         const auto index = static_cast<std::uint32_t>(i);
         bool enabled = pr.enabled;
+        const bool hold = lean && c.stock(b->ware) >= 4 * kTon;
         const auto set = [&](bool on) {
+            if (on && hold) {
+                return;
+            }
             changes.emplace_back(index, on);
             enabled = on;
         };
@@ -459,6 +468,13 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         } else {
             raw();  // farms, pastures, mines, hunters, fishers and the workshops without a raw ware
         }
+        if (lean && enabled && c.stock(w) >= 10 * kTon) {
+            set(false);
+            ++saved;
+        }
+    }
+    if (saved != 0) {
+        log(p, "city %u/%u: switches %u full producers off in debt", c.island, c.index, saved);
     }
     for (const auto& [index, on] : changes) {
         const Production& pr = m_world.productions()[index];

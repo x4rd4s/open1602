@@ -66,6 +66,7 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computer_strategy` | `land_colony_money` | 2000 | 0–10000000 | the gold in hand a colony waits for while the goal is land or gold (at most the usual 3000) |
 | `computer_strategy` | `pressure_percent` | 150 | 100–1000 | a near rival that much weaker (in percent of its strength) is pressed: armed against, offered no peace; 25 less for a conqueror, 50 more for a trader, 10 less per level |
 | `computer_strategy` | `human_threat_percent` | 15 | 0–1000 | from the third level on, a human's strength counts this much more per level |
+| `computer_strategy` | `war_units`, `war_money` | 6, 1500 | 0–1000, 0–10000000 | a computer that arms for a war declares it with an army of so many soldiers and so much gold in hand (BALA version 8) |
 
 The `computers` values are the original's cheats: what the computer players get from nowhere, on
 every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of

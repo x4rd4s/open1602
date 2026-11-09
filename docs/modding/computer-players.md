@@ -475,8 +475,23 @@ Every minute on the easiest level, ten seconds sooner per level (`[computer_stra
   settler, or with 8000 gold and fewer than three cities, once the home city is past its second
   stage; else the economy. A goal holds ten minutes, unless debt or a threat end it sooner.
 
-The stances and the goal steer the army, the colonies and the peace offers so far; the war plans
-will follow them.
+The stances and the goal steer the army, the colonies and the peace offers.
+
+**Wars.** An improved computer plans a war on a rival it presses: a conqueror on any level, a
+settler from the third level on, a trader only on the hardest; humans are spared on the easiest.
+From its main city on, with half an hour of peace since its last war, it first arms (its goal
+is military); once it has an army of six soldiers (`war_units`) and 1500 gold in hand
+(`war_money`), it declares war, keeps arming while the war lasts, and attacks the rival's cities as it attacks a human's: its ships land troops, its
+soldiers on an island fight the enemy's and take its Kontor and houses. It makes no peace with its
+target and offers no trade while the war lasts. Every ten minutes it looks whether the war gets
+anywhere: the target has lost a twentieth of its inhabitants (a city counts as fifty), or troops
+of its landed since the last look. After three
+looks without progress, in debt, or once the target is gone, it offers peace; the other side signs
+it as long as its mood is above -20. The original's computers never fight each other.
+
+More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
+disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
+10 t of its ware in stock until the stock is down to 4 t.
 
 ## What they get from nowhere
 

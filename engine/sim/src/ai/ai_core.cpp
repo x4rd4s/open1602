@@ -146,7 +146,8 @@ bool Engine::accepts(const State& state) const {
         }
         const Strategy& st = p.strategy;
         if (st.character > character::kCount || st.goal > goal::kLand || st.stances.size() > seen.size() ||
-            std::any_of(st.stances.begin(), st.stances.end(), [](std::uint8_t x) { return x > stance::kHostile; })) {
+            std::any_of(st.stances.begin(), st.stances.end(), [](std::uint8_t x) { return x > stance::kHostile; }) ||
+            (st.war_target != kNoPlayer && (st.war_target >= seen.size() || st.war_target == p.player))) {
             return false;
         }
     }
@@ -546,6 +547,7 @@ void Engine::init_player(AiPlayer& p) {
     const std::uint64_t fleet_ms = p.fleet_ms;
     const std::int32_t fleet_target = p.fleet_target;
     std::vector<std::pair<std::uint16_t, std::uint64_t>> left = std::move(p.left_islands);
+    Strategy strategy = std::move(p.strategy);  // its character, goal and war plan stay
     if (!classic()) {
         kept = std::move(p.plans);
     }
@@ -594,6 +596,7 @@ void Engine::init_player(AiPlayer& p) {
         p.fleet_ms = fleet_ms;
         p.fleet_target = fleet_target;
         p.left_islands = std::move(left);
+        p.strategy = std::move(strategy);
     }
     choose_home(p);
     const std::size_t ships = own_ships(p).size();
@@ -788,6 +791,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (p.strategy.war_target != kNoPlayer || p.strategy.war_ended_ms != 0) {
+            return static_cast<std::uint16_t>(ai::kStateWithWarPlan);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.character != ai::character::kNone) {
             return static_cast<std::uint16_t>(ai::kStateWithStrategy);

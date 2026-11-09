@@ -337,7 +337,7 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
         return kWideClassPublic;
     }
     if (id == kBalance) {
-        return kBalanceWithStrategy;
+        return kBalanceWithWar;
     }
     if (id == kFactions) {
         return kScriptedFactions;
