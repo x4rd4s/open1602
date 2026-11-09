@@ -18,6 +18,7 @@
 #include "annokit/platform/window.hpp"
 
 #include "o1602/audio/game_audio.hpp"
+#include "o1602/editor/islands.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/ui/build_menu.hpp"
@@ -2036,6 +2037,35 @@ void Hud::build_minimap(const sim::World& world, const assets::BuildingTable& bu
             m_minimap[i + 3] = rgb[3];
         }
     }
+    // The editor's placeholders, islands made when a game starts, in the yellow of the map's.
+    m_minimap_plan = m_editing ? minimap_plan(world) : decltype(m_minimap_plan){};
+    for (const auto& [px, py, pw, ph] : m_minimap_plan) {
+        for (std::uint32_t y = py; y < std::min(m_world_h, py + ph); ++y) {
+            for (std::uint32_t x = px; x < std::min(m_world_w, px + pw); ++x) {
+                const std::size_t i = (std::size_t{y} * m_world_w + x) * 4;
+                if (m_minimap[i + 3] == 0) {
+                    m_minimap[i] = 240;
+                    m_minimap[i + 1] = 210;
+                    m_minimap[i + 2] = 70;
+                    m_minimap[i + 3] = 255;
+                }
+            }
+        }
+    }
+}
+
+std::vector<std::array<std::uint32_t, 4>> Hud::minimap_plan(const sim::World& world) {
+    std::vector<std::array<std::uint32_t, 4>> out;
+    if (const auto& planned = world.planned_islands()) {
+        for (std::size_t i = 0; i < planned->plan.islands.size(); ++i) {
+            if (editor::placeholder_open(world, i)) {
+                const assets::ScenarioPlan::Island& e = planned->plan.islands[i];
+                const auto [w, h] = editor::placeholder_size(e);
+                out.push_back({e.x, e.y, w, h});
+            }
+        }
+    }
+    return out;
 }
 
 bool Hud::refresh_minimap_island(const sim::World& world, const assets::BuildingTable& buildings,
@@ -2251,7 +2281,7 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
     // longer makes it build the whole picture again (FB-5: without a minimap gadget nothing
     // uploads, and every frame rebuilt it).
     if (m_minimap_rebuild || world.width() != m_world_w || world.height() != m_world_h ||
-        world.islands().size() != m_minimap_islands) {
+        world.islands().size() != m_minimap_islands || (m_editing && minimap_plan(world) != m_minimap_plan)) {
         build_minimap(world, buildings, banners);
         m_minimap_ms = now_ms;
         m_minimap_rebuild = false;
