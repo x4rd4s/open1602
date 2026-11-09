@@ -8,6 +8,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -306,6 +307,7 @@ struct EditorRule {
     std::string label;    ///< Windows-1252
     std::string value;    ///< Windows-1252
     bool enabled = true;  ///< false: it does not matter with the others as they are
+    std::string tip{};    ///< the explanation the start dialog's tooltip gives, Windows-1252; empty: none
 };
 
 /// The rows of the page "Scenario": the name and the briefing in German and English, the stars,
@@ -884,6 +886,13 @@ private:
     std::int32_t m_packages_h = 0;           ///< the height the dialog of the packages needs
     std::int32_t m_campaign_h = 480;         ///< the height the dialog of the campaigns needs
     bool m_previewing = false;               ///< the dice preview, as laid out last (its page is the column's)
+    /// The mouse in design units, as it moved last; for the tooltips of the page "Rules".
+    std::optional<std::array<std::int32_t, 2>> m_mouse;
+    std::string m_tip;                                  ///< the tooltip's text under the mouse, empty: none
+    std::chrono::steady_clock::time_point m_tip_since;  ///< since when it is under the mouse
+    bool m_tip_dismissed = false;                       ///< a press hid it until the mouse moves to another
+    /// How long the mouse rests on a setting before its tooltip shows, as in the start dialog.
+    static constexpr std::chrono::milliseconds kTipDelay{500};
 };
 
 }  // namespace o1602::app

@@ -147,7 +147,7 @@ public:
         if (m_strip_shown) {
             const std::int32_t k = e.id - kStripFrame;
             if (e.kind == ui::PanelEvent::Kind::Clicked && k >= 0 &&
-                k < static_cast<std::int32_t>(diplomacy::kMaxPartners)) {
+                k < static_cast<std::int32_t>(diplomacy::kStripPlaces)) {
                 const std::vector<sim::PlayerId> partners = partners_of(c);
                 if (static_cast<std::size_t>(k) < partners.size() &&
                     partners[static_cast<std::size_t>(k)] != m_partner) {
@@ -273,10 +273,10 @@ private:
     static constexpr std::int32_t kLess = 64022;
     static constexpr std::int32_t kMore = 64023;
     static constexpr std::int32_t kSlider = 64024;
-    // The strip (Open1602), added to a copy of TRIBUT: + place 0..kMaxPartners - 1
+    // The strip (Open1602), added to a copy of TRIBUT: + place 0..kStripPlaces - 1
     static constexpr std::int32_t kStripArms = 64101;
     static constexpr std::int32_t kStripFrame = kStripArms + 256;
-    static_assert(diplomacy::kMaxPartners <= 256);
+    static_assert(diplomacy::kStripPlaces <= 256);
     /// PIRATORD.GAD's frame to choose a player (GFXPIRAT + 11), golden 4 further on.
     static constexpr std::int32_t kFrameOffset = 11;
     static constexpr std::int32_t kFramePress = 4;
@@ -290,11 +290,11 @@ private:
         const std::int32_t arms_gfx = shield != nullptr ? shield->gfx : 548;
         for (assets::Gadget& g : layout.gadgets) {
             if (g.id >= kTributeBoard && g.id <= kTributeHand) {
-                g.pos[1] += diplomacy::treaties_shift(diplomacy::kMaxPartners);
+                g.pos[1] += diplomacy::treaties_shift(diplomacy::kStripPlaces);
             }
         }
-        for (std::size_t k = 0; k < diplomacy::kMaxPartners; ++k) {
-            const auto [x, y] = diplomacy::strip_slot(k, diplomacy::kMaxPartners);
+        for (std::size_t k = 0; k < diplomacy::kStripPlaces; ++k) {
+            const auto [x, y] = diplomacy::strip_slot(k, diplomacy::kStripPlaces);
             assets::Gadget arms;
             arms.id = kStripArms + static_cast<std::int32_t>(k);
             arms.kind = assets::GadgetKind::Graphic;
@@ -339,7 +339,7 @@ private:
         const std::vector<diplomacy::Offer> offers = diplomacy::open_offers(c.world(), c.local);
         const bool flash = (c.now_ms / kOfferBlinkMs) % 2 == 0;
         const render::BannerArt arms = render::BannerArt::arms_at(m_shield);
-        for (std::size_t k = 0; k < diplomacy::kMaxPartners; ++k) {
+        for (std::size_t k = 0; k < diplomacy::kStripPlaces; ++k) {
             const auto slot = static_cast<std::int32_t>(k);
             const bool shown = k < partners.size();
             m_strip.set_visible(kStripArms + slot, shown);

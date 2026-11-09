@@ -976,7 +976,8 @@ bool trim_trade_settings(City& city, const assets::BuildingType& kontor);
 /// kMaxNativeGoodwill. Run when a game starts or is loaded.
 void fit_goodwill(World& world);
 
-/// The player at this computer until there is a lobby: the first human player, kNoPlayer if none.
+/// The player at this computer until there is a lobby: the first human player that is not an absent
+/// slot (only absent ones: the first of them), kNoPlayer if none.
 [[nodiscard]] PlayerId first_human_player(const World& world) noexcept;
 
 /// The player of a person who plays the game alone, `owner` being their Player::owner: the human

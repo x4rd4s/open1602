@@ -29,6 +29,8 @@ namespace o1602::app::diplomacy {
 inline constexpr std::size_t kOriginalRows = 3;
 /// Most partners a game can have.
 inline constexpr std::size_t kMaxPartners = sim::kMaxPlayers - 1;
+/// Most coats of arms the strip shows: a spectator, who is none of the players, sees every one.
+inline constexpr std::size_t kStripPlaces = sim::kMaxPlayers;
 
 /// The strip: frames of 41 x 49 with the coat of arms (32 x 40) 2 pixels in, six in a row, one
 /// or two rows centred in the panel's 250 pixels from x = 6 (further rows below them for more than

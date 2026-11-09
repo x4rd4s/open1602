@@ -294,6 +294,71 @@ annokit::core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& 
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "neutral_add"));
 }
 
+sim::PlayerId party_slot(Neutral party) noexcept {
+    switch (party) {
+        case Neutral::Pirates:
+            return 5;
+        case Neutral::Natives:
+            return 6;
+        case Neutral::Trader:
+            break;
+    }
+    return 4;
+}
+
+bool can_add_party(const sim::World& world, Neutral party) {
+    if (!party_slots(world, party).empty()) {
+        return false;
+    }
+    const sim::Player* p = world.player(party_slot(party));
+    return p == nullptr || (p->status == sim::PlayerStatus::Absent && p->role != sim::PlayerRole::Neutral);
+}
+
+annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party) {
+    if (!can_add_party(world, party)) {
+        return make_error(ErrorCode::Unsupported, "the world has the party already, or its slot is taken");
+    }
+    const sim::FactionBehaviour behaviour = behaviour_of(party);
+    std::optional<sim::FactionId> faction;
+    const sim::FactionId base = sim::base_faction(behaviour);
+    if (base < world.factions().size() && world.factions()[base].behaviour == behaviour) {
+        faction = base;
+    }
+    for (std::size_t f = 0; !faction && f < world.factions().size() && f < sim::kMaxFactions; ++f) {
+        if (world.factions()[f].behaviour == behaviour) {
+            faction = static_cast<sim::FactionId>(f);
+        }
+    }
+    if (!faction) {
+        return make_error(ErrorCode::NotFound, "no faction of the party's behaviour");
+    }
+    const sim::PlayerId slot = party_slot(party);
+    std::vector<sim::Player> players = world.players();
+    while (players.size() <= slot) {
+        sim::Player absent;  // holds the place of another party
+        absent.status = sim::PlayerStatus::Absent;
+        players.push_back(std::move(absent));
+    }
+    sim::Player p;
+    sim::make_neutral(p, *faction);
+    p.status = sim::PlayerStatus::Playing;
+    // The colours a new game gives them (the flags of their ships and buildings).
+    p.banner = party == Neutral::Pirates ? 4 : party == Neutral::Natives ? 5 : 6;
+    p.infra_mask = party == Neutral::Trader ? 0 : 0xFFFFFFFFU;
+    players[slot] = std::move(p);
+    sim::World after = world;
+    keep_relations(world, after, players);
+    // The party towards everyone as in a new game.
+    sim::Diplomacy fresh;
+    fresh.reset(players, after.factions());
+    for (std::size_t other = 0; other < players.size(); ++other) {
+        const auto o = static_cast<sim::PlayerId>(other);
+        after.diplomacy().relation(slot, o) = fresh.relation(slot, o);
+        after.diplomacy().relation(o, slot) = fresh.relation(o, slot);
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "party_add"));
+}
+
 Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {
     const sim::Relation& r = world.diplomacy().relation(a, b);
     return Relations{r.peace == sim::Treaty::Signed, r.trade == sim::Treaty::Signed};

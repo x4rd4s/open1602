@@ -328,3 +328,74 @@ TEST_CASE("editor players: a slot given a package's faction of the settlers' beh
     v.faction = static_cast<sim::FactionId>(factions.size());
     CHECK(!editor::set_player(world, 1, v).ok());
 }
+
+TEST_CASE("editor players: on a map of open sea the human is never a slot that only holds a place") {
+    // A new map without islands has no players: five added fill the slots 0 to 3 and 7, the slots
+    // 4 to 6 between them only hold places. The human is the fifth.
+    sim::World world(40, 40);
+    for (int n = 0; n < 5; ++n) {
+        auto op = editor::add_player(world);
+        REQUIRE(op.ok());
+        (*op)->apply(world);
+    }
+    REQUIRE(world.players().size() == 8);
+    editor::PlayerValues v = editor::player_values(world.players()[7]);
+    v.role = sim::PlayerRole::Human;
+    v.money = 30000;
+    auto human = editor::set_player(world, 7, v);
+    REQUIRE(human.ok());
+    (*human)->apply(world);
+    world.add_ship(sim::make_ship("", 3, 3, 21, 7));
+    CHECK(sim::first_human_player(world) == 7);
+
+    // So the game started from the scenario plays it too, and the empty slots stay empty.
+    auto bytes = sim::write_game(world, assets::BuildingTable{});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, assets::BuildingTable{});
+    REQUIRE(loaded.ok());
+    CHECK(sim::first_human_player(*loaded) == 7);
+    CHECK(loaded->players()[7].money == 30000);
+    for (sim::PlayerId slot = 4; slot < 7; ++slot) {
+        CHECK(loaded->players()[slot].status == sim::PlayerStatus::Absent);
+    }
+    CHECK((editor::player_slots(*loaded) == editor::player_slots(world)));
+}
+
+TEST_CASE("editor players: the natives and the pirates come to a map that lacks them") {
+    using editor::Neutral;
+    sim::World world(40, 40);
+    for (int n = 0; n < 2; ++n) {
+        auto op = editor::add_player(world);
+        REQUIRE(op.ok());
+        (*op)->apply(world);
+    }
+    CHECK(editor::neutral_parties(world).empty());
+    CHECK(editor::can_add_party(world, Neutral::Natives));
+    CHECK(editor::can_add_party(world, Neutral::Pirates));
+    auto pirates = editor::add_party(world, Neutral::Pirates);
+    REQUIRE(pirates.ok());
+    (*pirates)->apply(world);
+    REQUIRE(world.players().size() == 6);
+    CHECK(world.acts_as(editor::party_slot(Neutral::Pirates), sim::FactionBehaviour::Pirates));
+    CHECK(world.players()[4].status == sim::PlayerStatus::Absent);  // the trader's place
+    CHECK(!editor::can_add_party(world, Neutral::Pirates));
+    CHECK(!editor::add_party(world, Neutral::Pirates).ok());
+    auto natives = editor::add_party(world, Neutral::Natives);
+    REQUIRE(natives.ok());
+    (*natives)->apply(world);
+    CHECK(world.acts_as(editor::party_slot(Neutral::Natives), sim::FactionBehaviour::Natives));
+    CHECK((editor::neutral_parties(world) == std::vector<Neutral>{Neutral::Natives, Neutral::Pirates}));
+    // As in a new game: at war with the pirates, at peace and trading with the natives.
+    CHECK(!editor::neutral_relations(world, 0, Neutral::Pirates).peace);
+    CHECK(editor::neutral_relations(world, 1, Neutral::Natives).peace);
+    CHECK(editor::neutral_relations(world, 1, Neutral::Natives).trade);
+    // The players among themselves as they were; undone, the slot is gone.
+    CHECK(editor::relations(world, 0, 1).peace);
+    (*natives)->revert(world);
+    CHECK(editor::can_add_party(world, Neutral::Natives));
+
+    // A map of the original's seven slots has them.
+    sim::World full = seven_slots();
+    CHECK(!editor::can_add_party(full, Neutral::Natives));
+    CHECK(!editor::can_add_party(full, Neutral::Pirates));
+}

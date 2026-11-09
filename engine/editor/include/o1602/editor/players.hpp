@@ -111,6 +111,21 @@ struct Relations {
 /// and the free trader.
 enum class Neutral : std::uint8_t { Natives, Pirates, Trader };
 
+/// The slot the original gives a neutral party: the trader 4, the pirates 5, the natives 6.
+[[nodiscard]] sim::PlayerId party_slot(Neutral party) noexcept;
+
+/// Whether `party` can be added to the world: it has no slot of that behaviour, and the party's
+/// slot (party_slot()) is free or only holds a place.
+[[nodiscard]] bool can_add_party(const sim::World& world, Neutral party);
+
+/// `party` added in its slot (party_slot(), the slots before it holding places), of the world's
+/// faction of that behaviour, with the banner a new game gives it, standing towards everyone as in
+/// a new game (the pirates at war with the humans and computers, the natives at peace and trading).
+/// The relations of the others stay. Lets a map without them (a new one of open sea) get villages,
+/// nests and ships of the natives and the pirates. Fails (Unsupported) where can_add_party() is
+/// false, (NotFound) for a world without a faction of that behaviour.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party);
+
 /// The neutral parties the world has (a slot of that behaviour), in the order of Neutral.
 [[nodiscard]] std::vector<Neutral> neutral_parties(const sim::World& world);
 

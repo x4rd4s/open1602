@@ -443,6 +443,10 @@ private:
                                                                                               std::int64_t y) const;
     /// Whether the special object in hand fits about the world tile (x, y).
     [[nodiscard]] editor::SpecialRefusal editor_special_fits(std::int64_t x, std::int64_t y) const;
+    /// While a building is placed on the page "Buildings": its owner's land lit and the others'
+    /// dimmed with dotted borders, the circle of the building at the mouse outlined, as in the game
+    /// while the player builds; nothing otherwise (no owner with land to show, another tool).
+    [[nodiscard]] std::optional<render::TileLighting> editor_lighting() const;
     /// The page "Buildings" of the model: its settings, groups, building and owner.
     void editor_object_model(EditorModel& m) const;
     /// The city of the building selected on the map, nullptr for none.
