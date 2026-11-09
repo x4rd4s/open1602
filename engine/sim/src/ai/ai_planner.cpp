@@ -20,6 +20,7 @@ namespace {
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
 constexpr std::size_t kLockFromClass = 2;   // the merchants
 constexpr std::int64_t kLockMoney = 3000;   // improved computers lock the material only below it
+constexpr std::int64_t kUnlockMoney = 5000;
 constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
 
 }  // namespace
@@ -392,9 +393,9 @@ void Engine::material_lock(AiPlayer& p, City& c) {
     // them the taxes that pay for the city. So the material stays locked while the city has no
     // food left, or none of a good that its classes from the merchants on want and that it does
     // not make enough of itself.
-    // Only short of gold and with a falling purse: a computer with gold in hand lets its city grow
-    // and builds or buys what is missing.
-    if (player(p).money >= kLockMoney || net_income(p) >= 0) {
+    // Only short of gold: a computer with gold in hand lets its city grow and builds or buys what
+    // is missing. A lock holds until the gold is well above that.
+    if (player(p).money >= (c.material_lock ? kUnlockMoney : kLockMoney)) {
         if (c.material_lock) {
             set_material_lock(p, c, false);
         }
