@@ -4,6 +4,7 @@
 // start dialog offers for a scenario, all at once as in the original or as Open1602 has them. The
 // start dialog begins from them; without them the player's own settings apply.
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -131,6 +132,28 @@ void MapViewer::editor_roll() {
     }
     m_state->world = std::move(rolled).value();
     ++m_editor->preview_rolls;
+    // The islands the plan made: if none of them is on the screen, the view goes to the first.
+    std::vector<render::TilePos> made;
+    if (const auto& planned = plan.planned_islands()) {
+        for (const sim::WorldIsland& island : m_state->world.islands()) {
+            const bool of_plan =
+                std::any_of(planned->plan.islands.begin(), planned->plan.islands.end(),
+                            [&](const assets::ScenarioPlan::Island& e) { return e.number == island.header.number; });
+            if (of_plan) {
+                made.push_back(render::TilePos{island.x + island.map.width() / 2, island.y + island.map.height() / 2});
+            }
+        }
+    }
+    const auto on_screen = [&](const render::TilePos& t) {
+        const auto [px, py] = render::world_pixel_of(m_camera.view(), t.x, t.y);
+        double sx = 0.0;
+        double sy = 0.0;
+        m_camera.world_to_screen(px, py, sx, sy);
+        return sx >= 0.0 && sy >= 0.0 && sx < m_camera.screen_width() && sy < m_camera.screen_height();
+    };
+    if (!made.empty() && std::none_of(made.begin(), made.end(), on_screen)) {
+        m_camera.center_on(made.front());
+    }
     m_editor->pick = EditorPick{};
     m_editor->placing.reset();
     m_editor->selection.reset();
