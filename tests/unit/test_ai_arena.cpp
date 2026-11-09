@@ -567,8 +567,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // The computers' state version 4 (a search's target); the revised bread chain by default;
         // a woodcutter where trees are few when no place has many; public buildings amid the houses,
         // with a little chance. The military's state version 4 (the unit that goes first); chasing
-        // leaves half the way searches of a tick to units with a way to go.
-        test::check_golden("arena after an hour", s.state_hash(), 0x71ad47f53b868a0aULL);
+        // leaves half the way searches of a tick to units with a way to go. Improved computers
+        // without the original's gifts, setting their own taxes, moving on with less gold.
+        test::check_golden("arena after an hour", s.state_hash(), 0x119d0ea7dfb1178fULL);
     }
 }
 

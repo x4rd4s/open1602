@@ -104,7 +104,8 @@ std::uint32_t recovery_scan(World& world, const assets::BuildingTable& buildings
 }
 
 /// The drought roll of one island: only once the next drought time has come.
-void roll_drought(World& world, std::uint16_t i, std::uint8_t level, std::vector<IslandEvent>* events) {
+void roll_drought(World& world, std::uint16_t i, std::uint8_t level, bool computer_relief,
+                  std::vector<IslandEvent>* events) {
     const std::uint64_t now = world.time_ms();
     if (level == 0 || now < world.next_drought_ms()) {
         return;
@@ -119,7 +120,8 @@ void roll_drought(World& world, std::uint16_t i, std::uint8_t level, std::vector
     if ((kDroughtTable[level] >> k & 1U) == 0) {
         return;
     }
-    // Only islands of human or computer players get it; a computer city halves it.
+    // Only islands of human or computer players get it; a computer city halves it for the
+    // original's computers (Rules::bugs.classic_ai). Improved computers bear it as a player does.
     bool settled = false;
     std::uint64_t duration = level >= 3 ? kLongDroughtMs : kDroughtMs;
     std::array<const City*, kCitySlotsPerIsland> slots{};
@@ -137,8 +139,10 @@ void roll_drought(World& world, std::uint16_t i, std::uint8_t level, std::vector
             settled = true;
         } else if (p->role == PlayerRole::Computer) {
             settled = true;
-            duration /= 2;
-            break;
+            if (computer_relief) {
+                duration /= 2;
+                break;
+            }
         }
     }
     if (settled) {
@@ -198,7 +202,7 @@ void advance_island_events(World& world, const assets::BuildingTable& buildings,
             }
         }
         if (d.strength == 0) {
-            roll_drought(world, i, level, events);
+            roll_drought(world, i, level, rules.bugs.classic_ai, events);
         } else if (world.time_ms() < d.end_ms) {
             if (const std::uint32_t n = wither_scan(world, buildings, i, reserved); n != 0) {
                 emit(events, IslandEvent::Kind::Withered, i, n);

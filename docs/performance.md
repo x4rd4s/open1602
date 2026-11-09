@@ -145,7 +145,13 @@ o1602-tool bench --players 8 --world 500x350 --minutes 120 --period 10
 o1602-tool bench SAVEGAME/game00.gam --minutes 60   # a savegame of the original or of Open1602
 o1602-tool bench --minutes 600 --out late.o1602     # keep the end state, e.g. for the game's --load
 o1602-tool bench --minutes 60 --repeat 5            # the fastest of five runs per tick, for comparing code
+o1602-tool bench --players 4 --minutes 240 --ai classic --per-player  # the original's computers, each one's economy
 ```
+
+`--ai classic` or `--ai open1602` picks the computers of a new world (the rule "Computer opponents";
+Open1602's by default, a savegame keeps its own). `--per-player` adds to each period, per player, its cities, inhabitants, gold, units and
+castles, its taxes, running costs, sales and purchases per minute, and per class its inhabitants,
+satisfaction and tax rate: the way to compare the economies of the two kinds of computers.
 
 Tick times are the CPU time of the game thread where the system has a precise per-thread clock
 (Linux, macOS); elsewhere, and with `--wall`, they are wall-clock times. A single run's p99 and

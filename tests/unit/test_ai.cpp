@@ -488,7 +488,8 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
     // The wider hunter's hut by default. The military's state version 4 (the unit that goes first).
-    constexpr std::uint64_t kExpected = 0x276aa07a4f80ed38ULL;
+    // Improved computers without the original's gifts, setting their own taxes.
+    constexpr std::uint64_t kExpected = 0x7ee22dd53eabbf76ULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -917,14 +918,22 @@ TEST_CASE("ai: a computer the scenario forbids colonies founds its first city, w
     CHECK(!view[0].settling);
 }
 
-TEST_CASE("ai: a computer without money founds its city all the same") {
-    // The original gives a computer short of money its founding money (task 4).
-    Game g(true, 0);
-    sim::Simulation s(g.world, g.buildings, g.figures);
-    REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
-    run(s, 30'000);
-    CHECK(g.world.players()[kComputer].money >= 0);
-    CHECK(g.world.players()[kHuman].money == 10000);
+TEST_CASE("ai: the original's computer without money founds its city all the same, an improved one cannot") {
+    // The original gives a computer short of money its founding money (task 4); an improved
+    // computer gets nothing from nowhere and cannot pay for the Kontor, as a player could not.
+    const auto founds = [](bool original) {
+        Game g(true, 0);
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        const bool founded = run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; });
+        run(s, 30'000);
+        CHECK(g.world.players()[kComputer].money >= 0);
+        CHECK(g.world.players()[kHuman].money == 10000);
+        return founded;
+    };
+    CHECK(founds(true));
+    CHECK(!founds(false));
 }
 
 TEST_CASE("ai: a city founded next to a young colony is remembered against the founder") {
@@ -1911,18 +1920,24 @@ TEST_CASE("ai: a computer builds a package's farm that makes its good from nothi
 
 TEST_CASE("ai: the computers' cheats come from the game's balance (balance.toml [computers])") {
     // A poor computer gets money for its founding: the original's 799, or what the balance gives.
-    const auto money_after_founding = [](std::uint32_t founding_money) {
+    // Only the original's computers (Rules::bugs.classic_ai) get them: improved ones get nothing.
+    const auto money_after_founding = [](std::uint32_t founding_money, bool original) {
         Game g(true, 300);
         sim::Balance balance;
         balance.ai_founding_money = founding_money;
         g.world.set_balance(balance);
-        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
         REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
         return g.world.players()[kComputer].money;
     };
-    const std::int32_t original = money_after_founding(799);
-    CHECK(money_after_founding(5799) == original + 5000);
-    CHECK(money_after_founding(0) == original - 799);
+    const std::int32_t original = money_after_founding(799, true);
+    CHECK(money_after_founding(5799, true) == original + 5000);
+    CHECK(money_after_founding(0, true) == original - 799);
+    const std::int32_t improved = money_after_founding(799, false);
+    CHECK(money_after_founding(5799, false) == improved);
+    CHECK(improved == original - 799);
 }
 
 TEST_CASE("ai: a stage's build order from the game's balance (computers.toml) is what the city builds (MD-4)") {
@@ -2290,4 +2305,52 @@ TEST_CASE("ai: a computer's growing home city builds a castle, the original's on
     };
     CHECK(castles_built(true) == 1);  // a second castle only from 700 inhabitants
     CHECK(castles_built(false) == 0);
+}
+
+TEST_CASE("ai: an improved computer raises the taxes its content inhabitants bear, the original's never") {
+    // A class that asks for half of a good the city has plenty of stays content far above the
+    // normal rate: the improved computer raises it as far as the class stays fully content, with
+    // a step to spare; the original's computers keep the normal rate.
+    const auto rate = [](bool original) {
+        Game g;
+        assets::ResidentClass settlers;
+        settlers.max_per_house = 10;
+        settlers.share = 64;  // 50 %
+        settlers.needs.push_back({59, 100});
+        g.buildings.set_resident_classes({settlers});
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s);
+        sim::City* city = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                city = g.world.city(c.island, c.index);
+            }
+        }
+        REQUIRE(city != nullptr);
+        constexpr std::uint32_t kTon = sim::kStockUnitsPerTon;
+        std::uint8_t highest = 0;
+        run_until(s, 120'000, [&] {
+            city->inhabitants.assign(1, 100);
+            city->ensure_ware(59);
+            city->goods[59] = 50 * kTon;
+            if (!city->tax_rate.empty()) {
+                highest = std::max(highest, city->tax_rate[0]);
+            }
+            return highest > 128;
+        });
+        // Fully content at the raised rate, still supplied.
+        run_until(s, 10'000, [&] {
+            city->inhabitants.assign(1, 100);
+            city->goods[59] = 50 * kTon;
+            return false;
+        });
+        CHECK(city->satisfaction[0] == sim::kFullSupply);
+        return highest;
+    };
+    CHECK(rate(true) == 128);
+    const std::uint8_t improved = rate(false);
+    CHECK(improved > 128);
+    CHECK(improved <= sim::CityOrder::kMaxTax);
 }

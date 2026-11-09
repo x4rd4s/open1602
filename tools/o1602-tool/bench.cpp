@@ -23,6 +23,7 @@
 #include "o1602/assets/text_table.hpp"
 #include "o1602/core/file.hpp"
 #include "o1602/sim/balance.hpp"
+#include "o1602/sim/consumption.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/simulation.hpp"
@@ -135,6 +136,66 @@ void print_world_line(const sim::World& world, const sim::Simulation& simulation
     std::printf(" %7zu %8llu %6zu %5zu %8zu %7zu\n", world.houses().size(),
                 static_cast<unsigned long long>(inhabitants), world.productions().size(), world.ships().size(),
                 world.soldiers().size(), simulation.logistics().walkers().size());
+}
+
+/// Per player: cities, inhabitants, gold, units and castles (--per-player).
+void print_players(const sim::World& world, const assets::BuildingTable& buildings) {
+    const std::vector<std::int32_t> costs = sim::running_costs(world, buildings);
+    for (std::size_t i = 0; i < world.players().size(); ++i) {
+        const sim::Player& p = world.players()[i];
+        if (p.role != sim::PlayerRole::Computer && p.role != sim::PlayerRole::Human) {
+            continue;
+        }
+        std::size_t cities = 0;
+        std::uint64_t inhabitants = 0;
+        std::int64_t taxes = 0;
+        std::int64_t running = 0;
+        std::vector<std::uint64_t> classes;
+        std::vector<std::uint64_t> content;  // satisfaction weighted by inhabitants
+        std::vector<std::uint64_t> rates;    // tax rate weighted by inhabitants
+        for (std::size_t k = 0; k < world.cities().size(); ++k) {
+            const sim::City& c = world.cities()[k];
+            if (c.owner != i) {
+                continue;
+            }
+            ++cities;
+            taxes += sim::tax_income(c, buildings);
+            running += k < costs.size() ? costs[k] : 0;
+            classes.resize(std::max(classes.size(), c.inhabitants.size()));
+            content.resize(classes.size());
+            rates.resize(classes.size());
+            for (std::size_t r = 0; r < c.inhabitants.size(); ++r) {
+                inhabitants += c.inhabitants[r];
+                classes[r] += c.inhabitants[r];
+                content[r] += std::uint64_t{c.inhabitants[r]} * (r < c.satisfaction.size() ? c.satisfaction[r] : 0U);
+                rates[r] += std::uint64_t{c.inhabitants[r]} * (r < c.tax_rate.size() ? c.tax_rate[r] : 128U);
+            }
+        }
+        std::size_t soldiers = 0;
+        for (const sim::Soldier& u : world.soldiers()) {
+            soldiers += u.owner == i ? 1U : 0U;
+        }
+        std::size_t castles = 0;
+        for (const sim::CostBuilding& b : world.cost_buildings()) {
+            castles += b.kind == sim::CostBuilding::Kind::Castle && b.island < world.islands().size() &&
+                               world.islands()[b.island].map.top(b.x, b.y).owner == i
+                           ? 1U
+                           : 0U;
+        }
+        std::printf("         player %zu: %zu cities, %llu inhabitants, %d gold, %zu units, %zu castles\n", i, cities,
+                    static_cast<unsigned long long>(inhabitants), p.money, soldiers, castles);
+        std::printf("           taxes %lld/min, running costs %lld/min, sales %lld/min, purchases %lld/min; classes",
+                    static_cast<long long>(taxes), static_cast<long long>(running),
+                    static_cast<long long>(p.sales / 480), static_cast<long long>(p.purchases / 480));
+        for (std::size_t r = 0; r < classes.size(); ++r) {
+            if (classes[r] != 0) {
+                std::printf(" %zu:%llu (content %llu, tax %llu)", r, static_cast<unsigned long long>(classes[r]),
+                            static_cast<unsigned long long>(content[r] / classes[r]),
+                            static_cast<unsigned long long>(rates[r] / classes[r]));
+            }
+        }
+        std::printf("\n");
+    }
 }
 
 }  // namespace
@@ -270,9 +331,18 @@ int cmd_bench(const Args& args) {
         sim::apply_figure_values(*figures, original_figures, world->balance());
         // A new world runs Open1602's rules; --computer-cities original keeps the computers to the
         // original's four cities, to compare.
-        if (const auto it = args.options.find("--computer-cities"); it != args.options.end() && !world->saved_rules()) {
+        // --ai classic plays the original's computers, to compare.
+        const auto cities = args.options.find("--computer-cities");
+        const auto ai = args.options.find("--ai");
+        if ((cities != args.options.end() || ai != args.options.end()) && !world->saved_rules()) {
             sim::Rules r;
-            r.computer_cities = it->second == "original" ? sim::ComputerCities::Original : sim::ComputerCities::Scaled;
+            if (cities != args.options.end()) {
+                r.computer_cities =
+                    cities->second == "original" ? sim::ComputerCities::Original : sim::ComputerCities::Scaled;
+            }
+            if (ai != args.options.end()) {
+                r.bugs.classic_ai = ai->second == "classic";
+            }
             world->set_saved_rules(r);
         }
         simulation.emplace(*world, *buildings, *figures);
@@ -334,6 +404,9 @@ int cmd_bench(const Args& args) {
                 const double p99 = period.quantile(0.99);
                 std::printf("%6zu %7.1f %6.0f %7.0f %7.0f", minute, mean, p50, p99, max);
                 print_world_line(*world, *simulation);
+                if (args.flag("--per-player")) {
+                    print_players(*world, *buildings);
+                }
                 std::fflush(stdout);
                 period.ticks.clear();
             }

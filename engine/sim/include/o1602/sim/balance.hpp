@@ -166,6 +166,9 @@ struct Balance {
     std::uint32_t ai_castle_reserve = 2000;      ///< ... if so much gold is left after its cost
     std::uint32_t ai_inhabitants_per_unit = 40;  ///< an army of a swordsman's strength per so many inhabitants
     std::uint32_t ai_rival_army_percent = 75;    ///< ... at least so many percent of the strongest computer rival's
+    /// The improved computers' gold before a city moves on ([computer_stages], version
+    /// kBalanceWithRivalEconomy): so many percent of the gold the stages above ask of the original's.
+    std::uint32_t ai_rival_money_percent = 25;
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -202,9 +205,11 @@ inline constexpr std::uint16_t kBalanceWithStages = 3;
 inline constexpr std::uint16_t kBalanceWithMoreStages = 4;
 /// The version of the section BALA with the computers' armies and castles.
 inline constexpr std::uint16_t kBalanceWithMilitary = 5;
+/// The version of the section BALA with the improved computers' share of the stages' gold.
+inline constexpr std::uint16_t kBalanceWithRivalEconomy = 6;
 
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 69> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 70> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -278,6 +283,7 @@ inline constexpr std::array<BalanceField, 69> kBalanceFields = {{
     {"computer_military", "inhabitants_per_unit", &Balance::ai_inhabitants_per_unit, 0, 1'000'000,
      kBalanceWithMilitary},
     {"computer_military", "rival_army_percent", &Balance::ai_rival_army_percent, 0, 1000, kBalanceWithMilitary},
+    {"computer_stages", "rival_money_percent", &Balance::ai_rival_money_percent, 0, 1000, kBalanceWithRivalEconomy},
 }};
 
 /// The version of the section BALA that `balance` needs: the first that holds every value that is

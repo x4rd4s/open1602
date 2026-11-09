@@ -91,12 +91,17 @@ void Engine::refresh_city(AiPlayer& p) {
         buy_settings(p, *c, *r);
         sell_settings(p, *c, *r);
         production_switches(p, *c);
+        tax_rates(p, *c);
     }
     p.refresh_ms = now_ms();
+    // The original's steady money and subsidy (cheats), on every difficulty; improved computers
+    // live from what they earn, as a player does.
+    if (!gifts()) {
+        return;
+    }
     Player& pl = player(p);
     if (pl.money < cheats().steady_below) {
-        pl.money = money_plus(
-            pl.money, std::int64_t{cheats().steady_money});  // the original's steady money (cheat), on every difficulty
+        pl.money = money_plus(pl.money, std::int64_t{cheats().steady_money});
     }
     if (!threatened(p) && behind(p)) {
         subsidy(p, 1);
@@ -107,7 +112,7 @@ void Engine::subsidy(AiPlayer& p, std::int32_t m) {
     // Money and goods into the current city while the computer is behind.
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
-    if (c == nullptr || r == nullptr) {
+    if (c == nullptr || r == nullptr || !gifts()) {
         return;
     }
     Player& pl = player(p);
@@ -313,6 +318,62 @@ void Engine::sell_settings(AiPlayer& p, City& c, CityPlan& r) {
             s.mode = TradeSetting::Mode::Sell;
             s.amount = it->keep;
             execute(s);
+        }
+    }
+}
+
+std::int64_t Engine::stage_gold(std::uint32_t gold) const {
+    // The original's computers hoard their gold before a city moves on, which the steady money
+    // makes easy. Improved computers live from their taxes and trade and move on with a part of it,
+    // as a player does, who puts what comes in back into the city.
+    return rivals() ? std::int64_t{gold} * m_world.balance().ai_rival_money_percent / 100 : std::int64_t{gold};
+}
+
+void Engine::tax_rates(AiPlayer& p, City& c) {
+    // Improved computers set their taxes as a player does: as high as each class stays fully
+    // content with a step to spare, so growth never stops for it. Short of money, a class that is
+    // fully supplied pays up to where it is just content enough not to move out; with money to
+    // spare, a class short of goods pays less so that it still grows. The original's computers
+    // keep the normal rate.
+    if (!rivals()) {
+        return;
+    }
+    constexpr std::uint8_t kNormal = 128;
+    constexpr std::uint8_t kStep = 8;
+    constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
+    const auto& classes = m_buildings.resident_classes();
+    const std::int64_t money = player(p).money;
+    const bool broke = money < 1000 && net_income(p) < 0;
+    for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
+        if (c.inhabitants[k] == 0) {
+            continue;
+        }
+        const auto content = [&](std::uint32_t rate) {
+            return satisfaction_of(c, classes[k], static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
+        };
+        std::uint32_t rate = CityOrder::kMinTax;
+        for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
+            if (content(r + kStep) >= kFullSupply) {
+                rate = r;
+            }
+        }
+        if (rate < kNormal) {
+            rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
+        }
+        if (broke) {
+            for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
+                if (content(r) >= kStable) {
+                    rate = r;
+                }
+            }
+        }
+        const auto chosen = static_cast<std::uint8_t>(rate);
+        if (c.tax_rate[k] != chosen) {
+            c.tax_rate[k] = chosen;
+            if (k < c.satisfaction.size()) {
+                c.satisfaction[k] = content(chosen);
+            }
+            log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
         }
     }
 }
@@ -565,18 +626,18 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
         }
         return count(n);
     };
-    const auto holds = [money](StageNeed::When w) {
+    const auto holds = [&](StageNeed::When w) {
         switch (w) {
             case StageNeed::When::Never:
                 return false;
             case StageNeed::When::Always:
                 return true;
             case StageNeed::When::Gold4000:
-                return money >= 4000;
+                return money >= stage_gold(4000);
             case StageNeed::When::Gold5000:
-                return money >= 5000;
+                return money >= stage_gold(5000);
             case StageNeed::When::Gold8000:
-                return money >= 8000;
+                return money >= stage_gold(8000);
         }
         return false;
     };
@@ -739,7 +800,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
-    const auto has = [money](std::uint32_t gold) { return std::int64_t{money} >= std::int64_t{gold}; };
+    const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
     // The lists this visit went through; once there is nothing to do, Open1602 goes through them
     // again with their numbers grown by the city's land, so that a large island fills up without
@@ -1052,6 +1113,8 @@ void Engine::reserve(AiPlayer& p, const assets::BuildingType& b, std::int64_t ex
     r.city = c->index;
     r.money = std::int64_t{b.build_cost.money} + extra_money;
     player(p).money = money_plus(player(p).money, -std::int64_t{r.money});
+    log(p, "city %u/%u: reserve %lld gold for building %u (money left %d)", r.island, r.city,
+        static_cast<long long>(r.money), b.id, player(p).money);
     r.wood = remove_goods(*c, m.wood, b.build_cost.wood);
     r.bricks = remove_goods(*c, m.bricks, b.build_cost.bricks);
     r.tools = remove_goods(*c, m.tools, b.build_cost.tools);

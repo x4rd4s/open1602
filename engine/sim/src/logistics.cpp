@@ -945,10 +945,12 @@ void Logistics::mine_ore(std::uint32_t home) {
         if (mine.ware == ware::kGold) {
             return;  // gold never runs out
         }
-        // Computer players do not exhaust small veins (below 40 t nothing is taken).
+        // The original's computer players (Rules::bugs.classic_ai) do not exhaust small veins
+        // (below 40 t nothing is taken); improved ones mine them out as a player does.
         const City* city = m_world->city(p.island, hb->city);
         const Player* owner = city != nullptr ? m_world->player(city->owner) : nullptr;
-        if (it->amount < kComputerKeeps && owner != nullptr && owner->role != PlayerRole::Human) {
+        if (it->amount < kComputerKeeps && owner != nullptr && owner->role != PlayerRole::Human &&
+            (m_rules == nullptr || m_rules->bugs.classic_ai)) {
             return;
         }
     }

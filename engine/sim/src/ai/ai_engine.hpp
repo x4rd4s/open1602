@@ -276,6 +276,9 @@ private:
     /// computers too, not only with the humans: an army by their inhabitants and their rivals'
     /// armies, castles as their home city grows (Balance's [computer_military]).
     [[nodiscard]] bool rivals() const;
+    /// The money and goods the original's computers get from nowhere (cheats(), Balance's
+    /// [computers]): only the original's computers (Rules::bugs.classic_ai) get them.
+    [[nodiscard]] bool gifts() const;
     [[nodiscard]] std::uint32_t island_size(std::uint16_t island) const;
     /// The part of the map an island's middle lies in when the pirates aim for `nests` nests.
     [[nodiscard]] std::uint32_t island_region(std::uint16_t island, std::uint32_t nests) const;
@@ -326,6 +329,8 @@ private:
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);
+    void tax_rates(AiPlayer& p, City& c);
+    [[nodiscard]] std::int64_t stage_gold(std::uint32_t gold) const;
     void subsidy(AiPlayer& p, std::int32_t m);
     void set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s);
     void nothing_to_do(AiPlayer& p);

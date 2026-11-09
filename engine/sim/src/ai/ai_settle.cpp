@@ -673,7 +673,7 @@ void Engine::task_settle_land(AiPlayer& p) {
         return;
     }
     Player& pl = player(p);
-    if (pl.money < cheats().founding_below) {
+    if (gifts() && pl.money < cheats().founding_below) {
         pl.money =
             money_plus(pl.money, std::int64_t{cheats().founding_money});  // the original's founding money (cheat)
     }
@@ -716,8 +716,10 @@ void Engine::task_settle_land(AiPlayer& p) {
     r.stage_ms = now_ms();
     r.land = free_land(island, c->index, &r.land_percent);
     unload_at(*c, *ship, false, false);
-    add_goods(*c, m_buildings.materials().bricks,
-              cheats().founding_bricks * kStockUnitsPerTon);  // free bricks after founding
+    if (gifts()) {
+        add_goods(*c, m_buildings.materials().bricks,
+                  cheats().founding_bricks * kStockUnitsPerTon);  // free bricks after founding
+    }
     s.failed = false;
     p.budget = 14;
     if (!p.home_valid) {
@@ -960,7 +962,7 @@ bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
     }
     const auto& m = m_buildings.materials();
     const std::uint8_t food_ware = m_buildings.food_ware();
-    if (behind(p) && !threatened(p)) {
+    if (gifts() && behind(p) && !threatened(p)) {
         // The colony subsidy (cheat): one ware per call into the current city.
         bool given = true;
         if (c->stock(m.wood) < cheats().wood_below * kStockUnitsPerTon) {
