@@ -569,6 +569,10 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
     if (s.best < 1 || s.extra < def->min_houses) {
         if (s.best == 0 && slot_fail(p, def->slot) == 0 && def->roads_on_fail) {
             push(p, kRoads, true);
+        } else if (s.best != 0 && !classic()) {
+            // Open1602: a site with too few houses around counts as a failure for an improved
+            // computer; the original searched again at once, several times a second.
+            slot_fail(p, def->slot);
         }
         return;
     }
@@ -576,6 +580,9 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
         slot_built(p, def->slot);
         slot_ok(p, def->slot);
         slot_ok(p, kSlotMarket);
+    } else if (!classic()) {
+        log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, def->id, s.best_x0, s.best_y0);
+        slot_fail(p, def->slot);
     }
 }
 
@@ -596,6 +603,8 @@ void Engine::task_market(AiPlayer& p) {
             0) {
             slot_built(p, kSlotMarket);
             slot_ok(p, kSlotMarket);
+        } else if (!classic()) {
+            slot_fail(p, kSlotMarket);  // Open1602: a failed build counts, as for the farms
         }
         return;
     }
