@@ -383,6 +383,20 @@ void Engine::start_war(AiPlayer& p, PlayerId target) {
     }
 }
 
+std::string Engine::event_text(PlayerId a, PlayerId b) const {
+    // For the log: what a remembers of b, as type:value pairs.
+    std::string out;
+    const std::uint64_t now = now_ms();
+    for (const DiplomacyEvent& e : m_world.diplomacy().events(a)) {
+        if (e.type == DiplomacyEventType::None || e.partner != b) {
+            continue;
+        }
+        const std::int32_t v = diplomacy_event_value(e.type, now >= e.time_ms ? now - e.time_ms : 0);
+        out += (out.empty() ? "" : " ") + std::to_string(static_cast<int>(e.type)) + ":" + std::to_string(v);
+    }
+    return out.empty() ? "none" : out;
+}
+
 void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
     // Alliances with a partner it likes well, two at most; one ends when the mood falls. Attacked,
     // it asks its allies for help; an ally joins a war declared on its partner unless it fights
@@ -433,7 +447,8 @@ void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
         switch (rel.alliance) {
             case Treaty::Signed:
                 if (mood < kAllianceEndMood || st.war_target == b) {
-                    log(p, "ends the alliance with player %u (mood %d)", b, mood);
+                    log(p, "ends the alliance with player %u (mood %d, damage %u, tribute %u, events %s)", b, mood,
+                        rel.damage, rel.tribute, event_text(p.player, b).c_str());
                     order(b, DiplomacyOrder::Kind::Alliance, Treaty::None, kNoPlayer);
                     --allies;
                 }
