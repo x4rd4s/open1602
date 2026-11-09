@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 10;
+inline constexpr std::uint32_t kStateVersion = 11;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -36,6 +36,9 @@ inline constexpr std::uint32_t kStateWithLeftIslands = 9;
 /// Version 10: an improved computer's strategy: its character, its goal and its stance towards each
 /// player (AiPlayer::strategy). Written only once a character is drawn.
 inline constexpr std::uint32_t kStateWithStrategy = 10;
+/// Version 11: an improved computer's war plan (Strategy::war_target and the rest). Written only
+/// while or after a computer planned a war.
+inline constexpr std::uint32_t kStateWithWarPlan = 11;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -421,6 +424,14 @@ struct Strategy {
     std::uint64_t next_ms = 0;          ///< game time of the next look
     std::uint64_t goal_ms = 0;          ///< game time the goal was last changed
     std::vector<std::uint8_t> stances;  ///< by player
+    // The war plan (state 11): whom it attacks, since when, when it looks again whether the war
+    // gets anywhere, how often it did not, and the target's measure at the last look.
+    PlayerId war_target = kNoPlayer;
+    std::uint64_t war_since_ms = 0;
+    std::uint64_t war_check_ms = 0;
+    std::uint8_t war_fails = 0;
+    std::uint32_t war_measure = 0;
+    std::uint64_t war_ended_ms = 0;  ///< when its last war ended: no new one for a while
 };
 
 struct AiPlayer {

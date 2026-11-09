@@ -20,7 +20,12 @@ constexpr std::uint32_t kNearSeconds = 240;  // a rival whose city lies within f
 constexpr std::int32_t kPartnerMood = 20;    // a friendlier mood makes a partner
 constexpr std::int32_t kHostileMood = -60;   // an angrier one an enemy
 constexpr std::uint32_t kMinStrategyMs = 10'000;
-constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unless debt or a threat end it
+constexpr std::uint64_t kWarCheckMs = 600'000;   // a war plan is looked at every ten minutes
+constexpr std::uint8_t kWarFails = 3;            // ... and given up after three looks without progress
+constexpr std::uint64_t kWarRestMs = 1'800'000;  // half an hour of peace before the next war
+constexpr std::int32_t kWarMoney = 3000;         // gold in hand to start a war
+constexpr std::uint32_t kWarUnits = 6;           // an army of six swordsmen's strength at least
+constexpr std::uint64_t kGoalHoldMs = 600'000;   // a goal holds ten minutes, unless debt or a threat end it
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -196,9 +201,10 @@ void Engine::plan_strategy(AiPlayer& p) {
         aristocrats_near = aristocrats_near || r.stage >= stage::kMerchants2;
     }
     const bool broke = money < 0 || net_income(p) < 0;
+    war_plan(p, broke);
     if (broke) {
         g = goal::kEconomy;
-    } else if (threat || (pressing && st.character == character::kConqueror)) {
+    } else if (threat || st.war_target != kNoPlayer || (pressing && st.character == character::kConqueror)) {
         g = goal::kMilitary;
     } else if (aristocrats_near && !p.present[kSlotGoldMine]) {
         g = goal::kGold;
@@ -216,6 +222,110 @@ void Engine::plan_strategy(AiPlayer& p) {
         st.goal_ms = now_ms();
     }
     st.goal = g;
+}
+
+std::uint32_t Engine::war_measure(PlayerId target) const {
+    // What a war takes from its target: its inhabitants, and a city counts as fifty more.
+    return total_population(target) + 50U * own_city_count(target);
+}
+
+void Engine::end_war(AiPlayer& p, const char* why) {
+    Strategy& st = p.strategy;
+    const PlayerId b = st.war_target;
+    log(p, "ends the war on player %u: %s", b, why);
+    st.war_target = kNoPlayer;
+    st.war_ended_ms = now_ms();
+    if (m_world.player(b) != nullptr && m_world.diplomacy().relation(p.player, b).peace == Treaty::None) {
+        DiplomacyOrder o;
+        o.player = p.player;
+        o.partner = b;
+        o.kind = DiplomacyOrder::Kind::Peace;
+        o.value = Treaty::Offered;
+        execute(o);
+    }
+}
+
+void Engine::war_plan(AiPlayer& p, bool broke) {
+    // A war is planned against a rival it presses: near, not liked, clearly weaker. A conqueror
+    // wages one on any level, a settler from the third level on, a trader only on the hardest;
+    // humans are spared on the easiest. Every ten minutes it looks whether the war gets anywhere
+    // (the target lost a twentieth of its inhabitants and cities); after three looks without
+    // progress, or in debt, it offers peace and keeps the peace for half an hour.
+    Strategy& st = p.strategy;
+    const std::uint8_t level = difficulty();
+    if (st.war_target != kNoPlayer) {
+        const Player* t = m_world.player(st.war_target);
+        if (t == nullptr || t->status != PlayerStatus::Playing || own_city_count(st.war_target) == 0) {
+            end_war(p, "the target is gone");
+            return;
+        }
+        if (m_world.diplomacy().relation(p.player, st.war_target).peace == Treaty::Signed) {
+            end_war(p, "peace was made");
+            return;
+        }
+        if (broke) {
+            end_war(p, "out of gold");
+            return;
+        }
+        if (now_ms() >= st.war_check_ms) {
+            const std::uint32_t m = war_measure(st.war_target);
+            if (std::uint64_t{m} * 100U <= std::uint64_t{st.war_measure} * 95U) {
+                st.war_fails = 0;
+            } else {
+                ++st.war_fails;
+            }
+            log(p, "war on player %u: measure %u (was %u), %u looks without progress", st.war_target, m, st.war_measure,
+                st.war_fails);
+            st.war_measure = m;
+            st.war_check_ms = now_ms() + kWarCheckMs;
+            if (st.war_fails >= kWarFails) {
+                end_war(p, "no progress");
+            }
+        }
+        return;
+    }
+    const bool willing =
+        st.character == character::kConqueror || (st.character == character::kSettler && level >= 2) || level >= 3;
+    if (!willing || broke || player(p).money < kWarMoney || p.max_stage < stage::kMain2 ||
+        (st.war_ended_ms != 0 && now_ms() - st.war_ended_ms < kWarRestMs) ||
+        player(p).scenario.has(scenario_flag::kPassive)) {
+        return;
+    }
+    const std::uint32_t own = strength(p.player);
+    if (own < kWarUnits * unit_weights()[0]) {
+        return;
+    }
+    PlayerId best = kNoPlayer;
+    std::uint64_t best_ratio = 0;
+    for (std::size_t bi = 0; bi < st.stances.size(); ++bi) {
+        const auto b = static_cast<PlayerId>(bi);
+        const Player* pl = m_world.player(b);
+        if (st.stances[bi] != stance::kPressure || pl == nullptr || (pl->role == PlayerRole::Human && level == 0)) {
+            continue;
+        }
+        const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, threat_of(b));
+        if (ratio > best_ratio) {
+            best = b;
+            best_ratio = ratio;
+        }
+    }
+    if (best == kNoPlayer) {
+        return;
+    }
+    st.war_target = best;
+    st.war_since_ms = now_ms();
+    st.war_check_ms = now_ms() + kWarCheckMs;
+    st.war_fails = 0;
+    st.war_measure = war_measure(best);
+    log(p, "declares war on player %u (war plan, strength %u against %u)", best, own, threat_of(best));
+    if (m_world.diplomacy().relation(p.player, best).peace != Treaty::None) {
+        DiplomacyOrder o;
+        o.player = p.player;
+        o.partner = best;
+        o.kind = DiplomacyOrder::Kind::Peace;
+        o.value = Treaty::None;
+        execute(o);
+    }
 }
 
 }  // namespace o1602::sim::ai

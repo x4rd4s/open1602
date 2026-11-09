@@ -585,6 +585,11 @@ private:
     // Strategy (ai_strategy.cpp), improved computers only.
     /// Draws the character once, then looks at every rival: the stances and the goal.
     void plan_strategy(AiPlayer& p);
+    /// The war plan: starts a war on a rival it presses, looks every ten minutes whether it gets
+    /// anywhere and makes peace when it does not.
+    void war_plan(AiPlayer& p, bool broke);
+    void end_war(AiPlayer& p, const char* why);
+    [[nodiscard]] std::uint32_t war_measure(PlayerId target) const;
     /// The armies and the fleets' cannons of `owner`, weighted as stronger() does.
     [[nodiscard]] std::uint32_t strength(PlayerId owner) const;
     /// strength(), a human's raised on the harder levels (Balance::ai_human_threat_percent).

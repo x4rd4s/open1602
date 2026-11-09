@@ -1116,6 +1116,10 @@ void Engine::target_scan(AiPlayer& p) {
         ok = attack_ok(p, t);
     } else if (m_world.behaviour(*o) == FactionBehaviour::Natives && !at_peace) {
         ok = attack_ok(p, t);
+    } else if (rivals() && o->role == PlayerRole::Computer && m_world.behaviour(*o) == FactionBehaviour::Settlers &&
+               !at_peace) {
+        // Open1602: an improved computer attacks another computer it is at war with, as a human.
+        ok = attack_ok(p, t);
     }
     if (ok) {
         start_attack(p, t);
@@ -1131,7 +1135,10 @@ std::vector<PlayerId> Engine::island_enemies(const AiPlayer& a, std::uint16_t is
     for (std::size_t b = 0; b < m_world.players().size(); ++b) {
         const Player& pl = m_world.players()[b];
         const auto pb = static_cast<PlayerId>(b);
-        if ((pl.role != PlayerRole::Human && m_world.behaviour(pl) != FactionBehaviour::Natives) ||
+        // Open1602: for improved computers, another computer at war with them too.
+        const bool rival_computer = rivals() && pl.role == PlayerRole::Computer && pb != a.player &&
+                                    m_world.behaviour(pl) == FactionBehaviour::Settlers;
+        if ((pl.role != PlayerRole::Human && m_world.behaviour(pl) != FactionBehaviour::Natives && !rival_computer) ||
             m_world.diplomacy().relation(a.player, pb).peace == Treaty::Signed) {
             continue;
         }
@@ -1662,20 +1669,23 @@ void Engine::diplomacy(AiPlayer& p) {
             // Open1602's improved computers offer peace to a computer they do not mind (mood not
             // below 0 and not falling) and sign one unless they are angry (war among computers
             // comes with their war plans).
-            if (rel.trade == Treaty::None) {
+            // Improved computers at war trade only once the war is over.
+            const bool at_war = rivals() && rel.peace == Treaty::None;
+            if (rel.trade == Treaty::None && !at_war) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
-            } else if (rel.trade == Treaty::Received) {
+            } else if (rel.trade == Treaty::Received && !at_war) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Signed);
             }
             if (rivals() && m_world.player(b) != nullptr && m_world.player(b)->status == PlayerStatus::Playing) {
                 const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
                 const std::int32_t prev = p.previous_mood[bi];
                 const std::uint8_t st = stance_of(p, b);
-                if (rel.peace == Treaty::None && m >= prev && m >= 0 && st != stance::kPressure &&
+                const bool waging = p.strategy.war_target == b;  // its own war plan: no peace
+                if (!waging && rel.peace == Treaty::None && m >= prev && m >= 0 && st != stance::kPressure &&
                     st != stance::kHostile) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                     log(p, "offers peace to computer %u (mood %d)", b, m);
-                } else if (rel.peace == Treaty::Received && m > -20) {
+                } else if (!waging && rel.peace == Treaty::Received && m > -20) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
                     log(p, "signs peace with computer %u (mood %d)", b, m);
                 }
@@ -1688,9 +1698,10 @@ void Engine::diplomacy(AiPlayer& p) {
         }
         const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
         const std::int32_t prev = p.previous_mood[bi];
+        const bool waging = rivals() && p.strategy.war_target == b;  // its own war plan: no peace
         switch (rel.peace) {
             case Treaty::None:
-                if (m >= prev && m > 20) {
+                if (m >= prev && m > 20 && !waging) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                 }
                 break;
@@ -1721,7 +1732,7 @@ void Engine::diplomacy(AiPlayer& p) {
                 }
                 break;
             case Treaty::Received:
-                if (m > -20) {
+                if (m > -20 && !waging) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
                     // Ships on missions against b come home.
                     for (ShipNote& n : p.ships) {

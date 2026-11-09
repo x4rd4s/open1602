@@ -608,7 +608,7 @@ TEST_CASE("ai arena: improved computers draw a character and keep it through a s
             CHECK(v.goal <= 3);
         }
         if (!classic) {
-            CHECK(s.computers().state_version() == sim::ComputerPlayers::max_state_version());
+            CHECK(s.computers().state_version() >= 10);  // with the strategy
             const std::vector<std::uint8_t> bytes = saved(s.computers());
             annokit::core::ByteReader in(bytes);
             sim::ComputerPlayers computers(s);

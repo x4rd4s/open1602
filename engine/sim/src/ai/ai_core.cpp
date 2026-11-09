@@ -146,7 +146,8 @@ bool Engine::accepts(const State& state) const {
         }
         const Strategy& st = p.strategy;
         if (st.character > character::kCount || st.goal > goal::kLand || st.stances.size() > seen.size() ||
-            std::any_of(st.stances.begin(), st.stances.end(), [](std::uint8_t x) { return x > stance::kHostile; })) {
+            std::any_of(st.stances.begin(), st.stances.end(), [](std::uint8_t x) { return x > stance::kHostile; }) ||
+            (st.war_target != kNoPlayer && (st.war_target >= seen.size() || st.war_target == p.player))) {
             return false;
         }
     }
@@ -788,6 +789,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (p.strategy.war_target != kNoPlayer || p.strategy.war_ended_ms != 0) {
+            return static_cast<std::uint16_t>(ai::kStateWithWarPlan);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.character != ai::character::kNone) {
             return static_cast<std::uint16_t>(ai::kStateWithStrategy);
