@@ -182,7 +182,15 @@ four. "4, as in the original" keeps the original's way.
   kind make, so a fisher by a sea with few fish loses to a pasture. Each way counts for less the
   more of its kind the city has (four of them halve it), and one of the ways at least two thirds as
   good as the best is taken at random, so cities build a mix rather than one kind only. So a city
-  feeds itself from its own land before it waits for food from a far island.
+  feeds itself from its own land before it waits for food from a far island. A kind whose buildings
+  make nothing on the island (a fisher by a sea without fish) is not chosen. A city with no way to
+  more food (its farms not yet open to it) builds houses all the same while its stock feeds every
+  house, full, for 15 minutes.
+- *A fisher from the start.* On an island with fish, a computer sets its Kontor where a fishing hut
+  within 6 tiles finds more than 13 shoals and no other hut; where no beach has that much fish, any
+  site will do. When no road's end leads to fish (a town's first roads run inland), the fishing hut
+  gets a road of up to 12 tiles from the city's roads or Kontor to the nearest beach with fish
+  (the city's first hut only; later ones wait for the roads).
 - *Workshops by their raw material.* A workshop whose producer waits for another (`after`, such as
   a weaving hut for sheep, or a mill for grain) is built only as often as that other's producers keep
   busy: one for every two (rounded up; two stonemasons for each quarry), and one more while the city

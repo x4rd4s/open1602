@@ -432,6 +432,10 @@ private:
     bool search_market(AiPlayer& p);
     bool search_claim(AiPlayer& p);
     bool mine_path(AiPlayer& p, std::uint8_t ware, std::vector<BuildItem>& road);
+    /// Open1602: when no road's end leads to a fishing hut's site (search_fisher), the shortest way
+    /// over the city's open ground from its roads or its Kontor to a beach tile with fish, up to
+    /// kFisherPath tiles; the road along it goes to `road`, the site to the search.
+    bool fisher_path(AiPlayer& p, const assets::BuildingType& hut, std::vector<BuildItem>& road);
     [[nodiscard]] DepositAccess deposit_access(const AiPlayer& p, const assets::IslandHeader::Deposit& d,
                                                std::int32_t& free_x, std::int32_t& free_y);
     [[nodiscard]] std::int32_t market_distance(const AiPlayer& p, std::int32_t x, std::int32_t y);
@@ -440,6 +444,8 @@ private:
     bool search_denkmal(AiPlayer& p);
     bool search_pirate_houses(AiPlayer& p);
     bool search_fisher(AiPlayer& p);
+    /// The shoals, markets and other huts around a fishing hut's site (search_fisher).
+    [[nodiscard]] Acc fisher_site(AiPlayer& p, std::int32_t cx, std::int32_t cy);
     bool search_shipyard(AiPlayer& p);
     bool search_mine(AiPlayer& p, std::uint8_t ware);
     bool search_mine_wide(AiPlayer& p, std::uint8_t ware);
@@ -646,8 +652,14 @@ private:
         std::uint64_t revision = 0;  ///< the newest block revision of the island's map
         AreaCount green;
         AreaCount trees;
+        AreaCount fish;     ///< fish shoals, growing or ripe
+        AreaCount fishers;  ///< fishing huts of anyone
     };
     const SiteCounts& site_counts(std::uint16_t island);
+    /// Open1602: whether a fishing hut on the beach tile (x, y) finds as many shoals and no other
+    /// hut as search_fisher wants; fisher_room: whether such a tile lies near a Kontor at (cx, cy).
+    [[nodiscard]] static bool fisher_spot(const SiteCounts& counts, std::int32_t x, std::int32_t y);
+    [[nodiscard]] bool fisher_room(std::uint16_t island, const SiteCounts& counts, std::int32_t cx, std::int32_t cy);
     std::vector<std::optional<SiteCounts>> m_site_counts;
     /// The free land regions of an island (task 2) and its free beach tiles (task 3), kept per
     /// island while its tiles stay the same: every pass of the island search tests the islands

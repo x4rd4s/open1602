@@ -1646,6 +1646,95 @@ std::int32_t Engine::free_run(std::uint16_t island, std::uint8_t own, std::int32
     return n < 2 ? 0 : n;
 }
 
+Acc Engine::fisher_site(AiPlayer& p, std::int32_t cx, std::int32_t cy) {
+    // The fish a hut on (cx, cy) reaches, a market or Kontor near, and no other hut close by.
+    Acc acc;
+    rings(p, RingFilter::OwnOrSea, cx, cy, cx, cy, 13, [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
+        if (t.origin && market_or_kontor(t) && d < 13) {
+            acc.market = true;
+        }
+        if (t.prod == prod::kFisher && d < 8) {
+            acc.count = -100000;
+            acc.score -= 0x8000;
+        }
+        if (t.ware == ware::kFish && d < 6) {
+            ++acc.count;
+            acc.score += 2 * t.growth;
+        }
+    });
+    return acc;
+}
+
+bool Engine::fisher_path(AiPlayer& p, const assets::BuildingType& hut, std::vector<BuildItem>& road) {
+    constexpr std::int32_t kFisherPath = 12;
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto width = static_cast<std::int32_t>(map.width());
+    const auto height = static_cast<std::int32_t>(map.height());
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+    // From the city's roads and its Kontor (a road beside it joins it).
+    std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
+    std::vector<std::int32_t> dist(prev.size(), 0);
+    std::vector<std::int32_t> queue;
+    for (std::int32_t y = 0; y < height; ++y) {
+        for (std::int32_t x = 0; x < width; ++x) {
+            const Tile t = tile(p.island, x, y);
+            if (t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge || t.prod == prod::kKontor)) {
+                prev[static_cast<std::size_t>(y * width + x)] = -1;
+                queue.push_back(y * width + x);
+            }
+        }
+    }
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::int32_t i = queue[head];
+        const std::int32_t x = i % width;
+        const std::int32_t y = i / width;
+        for (std::uint8_t dir = 0; dir < 4; ++dir) {
+            const std::int32_t nx = x + kStep[dir][0];
+            const std::int32_t ny = y + kStep[dir][1];
+            const Tile t = tile(p.island, nx, ny);
+            if (!t.valid() || t.city != p.city) {
+                continue;
+            }
+            const auto n = static_cast<std::size_t>(ny * width + nx);
+            if (prev[n] != -2) {
+                continue;
+            }
+            if (t.kind == kind::kBeach || t.kind == kind::kBeachOuter || t.kind == kind::kBeachVariant ||
+                t.kind == kind::kBeachRuin) {
+                prev[n] = -3;  // tried
+                if (!can_place(p, hut, nx, ny, 1, 1)) {
+                    continue;
+                }
+                const Acc acc = fisher_site(p, nx, ny);
+                if (acc.count <= 13 || !acc.market) {
+                    continue;
+                }
+                for (std::int32_t k = i; prev[static_cast<std::size_t>(k)] >= 0;
+                     k = prev[static_cast<std::size_t>(k)]) {
+                    road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
+                }
+                std::reverse(road.begin(), road.end());
+                Search& s = p.search;
+                s.best = acc.score > 0 ? acc.score : 1;
+                s.best_x0 = s.best_x1 = nx;
+                s.best_y0 = s.best_y1 = ny;
+                s.extra = -1;
+                return true;
+            }
+            if (dist[static_cast<std::size_t>(i)] >= kFisherPath ||
+                !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
+                continue;
+            }
+            prev[n] = i;
+            dist[n] = dist[static_cast<std::size_t>(i)] + 1;
+            queue.push_back(ny * width + nx);
+        }
+    }
+    return false;
+}
+
 bool Engine::search_fisher(AiPlayer& p) {
     // From the dead ends of the road to the beach, where fish are and no other fisher.
     const assets::BuildingType* b = by_id(p.search.building);
@@ -1686,21 +1775,7 @@ bool Engine::search_fisher(AiPlayer& p) {
             if (!can_place(p, *b, cx, cy, 1, 1)) {
                 continue;
             }
-            Acc acc;
-            rings(p, RingFilter::OwnOrSea, cx, cy, cx, cy, 13,
-                  [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
-                      if (t.origin && market_or_kontor(t) && d < 13) {
-                          acc.market = true;
-                      }
-                      if (t.prod == prod::kFisher && d < 8) {
-                          acc.count = -100000;
-                          acc.score -= 0x8000;
-                      }
-                      if (t.ware == ware::kFish && d < 6) {
-                          ++acc.count;
-                          acc.score += 2 * t.growth;
-                      }
-                  });
+            const Acc acc = fisher_site(p, cx, cy);
             if ((acc.count > 13 || p.pirates) && acc.market && acc.score > s.best) {
                 s.best = acc.score;
                 s.best_x0 = s.best_x1 = cx;
