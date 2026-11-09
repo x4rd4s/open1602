@@ -773,14 +773,14 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             m_host.toggle_pause_video();
             break;
         case KeyAction::SpeedUp:
-            m_commands.submit(
-                sim::GameSpeedOrder{local(), sim::GameSpeedOrder::Op::SetSpeed,
-                                    std::min(simulation().rules().max_game_speed, simulation().speed() * 2)});
+        case KeyAction::SpeedDown: {
+            const std::uint32_t base = speed_base();
+            m_asked_speed = b.action == KeyAction::SpeedUp ? std::min(simulation().rules().max_game_speed, base * 2)
+                                                           : std::max(1U, base / 2);
+            m_asked_speed_ms = annokit::platform::ticks_ms();
+            m_commands.submit(sim::GameSpeedOrder{local(), sim::GameSpeedOrder::Op::SetSpeed, m_asked_speed});
             break;
-        case KeyAction::SpeedDown:
-            m_commands.submit(sim::GameSpeedOrder{local(), sim::GameSpeedOrder::Op::SetSpeed,
-                                                  std::max(1U, simulation().speed() / 2)});
-            break;
+        }
         case KeyAction::QuickSave:
             m_host.quick_save();
             break;
@@ -2323,6 +2323,16 @@ void MapInput::draw_overlay() {
         SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
         SDL_RenderRect(r, &band);
     }
+}
+
+std::uint32_t MapInput::speed_base() {
+    constexpr std::uint64_t kAskedMs = 1500;  // longer than the way to the host and back
+    const std::uint32_t now = simulation().speed();
+    if (m_asked_speed == 0 || now == m_asked_speed || annokit::platform::ticks_ms() > m_asked_speed_ms + kAskedMs) {
+        m_asked_speed = 0;
+        return now;
+    }
+    return m_asked_speed;
 }
 
 }  // namespace o1602::app

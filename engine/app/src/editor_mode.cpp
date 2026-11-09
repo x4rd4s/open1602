@@ -1919,11 +1919,13 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
                     Line{ui::tr("editor.check.start_sea", {who(a.player), number(a.rival)}), Line::Kind::Note});
                 continue;
             }
-            lines.push_back(
-                Line{ui::tr("editor.check.start", {who(a.player), number(a.islands), number(a.land),
-                                                   crops.empty() ? ui::tr("editor.check.start_no_crops") : crops,
-                                                   number(a.ore), number(a.gold), number(a.rival)}),
-                     Line::Kind::Note});
+            lines.push_back(Line{ui::tr("editor.check.start",
+                                        {who(a.player),
+                                         a.islands == 1 ? ui::tr("editor.check.start_islands.one")
+                                                        : ui::tr("editor.check.start_islands", {number(a.islands)}),
+                                         number(a.land), crops.empty() ? ui::tr("editor.check.start_no_crops") : crops,
+                                         number(a.ore), number(a.gold), number(a.rival)}),
+                                 Line::Kind::Note});
         }
         const auto uneven = editor::unfairness(areas);
         for (const editor::Unfairness& u : uneven) {
