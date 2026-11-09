@@ -92,7 +92,8 @@ bool Engine::ship_idle(AiPlayer& p, const Ship& s) {
     // The white flag does not count (the original tests the wrong bit):
     // a plundered ship gets its next job, and the job strikes the flag.
     const ShipNote& n = note(p, s.id);
-    return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.id != p.settle.ship;
+    return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.explore_steps == 0 &&
+           s.id != p.settle.ship;
 }
 
 void Engine::send_to_city(AiPlayer& p, Ship& s, const City& c) {
@@ -184,6 +185,11 @@ void Engine::logistics(AiPlayer& p) {
         }
     }
     missions(p);
+    // Open1602: an improved computer's ship with nothing to carry explores before it patrols, as a
+    // player sends his first ship around the islands.
+    if (rivals() && p.cities != 0) {
+        scout(p);
+    }
     for (const City& c : m_world.cities()) {
         if (c.owner != p.player) {
             continue;
@@ -191,11 +197,64 @@ void Engine::logistics(AiPlayer& p) {
         if (static_cast<std::int32_t>(patrols(p, c.island)) < p.ships_per_city) {
             Ship* s = pick_patrol_ship(p, healthy);
             if (s == nullptr) {
-                return;
+                break;
             }
             patrol_route(p, *s, c.island);
         }
     }
+}
+
+void Engine::scout(AiPlayer& p) {
+    // Open1602: an improved computer sees only what its ships saw. A ship with nothing else to do
+    // (no supply run; even the only one, which would otherwise patrol the home island) sails to the
+    // nearest island it has not explored and explores it, one ship at a time, so that the island
+    // search knows the crops when the city wants them.
+    const std::vector<Ship*> ships = own_ships(p);
+    if (ships.empty() ||
+        std::any_of(p.ships.begin(), p.ships.end(), [](const ShipNote& n) { return n.mission == 10; })) {
+        return;
+    }
+    Ship* ship = nullptr;
+    for (Ship* s : ships) {
+        if (ship_idle(p, *s) && note(p, s->id).cooldown == 0 && health128(*s) > kHealthy) {
+            ship = s;
+            break;
+        }
+    }
+    if (ship == nullptr) {
+        return;
+    }
+    std::int64_t best = -1;
+    Target goal;
+    std::uint16_t target = 0;
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        const auto island = static_cast<std::uint16_t>(i);
+        if (knows_crops(p, island) || island_size(island) == 0) {
+            continue;
+        }
+        if (island_of(island).discovered_by(p.player) && !island_allowed(p, island)) {
+            continue;
+        }
+        if (rim_goal(*ship, island, best, goal)) {
+            target = island;
+        }
+    }
+    if (best < 0) {
+        return;
+    }
+    ShipOrder order;
+    order.player = p.player;
+    order.ship = ship->id;
+    order.target = goal;
+    if (!execute(order).accepted) {
+        return;
+    }
+    ShipNote& n = note(p, ship->id);
+    n.patrol = false;
+    n.mission = 10;
+    n.param = target;
+    n.counter = 2;
+    log(p, "scouting island %u with ship %u", target, ship->id);
 }
 
 bool Engine::yard_service(AiPlayer& p) {

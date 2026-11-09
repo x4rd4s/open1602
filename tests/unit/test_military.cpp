@@ -294,28 +294,40 @@ TEST_CASE("military: after the fight and after the way the unit stands, its atta
     CHECK(f.world.soldier(a)->anim == kStand);
 }
 
-TEST_CASE("military: a musketeer shoots from afar, a computer's swordsman closes in") {
-    Field f;
-    f.start();
-    f.war(0, 1);
-    const std::uint32_t musket = f.add(kMusket, 0, 40, 30).id;
-    const std::uint32_t sword = f.add(kSword, 1, 52, 30).id;
-    f.run(2'000);
-    // The swordsman came closer (computer players' units chase); the musketeer stays.
-    const sim::Soldier* m = f.world.soldier(musket);
-    const sim::Soldier* s = f.world.soldier(sword);
-    REQUIRE(m != nullptr);
-    REQUIRE(s != nullptr);
-    CHECK(m->cell_x() == 40);
-    CHECK(s->cell_x() < 52);
-    f.run(60'000);
-    CHECK(f.count(sim::MilitaryEvent::Kind::SoldierKilled) == 1);
-    // A musket shot does 2.4 HP (76/32) at full health.
-    bool musket_hit = false;
-    for (const auto& e : f.events) {
-        musket_hit = musket_hit || (e.kind == sim::MilitaryEvent::Kind::Hit && e.unit == sim::Target::soldier(musket));
+TEST_CASE("military: a musketeer shoots from afar, the original's computer's swordsman closes in") {
+    // The original's computer players' units chase enemies on their own; an improved computer's
+    // swordsman behaves as a player's: six tiles away, out of the musket's range, it does not walk
+    // towards the musketeer without an order.
+    for (const bool original : {true, false}) {
+        Field f;
+        f.rules.bugs.classic_ai = original;
+        f.start();
+        f.war(0, 1);
+        const std::uint32_t musket = f.add(kMusket, 0, 40, 30).id;
+        const std::uint32_t sword = f.add(kSword, 1, 52, 30).id;
+        f.run(2'000);
+        const sim::Soldier* m = f.world.soldier(musket);
+        const sim::Soldier* s = f.world.soldier(sword);
+        REQUIRE(m != nullptr);
+        REQUIRE(s != nullptr);
+        CHECK(m->cell_x() == 40);
+        CHECK((s->cell_x() < 52) == original);
+        f.run(60'000);
+        if (!original) {
+            // Out of each other's reach, neither walks over: as two players' units would stand.
+            CHECK(f.count(sim::MilitaryEvent::Kind::SoldierKilled) == 0);
+            CHECK(f.world.soldier(sword)->cell_x() == 52);
+            continue;
+        }
+        CHECK(f.count(sim::MilitaryEvent::Kind::SoldierKilled) == 1);
+        // A musket shot does 2.4 HP (76/32) at full health.
+        bool musket_hit = false;
+        for (const auto& e : f.events) {
+            musket_hit =
+                musket_hit || (e.kind == sim::MilitaryEvent::Kind::Hit && e.unit == sim::Target::soldier(musket));
+        }
+        CHECK(musket_hit);
     }
-    CHECK(musket_hit);
 }
 
 TEST_CASE("military: an attack order on a building means war; the building falls, damage heals") {
@@ -1182,7 +1194,10 @@ TEST_CASE("military: finding units by id follows adds and removals without a new
 }
 
 TEST_CASE("military: a battle of two armies develops the same on every platform (golden hash)") {
+    // The original's computers, whose units go for each other on their own; improved computers'
+    // units wait for their computer's orders.
     Field f;
+    f.rules.bugs.classic_ai = true;
     f.start();
     f.war(0, 1);
     for (std::int32_t i = 0; i < 4; ++i) {

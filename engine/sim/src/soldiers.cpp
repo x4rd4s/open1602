@@ -43,11 +43,15 @@ constexpr std::uint64_t kStraightCellUs = 3'125'000;  // half a tile at Speed 1,
 constexpr std::uint64_t kDiagonalCellUs = 4'419'417;
 constexpr std::int32_t kSquareShift = 4;  // squares of 16 x 16 cells for near_units()
 
-bool computer_controlled(const World& world, PlayerId p) noexcept {
+/// Units that hunt enemies on their own: the natives', the pirates', and the original's computer
+/// players' (Rules::bugs.classic_ai). Improved computers' units behave as a player's: they fight
+/// what comes near and chase only by order (attack move, patrol), which the computer gives.
+bool computer_controlled(const World& world, PlayerId p, bool classic_computers) noexcept {
     const Player* player = world.player(p);
-    return player != nullptr &&
-           (player->role == PlayerRole::Computer || world.behaviour(*player) == FactionBehaviour::Natives ||
-            world.behaviour(*player) == FactionBehaviour::Pirates);
+    return player != nullptr && ((player->role == PlayerRole::Computer &&
+                                  (classic_computers || world.behaviour(*player) != FactionBehaviour::Settlers)) ||
+                                 world.behaviour(*player) == FactionBehaviour::Natives ||
+                                 world.behaviour(*player) == FactionBehaviour::Pirates);
 }
 
 }  // namespace
@@ -782,7 +786,8 @@ void Military::decide(Soldier& s) {
             // the player never walk towards enemies on their own (original).
             const bool melee = static_cast<std::int32_t>(type->combat.range8) <= kMeleeRange8;
             const bool walking = !s.target.empty() && !attackable(s, s.target);
-            const bool hunter = computer_controlled(*m_world, s.owner) || s.patrol.active || s.attack_move;
+            const bool hunter =
+                computer_controlled(*m_world, s.owner, m_rules->bugs.classic_ai) || s.patrol.active || s.attack_move;
             if (enemy.empty() && !s.hold && (hunter || (melee && !walking))) {
                 std::size_t tried = 0;
                 bool out_of_plans = false;

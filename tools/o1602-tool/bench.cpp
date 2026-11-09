@@ -332,10 +332,15 @@ int cmd_bench(const Args& args) {
         sim::apply_figure_values(*figures, original_figures, world->balance());
         // A new world runs Open1602's rules; --computer-cities original keeps the computers to the
         // original's four cities, to compare.
-        // --ai classic plays the original's computers, to compare.
+        // --ai classic plays the original's computers, to compare. --reveal and --reveal-resources
+        // show towns and every island's resources from the start, as the game's settings do.
         const auto cities = args.options.find("--computer-cities");
         const auto ai = args.options.find("--ai");
-        if ((cities != args.options.end() || ai != args.options.end()) && !world->saved_rules()) {
+        const auto reveal = args.options.find("--reveal");
+        const bool reveal_resources = args.flag("--reveal-resources");
+        if ((cities != args.options.end() || ai != args.options.end() || reveal != args.options.end() ||
+             reveal_resources) &&
+            !world->saved_rules()) {
             sim::Rules r;
             if (cities != args.options.end()) {
                 r.computer_cities =
@@ -344,6 +349,12 @@ int cmd_bench(const Args& args) {
             if (ai != args.options.end()) {
                 r.bugs.classic_ai = ai->second == "classic";
             }
+            if (reveal != args.options.end()) {
+                r.reveal = reveal->second == "none"  ? sim::Reveal::None
+                           : reveal->second == "all" ? sim::Reveal::All
+                                                     : sim::Reveal::Original;
+            }
+            r.reveal_resources = reveal_resources;
             world->set_saved_rules(r);
         }
         simulation.emplace(*world, *buildings, *figures);

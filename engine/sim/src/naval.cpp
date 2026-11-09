@@ -13,8 +13,12 @@ constexpr std::int32_t kOrderRange = 15;  // tiles: an ordered target this near 
 constexpr std::uint32_t kStandMs = 1000;  // a ship fighting stands a second between looks
 constexpr std::uint32_t kDefaultTurnMs = 200;
 
-bool computer_controlled(const Player* p) noexcept {
-    return p != nullptr && p->role != PlayerRole::Human;
+/// Ships that engage on their own out at sea or sent against something: all but a player's. Improved
+/// computers' ships (not Rules::bugs.classic_ai) behave as a player's; the computer gives them
+/// attack moves.
+bool computer_controlled(const World& world, const Player* p, bool classic_computers) noexcept {
+    return p != nullptr && p->role != PlayerRole::Human &&
+           (classic_computers || world.behaviour(*p) != FactionBehaviour::Settlers);
 }
 
 }  // namespace
@@ -64,9 +68,9 @@ bool Fleet::naval_combat(Ship& ship) {
     // Engage mode: ships on a route or patrol, pirates, and computer players' ships out at sea or
     // sent against something; the player's ships without a route only fight what is in range.
     const bool engage =
-        !ship.hold &&
-        (ship.route.active || pirate || ship.attack_move ||
-         (computer_controlled(owner) && !ship.repairing && (is_combat_ref(ship.target) || ship.near_island == 0xFFFF)));
+        !ship.hold && (ship.route.active || pirate || ship.attack_move ||
+                       (computer_controlled(*m_world, owner, m_rules == nullptr || m_rules->bugs.classic_ai) &&
+                        !ship.repairing && (is_combat_ref(ship.target) || ship.near_island == 0xFFFF)));
     // The ordered target (pirates: their order; others: the current target) if hostile, or a tree
     // or field that is not the ship's, and near.
     Target candidate;

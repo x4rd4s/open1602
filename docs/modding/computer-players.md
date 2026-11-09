@@ -392,6 +392,24 @@ castle_inhabitants = 0
 
 A game keeps them with its other balance values (section `BALA` version 5 of the savegame).
 
+## What they see and how their units fight
+
+The original's computers know the whole map: they choose islands, crops and targets anywhere, and
+their soldiers and ships attack every enemy near them on their own. Improved computers (not
+`classic_ai`) see what a player sees and command their units as a player does:
+
+- **Islands.** A computer founds and attacks only on islands its ships have discovered (a ship within
+  five tiles of the island), and it knows an island's crops only once a ship has explored it or it
+  has a city there. The settings that show towns or every island's resources from the start count
+  for the computers as for the players: with "island resources known" a computer makes no trip.
+- **Exploring.** A ship with nothing else to do, even a computer's only one, sails to the nearest
+  island the computer has not explored and explores it before it patrols, one ship at a time. When
+  no known island suits the island search, the settlement's ship sails to the nearest unknown one
+  first, and explores every unexplored island it stops at.
+- **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do
+  not either. The computer gives them attack moves instead (`attack_move` of the orders): to a
+  target city, against soldiers on its islands and on the ships' attack missions.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything

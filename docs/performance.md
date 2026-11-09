@@ -152,6 +152,8 @@ o1602-tool bench --players 4 --minutes 240 --ai classic --per-player  # the orig
 Open1602's by default, a savegame keeps its own). `--per-player` adds to each period, per player, its cities, inhabitants, gold, units and
 castles, its taxes, running costs, sales and purchases per minute, and per class its inhabitants,
 satisfaction and tax rate: the way to compare the economies of the two kinds of computers.
+`--reveal none|original|all` and `--reveal-resources` set the settings that show towns and every
+island's resources from the start, which the improved computers' exploring depends on.
 
 Tick times are the CPU time of the game thread where the system has a precise per-thread clock
 (Linux, macOS); elsewhere, and with `--wall`, they are wall-clock times. A single run's p99 and
