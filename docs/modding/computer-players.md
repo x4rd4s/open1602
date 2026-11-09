@@ -510,6 +510,9 @@ or is allied with the enemy too. Scripts see alliances in `game.relation` and `o
 More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
 disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
 10 t of its ware in stock until the stock is down to 4 t.
+More than 5000 gold in debt with a falling purse, it gives up the city that costs it most (its
+running costs above its taxes), one at a time; the home city stays. While its cities do not earn
+50 gold a minute each, it founds no further colony, whatever gold it has.
 
 In debt, an improved computer locks the building material of a city (the city window's switch)
 while the city has less than 1 t of food, or of a good its merchants or higher classes want and
