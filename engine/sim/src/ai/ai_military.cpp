@@ -671,6 +671,9 @@ void Engine::ship_send(AiPlayer& p, Ship& s, const Target& t, std::uint8_t missi
     order.player = p.player;
     order.ship = s.id;
     order.target = t;
+    // Raids, attacks and landings: improved computers' ships fight on the way only by such an
+    // order, as a player's do; the original's engage on their own.
+    order.attack_move = rivals() && (mission == 3 || mission == 5 || mission == 7);
     execute(order);
     ShipNote& n = note(p, s.id);
     n.mission = mission;
@@ -819,6 +822,17 @@ void Engine::missions(AiPlayer& p) {
                 } else {
                     mission_end(p, *s, n);
                 }
+                break;
+            }
+            case 10: {
+                // An improved computer's scout at the island: it explores, then is free again.
+                ExploreOrder order;
+                order.player = p.player;
+                order.ship = s->id;
+                execute(order);
+                n.mission = 0;
+                n.param = 0;
+                n.counter = 0;
                 break;
             }
             default:
@@ -1069,8 +1083,8 @@ void Engine::target_scan(AiPlayer& p) {
     p.target_cursor = static_cast<std::uint32_t>((p.target_cursor + 1) % cities.size());
     const City& t = cities[p.target_cursor];
     const Player* o = m_world.player(t.owner);
-    if (o == nullptr || t.owner == p.player) {
-        return;
+    if (o == nullptr || t.owner == p.player || !knows_island(p, t.island)) {
+        return;  // improved computers attack only cities on islands they discovered
     }
     const bool at_peace = m_world.diplomacy().relation(p.player, t.owner).peace == Treaty::Signed;
     bool ok = false;
@@ -1237,6 +1251,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             SoldierOrder order;
             order.player = a.player;
             order.attack = true;
+            order.attack_move = rivals();  // a player's units chase only by such an order
             order.target = Target::building(island, static_cast<std::uint32_t>(goals[g].first),
                                             static_cast<std::uint32_t>(goals[g].second));
             for (std::size_t k = 0; k < count && next < mine.size(); ++k) {
@@ -1275,6 +1290,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             SoldierOrder order;
             order.player = a.player;
             order.attack = true;
+            order.attack_move = rivals();  // a player's units chase only by such an order
             order.target = Target::soldier(enemy->id);
             const std::uint32_t need = enemy_count + enemy_count / 4;
             for (std::size_t k = 0; k < mine.size() && k < need; ++k) {
@@ -1527,6 +1543,7 @@ bool Engine::defend(AiPlayer& a, std::uint16_t island, const std::vector<PlayerI
             SoldierOrder order;
             order.player = a.player;
             order.attack = true;
+            order.attack_move = rivals();  // a player's units chase only by such an order
             order.target = target;
             orders.push_back(order);
             it = orders.end() - 1;

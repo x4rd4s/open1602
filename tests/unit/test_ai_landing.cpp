@@ -181,6 +181,8 @@ TEST_CASE("ai landing: at war, a computer ships the soldiers beside its Kontor t
     ship.cannons = 4;
     a.world.add_ship(ship);
     REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+    // The enemy's island is known, as the original shows every new city's island to all players.
+    a.world.island(1).discover(kComputer);
     sim::Simulation s(a.world, a.buildings, a.figures);
     run(s, 75'000);
     // Four went aboard (the ship's holds) and are ashore on the enemy's island, beside the beach
@@ -195,4 +197,32 @@ TEST_CASE("ai landing: at war, a computer ships the soldiers beside its Kontor t
     REQUIRE(a.world.islands()[1].map.top(0, 14).owner == kHuman);
     run(s, 2 * 60'000);
     CHECK(a.world.islands()[1].map.top(0, 14).owner != kHuman);  // the Kontor has fallen
+}
+
+TEST_CASE("ai landing: an improved computer lands nobody on an island it has not discovered, the original's does") {
+    const auto landed = [](bool original) {
+        Coast a;
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        a.world.add_ship(ship);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 75'000);
+        return a.soldiers_on(kComputer, 1);
+    };
+    CHECK(landed(true) > 0);
+    CHECK(landed(false) == 0);
 }

@@ -115,11 +115,22 @@ void Engine::pick_island(AiPlayer& p) {
         }
         return;
     }
+    // Improved computers see what a player sees: only the islands their ships have discovered, the
+    // crops only of those they explored. While a ship explores, the search waits for it.
+    const bool sighted = rivals();
+    if (sighted && exploring(p)) {
+        return;
+    }
     for (std::uint32_t k = 0; k <= n; ++k) {
         s.cursor = static_cast<std::uint16_t>(s.cursor + 1);
         if (s.cursor >= n) {
             // Before island 0, so that the next search tests it first (it was passed over).
             s.cursor = std::numeric_limits<std::uint16_t>::max();
+            // Nothing among the known islands: a ship sails to the next unknown one first; every
+            // trip counts as a pass, so the search still ends.
+            if (sighted && explore_next(p)) {
+                log(p, "exploring for an island (need %d, crop %u)", s.need, s.crop);
+            }
             if (s.need <= s.floor) {
                 if (s.crop != 0) {
                     // Drop the crop and search again from 1800 tiles.
@@ -140,10 +151,10 @@ void Engine::pick_island(AiPlayer& p) {
             return;
         }
         const std::uint16_t i = s.cursor;
-        if (!island_allowed(p, i)) {
+        if (!island_allowed(p, i) || !knows_island(p, i)) {
             continue;
         }
-        if (s.crop != 0 && fertility(i, s.crop) != 128) {
+        if (s.crop != 0 && (!knows_crops(p, i) || fertility(i, s.crop) != 128)) {
             continue;
         }
         if (island_size(i) < (p.cities <= 1 ? 2U : 1U)) {
@@ -158,6 +169,120 @@ void Engine::pick_island(AiPlayer& p) {
         push(p, kSettleArea, true);
         return;
     }
+}
+
+bool Engine::knows_island(const AiPlayer& p, std::uint16_t island) const {
+    // The original's computers know every island; an improved one those its ships discovered or
+    // explored (the setting that shows every island's resources explores them all from the start).
+    if (!rivals() || island_of(island).discovered_by(p.player) || island_of(island).explored_by(p.player)) {
+        return true;
+    }
+    return std::any_of(m_world.cities().begin(), m_world.cities().end(),
+                       [&](const City& c) { return c.island == island && c.owner == p.player; });
+}
+
+bool Engine::knows_crops(const AiPlayer& p, std::uint16_t island) const {
+    // An improved computer knows the crops of an island it explored or has a city on.
+    if (!rivals() || island_of(island).explored_by(p.player)) {
+        return true;
+    }
+    return std::any_of(m_world.cities().begin(), m_world.cities().end(),
+                       [&](const City& c) { return c.island == island && c.owner == p.player; });
+}
+
+Ship* Engine::explorer(AiPlayer& p) {
+    // The ship of the settlement, or the first of the computer's, which becomes it.
+    if (Ship* s = settle_ship(p)) {
+        return s;
+    }
+    const std::vector<Ship*> ships = own_ships(p);
+    if (ships.empty()) {
+        return nullptr;
+    }
+    p.settle.ship = ships.front()->id;
+    return ships.front();
+}
+
+bool Engine::exploring(AiPlayer& p) {
+    // The search waits while the settlement's ship sails or explores. A ship that stopped in the
+    // rectangle of an island it may settle and has not explored explores it.
+    Ship* ship = settle_ship(p);
+    if (ship == nullptr) {
+        return false;
+    }
+    if (ship_moving(*ship) || ship->explore_steps != 0) {
+        return true;
+    }
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        const WorldIsland& isl = m_world.islands()[i];
+        if (ship->x >= isl.x && ship->x < isl.x + isl.map.width() && ship->y >= isl.y &&
+            ship->y < isl.y + isl.map.height()) {
+            if (isl.explored_by(p.player) || !island_allowed(p, static_cast<std::uint16_t>(i))) {
+                return false;
+            }
+            ExploreOrder order;
+            order.player = p.player;
+            order.ship = ship->id;
+            return execute(order).accepted;
+        }
+    }
+    return false;
+}
+
+bool Engine::explore_next(AiPlayer& p) {
+    // The nearest island the computer does not know (looking for a crop: also one it knows but has
+    // not explored) that could take a city: the ship sails into its rectangle, which discovers it.
+    Ship* ship = explorer(p);
+    if (ship == nullptr) {
+        return false;
+    }
+    const Settlement& s = p.settle;
+    std::int64_t best = -1;
+    Target goal;
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        const auto island = static_cast<std::uint16_t>(i);
+        const bool unknown = !knows_island(p, island) || (s.crop != 0 && !knows_crops(p, island));
+        // Its shape is on the map; who lives there only once it is discovered.
+        if (!unknown || island_size(island) < (p.cities <= 1 ? 2U : 1U) ||
+            (knows_island(p, island) && !island_allowed(p, island))) {
+            continue;
+        }
+        rim_goal(*ship, island, best, goal);
+    }
+    if (best < 0) {
+        return false;
+    }
+    ShipOrder order;
+    order.player = p.player;
+    order.ship = ship->id;
+    order.target = goal;
+    return execute(order).accepted;
+}
+
+bool Engine::rim_goal(const Ship& ship, std::uint16_t island, std::int64_t& best, Target& goal) const {
+    const SeaMap& sea = m_sim.fleet().sea();
+    const WorldIsland& isl = island_of(island);
+    const auto x0 = static_cast<std::int32_t>(isl.x);
+    const auto y0 = static_cast<std::int32_t>(isl.y);
+    const auto w = static_cast<std::int32_t>(isl.map.width());
+    const auto h = static_cast<std::int32_t>(isl.map.height());
+    bool found = false;
+    for (std::int32_t y = y0; y < y0 + h; ++y) {
+        for (std::int32_t x = x0; x < x0 + w; ++x) {
+            if ((x != x0 && x != x0 + w - 1 && y != y0 && y != y0 + h - 1) || !sea.sailable(x, y)) {
+                continue;  // the rim of the rectangle, where the sea comes in
+            }
+            const std::int64_t dx = x - static_cast<std::int64_t>(ship.x);
+            const std::int64_t dy = y - static_cast<std::int64_t>(ship.y);
+            const std::int64_t d = dx * dx + dy * dy;
+            if (best < 0 || d < best) {
+                best = d;
+                goal = Target::position(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                found = true;
+            }
+        }
+    }
+    return found;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -791,12 +916,13 @@ void Engine::unload_at(City& c, Ship& ship, bool keep_basics, bool destroy) {
 // ---------------------------------------------------------------------------------------------
 // Later colonies
 
-bool Engine::crop_available(std::uint8_t crop) const {
+bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
     // Some city of any computer player lies on an island that grows the crop fully
-    // (ore: a big or small vein; gold: a big one). Shared by all computers.
+    // (ore: a big or small vein; gold: a big one). Shared by all the original's computers; an
+    // improved computer knows only its own cities.
     for (const City& c : m_world.cities()) {
         const Player* o = m_world.player(c.owner);
-        if (o == nullptr || o->role != PlayerRole::Computer) {
+        if (o == nullptr || o->role != PlayerRole::Computer || (rivals() && c.owner != p.player)) {
             continue;
         }
         const std::uint32_t f = fertility(c.island, crop);
@@ -811,7 +937,7 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     const std::uint8_t skip = p.settle.previous_crop;
     for (const std::uint8_t crop : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCocoaField,
                                     ware::kCottonField, ware::kSugarField}) {
-        if (crop != skip && !crop_available(crop)) {
+        if (crop != skip && !crop_available(p, crop)) {
             return crop;
         }
     }
@@ -920,7 +1046,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     }
     bool all = true;
     for (const std::uint8_t crop : wanted) {
-        all = all && crop_available(crop);
+        all = all && crop_available(p, crop);
     }
     if (all && !force && !wants_room(p)) {
         return false;

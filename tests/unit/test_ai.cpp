@@ -296,6 +296,57 @@ TEST_CASE("ai: a computer with a ship founds a city through a build order") {
     CHECK(!view[0].settling);
 }
 
+TEST_CASE("ai: an improved computer sails out to explore before it founds, the original's knows every island") {
+    // Nothing is discovered at the start. The improved computer's ship sails into the rectangle of
+    // an island, discovers it and explores its crops (the first city wants one); the original's
+    // computer picks its island from the whole map.
+    for (const bool original : {true, false}) {
+        Game g;
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        for (const sim::WorldIsland& isl : g.world.islands()) {
+            REQUIRE(!isl.discovered_by(kComputer));
+        }
+        REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+        const sim::City* city = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                city = &c;
+            }
+        }
+        REQUIRE(city != nullptr);
+        if (!original) {
+            CHECK(g.world.islands()[city->island].discovered_by(kComputer));
+            CHECK(g.world.islands()[city->island].explored_by(kComputer));
+        }
+    }
+}
+
+TEST_CASE("ai: with every island's resources known an improved computer founds as the original's, no trip first") {
+    // The setting explores every island for every player from the start: the improved computer
+    // knows what the original's knows and picks the same island without a trip first.
+    std::uint64_t when[2] = {0, 0};
+    std::uint16_t where[2] = {0, 0};
+    for (const bool original : {true, false}) {
+        Game g;
+        sim::Rules rules;
+        rules.bugs.classic_ai = original;
+        rules.reveal_resources = true;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                where[original ? 0 : 1] = c.island;
+            }
+        }
+        when[original ? 0 : 1] = g.world.time_ms();
+    }
+    CHECK(where[0] == where[1]);
+    // The improved computer's own gold rules may cost it a moment, an exploring trip would cost a minute.
+    CHECK(when[1] < when[0] + 5'000);
+}
+
 TEST_CASE("ai: a ship whose goods do not fit into the full home warehouse does not lie there for good") {
     Game g;
     sim::Simulation s(g.world, g.buildings, g.figures);

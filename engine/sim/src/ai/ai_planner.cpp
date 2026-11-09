@@ -810,6 +810,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         asked.push_back(list);
         return first_need(p, c, r, money, order_of(m_world.balance().computer_orders, list)) || package_chains(p, c, r);
     };
+    // A city that stopped growing is given up after a while.
+    const auto give_up = [&](std::uint32_t seconds) {
+        if (now_ms() - r.stage_ms >= std::uint64_t{seconds} * 1000 && (r.flags & city_flag::kAbandon) == 0) {
+            r.flags |= city_flag::kAbandon;
+            log(p, "city %u/%u: given up, %u inhabitants after %u s at stage 0x%02x (money %d)", r.island, r.city,
+                population(c), seconds, unsigned{r.stage}, money);
+        }
+    };
     const auto idle = [&] {
         if (!classic()) {
             // A city at its last stage that earns well grows on the original's large islands too
@@ -879,9 +887,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Founded)) {
                 return;
             }
-            if (now_ms() - r.stage_ms >= std::uint64_t{at.ai_founded_abandon_seconds} * 1000) {
-                r.flags |= city_flag::kAbandon;
-            }
+            give_up(at.ai_founded_abandon_seconds);
             return;
         }
         case stage::kColony: {
@@ -912,9 +918,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Pioneers)) {
                 return;
             }
-            if (now_ms() - r.stage_ms >= std::uint64_t{at.ai_pioneers_abandon_seconds} * 1000) {
-                r.flags |= city_flag::kAbandon;
-            }
+            give_up(at.ai_pioneers_abandon_seconds);
             return;
         }
         case stage::kSettlers: {

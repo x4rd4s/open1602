@@ -320,6 +320,16 @@ private:
 
     // ---- ai_settle.cpp ----
     void pick_island(AiPlayer& p);
+    [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
+    [[nodiscard]] bool knows_crops(const AiPlayer& p, std::uint16_t island) const;
+    [[nodiscard]] Ship* explorer(AiPlayer& p);
+    [[nodiscard]] bool exploring(AiPlayer& p);
+    bool explore_next(AiPlayer& p);
+    /// The open water on the rim of the island's rectangle nearest to the ship, if nearer than
+    /// `best` (squared tiles, < 0: any); updates `best`.
+    bool rim_goal(const Ship& ship, std::uint16_t island, std::int64_t& best, Target& goal) const;
+    /// Improved computers: an idle ship sails to the nearest island nobody of theirs explored.
+    void scout(AiPlayer& p);
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     void task_settle_area(AiPlayer& p);
     void task_settle_site(AiPlayer& p);
@@ -337,7 +347,7 @@ private:
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
-    [[nodiscard]] bool crop_available(std::uint8_t crop) const;
+    [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
     [[nodiscard]] std::uint32_t colony_ship_candidate(AiPlayer& p);
     void task_abandon(AiPlayer& p);
