@@ -56,7 +56,7 @@ the original. The menu bar's commands and the tools:
 | Change map size | Makes the map larger or smaller in steps of 50 tiles, or fits it to its content with some sea around. It grows or is cut at the right and the bottom, so everything keeps its place, and it cannot be cut below the islands, ships, land units and markers. |
 | Overlays | What the map shows over the world: the players' land in their colours, the numbers of the islands, the coordinates of the tile under the mouse. |
 | Music and sound | The game's music and effects in the editor: each switched on or off, its volume by the slider or by "-" and "+", and a test sound. The same settings as the game's music page, so a change holds in the game too. |
-| Check | The check list: what keeps the scenario from being saved (the world must hold together, its description and markers be right), and what the original cannot have (its map size, more islands, cities, ships, land units, towers or players with a start than it holds, larger islands, more ore deposits, content of a package, a script). With two starts or more, the start areas: for each player, the islands up to 60 tiles around its start (its first warehouse, else its first ship), their land, the crops they are fertile for, their ore and gold, and how far the nearest rival starts; a warning where a start has much less land than the richest (below 70 percent), or lacks a crop, ore or gold that others have. The original's limits are a fault only for a scenario that is to keep to them. A click on a line leads to what it is about: the island on the map, or the dialog of the description, the goals (on the mission), the players or the map size. |
+| Check | The check list: what keeps the scenario from being saved (the world must hold together, its description and markers be right), and what the original cannot have (its map size, more islands, cities, ships, land units, towers or players with a start than it holds, more than 7 cities on an island, larger islands, more ore deposits, content of a package, a script). With two starts or more, the start areas: for each player, the islands up to 60 tiles around its start (its first warehouse, else its first ship), their land, the crops they are fertile for, their ore and gold, and how far the nearest rival starts; a warning where a start has much less land than the richest (below 70 percent), or lacks a crop, ore or gold that others have. The original's limits are a fault only for a scenario that is to keep to them. A click on a line leads to what it is about: the island on the map, or the dialog of the description, the goals (on the mission), the players or the map size. |
 | Leave the editor | Back to the main menu. |
 
 New map, Open and Leave the editor ask before changes that are not saved are lost.
@@ -448,5 +448,10 @@ opened from the main menu it offers the copy. A recovered map counts as not save
 ## Files
 
 The editor always saves Open1602's own format. It never writes a file of the original: a scenario of
-the game that was opened is saved as an own scenario. The game's installation is never written to;
+the game that was opened is saved as an own scenario. This format is also what makes extended
+scenarios possible: it knows none of the original's limits (map size, islands, players, ships, land
+units, towers, packages, scripts), and an island may hold up to 31 cities instead of 7. The editor
+places as many as an island holds; in the game, the setting **Cities per island** (the scenario's own
+rules, else the player's) decides how many may be founded. A scenario that keeps to the original's
+limits shows what goes beyond them in the check list. The game's installation is never written to;
 a package's folder only when the map is saved into it.

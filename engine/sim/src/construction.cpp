@@ -997,7 +997,8 @@ void plan_order(const World& world, const assets::BuildingTable& buildings, cons
             if (refusal == BuildRefusal::None) {
                 if (planner.city == MapCell::kNoCity) {
                     if ((limited_player && player_has_city(world, order.island, order.player)) ||
-                        cities_on_island(world, order.island) >= kMaxCitiesPerIsland) {
+                        cities_on_island(world, order.island) >=
+                            (order.free ? kMaxCitiesPerIsland : world.cities_per_island())) {
                         refusal = BuildRefusal::CityLimit;
                     }
                 } else if (type->kind == kind::kHq) {
@@ -1156,13 +1157,13 @@ bool standing(const assets::BuildingType& b) noexcept {
 /// circles of the markets and Kontors of the city and within 8 tiles of the towers of its owner;
 /// the neutral buildings' city holds the tiles of its standing buildings.
 /// Buildings with their origin in `gone` count as removed.
-std::vector<std::uint8_t> territory_coverage(const World& world, const assets::BuildingTable& buildings,
-                                             std::uint16_t island, const std::vector<TilePos>& gone) {
+std::vector<CityMask> territory_coverage(const World& world, const assets::BuildingTable& buildings,
+                                         std::uint16_t island, const std::vector<TilePos>& gone) {
     const IslandMap& m = world.islands()[island].map;
     const std::uint32_t w = m.width();
     const std::uint32_t h = m.height();
-    std::vector<std::uint8_t> covered(std::size_t{w} * h, 0);
-    const auto cover = [&](const Catchment& area, std::uint8_t radius, std::uint8_t bits) {
+    std::vector<CityMask> covered(std::size_t{w} * h, 0);
+    const auto cover = [&](const Catchment& area, std::uint8_t radius, CityMask bits) {
         const std::vector<std::uint8_t>& half = circle_table(radius);
         for (std::int32_t dy = 0; dy <= radius; ++dy) {
             const std::int32_t hw = half[static_cast<std::size_t>(dy)];
@@ -1198,7 +1199,7 @@ std::vector<std::uint8_t> territory_coverage(const World& world, const assets::B
                             const std::int32_t ty = f.y + static_cast<std::int32_t>(j);
                             if (m.contains(tx, ty)) {
                                 covered[static_cast<std::size_t>(ty) * w + static_cast<std::size_t>(tx)] |=
-                                    static_cast<std::uint8_t>(1U << cell.city);
+                                    CityMask{1} << cell.city;
                             }
                         }
                     }
@@ -1215,17 +1216,17 @@ std::vector<std::uint8_t> territory_coverage(const World& world, const assets::B
             if (tower) {
                 // A tower protects the land of every city of its owner.
                 const City* c = world.city(island, cell.city);
-                std::uint8_t bits = 0;
+                CityMask bits = 0;
                 for (const City& other : world.cities()) {
                     if (c != nullptr && other.island == island && other.owner == c->owner &&
                         other.index < kCitySlotsPerIsland) {
-                        bits = static_cast<std::uint8_t>(bits | (1U << other.index));
+                        bits |= CityMask{1} << other.index;
                     }
                 }
                 cover(area, kTowerRadius, bits);
             } else {
                 cover(area, std::max(b->radius, kMinKontorRadius),
-                      static_cast<std::uint8_t>(cell.city < kCitySlotsPerIsland ? 1U << cell.city : 0U));
+                      cell.city < kCitySlotsPerIsland ? CityMask{1} << cell.city : CityMask{0});
             }
         }
     }
@@ -1239,10 +1240,10 @@ bool acting_player(const World& world, PlayerId id) {
 
 /// The cities of human and computer players on an island that still have a standing market,
 /// Kontor or tower: a bit per city number. Buildings with their origin in `gone` count as removed.
-std::uint8_t standing_cities(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
-                             const std::vector<TilePos>& gone) {
+CityMask standing_cities(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                         const std::vector<TilePos>& gone) {
     const IslandMap& m = world.islands()[island].map;
-    std::uint8_t bits = 0;
+    CityMask bits = 0;
     for (std::uint32_t y = 0; y < m.height(); ++y) {
         for (std::uint32_t x = 0; x < m.width(); ++x) {
             const MapCell& cell = m.top(x, y);
@@ -1262,7 +1263,7 @@ std::uint8_t standing_cities(const World& world, const assets::BuildingTable& bu
             }
             const City* c = world.city(island, cell.city);
             if (c != nullptr && acting_player(world, c->owner)) {
-                bits = static_cast<std::uint8_t>(bits | (1U << cell.city));
+                bits |= CityMask{1} << cell.city;
             }
         }
     }
@@ -1273,8 +1274,8 @@ std::uint8_t standing_cities(const World& world, const assets::BuildingTable& bu
 /// between human and computer players, a covering city of another owner that still has a
 /// standing market, Kontor or tower (`standing`, from standing_cities), as in the original;
 /// kNoCity when none covers it.
-std::uint8_t covering_city(const World& world, std::uint16_t island, std::uint8_t own_city, std::uint8_t bits,
-                           std::uint8_t standing) {
+std::uint8_t covering_city(const World& world, std::uint16_t island, std::uint8_t own_city, CityMask bits,
+                           CityMask standing) {
     const City* own = world.city(island, own_city);
     if (own == nullptr) {
         return MapCell::kNoCity;
@@ -2000,8 +2001,8 @@ public:
         IslandMap& m = map();
         const std::uint32_t w = m.width();
         const std::uint32_t h = m.height();
-        const std::vector<std::uint8_t> covered = territory_coverage(m_world, m_buildings, m_island, {});
-        const std::uint8_t standing = standing_cities(m_world, m_buildings, m_island, {});
+        const std::vector<CityMask> covered = territory_coverage(m_world, m_buildings, m_island, {});
+        const CityMask standing = standing_cities(m_world, m_buildings, m_island, {});
         // Tiles their city no longer covers.
         for (std::uint32_t y = 0; y < h; ++y) {
             for (std::uint32_t x = 0; x < w; ++x) {
@@ -2009,7 +2010,7 @@ public:
                 if (cell.city == MapCell::kNoCity || cell.city >= 8) {
                     continue;
                 }
-                const std::uint8_t bits = covered[std::size_t{y} * w + x];
+                const CityMask bits = covered[std::size_t{y} * w + x];
                 if ((bits >> cell.city & 1U) != 0) {
                     continue;
                 }
@@ -2138,8 +2139,8 @@ public:
         }
         IslandMap& m = map();
         const std::uint32_t w = m.width();
-        const std::vector<std::uint8_t> covered = territory_coverage(m_world, m_buildings, m_island, {});
-        const std::uint8_t standing = standing_cities(m_world, m_buildings, m_island, {});
+        const std::vector<CityMask> covered = territory_coverage(m_world, m_buildings, m_island, {});
+        const CityMask standing = standing_cities(m_world, m_buildings, m_island, {});
         for (std::uint32_t y = 0; y < m.height(); ++y) {
             for (std::uint32_t x = 0; x < w; ++x) {
                 const std::uint8_t from = m.top(x, y).city;
@@ -2569,8 +2570,8 @@ DemolishLoss demolish_loss(const World& world, const assets::BuildingTable& buil
     }
     // The tiles recheck_territory would take from their city with nobody to give them to.
     const IslandMap& m = world.islands()[order.island].map;
-    const std::vector<std::uint8_t> covered = territory_coverage(world, buildings, order.island, gone);
-    const std::uint8_t standing = standing_cities(world, buildings, order.island, gone);
+    const std::vector<CityMask> covered = territory_coverage(world, buildings, order.island, gone);
+    const CityMask standing = standing_cities(world, buildings, order.island, gone);
     std::set<std::pair<std::int32_t, std::int32_t>> counted;
     for (std::uint32_t y = 0; y < m.height(); ++y) {
         for (std::uint32_t x = 0; x < m.width(); ++x) {
@@ -2578,7 +2579,7 @@ DemolishLoss demolish_loss(const World& world, const assets::BuildingTable& buil
             if (cell.city == MapCell::kNoCity || cell.city >= 8) {
                 continue;
             }
-            const std::uint8_t bits = covered[std::size_t{y} * m.width() + x];
+            const CityMask bits = covered[std::size_t{y} * m.width() + x];
             if ((bits >> cell.city & 1U) != 0 ||
                 covering_city(world, order.island, cell.city, bits, standing) != MapCell::kNoCity) {
                 continue;
@@ -2859,7 +2860,7 @@ bool capture_neutral_building(World& world, const assets::BuildingTable& buildin
         return false;
     }
     const IslandMap& map = world.islands()[island].map;
-    const std::vector<std::uint8_t> covered = territory_coverage(world, buildings, island, {});
+    const std::vector<CityMask> covered = territory_coverage(world, buildings, island, {});
     const Footprint f = footprint_of(*b->type, b->origin.x, b->origin.y, b->rotation);
     const auto reaches = [&](std::uint8_t city) {
         for (std::uint32_t j = 0; j < f.h; ++j) {

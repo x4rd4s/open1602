@@ -30,12 +30,19 @@ static_assert(kMaxPlannedIslands < kMaxIslandNumbers);
 inline constexpr std::size_t kMaxIslands = 0xFFFF;
 static_assert(kMaxIslands <= 0xFFFF, "loops over the islands count with std::uint16_t (LC-23)");
 
-/// Cities a player may found on one island: the original's three-bit city number.
-inline constexpr std::uint32_t kMaxCitiesPerIsland = 7;
-/// City numbers an island of a loaded game can carry: the eight owner slots of the original's island
-/// record. Territory masks keep one bit for each in a byte.
-inline constexpr std::uint32_t kCitySlotsPerIsland = 8;
-static_assert(kMaxCitiesPerIsland < kCitySlotsPerIsland && kCitySlotsPerIsland <= 8);
+/// A set of city numbers of one island, a bit for each: the territory masks of the land a city
+/// covers, the cities that still stand. Its width bounds the city numbers (kCitySlotsPerIsland).
+using CityMask = std::uint32_t;
+/// City numbers an island can carry: a bit for each in a CityMask. Open1602's savegame keeps the
+/// number as a whole byte (MAPW, CITY), the original's island record as three bits (eight owner
+/// slots, original::kMaxCitiesPerIsland), which the .GAM export checks.
+inline constexpr std::uint32_t kCitySlotsPerIsland = 32;
+static_assert(kCitySlotsPerIsland <= sizeof(CityMask) * 8);
+/// The most cities one island may hold under any setting (Rules::cities_per_island, the editor).
+/// It may be raised up to kCitySlotsPerIsland with a wider CityMask.
+inline constexpr std::uint32_t kMaxCitiesPerIsland = 31;
+static_assert(kMaxCitiesPerIsland < kCitySlotsPerIsland && kCitySlotsPerIsland < 0xFF,
+              "MapCell::kNoCity (0xFF) is no city number");
 
 /// The longest side of a world in tiles, checked when a world is loaded before anything is
 /// allocated. The world generator stays below (WorldSettings::kMaxSide).

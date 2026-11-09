@@ -28,6 +28,9 @@ namespace {
 
 // Limits of the original (section 7, original_limits.hpp).
 using original::kMaxCities;
+using original::kMaxCitiesPerIsland;
+/// The island record's owner slots, one per city number of three bits; the last means no city.
+constexpr std::uint8_t kIslandCitySlots = kMaxCitiesPerIsland + 1;
 using original::kMaxDeposits;
 using original::kMaxIslands;
 /// Island coordinates are one byte in the original's records (INSELHAUS, SIEDLER, KONTOR2, HIRSCH2,
@@ -228,6 +231,14 @@ private:
         }
         if (m_world.width() > 0xFFFF || m_world.height() > 0xFFFF) {
             return make_error(ErrorCode::LimitExceeded, "the world is too large for the file format");
+        }
+        for (const City& c : m_world.cities()) {
+            // The island record and the tiles keep a city's number in three bits.
+            if (c.index >= kMaxCitiesPerIsland) {
+                return make_error(ErrorCode::LimitExceeded,
+                                  "more than " + std::to_string(kMaxCitiesPerIsland) + " cities on island " +
+                                      std::to_string(m_world.islands()[c.island].header.number));
+            }
         }
         if (original && m_world.cities().size() > kMaxCities) {
             return make_error(ErrorCode::LimitExceeded, "more than 75 cities");
@@ -465,7 +476,7 @@ private:
         r[8] = static_cast<std::uint8_t>((r[8] & ~3U) | (island.deer_phase & 3U));
         r[0x0A] = static_cast<std::uint8_t>((r[0x0A] & ~7U) | (island.last_phase & 7U));
         // Owners of the eight city slots.
-        for (std::uint8_t c = 0; c < kCitySlotsPerIsland; ++c) {
+        for (std::uint8_t c = 0; c < kIslandCitySlots; ++c) {
             const City* city = m_world.city(i, c);
             r[0x0C + c] = city != nullptr ? owner_byte(city->owner) : kNoOwner;
         }
@@ -543,7 +554,7 @@ private:
                 if (top_layer && same_as_ground(map, x, y)) {
                     continue;
                 }
-                const std::uint8_t city = top_layer && cell.city != MapCell::kNoCity ? cell.city : 7;
+                const std::uint8_t city = top_layer && cell.city != MapCell::kNoCity ? cell.city : kMaxCitiesPerIsland;
                 const std::uint8_t owner =
                     top_layer && cell.city != MapCell::kNoCity ? owner_byte(cell.owner) : kNoOwner;
                 std::uint32_t phase = cell.anim_phase;

@@ -38,7 +38,7 @@ enum class BuildRefusal : std::uint8_t {
     Terrain,          ///< a tile does not take this building
     Territory,        ///< not completely inside the player's city (a market: no full edge inside)
     ForeignCity,      ///< the first item lies in another player's city
-    CityLimit,        ///< the player has a city on the island already, or the island has 7
+    CityLimit,        ///< the player has a city on the island already, or the island is full (World::cities_per_island)
     SecondKontor,     ///< a city has one Kontor (larger ones replace it)
     NoCoast,          ///< Kontor, shipyard: no coast in the right place
     NoDeposit,        ///< mine: no ore of its kind in the mountain
