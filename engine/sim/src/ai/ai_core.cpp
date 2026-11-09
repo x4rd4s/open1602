@@ -398,6 +398,10 @@ bool Engine::classic() const {
     return m_sim.rules().bugs.classic_ai;
 }
 
+bool Engine::rivals() const {
+    return !classic();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Root task
 

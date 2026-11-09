@@ -485,6 +485,9 @@ void apply_figure_values(assets::FigureTable& table, const assets::FigureTable& 
             case FigureField::Holds:
                 t->ship.cargo_slots = static_cast<std::uint8_t>(v.value);
                 break;
+            case FigureField::LoadSlowdown:
+                t->ship.load_slowdown = static_cast<std::uint8_t>(v.value);
+                break;
         }
     }
 }

@@ -62,6 +62,12 @@ void Military::tick(std::uint32_t dt_ms, std::vector<ConstructionEvent>* constru
     for (const Soldier& s : m_world->soldiers()) {
         m_ids.push_back(s.id);
     }
+    // The unit the budget turned away first in the last tick starts, the others follow in the
+    // order of the list, those before it at the end.
+    if (const auto first = std::find(m_ids.begin(), m_ids.end(), m_first_id); first != m_ids.end()) {
+        std::rotate(m_ids.begin(), first, m_ids.end());
+    }
+    m_first_id = kNoUnit;
     grid_build();
     for (const std::uint32_t id : m_ids) {
         if (Soldier* s = m_world->soldier(id)) {
@@ -590,6 +596,7 @@ void Military::save(core::ByteWriter& out) const {
     out.u32(m_regen_ms);
     out.u32(m_castle_ms);
     out.u32(m_native_ticks);
+    out.u32(m_first_id);
 }
 
 core::Status Military::load(core::ByteReader& reader, std::uint16_t version) {
@@ -601,12 +608,14 @@ core::Status Military::load(core::ByteReader& reader, std::uint16_t version) {
     const std::uint32_t regen = in.u32();
     const std::uint32_t castle_ms = version >= 2 ? in.u32() % kCastleSecondMs : m_castle_ms;
     const std::uint32_t native_ticks = version >= 3 ? in.u32() : m_native_ticks;
+    const std::uint32_t first_id = version >= 4 ? in.u32() : kNoUnit;
     if (!in.ok()) {
         return core::make_error(core::ErrorCode::InvalidFormat, "MILI: cut off");
     }
     m_regen_ms = regen % kRegenEpochMs;
     m_castle_ms = castle_ms;
     m_native_ticks = native_ticks;
+    m_first_id = first_id;
     return core::Ok{};
 }
 

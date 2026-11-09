@@ -246,6 +246,33 @@ TEST_CASE("balance: the rest of the stages' numbers are [computer_stages] too, s
     CHECK(loaded->balance() == balance);
 }
 
+TEST_CASE("balance: the computers' armies and castles are [computer_military], saved in BALA version 5") {
+    sim::Balance balance;
+    CHECK(balance.ai_castle_inhabitants == 350);
+    CHECK(balance.ai_castle_reserve == 2000);
+    CHECK(balance.ai_inhabitants_per_unit == 40);
+    CHECK(balance.ai_rival_army_percent == 75);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "peaceful",
+                            "[computer_military]\n"
+                            "inhabitants_per_unit = 0\n"
+                            "castle_inhabitants = 900\n",
+                            warnings);
+    CHECK(warnings.empty());
+    CHECK(balance.ai_inhabitants_per_unit == 0);
+    CHECK(balance.ai_castle_inhabitants == 900);
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithMilitary);
+
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+}
+
 TEST_CASE("balance: a package changes values of the original's buildings") {
     sim::Balance balance;
     std::vector<std::string> warnings;
@@ -417,16 +444,17 @@ TEST_CASE("balance: the large merchant ship has 8 holds and the large warship 6 
     rules.large_ship_holds = true;
     CHECK(sim::rule_building_values(rules).empty());
     const std::vector<sim::FigureValue> holds = sim::rule_figure_values(rules);
-    REQUIRE(holds.size() == 2);
-    CHECK((holds[0] == sim::FigureValue{23, sim::FigureField::Holds, 8}));  // large merchant ship
-    CHECK((holds[1] == sim::FigureValue{27, sim::FigureField::Holds, 6}));  // large warship
+    REQUIRE(holds.size() == 3);
+    CHECK((holds[0] == sim::FigureValue{23, sim::FigureField::Holds, 8}));         // large merchant ship
+    CHECK((holds[1] == sim::FigureValue{23, sim::FigureField::LoadSlowdown, 0}));  // ... not slowed by its load
+    CHECK((holds[2] == sim::FigureValue{27, sim::FigureField::Holds, 6}));         // large warship
 
     // A package that sets the warship's holds itself keeps them.
     sim::Balance balance;
     sim::set_figure_value(balance, sim::FigureValue{27, sim::FigureField::Holds, 4});
     sim::add_figure_values(balance, holds);
-    REQUIRE(balance.figures.size() == 2);
-    CHECK((balance.figures[1] == sim::FigureValue{27, sim::FigureField::Holds, 4}));
+    REQUIRE(balance.figures.size() == 3);
+    CHECK((balance.figures[2] == sim::FigureValue{27, sim::FigureField::Holds, 4}));
     CHECK(sim::valid(balance));
 
     // The rule is kept with the game; a game without its key plays the original's holds.

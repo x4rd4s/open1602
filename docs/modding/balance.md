@@ -55,6 +55,10 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computer_stages` | `citizens_luxury`, `citizens_kontor` | 1, 2 | 0–100, 0–4 | on to the citizens also only with more luxury goods in stock than the first number or a Kontor above the second level |
 | `computer_stages` | `merchants2_kontor` | 4 | 1–5 | the merchants' second stage also with a Kontor of this level (5: never) |
 | `computer_stages` | `aristocrats2_luxury` | 3 | 0–100 | the aristocrats' second stage with more of their luxury goods in stock than this |
+| `computer_military` | `castle_inhabitants` | 350 | 0–1000000 | an improved computer's home city builds a castle from this many inhabitants, and one more for every further so many while its army is short of its target (0: only as in the original, while it trails the leading human) |
+| `computer_military` | `castle_reserve` | 2000 | 0–10000000 | ... if this much gold is left after the castle's cost |
+| `computer_military` | `inhabitants_per_unit` | 40 | 0–1000000 | an improved computer keeps an army of a swordsman's strength for every so many of its inhabitants, whoever else is armed (0: none) |
+| `computer_military` | `rival_army_percent` | 75 | 0–1000 | ... and at least this share of the strongest army of another computer, at peace with it or not |
 
 The `computers` values are the original's cheats: what the computer players get from nowhere, on
 every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of
@@ -97,8 +101,9 @@ switch it off.
 
 The other settings of that page work the same way: "Hunter's hut reach" (`Rules::wider_hunting`,
 `data/balance/wider_hunting.toml`: 12 tiles instead of 8) and "Holds of large ships"
-(`Rules::large_ship_holds`, `data/balance/large_ship_holds.toml`, the figures' field `holds`: the
-large merchant ship 8 holds and the large warship 6, the original's the other way round).
+(`Rules::large_ship_holds`, `data/balance/large_ship_holds.toml`, the figures' fields `holds` and
+`load_slowdown`: the large merchant ship 8 holds and the large warship 6, the original's the other
+way round, and the large merchant ship's load no longer slows it down).
 
 ## Where a mod's changes are
 

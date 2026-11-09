@@ -128,7 +128,9 @@ struct MilitaryEvent {
 class Military {
 public:
     /// Way searches of all soldiers in one tick (TB-1), about 1.6 ms each. Soldiers over the
-    /// budget decide again in the next tick, in the order of the unit list.
+    /// budget decide again in the next tick, and the first of them goes first then: units that
+    /// search a lot (computers' soldiers chasing enemies they cannot reach) never keep a unit
+    /// further down the list from its way for good.
     static constexpr std::uint32_t kPlansPerTick = 8;
 
     Military(World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
@@ -194,7 +196,7 @@ public:
 
     /// The version save() writes, the section MILI of the running game's state (DS-3): 1 the
     /// regeneration clock, 2 and the castles' clock, 3 and the natives' ticks.
-    static constexpr std::uint16_t kStateVersion = 3;
+    static constexpr std::uint16_t kStateVersion = 4;
     /// State that is not in the world (clocks), for Open1602's savegame.
     void save(core::ByteWriter& out) const;
     /// Restores what save() of `version` wrote; an error if the data is damaged (nothing changed).
@@ -210,6 +212,9 @@ private:
     void start_wait(Soldier& s, std::uint32_t ms);
     /// Waits standing (idle_ms), the walking or attack animation ended.
     void rest(Soldier& s);
+    /// No way search left in this tick: the unit waits for the next one, and the first such unit
+    /// goes first there (TB-1).
+    void turned_away(Soldier& s);
     bool start_next_run(Soldier& s);
     bool plan(Soldier& s, std::int32_t radius, bool hostile_goal);
     bool plan_to(Soldier& s, const Target& target, std::int32_t radius, bool hostile_goal);
@@ -284,7 +289,11 @@ private:
     LandPlanner m_planner;
     std::uint32_t m_plans_left = 0;  ///< way searches still allowed in this tick (TB-1)
     std::uint32_t m_tick_ms = 0;     ///< game time of the running tick
-    PathFinder m_finder;             ///< scratch of warrior_target()
+    /// The first unit the budget turned away in the last tick, which goes first in the next one
+    /// (kNoUnit: none).
+    std::uint32_t m_first_id = kNoUnit;
+    static constexpr std::uint32_t kNoUnit = 0xFFFF'FFFFU;
+    PathFinder m_finder;  ///< scratch of warrior_target()
     std::vector<MilitaryEvent> m_events;
     std::vector<std::uint32_t> m_ids;  ///< scratch of tick(): the units in their order
     // The squares of grid_build(): the units of each by their place in World::soldiers().

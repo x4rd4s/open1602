@@ -33,6 +33,11 @@ std::optional<std::uint8_t> Fleet::bearing_to(const Ship& ship, const Target& ta
         return std::nullopt;
     }
     const auto [nx, ny] = other->cells.nearest(cx, cy);
+    // Open1602: walls stop cannon balls; the original's ships fire through them
+    // (OriginalBugs::ship_shots_through_walls). A wall that is the target itself is no cover.
+    if (!m_world->original_bugs().ship_shots_through_walls && m_combat->land().wall_between(cx, cy, nx, ny)) {
+        return std::nullopt;
+    }
     return direction_to(nx - cx, ny - cy);
 }
 
