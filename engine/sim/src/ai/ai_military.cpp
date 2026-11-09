@@ -1651,11 +1651,25 @@ void Engine::diplomacy(AiPlayer& p) {
             execute(o);
         };
         if (role == PlayerRole::Computer) {
-            // Computers always trade with each other; their peace is never touched.
+            // Computers always trade with each other. The original's never touch their peace;
+            // Open1602's improved computers offer and sign peace with each other by their mood, as
+            // with a human (war among computers comes with their war plans).
             if (rel.trade == Treaty::None) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
             } else if (rel.trade == Treaty::Received) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Signed);
+            }
+            if (rivals() && m_world.player(b) != nullptr && m_world.player(b)->status == PlayerStatus::Playing) {
+                const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
+                const std::int32_t prev = p.previous_mood[bi];
+                if (rel.peace == Treaty::None && m >= prev && m > 20) {
+                    order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
+                    log(p, "offers peace to computer %u (mood %d)", b, m);
+                } else if (rel.peace == Treaty::Received && m > -20) {
+                    order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
+                    log(p, "signs peace with computer %u (mood %d)", b, m);
+                }
+                p.previous_mood[bi] = m;
             }
             continue;
         }

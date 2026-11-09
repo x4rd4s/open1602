@@ -435,6 +435,24 @@ Improved computers weigh the way at sea:
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.
 
+## Trade and treaties
+
+The original's computers never fill their Kontor's trade list: they buy and sell only through their
+own ships, and they keep the peace with each other untouched. Improved computers also deal with
+everyone through the Kontor and make treaties among themselves:
+
+- **Buying.** Every few seconds, a city that lacks a ware it needs (and whose owner has 1500 gold
+  in hand) puts it on its Kontor's list to buy, up to twice the stock it wants; a ship of any
+  player, computer or human, may bring it.
+- **Selling.** What lies in store beyond four times the stock it wants (30 t of a ware it does not
+  use) plus 10 t goes on the list to sell, at three quarters of the base price. Tools, wood and
+  bricks are never sold.
+- **Slots.** The longest needs and the largest surpluses come first, as many as the Kontor's level
+  has slots; entries no longer wanted are taken off the list.
+- **Treaties.** Computers offer each other a trade treaty, as in the original. Improved ones also
+  offer peace to another computer whose mood toward them is above 20 and not falling, and sign a
+  peace offer as long as the mood is above -20, as they do with humans.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
