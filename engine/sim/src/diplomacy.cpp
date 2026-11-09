@@ -553,13 +553,14 @@ std::int32_t Diplomacy::mood(const World& world, PlayerId a, PlayerId b, std::ui
             }
             // A city of b only counts on a small island of a; troops of b on any island of a, as
             // in the original and the History Edition.
-            if (b_city && small(c) && (cities_a <= 2 || empty)) {
+            // Open1602: an ally's cities and troops are welcome (it shares the islands and comes to help).
+            const bool ally = allied(a, b);
+            if (b_city && small(c) && (cities_a <= 2 || empty) && !ally) {
                 settle_penalty = 200;
             }
             const bool b_troops = (seen & kBTroops) != 0;
             const bool a_troops = (seen & kATroops) != 0;
-            // Open1602: an ally's troops are welcome (they come to help).
-            if (b_troops && !allied(a, b)) {
+            if (b_troops && !ally) {
                 troop_penalty = std::max(troop_penalty, a_troops && b_city ? 60 : 200);
             }
         }

@@ -277,7 +277,7 @@ private:
     static constexpr std::int32_t kLess = 64022;
     static constexpr std::int32_t kMore = 64023;
     static constexpr std::int32_t kSlider = 64024;
-    /// Open1602: the alliance's line under the partner's name, on the tribute page and the strip.
+    /// Open1602: the alliance's line below the treaties, on the tribute page and the strip.
     static constexpr std::int32_t kAlliance = 64099;
     // The strip (Open1602), added to a copy of TRIBUT: + place 0..kStripPlaces - 1
     static constexpr std::int32_t kStripArms = 64101;
@@ -345,6 +345,20 @@ private:
         g.pos = {name->pos[0], below + 4};
         g.size = {name->size[0], height};
         g.offset = {static_cast<std::int16_t>(name->size[0] / 2), static_cast<std::int16_t>(height - 2)};
+        // The tribute's controls below the treaties move down where the line would touch them (the
+        // strip, whose treaties sit lower).
+        const std::int32_t free_from = g.pos[1] + g.size[1] + 4;
+        std::int32_t first = free_from;
+        for (const assets::Gadget& c : layout.gadgets) {
+            if (c.id > kTributeHand && c.id < kAlliance && c.pos[1] >= below) {
+                first = std::min<std::int32_t>(first, c.pos[1]);
+            }
+        }
+        for (assets::Gadget& c : layout.gadgets) {
+            if (c.id > kTributeHand && c.id < kAlliance && c.pos[1] >= below) {
+                c.pos[1] += free_from - first;
+            }
+        }
         layout.gadgets.push_back(g);
         return layout;
     }
