@@ -89,12 +89,11 @@ bool Engine::free_deposit(std::uint16_t island, std::uint8_t w) const {
 
 bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     // Open1602, improved computers: an island with a city of a small rival (two cities at most),
-    // that the original's computers never settle, when it has a free vein of the ore or gold the
-    // colony looks for. Not next to a partner or an ally, not next to a rival stronger than itself,
+    // that the original's computers never settle, when it has a free vein of the ore or gold its
+    // goal looks for. Not next to a partner or an ally, not next to a rival stronger than itself,
     // and never on an island with a city of its own.
     const std::uint8_t crop = p.settle.crop;
-    if (!rivals() || p.pirates || (crop != ware::kOre && crop != ware::kGold) || !knows_crops(p, island) ||
-        !free_deposit(island, crop)) {
+    if (crop == 0 || crop != goal_crop(p) || !knows_crops(p, island) || !free_deposit(island, crop)) {
         return false;
     }
     const std::uint32_t own = strength(p.player);
@@ -233,9 +232,6 @@ void Engine::pick_island(AiPlayer& p) {
         const IslandMap& map = island_of(i).map;
         if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need}) {
             continue;
-        }
-        if (!island_allowed(p, i) && s.island != i) {
-            log(p, "contests island %u for crop %u", i, s.crop);
         }
         s.island = i;
         push(p, kSettleArea, true);
@@ -906,8 +902,9 @@ void Engine::task_settle_land(AiPlayer& p) {
     order.ship = ship->id;
     order.items.push_back(
         BuildItem{p.pirates ? id::kPirateKontor : id::kKontor1, s.site_x, s.site_y, s.site_rotation, 0});
+    const bool contested = !island_allowed(p, island);
     const CommandResult result = execute(order);
-    log(p, "found a city on island %u at %d,%d: %s", island, s.site_x, s.site_y,
+    log(p, "found a city on island %u at %d,%d%s: %s", island, s.site_x, s.site_y, contested ? " (contested)" : "",
         result.build && result.build->placed != 0
             ? "built"
             : (result.build ? refusal_name(result.build->items.front().refusal) : "?"));
@@ -1066,9 +1063,15 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     return 0;
 }
 
+namespace {
+constexpr std::int32_t kGoalColonyMoney = 10'000;
+constexpr std::int32_t kGoalColonyIncome = 100;
+}  // namespace
+
 std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
-    // What the goal of an improved computer asks a colony for: gold or ore it has none of.
-    if (!rivals() || p.pirates) {
+    // What the goal of an improved computer asks a colony for: gold or ore it has none of, once
+    // it earns well and has the gold to spare (a colony for a mine pays off late).
+    if (!rivals() || p.pirates || player(p).money < kGoalColonyMoney || net_income(p) < kGoalColonyIncome) {
         return 0;
     }
     if (p.strategy.goal == goal::kGold && !crop_available(p, ware::kGold)) {
