@@ -2329,12 +2329,11 @@ TEST_CASE("ai: an improved computer raises the taxes its content inhabitants bea
             }
         }
         REQUIRE(city != nullptr);
-        constexpr std::uint32_t kTon = sim::kStockUnitsPerTon;
         std::uint8_t highest = 0;
         run_until(s, 120'000, [&] {
             city->inhabitants.assign(1, 100);
             city->ensure_ware(59);
-            city->goods[59] = 50 * kTon;
+            city->goods[59] = 50 * sim::kStockUnitsPerTon;
             if (!city->tax_rate.empty()) {
                 highest = std::max(highest, city->tax_rate[0]);
             }
@@ -2343,7 +2342,7 @@ TEST_CASE("ai: an improved computer raises the taxes its content inhabitants bea
         // Fully content at the raised rate, still supplied.
         run_until(s, 10'000, [&] {
             city->inhabitants.assign(1, 100);
-            city->goods[59] = 50 * kTon;
+            city->goods[59] = 50 * sim::kStockUnitsPerTon;
             return false;
         });
         CHECK(city->satisfaction[0] == sim::kFullSupply);
