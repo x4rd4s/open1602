@@ -656,15 +656,20 @@ void MapViewer::apply_world_values(const sim::World& world) {
     sim::apply_figure_values(m_figures, m_original_figures, world.balance());
 }
 
-void MapViewer::editor_test_play() {
+void MapViewer::editor_test_play(std::optional<sim::PlayerId> as) {
     if (!m_editor || !m_state || m_session) {
         return;
     }
-    // A human of the page "Players": not a slot that only holds a place, whose role is a human's too.
+    // A human of the page "Players": not a slot that only holds a place, whose role is a human's too;
+    // or the player chosen to test as, whatever it is.
     const sim::World& edited = m_state->world;
     const std::vector<sim::PlayerId> slots = editor::player_slots(edited);
-    if (std::none_of(slots.begin(), slots.end(),
-                     [&](sim::PlayerId s) { return edited.players()[s].role == sim::PlayerRole::Human; })) {
+    if (as && std::find(slots.begin(), slots.end(), *as) == slots.end()) {
+        as.reset();
+    }
+    if (!as && std::none_of(slots.begin(), slots.end(), [&](sim::PlayerId s) {
+            return edited.players()[s].role == sim::PlayerRole::Human;
+        })) {
         editor_notice(ui::tr("editor.test_play.no_human"), true, "no human player to test with");
         return;
     }
@@ -692,6 +697,9 @@ void MapViewer::editor_test_play() {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
     log_world_notes(notes);
+    if (as) {
+        editor::test_as(*world, *as);
+    }
     // A test game is a game: what it does is not the editor's, but should it end the program, the
     // changes are kept.
     editor_keep_recovery(true);
@@ -1199,7 +1207,9 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::SoundTest:
             break;  // taken above (editor_sound_request)
         case Kind::TestPlay:
-            editor_test_play();
+            editor_test_play(request.index > 0 ? std::optional<sim::PlayerId>(
+                                                      static_cast<sim::PlayerId>(request.index - 1))
+                                                : std::nullopt);
             return;  // the editor stands aside: nothing of it to do now
         case Kind::Recover:
             editor_recover();

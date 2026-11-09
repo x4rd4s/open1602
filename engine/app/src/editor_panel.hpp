@@ -598,7 +598,7 @@ struct EditorRequest {
         /// or the one before (0): the stars, keeping to the original's limits.
         ScenarioStep,
         ScenarioText,  ///< the row `index` (EditorScenarioRow) of the description as `name`
-        TestPlay,      ///< a game of the map as it is now; F5 in it leads back
+        TestPlay,      ///< a game of the map as it is now, as the slot `index` - 1 (0: the first human); F5 leads back
         Recover,       ///< the map kept by the editor's recovery, opened instead of the new one
         ShowIsland,    ///< the island `index` in the view's middle, selected
         ExportImage,   ///< the map as a picture (PNG) in the screenshots' folder
@@ -693,7 +693,8 @@ public:
         PackageSave,
         Campaign,
         Neutrals,  ///< the players towards the natives, the pirates and the trader
-        Sound      ///< music and effects: on or off, their volumes
+        Sound,     ///< music and effects: on or off, their volumes
+        TestAs     ///< the player the test game is played as
     };
 
     explicit EditorPanel(ui::FormStyle style = {}) : m_form(style) {}
@@ -791,6 +792,7 @@ private:
     void layout_selection(const EditorModel& model);
     void layout_view(const EditorModel& model);
     void layout_sound(const EditorModel& model);
+    void layout_test_as(const EditorModel& model);
     void layout_check(const EditorModel& model);
     void layout_islands(const EditorModel& model);
     void layout_world_size(const EditorModel& model);

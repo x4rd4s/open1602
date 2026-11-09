@@ -363,8 +363,9 @@ private:
     /// Out of the editor, to the main menu.
     void leave_editor();
     /// A game of the editor's map as it is now, started as from its file; the editor waits aside
-    /// with its document, its undo and its view until editor_end_test_play().
-    void editor_test_play();
+    /// with its document, its undo and its view until editor_end_test_play(). `as`: the player of
+    /// the page "Players" it is played as (editor::test_as), else the first human.
+    void editor_test_play(std::optional<sim::PlayerId> as = std::nullopt);
     /// Out of the test game, back into the editor as it was.
     void editor_end_test_play();
     /// The editor's recovery (a copy of the changed document, written a minute after a change,

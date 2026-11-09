@@ -160,6 +160,22 @@ annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& w
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_change"));
 }
 
+bool test_as(sim::World& world, sim::PlayerId player) {
+    const std::vector<sim::PlayerId> slots = player_slots(world);
+    if (std::find(slots.begin(), slots.end(), player) == slots.end()) {
+        return false;
+    }
+    for (const sim::PlayerId s : slots) {
+        sim::Player& p = *world.player(s);
+        if (s == player) {
+            p.role = sim::PlayerRole::Human;
+        } else if (p.role == sim::PlayerRole::Human) {
+            p.role = sim::PlayerRole::Computer;
+        }
+    }
+    return true;
+}
+
 annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world) {
     const std::vector<sim::PlayerId> slots = player_slots(world);
     if (slots.size() >= sim::kMaxPlayers) {

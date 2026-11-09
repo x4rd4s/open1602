@@ -516,6 +516,11 @@ std::optional<EditorRequest> EditorPanel::command(EditorCommand command, const E
         case EditorCommand::Check:
             return press(kCheck, model, true);
         case EditorCommand::TestPlay:
+            // With more than one player, the test asks whom it is played as.
+            if (model.player_slots.size() > 1) {
+                m_page = Page::TestAs;
+                return std::nullopt;
+            }
             return EditorRequest{EditorRequest::Kind::TestPlay};
         case EditorCommand::ExportImage:
             return EditorRequest{EditorRequest::Kind::ExportImage};
@@ -775,6 +780,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::Sound:
             layout_sound(model);
+            break;
+        case Page::TestAs:
+            layout_test_as(model);
             break;
         case Page::Check:
             layout_check(model);
@@ -2724,6 +2732,27 @@ void EditorPanel::layout_sound(const EditorModel& model) {
     f.button(kBack, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.back"));
 }
 
+void EditorPanel::layout_test_as(const EditorModel& model) {
+    ui::Form& f = m_form;
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.test_as.title"), Align::Left, Tone::Heading);
+    y += 32;
+    f.paragraph(Rect{m_x, y, m_w, 60}, ui::tr("editor.test_as.note"), Tone::Dim, 20);
+    y += 64;
+    // One button for each player, as the page "Players" lists them; the scenario stays as it is.
+    const std::int32_t bottom = m_top + m_height - kButtonH - 2 * kGap;
+    for (std::size_t i = 0; i < model.player_slots.size() && i < 20; ++i) {
+        if (y + kButtonH > bottom) {
+            break;
+        }
+        const EditorPlayer& p = model.player_slots[i];
+        f.button(kFirstRow + static_cast<Id>(i), Rect{m_x, y, m_w, kButtonH},
+                 p.name + " (" + ui::tr(p.human ? "editor.players.human" : "editor.players.computer") + ")");
+        y += kButtonH + kGap;
+    }
+    f.button(kBack, Rect{m_x, bottom + kGap, m_w, kButtonH}, ui::tr("editor.back"));
+}
+
 std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept {
     if (line.kind == EditorCheckLine::Kind::Heading) {
         return 2 * 20 + 2;
@@ -3687,6 +3716,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 return press(kPlayersPage, model, true);
             case Target::WorldSize:
                 return press(kWorldSizePage, model, true);
+        }
+        return std::nullopt;
+    }
+    if (*id >= kFirstRow && *id < kFirstRow + 20 && m_page == Page::TestAs) {
+        const auto row = static_cast<std::size_t>(*id - kFirstRow);
+        if (row < model.player_slots.size()) {
+            show_document();
+            return EditorRequest{EditorRequest::Kind::TestPlay, std::size_t{model.player_slots[row].slot} + 1};
         }
         return std::nullopt;
     }
