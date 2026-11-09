@@ -484,7 +484,8 @@ is military); once it has an army of six soldiers (`war_units`) and 1500 gold in
 (`war_money`), it declares war, keeps arming while the war lasts, and attacks the rival's cities as it attacks a human's: its ships land troops, its
 soldiers on an island fight the enemy's and take its Kontor and houses. It makes no peace with its
 target and offers no trade while the war lasts. Every ten minutes it looks whether the war gets
-anywhere: the target has lost a twentieth of its inhabitants (a city counts as fifty). After three
+anywhere: the target has lost a twentieth of its inhabitants (a city counts as fifty), or troops
+of its landed since the last look. After three
 looks without progress, in debt, or once the target is gone, it offers peace; the other side signs
 it as long as its mood is above -20. The original's computers never fight each other.
 

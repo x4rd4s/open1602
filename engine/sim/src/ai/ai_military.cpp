@@ -809,6 +809,7 @@ void Engine::missions(AiPlayer& p) {
                     n.mission = 6;
                     plan_landing(p, *s, n);
                 } else if (aboard != 0 && home != nullptr) {
+                    log(p, "ship %u calls its attack off (too few soldiers: %u aboard)", s->id, aboard);
                     ship_send(p, *s, Target::city_of(home->island, home->index), 2, 0);  // S-101: home, not a stray ref
                 } else {
                     mission_end(p, *s, n);
@@ -824,6 +825,9 @@ void Engine::missions(AiPlayer& p) {
                 const PlayerId owner = static_cast<PlayerId>(n.param & 0xFF);
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
                     log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
+                    if (p.strategy.war_target == owner) {
+                        p.strategy.war_fails = 0;  // a landing is progress: the fight takes its time
+                    }
                     UnloadOrder order;
                     order.player = p.player;
                     order.ship = s->id;
