@@ -18,7 +18,7 @@ namespace o1602::sim::ai {
 namespace {
 
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
-constexpr std::size_t kLockFromClass = 2;   // the merchants
+constexpr std::size_t kLockFromClass = 1;   // the settlers
 constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
 constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
@@ -391,9 +391,8 @@ void Engine::material_lock(AiPlayer& p, City& c) {
     }
     // Houses that rise without the goods of their class only lose their people again, and with
     // them the taxes that pay for the city. So the material stays locked while the city has no
-    // food left, or none of a good that its classes from the merchants on want and that it does
-    // not make enough of itself. Only in debt: a computer with gold in hand lets its city grow and
-    // builds or buys what is missing. A lock holds until the gold is back above 3000.
+    // food left, or none of a good that its classes from the settlers on want. Only in debt: a computer with gold in
+    // hand lets its city grow and builds or buys what is missing. A lock holds until the gold is back above 3000.
     if (player(p).money >= (c.material_lock ? kUnlockMoney : kLockMoney)) {
         if (c.material_lock) {
             set_material_lock(p, c, false);
@@ -401,14 +400,14 @@ void Engine::material_lock(AiPlayer& p, City& c) {
         return;
     }
     const std::uint8_t food = m_buildings.food_ware();
-    bool lack = food_short(c) && c.stock(food) < kTon;
+    bool lack = c.stock(food) < kTon;
     const auto& classes = m_buildings.resident_classes();
     for (std::size_t k = kLockFromClass; !lack && k < classes.size() && k < c.inhabitants.size(); ++k) {
         if (c.inhabitants[k] == 0) {
             continue;
         }
         for (const assets::ResidentClass::Need& n : classes[k].needs) {
-            if (c.stock(n.ware) < kTon && supply(c, n.ware) < demand(c, n.ware)) {
+            if (c.stock(n.ware) < kTon) {
                 lack = true;
                 break;
             }
