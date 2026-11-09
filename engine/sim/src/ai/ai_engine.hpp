@@ -335,6 +335,12 @@ private:
     /// Improved computers: an idle ship sails to the nearest island nobody of theirs explored.
     void scout(AiPlayer& p);
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
+    /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
+    [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
+    /// A vein of the ware (ore, gold) on the island outside every city's land.
+    [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t w) const;
+    /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing.
+    [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
     void task_settle_area(AiPlayer& p);
     void task_settle_site(AiPlayer& p);
     void task_settle_land(AiPlayer& p);
