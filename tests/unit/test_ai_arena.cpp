@@ -576,6 +576,23 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
     }
 }
 
+TEST_CASE("ai arena: improved computers make peace with each other, the original's leave it as it is") {
+    for (const bool classic : {false, true}) {
+        Arena a;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        a.world.diplomacy().relation(kFirst, kSecond).peace = sim::Treaty::None;
+        a.world.diplomacy().relation(kSecond, kFirst).peace = sim::Treaty::None;
+        run(s, 10 * 60'000);
+        REQUIRE(a.cities_of(kFirst) == 1);
+        REQUIRE(a.cities_of(kSecond) == 1);
+        const sim::Treaty peace = a.world.diplomacy().relation(kFirst, kSecond).peace;
+        CHECK((peace == sim::Treaty::Signed) == !classic);
+        CHECK(a.world.diplomacy().relation(kFirst, kSecond).trade == sim::Treaty::Signed);
+    }
+}
+
 TEST_CASE("ai arena: a computer without ships or yard buys the cheapest ship on offer") {
     // The original's way out for a computer that lost its only ship and cannot plan a yard yet (no
     // weaving hut): the cheapest ship another player offers, while its money covers the price; at

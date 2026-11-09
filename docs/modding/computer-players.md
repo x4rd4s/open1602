@@ -435,6 +435,19 @@ Improved computers weigh the way at sea:
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.
 
+## Trade and treaties
+
+All computers fill their Kontor's trade list as in the original: they buy the wares their cities
+lack and offer what lies in store beyond what they keep, so that humans, the free trader and the
+other computers' ships trade with them. They offer each other a trade treaty, and an improved
+computer's supply ship fetches from a partner's Kontor where it is cheapest by the way at sea
+(see below).
+
+The original's computers never touch the peace among themselves. Improved computers offer peace
+to another computer whose mood toward them is not below 0 and not falling, and sign a peace offer
+as long as the mood is above -20, as they do with humans; war among computers comes with their war
+plans.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
