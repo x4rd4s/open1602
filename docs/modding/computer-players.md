@@ -214,13 +214,14 @@ four. "4, as in the original" keeps the original's way.
 **Towns.** Open1602's computers also lay out their towns with more care:
 
 - *A town zone.* A new city builds its first 12 houses as in the original, next to its market, so
-  that it reaches the settlers in time. From then on it plans a disc for its houses about the market nearest its Kontor, as
-  large as the free and town land the houses there are and a dozen more need, with their roads and
-  public buildings. Houses go into the zone, the nearer its middle the better; a house outside it is
-  built only where the zone has no site left. Farms, plantations, pastures and grain farms go
-  outside it, workshops at its edge or outside. A further market in the zone that claims little new
-  land keeps 12 tiles from the others instead of 8, so that the house land is not taken up by
-  markets. The zone follows from the island's tiles alone, so it is the same after a game is loaded.
+  that it reaches the settlers in time. From then on it plans a disc for its houses about the market
+  nearest its Kontor, as large as the free and town land the houses there are and a dozen more need,
+  with their roads and public buildings. Houses go into the zone, the nearer its middle the better;
+  a house outside it is built only where the zone has no site left. Farms, plantations, pastures and
+  grain farms go outside it, workshops at its edge or outside. A further market in the zone that
+  claims little new land keeps 12 tiles from the others instead of 8, so that the house land is not
+  taken up by markets. The zone follows from the island's tiles alone, so it is the same after a
+  game is loaded.
 - *A style of its own.* Each computer draws a number at random once per game (kept in the
   savegame, section `AIST` version 8). From it and the island each city takes how much room a house
   wants (dense or spacious towns), how far inland of the first market the zone's middle lies, the
