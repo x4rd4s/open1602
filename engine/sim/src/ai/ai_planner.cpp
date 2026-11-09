@@ -18,6 +18,7 @@ namespace o1602::sim::ai {
 namespace {
 
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
+constexpr std::size_t kLockFromClass = 2;   // the merchants
 constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
 
 }  // namespace
@@ -93,6 +94,7 @@ void Engine::refresh_city(AiPlayer& p) {
         sell_settings(p, *c, *r);
         production_switches(p, *c);
         tax_rates(p, *c);
+        material_lock(p, *c);
     }
     p.refresh_ms = now_ms();
     // The original's steady money and subsidy (cheats), on every difficulty; improved computers
@@ -379,6 +381,41 @@ void Engine::tax_rates(AiPlayer& p, City& c) {
             log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
         }
     }
+}
+
+void Engine::material_lock(AiPlayer& p, City& c) {
+    if (!rivals()) {
+        return;
+    }
+    // Houses that rise without the goods of their class only lose their people again, and with
+    // them the taxes that pay for the city. So the material stays locked while the city has no
+    // food left, or none of a good that its classes from the merchants on want and that it does
+    // not make enough of itself.
+    const std::uint8_t food = m_buildings.food_ware();
+    bool lack = food_short(c) && c.stock(food) < kTon;
+    const auto& classes = m_buildings.resident_classes();
+    for (std::size_t k = kLockFromClass; !lack && k < classes.size() && k < c.inhabitants.size(); ++k) {
+        if (c.inhabitants[k] == 0) {
+            continue;
+        }
+        for (const assets::ResidentClass::Need& n : classes[k].needs) {
+            if (c.stock(n.ware) < kTon && supply(c, n.ware) < demand(c, n.ware)) {
+                lack = true;
+                break;
+            }
+        }
+    }
+    if (lack == c.material_lock) {
+        return;
+    }
+    CityOrder o;
+    o.player = p.player;
+    o.island = c.island;
+    o.city = c.index;
+    o.op = CityOrder::Op::MaterialLock;
+    o.on = lack;
+    execute(o);
+    log(p, "city %u/%u: material %s", c.island, c.index, lack ? "locked, goods are missing" : "free again");
 }
 
 void Engine::production_switches(AiPlayer& p, City& c) {

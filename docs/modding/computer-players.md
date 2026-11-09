@@ -493,6 +493,11 @@ More than 1000 gold in debt with a falling purse, an improved computer cuts its 
 disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
 10 t of its ware in stock until the stock is down to 4 t.
 
+An improved computer locks the building material of a city (the city window's switch) while the
+city has no food left and makes too little, or lacks a good that its merchants or higher classes
+want and does not make enough of: houses that rise without their goods only lose their people
+again.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything
