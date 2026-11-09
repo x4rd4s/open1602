@@ -40,6 +40,8 @@ jobs:
           - { name: Linux Clang,   os: ubuntu-24.04, cc: clang, cxx: clang++, preset: ci }
           - { name: Linux ASan,    os: ubuntu-24.04, cc: clang, cxx: clang++, preset: asan }
           - { name: Linux TSan,    os: ubuntu-24.04, cc: clang, cxx: clang++, preset: tsan }
+          # 64-bit ARM: char is unsigned there, and the golden hashes must match the x86-64 jobs'.
+          - { name: Linux ARM GCC, os: ubuntu-24.04-arm, cc: gcc,   cxx: g++,     preset: ci }
           - { name: Windows MSVC,  os: windows-2025, cc: cl,    cxx: cl,      preset: ci }
           # Debug off Linux: asserts and the debug checks of MSVC's STL run there too.
           - { name: Windows Debug, os: windows-2025, cc: cl,    cxx: cl,      preset: debug }
@@ -101,6 +103,7 @@ jobs:
         include:
           - { name: Linux,      os: ubuntu-24.04, preset: ci }
           - { name: Linux ASan, os: ubuntu-24.04, preset: asan }  # the game's start under ASan/UBSan
+          - { name: Linux ARM,  os: ubuntu-24.04-arm, preset: ci }
           - { name: Windows,    os: windows-2025, preset: ci }
     env: &game-env
       SDL_VERSION: 3.2.24

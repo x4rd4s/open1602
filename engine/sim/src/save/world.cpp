@@ -63,6 +63,8 @@ enum RuleKey : std::uint16_t {
     kShipHolds = 55,        // 1: the large merchant ship has 8 holds, the warship 6 (Rules::large_ship_holds)
     kRevealResources = 56,  // 1: every island explored by everyone from the start (Rules::reveal_resources)
     kComputerCities = 57,   // Rules::computer_cities other than Scaled
+    kBugLandBehindWalls = 58,
+    kBugShipShotsThroughWalls = 59,
     // The victory conditions (VictoryConditions).
     kWinInhabitants = 11,
     kWinResidentClass = 12,
@@ -91,6 +93,8 @@ constexpr std::pair<RuleKey, bool OriginalBugs::*> kBugKeys[] = {
     {kBugRemoteRepair, &OriginalBugs::remote_repair},
     {kBugSmallYardWarships, &OriginalBugs::small_yard_warships},
     {kBugNativeLand, &OriginalBugs::native_land},
+    {kBugLandBehindWalls, &OriginalBugs::land_behind_walls},
+    {kBugShipShotsThroughWalls, &OriginalBugs::ship_shots_through_walls},
 };
 static_assert(std::size(kBugKeys) + 1 == std::size(OriginalBugs::kAll), "every bug but classic_ai has a key");
 
@@ -365,6 +369,8 @@ Rules read_rules(Reader& in) {
             case kBugRemoteRepair:
             case kBugSmallYardWarships:
             case kBugNativeLand:
+            case kBugLandBehindWalls:
+            case kBugShipShotsThroughWalls:
                 for (const auto& [k, bug] : kBugKeys) {
                     if (k == key) {
                         r.bugs.*bug = v != 0;

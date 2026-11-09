@@ -67,6 +67,9 @@ enum class FigureField : std::uint8_t {
     Price,     ///< Preis: what a ship is worth
     Material,  ///< Rohmenge: t of material a shipyard builds the ship from, of weapons a castle needs for the unit
     Holds,     ///< Maxware: cargo holds of 50 t a ship has
+    /// Open1602: how much a full load slows a ship, in percent of the original's (100: half the
+    /// speed when full, 0: as fast as empty).
+    LoadSlowdown,
 };
 
 /// A changed value of a figure, in the units of figures.toml.
@@ -157,6 +160,12 @@ struct Balance {
     std::uint32_t ai_citizens_kontor = 2;      ///< ... or a Kontor above this level
     std::uint32_t ai_merchants2_kontor = 4;    ///< the merchants' second stage also with a Kontor of this level
     std::uint32_t ai_aristocrats2_luxury = 3;  ///< the aristocrats' second stage with more luxury goods than this
+    /// The improved computers' armies and castles ([computer_military], version kBalanceWithMilitary);
+    /// the original's computers (Rules::bugs.classic_ai) know none of them.
+    std::uint32_t ai_castle_inhabitants = 350;   ///< the home city builds a castle from so many inhabitants ...
+    std::uint32_t ai_castle_reserve = 2000;      ///< ... if so much gold is left after its cost
+    std::uint32_t ai_inhabitants_per_unit = 40;  ///< an army of a swordsman's strength per so many inhabitants
+    std::uint32_t ai_rival_army_percent = 75;    ///< ... at least so many percent of the strongest computer rival's
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -191,9 +200,11 @@ inline constexpr std::uint16_t kBalanceWithComputers = 2;
 inline constexpr std::uint16_t kBalanceWithStages = 3;
 /// The version of the section BALA with the rest of the computers' stages.
 inline constexpr std::uint16_t kBalanceWithMoreStages = 4;
+/// The version of the section BALA with the computers' armies and castles.
+inline constexpr std::uint16_t kBalanceWithMilitary = 5;
 
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 65> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 69> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -262,6 +273,11 @@ inline constexpr std::array<BalanceField, 65> kBalanceFields = {{
     {"computer_stages", "citizens_kontor", &Balance::ai_citizens_kontor, 0, 4, kBalanceWithMoreStages},
     {"computer_stages", "merchants2_kontor", &Balance::ai_merchants2_kontor, 1, 5, kBalanceWithMoreStages},
     {"computer_stages", "aristocrats2_luxury", &Balance::ai_aristocrats2_luxury, 0, 100, kBalanceWithMoreStages},
+    {"computer_military", "castle_inhabitants", &Balance::ai_castle_inhabitants, 0, 1'000'000, kBalanceWithMilitary},
+    {"computer_military", "castle_reserve", &Balance::ai_castle_reserve, 0, 10'000'000, kBalanceWithMilitary},
+    {"computer_military", "inhabitants_per_unit", &Balance::ai_inhabitants_per_unit, 0, 1'000'000,
+     kBalanceWithMilitary},
+    {"computer_military", "rival_army_percent", &Balance::ai_rival_army_percent, 0, 1000, kBalanceWithMilitary},
 }};
 
 /// The version of the section BALA that `balance` needs: the first that holds every value that is
@@ -305,7 +321,7 @@ struct FigureFieldInfo {
 };
 
 /// Every field of a figure, in the order of FigureField.
-inline constexpr std::array<FigureFieldInfo, 11> kFigureFields = {{
+inline constexpr std::array<FigureFieldInfo, 12> kFigureFields = {{
     {"speed", FigureField::Speed, 1, 10000},
     {"max_carry", FigureField::MaxCarry, 1, 64},
     {"work_time", FigureField::WorkTime, 1, 600000},
@@ -317,6 +333,7 @@ inline constexpr std::array<FigureFieldInfo, 11> kFigureFields = {{
     {"price", FigureField::Price, 0, 100000},
     {"material", FigureField::Material, 0, 255},
     {"holds", FigureField::Holds, 1, 8},  // at most the wares of a route stop (RouteStop::kEntries)
+    {"load_slowdown", FigureField::LoadSlowdown, 0, 100},
 }};
 
 /// Whether every value lies within its limits and the building and figure values are sorted and

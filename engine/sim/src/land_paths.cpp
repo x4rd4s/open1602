@@ -70,6 +70,44 @@ const assets::BuildingType* LandMap::building(std::int32_t x, std::int32_t y) co
     return top.empty() ? nullptr : m_buildings->by_sprite(top.sprite);
 }
 
+bool LandMap::wall_between(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
+                           PlayerId except) const noexcept {
+    // Bresenham over the cells between the ends, as for a line of sight.
+    const std::int32_t dx = std::abs(x1 - x0);
+    const std::int32_t dy = -std::abs(y1 - y0);
+    const std::int32_t step_x = x0 < x1 ? 1 : -1;
+    const std::int32_t step_y = y0 < y1 ? 1 : -1;
+    std::int32_t err = dx + dy;
+    std::int32_t x = x0;
+    std::int32_t y = y0;
+    while (x != x1 || y != y1) {
+        const std::int32_t e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x += step_x;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y += step_y;
+        }
+        if ((x == x1 && y == y1) || x < 0 || y < 0) {
+            continue;
+        }
+        const assets::BuildingType* b = building(x / 2, y / 2);
+        if (b == nullptr || (b->kind != building_kind::kWall && b->kind != building_kind::kWallBeach)) {
+            continue;
+        }
+        if (except == kNoPlayer) {
+            return true;
+        }
+        const World::Cell& c = m_world->cell(static_cast<std::uint32_t>(x / 2), static_cast<std::uint32_t>(y / 2));
+        if (m_world->islands()[c.island].map.top(c.local_x, c.local_y).owner != except) {
+            return true;
+        }
+    }
+    return false;
+}
+
 LandMap::Cell LandMap::cell(std::int32_t x2, std::int32_t y2, std::uint8_t speed_type,
                             std::uint8_t* cost) const noexcept {
     if (x2 < 0 || y2 < 0) {

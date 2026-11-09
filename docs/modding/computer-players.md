@@ -341,6 +341,28 @@ towers and castle are counted by their kind of building. The producers of packag
 A field that cannot be read or an unknown slot is passed over with a warning that names the file and
 the line. A game keeps the changed slots (section `SLOT` of the savegame).
 
+## Armies and castles
+
+The original's computers arm only against the human players: an army half again as strong as the
+strongest human one (more on harder levels), and a castle only while they trail the leading human
+in inhabitants or units. Improved computers (not `classic_ai`) reckon with every other player as a
+rival. They also keep an army by their own inhabitants and at least a share of the strongest army
+of another computer, at peace with them or not; the share stays below the whole, so that two computers
+arming against each other settle at their inhabitants' army. Their home city builds its first
+castle once it is grown and gold is left after the cost, and further ones as it grows on while the
+army is short of its target. The numbers are the table `[computer_military]` of
+[`balance.toml`](balance.md#the-values):
+
+```toml
+# mods/peaceful/balance.toml: computers that arm only against the humans' armies
+[computer_military]
+inhabitants_per_unit = 0
+rival_army_percent = 0
+castle_inhabitants = 0
+```
+
+A game keeps them with its other balance values (section `BALA` version 5 of the savegame).
+
 ## What they get from nowhere
 
 The original gives its computer players money and goods on every difficulty: steady money while

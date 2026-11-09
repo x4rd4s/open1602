@@ -862,7 +862,7 @@ constexpr Golden kSaveNarrow[] = {
 
 constexpr Golden kSaveWide[] = {
     {"META", 1, 0, 38, 0xB89CD646},
-    {"SRUL", 1, 0, 166, 0xC8CD9FA0},
+    {"SRUL", 1, 0, 178, 0xF4E6C313},
     {"SCNI", 1, 0, 111, 0x88CEF8A7},
     {"MAPW", 2, 1, 5724, 0x3F3E2223},
     {"RULE", 1, 1, 82, 0xCC115664},

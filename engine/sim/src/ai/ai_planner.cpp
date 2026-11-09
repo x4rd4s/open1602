@@ -1524,8 +1524,28 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         return false;
     }
     const assets::BuildingType* b = by_id(id::kHouse);
-    if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b) || c->stock(m_buildings.food_ware()) <= kTon / 2 ||
-        player(p).money <= 1000) {
+    if (b == nullptr || !unlocked(p, *b)) {
+        return false;
+    }
+    if (!affordable(p, *c, *b)) {
+        // Open1602: a city whose houses wait for wood gets another woodcutter, one for every four
+        // houses (a town's first roads and markets take the wood its one woodcutter makes).
+        const auto& m = m_buildings.materials();
+        if (!classic() && c->stock(m.wood) < b->build_cost.wood &&
+            std::int64_t{player(p).money} >= b->build_cost.money && c->stock(m.tools) >= b->build_cost.tools) {
+            const std::uint32_t woodcutters = r->slots[kSlotWoodcutter].count;
+            const std::size_t before = p.stack.size();
+            if (woodcutters < std::min<std::uint32_t>(1 + s.count / 4, kMostWoodcutters)) {
+                (void)need(p, kSlotWoodcutter, woodcutters + 1);
+            }
+            if (p.stack.size() > before) {
+                log(p, "city %u/%u: houses wait for wood, woodcutter %u", r->island, r->city, woodcutters + 1);
+                return true;
+            }
+        }
+        return false;
+    }
+    if (c->stock(m_buildings.food_ware()) <= kTon / 2 || player(p).money <= 1000) {
         return false;
     }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
@@ -1761,7 +1781,9 @@ bool Engine::need_denkmal(AiPlayer& p) {
 }
 
 bool Engine::need_castle(AiPlayer& p) {
-    // A castle in the home city while the computer trails the leading human.
+    // A castle in the home city while the computer trails the leading human. Open1602 (rivals): also
+    // as the home city grows, a castle for every so many inhabitants while the army is short of its
+    // target (Balance's [computer_military]).
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
     if (c == nullptr || r == nullptr || (m_world.game_settings().flags & World::GameSettings::kNoMilitary) != 0) {
@@ -1773,7 +1795,14 @@ bool Engine::need_castle(AiPlayer& p) {
     if (p.castles.size() >= 3 || r->slots[kSlotCastle].attempts >= 2) {
         return false;
     }
-    if (!p.castles.empty()) {
+    const Balance& bal = m_world.balance();
+    const auto castles = static_cast<std::uint32_t>(p.castles.size());
+    // Rivals: grown enough for one more castle, and the army short of its target (the first castle
+    // in any case, so that the computer can recruit at all).
+    const bool grown = rivals() && bal.ai_castle_inhabitants != 0 &&
+                       population(*c) >= std::uint64_t{bal.ai_castle_inhabitants} * (castles + 1U) &&
+                       (castles == 0 || weighted_army(p.player) < army_target(p));
+    if (!p.castles.empty() && !grown) {
         bool war = false;
         for (std::size_t h = 0; h < m_world.players().size(); ++h) {
             if (m_world.players()[h].role == PlayerRole::Human &&
@@ -1793,7 +1822,15 @@ bool Engine::need_castle(AiPlayer& p) {
             break;
         }
     }
-    if (b == nullptr || !affordable(p, *c, *b) || !behind(p)) {
+    if (b == nullptr || !affordable(p, *c, *b)) {
+        return false;
+    }
+    if (grown) {
+        // Gold to spare after the castle, as a player keeps some for running costs.
+        if (player(p).money < std::int64_t{b->build_cost.money} + std::int64_t{bal.ai_castle_reserve}) {
+            return false;
+        }
+    } else if (!behind(p)) {
         return false;
     }
     const assets::BuildingType* square = by_id(id::kSquare);

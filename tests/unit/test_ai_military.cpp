@@ -163,6 +163,15 @@ struct Island {
         world.add_soldier(s);
     }
 
+    /// Swords for `n` swordsmen in every castle (three each).
+    void arm_castles(std::uint32_t n) {
+        for (sim::CostBuilding& c : world.cost_buildings()) {
+            if (c.kind == sim::CostBuilding::Kind::Castle) {
+                c.weapons = {3 * n * 32, 0, 0};
+            }
+        }
+    }
+
     /// A tree of nobody at tile (x, y) of the island.
     void tree(std::int32_t x, std::int32_t y, std::uint16_t island = 0) {
         REQUIRE(world.island(island).map.place(*buildings.by_id(kTree), x, y, 0, 0).ok());
@@ -490,4 +499,56 @@ TEST_CASE("ai military: soldiers defend their own city before they go for an ene
     CHECK(hunting == 6);  // every one of them, not a quarter more than the enemy has
     run(s, 3 * 60'000);
     CHECK(a.soldiers(kHuman).empty());
+}
+
+TEST_CASE("ai military: a computer keeps an army by its inhabitants with nobody armed, the original's none") {
+    // 160 inhabitants: four swordsmen's strength at one per 40 ([computer_military]), room for 10.
+    const auto trained = [](bool rivals) {
+        Island a;
+        a.build(kKontor, 10, 8, kComputer, 0);
+        a.build(kMarket, 30, 8, kComputer, 0);
+        a.build(kCastle, 40, 8, kComputer, 0);
+        a.build(kSwordsmith, 46, 8, kComputer, 0);
+        a.world.city(0, 0)->inhabitants = {160};
+        a.arm_castles(20);
+        sim::Rules rules;
+        rules.bugs.classic_ai = !rivals;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 8 * 60'000);
+        return a.soldiers(kComputer).size();
+    };
+    const std::size_t rivals = trained(true);
+    CHECK(rivals >= 4);
+    CHECK(rivals <= 6);
+    CHECK(trained(false) == 0);
+}
+
+TEST_CASE("ai military: a computer arms against the army of another computer at peace, short of its whole strength") {
+    const auto trained = [](bool rivals) {
+        Island a;
+        std::vector<sim::Player> players = a.world.players();
+        players.push_back(players[kComputer]);  // a second computer, its army on the islet
+        a.world.set_players(players);
+        const auto other = static_cast<sim::PlayerId>(players.size() - 1);
+        a.build(kKontor, 10, 8, kComputer, 0);
+        a.build(kMarket, 30, 8, kComputer, 0);
+        a.build(kCastle, 40, 8, kComputer, 0);
+        a.build(kSwordsmith, 46, 8, kComputer, 0);
+        a.world.city(0, 0)->inhabitants = {320};  // eight swordsmen by its own inhabitants, room for 20
+        a.arm_castles(20);
+        a.build(kKontor, 0, 0, other, 0, 1);  // its city there keeps its soldiers
+        for (int i = 0; i < 16; ++i) {
+            a.add(other, 2 * (100 + 1 + i % 6), 2 * (10 + 1 + i / 6), 1);
+        }
+        sim::Rules rules;
+        rules.bugs.classic_ai = !rivals;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 15 * 60'000);
+        return a.soldiers(kComputer).size();
+    };
+    // Three quarters of the other's 16 swordsmen: 12 and one more, not the 16 to outbid it.
+    const std::size_t rivals = trained(true);
+    CHECK(rivals >= 12);
+    CHECK(rivals <= 14);
+    CHECK(trained(false) == 0);
 }

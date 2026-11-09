@@ -116,6 +116,9 @@ struct FigureType {
         std::uint32_t price = 0;         ///< Preis (+0x54): value of the ship (computer players, sales)
         std::uint8_t build_ware = 0;     ///< Rohstoff (+0x31): material a shipyard builds it from
         std::uint32_t build_amount = 0;  ///< Rohmenge (+0x32): that material in 1/32 t
+        /// Open1602: how much a full load slows the ship, in percent of the original's slowdown
+        /// (figures.toml `load_slowdown`).
+        std::uint8_t load_slowdown = 100;
     };
     ShipData ship;
     /// Fighting values of soldiers, towers and ships.

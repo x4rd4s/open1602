@@ -488,8 +488,8 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // Names left empty without Text.cod (MD-10); SIMU in parts (DS-3); tiles by blocks (TB-26); a ship
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
-    // The wider hunter's hut by default.
-    constexpr std::uint64_t kExpected = 0x6e90c0ea8852cc84ULL;
+    // The wider hunter's hut by default. The military's state version 4 (the unit that goes first).
+    constexpr std::uint64_t kExpected = 0x276aa07a4f80ed38ULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -2235,4 +2235,60 @@ TEST_CASE("ai: improved computers settle on a large island another computer hold
     CHECK(!founded(true));
     // A human's city there the original's computers settle beside.
     CHECK(founded(true, sim::PlayerRole::Human));
+}
+
+TEST_CASE("ai: a computer's growing home city builds a castle, the original's only behind a human") {
+    // The settlers' order asks for a castle alone; nobody is armed and the human has no city, so
+    // the original's computer, which builds one only while it trails the leading human, never does.
+    const auto castles_built = [](bool rivals) {
+        Game g(true, 30000);
+        g.buildings = make_buildings(
+            "  @Nummer: 13\n  Id: 20311\n  Kind: 14\n  Gfx: 100\n  Size: 3, 3\n"
+            "  Objekt: HAUS_PRODTYP\n    Kind: 15\n    Maxware: 3\n  EndObj\n"
+            "  Objekt: HAUS_BAUKOST\n    Money: 500\n  EndObj\n");
+        g.buildings.by_id(kKontor)->ware = sim::ware::kAll;  // the castle goes near a Kontor or market
+        sim::Balance balance;
+        balance.computer_orders.push_back(
+            {sim::ComputerList::Settlers, {sim::ComputerNeed{sim::ComputerNeed::Kind::Castle}}});
+        REQUIRE(sim::valid(balance));
+        g.world.set_balance(balance);
+        // Room for the castle by the Kontor: the wood cleared but for its first columns.
+        sim::IslandMap& ground = g.world.island(1).map;
+        for (std::int32_t y = 0; y < 50; ++y) {
+            for (std::int32_t x = 36; x <= 43; ++x) {
+                REQUIRE(ground.place(*g.buildings.by_id(kGround), x, y, 0, 0).ok());
+            }
+        }
+        sim::Rules rules;
+        rules.bugs.classic_ai = !rivals;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s, 60'000);
+        sim::City* city = nullptr;
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                city = g.world.city(c.island, c.index);
+            }
+        }
+        REQUIRE(city != nullptr);
+        const sim::IslandMap& map = g.world.island(city->island).map;
+        const auto castles = [&] {
+            std::size_t n = 0;
+            for (std::uint32_t y = 0; y < map.height(); ++y) {
+                for (std::uint32_t x = 0; x < map.width(); ++x) {
+                    const sim::MapCell& cell = map.top(x, y);
+                    const assets::BuildingType* b = g.buildings.by_sprite(cell.sprite);
+                    n += b != nullptr && b->id == 20311 && cell.owner == kComputer ? 1U : 0U;
+                }
+            }
+            return n / 9;
+        };
+        for (std::uint32_t t = 0; t < 900'000; t += 10'000) {
+            // The pioneers' roads first, then past [computer_military] castle_inhabitants.
+            city->inhabitants.assign(1, t < 240'000 ? 10 : 400);
+            run(s, 10'000);
+        }
+        return castles();
+    };
+    CHECK(castles_built(true) == 1);  // a second castle only from 700 inhabitants
+    CHECK(castles_built(false) == 0);
 }

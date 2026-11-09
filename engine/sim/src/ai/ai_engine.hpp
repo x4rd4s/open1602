@@ -272,6 +272,10 @@ private:
     /// Rules::bugs.classic_ai: the original's computer players with their bugs S-097 to S-099.
     [[nodiscard]] bool classic() const;
     [[nodiscard]] bool is_settler(PlayerId owner) const;
+    /// Improved computers (not Rules::bugs.classic_ai) reckon with every other player, the other
+    /// computers too, not only with the humans: an army by their inhabitants and their rivals'
+    /// armies, castles as their home city grows (Balance's [computer_military]).
+    [[nodiscard]] bool rivals() const;
     [[nodiscard]] std::uint32_t island_size(std::uint16_t island) const;
     /// The part of the map an island's middle lies in when the pirates aim for `nests` nests.
     [[nodiscard]] std::uint32_t island_region(std::uint16_t island, std::uint32_t nests) const;
@@ -479,6 +483,9 @@ private:
     [[nodiscard]] std::array<std::uint32_t, 4> unit_weights() const;
     [[nodiscard]] std::uint32_t weighted_army(PlayerId owner) const;
     [[nodiscard]] std::uint32_t army_target(const AiPlayer& p) const;
+    /// Open1602 (rivals): the army a computer keeps whoever else is armed, by its inhabitants, and
+    /// the share of the strongest army of another computer, at peace with it or not.
+    [[nodiscard]] std::uint32_t rival_army_target(const AiPlayer& p) const;
     [[nodiscard]] bool stronger(PlayerId a, PlayerId b) const;
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);

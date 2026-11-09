@@ -15,6 +15,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -526,8 +527,17 @@ private:
     void route_next_stop(Ship& ship);
     bool route_city_stop(Ship& ship, const RouteStop& stop);
     bool route_ship_stop(Ship& ship, const RouteStop& stop);
+    /// Goods between a ship and a Kontor. `order`, when given, names the holds to use, best first
+    /// (a route's holds, Fleet::route_load_order and Fleet::route_unload_order), and replaces `hold`.
     std::uint32_t move_goods(Ship& ship, City& city, std::uint8_t ware, bool to_ship, std::uint32_t amount,
-                             std::uint8_t hold, bool limits, std::uint16_t price);
+                             std::uint8_t hold, bool limits, std::uint16_t price,
+                             std::span<const std::uint8_t> order = {});
+    /// The holds a route stop loads `ware` into, best first: the holds its entries name for that
+    /// ware, then free ones; never a free hold that the stop names for another ware.
+    [[nodiscard]] std::vector<std::uint8_t> route_load_order(const Ship& ship, const RouteStop& stop,
+                                                             std::uint8_t ware) const;
+    /// The holds a route stop unloads `ware` from, those the route does not name for it first.
+    [[nodiscard]] std::vector<std::uint8_t> route_unload_order(const Ship& ship, std::uint8_t ware) const;
     [[nodiscard]] bool may_trade(PlayerId ship_owner, PlayerId city_owner) const;
     [[nodiscard]] const assets::FigureType* type_of(const Ship& ship) const;
     [[nodiscard]] std::size_t holds(const Ship& ship) const;
@@ -535,6 +545,13 @@ private:
     [[nodiscard]] std::uint32_t run_us(const Ship& ship, std::uint8_t direction, std::uint8_t tiles) const;
     void add_cargo(Ship& ship, std::uint8_t ware, std::uint32_t amount, std::uint16_t price);
     std::uint32_t remove_cargo(Ship& ship, std::uint8_t ware, std::uint32_t amount, std::uint8_t hold);
+    /// The same within the holds `order`, in its order.
+    [[nodiscard]] std::uint32_t space_in(const Ship& ship, std::uint8_t ware,
+                                         std::span<const std::uint8_t> order) const;
+    void add_cargo_in(Ship& ship, std::uint8_t ware, std::uint32_t amount, std::uint16_t price,
+                      std::span<const std::uint8_t> order);
+    std::uint32_t remove_cargo_in(Ship& ship, std::uint8_t ware, std::uint32_t amount,
+                                  std::span<const std::uint8_t> order);
 
     // Trade carts (carts.cpp)
     void decide_cart(Ship& ship);

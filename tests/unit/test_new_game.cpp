@@ -726,8 +726,9 @@ TEST_CASE("new game: an own world with six players: the plan's size and starts, 
     }
     CHECK(!a.state_damaged());
     // And the same on every platform (golden hash, DS-2): a planned world, five computers.
-    // The computers' state version 5 (the slots counted); the revised bread chain by default.
-    test::check_golden("six players after 60 s", a.state_hash(), 0xf431ea0349d281aaULL);
+    // The computers' state version 5 (the slots counted); the revised bread chain by default; the
+    // military's state version 4 (the unit that goes first).
+    test::check_golden("six players after 60 s", a.state_hash(), 0x2a5a37e76da04d16ULL);
 }
 
 TEST_CASE("new game: an own world gives a package's climate its share of the islands of its like") {
