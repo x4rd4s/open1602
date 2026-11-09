@@ -11,6 +11,7 @@
 #include <memory>
 #include <random>
 #include <tuple>
+#include <vector>
 
 #include "endless_setup.hpp"
 #include "map_viewer.hpp"
@@ -29,6 +30,7 @@
 #include "o1602/editor/map_image.hpp"
 #include "o1602/editor/objects.hpp"
 #include "o1602/editor/original_check.hpp"
+#include "o1602/editor/players.hpp"
 #include "o1602/editor/resources.hpp"
 #include "o1602/editor/units.hpp"
 #include "o1602/render/world_renderer.hpp"
@@ -658,7 +660,11 @@ void MapViewer::editor_test_play() {
     if (!m_editor || !m_state || m_session) {
         return;
     }
-    if (sim::first_human_player(m_state->world) == sim::kNoPlayer) {
+    // A human of the page "Players": not a slot that only holds a place, whose role is a human's too.
+    const sim::World& edited = m_state->world;
+    const std::vector<sim::PlayerId> slots = editor::player_slots(edited);
+    if (std::none_of(slots.begin(), slots.end(),
+                     [&](sim::PlayerId s) { return edited.players()[s].role == sim::PlayerRole::Human; })) {
         editor_notice(ui::tr("editor.test_play.no_human"), true, "no human player to test with");
         return;
     }

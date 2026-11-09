@@ -2,7 +2,9 @@
 #include "editor_panel.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <tuple>
 
@@ -2294,6 +2296,8 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
     m_page_rows = std::min<std::size_t>(2 * per_column, 20);
     m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
     const std::size_t rows = (m_page_rows + 1) / 2;
+    const std::string* tip = nullptr;  // the explanation of the setting under the mouse
+    Rect tip_at{};
     for (std::size_t k = 0; k < m_page_rows && m_first + k < n; ++k) {
         const std::int32_t cx = m_x + static_cast<std::int32_t>(k / rows) * (column + 2 * kGap);
         const std::int32_t cy = y + static_cast<std::int32_t>(k % rows) * kRow;
@@ -2303,6 +2307,11 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
             const bool on = model.rules_own && r.enabled;
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label, Align::Left, on ? Tone::Normal : Tone::Dim);
             f.cycle_button(id, Rect{cx + label, cy, column - label, kButtonH}, r.value, on);
+            const Rect row{cx, cy, column, kButtonH};
+            if (m_mouse && row.contains((*m_mouse)[0], (*m_mouse)[1]) && !r.tip.empty()) {
+                tip = &r.tip;
+                tip_at = row;
+            }
         } else {
             const EditorRandom& r = model.randoms[m_first + k];
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label);
@@ -2322,6 +2331,18 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
         f.button(kRandomRoll, Rect{m_x + 2 * (quarter + kGap), foot, quarter, kButtonH}, ui::tr("editor.random.roll"));
     }
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+    // The setting's tooltip, as the start dialog shows it, once the mouse rested on it; laid out
+    // last, over everything.
+    const std::string under = tip != nullptr ? *tip : std::string();
+    const auto now = std::chrono::steady_clock::now();
+    if (under != m_tip) {
+        m_tip = under;
+        m_tip_since = now;
+        m_tip_dismissed = false;
+    }
+    if (tip != nullptr && !m_tip_dismissed && now - m_tip_since >= kTipDelay) {
+        f.tooltip(tip_at, *tip);
+    }
 }
 
 void EditorPanel::layout_goals(const EditorModel& model) {
@@ -2856,6 +2877,11 @@ std::optional<EditorRequest> EditorPanel::commit_name() {
 
 std::optional<EditorRequest> EditorPanel::mouse(std::int32_t x, std::int32_t y, bool down, const EditorModel& model,
                                                 ui::MouseButton button) {
+    const double scale = m_form.scale() > 0.0 ? m_form.scale() : 1.0;
+    m_mouse = std::array<std::int32_t, 2>{static_cast<std::int32_t>(x / scale), static_cast<std::int32_t>(y / scale)};
+    if (down) {
+        m_tip_dismissed = true;  // a click hides the tooltip, as in the start dialog
+    }
     layout(model);
     const auto id = m_form.mouse(x, y, down, button);
     if (!id) {
