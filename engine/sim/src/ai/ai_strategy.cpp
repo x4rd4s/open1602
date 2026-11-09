@@ -5,6 +5,7 @@
 // which gives a stance towards each and the computer's goal for now. The goal and the character
 // steer the army target, the gold a colony waits for and the peace offers among computers.
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -19,6 +20,7 @@ constexpr std::uint32_t kNearSeconds = 240;  // a rival whose city lies within f
 constexpr std::int32_t kPartnerMood = 20;    // a friendlier mood makes a partner
 constexpr std::int32_t kHostileMood = -60;   // an angrier one an enemy
 constexpr std::uint32_t kMinStrategyMs = 10'000;
+constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unless debt or a threat end it
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -97,7 +99,28 @@ void Engine::plan_strategy(AiPlayer& p) {
     const Balance& bal = m_world.balance();
     Strategy& st = p.strategy;
     if (st.character == character::kNone) {
-        st.character = static_cast<std::uint8_t>(rng().below(character::kCount) + 1);
+        // The characters are dealt out: one of those the fewest other computers have, so that four
+        // computers are not all of a kind.
+        std::array<std::uint32_t, character::kCount + 1> taken{};
+        for (const AiPlayer& o : m_state.players) {
+            if (&o != &p && !o.pirates) {
+                ++taken[o.strategy.character];
+            }
+        }
+        const std::uint32_t fewest = *std::min_element(taken.begin() + 1, taken.end());
+        std::vector<std::uint8_t> open;
+        for (std::uint8_t c = 1; c <= character::kCount; ++c) {
+            if (taken[c] == fewest) {
+                open.push_back(c);
+            }
+        }
+        // Drawn from a copy of the computers' generator, which stays where it was: the games run as
+        // before until the strategy acts.
+        Random draw = rng();
+        for (PlayerId i = 0; i <= p.player; ++i) {
+            draw.next();
+        }
+        st.character = open[draw.below(static_cast<std::uint32_t>(open.size()))];
         log(p, "character %u", st.character);
     }
     // Faster on harder levels: a minute on the easiest, ten seconds less per level.
@@ -149,7 +172,8 @@ void Engine::plan_strategy(AiPlayer& p) {
         } else if (mood > kPartnerMood ||
                    (rel.trade == Treaty::Signed && mood >= 0 && st.character == character::kTrader)) {
             s = stance::kPartner;
-        } else if (near && theirs != 0 && std::uint64_t{own} * 100U >= std::uint64_t{theirs} * press) {
+        } else if (near && mood <= 0 && theirs != 0 && std::uint64_t{own} * 100U >= std::uint64_t{theirs} * press) {
+            // Only a rival it does not like: a friendly neighbour is left in peace.
             s = stance::kPressure;
         }
         if (s != st.stances[bi]) {
@@ -171,18 +195,25 @@ void Engine::plan_strategy(AiPlayer& p) {
     for (const CityPlan& r : p.plans) {
         aristocrats_near = aristocrats_near || r.stage >= stage::kMerchants2;
     }
-    if (money < 0 || net_income(p) < 0) {
+    const bool broke = money < 0 || net_income(p) < 0;
+    if (broke) {
         g = goal::kEconomy;
     } else if (threat || (pressing && st.character == character::kConqueror)) {
         g = goal::kMilitary;
     } else if (aristocrats_near && !p.present[kSlotGoldMine]) {
         g = goal::kGold;
     } else if (p.cities < city_limit() && (st.character == character::kSettler || (money >= 8000 && p.cities < 3)) &&
-               p.max_stage >= stage::kMain) {
+               p.max_stage >= stage::kMain2) {
         g = goal::kLand;
+    }
+    // A goal holds a while, so that the computer does not change its mind with every look; debt
+    // and a threat change it at once.
+    if (g != st.goal && !broke && g != goal::kMilitary && st.goal_ms != 0 && now_ms() - st.goal_ms < kGoalHoldMs) {
+        return;
     }
     if (g != st.goal) {
         log(p, "goal: %s", goal_name(g));
+        st.goal_ms = now_ms();
     }
     st.goal = g;
 }

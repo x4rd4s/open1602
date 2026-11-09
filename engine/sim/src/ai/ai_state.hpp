@@ -419,6 +419,7 @@ struct Strategy {
     std::uint8_t character = character::kNone;
     std::uint8_t goal = goal::kEconomy;
     std::uint64_t next_ms = 0;          ///< game time of the next look
+    std::uint64_t goal_ms = 0;          ///< game time the goal was last changed
     std::vector<std::uint8_t> stances;  ///< by player
 };
 

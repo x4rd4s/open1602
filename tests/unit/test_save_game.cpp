@@ -657,7 +657,7 @@ TEST_CASE("save game: games of every earlier state version load and run on as th
             simulation.tick();
         }
         test::check_golden(("state version " + std::to_string(version)).c_str(), test::world_hash(*loaded, buildings),
-                           version <= 3 ? 0x6c5ed781423374f2ULL : 0xb29fd3aaf8bd095aULL);
+                           version <= 3 ? 0x7e30a1c7c2cb3da9ULL : 0x1f5a608d9972b0a3ULL);
 
         // Saved in parts, it comes back with the same game.
         auto parts = sim::write_game(*loaded, buildings, &simulation, sim::SaveOptions{false});

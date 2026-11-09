@@ -404,6 +404,7 @@ void io(A& a, AiPlayer& p) {
         a(p.strategy.character);
         a(p.strategy.goal);
         a(p.strategy.next_ms);
+        a(p.strategy.goal_ms);
         a(p.strategy.stances);
     }
 }
