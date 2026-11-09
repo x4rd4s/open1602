@@ -236,6 +236,9 @@ void Engine::pick_island(AiPlayer& p) {
         if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need}) {
             continue;
         }
+        if (!island_allowed(p, i)) {
+            log(p, "contests island %u for crop %u", i, s.crop);
+        }
         s.island = i;
         push(p, kSettleArea, true);
         return;

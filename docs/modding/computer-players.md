@@ -431,6 +431,12 @@ Improved computers weigh the way at sea:
   it first, so that its colonies lie within reach of its ships. It founds one only with 3000 gold
   in hand, passes over an island it gave a city up on for 45 minutes, and a young colony (before
   its settlers) no longer makes the older city a second city.
+- **Land power.** A colony follows the goal: with gold as its goal a computer without gold looks
+  for an island with a free gold vein, arming one without ore for an island with a free ore vein,
+  and it puts the Kontor by the vein, so that a market can take the mountain in. Such a colony may
+  go to an island where a small rival (two cities at most) lives, as the original's computers
+  never do, but not next to a partner, an ally or a rival stronger than itself; the rival takes it
+  ill. With land as its goal a computer settles for room after half the usual pause.
 - **Hourly new start.** The original's computers start again every hour and walk every city
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.
