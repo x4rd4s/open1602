@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 9;
+inline constexpr std::uint32_t kStateVersion = 10;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -33,6 +33,9 @@ inline constexpr std::uint32_t kStateWithTownSeed = 8;
 /// Version 9: when an improved computer's fleet target last held and the islands it gave a city up on
 /// (AiPlayer::fleet_ms, AiPlayer::left_islands). Written only once one of them is set.
 inline constexpr std::uint32_t kStateWithLeftIslands = 9;
+/// Version 10: an improved computer's strategy: its character, its goal and its stance towards each
+/// player (AiPlayer::strategy). Written only once a character is drawn.
+inline constexpr std::uint32_t kStateWithStrategy = 10;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -387,6 +390,38 @@ struct IslandWatch {
 };
 
 /// One computer player (or the pirates).
+/// Open1602, improved computers: how a computer plays (its character, drawn once per game) and
+/// what it is after for now (its goal and its stance towards each player), chosen by the strategy
+/// planner (ai_strategy.cpp).
+namespace character {
+inline constexpr std::uint8_t kNone = 0;       ///< not drawn yet
+inline constexpr std::uint8_t kTrader = 1;     ///< economy and diplomacy
+inline constexpr std::uint8_t kConqueror = 2;  ///< military might
+inline constexpr std::uint8_t kSettler = 3;    ///< land and colonies
+inline constexpr std::uint8_t kCount = 3;
+}  // namespace character
+
+namespace goal {
+inline constexpr std::uint8_t kEconomy = 0;   ///< build up the cities
+inline constexpr std::uint8_t kMilitary = 1;  ///< arm against a threat or for a war
+inline constexpr std::uint8_t kGold = 2;      ///< get gold for the aristocrats
+inline constexpr std::uint8_t kLand = 3;      ///< found colonies
+}  // namespace goal
+
+namespace stance {
+inline constexpr std::uint8_t kNeutral = 0;
+inline constexpr std::uint8_t kPartner = 1;   ///< friendly: trade, peace
+inline constexpr std::uint8_t kPressure = 2;  ///< weaker and near: armed against, no new peace offered
+inline constexpr std::uint8_t kHostile = 3;   ///< at war or angry
+}  // namespace stance
+
+struct Strategy {
+    std::uint8_t character = character::kNone;
+    std::uint8_t goal = goal::kEconomy;
+    std::uint64_t next_ms = 0;          ///< game time of the next look
+    std::vector<std::uint8_t> stances;  ///< by player
+};
+
 struct AiPlayer {
     PlayerId player = kNoPlayer;
     bool pirates = false;
@@ -451,6 +486,8 @@ struct AiPlayer {
     /// Open1602, improved computers: the islands a city was given up on, with the game time; the
     /// island search passes them over for a while (state 9).
     std::vector<std::pair<std::uint16_t, std::uint64_t>> left_islands;
+    /// Open1602, improved computers: the strategy planner's choices (state 10).
+    Strategy strategy;
 };
 
 /// Everything of all computer players.

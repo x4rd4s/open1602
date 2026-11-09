@@ -239,7 +239,14 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
         }
         rival = std::max(rival, weighted_army(other));
     }
+    const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);
+    // The strategy: more while arming or as a conqueror; a trader keeps less of the rivals' share,
+    // never less than its inhabitants' army.
+    const std::uint32_t pct = army_percent(p);
+    own = static_cast<std::uint32_t>(std::uint64_t{own} * std::max<std::uint32_t>(pct, 100) / 100U);
+    // Never beyond the rival's whole army, so that two computers do not outbid each other.
+    rival = std::min(static_cast<std::uint32_t>(std::uint64_t{rival} * pct / 100U), std::max(rival_whole, rival));
     return std::max(own, rival);
 }
 
@@ -1663,7 +1670,9 @@ void Engine::diplomacy(AiPlayer& p) {
             if (rivals() && m_world.player(b) != nullptr && m_world.player(b)->status == PlayerStatus::Playing) {
                 const std::int32_t m = d.mood(m_world, p.player, b, 0, now_ms());
                 const std::int32_t prev = p.previous_mood[bi];
-                if (rel.peace == Treaty::None && m >= prev && m >= 0) {
+                const std::uint8_t st = stance_of(p, b);
+                if (rel.peace == Treaty::None && m >= prev && m >= 0 && st != stance::kPressure &&
+                    st != stance::kHostile) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                     log(p, "offers peace to computer %u (mood %d)", b, m);
                 } else if (rel.peace == Treaty::Received && m > -20) {

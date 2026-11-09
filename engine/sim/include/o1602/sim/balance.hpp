@@ -169,6 +169,15 @@ struct Balance {
     /// The improved computers' gold before a city moves on ([computer_stages], version
     /// kBalanceWithRivalEconomy): so many percent of the gold the stages above ask of the original's.
     std::uint32_t ai_rival_money_percent = 25;
+    /// The improved computers' strategy planner ([computer_strategy], version kBalanceWithStrategy).
+    std::uint32_t ai_strategy_seconds = 60;  ///< a computer looks at its strategy this often on the easiest level ...
+    std::uint32_t ai_strategy_level_seconds = 10;   ///< ... so much more often per level
+    std::uint32_t ai_military_army_percent = 150;   ///< the army target while the goal is military
+    std::uint32_t ai_conqueror_army_percent = 125;  ///< ... and for a conqueror always
+    std::uint32_t ai_trader_army_percent = 80;      ///< ... and for a trader (never below the inhabitants' army)
+    std::uint32_t ai_land_colony_money = 2000;      ///< gold in hand for a colony while the goal is land or gold
+    std::uint32_t ai_pressure_percent = 150;        ///< a rival is pressed by a computer this many times as strong
+    std::uint32_t ai_human_threat_percent = 15;  ///< humans count as stronger by this much per level above the second
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -207,9 +216,11 @@ inline constexpr std::uint16_t kBalanceWithMoreStages = 4;
 inline constexpr std::uint16_t kBalanceWithMilitary = 5;
 /// The version of the section BALA with the improved computers' share of the stages' gold.
 inline constexpr std::uint16_t kBalanceWithRivalEconomy = 6;
+/// The version of the section BALA with the improved computers' strategy planner.
+inline constexpr std::uint16_t kBalanceWithStrategy = 7;
 
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 70> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 78> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -284,6 +295,14 @@ inline constexpr std::array<BalanceField, 70> kBalanceFields = {{
      kBalanceWithMilitary},
     {"computer_military", "rival_army_percent", &Balance::ai_rival_army_percent, 0, 1000, kBalanceWithMilitary},
     {"computer_stages", "rival_money_percent", &Balance::ai_rival_money_percent, 0, 1000, kBalanceWithRivalEconomy},
+    {"computer_strategy", "strategy_seconds", &Balance::ai_strategy_seconds, 1, 3600, kBalanceWithStrategy},
+    {"computer_strategy", "strategy_level_seconds", &Balance::ai_strategy_level_seconds, 0, 3600, kBalanceWithStrategy},
+    {"computer_strategy", "military_army_percent", &Balance::ai_military_army_percent, 0, 1000, kBalanceWithStrategy},
+    {"computer_strategy", "conqueror_army_percent", &Balance::ai_conqueror_army_percent, 0, 1000, kBalanceWithStrategy},
+    {"computer_strategy", "trader_army_percent", &Balance::ai_trader_army_percent, 0, 1000, kBalanceWithStrategy},
+    {"computer_strategy", "land_colony_money", &Balance::ai_land_colony_money, 0, 10'000'000, kBalanceWithStrategy},
+    {"computer_strategy", "pressure_percent", &Balance::ai_pressure_percent, 100, 1000, kBalanceWithStrategy},
+    {"computer_strategy", "human_threat_percent", &Balance::ai_human_threat_percent, 0, 1000, kBalanceWithStrategy},
 }};
 
 /// The version of the section BALA that `balance` needs: the first that holds every value that is

@@ -151,6 +151,17 @@ void Engine::logistics(AiPlayer& p) {
         if (s != nullptr && n.patrol && !s->route.active) {
             n.patrol = false;
         }
+        // Open1602: an improved computer that lost its last city calls its patrols off, so that a
+        // ship is free to found anew; before, it sailed round the empty island for good and the
+        // search waited for it.
+        if (s != nullptr && n.patrol && rivals() && p.cities == 0) {
+            RouteEdit off;
+            off.player = p.player;
+            off.ship = s->id;
+            off.op = RouteEdit::Op::Stop;
+            execute(off);
+            n.patrol = false;
+        }
         if (s != nullptr && n.supply && !s->route.active && !ship_moving(*s)) {
             n.supply = false;
         }

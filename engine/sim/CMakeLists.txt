@@ -9,6 +9,7 @@ add_library(o1602_sim
     src/ai/ai_military.cpp
     src/ai/ai_planner.cpp
     src/ai/ai_settle.cpp
+    src/ai/ai_strategy.cpp
     src/ai/ai_sites.cpp
     src/ai/ai_world.cpp
     src/blueprints.cpp

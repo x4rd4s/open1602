@@ -540,6 +540,10 @@ TEST_CASE("ai military: a computer arms against the army of another computer at 
         for (int i = 0; i < 16; ++i) {
             a.add(other, 2 * (100 + 1 + i % 6), 2 * (10 + 1 + i / 6), 1);
         }
+        sim::Balance balance = a.world.balance();
+        balance.ai_conqueror_army_percent = 100;  // the same for every character
+        balance.ai_trader_army_percent = 100;
+        a.world.set_balance(balance);
         sim::Rules rules;
         rules.bugs.classic_ai = !rivals;
         sim::Simulation s(a.world, a.buildings, a.figures, rules);

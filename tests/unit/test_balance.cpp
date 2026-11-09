@@ -725,3 +725,22 @@ TEST_CASE("balance: the improved computers' share of the stages' gold is [comput
     REQUIRE(loaded.ok());
     CHECK(loaded->balance() == balance);
 }
+
+TEST_CASE("balance: the improved computers' strategy is [computer_strategy], saved in BALA version 7") {
+    sim::Balance balance;
+    CHECK(balance.ai_strategy_seconds == 60);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "warlike", "[computer_strategy]\nconqueror_army_percent = 200\n", warnings);
+    CHECK(warnings.empty());
+    CHECK(balance.ai_conqueror_army_percent == 200);
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithStrategy);
+
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+}

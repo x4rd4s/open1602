@@ -60,6 +60,12 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computer_military` | `castle_reserve` | 2000 | 0–10000000 | ... if this much gold is left after the castle's cost |
 | `computer_military` | `inhabitants_per_unit` | 40 | 0–1000000 | an improved computer keeps an army of a swordsman's strength for every so many of its inhabitants, whoever else is armed (0: none) |
 | `computer_military` | `rival_army_percent` | 75 | 0–1000 | ... and at least this share of the strongest army of another computer, at peace with it or not |
+| `computer_strategy` | `strategy_seconds`, `strategy_level_seconds` | 60, 10 | 1–3600, 0–3600 | an improved computer looks at its rivals and its goal this often on the easiest level, so many seconds more often per level (at least every 10 s) |
+| `computer_strategy` | `military_army_percent` | 150 | 0–1000 | the army target while its goal is military, in percent ... |
+| `computer_strategy` | `conqueror_army_percent`, `trader_army_percent` | 125, 80 | 0–1000 | ... and of a conqueror and a trader always; never less than the inhabitants' army, never more than the strongest rival's whole army |
+| `computer_strategy` | `land_colony_money` | 2000 | 0–10000000 | the gold in hand a colony waits for while the goal is land or gold (at most the usual 3000) |
+| `computer_strategy` | `pressure_percent` | 150 | 100–1000 | a near rival that much weaker (in percent of its strength) is pressed: armed against, offered no peace; 25 less for a conqueror, 50 more for a trader, 10 less per level |
+| `computer_strategy` | `human_threat_percent` | 15 | 0–1000 | from the third level on, a human's strength counts this much more per level |
 
 The `computers` values are the original's cheats: what the computer players get from nowhere, on
 every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of
