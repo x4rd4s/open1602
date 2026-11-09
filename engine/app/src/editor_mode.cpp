@@ -667,9 +667,8 @@ void MapViewer::editor_test_play(std::optional<sim::PlayerId> as) {
     if (as && std::find(slots.begin(), slots.end(), *as) == slots.end()) {
         as.reset();
     }
-    if (!as && std::none_of(slots.begin(), slots.end(), [&](sim::PlayerId s) {
-            return edited.players()[s].role == sim::PlayerRole::Human;
-        })) {
+    if (!as && std::none_of(slots.begin(), slots.end(),
+                            [&](sim::PlayerId s) { return edited.players()[s].role == sim::PlayerRole::Human; })) {
         editor_notice(ui::tr("editor.test_play.no_human"), true, "no human player to test with");
         return;
     }
@@ -1207,9 +1206,9 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::SoundTest:
             break;  // taken above (editor_sound_request)
         case Kind::TestPlay:
-            editor_test_play(request.index > 0 ? std::optional<sim::PlayerId>(
-                                                      static_cast<sim::PlayerId>(request.index - 1))
-                                                : std::nullopt);
+            editor_test_play(request.index > 0
+                                 ? std::optional<sim::PlayerId>(static_cast<sim::PlayerId>(request.index - 1))
+                                 : std::nullopt);
             return;  // the editor stands aside: nothing of it to do now
         case Kind::Recover:
             editor_recover();
