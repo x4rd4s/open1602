@@ -19,6 +19,7 @@ namespace {
 
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
 constexpr std::size_t kLockFromClass = 2;   // the merchants
+constexpr std::int64_t kLockMoney = 3000;   // improved computers lock the material only below it
 constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
 
 }  // namespace
@@ -391,6 +392,14 @@ void Engine::material_lock(AiPlayer& p, City& c) {
     // them the taxes that pay for the city. So the material stays locked while the city has no
     // food left, or none of a good that its classes from the merchants on want and that it does
     // not make enough of itself.
+    // Only short of gold and with a falling purse: a computer with gold in hand lets its city grow
+    // and builds or buys what is missing.
+    if (player(p).money >= kLockMoney || net_income(p) >= 0) {
+        if (c.material_lock) {
+            set_material_lock(p, c, false);
+        }
+        return;
+    }
     const std::uint8_t food = m_buildings.food_ware();
     bool lack = food_short(c) && c.stock(food) < kTon;
     const auto& classes = m_buildings.resident_classes();
@@ -405,17 +414,20 @@ void Engine::material_lock(AiPlayer& p, City& c) {
             }
         }
     }
-    if (lack == c.material_lock) {
-        return;
+    if (lack != c.material_lock) {
+        set_material_lock(p, c, lack);
     }
+}
+
+void Engine::set_material_lock(AiPlayer& p, City& c, bool on) {
     CityOrder o;
     o.player = p.player;
     o.island = c.island;
     o.city = c.index;
     o.op = CityOrder::Op::MaterialLock;
-    o.on = lack;
+    o.on = on;
     execute(o);
-    log(p, "city %u/%u: material %s", c.island, c.index, lack ? "locked, goods are missing" : "free again");
+    log(p, "city %u/%u: material %s", c.island, c.index, on ? "locked, goods are missing" : "free again");
 }
 
 void Engine::production_switches(AiPlayer& p, City& c) {

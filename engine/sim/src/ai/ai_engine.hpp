@@ -366,6 +366,7 @@ private:
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.
     void material_lock(AiPlayer& p, City& c);
+    void set_material_lock(AiPlayer& p, City& c, bool on);
     [[nodiscard]] std::int64_t stage_gold(std::uint32_t gold) const;
     void subsidy(AiPlayer& p, std::int32_t m);
     void set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s);
