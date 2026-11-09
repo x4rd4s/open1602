@@ -814,6 +814,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const auto give_up = [&](std::uint32_t seconds) {
         if (now_ms() - r.stage_ms >= std::uint64_t{seconds} * 1000 && (r.flags & city_flag::kAbandon) == 0) {
             r.flags |= city_flag::kAbandon;
+            if (!classic()) {
+                p.left_islands.emplace_back(r.island, std::max<std::uint64_t>(now_ms(), 1));
+            }
             log(p, "city %u/%u: given up, %u inhabitants after %u s at stage 0x%02x (money %d)", r.island, r.city,
                 population(c), seconds, unsigned{r.stage}, money);
         }
@@ -1764,7 +1767,10 @@ bool Engine::need_shipyard(AiPlayer& p) {
     if (!own_ships(p).empty() && !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
         return false;
     }
-    if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0) {
+    // Open1602: an improved computer's main city builds its yard without a weaving mill of its own;
+    // the cloth for the sails comes by ship as any other ware.
+    if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0 &&
+        (classic() || r->stage < stage::kMain)) {
         return false;
     }
     SlotState& s = r->slots[kSlotShipyard];

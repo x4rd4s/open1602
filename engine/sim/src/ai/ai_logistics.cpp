@@ -15,6 +15,7 @@ namespace {
 
 constexpr std::uint32_t kHealthy = 0x5F;          // health * 128 / max above this: at least 75 %
 constexpr std::uint32_t kWornPatrol = 64;         // a patrol below half its health goes off duty while the yard repairs
+constexpr std::uint64_t kFleetHoldMs = 600'000;   // improved computers: a fleet target holds 10 min
 constexpr std::uint16_t kSpareShipFactor = 0x40;  // a spare ship for half its price
 constexpr std::uint16_t kFullPriceFactor = 128;   // what the yard asks
 constexpr std::int32_t kFirstShipPriceLimit = 100000;  // offers from this price on are not looked at
@@ -217,7 +218,8 @@ void Engine::scout(AiPlayer& p) {
     }
     Ship* ship = nullptr;
     for (Ship* s : ships) {
-        if (ship_idle(p, *s) && note(p, s->id).cooldown == 0 && health128(*s) > kHealthy) {
+        // Not with goods on board: the founding goods of a new city would sail away with it.
+        if (ship_idle(p, *s) && note(p, s->id).cooldown == 0 && health128(*s) > kHealthy && !carries_goods(*s)) {
             ship = s;
             break;
         }
@@ -978,6 +980,14 @@ void Engine::update_fleet_target(AiPlayer& p) {
     const std::uint32_t limit = m_sim.rules().max_ships_per_player;
     const std::int32_t before = p.fleet_target;
     p.fleet_target = limit != 0 ? std::min<std::int32_t>(t, static_cast<std::int32_t>(limit)) : t;
+    if (rivals()) {
+        // The target falls only once the supply wanted fewer ships for ten minutes.
+        if (p.fleet_target >= before) {
+            p.fleet_ms = std::max<std::uint64_t>(now_ms(), 1);
+        } else if (now_ms() - p.fleet_ms < kFleetHoldMs) {
+            p.fleet_target = before;
+        }
+    }
     if (rivals() && p.fleet_target != before) {
         log(p, "fleet target %d (ships %d, cities %d, for supply %d)", p.fleet_target, ships, n, supply);
     }

@@ -544,8 +544,9 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
     // The wider hunter's hut by default. The military's state version 4 (the unit that goes first).
     // Up to 16 cities on an island by default (only the rules' bytes); improved computers without
-    // the original's gifts, setting their own taxes, seeing only what their ships saw.
-    constexpr std::uint64_t kExpected = 0x192955a72269f765ULL;
+    // the original's gifts, setting their own taxes, seeing only what their ships saw; the computers' state version 9
+    // (fleet target hold, left islands).
+    constexpr std::uint64_t kExpected = 0x5aa1c460aafeaa6eULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -2288,7 +2289,7 @@ TEST_CASE("ai: a package's public building of a kind of its own is planned by th
     CHECK((first.flags & own_public(0)) != 0);
     // Within 32 bits the flags are the bytes of version 5; the computer's town seed, drawn with its
     // first town plan, asks for version 8 here all the same.
-    CHECK(first.version == sim::ai::kStateWithTownSeed);
+    CHECK(first.version >= sim::ai::kStateWithTownSeed);
     CHECK(first.kept);
     const Planned far = planned(true, 30);
     CHECK(own_public(30) > 0xFFFF'FFFFU);
