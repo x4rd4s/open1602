@@ -114,6 +114,8 @@ std::string refusal_text(sim::BuildRefusal refusal) {
                 return "build.refusal.immovable";
             case sim::BuildRefusal::Neutral:
                 return "build.refusal.neutral";
+            case sim::BuildRefusal::EnemyNear:
+                return "build.refusal.enemy_near";
         }
         return "build.refusal.unknown";
     }();

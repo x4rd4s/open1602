@@ -239,6 +239,9 @@ struct OriginalBugs {
     /// Ships fire without a line of sight, through walls too, so a wall along the coast keeps no
     /// shot off the soldiers and buildings behind it (fixed: walls stop cannon balls).
     bool ship_shots_through_walls = false;
+    /// Watchtowers can be built right beside enemy soldiers, even in the middle of a fight
+    /// (fixed: not while an enemy soldier stands within the tower's range and two tiles more).
+    bool towers_near_enemies = false;
     /// S-097 to S-099, the original's computer players: while a settlement ship
     /// sails no city develops, a city whose colony search failed waits for it for ever, an
     /// unreachable site is searched afresh (and found again), the fisher looks in two directions
@@ -262,6 +265,7 @@ struct OriginalBugs {
         &OriginalBugs::native_land,
         &OriginalBugs::land_behind_walls,
         &OriginalBugs::ship_shots_through_walls,
+        &OriginalBugs::towers_near_enemies,
         &OriginalBugs::classic_ai,
     };
 
