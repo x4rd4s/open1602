@@ -709,7 +709,7 @@ TEST_CASE("save game: a part of the state from a later Open1602 is skipped if op
     core::Bytes longer = *bytes;
     const std::size_t military = part_at(longer, "MILI");
     REQUIRE(military != 0);
-    longer[military + 4] = 2;  // version 2 reads two of the three clocks
+    longer[military + 4] = 3;  // version 3 reads the three clocks, not the unit that goes first
     longer[military + 5] = 0;
     fix_crc(longer);
     auto damaged = sim::read_game(longer, buildings, nullptr, &figures);

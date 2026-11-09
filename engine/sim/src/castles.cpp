@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Castles: recruiting, training, sending units out; soldiers on board ships.
 #include <algorithm>
+#include <cstdlib>
 #include <span>
 
 #include "o1602/sim/game_data.hpp"
@@ -488,16 +489,57 @@ bool Military::board(Soldier& s, Ship& ship) {
     return false;
 }
 
+bool Military::walled_off(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, PlayerId owner) const {
+    // Bresenham over the cells between the ship and the landing cell, as for a line of sight.
+    const LandMap& land = m_combat->land();
+    const std::int32_t dx = std::abs(x1 - x0);
+    const std::int32_t dy = -std::abs(y1 - y0);
+    const std::int32_t step_x = x0 < x1 ? 1 : -1;
+    const std::int32_t step_y = y0 < y1 ? 1 : -1;
+    std::int32_t err = dx + dy;
+    std::int32_t x = x0;
+    std::int32_t y = y0;
+    while (x != x1 || y != y1) {
+        const std::int32_t e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x += step_x;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y += step_y;
+        }
+        const assets::BuildingType* b = land.building(x / 2, y / 2);
+        if (b == nullptr || (b->kind != kind::kWall && b->kind != kind::kWallBeach)) {
+            continue;
+        }
+        const std::uint16_t island = land.island_at(x / 2, y / 2);
+        if (island == World::kSea || island >= m_world->islands().size()) {
+            continue;
+        }
+        const WorldIsland& isl = m_world->islands()[island];
+        const std::int32_t tx = x / 2 - static_cast<std::int32_t>(isl.x);
+        const std::int32_t ty = y / 2 - static_cast<std::int32_t>(isl.y);
+        if (isl.map.contains(tx, ty) &&
+            isl.map.top(static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty)).owner != owner) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Military::unload(const UnloadOrder& o) {
     Ship* ship = m_world->ship(o.ship);
     if (ship == nullptr || ship->sinking || (o.player != kNoPlayer && ship->owner != o.player)) {
         return false;
     }
     // Land within 6 tiles of the ship (Balance::castle_unload_range): the nearest cell
-    // soldiers can stand on.
+    // soldiers can stand on. Open1602: not behind a wall of another player that stands between
+    // the ship and the cell; the original lands them there too (OriginalBugs::land_behind_walls).
     const auto range = static_cast<std::int32_t>(m_world->balance().castle_unload_range);
     const std::int32_t sx = 2 * ship->x + 1;
     const std::int32_t sy = 2 * ship->y + 1;
+    const bool over_walls = m_world->original_bugs().land_behind_walls;
     std::optional<std::pair<std::int32_t, std::int32_t>> landing;
     std::int32_t best = 0;
     for (std::int32_t cy = sy - 2 * range; cy <= sy + 2 * range; ++cy) {
@@ -506,7 +548,7 @@ bool Military::unload(const UnloadOrder& o) {
                 continue;
             }
             const std::int32_t d = sea_distance(cx - sx, cy - sy);
-            if (d <= 2 * range && (!landing || d < best)) {
+            if (d <= 2 * range && (!landing || d < best) && (over_walls || !walled_off(sx, sy, cx, cy, ship->owner))) {
                 landing = std::pair{cx, cy};
                 best = d;
             }
