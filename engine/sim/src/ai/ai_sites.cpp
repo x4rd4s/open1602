@@ -33,6 +33,8 @@ constexpr std::int32_t kSparseWoodTrees = 4;
 constexpr std::int32_t kZoneSpareHouses = 12;
 constexpr std::int32_t kZoneMinRadius = 8;
 constexpr std::int32_t kZoneMaxRadius = 30;
+/// Open1602: the houses a city has before its town zone is planned.
+constexpr std::int32_t kZoneFirstHouses = 12;
 /// Open1602: added to the score of a site on the right side of the town zone, so that any such site
 /// wins over any on the wrong side, which is taken only where none is left.
 constexpr std::int32_t kZoneTier = 1 << 16;
@@ -393,6 +395,15 @@ const TownZone& Engine::town_zone(AiPlayer& p) {
     if (c == nullptr || !c->warehouse_x || !c->warehouse_y) {
         return z;
     }
+    // A new city is founded as in the original: its first houses go next to its market, which keeps
+    // it on time for the settlers; the town is planned once it has outgrown them.
+    std::int32_t houses = 0;
+    for (const House& hs : m_world.houses()) {
+        houses += hs.island == p.island && hs.city == p.city ? 1 : 0;
+    }
+    if (houses < kZoneFirstHouses) {
+        return z;
+    }
     const IslandMap& map = island_of(p.island).map;
     const auto w = static_cast<std::int32_t>(map.width());
     const auto h = static_cast<std::int32_t>(map.height());
@@ -430,10 +441,6 @@ const TownZone& Engine::town_zone(AiPlayer& p) {
         my += (my - ky) * style.shift / len;
     }
     // As large as the room of the houses there are and a dozen more.
-    std::int32_t houses = 0;
-    for (const House& hs : m_world.houses()) {
-        houses += hs.island == p.island && hs.city == p.city ? 1 : 0;
-    }
     const std::int64_t wanted = static_cast<std::int64_t>(houses + kZoneSpareHouses) * style.room;
     std::int64_t room = 0;
     std::int32_t r = kZoneMinRadius;
