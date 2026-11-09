@@ -2253,8 +2253,8 @@ TEST_CASE("ai: town styles differ by the number drawn for the game, and the same
         CHECK(a.field_margin == b.field_margin);
         CHECK(a.room >= 6);
         CHECK(a.room <= 9);
-        CHECK(a.block >= 6);
-        CHECK(a.block <= 8);
+        CHECK(a.block >= 7);
+        CHECK(a.block <= 9);
         CHECK(a.shift >= 0);
         CHECK(a.shift <= 4);
         seen.emplace(a.room, a.shift, a.block, a.field_margin);

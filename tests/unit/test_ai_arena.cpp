@@ -524,7 +524,7 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // The computers' state version 4 (a search's target); the revised bread chain by default;
         // a woodcutter where trees are few when no place has many; public buildings amid the houses,
         // with a little chance; town zones and styles (state version 8).
-        test::check_golden("arena after an hour", s.state_hash(), 0x79851d5c7e19ba46ULL);
+        test::check_golden("arena after an hour", s.state_hash(), 0x1c7507858c430792ULL);
     }
 }
 

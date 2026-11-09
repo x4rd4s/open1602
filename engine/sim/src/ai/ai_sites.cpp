@@ -362,7 +362,7 @@ TownStyle town_style(std::uint32_t seed, std::uint16_t island, std::uint8_t city
     TownStyle t;
     t.room = 6 + static_cast<std::int32_t>(h % 4);              // 6 (close) to 9 (spacious) tiles a house
     t.shift = static_cast<std::int32_t>((h >> 8) % 5);          // 0 to 4 tiles away from the Kontor
-    t.block = 6 + static_cast<std::int32_t>((h >> 16) % 3);     // roads every 7 to 9 tiles
+    t.block = 7 + static_cast<std::int32_t>((h >> 16) % 3);     // roads every 8 to 10 tiles
     t.field_margin = static_cast<std::int32_t>((h >> 24) % 4);  // fields 0 to 3 tiles further out
     return t;
 }
