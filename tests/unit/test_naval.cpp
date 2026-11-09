@@ -37,7 +37,11 @@ constexpr const char* kKontorRecord =
     "  @Nummer: 3\n  Id: 20107\n  Kind: 35\n  Gfx: 12\n  Size: 2, 2\n  Maxenergy: 20\n  NoShotFlg: 1\n"
     "  Ruinenr: 255\n";
 
-assets::BuildingTable make_buildings(bool tree = false, bool kontor = false) {
+/// A wall of 40 HP, only in the tables that ask for it.
+constexpr const char* kWallRecord =
+    "  @Nummer: 5\n  Id: 20109\n  Kind: 4\n  Gfx: 21\n  Size: 1, 1\n  Maxenergy: 40\n  NoShotFlg: 1\n";
+
+assets::BuildingTable make_buildings(bool tree = false, bool kontor = false, bool wall = false) {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     const std::string text =
         std::string(
@@ -45,7 +49,8 @@ assets::BuildingTable make_buildings(bool tree = false, bool kontor = false) {
             "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
             "  @Nummer: 1\n  Id: 20105\n  Kind: 6\n  Gfx: 10\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
             "  Objekt: HAUS_PRODTYP\n    Kind: 16\n    Figurnr: 38\n  EndObj\n") +
-        (tree ? kTreeRecord : "") + (kontor ? kKontorRecord : "") + (kontor ? kRoadRecord : "") + "EndObj\n";
+        (tree ? kTreeRecord : "") + (kontor ? kKontorRecord : "") + (kontor ? kRoadRecord : "") +
+        (wall ? kWallRecord : "") + "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -85,7 +90,8 @@ struct Sea {
     std::vector<sim::MilitaryEvent> events;
     std::vector<sim::ConstructionEvent> construction;
 
-    explicit Sea(bool tree = false, bool kontor = false) : buildings(make_buildings(tree, kontor)) {
+    explicit Sea(bool tree = false, bool kontor = false, bool wall = false)
+        : buildings(make_buildings(tree, kontor, wall)) {
         std::vector<sim::Player> players(3);
         players[0].role = sim::PlayerRole::Human;
         players[1].role = sim::PlayerRole::Computer;
@@ -333,6 +339,36 @@ TEST_CASE("naval: a warship sent against another player's road (Ctrl or F) shoot
     CHECK(s.count(sim::ShipEvent::Kind::Fired) >= 1);
     CHECK(std::any_of(s.events.begin(), s.events.end(),
                       [](const auto& e) { return e.kind == sim::MilitaryEvent::Kind::BuildingDestroyed; }));
+}
+
+TEST_CASE("naval: walls stop a ship's cannon balls; the original's ships fire through them") {
+    for (const bool original : {false, true}) {
+        Sea s(false, true, true);
+        sim::OriginalBugs bugs;
+        bugs.ship_shots_through_walls = original;
+        s.world.set_original_bugs(bugs);
+        // The computer's Kontor behind a wall along the west coast of the island.
+        for (std::int32_t y = 0; y < 8; ++y) {
+            REQUIRE(s.world.island(0).map.build(*s.buildings.by_id(20109), 0, y, 0, 0, 1, 0).ok());
+        }
+        REQUIRE(s.world.island(0).map.place(*s.buildings.by_id(20107), 1, 4, 0, 0, 1, 0).ok());
+        s.start();
+        s.world.diplomacy().set_peace(s.world, 0, 1, sim::Treaty::None, 0);
+        const std::uint32_t warship = s.add(36, 24, kWarship, 0, 8);
+        sim::ShipOrder o{0, warship, sim::Target::building(0, 1, 4)};
+        o.attack = true;
+        REQUIRE(s.fleet->order(o));
+        s.run(15'000);
+        CHECK((s.count(sim::ShipEvent::Kind::Fired) >= 1) == original);
+        // The wall itself is no cover for itself.
+        if (!original) {
+            sim::ShipOrder w{0, warship, sim::Target::building(0, 0, 2)};
+            w.attack = true;
+            REQUIRE(s.fleet->order(w));
+            s.run(15'000);
+            CHECK(s.count(sim::ShipEvent::Kind::Fired) >= 1);
+        }
+    }
 }
 
 TEST_CASE("naval: what units can shoot at") {

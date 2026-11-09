@@ -417,16 +417,17 @@ TEST_CASE("balance: the large merchant ship has 8 holds and the large warship 6 
     rules.large_ship_holds = true;
     CHECK(sim::rule_building_values(rules).empty());
     const std::vector<sim::FigureValue> holds = sim::rule_figure_values(rules);
-    REQUIRE(holds.size() == 2);
-    CHECK((holds[0] == sim::FigureValue{23, sim::FigureField::Holds, 8}));  // large merchant ship
-    CHECK((holds[1] == sim::FigureValue{27, sim::FigureField::Holds, 6}));  // large warship
+    REQUIRE(holds.size() == 3);
+    CHECK((holds[0] == sim::FigureValue{23, sim::FigureField::Holds, 8}));         // large merchant ship
+    CHECK((holds[1] == sim::FigureValue{23, sim::FigureField::LoadSlowdown, 0}));  // ... not slowed by its load
+    CHECK((holds[2] == sim::FigureValue{27, sim::FigureField::Holds, 6}));         // large warship
 
     // A package that sets the warship's holds itself keeps them.
     sim::Balance balance;
     sim::set_figure_value(balance, sim::FigureValue{27, sim::FigureField::Holds, 4});
     sim::add_figure_values(balance, holds);
-    REQUIRE(balance.figures.size() == 2);
-    CHECK((balance.figures[1] == sim::FigureValue{27, sim::FigureField::Holds, 4}));
+    REQUIRE(balance.figures.size() == 3);
+    CHECK((balance.figures[2] == sim::FigureValue{27, sim::FigureField::Holds, 4}));
     CHECK(sim::valid(balance));
 
     // The rule is kept with the game; a game without its key plays the original's holds.

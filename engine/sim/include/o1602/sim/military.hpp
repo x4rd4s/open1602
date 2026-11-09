@@ -150,10 +150,6 @@ public:
     bool command(const SoldierCommand& command);
     bool castle(const CastleOrder& order);
     bool unload(const UnloadOrder& order);
-    /// Whether a wall of a player other than `owner` stands on the line between cells (x0, y0)
-    /// and (x1, y1), the ends left out: soldiers do not land behind it.
-    [[nodiscard]] bool walled_off(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
-                                  PlayerId owner) const;
 
     /// Units a player has: on land, in castles and on board ships.
     [[nodiscard]] std::uint32_t army_size(PlayerId player) const;

@@ -458,7 +458,10 @@ std::uint32_t Fleet::run_us(const Ship& ship, std::uint8_t direction, std::uint8
     const std::uint64_t capacity = std::max<std::uint64_t>(1, n * std::uint64_t{kHoldCapacity});
     const auto l = static_cast<std::uint32_t>(std::min<std::uint64_t>(128, load * 128 / capacity));
     const std::uint32_t hf = interpolate(h, {{0, 384}, {25, 256}, {64, 192}, {96, 160}, {128, 128}});
-    const std::uint32_t lf = interpolate(l, {{0, 128}, {38, 140}, {64, 160}, {96, 192}, {128, 256}});
+    // A figure may be slowed less by its load (figures.toml `load_slowdown`, percent of the original's).
+    const std::uint32_t slowdown = t != nullptr ? t->ship.load_slowdown : 100U;
+    const std::uint32_t lf =
+        128 + (interpolate(l, {{0, 128}, {38, 140}, {64, 160}, {96, 192}, {128, 256}}) - 128) * slowdown / 100;
     const std::uint32_t f = std::min<std::uint32_t>(384, hf * lf / 128);
     const std::uint32_t divisor = std::max<std::uint32_t>(1, f * 32 / 128);
     const std::uint64_t per_tile = ((direction & 1U) != 0 ? kDiagonalUs : kStraightUs) * divisor / speed;

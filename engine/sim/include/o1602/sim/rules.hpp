@@ -236,6 +236,9 @@ struct OriginalBugs {
     /// player's walls too, so a wall along the coast keeps nobody out (fixed: not behind a wall of
     /// another player that stands between the ship and that cell).
     bool land_behind_walls = false;
+    /// Ships fire without a line of sight, through walls too, so a wall along the coast keeps no
+    /// shot off the soldiers and buildings behind it (fixed: walls stop cannon balls).
+    bool ship_shots_through_walls = false;
     /// S-097 to S-099, the original's computer players: while a settlement ship
     /// sails no city develops, a city whose colony search failed waits for it for ever, an
     /// unreachable site is searched afresh (and found again), the fisher looks in two directions
@@ -246,10 +249,19 @@ struct OriginalBugs {
 
     /// Every bug, for counting and switching them all.
     static constexpr bool OriginalBugs::*kAll[] = {
-        &OriginalBugs::fire_risk,           &OriginalBugs::gallows,      &OriginalBugs::robber_victims,
-        &OriginalBugs::robber_flight,       &OriginalBugs::goldsheep,    &OriginalBugs::building_radius,
-        &OriginalBugs::infertile_fields,    &OriginalBugs::remote_trade, &OriginalBugs::remote_repair,
-        &OriginalBugs::small_yard_warships, &OriginalBugs::native_land,  &OriginalBugs::land_behind_walls,
+        &OriginalBugs::fire_risk,
+        &OriginalBugs::gallows,
+        &OriginalBugs::robber_victims,
+        &OriginalBugs::robber_flight,
+        &OriginalBugs::goldsheep,
+        &OriginalBugs::building_radius,
+        &OriginalBugs::infertile_fields,
+        &OriginalBugs::remote_trade,
+        &OriginalBugs::remote_repair,
+        &OriginalBugs::small_yard_warships,
+        &OriginalBugs::native_land,
+        &OriginalBugs::land_behind_walls,
+        &OriginalBugs::ship_shots_through_walls,
         &OriginalBugs::classic_ai,
     };
 

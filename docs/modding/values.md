@@ -135,6 +135,7 @@ figure is.
 | `price` | `Preis` | 0–100000 | what a ship is worth (sales, computer players) |
 | `material` | `Rohmenge` | 0–255 | tons of material a shipyard builds the ship from; of weapons a castle needs for the unit |
 | `holds` | `Maxware` | 1–8 | cargo holds of 50 t a ship has; ships already at sea keep theirs, or get more |
+| `load_slowdown` | – | 0–100 | how much a full load slows a ship, in percent of the original's: 100 (default) halves its speed when full, 0 leaves it as fast as empty |
 
 ## In the game
 

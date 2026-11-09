@@ -3,10 +3,12 @@
 #
 # The original gives the large merchant ship 6 holds and the large warship 8, so that the warship
 # carries more for nearly the same price and sails faster. As with the small ships, the merchant
-# ship now carries more than the warship.
+# ship now carries more than the warship, and its load no longer slows it down: for carrying goods
+# it beats the warship.
 
 ["anno1602:large_merchant_ship"]
 holds = 8
+load_slowdown = 0
 
 ["anno1602:large_warship"]
 holds = 6

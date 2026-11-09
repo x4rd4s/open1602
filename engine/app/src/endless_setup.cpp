@@ -350,6 +350,7 @@ constexpr BugEntry kBugEntries[] = {
     {SetupItem::BugSmallYardWarships, &sim::OriginalBugs::small_yard_warships, "small_yard_warships"},
     {SetupItem::BugNativeLand, &sim::OriginalBugs::native_land, "native_land"},
     {SetupItem::BugLandBehindWalls, &sim::OriginalBugs::land_behind_walls, "land_behind_walls"},
+    {SetupItem::BugShipShots, &sim::OriginalBugs::ship_shots_through_walls, "ship_shots_through_walls"},
     {SetupItem::ClassicAi, &sim::OriginalBugs::classic_ai, "classic_ai"},
 };
 static_assert(std::size(kBugEntries) == std::size(sim::OriginalBugs::kAll), "every bug has its item");
@@ -483,6 +484,7 @@ std::size_t setup_choices(SetupItem item) noexcept {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::BugLandBehindWalls:
+        case SetupItem::BugShipShots:
         case SetupItem::ClassicAi:
             return 2;
         case SetupItem::WinInhabitants:
@@ -642,6 +644,7 @@ std::size_t setup_choice(const EndlessSetup& setup, SetupItem item) noexcept {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::BugLandBehindWalls:
+        case SetupItem::BugShipShots:
         case SetupItem::ClassicAi: {
             const auto bug = bug_of(item);
             return bug != nullptr && r.bugs.*bug ? 1 : 0;
@@ -873,6 +876,7 @@ void choose(EndlessSetup& setup, SetupItem item, std::size_t choice) {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::BugLandBehindWalls:
+        case SetupItem::BugShipShots:
         case SetupItem::ClassicAi:
             if (const auto bug = bug_of(item); bug != nullptr) {
                 r.bugs.*bug = choice == 1;
@@ -1173,6 +1177,7 @@ bool setup_item_offered(SetupScope scope, SetupItem item) noexcept {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::BugLandBehindWalls:
+        case SetupItem::BugShipShots:
         case SetupItem::ClassicAi:
             return true;
         default:
@@ -1295,6 +1300,7 @@ std::string_view setup_label_key(SetupItem item) {
         "setup.bug.small_yard_warships",
         "setup.bug.native_land",
         "setup.bug.land_behind_walls",
+        "setup.bug.ship_shots_through_walls",
     };
     static_assert(kKeys.size() == kSetupItems);
     const auto i = static_cast<std::size_t>(item);
@@ -1450,6 +1456,7 @@ std::string setup_value(SetupItem item, std::size_t choice) {
         case SetupItem::BugSmallYardWarships:
         case SetupItem::BugNativeLand:
         case SetupItem::BugLandBehindWalls:
+        case SetupItem::BugShipShots:
         case SetupItem::ClassicAi:
             return ui::tr(std::string(bug_key(item)) + (choice == 1 ? ".original" : ".fixed"));
         case SetupItem::ComputerPlayers: {

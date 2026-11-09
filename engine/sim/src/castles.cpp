@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Castles: recruiting, training, sending units out; soldiers on board ships.
 #include <algorithm>
-#include <cstdlib>
 #include <span>
 
 #include "o1602/sim/game_data.hpp"
@@ -489,45 +488,6 @@ bool Military::board(Soldier& s, Ship& ship) {
     return false;
 }
 
-bool Military::walled_off(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1, PlayerId owner) const {
-    // Bresenham over the cells between the ship and the landing cell, as for a line of sight.
-    const LandMap& land = m_combat->land();
-    const std::int32_t dx = std::abs(x1 - x0);
-    const std::int32_t dy = -std::abs(y1 - y0);
-    const std::int32_t step_x = x0 < x1 ? 1 : -1;
-    const std::int32_t step_y = y0 < y1 ? 1 : -1;
-    std::int32_t err = dx + dy;
-    std::int32_t x = x0;
-    std::int32_t y = y0;
-    while (x != x1 || y != y1) {
-        const std::int32_t e2 = 2 * err;
-        if (e2 >= dy) {
-            err += dy;
-            x += step_x;
-        }
-        if (e2 <= dx) {
-            err += dx;
-            y += step_y;
-        }
-        const assets::BuildingType* b = land.building(x / 2, y / 2);
-        if (b == nullptr || (b->kind != kind::kWall && b->kind != kind::kWallBeach)) {
-            continue;
-        }
-        const std::uint16_t island = land.island_at(x / 2, y / 2);
-        if (island == World::kSea || island >= m_world->islands().size()) {
-            continue;
-        }
-        const WorldIsland& isl = m_world->islands()[island];
-        const std::int32_t tx = x / 2 - static_cast<std::int32_t>(isl.x);
-        const std::int32_t ty = y / 2 - static_cast<std::int32_t>(isl.y);
-        if (isl.map.contains(tx, ty) &&
-            isl.map.top(static_cast<std::uint32_t>(tx), static_cast<std::uint32_t>(ty)).owner != owner) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool Military::unload(const UnloadOrder& o) {
     Ship* ship = m_world->ship(o.ship);
     if (ship == nullptr || ship->sinking || (o.player != kNoPlayer && ship->owner != o.player)) {
@@ -548,7 +508,8 @@ bool Military::unload(const UnloadOrder& o) {
                 continue;
             }
             const std::int32_t d = sea_distance(cx - sx, cy - sy);
-            if (d <= 2 * range && (!landing || d < best) && (over_walls || !walled_off(sx, sy, cx, cy, ship->owner))) {
+            if (d <= 2 * range && (!landing || d < best) &&
+                (over_walls || !m_combat->land().wall_between(sx, sy, cx, cy, ship->owner))) {
                 landing = std::pair{cx, cy};
                 best = d;
             }

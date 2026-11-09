@@ -97,8 +97,9 @@ switch it off.
 
 The other settings of that page work the same way: "Hunter's hut reach" (`Rules::wider_hunting`,
 `data/balance/wider_hunting.toml`: 12 tiles instead of 8) and "Holds of large ships"
-(`Rules::large_ship_holds`, `data/balance/large_ship_holds.toml`, the figures' field `holds`: the
-large merchant ship 8 holds and the large warship 6, the original's the other way round).
+(`Rules::large_ship_holds`, `data/balance/large_ship_holds.toml`, the figures' fields `holds` and
+`load_slowdown`: the large merchant ship 8 holds and the large warship 6, the original's the other
+way round, and the large merchant ship's load no longer slows it down).
 
 ## Where a mod's changes are
 
