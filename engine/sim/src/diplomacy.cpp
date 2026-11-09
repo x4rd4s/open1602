@@ -558,7 +558,8 @@ std::int32_t Diplomacy::mood(const World& world, PlayerId a, PlayerId b, std::ui
             }
             const bool b_troops = (seen & kBTroops) != 0;
             const bool a_troops = (seen & kATroops) != 0;
-            if (b_troops) {
+            // Open1602: an ally's troops are welcome (they come to help).
+            if (b_troops && !allied(a, b)) {
                 troop_penalty = std::max(troop_penalty, a_troops && b_city ? 60 : 200);
             }
         }

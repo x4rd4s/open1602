@@ -322,21 +322,29 @@ private:
         return layout;
     }
 
-    /// TRIBUT.GAD (or the strip) with a line of text for the alliance: under the partner's name, as
-    /// wide as the name bar.
+    /// TRIBUT.GAD (or the strip) with a line of text for the alliance: below the trade and peace
+    /// treaties, centred under the partner's name, in the name's font and height. The text is drawn
+    /// with its foot at the gadget's foot, so the click area and the text are the same.
     static assets::GadgetLayout with_alliance(assets::GadgetLayout layout) {
         const assets::Gadget* name = layout.find(kTributeName);
         if (name == nullptr) {
             return layout;
         }
+        std::int32_t below = name->pos[1] + name->size[1];
+        for (const std::int32_t id : {kTributeTrade, kTributePeace}) {
+            if (const assets::Gadget* t = layout.find(id)) {
+                below = std::max(below, t->pos[1] + t->size[1]);
+            }
+        }
+        const std::int32_t height = std::max<std::int32_t>(name->size[1], 16);
         assets::Gadget g;
         g.id = kAlliance;
         g.kind = assets::GadgetKind::TextCentre;
         g.block = name->block;
         g.colour = {ui::kTextInk, ui::kTextInkGreen};
-        g.pos = {name->pos[0], name->pos[1] + name->size[1] + 2};
-        g.size = {name->size[0], 14};
-        g.offset = {static_cast<std::int16_t>(name->size[0] / 2), 11};
+        g.pos = {name->pos[0], below + 4};
+        g.size = {name->size[0], height};
+        g.offset = {static_cast<std::int16_t>(name->size[0] / 2), static_cast<std::int16_t>(height - 2)};
         layout.gadgets.push_back(g);
         return layout;
     }

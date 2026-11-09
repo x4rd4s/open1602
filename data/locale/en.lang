@@ -428,11 +428,11 @@ diplomacy.offer.peace = {1} offers you a peace treaty
 diplomacy.offer.both = {1} offers you a trade treaty and a peace treaty
 diplomacy.wars = {1} is at war with {2}
 diplomacy.no_wars = {1} is at peace with everyone
-diplomacy.alliance.offer = Offer an alliance
-diplomacy.alliance.withdraw = Withdraw the offer of an alliance
-diplomacy.alliance.accept = Accept the alliance
-diplomacy.alliance.end = Allies - end the alliance
-diplomacy.alliance.help = Alliance: allies are at peace; a computer helps its ally when war is declared on it
+diplomacy.alliance.offer = Offer alliance
+diplomacy.alliance.withdraw = Withdraw offer
+diplomacy.alliance.accept = Accept alliance
+diplomacy.alliance.end = End alliance
+diplomacy.alliance.help = Alliance: allies help each other in war
 
 # Trade route editor: the row below the stops (copy a route, show the stops {1} as 1-4 or 5-8),
 # and the help line of the stop the ship sails to now ({1}: the original's help line)

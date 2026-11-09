@@ -406,10 +406,10 @@ diplomacy.offer.both = {1} bietet Euch einen Handels- und einen Friedensvertrag 
 diplomacy.wars = {1} führt Krieg gegen {2}
 diplomacy.no_wars = {1} lebt mit allen in Frieden
 diplomacy.alliance.offer = Bündnis anbieten
-diplomacy.alliance.withdraw = Bündnisangebot zurückziehen
+diplomacy.alliance.withdraw = Angebot zurückziehen
 diplomacy.alliance.accept = Bündnis annehmen
-diplomacy.alliance.end = Verbündet - Bündnis kündigen
-diplomacy.alliance.help = Bündnis: Verbündete leben in Frieden; ein Computer hilft seinem Verbündeten, wenn man ihm den Krieg erklärt
+diplomacy.alliance.end = Bündnis kündigen
+diplomacy.alliance.help = Bündnis: Verbündete helfen sich im Krieg
 
 # Trade route editor: the row below the stops, and the stop the ship sails to now
 route.copy = Route kopieren
