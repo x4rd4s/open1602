@@ -233,9 +233,6 @@ void Engine::tick(std::uint32_t dt_ms) {
             p.diplomacy_ms = 0;
             p.diplomacy_due = false;
             diplomacy(p);
-            if (!classic() && !p.pirates) {
-                kontor_trade(p);
-            }
             check_city_loss(p);
         }
     }

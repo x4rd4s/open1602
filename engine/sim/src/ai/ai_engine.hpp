@@ -509,10 +509,6 @@ private:
     /// Improved computers: each city's trade cart fetches a ware the city lacks from a partner's
     /// city on its island.
     void cart_supply(AiPlayer& p);
-    /// Improved computers: each city's Kontor offers what it has to spare and buys what it lacks,
-    /// as a player sets the trade window, so that other players, computers among them, and the
-    /// free trader trade with it.
-    void kontor_trade(AiPlayer& p);
     void update_fleet_target(AiPlayer& p);
     /// Improved computers: where a city lies on the map, its Kontor (else its island's middle).
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> city_point(const City& c) const;

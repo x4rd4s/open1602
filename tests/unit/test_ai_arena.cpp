@@ -572,7 +572,24 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
         // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
         // their ships saw.
-        test::check_golden("arena after an hour", s.state_hash(), 0x922d3c6160399cacULL);
+        test::check_golden("arena after an hour", s.state_hash(), 0x24adf7cb11903851ULL);
+    }
+}
+
+TEST_CASE("ai arena: improved computers make peace with each other, the original's leave it as it is") {
+    for (const bool classic : {false, true}) {
+        Arena a;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        a.world.diplomacy().relation(kFirst, kSecond).peace = sim::Treaty::None;
+        a.world.diplomacy().relation(kSecond, kFirst).peace = sim::Treaty::None;
+        run(s, 10 * 60'000);
+        REQUIRE(a.cities_of(kFirst) == 1);
+        REQUIRE(a.cities_of(kSecond) == 1);
+        const sim::Treaty peace = a.world.diplomacy().relation(kFirst, kSecond).peace;
+        CHECK((peace == sim::Treaty::Signed) == !classic);
+        CHECK(a.world.diplomacy().relation(kFirst, kSecond).trade == sim::Treaty::Signed);
     }
 }
 

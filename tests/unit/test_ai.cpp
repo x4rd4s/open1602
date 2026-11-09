@@ -546,7 +546,7 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // Up to 16 cities on an island by default (only the rules' bytes); improved computers without
     // the original's gifts, setting their own taxes, seeing only what their ships saw; the
     // computers' state version 9 (fleet target hold, left islands).
-    constexpr std::uint64_t kExpected = 0x38d19932626743f1ULL;
+    constexpr std::uint64_t kExpected = 0x5aa1c460aafeaa6eULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
     }
@@ -813,37 +813,6 @@ TEST_CASE("ai: at its hourly new start an improved computer keeps its cities' st
             for (const auto& c : v.plans) {
                 CHECK((c.stage >= sim::ai::stage::kMain) == !classic);
             }
-        }
-    }
-}
-
-TEST_CASE("ai: an improved computer's Kontor offers what it has to spare, the original's does not") {
-    for (const bool classic : {false, true}) {
-        Game g;
-        sim::Rules rules;
-        rules.bugs.classic_ai = classic;
-        sim::Simulation s(g.world, g.buildings, g.figures, rules);
-        found_city(g, s);
-        sim::City* city = nullptr;
-        for (const sim::City& c : g.world.cities()) {
-            if (c.owner == kComputer) {
-                city = g.world.city(c.island, c.index);
-            }
-        }
-        REQUIRE(city != nullptr);
-        constexpr std::uint32_t kTon = sim::kStockUnitsPerTon;
-        const std::uint16_t island = city->island;
-        const std::uint8_t index = city->index;
-        city->ensure_ware(sim::ware::kGold);
-        city->goods[sim::ware::kGold] = 60 * kTon;  // gold ore it has no use for yet
-        run(s, 70'000);
-        const sim::City* after = g.world.city(island, index);
-        REQUIRE(after != nullptr);
-        const sim::City::Trade* t = after->trade_of(sim::ware::kGold);
-        CHECK((t != nullptr && t->sell) == !classic);
-        if (!classic && t != nullptr) {
-            CHECK(t->keep == 30 * kTon);
-            CHECK(t->sell_price > 0);
         }
     }
 }

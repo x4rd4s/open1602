@@ -13,13 +13,11 @@ namespace o1602::sim::ai {
 
 namespace {
 
-constexpr std::uint32_t kHealthy = 0x5F;    // health * 128 / max above this: at least 75 %
-constexpr std::uint32_t kWornPatrol = 64;   // a patrol below half its health goes off duty while the yard repairs
-constexpr std::int32_t kTradeMoney = 1500;  // improved computers: they buy at their Kontors from this
-constexpr std::uint32_t kSurplusKeep = 30 * kTon;      // improved computers: a good beyond this is offered
-constexpr std::uint64_t kFleetHoldMs = 600'000;        // improved computers: a fleet target holds 10 min
-constexpr std::uint16_t kSpareShipFactor = 0x40;       // a spare ship for half its price
-constexpr std::uint16_t kFullPriceFactor = 128;        // what the yard asks
+constexpr std::uint32_t kHealthy = 0x5F;          // health * 128 / max above this: at least 75 %
+constexpr std::uint32_t kWornPatrol = 64;         // a patrol below half its health goes off duty while the yard repairs
+constexpr std::uint64_t kFleetHoldMs = 600'000;   // improved computers: a fleet target holds 10 min
+constexpr std::uint16_t kSpareShipFactor = 0x40;  // a spare ship for half its price
+constexpr std::uint16_t kFullPriceFactor = 128;   // what the yard asks
 constexpr std::int32_t kFirstShipPriceLimit = 100000;  // offers from this price on are not looked at
 
 bool carries_goods(const Ship& s) {
@@ -922,99 +920,6 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             src1.island, src1.index, first->seconds, second ? ", and a second ware" : "");
     }
     return true;
-}
-
-void Engine::kontor_trade(AiPlayer& p) {
-    // Per city: the wares its supply brings (supply_wares) are bought while the stock is short of
-    // twice what the city keeps, as long as the computer has kTradeMoney; any trade good beyond
-    // that (four times the keep for those wares, 30 t for the rest) is offered down to it. The
-    // most wanted and the largest surplus first, as far as the Kontor's slots go.
-    const auto& goods = m_world.goods();
-    const bool rich = player(p).money >= kTradeMoney;
-    for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
-        const City& listed = m_world.cities()[i];
-        if (listed.owner != p.player || !listed.warehouse_x || !listed.warehouse_y) {
-            continue;
-        }
-        const City& c = listed;
-        std::uint32_t target = 0;
-        const std::vector<std::uint8_t> needed = supply_wares(p, c, &target);
-        struct Want {
-            std::uint8_t ware = 0;
-            std::uint32_t amount = 0;  ///< shortage or surplus, 1/32 t
-            std::uint32_t level = 0;   ///< limit (buying) or keep (selling)
-        };
-        std::vector<Want> buys;
-        std::vector<Want> sells;
-        for (const std::uint8_t w : goods.trade_wares()) {
-            const bool need = std::find(needed.begin(), needed.end(), w) != needed.end();
-            const std::uint32_t stock = c.stock(w);
-            if (need && rich && stock < 2 * target) {
-                buys.push_back({w, 2 * target - stock, 2 * target});
-                continue;
-            }
-            // Building materials stay for the city's own building.
-            const auto& m = m_buildings.materials();
-            if (w == m.tools || w == m.wood || w == m.bricks) {
-                continue;
-            }
-            const std::uint32_t keep = need ? 4 * target : kSurplusKeep;
-            if (stock > keep + 10 * kTon) {
-                sells.push_back({w, stock - keep, keep});
-            }
-        }
-        const auto by_amount = [](const Want& a, const Want& b) {
-            return a.amount != b.amount ? a.amount > b.amount : a.ware < b.ware;
-        };
-        std::sort(buys.begin(), buys.end(), by_amount);
-        std::sort(sells.begin(), sells.end(), by_amount);
-        TradeSlots slots = trade_slots(m_world, m_buildings, c);
-        if (slots.limited()) {
-            buys.resize(std::min(buys.size(), slots.max_buys));
-            sells.resize(std::min(sells.size(), slots.max_sells));
-        }
-        const auto set = [&](std::uint8_t w, TradeSetting::Mode mode, std::optional<std::uint16_t> price,
-                             std::optional<std::uint32_t> amount) {
-            TradeSetting t;
-            t.player = p.player;
-            t.island = c.island;
-            t.city = c.index;
-            t.ware = w;
-            t.mode = mode;
-            t.price = price;
-            t.amount = amount;
-            execute(t);
-        };
-        // First switch off what is no longer wanted, so that the slots are free.
-        for (const std::uint8_t w : goods.trade_wares()) {
-            const City::Trade* t = c.trade_of(w);
-            if (t == nullptr || (!t->sell && !t->buy)) {
-                continue;
-            }
-            const auto in = [&](const std::vector<Want>& list) {
-                return std::any_of(list.begin(), list.end(), [&](const Want& x) { return x.ware == w; });
-            };
-            if ((t->buy && !in(buys)) || (t->sell && !in(sells))) {
-                set(w, TradeSetting::Mode::None, std::nullopt, std::nullopt);
-            }
-        }
-        for (const Want& b : buys) {
-            const City::Trade* t = c.trade_of(b.ware);
-            if (t == nullptr || !t->buy || t->limit != b.level) {
-                set(b.ware, TradeSetting::Mode::Buy, std::nullopt, b.level);
-                log(p, "city %u/%u buys ware %u up to %u t", c.island, c.index, b.ware, b.level / kTon);
-            }
-        }
-        for (const Want& s : sells) {
-            const City::Trade* t = c.trade_of(s.ware);
-            if (t == nullptr || !t->sell || t->keep != s.level) {
-                // A fair price: three quarters of the base price, as the window buys.
-                const auto price = static_cast<std::uint16_t>(goods.price(s.ware) * 96U / 128U);
-                set(s.ware, TradeSetting::Mode::Sell, price, s.level);
-                log(p, "city %u/%u sells ware %u above %u t", c.island, c.index, s.ware, s.level / kTon);
-            }
-        }
-    }
 }
 
 void Engine::update_fleet_target(AiPlayer& p) {
