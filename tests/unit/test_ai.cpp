@@ -487,8 +487,8 @@ TEST_CASE("ai: a computer's first minutes give the same state on every platform"
     // Names left empty without Text.cod (MD-10); SIMU in parts (DS-3); tiles by blocks (TB-26); a ship
     // whose goods do not fit at home is free again; the computers' state version 4 (a search's target);
     // the revised bread chain by default; the computers' state version 5 (the slots counted).
-    // The wider hunter's hut by default. The military's state version 4 (the unit that goes first). Up to 16 cities on an
-    // island by default (only the rules' bytes).
+    // The wider hunter's hut by default. The military's state version 4 (the unit that goes first).
+    // Up to 16 cities on an island by default (only the rules' bytes).
     constexpr std::uint64_t kExpected = 0x48bcf8a8c48d05c2ULL;
     if (hash != kExpected) {
         std::printf("  state hash after 90 s: 0x%016llx\n", static_cast<unsigned long long>(hash));
