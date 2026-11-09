@@ -288,6 +288,7 @@ net.dropped = {1} Eurer Befehle wurden nicht ausgeführt: zu viele auf einmal.
 net.reconnecting = Die Verbindung zum Gastgeber ist abgebrochen; Euer Rechner versucht, wieder hineinzukommen.
 net.speed_refused = Nur der Gastgeber kann das Spiel anhalten oder die Geschwindigkeit ändern.
 net.allow_spectator_chat = Zuschauer dürfen schreiben
+net.spectators_speed = Zuschauer dürfen das Tempo ändern
 net.chat_all = Alle
 net.chat_close = Schließen
 net.chat_to_label = An:

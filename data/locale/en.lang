@@ -314,6 +314,7 @@ net.dropped = {1} of your orders were not carried out: too many at once.
 net.reconnecting = The connection to the host broke; trying to get back in.
 net.speed_refused = Only the host can pause this game or change its speed.
 net.allow_spectator_chat = Spectators may chat
+net.spectators_speed = Spectators may set the speed
 net.chat_all = All
 net.chat_close = Close
 net.chat_to_label = To:

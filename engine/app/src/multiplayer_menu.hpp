@@ -55,6 +55,7 @@ struct HostSetup {
     bool spectators_chat = true;       ///< spectators may write in the chat (they always read it)
     bool computer_takes_over = true;   ///< the computer plays on for a person who left
     bool host_controls_speed = false;  ///< only the host pauses, resumes and sets the speed (MS-20)
+    bool spectators_speed = false;     ///< spectators may set the speed, for everyone
     bool dedicated = false;            ///< the host plays no slot
     std::uint16_t port = net::kDefaultPort;
     /// The game's settings (ADR 0008): rules, and for an endless game its world; a scenario uses

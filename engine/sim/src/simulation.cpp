@@ -534,11 +534,13 @@ void Simulation::apply_commands() {
     for (Queued& q : commands) {
         CommandResult result;
         // A player's command acts for that player only: one without a valid sender would pass every
-        // owner check (kNoPlayer) and is refused.
+        // owner check (kNoPlayer) and is refused. The speed owns nothing: a spectator may set it
+        // when the game lets it (the multiplayer session decides).
         const PlayerId from = sender(q.command);
+        const bool speed = std::holds_alternative<GameSpeedOrder>(q.command);
         if (q.tick < now) {
             result.late = true;
-        } else if (from != kNoPlayer && m_world->player(from) != nullptr) {
+        } else if (speed || (from != kNoPlayer && m_world->player(from) != nullptr)) {
             result = execute(q.command);
         }
         result.sequence = q.sequence;

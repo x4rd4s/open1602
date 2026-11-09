@@ -27,7 +27,7 @@ namespace o1602::net {
 /// Raised whenever the messages or the simulation change in a way older builds would not follow.
 /// The first three bytes of a Hello (its type and this version) never change, so that a computer of
 /// another version is told so (RefuseReason::Version) rather than refused as nonsense (MS-22).
-inline constexpr std::uint16_t kProtocolVersion = 28;
+inline constexpr std::uint16_t kProtocolVersion = 29;
 
 /// The port Open1602 hosts on unless told otherwise (annokit::net::enet_listen).
 inline constexpr std::uint16_t kDefaultPort = 16020;
@@ -267,6 +267,9 @@ struct Lobby {
     bool host_controls_speed = false;
     /// Spectators may write in the chat, to everyone (they read the lines to everyone in any case).
     bool spectators_chat = true;
+    /// Spectators may pause, resume and set the speed, for everyone (to watch a test game faster);
+    /// not while only the host controls it.
+    bool spectators_speed = false;
     friend bool operator==(const Lobby&, const Lobby&) = default;
 };
 

@@ -109,6 +109,7 @@ enum class MpText : std::uint16_t {
     Reconnecting,
     SpeedRefused,
     AllowSpectatorChat,
+    SpectatorsSpeed,
     ChatAll,
     ChatClose,
     ChatToLabel,

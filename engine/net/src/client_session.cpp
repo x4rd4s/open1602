@@ -90,8 +90,10 @@ void ClientSession::set_banner(sim::BannerId banner) {
 
 void ClientSession::submit(sim::Command command) {
     // Only the host decides when a command is carried out, also those of this computer's player.
-    if (m_ended || m_simulation == nullptr || m_seat == sim::kNoPlayer || command_player(command) != m_seat) {
-        return;
+    const bool speed = std::holds_alternative<sim::GameSpeedOrder>(command);
+    if (m_ended || m_simulation == nullptr || (m_seat == sim::kNoPlayer && !speed) ||
+        command_player(command) != m_seat) {
+        return;  // a spectator sets the speed at most (Lobby::spectators_speed)
     }
     if (!sim::command_size(command)) {
         // The others could not read it: the host would drop it (MS-10).
@@ -102,7 +104,10 @@ void ClientSession::submit(sim::Command command) {
         event(std::move(e));
         return;
     }
-    if (std::holds_alternative<sim::GameSpeedOrder>(command) && !may_change_speed()) {
+    if (speed && m_seat == sim::kNoPlayer && !may_change_speed()) {
+        return;  // a spectator of a game that does not let spectators set the speed, as before
+    }
+    if (speed && !may_change_speed()) {
         // The host would not carry it out (MS-20); the player is told why nothing happens.
         SessionEvent e;
         e.kind = SessionEvent::Kind::SpeedRefused;
