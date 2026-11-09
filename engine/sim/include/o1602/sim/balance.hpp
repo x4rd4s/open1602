@@ -67,6 +67,9 @@ enum class FigureField : std::uint8_t {
     Price,     ///< Preis: what a ship is worth
     Material,  ///< Rohmenge: t of material a shipyard builds the ship from, of weapons a castle needs for the unit
     Holds,     ///< Maxware: cargo holds of 50 t a ship has
+    /// Open1602: how much a full load slows a ship, in percent of the original's (100: half the
+    /// speed when full, 0: as fast as empty).
+    LoadSlowdown,
 };
 
 /// A changed value of a figure, in the units of figures.toml.
@@ -305,7 +308,7 @@ struct FigureFieldInfo {
 };
 
 /// Every field of a figure, in the order of FigureField.
-inline constexpr std::array<FigureFieldInfo, 11> kFigureFields = {{
+inline constexpr std::array<FigureFieldInfo, 12> kFigureFields = {{
     {"speed", FigureField::Speed, 1, 10000},
     {"max_carry", FigureField::MaxCarry, 1, 64},
     {"work_time", FigureField::WorkTime, 1, 600000},
@@ -317,6 +320,7 @@ inline constexpr std::array<FigureFieldInfo, 11> kFigureFields = {{
     {"price", FigureField::Price, 0, 100000},
     {"material", FigureField::Material, 0, 255},
     {"holds", FigureField::Holds, 1, 8},  // at most the wares of a route stop (RouteStop::kEntries)
+    {"load_slowdown", FigureField::LoadSlowdown, 0, 100},
 }};
 
 /// Whether every value lies within its limits and the building and figure values are sorted and

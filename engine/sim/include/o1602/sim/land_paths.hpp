@@ -52,6 +52,11 @@ public:
     [[nodiscard]] const assets::BuildingType* building(std::int32_t x, std::int32_t y) const noexcept;
     /// Island index at world tile (x, y), World::kSea for none.
     [[nodiscard]] std::uint16_t island_at(std::int32_t x, std::int32_t y) const noexcept;
+    /// Whether a wall (walls on land and on the beach) stands on the line between half-tile cells
+    /// (x0, y0) and (x1, y1), the ends left out; walls of `except` do not count (kNoPlayer: every
+    /// wall counts).
+    [[nodiscard]] bool wall_between(std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
+                                    PlayerId except = kNoPlayer) const noexcept;
 
 private:
     [[nodiscard]] bool closed_to(const assets::BuildingType& b, const MapCell& top, PlayerId walker) const noexcept;

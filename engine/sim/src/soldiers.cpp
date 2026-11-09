@@ -32,8 +32,9 @@ constexpr std::int32_t kOthersRange = 8;   // cells: other figures block plannin
 constexpr std::int32_t kSpread = 6;        // cells: how far a place moves to a free cell
 constexpr std::int32_t kCrowded = 3;       // cells: walking slower next to another figure
 constexpr std::uint8_t kMaxFailures = 3;
-constexpr std::int32_t kWanderRange = 9;  // tiles around home
-constexpr std::int32_t kBoardRange = 9;   // cells from an own ship: the soldier goes on board
+constexpr std::uint32_t kChaseReserve = Military::kPlansPerTick / 2;  // way searches chasing leaves
+constexpr std::int32_t kWanderRange = 9;                              // tiles around home
+constexpr std::int32_t kBoardRange = 9;  // cells from an own ship: the soldier goes on board
 constexpr std::uint8_t kAnimWalk = 0;
 constexpr std::uint8_t kAnimStand = 1;
 constexpr std::uint8_t kAnimAttack = 2;
@@ -143,6 +144,16 @@ void Military::start_wait(Soldier& s, std::uint32_t ms) {
     m.phase = SoldierMotion::Phase::Wait;
     m.elapsed_us = 0;
     m.duration_us = std::max<std::uint32_t>(1, ms * 1000U);
+}
+
+void Military::turned_away(Soldier& s) {
+    // The first unit turned away goes first in the next tick: without that, units early in the
+    // list that search a lot took the budget tick after tick, and one further down stood with its
+    // walk playing and did not follow its orders for minutes.
+    if (m_first_id == kNoUnit) {
+        m_first_id = s.id;
+    }
+    start_wait(s, std::max<std::uint32_t>(1, m_tick_ms));
 }
 
 void Military::rest(Soldier& s) {
@@ -735,7 +746,7 @@ void Military::decide(Soldier& s) {
     }
     if (m_plans_left == 0) {
         // No way search left in this tick: the unit decides in the next one (TB-1).
-        start_wait(s, std::max<std::uint32_t>(1, m_tick_ms));
+        turned_away(s);
         return;
     }
     if (!s.target.empty() && !target_valid(s.target)) {
@@ -793,7 +804,9 @@ void Military::decide(Soldier& s) {
                         }
                         continue;
                     }
-                    if (m_plans_left == 0) {
+                    if (m_plans_left <= kChaseReserve) {
+                        // The rest of the budget is for units with a way to go: chasing is their
+                        // own idea, a way is mostly an order.
                         out_of_plans = true;
                         break;
                     }
@@ -803,7 +816,7 @@ void Military::decide(Soldier& s) {
                     }
                 }
                 if (out_of_plans && !chase) {
-                    start_wait(s, std::max<std::uint32_t>(1, m_tick_ms));
+                    turned_away(s);
                     return;
                 }
             }

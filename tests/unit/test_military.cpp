@@ -59,7 +59,12 @@ constexpr const char* kVillageRecord =
     "  Objekt: HAUS_PRODTYP\n    Kind: 31\n  EndObj\n"
     "  @Nummer: 11\n  Id: 22601\n  Kind: 12\n  Gfx: 74\n  Size: 1, 1\n";  // its ruin
 
-assets::BuildingTable make_buildings(bool tree = false, bool village = false) {
+/// A wall (MAUER), only in the tables that ask for it (the golden hashes stay).
+constexpr const char* kWallRecord =
+    "  @Nummer: 12\n  Id: 20113\n  Kind: 4\n  Gfx: 80\n  Size: 1, 1\n  Maxenergy: 40\n  NoShotFlg: 1\n";
+constexpr std::uint32_t kWallBuilding = 20113;
+
+assets::BuildingTable make_buildings(bool tree = false, bool village = false, bool wall = false) {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     const std::string text =
         std::string(
@@ -85,7 +90,7 @@ assets::BuildingTable make_buildings(bool tree = false, bool village = false) {
             "  Ruinenr: 255\n"
             "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n    Nativflg: 1\n  EndObj\n"  // natives' main hut
             ) +
-        (tree ? kTreeRecord : "") + (village ? kVillageRecord : "") + "EndObj\n";
+        (tree ? kTreeRecord : "") + (village ? kVillageRecord : "") + (wall ? kWallRecord : "") + "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -125,7 +130,8 @@ struct Field {
     std::vector<sim::MilitaryEvent> events;
     std::vector<sim::ConstructionEvent> construction;
 
-    explicit Field(bool tree = false, bool village = false) : buildings(make_buildings(tree, village)) {
+    explicit Field(bool tree = false, bool village = false, bool wall = false)
+        : buildings(make_buildings(tree, village, wall)) {
         std::vector<sim::Player> players(3);
         players[0].role = sim::PlayerRole::Human;
         players[0].money = 10000;
@@ -577,6 +583,37 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
     CHECK(f.world.soldiers()[0].health == 640);
     CHECK(f.world.soldiers()[0].figure == kSword);
     CHECK(boat->cargo[0].ware == 0);
+}
+
+TEST_CASE("military: soldiers do not land behind another player's wall along the coast") {
+    for (const bool original : {false, true}) {
+        for (const sim::PlayerId wall_owner : {sim::PlayerId{1}, sim::PlayerId{0}}) {
+            Field f(false, false, true);
+            sim::OriginalBugs bugs;
+            bugs.land_behind_walls = original;
+            f.world.set_original_bugs(bugs);
+            // A wall along the island's west coast, the ship of player 0 at sea before it.
+            for (std::int32_t y = 0; y < 20; ++y) {
+                f.build(kWallBuilding, 0, y, wall_owner);
+            }
+            f.start();
+            sim::Ship ship = sim::make_ship("Boat", 8, 15, 21, 0);
+            ship.cargo.resize(4);
+            ship.cargo[0] = sim::CargoSlot{25, 1600, 0};
+            f.world.add_ship(ship);
+            const std::uint32_t ship_id = f.world.ships().back().id;
+            const bool landed = f.military->unload(sim::UnloadOrder{0, ship_id});
+            if (original || wall_owner == 0) {
+                REQUIRE(landed);
+                REQUIRE(f.world.soldiers().size() == 1);
+                CHECK(f.world.soldiers()[0].cell_x() == 2 * 11);  // just behind the wall
+            } else {
+                CHECK(!landed);
+                CHECK(f.world.soldiers().empty());
+                CHECK(f.world.ship(ship_id)->cargo[0].ware == 25);  // they stay on board
+            }
+        }
+    }
 }
 
 TEST_CASE("military: a package's unit trains in a castle's place, goes on board and lands as itself") {
@@ -1057,6 +1094,36 @@ TEST_CASE("military: at most a fixed number of way searches per tick, the others
     }
 }
 
+TEST_CASE("military: units that search a lot never keep a later unit from its way for good (TB-1)") {
+    // The natives chase computer soldiers walled in by forest: every look of every warrior takes
+    // seven way searches that fail. A human's unit added after them still gets its way at once.
+    Field f;
+    f.start();
+    sim::IslandMap& map = f.world.island(0).map;
+    for (std::int32_t y = 2; y <= 8; ++y) {
+        for (std::int32_t x = 2; x <= 8; ++x) {
+            if (x == 2 || x == 8 || y == 2 || y == 8) {
+                REQUIRE(map.place(*f.buildings.by_id(kForest), x, y, 0, 0).ok());
+            }
+        }
+    }
+    f.start();  // the land map with the forest
+    f.war(2, 1);
+    for (std::int32_t i = 0; i < 9; ++i) {
+        f.add(kSword, 1, 2 * (10 + 4 + i % 3), 2 * (10 + 4 + i / 3));
+    }
+    for (std::int32_t i = 0; i < 60; ++i) {
+        f.add(kSword, 2, 2 * (10 + 10 + i % 10), 2 * (10 + 2 + i / 10));
+    }
+    f.run(3'000);  // the warriors have walked up and keep failing
+    const std::uint32_t id = f.add(kSword, 0, 2 * (10 + 25), 2 * (10 + 15)).id;
+    REQUIRE(f.military->order(sim::SoldierOrder{0, {id}, sim::Target::spot(2 * (10 + 28), 2 * (10 + 15))}));
+    f.run(200);
+    CHECK(!f.world.soldier(id)->motion.path.empty());
+    f.run(5'000);
+    CHECK(f.world.soldier(id)->cell_x() == 2 * (10 + 28));
+}
+
 TEST_CASE("military: idle units look again at times spread by their number (TB-1)") {
     Field f;
     f.start();
@@ -1128,7 +1195,8 @@ TEST_CASE("military: a battle of two armies develops the same on every platform 
     }
     f.run(45'000);
     CHECK(f.count(sim::MilitaryEvent::Kind::SoldierKilled) > 0);
-    test::check_golden("battle after 45 s", test::world_hash(f.world, f.buildings), 0xe7930b594ea8cc19ULL);
+    // Chasing leaves half the way searches of a tick to units with a way to go.
+    test::check_golden("battle after 45 s", test::world_hash(f.world, f.buildings), 0xab469661249e4857ULL);
 }
 
 namespace {

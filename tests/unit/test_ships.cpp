@@ -280,6 +280,15 @@ TEST_CASE("ships: damage and a full hold slow a ship down") {
     CHECK(fleet.speed_milli(*sea.world.ship(id)) == 1250);  // half speed
     sea.world.ship(id)->health = 25 * kTon;                 // half health on top: a third
     CHECK(fleet.speed_milli(*sea.world.ship(id)) == 833);
+    // A ship type its load does not slow (figures.toml `load_slowdown`, the large merchant ship's
+    // in Open1602) is slowed by damage only; half the slowdown is three quarters of the speed.
+    sea.world.ship(id)->health = 50 * kTon;
+    assets::FigureType* type = sea.figures.get(sea.world.ship(id)->figure);
+    REQUIRE(type != nullptr);
+    type->ship.load_slowdown = 0;
+    CHECK(fleet.speed_milli(*sea.world.ship(id)) == 2500);
+    type->ship.load_slowdown = 50;
+    CHECK(fleet.speed_milli(*sea.world.ship(id)) == 1666);
 }
 
 TEST_CASE("ships: an order onto land ends at the coast instead of being given up") {
