@@ -493,11 +493,11 @@ More than 1000 gold in debt with a falling purse, an improved computer cuts its 
 disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
 10 t of its ware in stock until the stock is down to 4 t.
 
-With less than 3000 gold, an improved computer locks the building material of a city (the city
+In debt, an improved computer locks the building material of a city (the city
 window's switch) while the city has no food left and makes too little, or lacks a good that its
 merchants or higher classes want and does not make enough of: houses that rise without their
 goods only lose their people again. The lock holds until the goods are back or the gold is above
-5000.
+3000.
 
 ## What they get from nowhere
 
