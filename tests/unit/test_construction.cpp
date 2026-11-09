@@ -324,7 +324,7 @@ TEST_CASE("construction: an island holds as many cities as the rules allow, beyo
     // The tile word of the original keeps three bits: the export refuses rather than cut the number.
     const auto chunks = sim::savegame_chunks(island.world, island.buildings);
     REQUIRE(!chunks.ok());
-    CHECK(chunks.error().code == core::ErrorCode::LimitExceeded);
+    CHECK(chunks.error().code == annokit::core::ErrorCode::LimitExceeded);
     CHECK(chunks.error().message.find("more than 7 cities") != std::string::npos);
     // Open1602's own file keeps it.
     const auto bytes = sim::write_game(island.world, island.buildings, nullptr, sim::SaveOptions{false});
