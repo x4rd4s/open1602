@@ -231,6 +231,8 @@ std::string limit_text(const editor::LimitProblem& p) {
             return ui::tr("editor.limit.island_size", {island, number(p.width), number(p.height), number(p.limit)});
         case Kind::Deposits:
             return ui::tr("editor.limit.deposits", {island, number(p.count), number(p.limit)});
+        case Kind::IslandCities:
+            return ui::tr("editor.limit.island_cities", {island, number(p.count), number(p.limit)});
         case Kind::PackageContent:
             return ui::tr("editor.limit.package_content");
         case Kind::PackageClasses:
@@ -1905,7 +1907,8 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     const auto problems = editor::original_limit_problems(world);
     for (const editor::LimitProblem& p : problems) {
         using LK = editor::LimitProblem::Kind;
-        const Line::Target target = p.kind == LK::IslandSize || p.kind == LK::Deposits   ? Line::Target::Island
+        const bool on_island = p.kind == LK::IslandSize || p.kind == LK::Deposits || p.kind == LK::IslandCities;
+        const Line::Target target = on_island                                            ? Line::Target::Island
                                     : p.kind == LK::MapSize                              ? Line::Target::WorldSize
                                     : p.kind == LK::Players || p.kind == LK::PiratePeace ? Line::Target::Players
                                                                                          : Line::Target::None;

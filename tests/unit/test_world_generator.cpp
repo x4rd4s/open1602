@@ -110,8 +110,17 @@ assets::BuildingTable make_buildings() {
     add(ids::kOuterCorner, 25, 1, -1);
     add(ids::kInnerCorner, 26, 1, -1);
     std::vector<std::uint32_t> grounds;
-    for (const auto& g : ids::kGroundMix) {
-        grounds.push_back(g.id);
+    for (std::uint8_t climate = 0; climate < 2; ++climate) {
+        const auto& dry = ids::dry_land(climate);
+        for (const auto& list :
+             {ids::meadow(climate), std::span<const ids::WeightedId>(dry.grass),
+              std::span<const ids::WeightedId>(dry.floor), std::span<const ids::WeightedId>(dry.scattered)}) {
+            for (const auto& g : list) {
+                if (g.weight > 0 && std::find(grounds.begin(), grounds.end(), g.id) == grounds.end()) {
+                    grounds.push_back(g.id);
+                }
+            }
+        }
     }
     if (std::find(grounds.begin(), grounds.end(), ids::kGround) == grounds.end()) {
         grounds.push_back(ids::kGround);

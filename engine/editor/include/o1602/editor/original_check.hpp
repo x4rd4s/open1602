@@ -26,6 +26,7 @@ struct LimitProblem {
         Players,          ///< players with a start
         IslandSize,       ///< an island wider or higher than the original's (`island`, `width`, `height`)
         Deposits,         ///< more deposits on an island (`island`, `count`, `limit`)
+        IslandCities,     ///< more cities on an island, or a city number beyond them (`island`, `count`, `limit`)
         PackageContent,   ///< buildings, figures or goods of a content package
         PackageClasses,   ///< classes of inhabitants or unlock levels of a content package
         PackageFactions,  ///< factions of a content package
@@ -36,14 +37,14 @@ struct LimitProblem {
     Kind kind = Kind::MapSize;
     std::size_t count = 0;
     std::size_t limit = 0;
-    std::size_t island = 0;  ///< IslandSize, Deposits: the island's index in World::islands()
+    std::size_t island = 0;  ///< IslandSize, Deposits, IslandCities: the island's index in World::islands()
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     friend bool operator==(const LimitProblem&, const LimitProblem&) = default;
 };
 
 /// Everything of `world` the original cannot have: the map's size, more islands, cities, ships,
-/// soldiers or towers, a larger island or more deposits on one, more than four players with a
+/// soldiers or towers, a larger island or more deposits or cities on one, more than four players with a
 /// start, anything of a content package, values of the balance changed, a script, a lasting peace
 /// with the pirates. Empty if it fits.
 [[nodiscard]] std::vector<LimitProblem> original_limit_problems(const sim::World& world);
