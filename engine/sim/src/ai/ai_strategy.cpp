@@ -432,6 +432,7 @@ void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
         }
         return false;
     };
+    const bool resting = st.war_ended_ms != 0 && now - st.war_ended_ms < kWarRestMs;
     const std::size_t players = m_world.players().size();
     std::uint32_t allies = 0;
     for (std::size_t bi = 0; bi < players; ++bi) {
@@ -489,8 +490,9 @@ void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
                 log(p, "asks its ally %u for help against player %u", a, x);
                 order(a, DiplomacyOrder::Kind::AskHelp, Treaty::None, x);
             }
-            // Its ally was attacked within the last half hour: it joins that war.
-            if (st.war_target == kNoPlayer && !broke && !d.allied(p.player, x) &&
+            // Its ally was attacked within the last half hour: it joins that war, unless it rests
+            // after a war of its own (as before a war plan).
+            if (st.war_target == kNoPlayer && !broke && !resting && !d.allied(p.player, x) &&
                 d.relation(p.player, x).peace != Treaty::None && declared_on(a, x, kHelpMs)) {
                 log(p, "joins its ally %u in the war on player %u", a, x);
                 start_war(p, x);

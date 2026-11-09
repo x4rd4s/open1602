@@ -498,7 +498,7 @@ mood falls below -10 or it plans a war on the ally. Allies are partners: a compu
 or attacks its ally, and its cities and troops on the computer's islands do not spoil the mood
 as a stranger's would. When a rival declares war on a computer, it asks each of its allies for help
 (a human ally gets a message); a computer whose ally had war declared on it within the last half
-hour joins that war with a war plan of its own, unless it fights one already, is short of gold
+hour joins that war with a war plan of its own, unless it fights one already, rests after a war of its own, is short of gold
 or is allied with the enemy too. Scripts see alliances in `game.relation` and `on_diplomacy`.
 
 More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
