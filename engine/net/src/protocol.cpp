@@ -140,6 +140,7 @@ void put(annokit::core::ByteWriter& out, const Lobby& m) {
     out.boolean(m.computer_takes_over);
     out.boolean(m.host_controls_speed);
     out.boolean(m.spectators_chat);
+    out.boolean(m.spectators_speed);
 }
 
 void put(annokit::core::ByteWriter& out, const TakeSeat& m) {
@@ -387,6 +388,7 @@ Lobby get_lobby(In& in) {
     m.computer_takes_over = in.boolean();
     m.host_controls_speed = in.boolean();
     m.spectators_chat = in.boolean();
+    m.spectators_speed = in.boolean();
     return m;
 }
 

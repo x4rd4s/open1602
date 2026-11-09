@@ -729,6 +729,7 @@ annokit::core::Status MapViewer::host_lobby(const HostSetup& setup) {
     config.spectators_chat = setup.spectators_chat;
     config.computer_takes_over = setup.computer_takes_over;
     config.host_controls_speed = setup.host_controls_speed;
+    config.spectators_speed = setup.spectators_speed;
     auto transport = annokit::net::enet_listen(setup.port);
     if (!transport) {
         return transport.error();

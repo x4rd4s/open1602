@@ -28,6 +28,7 @@ struct StartArea {
     std::uint32_t islands = 0;                       ///< islands within kStartReach
     std::uint64_t land = 0;                          ///< their tiles that are no water
     std::array<std::uint32_t, kStartCrops> crops{};  ///< of them fertile for each crop
+    std::uint32_t random_crops = 0;                  ///< of them rolling their crops at the start
     std::uint32_t ore = 0;                           ///< iron ore deposits on them
     std::uint32_t gold = 0;                          ///< gold deposits on them
     /// The distance to the nearest other start (the longer axis plus a quarter of the shorter, as

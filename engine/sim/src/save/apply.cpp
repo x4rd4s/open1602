@@ -267,6 +267,13 @@ annokit::core::Status apply_decoded(World& world, Decoded& d) {
     if (d.planned_islands) {
         world.set_planned_islands(std::move(d.planned_islands));
     }
+    if (d.random_fertility) {
+        for (std::size_t i = 0; i < world.islands().size(); ++i) {
+            WorldIsland& island = world.island(i);
+            island.random_fertility = std::find(d.random_fertility->begin(), d.random_fertility->end(),
+                                                island.header.number) != d.random_fertility->end();
+        }
+    }
     if (d.blueprints) {
         world.blueprints() = std::move(d.blueprints->blueprints);
         world.blueprint_auto() = std::move(d.blueprints->autos);

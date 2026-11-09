@@ -53,6 +53,7 @@ constexpr Id kMorePlayers = 54;
 constexpr Id kTakeOver = 55;
 constexpr Id kHostSpeed = 56;
 constexpr Id kSpectatorChat = 57;
+constexpr Id kSpectatorSpeed = 58;
 constexpr Id kListRow = 200;  ///< + row
 constexpr std::size_t kListRows = 11;
 // The lobby
@@ -653,9 +654,11 @@ void MultiplayerMenu::layout_create(const MultiplayerModel& model) {
     f.check(kTakeOver, Rect{668, 398, 304, 30}, tr(MpText::ComputerTakesOver), m_setup.computer_takes_over);
     f.check(kDedicated, Rect{668, 430, 304, 30}, tr(MpText::HostOnly), m_setup.dedicated);
     f.check(kHostSpeed, Rect{668, 462, 304, 30}, tr(MpText::HostControlsSpeed), m_setup.host_controls_speed);
+    f.check(kSpectatorSpeed, Rect{668, 494, 304, 30}, tr(MpText::SpectatorsSpeed), m_setup.spectators_speed,
+            m_setup.spectators && !m_setup.host_controls_speed);
     if (m_setup.kind != HostSetup::Kind::Savegame) {
         // A savegame keeps the settings it was started with; the lobby shows them.
-        settings_button(502, m_setup.game_settings(), true);
+        settings_button(532, m_setup.game_settings(), true);
     }
     f.label(Rect{664, 620, 150, 34}, tr(MpText::Port), Align::Left, Tone::Dim);
     f.field(kPort, Rect{820, 620, 152, 34}, m_port_text);
@@ -749,17 +752,18 @@ void MultiplayerMenu::layout_lobby(const MultiplayerModel& model) {
         f.entry(Rect{684, y, 292, 30}, tr(name), tr(on ? MpText::Yes : MpText::No), Tone::Dim);
     };
     setting(176, MpText::Password, lobby.password);
-    setting(208, MpText::AllowJoinRunning, lobby.join_running);
-    setting(240, MpText::AllowSpectators, lobby.spectators);
-    setting(272, MpText::AllowSpectatorChat, lobby.spectators && lobby.spectators_chat);
-    setting(304, MpText::ComputerTakesOver, lobby.computer_takes_over);
-    setting(336, MpText::HostControlsSpeed, lobby.host_controls_speed);
+    setting(206, MpText::AllowJoinRunning, lobby.join_running);
+    setting(236, MpText::AllowSpectators, lobby.spectators);
+    setting(266, MpText::AllowSpectatorChat, lobby.spectators && lobby.spectators_chat);
+    setting(296, MpText::ComputerTakesOver, lobby.computer_takes_over);
+    setting(326, MpText::HostControlsSpeed, lobby.host_controls_speed);
+    setting(356, MpText::SpectatorsSpeed, lobby.spectators && lobby.spectators_speed && !lobby.host_controls_speed);
     // The host's settings: the host changes them until the game starts, the others look at them.
-    std::int32_t y_free = 386;
+    std::int32_t y_free = 400;
     if (const auto settings = read_lobby_setup(lobby.setup)) {
-        settings_button(372, settings->first,
+        settings_button(392, settings->first,
                         model.hosting && !lobby.started && settings->second != SetupScope::Savegame);
-        y_free = 452;
+        y_free = 470;
     }
     if (lobby.spectators && me != sim::kNoPlayer) {
         f.button(kWatch, Rect{688, y_free, 284, 38}, tr(MpText::Watch));
@@ -1147,6 +1151,8 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
                 m_setup.computer_takes_over = !m_setup.computer_takes_over;
             } else if (id == kHostSpeed) {
                 m_setup.host_controls_speed = !m_setup.host_controls_speed;
+            } else if (id == kSpectatorSpeed) {
+                m_setup.spectators_speed = !m_setup.spectators_speed;
             } else if (id == kDedicated) {
                 m_setup.dedicated = !m_setup.dedicated;
             } else if (id == kSettings && m_setup.kind != Kind::Savegame) {

@@ -113,11 +113,30 @@ std::optional<PlayerId> take_banner(World& world, PlayerId who, BannerId banner)
 /// as the original makes them when the scenario starts: the scenario the world came from
 /// (World::source) with the plan as it is now, drawn as `start` says (from the plan's table, or
 /// with Open1602's generator if it has none). The world's description, markers and script are
-/// carried over. Fails for a world without a plan or without the scenario it came from.
+/// carried over. Fails for a world without a plan, and for one the original's chunks cannot hold
+/// that has no scenario of the original it came from.
 [[nodiscard]] annokit::core::Result<World> roll_planned_islands(const World& world, const assets::GameDirectory& game,
                                                                 const assets::BuildingTable& buildings,
                                                                 const WorldStart& start,
                                                                 std::vector<std::string>* warnings = nullptr);
+
+/// The plan a new map of the editor starts with: no islands yet, and the random elements of the
+/// original's endless game (its ores, crops, treasures and native villages), so that placeholders
+/// and random elements work on every map. Without the endless game the lists are empty.
+[[nodiscard]] PlannedIslands blank_plan(const assets::GameDirectory& game);
+
+/// Rolls the crops of every island marked "fertility at random" (WorldIsland::random_fertility):
+/// two crops of the island's climate, from `seed`, never sugar cane and wine together, and clears
+/// the mark. An island whose climate grows fewer gets all it grows.
+void roll_random_fertility(World& world, std::uint64_t seed);
+
+/// A scenario's world as a game of it starts: the islands of its plan made
+/// (roll_planned_islands) when it plans any, a plan without islands dropped, then the random
+/// fertilities rolled (roll_random_fertility) from `start.seed`.
+[[nodiscard]] annokit::core::Result<World> start_scenario(World world, const assets::GameDirectory& game,
+                                                          const assets::BuildingTable& buildings,
+                                                          const WorldStart& start,
+                                                          std::vector<std::string>* warnings = nullptr);
 
 /// Starts a new endless game: the scenario of new_game_scenario() with its islands made.
 [[nodiscard]] annokit::core::Result<World> start_new_game(const assets::GameDirectory& game,

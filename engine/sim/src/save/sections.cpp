@@ -166,6 +166,9 @@ constexpr std::uint32_t kEditorState = tag("EDIT");
 /// The plan of islands still to be made when the game starts (World::planned_islands()), only
 /// written for such a world. Required: without it the game would have no islands.
 constexpr std::uint32_t kPlannedIslands = tag("PLAN");
+/// The islands whose crops a game rolls when it starts (WorldIsland::random_fertility), by number,
+/// only written when there are any. Optional: without it the islands keep the crops they have.
+constexpr std::uint32_t kRandomFertility = tag("RFRT");
 /// The packages' climates (Balance::climates) and the islands that have one (WorldIsland::climate),
 /// only written when there are any. Required: crops would grow otherwise.
 constexpr std::uint32_t kClimates = tag("CLIM");
@@ -256,6 +259,7 @@ constexpr std::array kKnownSections = {kRules,
                                        kScenarioScript,
                                        kEditorState,
                                        kPlannedIslands,
+                                       kRandomFertility,
                                        kClimates,
                                        kComputerProducers,
                                        kComputerSlots};
@@ -1041,6 +1045,18 @@ void encode_sections(annokit::core::ByteWriter& out, const World& world, const a
     if (const auto& planned = world.planned_islands()) {
         section(out, kPlannedIslands, [&](Writer& o) { write_planned_islands(o, *planned); });
     }
+    if (std::any_of(world.islands().begin(), world.islands().end(),
+                    [](const WorldIsland& i) { return i.random_fertility; })) {
+        std::vector<std::uint16_t> numbers;
+        for (const WorldIsland& i : world.islands()) {
+            if (i.random_fertility) {
+                numbers.push_back(static_cast<std::uint16_t>(i.header.number));
+            }
+        }
+        section(
+            out, kRandomFertility, [&](Writer& o) { o.list(numbers, 2, [&](std::uint16_t n) { o.u16(n); }); },
+            Need::Optional);
+    }
     const auto has_groups = [](const UnitGroups& g) {
         return std::any_of(g.begin(), g.end(), [](const auto& members) { return !members.empty(); });
     };
@@ -1735,6 +1751,12 @@ annokit::core::Status apply_sections(World& world, const assets::BuildingTable& 
                 PlannedIslands planned;
                 read_planned_islands(in, planned);
                 d.planned_islands = std::move(planned);
+                break;
+            }
+            case kRandomFertility: {
+                std::vector<std::uint16_t> numbers;
+                in.list(numbers, 2, [&](std::uint16_t& n) { in.u16(n); });
+                d.random_fertility = std::move(numbers);
                 break;
             }
             case kUnitGroups: {

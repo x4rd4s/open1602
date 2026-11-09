@@ -1547,7 +1547,7 @@ TEST_CASE("editor panel: the dice preview shows a roll and only leads back to th
     panel.layout(m);
     bool roll_shown = false;
     for (const ui::Form::Widget& w : panel.form().widgets()) {
-        roll_shown = roll_shown || w.text == "Roll 1: 23 islands";
+        roll_shown = roll_shown || w.text == "Roll 1, islands: 23";
         CHECK(w.text != "Back to the rules");
         CHECK(w.rect.y + w.rect.h <= 760);
     }

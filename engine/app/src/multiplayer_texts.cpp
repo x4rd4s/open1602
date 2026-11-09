@@ -112,6 +112,7 @@ constexpr std::array kTexts = {
     Entry{MpText::Reconnecting, "net.reconnecting"},
     Entry{MpText::SpeedRefused, "net.speed_refused"},
     Entry{MpText::AllowSpectatorChat, "net.allow_spectator_chat"},
+    Entry{MpText::SpectatorsSpeed, "net.spectators_speed"},
     Entry{MpText::ChatAll, "net.chat_all"},
     Entry{MpText::ChatClose, "net.chat_close"},
     Entry{MpText::ChatToLabel, "net.chat_to_label"},

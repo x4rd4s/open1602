@@ -176,6 +176,7 @@ HostSession::HostSession(std::unique_ptr<annokit::net::Transport> transport, Cli
     m_config.computer_takes_over = client.m_lobby.computer_takes_over;
     m_config.host_controls_speed = client.m_lobby.host_controls_speed;
     m_config.spectators_chat = client.m_lobby.spectators_chat;
+    m_config.spectators_speed = client.m_lobby.spectators_speed;
     m_seat = client.m_seat;
     // The game goes on from this computer's frame. The frames the old host closed beyond it are
     // as good as any: every computer gets them with this game. What the others had beyond them
@@ -237,6 +238,7 @@ void HostSession::init_lobby() {
     m_lobby.host_controls_speed = m_config.host_controls_speed;
     m_lobby.spectators = m_config.spectators;
     m_lobby.spectators_chat = m_config.spectators_chat;
+    m_lobby.spectators_speed = m_config.spectators_speed;
     m_lobby.password = !m_config.password.empty();
     m_lobby.title.resize(std::min(m_lobby.title.size(), kMaxTitleLength));
     m_lobby.game.resize(std::min(m_lobby.game.size(), kMaxTitleLength));
@@ -256,7 +258,22 @@ HostSession::~HostSession() {
 }
 
 void HostSession::submit(sim::Command command) {
+    if (m_seat == sim::kNoPlayer) {
+        spectator_speed(std::move(command));
+        return;
+    }
     queue(m_seat, std::move(command));
+}
+
+bool HostSession::spectator_speed(sim::Command command) {
+    // A spectator plays no slot: its speed orders go in as the host's own insertions, for everyone.
+    auto* order = std::get_if<sim::GameSpeedOrder>(&command);
+    if (!started() || order == nullptr || !m_config.spectators_speed || m_config.host_controls_speed) {
+        return false;
+    }
+    order->player = sim::kNoPlayer;
+    insert(std::move(command));
+    return true;
 }
 
 void HostSession::queue(Seat from, sim::Command command) {
@@ -608,8 +625,17 @@ void HostSession::hello(Peer& peer, const Hello& m) {
 }
 
 void HostSession::commands(Peer& peer, CommandBatch& m) {
-    if (peer.seat == sim::kNoPlayer || peer.state == Peer::State::Greeting) {
-        return;  // spectators give no orders, and nobody without a game
+    if (peer.state == Peer::State::Greeting) {
+        return;  // nobody without a game
+    }
+    if (peer.seat == sim::kNoPlayer) {
+        // Spectators give no orders; the speed only if the game lets them, a few times a second.
+        for (sim::Command& c : m.commands) {
+            if (peer.game_orders < kMaxGameOrdersPerSecond && spectator_speed(std::move(c))) {
+                ++peer.game_orders;
+            }
+        }
+        return;
     }
     for (sim::Command& c : m.commands) {
         // Only the host hands slots to the computer (ADR 0011); everyone may pause, resume, set the

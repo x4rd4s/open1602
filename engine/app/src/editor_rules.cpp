@@ -119,7 +119,7 @@ void MapViewer::editor_roll() {
     std::random_device device;
     start.seed = (static_cast<std::uint64_t>(device()) << 32U) | device();
     std::vector<std::string> warnings;
-    auto rolled = sim::roll_planned_islands(plan, m_game, m_buildings, start, &warnings);
+    auto rolled = sim::start_scenario(plan, m_game, m_buildings, start, &warnings);
     if (!rolled) {
         editor_notice(ui::tr("editor.preview.failed", {ui::error_text(rolled.error(), "editor")}), true,
                       rolled.error().message);
