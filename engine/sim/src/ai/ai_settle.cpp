@@ -77,6 +77,49 @@ bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
     return true;
 }
 
+bool Engine::free_deposit(std::uint16_t island, std::uint8_t w) const {
+    // A vein of ore or gold left on the island that no city's land covers yet.
+    for (const auto& d : island_of(island).header.deposits) {
+        if (d.ware == w && d.amount > 0 && tile(island, d.x, d.y).city == MapCell::kNoCity) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
+    // Open1602, improved computers: an island with a city of a small rival (two cities at most),
+    // that the original's computers never settle, when it has what the colony looks for: the crop,
+    // or a free vein of ore or gold. Not next to a partner or an ally, not next to a rival stronger
+    // than itself, and never on an island with a city of its own.
+    const std::uint8_t crop = p.settle.crop;
+    if (!rivals() || p.pirates || crop == 0 || !knows_crops(p, island)) {
+        return false;
+    }
+    if ((crop == ware::kOre || crop == ware::kGold) && !free_deposit(island, crop)) {
+        return false;
+    }
+    const std::uint32_t own = strength(p.player);
+    bool contested = false;
+    for (const City& c : m_world.cities()) {
+        if (c.island != island) {
+            continue;
+        }
+        if (c.owner == p.player) {
+            return false;
+        }
+        if (!is_settler(c.owner) || own_city_count(c.owner) > 2) {
+            continue;
+        }
+        if (stance_of(p, c.owner) == stance::kPartner || m_world.diplomacy().allied(p.player, c.owner) ||
+            threat_of(c.owner) > own) {
+            return false;
+        }
+        contested = true;
+    }
+    return contested;
+}
+
 void Engine::pick_island(AiPlayer& p) {
     const auto n = static_cast<std::uint16_t>(m_world.islands().size());
     if (n == 0) {
@@ -174,11 +217,16 @@ void Engine::pick_island(AiPlayer& p) {
             return;
         }
         const std::uint16_t i = order.empty() ? s.cursor : order[s.cursor];
-        if (!island_allowed(p, i) || !knows_island(p, i) || left_lately(p, i)) {
+        if (!(island_allowed(p, i) || island_contested(p, i)) || !knows_island(p, i) || left_lately(p, i)) {
             continue;
         }
-        if (s.crop != 0 && (!knows_crops(p, i) || fertility(i, s.crop) != 128)) {
+        // Ore: a big or a small vein will do (as crop_available counts it); the rest grows fully.
+        if (s.crop != 0 &&
+            (!knows_crops(p, i) || (s.crop == ware::kOre ? fertility(i, s.crop) < 64 : fertility(i, s.crop) != 128))) {
             continue;
+        }
+        if (rivals() && (s.crop == ware::kOre || s.crop == ware::kGold) && !free_deposit(i, s.crop)) {
+            continue;  // every vein lies in someone's land already
         }
         if (island_size(i) < (p.cities <= 1 ? 2U : 1U)) {
             continue;
@@ -552,6 +600,18 @@ void Engine::task_settle_site(AiPlayer& p) {
     if (kontor == nullptr) {
         return;
     }
+    const bool vein = rivals() && !p.pirates && (s.crop == ware::kOre || s.crop == ware::kGold);
+    constexpr std::int32_t kVeinReach = 24;
+    constexpr std::int32_t kVeinBonus = 1 << 16;
+    const auto near_vein = [&](std::int32_t cx, std::int32_t cy) {
+        for (const auto& d : isl.header.deposits) {
+            if (d.ware == s.crop && d.amount > 0 && tile(island, d.x, d.y).city == MapCell::kNoCity &&
+                std::max(std::abs(std::int32_t{d.x} - cx), std::abs(std::int32_t{d.y} - cy)) <= kVeinReach) {
+                return true;
+            }
+        }
+        return false;
+    };
     // Candidates: Kontor sites on the beach around the region (the original walks straight beach
     // runs of at least four tiles; Open1602 lets the build rules decide what stands at the coast).
     struct Best {
@@ -629,7 +689,12 @@ void Engine::task_settle_site(AiPlayer& p) {
                 if (fish_first && !fisher_room(island, counts, cx, cy)) {
                     continue;
                 }
-                const std::int32_t g = green.count(cx - 32, cy - 32, cx + 32, cy + 32);
+                std::int32_t g = green.count(cx - 32, cy - 32, cx + 32, cy + 32);
+                // Open1602: a colony for ore or gold stands by a free vein, so that its market can
+                // take the mountain in.
+                if (vein && near_vein(cx, cy)) {
+                    g += kVeinBonus;
+                }
                 if (g > best.green) {
                     best = {item.x, item.y, item.rotation, g};
                 }
@@ -967,6 +1032,11 @@ bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
 
 std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     const std::uint8_t skip = p.settle.previous_crop;
+    // Open1602: an improved computer looks for what its goal needs first: gold for its
+    // aristocrats, ore to arm.
+    if (const std::uint8_t g = goal_crop(p); g != 0 && g != skip) {
+        return g;
+    }
     for (const std::uint8_t crop : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCocoaField,
                                     ware::kCottonField, ware::kSugarField}) {
         if (crop != skip && !crop_available(p, crop)) {
@@ -991,6 +1061,20 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
         if (pr.crop != skip && slot_present(p, pr.slot) == 0) {
             return pr.crop;
         }
+    }
+    return 0;
+}
+
+std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
+    // What the goal of an improved computer asks a colony for: gold or ore it has none of.
+    if (!rivals() || p.pirates) {
+        return 0;
+    }
+    if (p.strategy.goal == goal::kGold && !crop_available(p, ware::kGold)) {
+        return ware::kGold;
+    }
+    if (p.strategy.goal == goal::kMilitary && !crop_available(p, ware::kOre)) {
+        return ware::kOre;
     }
     return 0;
 }
@@ -1039,7 +1123,9 @@ bool Engine::wants_room(const AiPlayer& p) const {
     if (p.cities == 0 || p.max_stage < stage::kCitizens || p.settle.active) {
         return false;
     }
-    if (now_ms() - p.settle.last_ms < kRoomPauseMs || p.cities >= city_limit()) {
+    // Open1602: with land as its goal, an improved computer settles on after half the pause.
+    const std::uint64_t pause = rivals() && p.strategy.goal == goal::kLand ? kRoomPauseMs / 2 : kRoomPauseMs;
+    if (now_ms() - p.settle.last_ms < pause || p.cities >= city_limit()) {
         return false;
     }
     if (p.settle.ship != 0) {
@@ -1080,6 +1166,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     }
     if (mode >= 4) {
         wanted.push_back(ware::kGold);
+    }
+    if (const std::uint8_t g = goal_crop(p); g != 0) {
+        wanted.push_back(g);
     }
     bool all = true;
     for (const std::uint8_t crop : wanted) {
