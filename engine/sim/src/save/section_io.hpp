@@ -308,6 +308,9 @@ inline constexpr std::uint16_t kRouteWares = 3;
 /// SCOR version 2: the fight counters of the players are 32 bit, not 16 (LC-9). The writer takes it
 /// only when a counter needs it, so other games write the bytes of version 1 as before.
 inline constexpr std::uint16_t kWideScores = 2;
+/// DIPL version 2: every relation has the state of an alliance (Open1602) after the trade treaty.
+/// The writer takes it only when there is an alliance or an offer of one.
+inline constexpr std::uint16_t kDiplomacyAlliances = 2;
 /// GLDG version 2: the ledgers have the flow GoodsFlow::Withheld after the 16 of version 1. The
 /// writer takes it only when one booked it, so other games write the bytes of version 1 as before.
 inline constexpr std::uint16_t kLedgerWithheld = 2;
@@ -416,8 +419,10 @@ void write_missions(Writer& out, const World& w);
 [[nodiscard]] std::uint16_t scores_version(const World& w);
 void write_scores(Writer& out, const World& w, std::uint16_t version);
 [[nodiscard]] Decoded::ScorePart read_scores(Reader& in, std::uint16_t version);
-void write_diplomacy(Writer& out, const World& w);
-[[nodiscard]] Diplomacy read_diplomacy(Reader& in);
+/// The DIPL version a world needs: kDiplomacyAlliances only with an alliance or an offer of one.
+[[nodiscard]] std::uint16_t diplomacy_version(const World& w);
+void write_diplomacy(Writer& out, const World& w, std::uint16_t version);
+[[nodiscard]] Diplomacy read_diplomacy(Reader& in, std::uint16_t version);
 
 // cities.cpp: CITY, CSTA, MLCK, CPOP, PROD, HOUS, GROW, COST.
 void write_cities(Writer& out, const World& w);

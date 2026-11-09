@@ -315,6 +315,9 @@ constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     if (id == kScores) {
         return kWideScores;
     }
+    if (id == kDiplomacy) {
+        return kDiplomacyAlliances;
+    }
     if (id == kLedgers) {
         return kLedgerWithheld;
     }
@@ -972,7 +975,8 @@ void encode_sections(annokit::core::ByteWriter& out, const World& world, const a
     const std::uint16_t epochs_at = epochs_version(world);
     section(out, kEpochs, [&](Writer& o) { write_epochs(o, world, epochs_at); }, Need::Required, epochs_at);
     section(out, kArmy, [&](Writer& o) { write_army(o, world); });
-    section(out, kDiplomacy, [&](Writer& o) { write_diplomacy(o, world); });
+    const std::uint16_t diplomacy_at = diplomacy_version(world);
+    section(out, kDiplomacy, [&](Writer& o) { write_diplomacy(o, world, diplomacy_at); }, Need::Required, diplomacy_at);
     const std::uint16_t explored_at = explored_version(world);
     section(out, kExplored, [&](Writer& o) { write_explored(o, world, explored_at); }, Need::Required, explored_at);
     section(out, kQueues, [&](Writer& o) { write_queues(o, world); });
@@ -1841,7 +1845,7 @@ annokit::core::Status apply_sections(World& world, const assets::BuildingTable& 
                 d.army = read_army(in);
                 break;
             case kDiplomacy:
-                d.diplomacy = read_diplomacy(in);
+                d.diplomacy = read_diplomacy(in, version);
                 break;
             case kExplored:
                 d.explored = read_explored(in, version);

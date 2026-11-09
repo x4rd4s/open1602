@@ -129,6 +129,7 @@ three (one per hold of the ship, Open1602's page of a stop), the same record per
 `PSTA` version 3: version 2 with a boolean per player after the switches: the player closed his city gates to foreign soldiers (Open1602's own; the writer takes it only when a player did).
 `PSTA` version 4: version 3 with a u64 per player after the gates: who played it last (`Player::owner`, a verifier of the player ID of that person's installation, 0 for nobody; Open1602's own, the writer takes it only when a player has one).
 `PSTA` version 5: version 4 with a u8 per player after the owner: the cheats it unlocked with a code (`Player::cheats`: 0 none, 1 the code 2061, 2 the code 512, which also works with more than one person; the writer takes it only when a player has unlocked them).
+`DIPL` version 2: per player pair a u8 after the trade treaty: the alliance (Open1602's own, with improved computers only; 0 none, 1 offered, 2 received, 3 signed, as the treaties). The writer takes it only when there is an alliance or an offer of one.
 `XPLR` version 2: per deposit who knows it as a list of u32 words (u32 count, then the words; bit p of word w = player 32 w + p) instead of one u32 (`assets::SlotSet`; Open1602's own, the writer takes it only when a player beyond the 32nd knows a deposit, which a game of `sim::kMaxPlayers` = 12 never has).
 `MAPW` (own savegame only) version 2: see [o1602-save.md](o1602-save.md).
 

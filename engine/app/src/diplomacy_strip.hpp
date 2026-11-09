@@ -76,6 +76,7 @@ struct Offer {
     sim::PlayerId from = sim::kNoPlayer;
     bool trade = false;
     bool peace = false;
+    bool alliance = false;  ///< Open1602
     friend bool operator==(const Offer&, const Offer&) = default;
 };
 /// The open offers of the partners, by player number.

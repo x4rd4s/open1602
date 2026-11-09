@@ -163,7 +163,7 @@ void io(A& a, T& t)
 {
     a(t.player);
     a(t.partner);
-    a.enumeration(t.kind, DiplomacyOrder::Kind::AskFounding);
+    a.enumeration(t.kind, DiplomacyOrder::Kind::AskHelp);
     a.enumeration(t.value, Treaty::Signed);
     a(t.friendly);
     a(t.gold);

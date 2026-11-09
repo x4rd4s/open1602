@@ -405,6 +405,11 @@ diplomacy.offer.peace = {1} bietet Euch einen Friedensvertrag an
 diplomacy.offer.both = {1} bietet Euch einen Handels- und einen Friedensvertrag an
 diplomacy.wars = {1} führt Krieg gegen {2}
 diplomacy.no_wars = {1} lebt mit allen in Frieden
+diplomacy.alliance.offer = Bündnis anbieten
+diplomacy.alliance.withdraw = Bündnisangebot zurückziehen
+diplomacy.alliance.accept = Bündnis annehmen
+diplomacy.alliance.end = Verbündet - Bündnis kündigen
+diplomacy.alliance.help = Bündnis: Verbündete leben in Frieden; ein Computer hilft seinem Verbündeten, wenn man ihm den Krieg erklärt
 
 # Trade route editor: the row below the stops, and the stop the ship sails to now
 route.copy = Route kopieren
@@ -1107,6 +1112,10 @@ message.won.purple = Der violette Spieler konnte seinen Auftrag erfüllen!
 message.won.brown = Der braune Spieler konnte seinen Auftrag erfüllen!
 message.rival_war = Krieg: {1} gegen {2}
 message.rival_peace = Frieden: {1} und {2}
+message.alliance_offered = {1} bietet Euch ein Bündnis an
+message.alliance_signed = {1} ist nun Euer Verbündeter
+message.alliance_ended = {1} kündigt das Bündnis mit Euch
+message.help_asked = Euer Verbündeter {1} bittet um Hilfe gegen {2}
 message.ship_bought = {1} hat Euer Schiff {2} für {3} Taler gekauft
 
 # The game's folder, asked for at the start when none is found (in the system's dialogs, which may

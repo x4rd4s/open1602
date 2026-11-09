@@ -481,7 +481,28 @@ std::vector<Notice> EventPresenter::diplomacy_notices(const sim::World& world, s
     static constexpr std::array<std::uint16_t, 9> kMessages = {0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52, 0x49, 0x4A, 0x4B};
     std::vector<Notice> out;
     for (const sim::DiplomacyNotice& n : notices) {
-        if (n.to == local) {
+        if (n.to == local && n.kind >= sim::DiplomacyNotice::Kind::AllianceOffered) {
+            // Open1602's alliances: the peace treaty's messages with a text of their own, without voice.
+            const sim::Player* from = world.player(n.from);
+            if (from == nullptr) {
+                continue;
+            }
+            using K = sim::DiplomacyNotice::Kind;
+            const sim::Player* against = world.player(n.against);
+            Announcement a = announce(n.kind == K::AllianceEnded    ? 0x4D
+                                      : n.kind == K::AllianceSigned ? 0x4F
+                                                                    : 0x4E,
+                                      player_spot(world, n.from), n.from);
+            a.text = n.kind == K::HelpAsked
+                         ? ui::tr("message.help_asked",
+                                  {player_name(*from), against != nullptr ? player_name(*against) : std::string()})
+                         : ui::tr(n.kind == K::AllianceOffered  ? "message.alliance_offered"
+                                  : n.kind == K::AllianceSigned ? "message.alliance_signed"
+                                                                : "message.alliance_ended",
+                                  {player_name(*from)});
+            a.voice = false;
+            out.emplace_back(std::move(a));
+        } else if (n.to == local) {
             // An answer to a founding points at the computer's city on that island.
             const bool founding = n.kind == sim::DiplomacyNotice::Kind::FoundingProtest ||
                                   n.kind == sim::DiplomacyNotice::Kind::FoundingRefused ||

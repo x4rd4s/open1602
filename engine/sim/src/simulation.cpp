@@ -604,8 +604,12 @@ CommandResult Simulation::execute(const Command& command) {
     } else if (const auto* explore = std::get_if<ExploreOrder>(&command)) {
         result.accepted = m_fleet.explore(*explore);
     } else if (const auto* dipl = std::get_if<DiplomacyOrder>(&command)) {
-        result.accepted =
-            dipl->kind == DiplomacyOrder::Kind::AskFounding ? ask_founding(*dipl) : apply_diplomacy(*m_world, *dipl);
+        // Open1602's alliances come with the improved computers; the original's know none.
+        const bool alliance =
+            dipl->kind == DiplomacyOrder::Kind::Alliance || dipl->kind == DiplomacyOrder::Kind::AskHelp;
+        result.accepted = alliance && m_rules.bugs.classic_ai               ? false
+                          : dipl->kind == DiplomacyOrder::Kind::AskFounding ? ask_founding(*dipl)
+                                                                            : apply_diplomacy(*m_world, *dipl);
     } else if (const auto* soldiers = std::get_if<SoldierOrder>(&command)) {
         result.accepted = m_military.order(*soldiers);
     } else if (const auto* soldier = std::get_if<SoldierCommand>(&command)) {

@@ -593,6 +593,25 @@ TEST_CASE("ai arena: improved computers make peace with each other, the original
     }
 }
 
+TEST_CASE("ai arena: improved computers that like each other become allies, the original's never") {
+    for (const bool classic : {false, true}) {
+        Arena a;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        bool allied = false;
+        for (int minute = 0; minute < 10 && !allied; ++minute) {
+            // Gifts keep them fond of each other.
+            for (const auto [x, y] : {std::pair{kFirst, kSecond}, std::pair{kSecond, kFirst}}) {
+                a.world.diplomacy().relation(x, y).tribute = 20'000;
+            }
+            run(s, 60'000);
+            allied = a.world.diplomacy().allied(kFirst, kSecond);
+        }
+        CHECK(allied == !classic);
+    }
+}
+
 TEST_CASE("ai arena: improved computers draw a character and keep it through a save, the original's draw none") {
     for (const bool classic : {false, true}) {
         Arena a;
