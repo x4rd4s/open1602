@@ -184,6 +184,7 @@ void Engine::pick_island(AiPlayer& p) {
             }
         }
     }
+    const bool for_goal = s.crop != 0 && s.crop == goal_crop(p);
     for (std::uint32_t k = 0; k <= n; ++k) {
         s.cursor = static_cast<std::uint16_t>(s.cursor + 1);
         if (s.cursor >= n) {
@@ -217,12 +218,13 @@ void Engine::pick_island(AiPlayer& p) {
         if (!(island_allowed(p, i) || island_contested(p, i)) || !knows_island(p, i) || left_lately(p, i)) {
             continue;
         }
-        // Ore: a big or a small vein will do (as crop_available counts it); the rest grows fully.
-        if (s.crop != 0 &&
-            (!knows_crops(p, i) || (s.crop == ware::kOre ? fertility(i, s.crop) < 64 : fertility(i, s.crop) != 128))) {
+        // A colony for the goal's ore takes a small vein too (as crop_available counts it), if it is
+        // free; the rest grows fully.
+        if (s.crop != 0 && (!knows_crops(p, i) || (for_goal && s.crop == ware::kOre ? fertility(i, s.crop) < 64
+                                                                                    : fertility(i, s.crop) != 128))) {
             continue;
         }
-        if (rivals() && (s.crop == ware::kOre || s.crop == ware::kGold) && !free_deposit(i, s.crop)) {
+        if (for_goal && !free_deposit(i, s.crop)) {
             continue;  // every vein lies in someone's land already
         }
         if (island_size(i) < (p.cities <= 1 ? 2U : 1U)) {
@@ -597,7 +599,7 @@ void Engine::task_settle_site(AiPlayer& p) {
     if (kontor == nullptr) {
         return;
     }
-    const bool vein = rivals() && !p.pirates && (s.crop == ware::kOre || s.crop == ware::kGold);
+    const bool vein = s.crop != 0 && s.crop == goal_crop(p);
     constexpr std::int32_t kVeinReach = 24;
     constexpr std::int32_t kVeinBonus = 1 << 16;
     const auto near_vein = [&](std::int32_t cx, std::int32_t cy) {
