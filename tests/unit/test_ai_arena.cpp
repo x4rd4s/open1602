@@ -570,8 +570,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // with a little chance. The military's state version 4 (the unit that goes first); chasing
         // leaves half the way searches of a tick to units with a way to go; up to 16 cities on an island
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
-        // computers without the original's gifts, setting their own taxes, moving on with less gold.
-        test::check_golden("arena after an hour", s.state_hash(), 0x2f7bca8a23e391aaULL);
+        // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
+        // their ships saw.
+        test::check_golden("arena after an hour", s.state_hash(), 0xd493b0324d37d1a9ULL);
     }
 }
 
