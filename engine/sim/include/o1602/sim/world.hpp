@@ -83,6 +83,9 @@ struct WorldIsland {
     std::uint8_t climate = 0;
     /// Players who know the island: a ship of theirs came close.
     std::vector<bool> discovered{};
+    /// The editor's "fertility at random": a game of the scenario rolls the island's crops when it
+    /// starts (roll_random_fertility, new_game.hpp), which clears the mark.
+    bool random_fertility = false;
 
     /// Players who explored the island's crops with a ship.
     std::vector<bool> explored{};

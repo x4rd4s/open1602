@@ -71,6 +71,25 @@ private:
                                                                               std::size_t index,
                                                                               std::uint32_t fertility);
 
+/// An island's "fertility at random" (sim::WorldIsland::random_fertility) turned on or off.
+class RandomFertilityEdit final : public Operation {
+public:
+    RandomFertilityEdit(std::size_t island, bool after) noexcept : m_island(island), m_after(after) {}
+    void apply(sim::World& world) override;
+    void revert(sim::World& world) override;
+    [[nodiscard]] std::size_t memory() const noexcept override { return sizeof(*this); }
+    [[nodiscard]] std::string_view kind() const noexcept override { return "island_random_fertility"; }
+
+private:
+    std::size_t m_island;
+    bool m_after;
+};
+
+/// The island `index` rolls its crops when a game starts (`on`), or keeps those it has; an error
+/// if there is no such island or nothing changes.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_random_fertility(const sim::World& world,
+                                                                                     std::size_t index, bool on);
+
 // Placeholders: the islands of a world plan (sim::PlannedIslands), made when a game of the world
 // starts. Only a world that has a plan has them (a scenario of the original that makes its islands).
 

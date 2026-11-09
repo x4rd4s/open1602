@@ -178,6 +178,7 @@ constexpr Id kEffectsLess = 295;
 constexpr Id kEffectsSlider = 296;
 constexpr Id kEffectsMore = 297;
 constexpr Id kSoundTest = 298;
+constexpr Id kRandomFertility = 299;  ///< the selected island's crops rolled at the start, or not
 /// A click on "-" or "+" beside a volume: a twentieth of the slider.
 constexpr std::uint32_t kVolumeStep = EditorModel::kVolumeRange / 20;
 constexpr Id kCheckLine = 800;         ///< + the line of the check list (a line that leads somewhere)
@@ -1723,17 +1724,23 @@ void EditorPanel::layout_fertility(const EditorModel& model) {
     y += 28;
     f.label(Rect{m_x, y, m_w, kLine}, model.selection);
     y += kLine + 4;
+    f.check(kRandomFertility, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.fertility.random"),
+            model.island_random_fertility);
+    y += kButtonH + kGap;
     for (std::size_t i = 0; i < kCropTexts.size(); ++i) {
         std::string text = ui::tr(kCropTexts[i]);
         const bool own = (model.island_fertility >> (kCropWares[i] - assets::ware::kCornField) & 1U) != 0;
         if (!own && (model.island_crops >> (kCropWares[i] - assets::ware::kCornField) & 1U) != 0) {
             text = ui::tr("editor.fertility.half", {text});
         }
-        f.check(kFirstCrop + static_cast<Id>(i), Rect{m_x, y, m_w, kButtonH}, std::move(text), own);
+        f.check(kFirstCrop + static_cast<Id>(i), Rect{m_x, y, m_w, kButtonH}, std::move(text), own,
+                !model.island_random_fertility);
         y += kButtonH + kGap;
     }
     constexpr std::int32_t kFertilityNote = 4 * 20;
-    f.paragraph(Rect{m_x, y, m_w, kFertilityNote}, ui::tr("editor.fertility.note"), Tone::Dim, 20);
+    f.paragraph(Rect{m_x, y, m_w, kFertilityNote},
+                ui::tr(model.island_random_fertility ? "editor.fertility.random_note" : "editor.fertility.note"),
+                Tone::Dim, 20);
     y += kFertilityNote + 4;
     f.button(kSelectionPage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.fertility.back"));
 }
@@ -3608,8 +3615,17 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         r.index = model.player_slots[b].slot;
         return r;
     }
-    if (*id >= kFirstCrop && *id < kFirstCrop + static_cast<Id>(kCropTexts.size())) {
+    if (*id == kRandomFertility) {
         if (!model.island) {
+            return std::nullopt;
+        }
+        EditorRequest r{EditorRequest::Kind::SetRandomFertility};
+        r.index = *model.island;
+        r.fertility = model.island_random_fertility ? 0U : 1U;
+        return r;
+    }
+    if (*id >= kFirstCrop && *id < kFirstCrop + static_cast<Id>(kCropTexts.size())) {
+        if (!model.island || model.island_random_fertility) {
             return std::nullopt;
         }
         const auto i = static_cast<std::size_t>(*id - kFirstCrop);

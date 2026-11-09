@@ -14,6 +14,7 @@
 
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/scenario.hpp"
+#include "o1602/sim/climates.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/savegame_extension.hpp"
@@ -518,10 +519,6 @@ annokit::core::Result<World> roll_planned_islands(const World& world, const asse
     if (!planned) {
         return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "the world plans no islands");
     }
-    if (world.source() == nullptr) {
-        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
-                                         "the islands of the plan need the scenario of the original it came from");
-    }
     if (const auto problems = check_planned_islands(*planned, world.width(), world.height()); !problems.empty()) {
         return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "world plan: " + problems.front());
     }
@@ -537,11 +534,14 @@ annokit::core::Result<World> roll_planned_islands(const World& world, const asse
             table.push_back(static_cast<std::uint8_t>(v >> 8U));
         }
     }
-    const assets::ChunkFile& source = *world.source();
+    // A new map of the editor has no scenario of the original: its plan is written into an empty
+    // SZENE.
     std::span<const std::uint8_t> szene;
-    for (const assets::Chunk& c : source.chunks()) {
-        if (c.name == "SZENE") {
-            szene = source.payload(c);
+    if (world.source() != nullptr) {
+        for (const assets::Chunk& c : world.source()->chunks()) {
+            if (c.name == "SZENE") {
+                szene = world.source()->payload(c);
+            }
         }
     }
     assets::ChunkWriter out;
@@ -570,9 +570,15 @@ annokit::core::Result<World> roll_planned_islands(const World& world, const asse
             out.add(c.name, saved_file->payload(c));
         }
     } else {
+        if (world.source() == nullptr) {
+            return annokit::core::make_error(
+                annokit::core::ErrorCode::Unsupported,
+                "the islands of the plan need a world the original's files can hold: " + saved_file.error().message);
+        }
         if (warnings != nullptr) {
             warnings->push_back("the world starts from the original's scenario: " + saved_file.error().message);
         }
+        const assets::ChunkFile& source = *world.source();
         for (const assets::Chunk& c : source.chunks()) {
             if (c.name != "SZENE" && c.name != "RANDTAB") {
                 out.add(c.name, source.payload(c));
@@ -599,10 +605,81 @@ annokit::core::Result<World> roll_planned_islands(const World& world, const asse
     rolled->set_scenario_info(world.scenario_info());
     rolled->set_markers(world.markers());
     rolled->set_scenario_script(world.scenario_script());
+    for (const WorldIsland& before : world.islands()) {
+        if (!before.random_fertility) {
+            continue;
+        }
+        for (std::size_t i = 0; i < rolled->islands().size(); ++i) {
+            if (rolled->islands()[i].header.number == before.header.number) {
+                rolled->island(i).random_fertility = true;
+            }
+        }
+    }
     if (const auto problems = check_markers(rolled->markers(), rolled->width(), rolled->height()); !problems.empty()) {
         return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "scenario: " + problems.front());
     }
     return rolled;
+}
+
+PlannedIslands blank_plan(const assets::GameDirectory& game) {
+    PlannedIslands planned;
+    if (const auto endless = find_endless_file(game, 0, 0)) {
+        if (const auto file = assets::ChunkFile::load(endless->path)) {
+            if (auto plan = assets::load_scenario_plan(*file); plan && plan->has_value()) {
+                planned.plan = std::move(**plan);
+                planned.plan.islands.clear();
+            }
+        }
+    }
+    return planned;
+}
+
+void roll_random_fertility(World& world, std::uint64_t seed) {
+    PlanRandom random(seed ^ 0xF3F7'11A5'0000'0000ULL);
+    const std::uint32_t sugar = 1U << (assets::ware::kSugarField - assets::ware::kCornField);
+    const std::uint32_t wine = 1U << (assets::ware::kWineField - assets::ware::kCornField);
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        WorldIsland& island = world.island(i);
+        if (!island.random_fertility) {
+            continue;
+        }
+        island.random_fertility = false;
+        const std::uint32_t crops = island.climate != 0 && island.climate <= world.balance().climates.size()
+                                        ? world.balance().climates[island.climate - 1U].crops
+                                        : original_climate_crops(island.header.climate % 2U);
+        std::uint32_t chosen = 0;
+        for (int pick = 0; pick < 2; ++pick) {
+            std::vector<std::uint32_t> candidates;
+            for (unsigned bit = 0; bit < 32; ++bit) {
+                const std::uint32_t b = 1U << bit;
+                const bool clash = (b == sugar && (chosen & wine) != 0) || (b == wine && (chosen & sugar) != 0);
+                if ((crops & b) != 0 && (chosen & b) == 0 && !clash) {
+                    candidates.push_back(b);
+                }
+            }
+            if (candidates.empty()) {
+                break;
+            }
+            chosen |= candidates[random.below(static_cast<std::uint32_t>(candidates.size()))];
+        }
+        island.header.fertility = chosen;
+    }
+}
+
+annokit::core::Result<World> start_scenario(World world, const assets::GameDirectory& game,
+                                            const assets::BuildingTable& buildings, const WorldStart& start,
+                                            std::vector<std::string>* warnings) {
+    if (const auto& planned = world.planned_islands(); planned && !planned->plan.islands.empty()) {
+        auto rolled = roll_planned_islands(world, game, buildings, start, warnings);
+        if (!rolled) {
+            return rolled.error();
+        }
+        world = std::move(rolled).value();
+    } else if (planned) {
+        world.set_planned_islands(std::nullopt);  // nothing to make: the game needs no plan
+    }
+    roll_random_fertility(world, start.seed);
+    return world;
 }
 
 }  // namespace o1602::sim

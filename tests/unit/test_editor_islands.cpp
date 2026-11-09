@@ -392,6 +392,21 @@ TEST_CASE("editor islands: the crops an island grows are one step") {
     CHECK(document.world().islands()[1].header.fertility == before);
 }
 
+TEST_CASE("editor islands: an island rolls its crops at the start, a step that can be undone") {
+    const auto buildings = make_buildings();
+    editor::Document document(make_world(buildings));
+    auto op = editor::set_random_fertility(document.world(), 1, true);
+    REQUIRE(op.ok());
+    document.perform(std::move(op).value());
+    CHECK(document.world().islands()[1].random_fertility);
+    CHECK(!document.world().islands()[0].random_fertility);
+    CHECK(document.history().next_undo() == "island_random_fertility");
+    CHECK(!editor::set_random_fertility(document.world(), 1, true).ok());  // nothing changes
+    CHECK(!editor::set_random_fertility(document.world(), 5, true).ok());
+    CHECK(document.undo());
+    CHECK(!document.world().islands()[1].random_fertility);
+}
+
 TEST_CASE("editor islands: an island saved alone comes back with its tiles, without who knew it") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings);
