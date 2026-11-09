@@ -11,8 +11,9 @@
 #include <memory>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -40,8 +41,8 @@ struct RandomElement {
 
 /// The entry `slot` of `kind` given at random `count` times. Fails (NotFound) for a world without a
 /// plan or an entry that names nothing, (InvalidFormat) beyond kMaxRandom.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_random_count(const sim::World& world,
-                                                                        RandomElement::Kind kind, std::size_t slot,
-                                                                        std::uint32_t count);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_random_count(const sim::World& world,
+                                                                                 RandomElement::Kind kind,
+                                                                                 std::size_t slot, std::uint32_t count);
 
 }  // namespace o1602::editor

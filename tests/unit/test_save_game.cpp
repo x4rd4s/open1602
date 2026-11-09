@@ -12,8 +12,9 @@
 #include "../test_framework.hpp"
 #include "golden.hpp"
 
+#include "annokit/core/compress.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
-#include "o1602/core/compress.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/simulation.hpp"
@@ -127,7 +128,7 @@ TEST_CASE("save game: a world beyond the original's limits comes back whole") {
     auto info = sim::save_info(*bytes);
     REQUIRE(info.ok());
     CHECK(info->version == 1);
-    CHECK(info->compressed == core::has_zlib());
+    CHECK(info->compressed == annokit::core::has_zlib());
     // The list of savegames reads META from the head of the file (without zlib, packed files have none).
     REQUIRE(info->meta.has_value());
     CHECK(info->meta->width == 900);
@@ -195,7 +196,7 @@ TEST_CASE("save game: a world beyond the original's limits comes back whole") {
 namespace {
 
 /// The version of the first section `tag` in an unpacked save (header of 32 bytes, then sections).
-std::uint16_t section_version(const core::Bytes& bytes, std::string_view tag) {
+std::uint16_t section_version(const annokit::core::Bytes& bytes, std::string_view tag) {
     std::size_t at = 32;
     while (at + 12 <= bytes.size()) {
         const std::string_view id(reinterpret_cast<const char*>(bytes.data() + at), 4);
@@ -409,7 +410,7 @@ TEST_CASE("save game: craters and deer spots beyond 255 tiles come back whole (S
     // instead of cutting x = 280 down to 24.
     auto chunks = sim::savegame_chunks(world, buildings);
     REQUIRE(!chunks.ok());
-    CHECK(chunks.error().code == core::ErrorCode::LimitExceeded);
+    CHECK(chunks.error().code == annokit::core::ErrorCode::LimitExceeded);
     CHECK(chunks.error().message.find("255") != std::string::npos);
     CHECK(!sim::write_savegame(world, buildings).ok());
 }
@@ -420,22 +421,22 @@ TEST_CASE("save game: a damaged, cut off or newer file loads nothing") {
     auto bytes = sim::write_game(world, buildings, nullptr, sim::SaveOptions{false});
     REQUIRE(bytes.ok());
     // One byte of the data changed: the checksum catches it.
-    core::Bytes damaged = *bytes;
+    annokit::core::Bytes damaged = *bytes;
     damaged[damaged.size() / 2] ^= 0x40;
     auto r1 = sim::read_game(damaged, buildings);
     CHECK(!r1.ok());
     // Cut off.
-    core::Bytes cut(bytes->begin(), bytes->end() - 100);
+    annokit::core::Bytes cut(bytes->begin(), bytes->end() - 100);
     CHECK(!sim::read_game(cut, buildings).ok());
-    CHECK(!sim::read_game(core::Bytes(bytes->begin(), bytes->begin() + 20), buildings).ok());
+    CHECK(!sim::read_game(annokit::core::Bytes(bytes->begin(), bytes->begin() + 20), buildings).ok());
     // A newer format.
-    core::Bytes newer = *bytes;
+    annokit::core::Bytes newer = *bytes;
     newer[8] = 2;
     auto r3 = sim::read_game(newer, buildings);
     REQUIRE(!r3.ok());
-    CHECK(r3.error().code == core::ErrorCode::Unsupported);
+    CHECK(r3.error().code == annokit::core::ErrorCode::Unsupported);
     // Not a savegame at all.
-    CHECK(!sim::is_open1602_save(core::Bytes(64, 0)));
+    CHECK(!sim::is_open1602_save(annokit::core::Bytes(64, 0)));
     // A building the game's data does not have.
     const auto without_house = make_buildings(false);
     auto r4 = sim::read_game(*bytes, without_house);
@@ -443,33 +444,33 @@ TEST_CASE("save game: a damaged, cut off or newer file loads nothing") {
 }
 
 TEST_CASE("save game: unpacking follows the data, not what the header promises") {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         SKIP("no zlib");
     }
     std::vector<std::uint8_t> data(3'000'000);
     for (std::size_t i = 0; i < data.size(); ++i) {
         data[i] = static_cast<std::uint8_t>(i * 7 / 1000);
     }
-    auto packed = core::zlib_deflate(data);
+    auto packed = annokit::core::zlib_deflate(data);
     REQUIRE(packed.ok());
-    auto back = core::zlib_inflate(*packed, data.size());
+    auto back = annokit::core::zlib_inflate(*packed, data.size());
     REQUIRE(back.ok());
     CHECK(*back == data);
-    CHECK(!core::zlib_inflate(*packed, data.size() - 1).ok());  // more data than promised
-    CHECK(!core::zlib_inflate(*packed, data.size() + 1).ok());  // less
+    CHECK(!annokit::core::zlib_inflate(*packed, data.size() - 1).ok());  // more data than promised
+    CHECK(!annokit::core::zlib_inflate(*packed, data.size() + 1).ok());  // less
     const std::vector<std::uint8_t> cut(packed->begin(), packed->end() - 10);
-    CHECK(!core::zlib_inflate(cut, data.size()).ok());
+    CHECK(!annokit::core::zlib_inflate(cut, data.size()).ok());
     // A 2 GiB promise from a few bytes is refused before anything is allocated.
-    CHECK(!core::zlib_inflate(std::span(packed->data(), 33), std::size_t{1} << 31).ok());
+    CHECK(!annokit::core::zlib_inflate(std::span(packed->data(), 33), std::size_t{1} << 31).ok());
     // The fastest level (large games) is read the same way.
-    auto fast = core::zlib_deflate(data, 1);
+    auto fast = annokit::core::zlib_deflate(data, 1);
     REQUIRE(fast.ok());
-    auto fast_back = core::zlib_inflate(*fast, data.size());
+    auto fast_back = annokit::core::zlib_inflate(*fast, data.size());
     REQUIRE(fast_back.ok());
     CHECK(*fast_back == data);
-    auto empty = core::zlib_deflate({});
+    auto empty = annokit::core::zlib_deflate({});
     REQUIRE(empty.ok());
-    auto none = core::zlib_inflate(*empty, 0);
+    auto none = annokit::core::zlib_inflate(*empty, 0);
     REQUIRE(none.ok());
     CHECK(none->empty());
 }
@@ -477,7 +478,7 @@ TEST_CASE("save game: unpacking follows the data, not what the header promises")
 TEST_CASE("save game: a list grows with the records the data holds, not with its count") {
     // A count of a million records of 2 bytes each, followed by three bytes.
     const std::vector<std::uint8_t> data = {0x40, 0x42, 0x0F, 0x00, 1, 0, 2};
-    core::ByteReader reader(data);
+    annokit::core::ByteReader reader(data);
     sim::StateIn in(reader);
     std::vector<std::uint64_t> list;
     in.list(list, 2, [&](std::uint64_t& v) { v = in.u16(); });
@@ -485,7 +486,7 @@ TEST_CASE("save game: a list grows with the records the data holds, not with its
     CHECK(list.empty());  // the count does not fit: nothing is allocated
 
     const std::vector<std::uint8_t> two = {2, 0, 0, 0, 5, 0, 6, 0};
-    core::ByteReader reader2(two);
+    annokit::core::ByteReader reader2(two);
     sim::StateIn in2(reader2);
     in2.list(list, 2, [&](std::uint64_t& v) { v = in2.u16(); });
     CHECK(in2.ok());
@@ -504,7 +505,7 @@ TEST_CASE("save game: an island far outside the world or a world beyond the limi
     CHECK(world.islands().empty());
 
     // MAPW naming a world of 65535 x 65535 tiles (25 GB): refused, nothing allocated.
-    core::ByteWriter sections;
+    annokit::core::ByteWriter sections;
     sections.bytes(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>("MAPW"), 4));
     sections.u16(1);
     sections.u16(0);
@@ -512,17 +513,17 @@ TEST_CASE("save game: an island far outside the world or a world beyond the limi
     sections.u32(0xFFFF);
     sections.u32(0xFFFF);
     sections.u32(0);
-    const core::Bytes body = sections.take();
-    core::ByteWriter file;
+    const annokit::core::Bytes body = sections.take();
+    annokit::core::ByteWriter file;
     file.bytes(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>("OPEN1602"), 8));
     file.u16(1);
     file.u16(0);
     file.u32(0);
     file.u64(body.size());
-    file.u32(core::crc32(body));
+    file.u32(annokit::core::crc32(body));
     file.u32(static_cast<std::uint32_t>(body.size()));
     file.bytes(body);
-    const core::Bytes bytes = file.take();
+    const annokit::core::Bytes bytes = file.take();
     auto loaded = sim::read_game(bytes, buildings);
     REQUIRE(!loaded.ok());
     CHECK(loaded.error().message.find("world size") != std::string::npos);
@@ -582,13 +583,13 @@ TEST_CASE("save game: a damaged state of the running game is refused when loadin
 
     // The version of the SIMU section (its first two bytes) made unknown, the checksum made right.
     constexpr std::size_t kHeader = 32;
-    core::Bytes damaged = *bytes;
+    annokit::core::Bytes damaged = *bytes;
     const std::string_view text(reinterpret_cast<const char*>(damaged.data()), damaged.size());
     const std::size_t at = text.find("SIMU", kHeader);
     REQUIRE(at != std::string_view::npos);
     damaged[at + 12] = 0x63;
     damaged[at + 13] = 0;
-    const std::uint32_t crc = core::crc32(std::span(damaged).subspan(kHeader));
+    const std::uint32_t crc = annokit::core::crc32(std::span(damaged).subspan(kHeader));
     for (std::size_t b = 0; b < 4; ++b) {
         damaged[24 + b] = static_cast<std::uint8_t>(crc >> (8 * b));
     }
@@ -604,16 +605,16 @@ TEST_CASE("save game: a damaged state of the running game is refused when loadin
 
 namespace {
 
-core::Bytes stored_save(int version) {
+annokit::core::Bytes stored_save(int version) {
     const std::filesystem::path path =
         std::filesystem::path(O1602_TEST_SAVES) / ("simu-v" + std::to_string(version) + ".o1602");
     std::ifstream in(path, std::ios::binary);
     REQUIRE(in.good());
-    return core::Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    return annokit::core::Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
 /// Where the part `name` of the running game's state starts in a savegame written unpacked, or 0.
-std::size_t part_at(const core::Bytes& bytes, std::string_view name) {
+std::size_t part_at(const annokit::core::Bytes& bytes, std::string_view name) {
     const std::string_view text(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     const std::size_t simu = text.find("SIMU", 32);
     const std::size_t at = simu == std::string_view::npos ? simu : text.find(name, simu);
@@ -621,9 +622,9 @@ std::size_t part_at(const core::Bytes& bytes, std::string_view name) {
 }
 
 /// The checksum of an unpacked savegame made right after its sections were changed.
-void fix_crc(core::Bytes& bytes) {
+void fix_crc(annokit::core::Bytes& bytes) {
     constexpr std::size_t kHeader = 32;
-    const std::uint32_t crc = core::crc32(std::span(bytes).subspan(kHeader));
+    const std::uint32_t crc = annokit::core::crc32(std::span(bytes).subspan(kHeader));
     for (std::size_t b = 0; b < 4; ++b) {
         bytes[24 + b] = static_cast<std::uint8_t>(crc >> (8 * b));
     }
@@ -632,7 +633,7 @@ void fix_crc(core::Bytes& bytes) {
 }  // namespace
 
 TEST_CASE("save game: games of every earlier state version load and run on as they did (DS-3)") {
-    if (!core::has_zlib()) {
+    if (!annokit::core::has_zlib()) {
         return;  // the stored games are packed
     }
     // tests/unit/saves: the same small game saved by Open1602 with SIMU state versions 1 to 6 (the
@@ -641,7 +642,7 @@ TEST_CASE("save game: games of every earlier state version load and run on as th
     const auto buildings = make_buildings();
     const assets::FigureTable figures;
     for (int version = 1; version <= 6; ++version) {
-        const core::Bytes bytes = stored_save(version);
+        const annokit::core::Bytes bytes = stored_save(version);
         auto loaded = sim::read_game(bytes, buildings, nullptr, &figures);
         REQUIRE(loaded.ok());
         // Saved again before it runs: the state goes through as it came and still loads.
@@ -683,7 +684,7 @@ TEST_CASE("save game: a part of the state from a later Open1602 is skipped if op
 
     // The computers' plans of a later version (part header: tag, then the u16 version): the game
     // loads, and the computers look at the world anew.
-    core::Bytes later_ai = *bytes;
+    annokit::core::Bytes later_ai = *bytes;
     const std::size_t ai = part_at(later_ai, "AIST");
     REQUIRE(ai != 0);
     later_ai[ai + 4] = 0x63;
@@ -695,7 +696,7 @@ TEST_CASE("save game: a part of the state from a later Open1602 is skipped if op
     CHECK(!started.state_damaged());
 
     // The figures of a later version are required: the file is refused and says why.
-    core::Bytes later_walkers = *bytes;
+    annokit::core::Bytes later_walkers = *bytes;
     const std::size_t walkers = part_at(later_walkers, "LOGI");
     REQUIRE(walkers != 0);
     later_walkers[walkers + 4] = 0x63;
@@ -706,7 +707,7 @@ TEST_CASE("save game: a part of the state from a later Open1602 is skipped if op
     CHECK(refused.error().message.find("LOGI (version 99) needs a newer Open1602") != std::string::npos);
 
     // A part's body that holds more than its reader takes is damage, not something to pass over.
-    core::Bytes longer = *bytes;
+    annokit::core::Bytes longer = *bytes;
     const std::size_t military = part_at(longer, "MILI");
     REQUIRE(military != 0);
     longer[military + 4] = 2;  // version 2 reads two of the three clocks

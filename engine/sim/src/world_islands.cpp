@@ -12,8 +12,8 @@
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -84,7 +84,7 @@ World::IslandUse World::island_use(std::size_t index) const {
     return IslandUse::None;
 }
 
-core::Status World::place_islands(const assets::BuildingTable* buildings) {
+annokit::core::Status World::place_islands(const assets::BuildingTable* buildings) {
     std::fill(m_cells.begin(), m_cells.end(), Cell{});
     std::vector<bool> taken;
     for (std::size_t i = 0; i < m_islands.size(); ++i) {
@@ -102,11 +102,11 @@ core::Status World::place_islands(const assets::BuildingTable* buildings) {
             }
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::move_island(std::size_t index, std::uint32_t x, std::uint32_t y,
-                                const assets::BuildingTable* buildings) {
+annokit::core::Status World::move_island(std::size_t index, std::uint32_t x, std::uint32_t y,
+                                         const assets::BuildingTable* buildings) {
     if (index >= m_islands.size()) {
         return make_error(ErrorCode::OutOfRange, "no island " + std::to_string(index));
     }
@@ -197,10 +197,10 @@ core::Status World::move_island(std::size_t index, std::uint32_t x, std::uint32_
     }
     island.header.pos_x = static_cast<std::uint16_t>(std::min<std::uint32_t>(x, 0xFFFF));
     island.header.pos_y = static_cast<std::uint16_t>(std::min<std::uint32_t>(y, 0xFFFF));
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::rotate_island(std::size_t index, const assets::BuildingTable* buildings) {
+annokit::core::Status World::rotate_island(std::size_t index, const assets::BuildingTable* buildings) {
     if (index >= m_islands.size()) {
         return make_error(ErrorCode::OutOfRange, "no island " + std::to_string(index));
     }
@@ -310,12 +310,12 @@ core::Status World::rotate_island(std::size_t index, const assets::BuildingTable
     if (m_volcanoes.last && m_volcanoes.last->island == index) {
         m_volcanoes.last.reset();
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::grow_island(std::size_t index, std::uint32_t left, std::uint32_t top, std::uint32_t right,
-                                std::uint32_t bottom, const assets::BuildingType& sea,
-                                const assets::BuildingTable* buildings) {
+annokit::core::Status World::grow_island(std::size_t index, std::uint32_t left, std::uint32_t top, std::uint32_t right,
+                                         std::uint32_t bottom, const assets::BuildingType& sea,
+                                         const assets::BuildingTable* buildings) {
     if (index >= m_islands.size()) {
         return make_error(ErrorCode::OutOfRange, "no island " + std::to_string(index));
     }
@@ -411,11 +411,11 @@ core::Status World::grow_island(std::size_t index, std::uint32_t left, std::uint
         shift(*m_volcanoes.last);
     }
     std::erase_if(m_volcanoes.lava, [index](const LavaLump& l) { return l.island == index; });
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::merge_islands(std::size_t keep, std::size_t other, const assets::BuildingType& sea,
-                                  const assets::BuildingTable* buildings) {
+annokit::core::Status World::merge_islands(std::size_t keep, std::size_t other, const assets::BuildingType& sea,
+                                           const assets::BuildingTable* buildings) {
     if (keep >= m_islands.size() || other >= m_islands.size() || keep == other) {
         return make_error(ErrorCode::OutOfRange, "no two islands to join");
     }
@@ -520,11 +520,11 @@ core::Status World::merge_islands(std::size_t keep, std::size_t other, const ass
         return status;
     }
     *this = std::move(after);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::copy_island(std::size_t index, std::uint32_t x, std::uint32_t y, std::uint16_t number,
-                                const assets::BuildingTable* buildings) {
+annokit::core::Status World::copy_island(std::size_t index, std::uint32_t x, std::uint32_t y, std::uint16_t number,
+                                         const assets::BuildingTable* buildings) {
     if (index >= m_islands.size()) {
         return make_error(ErrorCode::OutOfRange, "no island " + std::to_string(index));
     }
@@ -575,10 +575,10 @@ core::Status World::copy_island(std::size_t index, std::uint32_t x, std::uint32_
             m_growth.entries.push_back(e);
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::remove_island(std::size_t index, const assets::BuildingTable* buildings) {
+annokit::core::Status World::remove_island(std::size_t index, const assets::BuildingTable* buildings) {
     if (index >= m_islands.size()) {
         return make_error(ErrorCode::OutOfRange, "no island " + std::to_string(index));
     }
@@ -674,10 +674,10 @@ core::Status World::remove_island(std::size_t index, const assets::BuildingTable
             }
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::resize(std::uint32_t width, std::uint32_t height, const assets::BuildingTable* buildings) {
+annokit::core::Status World::resize(std::uint32_t width, std::uint32_t height, const assets::BuildingTable* buildings) {
     if (width == 0 || height == 0 || width > kMaxSide || height > kMaxSide) {
         return make_error(ErrorCode::OutOfRange,
                           "a map of " + std::to_string(width) + " x " + std::to_string(height) + " tiles");

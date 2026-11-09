@@ -10,7 +10,8 @@
 #include "app_settings.hpp"
 #include "game_folder.hpp"
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 using namespace o1602;
@@ -37,9 +38,9 @@ TEST_CASE("game folder: --game-dir, then ANNO1602_DIR, then the saved folder") {
     make_installation(a);
     make_installation(b);
     make_installation(c);
-    const std::string sa = core::path_to_utf8(a);
-    const std::string sb = core::path_to_utf8(b);
-    const std::string sc = core::path_to_utf8(c);
+    const std::string sa = annokit::core::path_to_utf8(a);
+    const std::string sb = annokit::core::path_to_utf8(b);
+    const std::string sc = annokit::core::path_to_utf8(c);
 
     auto found = app::find_game_folder(sa, sc, sb);
     REQUIRE(found.game);
@@ -55,16 +56,16 @@ TEST_CASE("game folder: --game-dir, then ANNO1602_DIR, then the saved folder") {
     CHECK(found.game->root() == c);
 
     // A folder named on the command line or in the variable is never replaced, nor asked for.
-    found = app::find_game_folder(core::path_to_utf8(base / "typo"), sc, std::nullopt);
+    found = app::find_game_folder(annokit::core::path_to_utf8(base / "typo"), sc, std::nullopt);
     CHECK(!found.game);
     CHECK(!found.ask);
     CHECK(found.error.message.find("typo") != std::string::npos);
-    found = app::find_game_folder("", sc, core::path_to_utf8(base / "typo"));
+    found = app::find_game_folder("", sc, annokit::core::path_to_utf8(base / "typo"));
     CHECK(!found.game);
     CHECK(!found.ask);
 
     // A saved folder that is gone: an installation in the usual folders, else the question.
-    found = app::find_game_folder("", core::path_to_utf8(base / "moved"), std::nullopt);
+    found = app::find_game_folder("", annokit::core::path_to_utf8(base / "moved"), std::nullopt);
     CHECK(found.saved_invalid == base / "moved");
     CHECK((found.game.has_value() || found.ask));
     std::filesystem::remove_all(base);
@@ -99,7 +100,7 @@ TEST_CASE("game folder: why a folder is no installation") {
 
     const std::string gone = app::folder_problem(base / "gone");
     CHECK(gone.find("does not exist") != std::string::npos);
-    CHECK(gone.find(core::path_to_utf8(base / "gone")) != std::string::npos);
+    CHECK(gone.find(annokit::core::path_to_utf8(base / "gone")) != std::string::npos);
     const std::string partial = app::folder_problem(base / "Anno");
     CHECK(partial.find("figuren.cod") != std::string::npos);
     CHECK(assets::GameDirectory::missing_file(base / "Anno") == std::optional<std::string_view>("figuren.cod"));

@@ -64,8 +64,8 @@ sim::World new_game(const Setup& s, std::uint64_t seed) {
 }
 
 /// The sections of two uncompressed Open1602 savegames that differ.
-void report(const core::Bytes& one, const core::Bytes& two) {
-    const auto sections = [](const core::Bytes& b) {
+void report(const annokit::core::Bytes& one, const annokit::core::Bytes& two) {
+    const auto sections = [](const annokit::core::Bytes& b) {
         std::vector<std::pair<std::string, std::span<const std::uint8_t>>> out;
         std::size_t o = 32;
         while (o + 12 <= b.size()) {

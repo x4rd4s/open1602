@@ -21,11 +21,12 @@
 #include "../test_framework.hpp"
 #include "test_support.hpp"
 
+#include "annokit/net/enet_transport.hpp"
+#include "annokit/net/loopback.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/net/enet_transport.hpp"
 #include "o1602/net/lan.hpp"
-#include "o1602/net/loopback.hpp"
 #include "o1602/net/protocol.hpp"
 #include "o1602/net/session.hpp"
 #include "o1602/sim/command_io.hpp"
@@ -127,11 +128,11 @@ struct Game {
 struct Computer {
     Game game;
     std::unique_ptr<net::ClientSession> session;
-    const net::Transport* transport = nullptr;  ///< owned by the session; to cut the connection
+    const annokit::net::Transport* transport = nullptr;  ///< owned by the session; to cut the connection
     std::vector<net::SessionEvent> events;
 
-    Computer(net::LoopbackNetwork& network, std::string name, std::uint64_t token = 0, std::uint64_t content = kContent,
-             net::SessionConfig config = {}, std::string password = {},
+    Computer(annokit::net::LoopbackNetwork& network, std::string name, std::uint64_t token = 0,
+             std::uint64_t content = kContent, net::SessionConfig config = {}, std::string password = {},
              std::vector<assets::ContentPackage> packages = {}, bool fetch_packages = false, std::uint64_t player = 0) {
         net::Hello hello;
         hello.player = player;
@@ -151,7 +152,7 @@ struct Computer {
     struct Person {
         std::uint64_t player = 0;
     };
-    Computer(net::LoopbackNetwork& network, std::string name, Person person, std::uint64_t token = 0)
+    Computer(annokit::net::LoopbackNetwork& network, std::string name, Person person, std::uint64_t token = 0)
         : Computer(network, std::move(name), token, kContent, {}, {}, {}, false, person.player) {}
 
     void update(std::uint32_t ms, const sim::Simulation::BeforeTick& before = {}) {
@@ -175,7 +176,7 @@ struct Host {
     std::unique_ptr<net::HostSession> session;
     std::vector<net::SessionEvent> events;
 
-    explicit Host(net::LoopbackNetwork& network, net::SessionConfig config = {}, Game g = Game::fresh())
+    explicit Host(annokit::net::LoopbackNetwork& network, net::SessionConfig config = {}, Game g = Game::fresh())
         : game(std::move(g)) {
         session = std::make_unique<net::HostSession>(network.listen(), *game.simulation, buildings(), 0, "Gastgeber",
                                                      kContent, config);
@@ -198,7 +199,7 @@ struct Host {
 };
 
 /// Time passes for the network and every computer.
-void step(net::LoopbackNetwork& network, Host& host, const std::vector<Computer*>& computers,
+void step(annokit::net::LoopbackNetwork& network, Host& host, const std::vector<Computer*>& computers,
           std::uint32_t ms = kStepMs) {
     network.advance(ms);
     host.update(ms);
@@ -207,7 +208,7 @@ void step(net::LoopbackNetwork& network, Host& host, const std::vector<Computer*
     }
 }
 
-void run_for(net::LoopbackNetwork& network, Host& host, const std::vector<Computer*>& computers,
+void run_for(annokit::net::LoopbackNetwork& network, Host& host, const std::vector<Computer*>& computers,
              std::uint32_t total_ms) {
     for (std::uint32_t t = 0; t < total_ms; t += kStepMs) {
         step(network, host, computers);
@@ -230,7 +231,7 @@ struct FrameProbe {
 };
 
 /// The host left: `c` follows the successor the host named, on `next` (host migration).
-void follow(net::LoopbackNetwork& next, Computer& c) {
+void follow(annokit::net::LoopbackNetwork& next, Computer& c) {
     REQUIRE(c.session->can_migrate());
     REQUIRE(!c.session->hosts_next());
     auto session = std::make_unique<net::ClientSession>(*c.session, [&next] { return next.connect(); });
@@ -239,7 +240,7 @@ void follow(net::LoopbackNetwork& next, Computer& c) {
 }
 
 /// Time passes after the host changed: the new host (the successor's game) and its computers.
-void step_moved(net::LoopbackNetwork& next, net::HostSession& host, const std::vector<Computer*>& computers,
+void step_moved(annokit::net::LoopbackNetwork& next, net::HostSession& host, const std::vector<Computer*>& computers,
                 std::uint32_t total_ms) {
     for (std::uint32_t t = 0; t < total_ms; t += kStepMs) {
         next.advance(kStepMs);
@@ -252,7 +253,7 @@ void step_moved(net::LoopbackNetwork& next, net::HostSession& host, const std::v
 }
 
 /// The computers hear that the host is gone.
-void notice_host_left(net::LoopbackNetwork& network, const std::vector<Computer*>& computers) {
+void notice_host_left(annokit::net::LoopbackNetwork& network, const std::vector<Computer*>& computers) {
     for (int i = 0; i < 50; ++i) {
         network.advance(kStepMs);
         for (Computer* c : computers) {
@@ -415,7 +416,7 @@ const net::SessionEvent* chat_line(const std::vector<net::SessionEvent>& events,
 }  // namespace
 
 TEST_CASE("net: a private line reaches only the players it is for; a line to everyone the spectators too") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);  // slot 0
     Computer anna(network, "Anna");
     Computer bernd(network, "Bernd");
@@ -471,7 +472,7 @@ TEST_CASE("net: a private line reaches only the players it is for; a line to eve
 }
 
 TEST_CASE("net: without the setting, spectators only read the chat") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
     config.spectators_chat = false;
     Host host(network, config);
@@ -494,7 +495,7 @@ TEST_CASE("net: without the setting, spectators only read the chat") {
 }
 
 TEST_CASE("net: two computers join, everyone plays, all games stay the same") {
-    net::LoopbackNetwork network(40, 25);
+    annokit::net::LoopbackNetwork network(40, 25);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -550,7 +551,7 @@ TEST_CASE("net: two computers join, everyone plays, all games stay the same") {
 }
 
 TEST_CASE("net: a game packed while the host plays on reaches the computer with the frames run since (TB-26)") {
-    net::LoopbackNetwork network(40, 25);
+    annokit::net::LoopbackNetwork network(40, 25);
     net::SessionConfig config;
     config.pack_wait_ms = 60'000;  // never waits for it: the game goes on until it is packed
     Host host(network, config);
@@ -585,7 +586,7 @@ TEST_CASE("net: a game packed while the host plays on reaches the computer with 
 }
 
 TEST_CASE("net: nobody gives orders for another player") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     Host host(network);
     Computer a(network, "Anna");
     run_for(network, host, {&a}, 500);
@@ -595,7 +596,7 @@ TEST_CASE("net: nobody gives orders for another player") {
     a.session->submit(sim::PlayerRename{0, "Gekapert"});  // the computer itself refuses
     // A computer that skips its own check: the host drops the command.
     auto raw = network.connect();
-    std::vector<net::TransportEvent> ev;
+    std::vector<annokit::net::TransportEvent> ev;
     network.advance(50);
     raw->poll(ev);
     raw->send(0, net::encode(net::Hello{net::kProtocolVersion, kContent, "Mallory", sim::kNoPlayer, 0, "", false, {}}));
@@ -627,7 +628,7 @@ TEST_CASE("net: nobody gives orders for another player") {
 }
 
 TEST_CASE("net: a computer that diverges is noticed and gets the game anew") {
-    net::LoopbackNetwork network(30, 10);
+    annokit::net::LoopbackNetwork network(30, 10);
     net::SessionConfig config;
     config.hash_interval = 20;
     Host host(network, config);
@@ -663,7 +664,7 @@ TEST_CASE("net: a computer that diverges is noticed and gets the game anew") {
 }
 
 TEST_CASE("net: into a running game, out and back into the same slot") {
-    net::LoopbackNetwork network(25, 10);
+    annokit::net::LoopbackNetwork network(25, 10);
     Host host(network);
     Computer a(network, "Anna");
     run_for(network, host, {&a}, 5000);
@@ -701,7 +702,7 @@ TEST_CASE("net: into a running game, out and back into the same slot") {
 }
 
 TEST_CASE("net: the computer plays on for someone who left, until he is back") {
-    net::LoopbackNetwork network(25, 10);
+    annokit::net::LoopbackNetwork network(25, 10);
     net::SessionConfig config;
     config.take_over_ms = 5000;
     Host host(network, config);
@@ -737,7 +738,7 @@ TEST_CASE("net: the computer plays on for someone who left, until he is back") {
 }
 
 TEST_CASE("net: a person comes back into the slot they played by their player ID, without the token") {
-    net::LoopbackNetwork network(25, 10);
+    annokit::net::LoopbackNetwork network(25, 10);
     net::SessionConfig config;
     config.take_over_ms = 1000;
     config.player = 1;
@@ -781,7 +782,7 @@ TEST_CASE("net: a person comes back into the slot they played by their player ID
 }
 
 TEST_CASE("net: another person's slot only when no other is free") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
     config.take_over_ms = 500;
     Host host(network, config, Game::fresh(4));
@@ -805,7 +806,7 @@ TEST_CASE("net: another person's slot only when no other is free") {
 }
 
 TEST_CASE("net: a person sent away has no claim to the slot they played") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network, {}, Game::fresh(4));
     Computer a(network, "Anna", Computer::Person{11});
     auto d = std::make_unique<Computer>(network, "Dora", Computer::Person{44});
@@ -822,7 +823,7 @@ TEST_CASE("net: a person sent away has no claim to the slot they played") {
 }
 
 TEST_CASE("net: in the lobby of a savegame, each person finds the slot they played") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::Lobby lobby;
     lobby.seats = {net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 0, net::player_verifier(1)},
                    net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 1, net::player_verifier(22)},
@@ -858,7 +859,7 @@ TEST_CASE("net: the player ID's verifier gives the ID not away") {
 }
 
 TEST_CASE("net: without the setting, the slot of someone who left gives no orders") {
-    net::LoopbackNetwork network(25, 10);
+    annokit::net::LoopbackNetwork network(25, 10);
     net::SessionConfig config;
     config.computer_takes_over = false;
     config.take_over_ms = 1000;
@@ -877,7 +878,7 @@ TEST_CASE("net: without the setting, the slot of someone who left gives no order
 }
 
 TEST_CASE("net: with the setting, only the host pauses, resumes and sets the speed (MS-20)") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
     config.host_controls_speed = true;
     Host host(network, config);
@@ -918,7 +919,7 @@ TEST_CASE("net: with the setting, only the host pauses, resumes and sets the spe
 }
 
 TEST_CASE("net: without the setting, every player pauses, resumes and sets the speed") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     run_for(network, host, {&a}, 2000);
@@ -942,7 +943,7 @@ TEST_CASE("net: without the setting, every player pauses, resumes and sets the s
 }
 
 TEST_CASE("net: a slot's token is good only for the one it was given to") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     auto c = std::make_unique<Computer>(network, "Clara");
@@ -971,7 +972,7 @@ TEST_CASE("net: a slot's token is good only for the one it was given to") {
 }
 
 TEST_CASE("net: the host sends a spectator away by its place in the roster") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -1007,7 +1008,7 @@ TEST_CASE("net: the host sends a spectator away by its place in the roster") {
 }
 
 TEST_CASE("net: a flooding player leaves room for the others' commands") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
     config.max_commands_per_frame = 1024;  // one player alone could fill a whole frame
     Host host(network, config);
@@ -1026,18 +1027,18 @@ TEST_CASE("net: a flooding player leaves room for the others' commands") {
 }
 
 TEST_CASE("net: a connection that never says hello is let go") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     auto silent = network.connect();
     run_for(network, host, {}, 12'000);
-    std::vector<net::TransportEvent> events;
+    std::vector<annokit::net::TransportEvent> events;
     silent->poll(events);
     CHECK(std::any_of(events.begin(), events.end(),
-                      [](const auto& e) { return e.kind == net::TransportEvent::Kind::Disconnected; }));
+                      [](const auto& e) { return e.kind == annokit::net::TransportEvent::Kind::Disconnected; }));
 }
 
 TEST_CASE("net: without a free slot a computer watches; other data or versions are refused") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -1069,7 +1070,7 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
 
     net::SessionConfig closed;
     closed.spectators = false;
-    net::LoopbackNetwork network2(5, 0);
+    annokit::net::LoopbackNetwork network2(5, 0);
     Host host2(network2, closed);
     Computer x(network2, "X");
     Computer y(network2, "Y");
@@ -1080,7 +1081,7 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
     CHECK(z.events.back().refused == net::RefuseReason::Full);
 
     // No host at all.
-    net::LoopbackNetwork empty(5, 0);
+    annokit::net::LoopbackNetwork empty(5, 0);
     Computer lonely(empty, "Niemand");
     empty.advance(50);
     lonely.update(50);
@@ -1089,7 +1090,7 @@ TEST_CASE("net: without a free slot a computer watches; other data or versions a
 }
 
 TEST_CASE("net: a computer needs the game's packages, and may have more") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     const assets::ContentPackage lighthouse{"lighthouse", "1.2", 0x1111};
     const assets::ContentPackage weather{"weather", "", 0x2222};
@@ -1123,7 +1124,7 @@ TEST_CASE("net: the host sends the packages a computer lacks once it asks for th
     const assets::ContentPackage lighthouse{"lighthouse", "1.2", assets::package_hash(folder)};
     const std::uint64_t size = assets::package_size(folder);
 
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     host.game.world->set_packages({lighthouse});
     host.session->share_packages({{lighthouse, folder, size}});
@@ -1151,7 +1152,7 @@ TEST_CASE("net: the host sends the packages a computer lacks once it asks for th
     CHECK(unasked.session->end_reason() == net::EndReason::ProtocolError);
 
     // More than the host sends: refused as if it did not share.
-    net::LoopbackNetwork small(5, 0);
+    annokit::net::LoopbackNetwork small(5, 0);
     net::SessionConfig config;
     config.max_share_bytes = size - 1;
     Host stingy(small, config);
@@ -1168,7 +1169,7 @@ TEST_CASE("net: the host sends the packages a computer lacks once it asks for th
 }
 
 TEST_CASE("net: in the lobby the host asks for the packages it was given") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::Lobby lobby;
     lobby.seats = {net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 0},
                    net::LobbySeat{net::LobbySeat::Kind::Open, "", false, 1}};
@@ -1180,7 +1181,7 @@ TEST_CASE("net: in the lobby the host asks for the packages it was given") {
 }
 
 TEST_CASE("net: the host waits for a slow computer, then goes on without a frozen one") {
-    net::LoopbackNetwork network(20, 0);
+    annokit::net::LoopbackNetwork network(20, 0);
     net::SessionConfig config;
     config.stall_ms = 2000;
     config.resync_behind = 100;
@@ -1219,7 +1220,7 @@ TEST_CASE("net: the host waits for a slow computer, then goes on without a froze
 }
 
 TEST_CASE("net: a slow computer that keeps up some frames sets the pace and is not dropped") {
-    net::LoopbackNetwork network(20, 5);
+    annokit::net::LoopbackNetwork network(20, 5);
     net::SessionConfig config;
     config.stall_ms = 2000;
     Host host(network, config);
@@ -1259,7 +1260,7 @@ TEST_CASE("net: a slow computer that keeps up some frames sets the pace and is n
 }
 
 TEST_CASE("net: a lagging computer gets the game anew after the same game time at every speed") {
-    net::LoopbackNetwork network(20, 0);
+    annokit::net::LoopbackNetwork network(20, 0);
     net::SessionConfig config;
     config.stall_ms = 1000;
     config.resync_behind = 100;  // 5 s of game time
@@ -1284,7 +1285,7 @@ TEST_CASE("net: a lagging computer gets the game anew after the same game time a
 }
 
 TEST_CASE("net: a long session keeps its memory and its frames in step") {
-    net::LoopbackNetwork network(60, 40);
+    annokit::net::LoopbackNetwork network(60, 40);
     net::SessionConfig config;
     config.hash_interval = 50;
     Host host(network, config);
@@ -1317,11 +1318,11 @@ TEST_CASE("net: a long session keeps its memory and its frames in step") {
 
 TEST_CASE("net: over real UDP on this computer (ENet)") {
     constexpr std::uint16_t kPort = 46021;
-    auto listening = net::enet_listen(kPort, 4);
+    auto listening = annokit::net::enet_listen(kPort, 4);
     if (!listening) {
         SKIP("UDP port 46021 is not free here");
     }
-    auto connecting = net::enet_connect("127.0.0.1", kPort);
+    auto connecting = annokit::net::enet_connect("127.0.0.1", kPort);
     REQUIRE(connecting.ok());
 
     Game host_game = Game::fresh();
@@ -1354,7 +1355,7 @@ TEST_CASE("net: over real UDP on this computer (ENet)") {
 }
 
 TEST_CASE("net: a lobby: slots, password, chat and ready, then the game starts on every computer") {
-    net::LoopbackNetwork network(30, 10);
+    annokit::net::LoopbackNetwork network(30, 10);
     net::SessionConfig config;
     config.password = "insel";
     net::Lobby setup;
@@ -1482,7 +1483,7 @@ TEST_CASE("net: a lobby: slots, password, chat and ready, then the game starts o
 }
 
 TEST_CASE("net: a lobby's banners: each player chooses one, no two alike, the computer gives way") {
-    net::LoopbackNetwork network(30, 10);
+    annokit::net::LoopbackNetwork network(30, 10);
     net::Lobby setup;
     // Four slots, the third the computer's, all with the same banner and one not on offer: the host
     // makes them different.
@@ -1569,7 +1570,7 @@ TEST_CASE("net: a lobby's banners: each player chooses one, no two alike, the co
 }
 
 TEST_CASE("net: a running game's lobby shows the players' banners and offers none") {
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     Game game = Game::fresh(2);
     game.world->player(1)->banner = 9;
     net::HostSession host(network.listen(), *game.simulation, buildings(), 0, "Merlin", kContent);
@@ -1673,7 +1674,7 @@ TEST_CASE("net: a host on this computer is found without an address, once") {
 }
 
 TEST_CASE("net: the computer holds an open slot until someone comes, and takes it back") {
-    net::LoopbackNetwork network(30, 10);
+    annokit::net::LoopbackNetwork network(30, 10);
     net::Lobby setup;
     setup.seats = {net::LobbySeat{}, net::LobbySeat{}};
     net::HostSession host(network.listen(), setup, 0, "Merlin", kContent);
@@ -1714,7 +1715,7 @@ TEST_CASE("net: the computer holds an open slot until someone comes, and takes i
 }
 
 TEST_CASE("net: a computer that joins in a loop gets the game at most once a second") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     Host host(network);
     int loads = 0;
     for (int i = 0; i < 12; ++i) {
@@ -1735,7 +1736,7 @@ TEST_CASE("net: a computer that joins in a loop gets the game at most once a sec
 // --- Host migration ---
 
 TEST_CASE("net: the host names the playing computer with the lowest slot its successor") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     auto host = std::make_unique<Host>(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -1775,8 +1776,8 @@ TEST_CASE("net: the host names the playing computer with the lowest slot its suc
 }
 
 TEST_CASE("net: the host leaves; its successor hosts on, the others follow, all games stay the same") {
-    net::LoopbackNetwork network(20, 0);  // Anna first, in slot 1
-    net::LoopbackNetwork next(20, 10);
+    annokit::net::LoopbackNetwork network(20, 0);  // Anna first, in slot 1
+    annokit::net::LoopbackNetwork next(20, 10);
     net::SessionConfig config;
     config.hash_interval = 20;
     auto host = std::make_unique<Host>(network, config);
@@ -1837,8 +1838,8 @@ TEST_CASE("net: the host leaves; its successor hosts on, the others follow, all 
 }
 
 TEST_CASE("net: the host leaves and nobody hosts on: the others give up after a while") {
-    net::LoopbackNetwork network(20, 0);
-    net::LoopbackNetwork next(20, 0);  // the successor never hosts there (its port is taken)
+    annokit::net::LoopbackNetwork network(20, 0);
+    annokit::net::LoopbackNetwork next(20, 0);  // the successor never hosts there (its port is taken)
     net::SessionConfig config;
     config.migration_ms = 3000;
     auto host = std::make_unique<Host>(network, config);
@@ -1867,7 +1868,7 @@ TEST_CASE("net: the host leaves and nobody hosts on: the others give up after a 
     CHECK(b.game.simulation->state_hash() == before);
 
     // A host that leaves before its game starts leaves nothing to carry on.
-    net::LoopbackNetwork lobby_network(5, 0);
+    annokit::net::LoopbackNetwork lobby_network(5, 0);
     net::Lobby setup;
     setup.seats = {net::LobbySeat{}, net::LobbySeat{}};
     auto lobby = std::make_unique<net::HostSession>(lobby_network.listen(), setup, 0, "Merlin", kContent);
@@ -1884,8 +1885,8 @@ TEST_CASE("net: the host leaves and nobody hosts on: the others give up after a 
 }
 
 TEST_CASE("net: after the host changed, players come back into their slots, newcomers take the old host's") {
-    net::LoopbackNetwork network(15, 0);  // Anna first, in slot 1
-    net::LoopbackNetwork next(15, 5);
+    annokit::net::LoopbackNetwork network(15, 0);  // Anna first, in slot 1
+    annokit::net::LoopbackNetwork next(15, 5);
     auto host = std::make_unique<Host>(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -1940,7 +1941,7 @@ TEST_CASE("net: after the host changed, players come back into their slots, newc
 }
 
 TEST_CASE("net: a slot's token does not take it from a computer that is still there (MS-1)") {
-    net::LoopbackNetwork network(20, 0);
+    annokit::net::LoopbackNetwork network(20, 0);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -1969,8 +1970,8 @@ TEST_CASE("net: the successor gets verifiers of the slots' tokens, never the tok
 
 TEST_CASE("net: a slot from the old host outside the lobby is not taken over (MS-8)") {
     // An old host that hands its successor a slot the lobby does not have, then leaves.
-    net::LoopbackNetwork network(10, 0);
-    net::LoopbackNetwork next(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork next(10, 0);
     auto old_host = network.listen();
     Computer a(network, "Anna");
     Game world = Game::fresh();
@@ -1984,15 +1985,15 @@ TEST_CASE("net: a slot from the old host outside the lobby is not taken over (MS
         lobby.seats.push_back(seat);
     }
     const std::uint64_t token = 0x5EC0DE;
-    std::vector<net::TransportEvent> events;
+    std::vector<annokit::net::TransportEvent> events;
     bool answered = false;  // only the Hello: a second Welcome in a running game is nonsense
-    net::LinkId anna = 0;
+    annokit::net::LinkId anna = 0;
     for (int i = 0; i < 20; ++i) {
         network.advance(kStepMs);
         events.clear();
         old_host->poll(events);
         for (const auto& e : events) {
-            if (e.kind == net::TransportEvent::Kind::Received && !answered) {
+            if (e.kind == annokit::net::TransportEvent::Kind::Received && !answered) {
                 answered = true;
                 anna = e.link;
                 old_host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 0xA77A}));
@@ -2049,7 +2050,7 @@ Game game_with_island(std::uint32_t side) {
 
 TEST_CASE("net: rectangles over a whole island take frames, not one long frame (MS-3)") {
     constexpr std::uint32_t kSide = 40;
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network, {}, game_with_island(kSide));
     Computer a(network, "Anna");
     run_for(network, host, {&a}, 1000);
@@ -2084,7 +2085,7 @@ TEST_CASE("net: rectangles over a whole island take frames, not one long frame (
 }
 
 TEST_CASE("net: an order the others could not read is not sent; a flood is dropped and told (MS-10, MS-17)") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -2132,7 +2133,7 @@ TEST_CASE("net: an order the others could not read is not sent; a flood is dropp
 }
 
 TEST_CASE("net: lobby requests in a loop reach the others a few times a second (MS-16)") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::Lobby setup;
     setup.seats = {net::LobbySeat{}, net::LobbySeat{}, net::LobbySeat{}};
     net::HostSession host(network.listen(), setup, 0, "Merlin", kContent);
@@ -2165,7 +2166,7 @@ TEST_CASE("net: lobby requests in a loop reach the others a few times a second (
 }
 
 TEST_CASE("net: a newcomer does not get the slot of a player whose link just broke (MS-5)") {
-    net::LoopbackNetwork network(15, 0);
+    annokit::net::LoopbackNetwork network(15, 0);
     Host host(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -2190,7 +2191,7 @@ TEST_CASE("net: a newcomer does not get the slot of a player whose link just bro
 }
 
 TEST_CASE("net: without joining the running game, a player whose link broke still comes back (MS-6)") {
-    net::LoopbackNetwork network(15, 0);
+    annokit::net::LoopbackNetwork network(15, 0);
     net::SessionConfig config;
     config.join_running = false;
     net::Lobby setup;
@@ -2229,7 +2230,7 @@ TEST_CASE("net: without joining the running game, a player whose link broke stil
 }
 
 TEST_CASE("net: once the time to come back is over, a newcomer may take the slot") {
-    net::LoopbackNetwork network(15, 0);
+    annokit::net::LoopbackNetwork network(15, 0);
     net::SessionConfig config;
     config.take_over_ms = 2000;
     Host host(network, config);
@@ -2249,8 +2250,8 @@ TEST_CASE("net: once the time to come back is over, a newcomer may take the slot
 }
 
 TEST_CASE("net: during a host migration a newcomer does not take a returning player's slot (MS-14)") {
-    net::LoopbackNetwork network(15, 0);
-    net::LoopbackNetwork next(15, 5);
+    annokit::net::LoopbackNetwork network(15, 0);
+    annokit::net::LoopbackNetwork next(15, 5);
     auto host = std::make_unique<Host>(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -2274,7 +2275,7 @@ TEST_CASE("net: during a host migration a newcomer does not take a returning pla
 }
 
 TEST_CASE("net: the successor whose own link breaks comes back, it does not host a second game (MS-2)") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     Host host(network);
     Computer a(network, "Anna");  // the successor
     Computer b(network, "Bernd");
@@ -2299,7 +2300,7 @@ TEST_CASE("net: the successor whose own link breaks comes back, it does not host
 }
 
 TEST_CASE("net: a host that vanishes without a word: after trying it again, the successor carries on (MS-2)") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     net::SessionConfig config;
     config.reconnect_ms = 1500;
     auto host = std::make_unique<Host>(network, config);
@@ -2332,7 +2333,7 @@ TEST_CASE("net: a host that vanishes without a word: after trying it again, the 
 }
 
 TEST_CASE("net: a host that leaves on purpose: the others move on at once, spectators too (MS-2, MS-25)") {
-    net::LoopbackNetwork network(10, 0);
+    annokit::net::LoopbackNetwork network(10, 0);
     auto host = std::make_unique<Host>(network);
     Computer a(network, "Anna");
     Computer b(network, "Bernd");
@@ -2354,7 +2355,7 @@ TEST_CASE("net: a host that leaves on purpose: the others move on at once, spect
 }
 
 TEST_CASE("net: a computer of another version is told so, however its Hello looks (MS-22)") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     for (const std::uint16_t version :
          {std::uint16_t{net::kProtocolVersion - 1}, std::uint16_t{net::kProtocolVersion + 1}}) {
@@ -2366,7 +2367,7 @@ TEST_CASE("net: a computer of another version is told so, however its Hello look
         bytes[1] = static_cast<std::uint8_t>(version & 0xFF);
         bytes[2] = static_cast<std::uint8_t>(version >> 8);
         bytes.push_back(0x42);  // a field this version does not know
-        std::vector<net::TransportEvent> events;
+        std::vector<annokit::net::TransportEvent> events;
         std::optional<net::RefuseReason> refused;
         for (int i = 0; i < 30 && !refused; ++i) {
             network.advance(kStepMs);
@@ -2374,9 +2375,9 @@ TEST_CASE("net: a computer of another version is told so, however its Hello look
             events.clear();
             link->poll(events);
             for (const auto& e : events) {
-                if (e.kind == net::TransportEvent::Kind::Connected) {
+                if (e.kind == annokit::net::TransportEvent::Kind::Connected) {
                     link->send(0, bytes);
-                } else if (e.kind == net::TransportEvent::Kind::Received) {
+                } else if (e.kind == annokit::net::TransportEvent::Kind::Received) {
                     if (const auto m = net::decode(e.data)) {
                         if (const auto* r = std::get_if<net::Refused>(&*m)) {
                             refused = r->reason;
@@ -2392,12 +2393,12 @@ TEST_CASE("net: a computer of another version is told so, however its Hello look
 
 TEST_CASE("net: a message larger than a packet travels in parts and arrives whole (MS-7, MS-11)") {
     // Up to a packet: as it is.
-    const std::vector<std::uint8_t> small(net::kMaxPacketBytes, 7);
+    const std::vector<std::uint8_t> small(annokit::net::kMaxPacketBytes, 7);
     REQUIRE(net::packets(small).size() == 1);
     CHECK(net::packets(small).front() == small);
 
     // A fake host sends a game, then a Turn of many frames that only fits into parts.
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     auto host = network.listen();
     Computer a(network, "Anna");
     Game world = Game::fresh();
@@ -2417,20 +2418,20 @@ TEST_CASE("net: a message larger than a packet travels in parts and arrives whol
         turn.frames.push_back(std::move(frame));
     }
     const std::vector<std::uint8_t> bytes = net::encode(turn);
-    REQUIRE(bytes.size() > net::kMaxPacketBytes);
+    REQUIRE(bytes.size() > annokit::net::kMaxPacketBytes);
     const auto parts = net::packets(bytes);
     REQUIRE(parts.size() > 1);
     for (const auto& p : parts) {
-        CHECK(p.size() <= net::kMaxPacketBytes);
+        CHECK(p.size() <= annokit::net::kMaxPacketBytes);
     }
-    std::vector<net::TransportEvent> events;
+    std::vector<annokit::net::TransportEvent> events;
     bool answered = false;
     for (int i = 0; i < 20; ++i) {
         network.advance(kStepMs);
         events.clear();
         host->poll(events);
         for (const auto& e : events) {
-            if (e.kind == net::TransportEvent::Kind::Received && !answered) {
+            if (e.kind == annokit::net::TransportEvent::Kind::Received && !answered) {
                 answered = true;
                 host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 0xA77A}));
                 host->send(e.link, net::encode(lobby));
@@ -2455,7 +2456,7 @@ TEST_CASE("net: a message larger than a packet travels in parts and arrives whol
         events.clear();
         host->poll(events);
         for (const auto& e : events) {
-            if (e.kind == net::TransportEvent::Kind::Received && !answered) {
+            if (e.kind == annokit::net::TransportEvent::Kind::Received && !answered) {
                 answered = true;
                 host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 2, 0xB0B}));
                 host->send(e.link, parts.front());
@@ -2470,28 +2471,28 @@ TEST_CASE("net: a message larger than a packet travels in parts and arrives whol
 
 TEST_CASE("net: a joining computer tells how far the game on its way has come") {
     using Stage = net::ClientSession::JoinStage;
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     auto host = network.listen();
     Computer a(network, "Anna");
     net::Lobby lobby;
     lobby.seats.resize(4);
     // A game larger than a packet (one that cannot be loaded: only its way matters here).
     const std::vector<std::uint8_t> game =
-        net::encode(net::Snapshot{1, 0, 1, true, std::vector<std::uint8_t>(3 * net::kMaxPacketBytes, 0)});
+        net::encode(net::Snapshot{1, 0, 1, true, std::vector<std::uint8_t>(3 * annokit::net::kMaxPacketBytes, 0)});
     const auto parts = net::packets(game);
     REQUIRE(parts.size() > 3);
-    std::optional<net::LinkId> link;
+    std::optional<annokit::net::LinkId> link;
     std::vector<std::uint8_t> told;  // LoadProgress the host was sent
     const auto step = [&] {
         network.advance(kStepMs);
-        std::vector<net::TransportEvent> events;
+        std::vector<annokit::net::TransportEvent> events;
         host->poll(events);
         for (const auto& e : events) {
-            if (e.kind == net::TransportEvent::Kind::Received && !link) {
+            if (e.kind == annokit::net::TransportEvent::Kind::Received && !link) {
                 link = e.link;
                 host->send(e.link, net::encode(net::Welcome{net::kProtocolVersion, 1, 0xA77A}));
                 host->send(e.link, net::encode(lobby));
-            } else if (e.kind == net::TransportEvent::Kind::Received) {
+            } else if (e.kind == annokit::net::TransportEvent::Kind::Received) {
                 if (const auto m = net::decode(e.data); m && std::holds_alternative<net::LoadProgress>(*m)) {
                     told.push_back(std::get<net::LoadProgress>(*m).percent);
                 }
@@ -2550,7 +2551,7 @@ TEST_CASE("net: a joining computer tells how far the game on its way has come") 
 }
 
 TEST_CASE("net: the host takes a few spectators, not any number (MS-12)") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     net::SessionConfig config;
     config.max_spectators = 2;
     Host host(network, config);
@@ -2573,7 +2574,7 @@ namespace {
 /// A lobby of four slots, the third the computer's, whose host waits for everyone at the start
 /// (SessionConfig::start_wait_ms); Anna and Bernd join it.
 struct StartingLobby {
-    net::LoopbackNetwork network{30, 10};
+    annokit::net::LoopbackNetwork network{30, 10};
     std::unique_ptr<net::HostSession> host;
     std::vector<net::SessionEvent> host_events;
     std::optional<Game> host_game;
@@ -2718,7 +2719,7 @@ TEST_CASE("net: without waiting at the start the host's game runs at once") {
 }
 
 TEST_CASE("net: a game loaded in the background: the computer goes on meanwhile, then plays in step") {
-    net::LoopbackNetwork network(20, 5);
+    annokit::net::LoopbackNetwork network(20, 5);
     Host host(network);
     Computer a(network, "Anna");
     // Reading the game waits for the test: as a large world on a slow computer.
@@ -2757,7 +2758,7 @@ TEST_CASE("net: a game loaded in the background: the computer goes on meanwhile,
 }
 
 TEST_CASE("net: a game that cannot be read in the background ends the session as one read at once") {
-    net::LoopbackNetwork network(5, 0);
+    annokit::net::LoopbackNetwork network(5, 0);
     Host host(network);
     Computer a(network, "Anna");
     a.session->load_in_background(
@@ -2772,11 +2773,11 @@ TEST_CASE("net: a game that cannot be read in the background ends the session as
 
 TEST_CASE("net: over real UDP, a game read for longer than the connection's timeout keeps the connection") {
     constexpr std::uint16_t kPort = 46022;
-    auto listening = net::enet_listen(kPort, 4);
+    auto listening = annokit::net::enet_listen(kPort, 4);
     if (!listening) {
         SKIP("UDP port 46022 is not free here");
     }
-    auto connecting = net::enet_connect("127.0.0.1", kPort);
+    auto connecting = annokit::net::enet_connect("127.0.0.1", kPort);
     REQUIRE(connecting.ok());
 
     Game host_game = Game::fresh();

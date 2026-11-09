@@ -36,6 +36,12 @@
 #include "viewer_options.hpp"
 #include "zoom_graphics.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+#include "annokit/net/enet_transport.hpp"
+#include "annokit/platform/mouse_cursor.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_looks.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -46,17 +52,12 @@
 #include "o1602/assets/package_scenarios.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/document.hpp"
 #include "o1602/editor/special_objects.hpp"
 #include "o1602/editor/terrain.hpp"
 #include "o1602/editor/units.hpp"
-#include "o1602/net/enet_transport.hpp"
 #include "o1602/net/lan.hpp"
 #include "o1602/net/session.hpp"
-#include "o1602/platform/mouse_cursor.hpp"
-#include "o1602/platform/window.hpp"
 #include "o1602/render/ambient.hpp"
 #include "o1602/render/animation_clock.hpp"
 #include "o1602/render/camera.hpp"
@@ -90,8 +91,8 @@ class MainMenu;
 /// (VideoController), and runs the frames.
 class MapViewer : private MapInput::Host {
 public:
-    static core::Result<std::unique_ptr<MapViewer>> create(const assets::GameDirectory& game,
-                                                           const ViewerOptions& options);
+    static annokit::core::Result<std::unique_ptr<MapViewer>> create(const assets::GameDirectory& game,
+                                                                    const ViewerOptions& options);
     ~MapViewer() override;
     MapViewer(const MapViewer&) = delete;
     MapViewer& operator=(const MapViewer&) = delete;
@@ -119,12 +120,12 @@ private:
     /// Starts loading the zoom levels in the background (window and banners must be there).
     void start_preloading();
     /// The graphics of `zoom` on the GPU; waits for the background if it is not done yet.
-    core::Status ensure_graphics(render::Zoom zoom);
+    annokit::core::Status ensure_graphics(render::Zoom zoom);
     /// The menu is shown: no world is drawn.
     [[nodiscard]] bool in_menu() const noexcept { return m_hud && m_hud->menu_active(); }
     /// Every frame: uploads the zoom levels the background finished.
     void adopt_preloaded_graphics();
-    core::Status install_graphics(render::Zoom zoom, render::PreparedGraphics prepared);
+    annokit::core::Status install_graphics(render::Zoom zoom, render::PreparedGraphics prepared);
     /// The parts of the world's layers that do not change within a frame (graphics of the zoom
     /// level, figures, banners).
     [[nodiscard]] render::WorldLayers world_layers(const ZoomGraphics& graphics) const;
@@ -179,7 +180,7 @@ private:
     /// Where the camera starts and Home goes: the local player's Kontor, else his first ship,
     /// else the first island.
     [[nodiscard]] render::TilePos home_tile() const override;
-    core::Status save_screenshot(const std::filesystem::path& path);
+    annokit::core::Status save_screenshot(const std::filesystem::path& path);
     /// Shows the drawn frame. A screenshot asked for since the last one is read first: SDL can read
     /// the picture back only before it is presented.
     void present();
@@ -189,13 +190,13 @@ private:
     /// Saves the game: Open1602's own savegame, or a .GAM the original loads if the path ends in
     /// .gam. Never into the game's installation. An autosave still being written is finished
     /// first, so it never lands over a newer file.
-    core::Status save_game(const std::filesystem::path& path);
+    annokit::core::Status save_game(const std::filesystem::path& path);
     /// Where a savegame for `path` goes (absolute), unless that lies in the game's installation
     /// or cannot be checked; the groups of this computer's player go into the world.
-    core::Result<std::filesystem::path> prepare_save(const std::filesystem::path& path);
+    annokit::core::Result<std::filesystem::path> prepare_save(const std::filesystem::path& path);
     /// Saves the game into a slot of the savegame list and names it there (slots.cfg, the panel,
     /// the menu).
-    core::Status save_slot(std::size_t slot, std::string name);
+    annokit::core::Status save_slot(std::size_t slot, std::string name);
     /// Names a slot whose file was just written: slots.cfg, the panel and the menu.
     void remember_slot(std::size_t slot, std::string name, std::uint8_t humans);
     /// Human players in the game now (the savegame list shows them).
@@ -223,7 +224,7 @@ private:
     /// Replaces the running game by a savegame (Open1602's own or the original's) while the
     /// program runs (F9); the game goes on as it was if the file cannot be read. `rules`: the
     /// settings chosen for a scenario (a savegame of Open1602 keeps its own).
-    core::Status load_game(const std::filesystem::path& path, const sim::Rules* rules = nullptr);
+    annokit::core::Status load_game(const std::filesystem::path& path, const sim::Rules* rules = nullptr);
     /// A game loaded alone that does not know this person and has several human players: they
     /// choose which one to play before it starts (ask_choice); the human players to choose from,
     /// empty if the game needs no choice.
@@ -233,8 +234,8 @@ private:
     /// A savegame or scenario as a world, not started.
     /// `warnings`: how many the loader gave (they are written to the log); the notes of the
     /// generator for islands made when the game starts are not among them (log_world_notes).
-    [[nodiscard]] core::Result<sim::World> read_world(const std::filesystem::path& path,
-                                                      std::size_t* warnings = nullptr) const;
+    [[nodiscard]] annokit::core::Result<sim::World> read_world(const std::filesystem::path& path,
+                                                               std::size_t* warnings = nullptr) const;
     /// The game goes on in another world (a savegame, a scenario, a new game): the new game is
     /// built whole, then everything of the old one goes. `source`: the file it came from, for the
     /// window title when the game has no name of its own. Out of memory leaves the old game running.
@@ -247,8 +248,8 @@ private:
     /// The presentation takes `next` as the game: everything of the old one goes. `source`: the file
     /// it came from.
     void adopt_state(std::unique_ptr<GameState> next, const std::filesystem::path& source);
-    core::Status replace_world(sim::World world, const std::filesystem::path& source = {},
-                               const sim::Rules* rules = nullptr);
+    annokit::core::Status replace_world(sim::World world, const std::filesystem::path& source = {},
+                                        const sim::Rules* rules = nullptr);
     /// The name of the game for the window title (UTF-8).
     [[nodiscard]] std::string game_title() const;
     /// The multiplayer part of the window title (players, ended, waiting), or nothing.
@@ -307,8 +308,8 @@ private:
     [[nodiscard]] GameSettingsMenu::PreviewMaker preview_maker(bool multiplayer) const;
     /// A new endless game of `level` (from the menu): name and banner of the human (one of the
     /// original's four or a further one), with the settings of the start dialog (rules, an own world).
-    core::Status start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
-                               const EndlessSetup& setup);
+    annokit::core::Status start_endless(std::uint8_t level, sim::BannerId banner, const std::string& name,
+                                        const EndlessSetup& setup);
     /// Open1602's own folder for savegames (the user's data folder, not the installation).
     [[nodiscard]] static std::filesystem::path save_folder();
 
@@ -316,12 +317,13 @@ private:
     /// Shows `world` in the editor, as a new document of `file` (empty: a new map). The game that
     /// ran goes; out of memory leaves everything as it was.
     /// With a `slot` the world is that savegame, edited as a savegame (EditorSession::slot).
-    core::Status enter_editor(sim::World world, const std::filesystem::path& file,
-                              std::optional<std::size_t> slot = std::nullopt);
+    annokit::core::Status enter_editor(sim::World world, const std::filesystem::path& file,
+                                       std::optional<std::size_t> slot = std::nullopt);
     /// The editor with the file of the command line (--editor), or a new map.
     void start_editor();
     /// Opens `file` in the editor (a file of Open1602 or of the original).
-    core::Status editor_open(const std::filesystem::path& file, std::optional<std::size_t> slot = std::nullopt);
+    annokit::core::Status editor_open(const std::filesystem::path& file,
+                                      std::optional<std::size_t> slot = std::nullopt);
     /// The slot of the savegame list whose file `file` is (named, not the last game), if any.
     [[nodiscard]] std::optional<std::size_t> editor_slot_of(const std::filesystem::path& file) const;
     /// Writes the savegame of the document back to its slot, marked as changed.
@@ -339,7 +341,7 @@ private:
     void editor_keep_script_file();
     void editor_find_script_file();
     /// A new map in the editor.
-    core::Status editor_new(const EditorNewMap& map);
+    annokit::core::Status editor_new(const EditorNewMap& map);
     /// Saves the document under `file`; what happened goes to the panel's notice. False if it
     /// could not be.
     bool editor_save(const std::filesystem::path& file);
@@ -413,7 +415,7 @@ private:
     void editor_load_island(const std::filesystem::path& file, std::uint8_t climate);
     [[nodiscard]] static std::filesystem::path own_island_folder();
     /// `op` done as a step of the document; false (and a note why) if it could not be made.
-    bool editor_perform(core::Result<std::unique_ptr<editor::Operation>> op);
+    bool editor_perform(annokit::core::Result<std::unique_ptr<editor::Operation>> op);
     /// The terrain piece chosen on the page "Terrain" (nothing if its group has none).
     [[nodiscard]] const assets::BuildingType* editor_terrain_piece() const;
     /// The terrain tool lays at the world tile (x, y) into `stroke`; `going_on`: the mouse moved
@@ -536,7 +538,7 @@ private:
 
     // ---- Multiplayer (multiplayer.cpp, ADR 0011) ----
     /// Hosts or joins the multiplayer game of the command line.
-    core::Status start_multiplayer();
+    annokit::core::Status start_multiplayer();
     /// What the multiplayer session reported this frame: lines of the chat, the menu's screens.
     void apply_session_events();
     /// A chat line for each person's slot the computer took over since the last frame.
@@ -547,7 +549,7 @@ private:
     /// thread and returns what starts it on the game thread.
     [[nodiscard]] net::ClientSession::Finish prepare_host_game(std::vector<std::uint8_t> save);
     /// Starts the game a host sent, read as `world` (with the `warnings` of reading it).
-    sim::Simulation* start_host_game(core::Result<sim::World> world, const std::vector<std::string>& warnings);
+    sim::Simulation* start_host_game(annokit::core::Result<sim::World> world, const std::vector<std::string>& warnings);
     /// Fingerprint of the game data the simulation depends on: computers of a multiplayer game
     /// must have the same.
     [[nodiscard]] std::uint64_t content_fingerprint() const;
@@ -565,13 +567,13 @@ private:
     /// Answers searches for the hosted game, in the menu and in the game.
     void update_lan_beacon();
     /// Opens a lobby for `setup` on its port.
-    core::Status host_lobby(const HostSetup& setup);
+    annokit::core::Status host_lobby(const HostSetup& setup);
     /// The host starts the game of its lobby: makes the world, gives the slots their players.
-    core::Status start_hosted_game();
+    annokit::core::Status start_hosted_game();
     /// Joins the host at `address`; with `fetch_packages` it asks the host for the packages of the
     /// game this computer lacks, which the person agreed to download (docs/modding/packages.md).
-    core::Status join_game(const std::string& address, std::uint16_t port, const std::string& password,
-                           bool fetch_packages = false);
+    annokit::core::Status join_game(const std::string& address, std::uint16_t port, const std::string& password,
+                                    bool fetch_packages = false);
     /// The host has packages of its game this computer lacks and would send them: asks the person,
     /// the answer joins again with them or goes back to the search (m_fetch_offer).
     void offer_packages(std::span<const assets::ContentPackage> packages, std::uint64_t bytes, std::string refusal);
@@ -596,8 +598,8 @@ private:
     /// Starts the package scenario `id`: its map with its money and goals, its script with the
     /// packages' (`rules`: of the start dialog, else the options'). As part `part` (from 0) of the
     /// package campaign `campaign`, if not empty, with what the part before left.
-    core::Status start_package_scenario(const std::string& id, const sim::Rules* rules,
-                                        const std::string& campaign = {}, std::uint8_t part = 0);
+    annokit::core::Status start_package_scenario(const std::string& id, const sim::Rules* rules,
+                                                 const std::string& campaign = {}, std::uint8_t part = 0);
     /// A won part of a package's campaign: opens the next part in `progress` and keeps what it
     /// leaves to it (campaign_carry_file).
     void record_campaign_part(assets::CampaignProgress& progress, const sim::World::CampaignPart& part);
@@ -783,14 +785,14 @@ private:
     AutosaveTimer m_autosave;
     /// An autosave on its way to the disk (packing and writing on another thread).
     struct AutosaveJob {
-        std::future<core::Status> written;
+        std::future<annokit::core::Status> written;
         std::uint8_t humans = 0;
         std::int32_t minutes = 0;
         std::uint64_t capture_us = 0;  ///< the part in the frame
         std::chrono::steady_clock::time_point started;
     };
     std::optional<AutosaveJob> m_autosave_job;
-    bool m_debug_title = core::environment_variable("O1602_DEBUG_TITLE").has_value();
+    bool m_debug_title = annokit::core::environment_variable("O1602_DEBUG_TITLE").has_value();
     ViewerOptions m_options;
     std::unique_ptr<GameState> m_state;  ///< the running game (after m_buildings, m_figures, m_options)
     /// Messages, the end screen and the notes of the status line (quick save, screenshot, errors).
@@ -841,15 +843,16 @@ private:
     std::optional<HostSetup> m_hosted;               ///< the game this computer hosts
     std::optional<sim::World> m_hosted_world;        ///< its scenario or savegame until the start
 
-    std::unique_ptr<platform::SdlSystem> m_sdl;
-    std::unique_ptr<platform::Window> m_window;
+    std::unique_ptr<annokit::platform::SdlSystem> m_sdl;
+    std::unique_ptr<annokit::platform::Window> m_window;
     /// The map at a scale that is no whole number (after the window, before SDL quits).
     std::unique_ptr<render::SdlMapCanvas> m_map_canvas;
     bool m_software_renderer = false;  ///< SDL draws without a GPU
     /// After a device reset: the game goes on with a black map and the interface until the
     /// background has the zoom level shown, instead of standing still for seconds (FB-11).
     bool m_graphics_reloading = false;
-    platform::MouseCursors m_cursors;  ///< the original's arrow and target (after the window, before SDL quits)
+    annokit::platform::MouseCursors
+        m_cursors;  ///< the original's arrow and target (after the window, before SDL quits)
     std::array<std::optional<ZoomGraphics>, 3> m_graphics;
     std::unique_ptr<render::GraphicsPreloader> m_preloader;  ///< the CPU side of the zoom levels
 

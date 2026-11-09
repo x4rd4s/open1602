@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -29,14 +29,14 @@ public:
 
     /// Validates that `root` looks like an Anno 1602 installation. Of the History Edition's language
     /// folders it takes that of the system's language (see language_folder()).
-    static core::Result<GameDirectory> open(const std::filesystem::path& root);
+    static annokit::core::Result<GameDirectory> open(const std::filesystem::path& root);
 
     /// The first file of an installation that `root` lacks ("haeuser.cod", ...), or nothing if it
     /// has them all. open() fails exactly when there is one.
     [[nodiscard]] static std::optional<std::string_view> missing_file(const std::filesystem::path& root);
 
     /// Opens the directory named by ANNO1602_DIR.
-    static core::Result<GameDirectory> from_environment();
+    static annokit::core::Result<GameDirectory> from_environment();
 
     /// Folders where installers usually put the game, most likely first: GOG's registry entries on
     /// Windows, then the default folders of GOG, GOG Galaxy and the CD's installer; elsewhere those of

@@ -17,4 +17,4 @@ community improvements stay open.
 ## Consequences
 - `.gitignore` excludes typical game files and export folders.
 - Tests against original data only run when `ANNO1602_DIR` is set (skipped in CI).
-- Third-party code only with a GPL-3.0-compatible licence; document its origin in `third_party/README.md`.
+- Third-party code only with a GPL-3.0-compatible licence; document its origin in annokit's `third_party/README.md`.

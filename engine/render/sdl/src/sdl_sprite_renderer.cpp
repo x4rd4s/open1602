@@ -33,21 +33,21 @@ void SdlSpriteRenderer::release() {
     m_atlas = nullptr;
 }
 
-core::Status SdlSpriteRenderer::upload(const SpriteAtlas& atlas) {
+annokit::core::Status SdlSpriteRenderer::upload(const SpriteAtlas& atlas) {
     release();
     for (const RgbaImage& page : atlas.pages()) {
         SDL_Texture* texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC,
                                                  static_cast<int>(page.width), static_cast<int>(page.height));
         if (texture == nullptr) {
             release();
-            return core::make_error(core::ErrorCode::PlatformError,
-                                    std::string("SDL_CreateTexture: ") + SDL_GetError());
+            return annokit::core::make_error(annokit::core::ErrorCode::PlatformError,
+                                             std::string("SDL_CreateTexture: ") + SDL_GetError());
         }
         m_pages.push_back(texture);
         if (!SDL_UpdateTexture(texture, nullptr, page.pixels.data(), static_cast<int>(page.width * 4))) {
             release();
-            return core::make_error(core::ErrorCode::PlatformError,
-                                    std::string("SDL_UpdateTexture: ") + SDL_GetError());
+            return annokit::core::make_error(annokit::core::ErrorCode::PlatformError,
+                                             std::string("SDL_UpdateTexture: ") + SDL_GetError());
         }
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
@@ -69,7 +69,7 @@ core::Status SdlSpriteRenderer::upload(const SpriteAtlas& atlas) {
         SDL_SetTextureScaleMode(m_hatch, SDL_SCALEMODE_NEAREST);
     }
     m_atlas = &atlas;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 bool SdlSpriteRenderer::draw_checker(const DrawCommand& c, std::int32_t height, float x0, float y0, float x1,

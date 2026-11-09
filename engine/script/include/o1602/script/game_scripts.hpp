@@ -17,9 +17,10 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/script/sandbox.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/package_scenarios.hpp"
-#include "o1602/script/sandbox.hpp"
 #include "o1602/sim/scripting.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -80,7 +81,7 @@ public:
     /// Runs the top level of each script for the game on `world`, which must outlive this object.
     /// A package the world's savegame kept a state for takes it up; the others start at the first
     /// tick (on_start). A script whose top level fails is reported and stays off.
-    GameScripts(std::vector<PackageScript> scripts, const sim::World& world, Limits limits = {});
+    GameScripts(std::vector<PackageScript> scripts, const sim::World& world, annokit::script::Limits limits = {});
     ~GameScripts() override;
 
     void after_tick(sim::Simulation& simulation, const sim::TickEvents& events) override;
@@ -101,7 +102,7 @@ private:
     /// The events of cities, disasters, ships, fights and diplomacy.
     void dispatch_more(Package& package, const sim::TickEvents& events);
     /// Calls `function` if the script defines it; failures count towards kMaxScriptErrors.
-    void call(Package& package, std::string_view function, std::span<const Value> args = {});
+    void call(Package& package, std::string_view function, std::span<const annokit::script::Value> args = {});
     void fail(Package& package, const std::string& message);
     void add_api(Package& package);
 

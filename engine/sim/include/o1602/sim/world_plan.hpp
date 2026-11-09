@@ -17,10 +17,11 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/scenario.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/limits.hpp"
 #include "o1602/sim/package_islands.hpp"
@@ -236,8 +237,8 @@ inline constexpr std::uint8_t kPlanNoVillage = 2;
 inline constexpr std::uint8_t kPlanOwnShape = 4;
 
 /// Plans a world. The same settings and seed give the same plan.
-[[nodiscard]] core::Result<WorldPlan> plan_world(const WorldSettings& settings,
-                                                 const std::vector<TemplateInfo>& templates,
-                                                 std::vector<std::string>* warnings = nullptr);
+[[nodiscard]] annokit::core::Result<WorldPlan> plan_world(const WorldSettings& settings,
+                                                          const std::vector<TemplateInfo>& templates,
+                                                          std::vector<std::string>* warnings = nullptr);
 
 }  // namespace o1602::sim

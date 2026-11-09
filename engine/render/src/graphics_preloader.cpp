@@ -81,13 +81,13 @@ std::optional<GraphicsPreloader::Ready> GraphicsPreloader::take_ready() {
     return r;
 }
 
-core::Result<PreparedGraphics> GraphicsPreloader::take(Zoom zoom, const std::function<void()>& wait_step) {
+annokit::core::Result<PreparedGraphics> GraphicsPreloader::take(Zoom zoom, const std::function<void()>& wait_step) {
     std::unique_lock lock(m_mutex);
     for (;;) {
         const auto ready =
             std::find_if(m_ready.begin(), m_ready.end(), [zoom](const Ready& r) { return r.first == zoom; });
         if (ready != m_ready.end()) {
-            core::Result<PreparedGraphics> result = std::move(ready->second);
+            annokit::core::Result<PreparedGraphics> result = std::move(ready->second);
             m_ready.erase(ready);
             return result;
         }
@@ -121,7 +121,7 @@ void GraphicsPreloader::work() {
         m_queue.pop_front();
         m_making = zoom;
         lock.unlock();
-        core::Result<PreparedGraphics> result = prepare(zoom);
+        annokit::core::Result<PreparedGraphics> result = prepare(zoom);
         lock.lock();
         m_making.reset();
         m_ready.emplace_back(zoom, std::move(result));
@@ -129,13 +129,13 @@ void GraphicsPreloader::work() {
     }
 }
 
-core::Result<PreparedGraphics> GraphicsPreloader::prepare(Zoom zoom) const {
+annokit::core::Result<PreparedGraphics> GraphicsPreloader::prepare(Zoom zoom) const {
     try {
         return m_prepare(zoom, m_cancel);
     } catch (const std::bad_alloc&) {
-        return core::make_error(core::ErrorCode::PlatformError, "not enough memory for the graphics");
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError, "not enough memory for the graphics");
     } catch (const std::exception& e) {
-        return core::make_error(core::ErrorCode::PlatformError, std::string("graphics: ") + e.what());
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError, std::string("graphics: ") + e.what());
     }
 }
 

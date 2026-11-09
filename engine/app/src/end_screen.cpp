@@ -8,7 +8,8 @@
 
 #include "banner_graphic.hpp"
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {

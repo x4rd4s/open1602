@@ -8,8 +8,9 @@
 #include <memory>
 #include <string_view>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
@@ -21,8 +22,9 @@ inline constexpr std::size_t kMaxCityName = 40;
 
 /// The city `city` of island `island`, named `name` (Windows-1252, sim::valid_name). Fails
 /// (NotFound) without the city, (InvalidFormat) for a name a player could not give.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> rename_city(const sim::World& world, std::uint16_t island,
-                                                                   std::uint8_t city, std::string_view name);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> rename_city(const sim::World& world,
+                                                                            std::uint16_t island, std::uint8_t city,
+                                                                            std::string_view name);
 
 /// The room per ware of the city in 1/32 t (sim::City::capacity, as the game reckons it from the
 /// city's Kontor, markets and warehouses); 0 without the city.
@@ -32,25 +34,26 @@ inline constexpr std::size_t kMaxCityName = 40;
 /// The city with `amount` (1/32 t) of `ware` in its warehouses, at most its room (city_room()):
 /// the game would lose what is above. Fails (NotFound) without the city, (InvalidFormat) for a
 /// ware that is no trade good of the world.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world,
-                                                                      const assets::BuildingTable& buildings,
-                                                                      std::uint16_t island, std::uint8_t city,
-                                                                      std::uint8_t ware, std::uint32_t amount);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_city_goods(const sim::World& world,
+                                                                               const assets::BuildingTable& buildings,
+                                                                               std::uint16_t island, std::uint8_t city,
+                                                                               std::uint8_t ware, std::uint32_t amount);
 
 /// What the city's Kontor offers for the ware of `setting` to other players' ships and the free
 /// trader: its mode, price and amount (keep or limit, at most city_room()) as the Kontor's trade
 /// window sets them (sim::apply_trade_setting; the setting's player, island and city are not read).
 /// Fails (NotFound) without the city or without room (no Kontor), (InvalidFormat) for a ware that is
 /// no trade good, (Unsupported) for one more ware than the Kontor's slots allow (sim::trade_slots).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world,
-                                                                      const assets::BuildingTable& buildings,
-                                                                      std::uint16_t island, std::uint8_t city,
-                                                                      const sim::TradeSetting& setting);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_city_trade(const sim::World& world,
+                                                                               const assets::BuildingTable& buildings,
+                                                                               std::uint16_t island, std::uint8_t city,
+                                                                               const sim::TradeSetting& setting);
 
 /// The city's trade as its owner starts with it: a native village's offer
 /// (sim::native_village_offer), nothing for everybody else. Fails (NotFound) without the city.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world, std::uint16_t island,
-                                                                        std::uint8_t city);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> reset_city_trade(const sim::World& world,
+                                                                                 std::uint16_t island,
+                                                                                 std::uint8_t city);
 
 /// The city and every tile it holds given to `owner`, a human, a computer, the natives or the
 /// pirates (for whom the editor places buildings too), as when a player takes a city over: its
@@ -58,7 +61,9 @@ inline constexpr std::size_t kMaxCityName = 40;
 /// (sim::native_village_offer), one that stops being one trades nothing. Fails (NotFound) without
 /// the city or the player, (Unsupported) where `owner` has a city on the island already (one each)
 /// or is none of those.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world, std::uint16_t island,
-                                                                         std::uint8_t city, sim::PlayerId owner);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> change_city_owner(const sim::World& world,
+                                                                                  std::uint16_t island,
+                                                                                  std::uint8_t city,
+                                                                                  sim::PlayerId owner);
 
 }  // namespace o1602::editor

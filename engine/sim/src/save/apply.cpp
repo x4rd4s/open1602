@@ -14,8 +14,8 @@
 
 namespace o1602::sim::save {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -23,7 +23,7 @@ bool island_ok(const World& w, std::uint16_t island) {
     return island < w.islands().size();
 }
 
-core::Status check(const World& w, const Decoded& d) {
+annokit::core::Status check(const World& w, const Decoded& d) {
     const auto bad = [](const char* what) {
         return make_error(ErrorCode::InvalidFormat, std::string("O1602: ") + what);
     };
@@ -134,12 +134,12 @@ core::Status check(const World& w, const Decoded& d) {
             }
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace
 
-core::Status apply_decoded(World& world, Decoded& d) {
+annokit::core::Status apply_decoded(World& world, Decoded& d) {
     if (auto status = check(world, d); !status) {
         return status;
     }
@@ -580,7 +580,7 @@ core::Status apply_decoded(World& world, Decoded& d) {
             world.set_source(std::make_shared<const assets::ChunkFile>(std::move(file).value()));
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace o1602::sim::save

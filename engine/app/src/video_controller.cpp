@@ -7,7 +7,7 @@
 #include "game_sound.hpp"
 #include "hud.hpp"
 
-#include "o1602/platform/window.hpp"
+#include "annokit/platform/window.hpp"
 
 namespace o1602::app {
 
@@ -67,7 +67,7 @@ bool VideoController::frame(std::uint64_t now_ms, bool minimap_shown) {
                 // The picture waits for the sound, which plays after what the device holds.
                 m_sound.prefill();
                 m_sound.start_video(m_player->audio());
-                m_player->hold_until(platform::ticks_ms() + m_sound.queued_ms());
+                m_player->hold_until(annokit::platform::ticks_ms() + m_sound.queued_ms());
                 break;
             case VideoPlayer::Load::Failed:
                 // A damaged file goes on with the next one, as a missing one does.

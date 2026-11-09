@@ -8,8 +8,9 @@
 #include <set>
 #include <span>
 
+#include "annokit/core/byte_reader.hpp"
+
 #include "o1602/assets/scenario.hpp"
-#include "o1602/core/byte_reader.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/mission.hpp"
 #include "o1602/sim/world.hpp"
@@ -189,7 +190,7 @@ GameIdentity game_identity(const World& world) {
     // A savegame keeps what the scenario said in TIMERS (the SZENE_* chunks are gone).
     if (const assets::Chunk* timers = file->find("TIMERS")) {
         const auto t = file->payload(*timers);
-        core::ByteReader r(t);
+        annokit::core::ByteReader r(t);
         if (r.seek(kTimersGameId)) {
             if (const auto game = r.u32(); game && *game != 0) {
                 id.game_id = *game;

@@ -7,7 +7,7 @@
 #include "../test_framework.hpp"
 #include "command_sink.hpp"
 
-#include "o1602/net/loopback.hpp"
+#include "annokit/net/loopback.hpp"
 
 using namespace o1602;
 
@@ -37,7 +37,7 @@ struct Game {
 /// Stands in for a multiplayer session: keeps what it is given.
 class FakeSession final : public net::Session {
 public:
-    explicit FakeSession(net::LoopbackNetwork& network) : Session(network.listen(), {}) {}
+    explicit FakeSession(annokit::net::LoopbackNetwork& network) : Session(network.listen(), {}) {}
 
     void submit(sim::Command command) override { commands.push_back(std::move(command)); }
     void update(std::uint32_t, const sim::Simulation::BeforeTick&) override {}
@@ -58,7 +58,7 @@ TEST_CASE("command sink: a single-player command reaches the simulation") {
 
 TEST_CASE("command sink: in multiplayer the session takes the command, not the simulation") {
     Game g;
-    net::LoopbackNetwork network;
+    annokit::net::LoopbackNetwork network;
     FakeSession session(network);
     app::CommandSink sink;
     sink.set_simulation(&g.simulation);

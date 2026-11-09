@@ -6,8 +6,9 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -19,10 +20,10 @@ using assets::GameDirectory;
 namespace {
 
 fs::path typed_path(std::string_view text) {
-    return core::path_from_utf8(GameDirectory::clean_path_text(text));
+    return annokit::core::path_from_utf8(GameDirectory::clean_path_text(text));
 }
 
-GameFolderSearch named(core::Result<GameDirectory> dir) {
+GameFolderSearch named(annokit::core::Result<GameDirectory> dir) {
     GameFolderSearch out;
     if (dir) {
         out.game = std::move(dir).value();
@@ -61,12 +62,13 @@ GameFolderSearch find_game_folder(std::string_view command_line, std::string_vie
             return out;
         }
     }
-    out.error = core::make_error(core::ErrorCode::NotFound, "no Anno 1602 installation found in the usual folders");
+    out.error = annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                          "no Anno 1602 installation found in the usual folders");
     out.ask = true;
     return out;
 }
 
-core::Result<GameDirectory> open_chosen_folder(const fs::path& folder) {
+annokit::core::Result<GameDirectory> open_chosen_folder(const fs::path& folder) {
     auto dir = GameDirectory::open(folder);
     if (dir) {
         return dir;
@@ -84,7 +86,7 @@ core::Result<GameDirectory> open_chosen_folder(const fs::path& folder) {
 }
 
 std::string folder_problem(const fs::path& folder) {
-    const std::string name = core::path_to_utf8(folder);
+    const std::string name = annokit::core::path_to_utf8(folder);
     std::error_code ec;
     if (!fs::is_directory(folder, ec)) {
         return tr_utf8("game_folder.missing", {name});
@@ -94,7 +96,7 @@ std::string folder_problem(const fs::path& folder) {
         std::size_t count = 0;
         for (const fs::path& child : GameDirectory::folders_named_1602(folder)) {
             if (!GameDirectory::missing_file(child)) {
-                inside += "\n" + core::path_to_utf8(child.filename());
+                inside += "\n" + annokit::core::path_to_utf8(child.filename());
                 ++count;
             }
         }
@@ -108,7 +110,7 @@ std::string folder_problem(const fs::path& folder) {
 
 std::string tr_utf8(std::string_view key, std::initializer_list<std::string_view> args) {
     // The arguments go in after the conversion: Windows-1252 cannot hold every letter of a path.
-    std::string text = core::cp1252_to_utf8(ui::tr(key));
+    std::string text = annokit::core::cp1252_to_utf8(ui::tr(key));
     std::size_t n = 1;
     for (const std::string_view arg : args) {
         const std::string mark = "{" + std::to_string(n++) + "}";

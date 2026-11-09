@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <string>
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::assets {
 
@@ -86,13 +87,13 @@ TextTable TextTable::parse(std::string_view text) {
     return table;
 }
 
-core::Result<TextTable> TextTable::load(const GameDirectory& game) {
+annokit::core::Result<TextTable> TextTable::load(const GameDirectory& game) {
     const auto path = game.resolve("Text.cod");
     if (!path) {
-        return core::make_error(core::ErrorCode::NotFound, "Text.cod not found");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "Text.cod not found");
     }
     // Kept in Windows-1252 like the names in savegames (City::name).
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     if (!bytes) {
         return bytes.error();
     }

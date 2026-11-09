@@ -20,9 +20,10 @@
 #include <string>
 #include <vector>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::sim {
@@ -30,20 +31,21 @@ namespace o1602::sim {
 /// One chunk of a savegame.
 struct SavedChunk {
     std::string name;
-    core::Bytes data;
+    annokit::core::Bytes data;
 };
 
 /// The chunks of the savegame in the original's order, without WIFF. Needs the world's source
 /// file (World::source()) for the fields Open1602 does not model; fails if the world does not fit
 /// the original's limits (50 islands, 75 cities, 7 players, 150 ships, ...).
-[[nodiscard]] core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world,
-                                                                    const assets::BuildingTable& buildings);
+[[nodiscard]] annokit::core::Result<std::vector<SavedChunk>> savegame_chunks(const World& world,
+                                                                             const assets::BuildingTable& buildings);
 
 class Simulation;
 
 /// The whole file: the chunks, WIFF and Open1602's own chunk (savegame_extension.hpp). With the
 /// running `simulation` its clocks and figures are saved too, so the game continues exactly.
-[[nodiscard]] core::Result<core::Bytes> write_savegame(const World& world, const assets::BuildingTable& buildings,
-                                                       const Simulation* simulation = nullptr);
+[[nodiscard]] annokit::core::Result<annokit::core::Bytes> write_savegame(const World& world,
+                                                                         const assets::BuildingTable& buildings,
+                                                                         const Simulation* simulation = nullptr);
 
 }  // namespace o1602::sim

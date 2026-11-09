@@ -29,7 +29,8 @@
 #include "map_gestures.hpp"
 #include "zoom_graphics.hpp"
 
-#include "o1602/platform/window.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/render/camera.hpp"
 #include "o1602/render/world_renderer.hpp"
 #include "o1602/sim/island_map.hpp"
@@ -130,7 +131,7 @@ public:
         BuildTool& tool;
         CommandSink& commands;
         GameSound& sound;
-        platform::Window& window;
+        annokit::platform::Window& window;
         Hud* hud;  ///< null without the panel
         /// The original's mouse: the left button gives orders too, the right one only cancels.
         bool original_mouse = false;
@@ -319,7 +320,7 @@ private:
     BuildTool& m_tool;
     CommandSink& m_commands;
     GameSound& m_sound;
-    platform::Window& m_window;
+    annokit::platform::Window& m_window;
     Hud* m_hud;
     bool m_original_mouse;
     bool m_confirm;

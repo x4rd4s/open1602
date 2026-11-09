@@ -3,7 +3,7 @@
 The game's videos are Smacker files (RAD Game Tools); the original plays them with
 `smackw32.dll`. Open1602 has its own decoder, written from the public
 format description ([MultimediaWiki: Smacker](https://wiki.multimedia.cx/index.php/Smacker)), without
-third-party code and without a library: `video::Smacker` (`engine/video/src/smacker.cpp`).
+third-party code and without a library: `video::Smacker` (`modules/video/src/smacker.cpp` of annokit).
 
 ## The game's files
 

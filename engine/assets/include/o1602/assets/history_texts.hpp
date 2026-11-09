@@ -14,16 +14,16 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
 class HistoryTexts {
 public:
     /// Parses texts.xml (UTF-8).
-    static core::Result<HistoryTexts> parse(std::string_view xml);
+    static annokit::core::Result<HistoryTexts> parse(std::string_view xml);
     /// data/texts.xml of the archive `rda` (the History Edition's ahe/a1he0.rda).
-    static core::Result<HistoryTexts> load(const std::filesystem::path& rda);
+    static annokit::core::Result<HistoryTexts> load(const std::filesystem::path& rda);
 
     /// Line `id` in `language` ("de", "en", ...; the file's codes are "de_de", "en_us", ...), else
     /// in English; UTF-8. Nothing if the line is unknown.

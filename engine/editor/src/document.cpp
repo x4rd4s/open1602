@@ -9,8 +9,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -30,25 +30,27 @@ Document Document::edit(sim::World& world, std::size_t history_limit) {
     return Document(&world, history_limit);
 }
 
-core::Result<sim::World> Document::read(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
-                                        const assets::GameDirectory* game, std::vector<std::string>* warnings,
-                                        const assets::FigureTable* figures) {
+annokit::core::Result<sim::World> Document::read(std::span<const std::uint8_t> bytes,
+                                                 const assets::BuildingTable& buildings,
+                                                 const assets::GameDirectory* game, std::vector<std::string>* warnings,
+                                                 const assets::FigureTable* figures) {
     if (sim::is_open1602_save(bytes)) {
         return sim::read_game(bytes, buildings, warnings, figures);
     }
     if (game == nullptr) {
         return make_error(ErrorCode::Unsupported, "editor: a file of the original needs the game's directory");
     }
-    auto file = assets::ChunkFile::from_bytes(core::Bytes(bytes.begin(), bytes.end()));
+    auto file = assets::ChunkFile::from_bytes(annokit::core::Bytes(bytes.begin(), bytes.end()));
     if (!file) {
         return file.error();
     }
     return sim::load_world(*file, buildings, *game, warnings, keep_plan());
 }
 
-core::Result<Document> Document::open(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
-                                      const assets::GameDirectory* game, std::vector<std::string>* warnings,
-                                      const assets::FigureTable* figures) {
+annokit::core::Result<Document> Document::open(std::span<const std::uint8_t> bytes,
+                                               const assets::BuildingTable& buildings,
+                                               const assets::GameDirectory* game, std::vector<std::string>* warnings,
+                                               const assets::FigureTable* figures) {
     auto world = read(bytes, buildings, game, warnings, figures);
     if (!world) {
         return world.error();
@@ -73,7 +75,7 @@ std::vector<std::string> Document::check_scenario() const {
     return problems;
 }
 
-core::Result<core::Bytes> Document::save(const assets::BuildingTable& buildings) {
+annokit::core::Result<annokit::core::Bytes> Document::save(const assets::BuildingTable& buildings) {
     if (auto problems = check_scenario(); !problems.empty()) {
         return make_error(ErrorCode::InvalidFormat, "scenario: " + problems.front());
     }
@@ -95,7 +97,7 @@ core::Result<core::Bytes> Document::save(const assets::BuildingTable& buildings)
     return bytes;
 }
 
-core::Result<core::Bytes> Document::save_game(const assets::BuildingTable& buildings) {
+annokit::core::Result<annokit::core::Bytes> Document::save_game(const assets::BuildingTable& buildings) {
     if (auto valid = sim::validate(*m_world); !valid) {
         return valid.error();
     }

@@ -191,7 +191,7 @@ void GameSettingsMenu::update_preview() {
             m_preview = std::move(made).value();
             m_preview_error.clear();
             picture(*m_preview);
-        } else if (made.error().code == core::ErrorCode::Cancelled) {
+        } else if (made.error().code == annokit::core::ErrorCode::Cancelled) {
             m_preview_key.clear();  // the last one shown stays until the next is made
         } else {
             m_preview.reset();

@@ -37,7 +37,7 @@ Set on 2026-10-16, binding for all new code. The architecture for this is in
 | `TOOLGFX/*.ZEI`, `*.COL` | Fonts (`ZEI\0`), palette | Fonts, 8-bit palette |
 | `NORD/`, `SUED/`, `*NAT/`, `NOKLIMA/` `*.SCP` (677 files) | Island templates, chunk-based | Map generation |
 | `Szenes/*.SZS`, `*.SZM` (138) | Scenarios / multiplayer maps | Same chunk format as savegames (`.GAM`) |
-| `VideoSmk/*.SMK` (51) | Smacker videos | own decoder based on the public description (`engine/video`, [smk.md](formats/smk.md)) |
+| `VideoSmk/*.SMK` (51) | Smacker videos | own decoder based on the public description (`annokit::video`, [smk.md](formats/smk.md)) |
 | `SAMPLES/`, `Speech8/`, `MUSIC8/` | WAV | usable directly |
 
 Existing community work (format knowledge, reference – check licences before reuse):

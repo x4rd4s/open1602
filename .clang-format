@@ -13,7 +13,9 @@ IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: '^<.*>'
     Priority: 1
-  - Regex: '^"o1602/'
+  - Regex: '^"annokit/'
     Priority: 3
+  - Regex: '^"o1602/'
+    Priority: 4
   - Regex: '.*'
     Priority: 2

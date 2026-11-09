@@ -4,8 +4,9 @@
 #include <array>
 #include <cstdint>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -23,8 +24,8 @@ class Palette {
 public:
     static constexpr std::size_t kSize = 256;
 
-    static core::Result<Palette> from_chunk_file(const ChunkFile& file);
-    static core::Result<Palette> load(const std::filesystem::path& path);
+    static annokit::core::Result<Palette> from_chunk_file(const ChunkFile& file);
+    static annokit::core::Result<Palette> load(const std::filesystem::path& path);
 
     [[nodiscard]] const Rgba& operator[](std::uint8_t index) const noexcept { return m_colours[index]; }
     [[nodiscard]] const std::array<Rgba, kSize>& colours() const noexcept { return m_colours; }

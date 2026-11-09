@@ -3,10 +3,11 @@
 
 #include <algorithm>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_reader.hpp"
+
 #include "o1602/assets/game_content.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_reader.hpp"
 
 namespace o1602::assets {
 
@@ -24,12 +25,12 @@ bool is_name(std::string_view name) noexcept {
 }
 
 /// The width and height of a PNG file from its header.
-core::Result<core::PngImage> png_header(const std::filesystem::path& path) {
-    auto head = core::read_file_head(path, 64);
+annokit::core::Result<annokit::core::PngImage> png_header(const std::filesystem::path& path) {
+    auto head = annokit::core::read_file_head(path, 64);
     if (!head) {
         return head.error();
     }
-    return core::png_size(head->bytes);
+    return annokit::core::png_size(head->bytes);
 }
 
 }  // namespace
@@ -51,12 +52,12 @@ void apply_graphics_file(std::vector<PackageImage>& images, std::string_view pac
                          const std::filesystem::path& folder, std::string_view utf8,
                          std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kGraphicsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: an image's name holds only lower case letters, digits and '_'");
@@ -70,7 +71,7 @@ void apply_graphics_file(std::vector<PackageImage>& images, std::string_view pac
         }
         std::optional<std::int64_t> count;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "image" || e.key == "image_medium" || e.key == "image_small") {
                 const std::string* s = e.value.string();
@@ -80,7 +81,7 @@ void apply_graphics_file(std::vector<PackageImage>& images, std::string_view pac
                     continue;
                 }
                 const std::size_t zoom = e.key == "image" ? 0 : e.key == "image_medium" ? 1 : 2;
-                image.files[zoom] = folder / core::path_from_utf8(*s);
+                image.files[zoom] = folder / annokit::core::path_from_utf8(*s);
             } else if (e.key == "width" || e.key == "height" || e.key == "count") {
                 const std::int64_t* n = e.value.integer();
                 const std::int64_t max =
@@ -114,7 +115,7 @@ void apply_graphics_file(std::vector<PackageImage>& images, std::string_view pac
             std::string file = at;  // "<where> line <n>: <id>: <file>"
             file += image.id;
             file += ": ";
-            file += core::path_to_utf8(image.files[zoom].lexically_relative(folder));
+            file += annokit::core::path_to_utf8(image.files[zoom].lexically_relative(folder));
             const auto size = png_header(image.files[zoom]);
             if (!size) {
                 file += ": ";
@@ -183,12 +184,12 @@ const PackageIcon* package_icon_at(std::span<const PackageIcon> icons, std::int3
 void apply_icons_file(std::vector<PackageIcon>& icons, std::string_view package, const std::filesystem::path& folder,
                       std::string_view utf8, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kIconsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: an icon's name holds only lower case letters, digits and '_'");
@@ -201,7 +202,7 @@ void apply_icons_file(std::vector<PackageIcon>& icons, std::string_view package,
             continue;
         }
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "image") {
                 const std::string* s = e.value.string();
@@ -209,7 +210,7 @@ void apply_icons_file(std::vector<PackageIcon>& icons, std::string_view package,
                     warnings.push_back(field + "is the path of a PNG file in the package, folders split by '/'");
                     ok = false;
                 } else {
-                    icon.file = folder / core::path_from_utf8(*s);
+                    icon.file = folder / annokit::core::path_from_utf8(*s);
                 }
             } else if (e.key == "tint") {
                 if (const bool* on = e.value.boolean()) {
@@ -232,7 +233,7 @@ void apply_icons_file(std::vector<PackageIcon>& icons, std::string_view package,
         std::string file = at;  // "<where> line <n>: <id>: <file>: ..."
         file += icon.id;
         file += ": ";
-        file += core::path_to_utf8(icon.file.lexically_relative(folder));
+        file += annokit::core::path_to_utf8(icon.file.lexically_relative(folder));
         file += ": ";
         const auto size = png_header(icon.file);
         if (!size) {

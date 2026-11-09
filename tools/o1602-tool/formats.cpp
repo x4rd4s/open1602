@@ -12,12 +12,13 @@
 
 #include "tool.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
 
 namespace o1602::tool {
 
@@ -86,7 +87,8 @@ int cmd_cod(const Args& args) {
     }
     if (args.positional.size() == 2) {
         const auto* begin = reinterpret_cast<const std::uint8_t*>(text->data());
-        if (auto status = core::write_file(fs::path(args.positional[1]), std::span(begin, text->size())); !status) {
+        if (auto status = annokit::core::write_file(fs::path(args.positional[1]), std::span(begin, text->size()));
+            !status) {
             return fail(status.error());
         }
     } else {
@@ -100,7 +102,7 @@ int cmd_cod_dump(const Args& args) {
         return usage();
     }
     const fs::path path(args.positional[0]);
-    auto bytes = core::read_file(path);
+    auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         return fail(bytes.error());
     }
@@ -170,7 +172,7 @@ int cmd_bsh_export(const Args& args) {
     std::error_code ec;
     fs::create_directories(out_dir, ec);
     if (ec) {
-        return fail(core::make_error(core::ErrorCode::IoError, "cannot create " + out_dir.string()));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::IoError, "cannot create " + out_dir.string()));
     }
 
     const std::size_t first = std::min(args.number("--first").value_or(0), sheet->size());
@@ -189,7 +191,8 @@ int cmd_bsh_export(const Args& args) {
         }
         char name[64];
         std::snprintf(name, sizeof(name), "%s_%05zu.png", stem.c_str(), i);
-        if (auto status = core::write_png_rgba(out_dir / name, image->width, image->height, image->to_rgba(*palette));
+        if (auto status =
+                annokit::core::write_png_rgba(out_dir / name, image->width, image->height, image->to_rgba(*palette));
             !status) {
             return fail(status.error());
         }
@@ -221,7 +224,7 @@ int cmd_bsh_export(const Args& args) {
             }
         }
         const fs::path out = out_dir / (stem + "_sheet.png");
-        if (auto status = core::write_png_rgba(out, width, height, rgba); !status) {
+        if (auto status = annokit::core::write_png_rgba(out, width, height, rgba); !status) {
             return fail(status.error());
         }
         std::printf("wrote %s (%ux%u, %zu sprites)\n", out.string().c_str(), width, height, images.size());

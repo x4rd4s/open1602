@@ -14,19 +14,20 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/compress.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/hash.hpp"
+#include "annokit/core/numeric.hpp"
+#include "annokit/core/png_writer.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/compress.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/hash.hpp"
-#include "o1602/core/numeric.hpp"
-#include "o1602/core/png_writer.hpp"
-#include "o1602/core/text.hpp"
 
 using namespace o1602;
 
@@ -93,16 +94,17 @@ TEST_CASE("cod: decode is byte-wise negation and roundtrips") {
 }
 
 TEST_CASE("text: cp1252 to utf8") {
-    CHECK(core::cp1252_to_utf8("T\xfcrme") == "T\xc3\xbcrme");  // ue
-    CHECK(core::cp1252_to_utf8("\x80") == "\xe2\x82\xac");      // euro sign
-    CHECK(core::cp1252_to_utf8("plain") == "plain");
+    CHECK(annokit::core::cp1252_to_utf8("T\xfcrme") == "T\xc3\xbcrme");  // ue
+    CHECK(annokit::core::cp1252_to_utf8("\x80") == "\xe2\x82\xac");      // euro sign
+    CHECK(annokit::core::cp1252_to_utf8("plain") == "plain");
 }
 
-TEST_CASE("png: chunks carry the CRC-32 of core::crc32 (IEEE, as zlib's)") {
+TEST_CASE("png: chunks carry the CRC-32 of annokit::core::crc32 (IEEE, as zlib's)") {
     // The check value of the CRC-32 of zlib and PNG.
     const std::string check = "123456789";
-    CHECK(core::crc32(std::span(reinterpret_cast<const std::uint8_t*>(check.data()), check.size())) == 0xCBF43926U);
-    // A bit-by-bit CRC-32 independent of the table of core::crc32.
+    CHECK(annokit::core::crc32(std::span(reinterpret_cast<const std::uint8_t*>(check.data()), check.size())) ==
+          0xCBF43926U);
+    // A bit-by-bit CRC-32 independent of the table of annokit::core::crc32.
     const auto reference = [](std::span<const std::uint8_t> data) {
         std::uint32_t c = 0xFFFFFFFFU;
         for (const std::uint8_t b : data) {
@@ -114,7 +116,7 @@ TEST_CASE("png: chunks carry the CRC-32 of core::crc32 (IEEE, as zlib's)") {
         return ~c;
     };
     const std::vector<std::uint8_t> rgba(std::size_t{3} * 2 * 4, 0x7F);
-    const std::vector<std::uint8_t> png = core::encode_png_rgba(3, 2, rgba);
+    const std::vector<std::uint8_t> png = annokit::core::encode_png_rgba(3, 2, rgba);
     const auto be32 = [&](std::size_t at) {
         return std::uint32_t{png[at]} << 24 | std::uint32_t{png[at + 1]} << 16 | std::uint32_t{png[at + 2]} << 8 |
                std::uint32_t{png[at + 3]};
@@ -135,20 +137,20 @@ TEST_CASE("png: chunks carry the CRC-32 of core::crc32 (IEEE, as zlib's)") {
 }
 
 TEST_CASE("text: well-formed utf8 and the byte order mark") {
-    CHECK(core::is_utf8(""));
-    CHECK(core::is_utf8("plain"));
-    CHECK(core::is_utf8("J\xc3\xbcrgen"));      // ue
-    CHECK(core::is_utf8("\xe2\x82\xac"));       // euro sign
-    CHECK(core::is_utf8("\xf0\x9f\x8f\xb0"));   // U+1F3F0, four bytes
-    CHECK(!core::is_utf8("J\xfcrgen"));         // Windows-1252
-    CHECK(!core::is_utf8("\xc3"));              // cut short
-    CHECK(!core::is_utf8("\x80"));              // a stray continuation byte
-    CHECK(!core::is_utf8("\xc0\xaf"));          // overlong
-    CHECK(!core::is_utf8("\xed\xa0\x80"));      // a surrogate
-    CHECK(!core::is_utf8("\xf4\x90\x80\x80"));  // beyond U+10FFFF
-    CHECK(core::skip_utf8_bom("\xef\xbb\xbfx = 1") == "x = 1");
-    CHECK(core::skip_utf8_bom("x = 1") == "x = 1");
-    CHECK(core::skip_utf8_bom("\xef\xbb") == "\xef\xbb");
+    CHECK(annokit::core::is_utf8(""));
+    CHECK(annokit::core::is_utf8("plain"));
+    CHECK(annokit::core::is_utf8("J\xc3\xbcrgen"));      // ue
+    CHECK(annokit::core::is_utf8("\xe2\x82\xac"));       // euro sign
+    CHECK(annokit::core::is_utf8("\xf0\x9f\x8f\xb0"));   // U+1F3F0, four bytes
+    CHECK(!annokit::core::is_utf8("J\xfcrgen"));         // Windows-1252
+    CHECK(!annokit::core::is_utf8("\xc3"));              // cut short
+    CHECK(!annokit::core::is_utf8("\x80"));              // a stray continuation byte
+    CHECK(!annokit::core::is_utf8("\xc0\xaf"));          // overlong
+    CHECK(!annokit::core::is_utf8("\xed\xa0\x80"));      // a surrogate
+    CHECK(!annokit::core::is_utf8("\xf4\x90\x80\x80"));  // beyond U+10FFFF
+    CHECK(annokit::core::skip_utf8_bom("\xef\xbb\xbfx = 1") == "x = 1");
+    CHECK(annokit::core::skip_utf8_bom("x = 1") == "x = 1");
+    CHECK(annokit::core::skip_utf8_bom("\xef\xbb") == "\xef\xbb");
 }
 
 TEST_CASE("palette: reads 256 RGBX entries") {
@@ -490,7 +492,7 @@ TEST_CASE("file: a full disk is an error, and an atomic write keeps the old file
         // Every write to /dev/full fails with "no space left"; before the file is closed the data
         // may still sit in a buffer.
         const std::vector<std::uint8_t> data(100, 7);
-        CHECK(!core::write_file("/dev/full", data).ok());
+        CHECK(!annokit::core::write_file("/dev/full", data).ok());
     }
     const fs::path dir = test::temp_path("o1602_test_atomic");
     std::error_code ec;
@@ -499,13 +501,13 @@ TEST_CASE("file: a full disk is an error, and an atomic write keeps the old file
     const fs::path file = dir / "game.o1602";
     const std::vector<std::uint8_t> first = {1, 2, 3};
     const std::vector<std::uint8_t> second = {4, 5, 6, 7};
-    REQUIRE(core::write_file_atomic(file, first).ok());
-    REQUIRE(core::write_file_atomic(file, second).ok());
-    CHECK(*core::read_file(file) == second);
+    REQUIRE(annokit::core::write_file_atomic(file, first).ok());
+    REQUIRE(annokit::core::write_file_atomic(file, second).ok());
+    CHECK(*annokit::core::read_file(file) == second);
     CHECK(!fs::exists(dir / "game.o1602.tmp"));
     // A target that cannot be replaced (a folder of that name): nothing left behind.
     REQUIRE(fs::create_directories(dir / "folder.o1602" / "inside"));
-    CHECK(!core::write_file_atomic(dir / "folder.o1602", first).ok());
+    CHECK(!annokit::core::write_file_atomic(dir / "folder.o1602", first).ok());
     CHECK(!fs::exists(dir / "folder.o1602.tmp"));
     fs::remove_all(dir, ec);
 }
@@ -520,62 +522,62 @@ TEST_CASE("file: the head of a file is its first bytes, with the size of the who
     for (std::size_t i = 0; i < data.size(); ++i) {
         data[i] = static_cast<std::uint8_t>(i);
     }
-    REQUIRE(core::write_file_atomic(dir / "a.bin", data).ok());
-    const auto head = core::read_file_head(dir / "a.bin", 100);
+    REQUIRE(annokit::core::write_file_atomic(dir / "a.bin", data).ok());
+    const auto head = annokit::core::read_file_head(dir / "a.bin", 100);
     REQUIRE(head.ok());
     CHECK(head->size == 1000);
     CHECK(head->bytes == std::vector<std::uint8_t>(data.begin(), data.begin() + 100));
-    const auto whole = core::read_file_head(dir / "a.bin", 5000);
+    const auto whole = annokit::core::read_file_head(dir / "a.bin", 5000);
     REQUIRE(whole.ok());
     CHECK(whole->bytes == data);
-    CHECK(!core::read_file_head(dir / "missing.bin", 100).ok());
-    CHECK(!core::read_file_head(dir, 100).ok());
+    CHECK(!annokit::core::read_file_head(dir / "missing.bin", 100).ok());
+    CHECK(!annokit::core::read_file_head(dir, 100).ok());
     fs::remove_all(dir, ec);
 }
 
 TEST_CASE("file: paths go to and from UTF-8 unchanged (a user named Juergen)") {
     namespace fs = std::filesystem;
     const std::string name = "J\xC3\xBCrgen";  // "Jürgen" in UTF-8
-    CHECK(core::path_to_utf8(core::path_from_utf8(name)) == name);
+    CHECK(annokit::core::path_to_utf8(annokit::core::path_from_utf8(name)) == name);
     const fs::path dir = test::temp_path("o1602_test_utf8");
     std::error_code ec;
     fs::remove_all(dir, ec);
-    const fs::path folder = dir / core::path_from_utf8(name);
+    const fs::path folder = dir / annokit::core::path_from_utf8(name);
     REQUIRE(fs::create_directories(folder));
     const std::vector<std::uint8_t> data = {1, 2, 3};
-    REQUIRE(core::write_file(folder / "keys.cfg", data).ok());
-    CHECK(*core::read_file(folder / "keys.cfg") == data);
-    CHECK(core::path_to_utf8(folder.filename()) == name);
+    REQUIRE(annokit::core::write_file(folder / "keys.cfg", data).ok());
+    CHECK(*annokit::core::read_file(folder / "keys.cfg") == data);
+    CHECK(annokit::core::path_to_utf8(folder.filename()) == name);
     // The case-insensitive lookup compares the names as UTF-8 as well.
-    const auto found = core::find_case_insensitive(dir, "j\xC3\xBCrgen/KEYS.CFG");
+    const auto found = annokit::core::find_case_insensitive(dir, "j\xC3\xBCrgen/KEYS.CFG");
     REQUIRE(found.has_value());
-    CHECK(*core::read_file(*found) == data);
+    CHECK(*annokit::core::read_file(*found) == data);
     // Nothing outside the root: no "..", no absolute path.
-    CHECK(!core::find_case_insensitive(folder, "../j\xC3\xBCrgen/keys.cfg").has_value());
-    CHECK(!core::find_case_insensitive(folder, "..\\j\xC3\xBCrgen\\keys.cfg").has_value());
-    CHECK(!core::find_case_insensitive(dir, core::path_to_utf8(folder / "keys.cfg")).has_value());
+    CHECK(!annokit::core::find_case_insensitive(folder, "../j\xC3\xBCrgen/keys.cfg").has_value());
+    CHECK(!annokit::core::find_case_insensitive(folder, "..\\j\xC3\xBCrgen\\keys.cfg").has_value());
+    CHECK(!annokit::core::find_case_insensitive(dir, annokit::core::path_to_utf8(folder / "keys.cfg")).has_value());
     // A folder is no file.
-    const auto folder_read = core::read_file(folder);
+    const auto folder_read = annokit::core::read_file(folder);
     CHECK(!folder_read.ok());
     fs::remove_all(dir, ec);
 
-    CHECK(core::environment_variable("PATH").has_value());
-    CHECK(!core::environment_variable("O1602_TEST_VARIABLE_THAT_IS_NOT_SET").has_value());
+    CHECK(annokit::core::environment_variable("PATH").has_value());
+    CHECK(!annokit::core::environment_variable("O1602_TEST_VARIABLE_THAT_IS_NOT_SET").has_value());
 }
 
 TEST_CASE("core: xxh64 gives the values of xxHash's reference implementation") {
     const auto text = [](std::string_view t) {
         return std::span(reinterpret_cast<const std::uint8_t*>(t.data()), t.size());
     };
-    CHECK(core::xxh64({}) == 0xEF46DB3751D8E999ULL);
-    CHECK(core::xxh64(text("abc")) == 0x44BC2CF5AD770999ULL);
-    CHECK(core::xxh64(text("abc"), 1602) == 0xA9CF0FA6C252006AULL);
+    CHECK(annokit::core::xxh64({}) == 0xEF46DB3751D8E999ULL);
+    CHECK(annokit::core::xxh64(text("abc")) == 0x44BC2CF5AD770999ULL);
+    CHECK(annokit::core::xxh64(text("abc"), 1602) == 0xA9CF0FA6C252006AULL);
     // Every path: 32 bytes a step, then 8, 4 and single bytes (37 = 32 + 4 + 1; 1032 = 32 * 32 + 8).
     std::vector<std::uint8_t> bytes(37);
     for (std::size_t k = 0; k < bytes.size(); ++k) {
         bytes[k] = static_cast<std::uint8_t>(k);
     }
-    CHECK(core::xxh64(bytes) == 0xD93FA2DFEE5C24C9ULL);
+    CHECK(annokit::core::xxh64(bytes) == 0xD93FA2DFEE5C24C9ULL);
     bytes.clear();
     for (int r = 0; r < 4; ++r) {
         for (int k = 0; k < 256; ++k) {
@@ -585,7 +587,7 @@ TEST_CASE("core: xxh64 gives the values of xxHash's reference implementation") {
     for (const char c : std::string_view("Open1602")) {
         bytes.push_back(static_cast<std::uint8_t>(c));
     }
-    CHECK(core::xxh64(bytes) == 0xF104EC2A5DD9F46FULL);
+    CHECK(annokit::core::xxh64(bytes) == 0xF104EC2A5DD9F46FULL);
 }
 
 TEST_CASE("core: sha256 gives the values of FIPS 180-4's examples") {
@@ -600,19 +602,20 @@ TEST_CASE("core: sha256 gives the values of FIPS 180-4's examples") {
     const auto text = [](std::string_view t) {
         return std::span(reinterpret_cast<const std::uint8_t*>(t.data()), t.size());
     };
-    CHECK(hex(core::sha256({})) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    CHECK(hex(core::sha256(text("abc"))) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    CHECK(hex(annokit::core::sha256({})) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    CHECK(hex(annokit::core::sha256(text("abc"))) ==
+          "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     // Two blocks of padding: 56 bytes leave no room for the length in the first.
-    CHECK(hex(core::sha256(text("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))) ==
+    CHECK(hex(annokit::core::sha256(text("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))) ==
           "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
     const std::vector<std::uint8_t> million(1'000'000, 'a');
-    CHECK(hex(core::sha256(million)) == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+    CHECK(hex(annokit::core::sha256(million)) == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
     const std::vector<std::uint8_t> block(64, 'x');
-    CHECK(hex(core::sha256(block)) == "7ce100971f64e7001e8fe5a51973ecdfe1ced42befe7ee8d5fd6219506b5393c");
+    CHECK(hex(annokit::core::sha256(block)) == "7ce100971f64e7001e8fe5a51973ecdfe1ced42befe7ee8d5fd6219506b5393c");
 }
 
 TEST_CASE("core: a ByteWriter writes lists of numbers little-endian and reuses a buffer from its start") {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.u8(9);
     const std::uint16_t halves[] = {0x0102, 0xA0B0};
     const std::uint32_t words[] = {0x01020304U};
@@ -623,7 +626,7 @@ TEST_CASE("core: a ByteWriter writes lists of numbers little-endian and reuses a
     const std::vector<std::uint8_t> expected{9, 0x02, 0x01, 0xB0, 0xA0, 0x04, 0x03, 0x02, 0x01, 0x34, 0x12};
     CHECK(bytes == expected);
     const std::uint8_t* memory = bytes.data();
-    core::ByteWriter again(std::move(bytes));
+    annokit::core::ByteWriter again(std::move(bytes));
     CHECK(again.size() == 0);
     again.u32(7);
     const std::vector<std::uint8_t> seven{7, 0, 0, 0};
@@ -632,13 +635,13 @@ TEST_CASE("core: a ByteWriter writes lists of numbers little-endian and reuses a
 }
 
 TEST_CASE("core: doubles from data files become integers the same way everywhere") {
-    CHECK(core::saturating_cast<std::uint32_t>(2.9) == 2u);
-    CHECK(core::saturating_cast<std::uint32_t>(-3.5) == 0u);
-    CHECK(core::saturating_cast<std::uint32_t>(1e10) == 0xFFFFFFFFu);
-    CHECK(core::saturating_cast<std::int32_t>(-1e10) == std::numeric_limits<std::int32_t>::min());
-    CHECK(core::saturating_cast<std::int32_t>(-2.9) == -2);
-    CHECK(core::saturating_cast<std::uint8_t>(std::numeric_limits<double>::quiet_NaN()) == 0);
-    CHECK(core::saturating_cast<std::int64_t>(1e30) == std::numeric_limits<std::int64_t>::max());
+    CHECK(annokit::core::saturating_cast<std::uint32_t>(2.9) == 2u);
+    CHECK(annokit::core::saturating_cast<std::uint32_t>(-3.5) == 0u);
+    CHECK(annokit::core::saturating_cast<std::uint32_t>(1e10) == 0xFFFFFFFFu);
+    CHECK(annokit::core::saturating_cast<std::int32_t>(-1e10) == std::numeric_limits<std::int32_t>::min());
+    CHECK(annokit::core::saturating_cast<std::int32_t>(-2.9) == -2);
+    CHECK(annokit::core::saturating_cast<std::uint8_t>(std::numeric_limits<double>::quiet_NaN()) == 0);
+    CHECK(annokit::core::saturating_cast<std::int64_t>(1e30) == std::numeric_limits<std::int64_t>::max());
 }
 
 TEST_CASE("assets: a game folder typed with quotes or blanks around it is still found") {
@@ -658,9 +661,9 @@ TEST_CASE("assets: a game folder typed with quotes or blanks around it is still 
     for (const char* file : {"Haeuser.cod", "Figuren.cod", "TOOLGFX/STADTFLD.COL", "GFX/STADTFLD.BSH"}) {
         std::ofstream(root / file) << "";
     }
-    CHECK(!GameDirectory::open(core::path_from_utf8("\"" + core::path_to_utf8(root) + "\"")));
-    CHECK(GameDirectory::open(
-        core::path_from_utf8(GameDirectory::clean_path_text("\"" + core::path_to_utf8(root) + "\""))));
+    CHECK(!GameDirectory::open(annokit::core::path_from_utf8("\"" + annokit::core::path_to_utf8(root) + "\"")));
+    CHECK(GameDirectory::open(annokit::core::path_from_utf8(
+        GameDirectory::clean_path_text("\"" + annokit::core::path_to_utf8(root) + "\""))));
     std::filesystem::remove_all(root);
 }
 

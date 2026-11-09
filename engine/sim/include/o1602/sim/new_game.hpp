@@ -20,11 +20,12 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/world.hpp"
 #include "o1602/sim/world_generator.hpp"
 #include "o1602/sim/world_plan.hpp"
@@ -79,22 +80,23 @@ struct EndlessFile {
 /// the file of the same two digits in another language's name. The English game's endless levels
 /// are not called Endlosspiel; their name is that of the .szs files in Szenes whose names end in two
 /// digits and whose scenario is the endless game (SZENE_MISSNR 1), as the scenario list finds them.
-[[nodiscard]] core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game, std::uint8_t difficulty,
-                                                          std::uint8_t layout, bool multiplayer = false);
+[[nodiscard]] annokit::core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game,
+                                                                   std::uint8_t difficulty, std::uint8_t layout,
+                                                                   bool multiplayer = false);
 
 /// The endless scenario as the original has it after the reset of a new game: control, colour and
 /// names of the players, the gated TIMERS fields, no editor leftovers in the ships, NAME
 /// `name` (the scenario's name in the installation's language, EndlessFile::name). The world plan
 /// stays for load_world.
-[[nodiscard]] core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endless,
-                                                                const assets::TextTable& text,
-                                                                const NewGameOptions& options,
-                                                                std::string_view name = kEndlessName);
+[[nodiscard]] annokit::core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endless,
+                                                                         const assets::TextTable& text,
+                                                                         const NewGameOptions& options,
+                                                                         std::string_view name = kEndlessName);
 
 /// Players five to `players` of an own world: computers as the level's second player, with its
 /// money and a copy of its ship at their starts, in the slots player_slot() names and with banners
 /// from kFirstExtraBanner on. Nothing for four players or fewer.
-core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t players);
+annokit::core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t players);
 
 /// Gives player `who` banner `banner`: the colour screen offers all of kMaxPlayers colours, a new
 /// game's file only the original's four (NewGameOptions::colour). The player that had it, if any,
@@ -104,23 +106,24 @@ std::optional<PlayerId> take_banner(World& world, PlayerId who, BannerId banner)
 
 /// The scenario of an own world: the players' ships at the plan's starts (none for players beyond
 /// `players`), the map size if it is not the original's. The islands are still to be made.
-[[nodiscard]] core::Result<assets::ChunkFile> own_world_scenario(const assets::ChunkFile& scenario,
-                                                                 const WorldPlan& plan, std::uint8_t players);
+[[nodiscard]] annokit::core::Result<assets::ChunkFile> own_world_scenario(const assets::ChunkFile& scenario,
+                                                                          const WorldPlan& plan, std::uint8_t players);
 
 /// Makes the islands of a world that kept its plan (World::planned_islands, WorldStart::keep_plan),
 /// as the original makes them when the scenario starts: the scenario the world came from
 /// (World::source) with the plan as it is now, drawn as `start` says (from the plan's table, or
 /// with Open1602's generator if it has none). The world's description, markers and script are
 /// carried over. Fails for a world without a plan or without the scenario it came from.
-[[nodiscard]] core::Result<World> roll_planned_islands(const World& world, const assets::GameDirectory& game,
-                                                       const assets::BuildingTable& buildings, const WorldStart& start,
-                                                       std::vector<std::string>* warnings = nullptr);
+[[nodiscard]] annokit::core::Result<World> roll_planned_islands(const World& world, const assets::GameDirectory& game,
+                                                                const assets::BuildingTable& buildings,
+                                                                const WorldStart& start,
+                                                                std::vector<std::string>* warnings = nullptr);
 
 /// Starts a new endless game: the scenario of new_game_scenario() with its islands made.
-[[nodiscard]] core::Result<World> start_new_game(const assets::GameDirectory& game,
-                                                 const assets::BuildingTable& buildings, const assets::TextTable& text,
-                                                 const NewGameOptions& options,
-                                                 std::vector<std::string>* warnings = nullptr);
+[[nodiscard]] annokit::core::Result<World> start_new_game(const assets::GameDirectory& game,
+                                                          const assets::BuildingTable& buildings,
+                                                          const assets::TextTable& text, const NewGameOptions& options,
+                                                          std::vector<std::string>* warnings = nullptr);
 
 /// A new world in small (the start dialog's preview of the islands): what lies on every tile and
 /// where the ships start.
@@ -150,9 +153,10 @@ struct WorldPreview {
 };
 
 /// The world start_new_game() makes for these options, in small: the same seed, the same world.
-[[nodiscard]] core::Result<WorldPreview> preview_world(const assets::GameDirectory& game,
-                                                       const assets::BuildingTable& buildings,
-                                                       const assets::TextTable& text, const NewGameOptions& options);
+[[nodiscard]] annokit::core::Result<WorldPreview> preview_world(const assets::GameDirectory& game,
+                                                                const assets::BuildingTable& buildings,
+                                                                const assets::TextTable& text,
+                                                                const NewGameOptions& options);
 /// The preview of a world that is made already.
 [[nodiscard]] WorldPreview preview_of(const World& world, const assets::BuildingTable& buildings);
 

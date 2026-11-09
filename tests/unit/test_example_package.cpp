@@ -16,13 +16,14 @@
 #include "mod_check.hpp"
 #include "mod_rules.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/package_scenarios.hpp"
 #include "o1602/assets/resident_classes.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/script/game_scripts.hpp"
 #include "o1602/sim/climates.hpp"
 #include "o1602/sim/computer_slots.hpp"
@@ -94,7 +95,7 @@ TEST_CASE("the example package loads without a warning, as far as it needs no or
     const std::vector<sim::PackageLandscape> landscapes = app::load_package_landscapes(packages, problems);
     CHECK(landscapes.size() == 1);
     std::vector<sim::Climate> climates;
-    if (const auto bytes = core::read_file(kMods / "example" / sim::kClimatesFile)) {
+    if (const auto bytes = annokit::core::read_file(kMods / "example" / sim::kClimatesFile)) {
         const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
         sim::apply_climates_file(climates, "example", text, problems);
     }

@@ -56,7 +56,6 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Sanitizers)
 include(Coverage)
-include(EmbedFiles)
 include(WindowsUtf8)
 
 option(O1602_BUILD_TESTS  "Build unit tests"                         ON)
@@ -91,12 +90,15 @@ else()
     endif()
 endif()
 
-add_subdirectory(third_party/enet)
-add_subdirectory(third_party/stb_vorbis)
-add_subdirectory(third_party/dr_flac)
-add_subdirectory(third_party/lua)
-add_subdirectory(third_party/dav1d)
-add_subdirectory(third_party/opus)
+# annokit: the game-independent modules (core, audio, video, net, script, platform) and the
+# third-party libraries they build, at a fixed commit. For work on both at once, point
+# FETCHCONTENT_SOURCE_DIR_ANNOKIT at a local clone of annokit.
+include(FetchContent)
+set(ANNOKIT_BUILD_PLATFORM ${O1602_BUILD_GAME})
+FetchContent_Declare(annokit
+    GIT_REPOSITORY https://github.com/x4rd4s/annokit.git
+    GIT_TAG c6ad8345dce1694f3e8c80ffaff4f96811099e5d)
+FetchContent_MakeAvailable(annokit)
 add_subdirectory(engine)
 
 if(O1602_BUILD_TOOLS)

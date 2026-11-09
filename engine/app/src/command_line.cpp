@@ -6,8 +6,9 @@
 #include <string_view>
 #include <system_error>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/sim/world_plan.hpp"
 
 namespace o1602::app {
@@ -112,7 +113,7 @@ bool parse_input(std::string_view text, std::vector<ViewerOptions::ScriptedInput
     return true;
 }
 
-core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) {
+annokit::core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) {
     CommandLine out;
     ViewerOptions& options = out.options;
     bool new_game = false;
@@ -131,13 +132,14 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
     std::optional<std::uint8_t>& layout_given = out.layout;
     std::optional<std::uint64_t>& seed_given = out.seed;
     // The argument that is wrong: the option itself, or the value after it.
-    const auto bad = [&](int at) -> core::Result<CommandLine> {
+    const auto bad = [&](int at) -> annokit::core::Result<CommandLine> {
         const std::string_view arg = argv[at];
         if (at > 1 && std::string_view(argv[at - 1]).starts_with("--") && !arg.starts_with("--")) {
-            return core::make_error(core::ErrorCode::InvalidFormat,
-                                    "bad value for " + std::string(argv[at - 1]) + ": " + std::string(arg));
+            return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                             "bad value for " + std::string(argv[at - 1]) + ": " + std::string(arg));
         }
-        return core::make_error(core::ErrorCode::InvalidFormat, "unknown option or missing value: " + std::string(arg));
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "unknown option or missing value: " + std::string(arg));
     };
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
@@ -204,7 +206,7 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
         } else if (arg == "--no-dialogs") {
             out.dialogs = false;
         } else if (arg == "--keys" && has_value) {
-            options.keys_file = core::path_from_utf8(argv[++i]);
+            options.keys_file = annokit::core::path_from_utf8(argv[++i]);
         } else if (arg == "--language" && has_value) {
             options.language = argv[++i];
         } else if (arg == "--no-videos") {
@@ -240,7 +242,7 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
             }
             options.zoom = static_cast<render::Zoom>(zoom);
         } else if (arg == "--screenshot" && has_value) {
-            options.screenshot = core::path_from_utf8(argv[++i]);
+            options.screenshot = annokit::core::path_from_utf8(argv[++i]);
         } else if (arg == "--refund" && has_value) {
             // Game setting: what demolishing gives back (none as in the original, partial[:N], full).
             const std::string_view mode = argv[++i];
@@ -277,7 +279,7 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
                 return bad(i);
             }
         } else if (arg == "--save" && has_value) {
-            options.save = core::path_from_utf8(argv[++i]);
+            options.save = annokit::core::path_from_utf8(argv[++i]);
         } else if (arg == "--volcanoes" && has_value) {
             // Game setting: whether volcanoes erupt.
             const std::string_view mode = argv[++i];
@@ -412,7 +414,7 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
             }
             seed_given = seed;
         } else if (arg == "--name" && has_value) {
-            new_game_options.name = core::utf8_to_cp1252(argv[++i]);  // the game keeps names in Windows-1252
+            new_game_options.name = annokit::core::utf8_to_cp1252(argv[++i]);  // the game keeps names in Windows-1252
             name_given = true;
         } else if (arg == "--host") {
             multiplayer.role = ViewerOptions::Multiplayer::Role::Host;
@@ -571,7 +573,8 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
     }
 
     if (custom_world && !new_game) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "an own world (--world ...) needs --new-game");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "an own world (--world ...) needs --new-game");
     }
     if (new_game) {
         if (custom_world) {
@@ -593,8 +596,8 @@ core::Result<CommandLine> parse_command_line(int argc, const char* const* argv) 
     options.menu = options.frame && !multiplayer_given && (menu || (!game_named && !new_game));
     if (options.editor) {
         if (!options.frame || multiplayer_given || game_named || new_game) {
-            return core::make_error(core::ErrorCode::InvalidFormat,
-                                    "--editor opens its own file: not with a game, --no-panel or multiplayer");
+            return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                             "--editor opens its own file: not with a game, --no-panel or multiplayer");
         }
         options.menu = true;  // the sea behind the menu, until the editor takes its place
     }

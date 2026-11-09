@@ -8,7 +8,8 @@
 
 #include "save/sections.hpp"
 
-#include "o1602/core/hash.hpp"
+#include "annokit/core/hash.hpp"
+
 #include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -86,7 +87,7 @@ Simulation::Simulation(World& world, const assets::BuildingTable& buildings, con
     if (const std::vector<std::uint8_t> state = world.take_simulation_state(); !state.empty()) {
         // Each part loads whole or not at all, but a later part may fail after an earlier one
         // was taken over: then all go back to how they are now, fresh.
-        core::ByteWriter fresh;
+        annokit::core::ByteWriter fresh;
         save_state(fresh);
         if (restore_state(state)) {
             return;  // a game saved by Open1602 continues where it was
@@ -103,10 +104,10 @@ Simulation::Simulation(World& world, const assets::BuildingTable& buildings, con
     update_services(world, buildings);
 }
 
-core::Status Simulation::state_readable(World& world, const assets::BuildingTable& buildings,
-                                        const assets::FigureTable& figures) {
+annokit::core::Status Simulation::state_readable(World& world, const assets::BuildingTable& buildings,
+                                                 const assets::FigureTable& figures) {
     if (world.simulation_state().empty()) {
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
     Simulation probe(world, buildings, figures, Rules::open1602(), Parts{});
     return probe.restore_state(world.simulation_state());
@@ -119,18 +120,18 @@ std::uint64_t Simulation::state_hash() const {
     // the hashes of their blocks, kept from one fingerprint to the next for the blocks that stay.
     // The buffer is kept too: written anew, a game of a megabyte would cost an allocation and its
     // growth each time.
-    core::ByteWriter out(std::move(m_hash_buffer));
+    annokit::core::ByteWriter out(std::move(m_hash_buffer));
     save::encode_sections(out, *m_world, *m_buildings, this, save::TileMode::Full, {}, save::Origin::Leave,
                           &m_block_hashes);
     m_hash_buffer = out.take();
-    return core::xxh64(m_hash_buffer);
+    return annokit::core::xxh64(m_hash_buffer);
 }
 
 std::uint64_t Simulation::state_hash_anew() const {
     std::vector<std::vector<BlockHash>> blocks;
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     save::encode_sections(out, *m_world, *m_buildings, this, save::TileMode::Full, {}, save::Origin::Leave, &blocks);
-    return core::xxh64(out.data());
+    return annokit::core::xxh64(out.data());
 }
 
 namespace {
@@ -139,7 +140,7 @@ namespace {
 constexpr std::uint32_t kMaxNames = 4096;
 constexpr std::uint32_t kMaxNameBytes = 255;
 
-void write_names(core::ByteWriter& out, const std::vector<std::string>& names) {
+void write_names(annokit::core::ByteWriter& out, const std::vector<std::string>& names) {
     const auto n = static_cast<std::uint32_t>(std::min<std::size_t>(names.size(), kMaxNames));
     out.u32(n);
     for (std::uint32_t i = 0; i < n; ++i) {
@@ -201,7 +202,7 @@ constexpr std::uint16_t kClocksVersion = 1;
 constexpr std::uint16_t kRequiredPart = 1;  ///< flag: a reader that cannot read the part must not load
 
 template <class Fn>
-void write_part(core::ByteWriter& out, std::uint32_t id, std::uint16_t version, bool required, Fn&& body) {
+void write_part(annokit::core::ByteWriter& out, std::uint32_t id, std::uint16_t version, bool required, Fn&& body) {
     out.u32(id);
     out.u16(version);
     out.u16(required ? kRequiredPart : 0);
@@ -221,27 +222,28 @@ std::string part_name(std::uint32_t id) {
     return name;
 }
 
-core::Status damaged(std::string what) {
-    return core::make_error(core::ErrorCode::InvalidFormat, "SIMU: " + std::move(what));
+annokit::core::Status damaged(std::string what) {
+    return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "SIMU: " + std::move(what));
 }
 
 /// Reads all of a part through `load(reader, version)`: bytes left over are damage too, as the
 /// reader did not read what the writer wrote.
 template <class Load>
-core::Status load_part(std::span<const std::uint8_t> body, std::uint32_t id, std::uint16_t version, Load&& load) {
-    core::ByteReader reader(body);
+annokit::core::Status load_part(std::span<const std::uint8_t> body, std::uint32_t id, std::uint16_t version,
+                                Load&& load) {
+    annokit::core::ByteReader reader(body);
     if (auto status = load(reader, version); !status) {
         return damaged(status.error().message);
     }
     if (!reader.at_end()) {
         return damaged(part_name(id) + ": " + std::to_string(reader.remaining()) + " bytes not read");
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace
 
-void Simulation::save_state(core::ByteWriter& out) const {
+void Simulation::save_state(annokit::core::ByteWriter& out) const {
     out.u16(kSectionedState);
     write_part(out, kClocksPart, kClocksVersion, true, [&] {
         out.u32(m_production_ms);
@@ -260,8 +262,8 @@ void Simulation::save_state(core::ByteWriter& out) const {
     write_part(out, kComputersPart, m_ai.state_version(), false, [&] { m_ai.save(out); });
 }
 
-core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
-    core::ByteReader reader(state);
+annokit::core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
+    annokit::core::ByteReader reader(state);
     const auto version = reader.u16();
     if (!version) {
         return damaged("empty");
@@ -270,8 +272,8 @@ core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
         return restore_legacy_state(reader, *version);
     }
     if (*version != kSectionedState) {
-        return core::make_error(core::ErrorCode::Unsupported,
-                                "SIMU: version " + std::to_string(*version) + " needs a newer Open1602");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "SIMU: version " + std::to_string(*version) + " needs a newer Open1602");
     }
     // Every part found first, then read in a fixed order.
     struct Part {
@@ -317,7 +319,8 @@ core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
         const std::string what = part_name(*id) + " (version " + std::to_string(*part_version) + ")";
         if (slot == nullptr || *part_version == 0 || *part_version > max_version) {
             if ((*flags & kRequiredPart) != 0) {
-                return core::make_error(core::ErrorCode::Unsupported, "SIMU: " + what + " needs a newer Open1602");
+                return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                                 "SIMU: " + what + " needs a newer Open1602");
             }
             continue;  // a part of a later Open1602 the game can do without
         }
@@ -330,7 +333,7 @@ core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
         return damaged("a part is missing");
     }
 
-    core::ByteReader clock_reader(clocks->body);
+    annokit::core::ByteReader clock_reader(clocks->body);
     StateIn in(clock_reader);
     const std::uint32_t production = in.u32();
     const std::uint32_t city = in.u32();
@@ -350,10 +353,10 @@ core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
         upkeep >= kUpkeepPeriodMs || island >= Logistics::kIslandEpochMs) {
         return damaged("SIMC: a clock past its period");
     }
-    const auto load_logistics = [&](core::ByteReader& r, std::uint16_t v) { return m_logistics.load(r, v); };
-    const auto load_fleet = [&](core::ByteReader& r, std::uint16_t v) { return m_fleet.load(r, v); };
-    const auto load_military = [&](core::ByteReader& r, std::uint16_t v) { return m_military.load(r, v); };
-    const auto load_computers = [&](core::ByteReader& r, std::uint16_t v) { return m_ai.load(r, v); };
+    const auto load_logistics = [&](annokit::core::ByteReader& r, std::uint16_t v) { return m_logistics.load(r, v); };
+    const auto load_fleet = [&](annokit::core::ByteReader& r, std::uint16_t v) { return m_fleet.load(r, v); };
+    const auto load_military = [&](annokit::core::ByteReader& r, std::uint16_t v) { return m_military.load(r, v); };
+    const auto load_computers = [&](annokit::core::ByteReader& r, std::uint16_t v) { return m_ai.load(r, v); };
     if (auto s = load_part(logistics->body, kLogisticsPart, logistics->version, load_logistics); !s) {
         return s;
     }
@@ -379,10 +382,10 @@ core::Status Simulation::restore_state(const std::vector<std::uint8_t>& state) {
     m_fleet.set_ship_names(std::move(ships));
     set_speed(speed);
     m_paused = pause != 0;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status Simulation::restore_legacy_state(core::ByteReader& reader, std::uint16_t version) {
+annokit::core::Status Simulation::restore_legacy_state(annokit::core::ByteReader& reader, std::uint16_t version) {
     // Versions 1 to 6 (until 2026-10): the parts one after the other, each new version adding one
     // at the end. Kept for the games saved with them (tests/unit/saves).
     StateIn in(reader);
@@ -460,7 +463,7 @@ core::Status Simulation::restore_legacy_state(core::ByteReader& reader, std::uin
     }
     set_speed(speed);
     m_paused = paused;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 void Simulation::set_speed(std::uint32_t speed) noexcept {

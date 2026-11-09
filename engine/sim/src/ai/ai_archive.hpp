@@ -13,7 +13,8 @@
 
 #include "ai_state.hpp"
 
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/sim/state_io.hpp"
 
 namespace o1602::sim::ai {
@@ -21,7 +22,8 @@ namespace o1602::sim::ai {
 class Saver {
 public:
     /// Writes the newest version; an older one only for the tests of the loader.
-    explicit Saver(core::ByteWriter& out, std::uint32_t version = kStateVersion) : m_out(out), m_version(version) {}
+    explicit Saver(annokit::core::ByteWriter& out, std::uint32_t version = kStateVersion)
+        : m_out(out), m_version(version) {}
     static constexpr bool kLoading = false;
     [[nodiscard]] std::uint32_t version() const { return m_version; }
     void operator()(bool& v) { m_out.boolean(v); }
@@ -66,7 +68,7 @@ public:
     void fail() {}
 
 private:
-    core::ByteWriter& m_out;
+    annokit::core::ByteWriter& m_out;
     std::uint32_t m_version;
 };
 

@@ -114,7 +114,7 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
    before it takes the computer in, and the computer keeps a package only when its files have the
    game's hash (protocol version 15). Packages the computer has in addition are not loaded for the
    game ([packages.md](../modding/packages.md#packages-a-host-sends)).
-10. **Transport.** Messages travel reliably and in order over ENet 1.3.18 (`third_party/enet`, MIT,
+10. **Transport.** Messages travel reliably and in order over ENet 1.3.18 (annokit's `third_party/enet`, MIT,
     shipped unchanged so that the build needs no network). The sessions only know the interface
     `net::Transport`; the tests have an in-memory network with latency, jitter and cuts, and a relay
     or Steam can be plugged in later. A packet is at most 1 MiB + 64 KiB both ways (ENet holds what

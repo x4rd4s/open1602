@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Zip archives for tests (engine/core/include/o1602/core/zip_archive.hpp).
+// Zip archives for tests (annokit: modules/core/include/annokit/core/zip_archive.hpp).
 #pragma once
 
 #include <cstdint>
@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/core/compress.hpp"
+#include "annokit/core/compress.hpp"
 
 namespace o1602::test {
 
@@ -34,11 +34,11 @@ inline std::vector<std::uint8_t> make_zip(const std::vector<ZipFile>& files) {
         const std::vector<std::uint8_t> bytes(f.text.begin(), f.text.end());
         std::vector<std::uint8_t> data = bytes;
         if (f.deflate) {
-            const auto packed = core::zlib_deflate(bytes);
+            const auto packed = annokit::core::zlib_deflate(bytes);
             // A zlib stream without its 2 bytes of header and 4 of checksum is raw deflate.
             data.assign(packed->begin() + 2, packed->end() - 4);
         }
-        const std::uint32_t crc = core::crc32(bytes);
+        const std::uint32_t crc = annokit::core::crc32(bytes);
         const auto offset = static_cast<std::uint32_t>(out.size());
         const std::uint32_t method = f.deflate ? 8 : 0;
         const auto header = [&](std::vector<std::uint8_t>& to) {

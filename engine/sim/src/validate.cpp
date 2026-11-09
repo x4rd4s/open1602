@@ -15,8 +15,8 @@ namespace o1602::sim {
 
 namespace {
 
-core::Status bad(const std::string& what) {
-    return core::make_error(core::ErrorCode::InvalidFormat, "game: " + what);
+annokit::core::Status bad(const std::string& what) {
+    return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "game: " + what);
 }
 
 class Check {
@@ -76,7 +76,7 @@ template <typename List>
 
 }  // namespace
 
-core::Status validate(const World& w) {
+annokit::core::Status validate(const World& w) {
     const Check c(w);
     if (w.players().size() > kMaxPlayerCount) {
         return bad("more than " + std::to_string(kMaxPlayerCount) + " players");
@@ -175,7 +175,7 @@ core::Status validate(const World& w) {
     if (v.last && !c.island(v.last->island)) {
         return bad("last eruption on an unknown island");
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace o1602::sim

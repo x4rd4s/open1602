@@ -13,7 +13,8 @@
 #include <type_traits>
 #include <vector>
 
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/sim/state_io.hpp"
 
 namespace o1602::sim::save {
@@ -27,7 +28,7 @@ class Writer {
 public:
     static constexpr bool kReading = false;
 
-    explicit Writer(core::ByteWriter& out) noexcept : m_out(out) {}
+    explicit Writer(annokit::core::ByteWriter& out) noexcept : m_out(out) {}
 
     template <Field T>
     void u8(T v) {
@@ -85,10 +86,10 @@ public:
     }
 
     [[nodiscard]] static constexpr bool ok() noexcept { return true; }
-    [[nodiscard]] core::ByteWriter& out() noexcept { return m_out; }
+    [[nodiscard]] annokit::core::ByteWriter& out() noexcept { return m_out; }
 
 private:
-    core::ByteWriter& m_out;
+    annokit::core::ByteWriter& m_out;
 };
 
 /// Reads the records described from the bytes of a section; after the data ran out or a check

@@ -6,7 +6,6 @@ add_executable(o1602_tests
     unit/test_cod_parser.cpp
     unit/test_history_edition.cpp
     unit/test_data_fixes.cpp
-    unit/test_data_file_write.cpp
     unit/test_commands.cpp
     unit/test_island_render.cpp
     unit/test_world_render.cpp
@@ -97,20 +96,16 @@ add_executable(o1602_tests
     unit/test_package_flags.cpp
     unit/test_package_interface.cpp
     unit/test_figure_looks.cpp
-    unit/test_script_sandbox.cpp
     unit/test_game_scripts.cpp
     unit/test_unlock_levels.cpp
     unit/test_own_buildings.cpp
     unit/test_own_figures.cpp
     unit/test_game_content.cpp
-    unit/test_zip_archive.cpp
     unit/test_package_scenarios.cpp
     unit/test_tutorial.cpp
     unit/test_localization.cpp
     unit/test_unit_selection.cpp
     unit/test_video.cpp
-    unit/test_bink.cpp
-    unit/test_webm.cpp
     unit/test_net.cpp
     unit/test_cursor_resource.cpp
     unit/test_endless_setup.cpp
@@ -149,10 +144,8 @@ add_executable(o1602_tests
     data/test_goods_data.cpp
     data/test_net_data.cpp
 )
-target_link_libraries(o1602_tests PRIVATE o1602::assets o1602::sim o1602::render o1602::audio o1602::ui o1602::video o1602::net o1602::menus o1602::script o1602::editor)
+target_link_libraries(o1602_tests PRIVATE o1602::assets o1602::sim o1602::render o1602::audio o1602::ui annokit::video o1602::net o1602::menus o1602::script o1602::editor)
 o1602_set_warnings(o1602_tests)
-# test_bink.cpp checks the Bink Audio transforms directly, which are internal to o1602_video.
-target_include_directories(o1602_tests PRIVATE ${PROJECT_SOURCE_DIR}/engine/video/src)
 # Stored savegames of earlier versions (DS-3), read by test_save_game.cpp.
 target_compile_definitions(o1602_tests PRIVATE O1602_TEST_SAVES="${CMAKE_CURRENT_SOURCE_DIR}/unit/saves"
                                                O1602_TEST_SOUNDS="${CMAKE_CURRENT_SOURCE_DIR}/unit/sounds"

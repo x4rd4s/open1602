@@ -15,8 +15,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/editor/operations.hpp"
 #include "o1602/sim/world.hpp"
@@ -218,17 +219,17 @@ struct SeaTile {
 
 /// Fills from the world tile (x, y): every tile joined to it by sides that shows the same as it
 /// (record and rotation) becomes `piece` (a piece of one tile). An error if nothing could change.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> fill_terrain(sim::World& world,
-                                                                    const assets::BuildingTable& buildings,
-                                                                    std::uint32_t x, std::uint32_t y,
-                                                                    TerrainPiece piece);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> fill_terrain(sim::World& world,
+                                                                             const assets::BuildingTable& buildings,
+                                                                             std::uint32_t x, std::uint32_t y,
+                                                                             TerrainPiece piece);
 /// Replaces on the island at the world tile (x, y) every tile of the record shown there by `piece`
 /// (a piece of one tile), each keeping its rotation if the piece can turn. An error if nothing
 /// could change.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> replace_terrain(sim::World& world,
-                                                                       const assets::BuildingTable& buildings,
-                                                                       std::uint32_t x, std::uint32_t y,
-                                                                       TerrainPiece piece);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> replace_terrain(sim::World& world,
+                                                                                const assets::BuildingTable& buildings,
+                                                                                std::uint32_t x, std::uint32_t y,
+                                                                                TerrainPiece piece);
 
 /// The island's tiles x0..x1, y0..y1 copied; a piece only if all of its footprint is within them.
 /// Empty if the rectangle is not on the island.

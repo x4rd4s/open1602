@@ -16,7 +16,7 @@
 #include <string>
 #include <system_error>
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -73,7 +73,7 @@ void log_to_file() {
     if (folder == nullptr) {
         return;
     }
-    const std::filesystem::path dir = core::path_from_utf8(folder);
+    const std::filesystem::path dir = annokit::core::path_from_utf8(folder);
     SDL_free(folder);
     const std::filesystem::path log = dir / "open1602.log";
     std::error_code ec;

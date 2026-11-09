@@ -1115,8 +1115,8 @@ TEST_CASE("endless setup: the islands' presets and settings, and their lines in 
 namespace {
 
 /// A world for the preview without the game's files: one island, two starts.
-core::Result<sim::WorldPreview> fake_world(const EndlessSetup& setup, std::uint8_t /*level*/,
-                                           const app::GameSettingsMenu::PreviewStop& /*stop*/) {
+annokit::core::Result<sim::WorldPreview> fake_world(const EndlessSetup& setup, std::uint8_t /*level*/,
+                                                    const app::GameSettingsMenu::PreviewStop& /*stop*/) {
     sim::WorldPreview p;
     p.width = 100;
     p.height = 70;
@@ -1130,7 +1130,7 @@ core::Result<sim::WorldPreview> fake_world(const EndlessSetup& setup, std::uint8
     p.land = 20 * 30;
     p.starts = {{10, 10}, {90, 60}};
     if (setup.world.landscape.land == 45) {
-        return core::make_error(core::ErrorCode::LimitExceeded, "too much land");
+        return annokit::core::make_error(annokit::core::ErrorCode::LimitExceeded, "too much land");
     }
     return p;
 }

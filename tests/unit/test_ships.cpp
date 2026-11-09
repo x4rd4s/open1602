@@ -4,11 +4,12 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/diplomacy.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/sea_paths.hpp"
@@ -865,14 +866,14 @@ TEST_CASE("ships: with more than four players a trader without profit goes where
     CHECK(chosen[1] != chosen[2]);
     CHECK(chosen[0] != chosen[2]);
     // The choices are part of the savegame: a loaded fleet writes the same.
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     fleet.save(out);
     const std::vector<std::uint8_t> bytes = out.take();
     sim::Fleet loaded(sea.world, sea.buildings, sea.figures, sea.rules);
-    core::ByteReader in(bytes);
+    annokit::core::ByteReader in(bytes);
     REQUIRE(loaded.load(in, fleet.state_version()));
     CHECK(fleet.state_version() == 5);  // with the choices
-    core::ByteWriter again;
+    annokit::core::ByteWriter again;
     loaded.save(again);
     CHECK(again.take() == bytes);
 }

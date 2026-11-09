@@ -5,15 +5,16 @@
 #include <cmath>
 #include <optional>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_reader.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_reader.hpp"
 
 namespace o1602::render {
 
 namespace {
 
 /// The cell of sprite `i` of a grid of `width` x `height` sprites, alpha made 0 or 255.
-std::vector<std::uint8_t> cut(const core::PngImage& png, std::uint32_t i, std::uint32_t width, std::uint32_t height) {
+std::vector<std::uint8_t> cut(const annokit::core::PngImage& png, std::uint32_t i, std::uint32_t width,
+                              std::uint32_t height) {
     const std::uint32_t columns = png.width / width;
     const std::uint32_t left = (i % columns) * width;
     const std::uint32_t top = (i / columns) * height;
@@ -40,20 +41,20 @@ PackageImageSource::PackageImageSource(const assets::PackageImage& image, std::s
     while (from > 0 && image.files[from].empty()) {
         --from;
     }
-    const auto bytes = core::read_file(image.files[from]);
+    const auto bytes = annokit::core::read_file(image.files[from]);
     if (!bytes) {
-        m_error = core::path_to_utf8(image.files[from]) + ": " + bytes.error().message;
+        m_error = annokit::core::path_to_utf8(image.files[from]) + ": " + bytes.error().message;
         return;
     }
-    auto png = core::decode_png(*bytes);
+    auto png = annokit::core::decode_png(*bytes);
     if (!png) {
-        m_error = core::path_to_utf8(image.files[from]) + ": " + png.error().message;
+        m_error = annokit::core::path_to_utf8(image.files[from]) + ": " + png.error().message;
         return;
     }
     const std::uint32_t width = assets::package_sprite_width(image, from);
     const std::uint32_t height = assets::package_sprite_height(image, from);
     if ((png->width / width) * (png->height / height) < image.count) {
-        m_error = core::path_to_utf8(image.files[from]) + ": fewer sprites than when the package was loaded";
+        m_error = annokit::core::path_to_utf8(image.files[from]) + ": fewer sprites than when the package was loaded";
         return;
     }
     for (std::uint32_t i = 0; i < image.count; ++i) {
@@ -181,17 +182,17 @@ IconPixels package_icon_pixels(const assets::PackageIcon& icon, double scale) {
     std::vector<std::uint8_t> read;
     std::span<const std::uint8_t> file(icon.data, icon.data != nullptr ? icon.size : 0);
     if (icon.data == nullptr) {
-        auto bytes = core::read_file(icon.file);
+        auto bytes = annokit::core::read_file(icon.file);
         if (!bytes) {
-            out.error = core::path_to_utf8(icon.file) + ": " + bytes.error().message;
+            out.error = annokit::core::path_to_utf8(icon.file) + ": " + bytes.error().message;
             return out;
         }
         read = std::move(*bytes);
         file = read;
     }
-    auto png = core::decode_png(file);
+    auto png = annokit::core::decode_png(file);
     if (!png) {
-        out.error = core::path_to_utf8(icon.file) + ": " + png.error().message;
+        out.error = annokit::core::path_to_utf8(icon.file) + ": " + png.error().message;
         return out;
     }
     if (scale >= 1.0) {

@@ -9,10 +9,11 @@
 #include <optional>
 #include <system_error>
 
+#include "annokit/audio/sound_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_content.hpp"
-#include "o1602/audio/sound_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/ui/package_icons.hpp"
 
 namespace o1602::app {
@@ -90,7 +91,7 @@ bool valid_package(std::string_view package) {
 
 /// A file of the package, never outside its folder; nullopt for a path that leaves it.
 std::optional<std::filesystem::path> package_path(std::string_view utf8) {
-    std::filesystem::path relative = std::filesystem::path(core::path_from_utf8(utf8)).lexically_normal();
+    std::filesystem::path relative = std::filesystem::path(annokit::core::path_from_utf8(utf8)).lexically_normal();
     if (relative.empty() || relative.is_absolute() || relative.has_root_name() || *relative.begin() == "..") {
         return std::nullopt;
     }
@@ -191,10 +192,11 @@ std::string MessageTable::text(MessageId id, std::string_view language, const Me
     return {};
 }
 
-void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, const std::filesystem::path& folder,
-                         const std::string& where, std::vector<std::string>& warnings) {
+void MessageTable::apply(const annokit::core::DataTable& table, MessageDefinition& m,
+                         const std::filesystem::path& folder, const std::string& where,
+                         std::vector<std::string>& warnings) {
     // `like` first, wherever it stands: the other fields change what it brings.
-    if (const core::DataValue* like = table.find("like")) {
+    if (const annokit::core::DataValue* like = table.find("like")) {
         std::optional<MessageId> from;
         if (const std::int64_t* n = like->integer(); n != nullptr && *n >= 0 && *n < kOriginalMessages) {
             from = static_cast<MessageId>(*n);
@@ -211,7 +213,7 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
             warnings.push_back(line_of(where, like->line) + "'like' names no message (an original number or an id)");
         }
     }
-    for (const core::DataEntry& e : table.entries) {
+    for (const annokit::core::DataEntry& e : table.entries) {
         const std::string at = line_of(where, e.value.line);
         const std::string* s = e.value.string();
         const std::int64_t* n = e.value.integer();
@@ -224,7 +226,7 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
             if (s == nullptr) {
                 warnings.push_back(at + "'" + e.key + "' must be a string");
             } else {
-                m.texts.insert_or_assign(code, core::utf8_to_cp1252(*s));
+                m.texts.insert_or_assign(code, annokit::core::utf8_to_cp1252(*s));
             }
         } else if (e.key == "icon") {
             const auto it =
@@ -264,17 +266,17 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
                     warnings.push_back(at + "'sound' must be a file in the package's folder");
                     continue;
                 }
-                const auto bytes = core::read_file(folder / *relative);
+                const auto bytes = annokit::core::read_file(folder / *relative);
                 if (!bytes) {
                     warnings.push_back(at + *s + ": " + bytes.error().message);
                     continue;
                 }
-                auto pcm = audio::decode_sound(*bytes);
+                auto pcm = annokit::audio::decode_sound(*bytes);
                 if (!pcm) {
                     warnings.push_back(at + *s + ": " + pcm.error().message);
                     continue;
                 }
-                m.playback.sound = std::make_shared<const audio::Pcm>(std::move(pcm).value());
+                m.playback.sound = std::make_shared<const annokit::audio::Pcm>(std::move(pcm).value());
             } else {
                 warnings.push_back(
                     at +
@@ -314,19 +316,21 @@ void MessageTable::apply(const core::DataTable& table, MessageDefinition& m, con
     }
 }
 
-core::Status MessageTable::load_package(std::string_view package, std::string_view utf8,
-                                        const std::filesystem::path& folder, std::vector<std::string>& warnings) {
+annokit::core::Status MessageTable::load_package(std::string_view package, std::string_view utf8,
+                                                 const std::filesystem::path& folder,
+                                                 std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kFileName);
     if (!valid_package(package) || package == kOriginal) {
-        return core::make_error(core::ErrorCode::InvalidFormat,
-                                where + ": a package's id is its folder's name, of a-z, 0-9, '_' and '-', and not " +
-                                    std::string(kOriginal));
+        return annokit::core::make_error(
+            annokit::core::ErrorCode::InvalidFormat,
+            where + ": a package's id is its folder's name, of a-z, 0-9, '_' and '-', and not " +
+                std::string(kOriginal));
     }
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
-        return core::make_error(tables.error().code, where + " " + tables.error().message);
+        return annokit::core::make_error(tables.error().code, where + " " + tables.error().message);
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [message] belong to none and are passed over");
@@ -356,7 +360,7 @@ core::Status MessageTable::load_package(std::string_view package, std::string_vi
         m_ids.emplace(m.id, index);
         m_messages.push_back(std::move(m));
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::optional<std::uint16_t> MessageTable::package_video(const std::filesystem::path& file, const std::string& at,
@@ -379,7 +383,7 @@ std::optional<std::uint16_t> MessageTable::package_video(const std::filesystem::
 
 void MessageTable::load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings) {
     for (const assets::ModPackage& package : packages) {
-        const auto bytes = core::read_file(package.folder / kFileName);
+        const auto bytes = annokit::core::read_file(package.folder / kFileName);
         if (!bytes) {
             continue;  // a package without messages
         }

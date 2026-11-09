@@ -7,7 +7,7 @@
 2. **No code of the original program**. Behaviour is described as a specification in `docs/` and
    implemented from it (see ADR 0003).
 3. Contributions are licensed under GPL-3.0-or-later. Third-party code only with a compatible licence,
-   documented in `third_party/README.md`.
+   documented in annokit's `third_party/README.md`.
 
 ## Code
 

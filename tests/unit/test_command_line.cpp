@@ -15,7 +15,7 @@ using namespace o1602;
 
 namespace {
 
-core::Result<app::CommandLine> parse(std::initializer_list<const char*> args) {
+annokit::core::Result<app::CommandLine> parse(std::initializer_list<const char*> args) {
     std::vector<const char*> argv{"open1602"};
     argv.insert(argv.end(), args.begin(), args.end());
     return app::parse_command_line(static_cast<int>(argv.size()), argv.data());

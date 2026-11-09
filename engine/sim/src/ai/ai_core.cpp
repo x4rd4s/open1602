@@ -10,7 +10,8 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/sim/ai.hpp"
 
 namespace o1602::sim {
@@ -52,7 +53,7 @@ CommandResult Engine::execute(const Command& command) {
 }
 
 void Engine::log(const AiPlayer& p, const char* format, ...) const {
-    static const bool enabled = core::environment_variable("O1602_AI_LOG").has_value();
+    static const bool enabled = annokit::core::environment_variable("O1602_AI_LOG").has_value();
     if (!enabled) {
         return;
     }
@@ -762,27 +763,29 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     return static_cast<std::uint16_t>(ai::kStateWithWideFlags - 1);
 }
 
-void ComputerPlayers::save(core::ByteWriter& out) const {
+void ComputerPlayers::save(annokit::core::ByteWriter& out) const {
     ai::Saver saver(out, state_version());
     saver(*m_state);
 }
 
-core::Status ComputerPlayers::load(core::ByteReader& in, std::uint16_t version) {
+annokit::core::Status ComputerPlayers::load(annokit::core::ByteReader& in, std::uint16_t version) {
     if (version < ai::kFirstStateVersion || version > ai::kStateVersion) {
-        return core::make_error(core::ErrorCode::Unsupported, "AIST: version " + std::to_string(version));
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "AIST: version " + std::to_string(version));
     }
     StateIn reader(in);
     ai::State state;
     ai::Loader loader(reader, version);
     loader(state);
     if (!reader.ok()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "AIST: cut off");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "AIST: cut off");
     }
     if (!m_engine->accepts(state)) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "AIST: the computers' state does not fit the world");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "AIST: the computers' state does not fit the world");
     }
     *m_state = std::move(state);
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 bool ComputerPlayers::directs(std::uint32_t ship) const {

@@ -12,9 +12,10 @@
 #include <string>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/game_data.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -256,6 +257,6 @@ struct GameState {
     std::optional<GrowthClocks> growth_clocks;  ///< nothing without a TIMERS chunk
 };
 
-core::Result<GameState> load_game_state(const ChunkFile& file);
+annokit::core::Result<GameState> load_game_state(const ChunkFile& file);
 
 }  // namespace o1602::assets

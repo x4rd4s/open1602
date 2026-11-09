@@ -9,7 +9,8 @@
 
 #include "../test_framework.hpp"
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/net/protocol.hpp"
 #include "o1602/sim/limits.hpp"
 #include "o1602/sim/player.hpp"
@@ -41,27 +42,27 @@ TEST_CASE("limits: the world plan takes the players add_players places, not more
     settings.players = static_cast<std::uint8_t>(sim::kMaxPlayers + 1);
     const auto plan = sim::plan_world(settings, {});
     REQUIRE(!plan.ok());
-    CHECK(plan.error().code == core::ErrorCode::LimitExceeded);
+    CHECK(plan.error().code == annokit::core::ErrorCode::LimitExceeded);
     CHECK(plan.error().message.find(std::to_string(sim::kMaxPlayers)) != std::string::npos);
 
     // At the limit the players pass and the plan fails for the missing templates only.
     settings.players = static_cast<std::uint8_t>(sim::kMaxPlayers);
     const auto at_limit = sim::plan_world(settings, {});
     REQUIRE(!at_limit.ok());
-    CHECK(at_limit.error().code == core::ErrorCode::NotFound);
+    CHECK(at_limit.error().code == annokit::core::ErrorCode::NotFound);
 
     settings.width = sim::WorldSettings::kMaxSide + 1;
     const auto wide = sim::plan_world(settings, {});
     REQUIRE(!wide.ok());
-    CHECK(wide.error().code == core::ErrorCode::LimitExceeded);
+    CHECK(wide.error().code == annokit::core::ErrorCode::LimitExceeded);
 }
 
 TEST_CASE("limits: a limit reaches the player as one, not as a damaged file") {
     ui::set_language("en");
-    const core::Error limit{core::ErrorCode::LimitExceeded, "1 to 12 players"};
+    const annokit::core::Error limit{annokit::core::ErrorCode::LimitExceeded, "1 to 12 players"};
     const std::string text = ui::error_text(limit, "test");
     CHECK(text.find("1 to 12 players") != std::string::npos);
-    CHECK(text != ui::error_text(core::Error{core::ErrorCode::InvalidFormat, "bad"}, "test"));
+    CHECK(text != ui::error_text(annokit::core::Error{annokit::core::ErrorCode::InvalidFormat, "bad"}, "test"));
     ui::set_language("de");
     CHECK(ui::error_text(limit, "test").find("Spiel") != std::string::npos);
     ui::set_language("en");

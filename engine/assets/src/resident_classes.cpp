@@ -5,9 +5,10 @@
 #include <array>
 #include <charconv>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::assets {
 
@@ -197,13 +198,13 @@ std::string class_name(const ResidentClass& c, std::string_view language) {
 bool apply_classes_file(std::vector<ResidentClass>& classes, std::string_view package, std::string_view utf8,
                         std::vector<std::string>& warnings, const Goods& goods, std::span<const std::string> services) {
     const std::string where = std::string(package) + "/" + std::string(kClassesFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return false;
     }
     bool changed = false;
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         // A class there is, or a new one of this package.
         std::optional<std::uint8_t> target;
@@ -234,7 +235,7 @@ bool apply_classes_file(std::vector<ResidentClass>& classes, std::string_view pa
 
         Change change;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             const auto number = [&](std::int64_t min, std::int64_t max, std::optional<std::int64_t>& out) {
                 const std::int64_t* n = e.value.integer();
@@ -297,7 +298,7 @@ bool apply_classes_file(std::vector<ResidentClass>& classes, std::string_view pa
                     warnings.push_back(field + "is a text");
                     ok = false;
                 } else {
-                    change.names.emplace_back(language, core::utf8_to_cp1252(*e.value.string()));
+                    change.names.emplace_back(language, annokit::core::utf8_to_cp1252(*e.value.string()));
                 }
             } else {
                 warnings.push_back(field + "is no field of a class and is passed over");

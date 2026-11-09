@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <string>
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -61,7 +62,7 @@ std::string ModsMenu::short_problem_text(const assets::PackageProblem& problem) 
         case Kind::WrongVersion:
         case Kind::DependencyOff:
         case Kind::DependencyBroken:
-            return ui::tr("mods.state_needs", {core::utf8_to_cp1252(problem.dependency)});
+            return ui::tr("mods.state_needs", {annokit::core::utf8_to_cp1252(problem.dependency)});
     }
     return {};
 }
@@ -69,7 +70,7 @@ std::string ModsMenu::short_problem_text(const assets::PackageProblem& problem) 
 std::string ModsMenu::problem_text(const assets::PackageProblem& problem) {
     using Kind = assets::PackageProblem::Kind;
     const std::string needs =
-        core::utf8_to_cp1252(problem.dependency + (problem.versions.empty() ? "" : " " + problem.versions));
+        annokit::core::utf8_to_cp1252(problem.dependency + (problem.versions.empty() ? "" : " " + problem.versions));
     switch (problem.kind) {
         case Kind::TurnedOff:
             return {};
@@ -78,8 +79,9 @@ std::string ModsMenu::problem_text(const assets::PackageProblem& problem) {
         case Kind::Missing:
             return ui::tr("mods.problem_missing", {needs});
         case Kind::WrongVersion:
-            return problem.found.empty() ? ui::tr("mods.problem_no_version", {needs})
-                                         : ui::tr("mods.problem_version", {needs, core::utf8_to_cp1252(problem.found)});
+            return problem.found.empty()
+                       ? ui::tr("mods.problem_no_version", {needs})
+                       : ui::tr("mods.problem_version", {needs, annokit::core::utf8_to_cp1252(problem.found)});
         case Kind::DependencyOff:
             return ui::tr("mods.problem_off", {needs});
         case Kind::DependencyBroken:

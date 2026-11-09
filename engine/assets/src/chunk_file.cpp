@@ -3,36 +3,36 @@
 
 #include <algorithm>
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/file.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/file.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 constexpr std::size_t kNameLength = 16;
 constexpr std::size_t kHeaderSize = kNameLength + 4;
 }  // namespace
 
-core::Result<ChunkFile> ChunkFile::load(const std::filesystem::path& path) {
-    auto bytes = core::read_file(path);
+annokit::core::Result<ChunkFile> ChunkFile::load(const std::filesystem::path& path) {
+    auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         return bytes.error();
     }
     auto file = from_bytes(std::move(bytes).value());
     if (!file) {
-        return make_error(file.error().code, core::path_to_utf8(path) + ": " + file.error().message);
+        return make_error(file.error().code, annokit::core::path_to_utf8(path) + ": " + file.error().message);
     }
     return file;
 }
 
-core::Result<ChunkFile> ChunkFile::from_bytes(core::Bytes data) {
+annokit::core::Result<ChunkFile> ChunkFile::from_bytes(annokit::core::Bytes data) {
     ChunkFile file;
     file.m_data = std::move(data);
 
-    core::ByteReader reader(file.m_data);
+    annokit::core::ByteReader reader(file.m_data);
     while (!reader.at_end()) {
         const std::size_t header_offset = reader.offset();
         const auto name_bytes = reader.bytes(kNameLength);

@@ -12,9 +12,10 @@
 #include "../test_framework.hpp"
 #include "message_table.hpp"
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/game_content.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
 
 using namespace o1602;
 
@@ -62,14 +63,14 @@ struct TempPackage {
         tag("data");
         put(frames, 4);
         v.insert(v.end(), frames, 128);
-        REQUIRE(core::write_file(path / name, v).ok());
+        REQUIRE(annokit::core::write_file(path / name, v).ok());
     }
 };
 
 }  // namespace
 
 TEST_CASE("data file: tables, keys and the three kinds of value") {
-    const auto tables = core::parse_data_file(
+    const auto tables = annokit::core::parse_data_file(
         "\xEF\xBB\xBF# A mod's messages\n"
         "[lighthouse]\n"
         "text = \"The lighthouse shines. # not a comment\"\n"
@@ -82,7 +83,7 @@ TEST_CASE("data file: tables, keys and the three kinds of value") {
         "\"quoted key\" = \"\\u00e4\\n\\\"\"\n");
     REQUIRE(tables.ok());
     REQUIRE(tables->size() == 2);
-    const core::DataTable& t = (*tables)[0];
+    const annokit::core::DataTable& t = (*tables)[0];
     CHECK(t.name == "lighthouse");
     CHECK(t.line == 2);
     REQUIRE(t.find("text") != nullptr);
@@ -92,14 +93,14 @@ TEST_CASE("data file: tables, keys and the three kinds of value") {
     CHECK(*t.find("count")->integer() == -1000);
     CHECK(*t.find("video_always")->boolean());
     CHECK(t.find("video_always")->line == 7);
-    const core::DataTable& o = (*tables)[1];
+    const annokit::core::DataTable& o = (*tables)[1];
     CHECK(o.name == "anno1602:42");
     CHECK(*o.find("quoted key")->string() == "\xC3\xA4\n\"");
 }
 
 TEST_CASE("data file: what is not supported is an error with its line, never a guess") {
     const auto error_line = [](std::string_view text) {
-        const auto r = core::parse_data_file(text);
+        const auto r = annokit::core::parse_data_file(text);
         return r.ok() ? std::string("ok") : r.error().message.substr(0, r.error().message.find(':'));
     };
     CHECK(error_line("[a]\nx = unquoted\n") == "line 2");
@@ -114,9 +115,9 @@ TEST_CASE("data file: what is not supported is an error with its line, never a g
     CHECK(error_line("[a]\nx = 1 2\n") == "line 2");
     CHECK(error_line("[a]\nx = 99999999999999999999\n") == "line 2");
     CHECK(error_line("[a]\nx\n") == "line 2");
-    CHECK(!core::parse_data_file("x = \"\xFF\"\n").ok());  // not UTF-8
+    CHECK(!annokit::core::parse_data_file("x = \"\xFF\"\n").ok());  // not UTF-8
     // Fields before the first table belong to the nameless one.
-    const auto top = core::parse_data_file("x = 1\n[a]\n");
+    const auto top = annokit::core::parse_data_file("x = 1\n[a]\n");
     REQUIRE(top.ok());
     CHECK(top->size() == 2);
     CHECK((*top)[0].name.empty());

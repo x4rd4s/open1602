@@ -16,11 +16,12 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/land_paths.hpp"
@@ -196,9 +197,9 @@ public:
     /// regeneration clock, 2 and the castles' clock, 3 and the natives' ticks.
     static constexpr std::uint16_t kStateVersion = 3;
     /// State that is not in the world (clocks), for Open1602's savegame.
-    void save(core::ByteWriter& out) const;
+    void save(annokit::core::ByteWriter& out) const;
     /// Restores what save() of `version` wrote; an error if the data is damaged (nothing changed).
-    core::Status load(core::ByteReader& in, std::uint16_t version);
+    annokit::core::Status load(annokit::core::ByteReader& in, std::uint16_t version);
 
 private:
     /// A unit or building on another island than the unit stands on (a melee unit cannot reach it).

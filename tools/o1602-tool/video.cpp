@@ -12,18 +12,18 @@
 
 #include "tool.hpp"
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
-#include "o1602/video/bink.hpp"
-#include "o1602/video/smacker.hpp"
-#include "o1602/video/webm.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+#include "annokit/video/bink.hpp"
+#include "annokit/video/smacker.hpp"
+#include "annokit/video/webm.hpp"
 
 namespace o1602::tool {
 
 namespace {
 
 /// 16-bit PCM as a RIFF WAVE file.
-std::vector<std::uint8_t> wave_bytes(const audio::Pcm& pcm) {
+std::vector<std::uint8_t> wave_bytes(const annokit::audio::Pcm& pcm) {
     std::vector<std::uint8_t> out;
     const auto put32 = [&](std::uint32_t v) {
         for (int i = 0; i < 4; ++i) {
@@ -75,7 +75,7 @@ int decode(Video& video, std::uint32_t width, std::uint32_t height, std::uint32_
             video.to_rgba(rgba);
             char name[32];
             std::snprintf(name, sizeof name, "frame%04u.png", frame);
-            if (auto st = core::write_png_rgba(fs::path(png_dir->second) / name, width, height, rgba); !st) {
+            if (auto st = annokit::core::write_png_rgba(fs::path(png_dir->second) / name, width, height, rgba); !st) {
                 return fail(st.error());
             }
         }
@@ -92,7 +92,7 @@ int decode(Video& video, std::uint32_t width, std::uint32_t height, std::uint32_
             return fail(pcm.error());
         }
         std::printf("track: %zu frames, %.2f s\n", pcm->frames(), static_cast<double>(pcm->duration_ms()) / 1000.0);
-        if (auto st = core::write_file(fs::path(args.positional[1]), wave_bytes(*pcm)); !st) {
+        if (auto st = annokit::core::write_file(fs::path(args.positional[1]), wave_bytes(*pcm)); !st) {
             return fail(st.error());
         }
     }
@@ -105,11 +105,11 @@ int cmd_smk(const Args& args) {
     if (args.positional.empty()) {
         return usage();
     }
-    auto bytes = core::read_file(fs::path(args.positional[0]));
+    auto bytes = annokit::core::read_file(fs::path(args.positional[0]));
     if (!bytes) {
         return fail(bytes.error());
     }
-    auto video = video::Smacker::open(std::move(*bytes));
+    auto video = annokit::video::Smacker::open(std::move(*bytes));
     if (!video) {
         return fail(video.error());
     }
@@ -117,7 +117,7 @@ int cmd_smk(const Args& args) {
     std::printf("SMK%u %ux%u, %u frames, %.3f fps%s%s%s\n", info.version, info.width, info.height, info.frames,
                 1e6 / static_cast<double>(info.frame_us), info.ring_frame ? ", ring frame" : "",
                 info.interlaced ? ", interlaced" : "", info.doubled ? ", doubled" : "");
-    for (std::size_t t = 0; t < video::kSmackerTracks; ++t) {
+    for (std::size_t t = 0; t < annokit::video::kSmackerTracks; ++t) {
         const auto& track = info.tracks[t];
         if (track.present) {
             std::printf("track %zu: %u Hz, %s, %d-bit%s\n", t, track.rate, track.stereo ? "stereo" : "mono",
@@ -138,8 +138,8 @@ int cmd_smk(const Args& args) {
             video->to_rgba(rgba);
             char name[32];
             std::snprintf(name, sizeof name, "frame%04u.png", frame);
-            if (auto st =
-                    core::write_png_rgba(fs::path(png_dir->second) / name, info.width, info.display_height(), rgba);
+            if (auto st = annokit::core::write_png_rgba(fs::path(png_dir->second) / name, info.width,
+                                                        info.display_height(), rgba);
                 !st) {
                 return fail(st.error());
             }
@@ -155,7 +155,7 @@ int cmd_smk(const Args& args) {
             return fail(pcm.error());
         }
         std::printf("track: %zu frames, %.2f s\n", pcm->frames(), static_cast<double>(pcm->duration_ms()) / 1000.0);
-        if (auto st = core::write_file(fs::path(args.positional[1]), wave_bytes(*pcm)); !st) {
+        if (auto st = annokit::core::write_file(fs::path(args.positional[1]), wave_bytes(*pcm)); !st) {
             return fail(st.error());
         }
     }
@@ -166,7 +166,7 @@ int cmd_bk2(const Args& args) {
     if (args.positional.empty()) {
         return usage();
     }
-    auto video = video::Bink::open_file(fs::path(args.positional[0]));
+    auto video = annokit::video::Bink::open_file(fs::path(args.positional[0]));
     if (!video) {
         return fail(video.error());
     }
@@ -192,7 +192,7 @@ int cmd_webm(const Args& args) {
     if (args.positional.empty()) {
         return usage();
     }
-    auto video = video::Webm::open_file(fs::path(args.positional[0]));
+    auto video = annokit::video::Webm::open_file(fs::path(args.positional[0]));
     if (!video) {
         return fail(video.error());
     }

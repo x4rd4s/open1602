@@ -17,7 +17,8 @@ constexpr std::uint32_t kRetryMs = 500;
 
 }  // namespace
 
-ClientSession::ClientSession(std::unique_ptr<Transport> transport, Hello hello, Loader load, SessionConfig config)
+ClientSession::ClientSession(std::unique_ptr<annokit::net::Transport> transport, Hello hello, Loader load,
+                             SessionConfig config)
     : Session(std::move(transport), std::move(config)), m_hello(std::move(hello)), m_load(std::move(load)) {
     m_hello.protocol = kProtocolVersion;
     m_hello.name.resize(std::min(m_hello.name.size(), kMaxNameLength));
@@ -213,13 +214,13 @@ bool ClientSession::finish_pending() {
     return !m_ended;
 }
 
-void ClientSession::handle(TransportEvent& e) {
+void ClientSession::handle(annokit::net::TransportEvent& e) {
     switch (e.kind) {
-        case TransportEvent::Kind::Connected:
+        case annokit::net::TransportEvent::Kind::Connected:
             m_connected = true;
             send(kHost, m_hello);
             break;
-        case TransportEvent::Kind::Disconnected:
+        case annokit::net::TransportEvent::Kind::Disconnected:
             if (m_connect && !m_welcomed) {
                 m_connected = false;
                 m_transport.reset();  // and again in a moment
@@ -231,7 +232,7 @@ void ClientSession::handle(TransportEvent& e) {
             }
             end(m_welcomed ? EndReason::HostLeft : EndReason::ConnectFailed);
             break;
-        case TransportEvent::Kind::Received:
+        case annokit::net::TransportEvent::Kind::Received:
             receive(e.data);
             break;
     }
@@ -255,7 +256,7 @@ void ClientSession::receive(std::span<const std::uint8_t> bytes) {
     }
     if (auto* part = std::get_if<Part>(&*message)) {
         // A large message in pieces, one after another (MS-7): read once it is whole.
-        if ((!m_part.empty() && part->total != m_part_total) || part->total <= kMaxPacketBytes ||
+        if ((!m_part.empty() && part->total != m_part_total) || part->total <= annokit::net::kMaxPacketBytes ||
             m_part.size() + part->bytes.size() > part->total) {
             end(EndReason::ProtocolError);
             return;

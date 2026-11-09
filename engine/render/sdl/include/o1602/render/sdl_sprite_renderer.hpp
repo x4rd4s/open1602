@@ -8,7 +8,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/render/sprite_atlas.hpp"
 
@@ -27,7 +28,7 @@ public:
     SdlSpriteRenderer& operator=(const SdlSpriteRenderer&) = delete;
 
     /// Uploads the atlas pages (replacing previous ones). The atlas must outlive draw calls.
-    core::Status upload(const SpriteAtlas& atlas);
+    annokit::core::Status upload(const SpriteAtlas& atlas);
 
     /// Draws at screen = (x, y) * scale - origin; returns the number of sprites drawn. A scale that
     /// is no whole number gives uneven pixels (render::RenderPlan avoids it for the map).

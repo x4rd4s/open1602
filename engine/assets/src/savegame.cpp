@@ -6,8 +6,8 @@
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -40,7 +40,7 @@ std::uint32_t u32(std::span<const std::uint8_t> d, std::size_t o) {
 
 /// Payloads of all chunks with this name (savegames: once, scenarios: once per island).
 template <class Fn>
-core::Status for_each_record(const ChunkFile& file, const char* name, std::size_t size, Fn&& fn) {
+annokit::core::Status for_each_record(const ChunkFile& file, const char* name, std::size_t size, Fn&& fn) {
     for (const Chunk& chunk : file.chunks()) {
         if (chunk.name != name) {
             continue;
@@ -54,12 +54,12 @@ core::Status for_each_record(const ChunkFile& file, const char* name, std::size_
             fn(data.subspan(o, size));
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace
 
-core::Result<GameState> load_game_state(const ChunkFile& file) {
+annokit::core::Result<GameState> load_game_state(const ChunkFile& file) {
     GameState state;
     auto status = for_each_record(file, "STADT4", kCitySize, [&](std::span<const std::uint8_t> r) {
         CityRecord c;

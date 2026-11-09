@@ -8,8 +8,8 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -27,8 +27,8 @@ struct Chunk {
 /// Owns the file contents; chunk payloads are views into that buffer.
 class ChunkFile {
 public:
-    static core::Result<ChunkFile> load(const std::filesystem::path& path);
-    static core::Result<ChunkFile> from_bytes(core::Bytes data);
+    static annokit::core::Result<ChunkFile> load(const std::filesystem::path& path);
+    static annokit::core::Result<ChunkFile> from_bytes(annokit::core::Bytes data);
 
     [[nodiscard]] const std::vector<Chunk>& chunks() const noexcept { return m_chunks; }
 
@@ -44,7 +44,7 @@ public:
     [[nodiscard]] std::span<const std::uint8_t> data() const noexcept { return m_data; }
 
 private:
-    core::Bytes m_data;
+    annokit::core::Bytes m_data;
     std::vector<Chunk> m_chunks;
 };
 

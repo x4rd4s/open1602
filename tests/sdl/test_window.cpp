@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The window and its renderer (engine/platform/window.cpp) on SDL's dummy video driver.
+// The window and its renderer (annokit::platform) on SDL's dummy video driver.
 
 #include <SDL3/SDL.h>
 #include <cstring>
 #include <string>
 
 #include "../test_framework.hpp"
+#include "app_icon.hpp"
 #include "sdl_support.hpp"
 
-#include "o1602/platform/window.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/render/camera.hpp"
 
 using namespace o1602;
 
 TEST_CASE("window: a window has a renderer whose output is the window's size in pixels") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.title = "test", .width = 320, .height = 200});
+    auto window = annokit::platform::Window::create(
+        annokit::platform::WindowConfig{.title = "test", .width = 320, .height = 200});
     REQUIRE(window.ok());
-    const platform::Window& w = **window;
+    const annokit::platform::Window& w = **window;
     REQUIRE(w.sdl_window() != nullptr);
     REQUIRE(w.sdl_renderer() != nullptr);
     CHECK(SDL_GetRenderWindow(w.sdl_renderer()) == w.sdl_window());
@@ -38,9 +41,10 @@ TEST_CASE("window: a window has a renderer whose output is the window's size in 
 
 TEST_CASE("window: the output size follows a resize") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 320, .height = 200, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 320, .height = 200, .vsync = false});
     REQUIRE(window.ok());
     REQUIRE(SDL_SetWindowSize((*window)->sdl_window(), 400, 300));
     SDL_SyncWindow((*window)->sdl_window());
@@ -53,9 +57,9 @@ TEST_CASE("window: the output size follows a resize") {
 
 TEST_CASE("window: the display scale is positive and gives the game a pixel scale of 1 on a plain screen") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 320, .height = 200});
+    auto window = annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 320, .height = 200});
     REQUIRE(window.ok());
     const float scale = (*window)->display_scale();
     CHECK(scale > 0.0F);
@@ -67,9 +71,9 @@ TEST_CASE("window: the display scale is positive and gives the game a pixel scal
 
 TEST_CASE("window: set_title changes the window's title") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.title = "first"});
+    auto window = annokit::platform::Window::create(annokit::platform::WindowConfig{.title = "first"});
     REQUIRE(window.ok());
     CHECK(std::strcmp(SDL_GetWindowTitle((*window)->sdl_window()), "first") == 0);
     (*window)->set_title("Open1602 - second");
@@ -78,9 +82,10 @@ TEST_CASE("window: set_title changes the window's title") {
 
 TEST_CASE("window: what the renderer draws reaches the window's pixels") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
     REQUIRE(window.ok());
     SDL_Renderer* renderer = (*window)->sdl_renderer();
     SDL_SetRenderDrawColor(renderer, 10, 20, 30, 255);
@@ -110,19 +115,20 @@ TEST_CASE("window: what the renderer draws reaches the window's pixels") {
 
 TEST_CASE("window: ticks_ms counts up from SDL_Init") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    const std::uint64_t before = platform::ticks_ms();
+    const std::uint64_t before = annokit::platform::ticks_ms();
     SDL_Delay(5);
-    const std::uint64_t after = platform::ticks_ms();
+    const std::uint64_t after = annokit::platform::ticks_ms();
     CHECK(after >= before + 5);
 }
 
 TEST_CASE("window: render events say whether textures or the renderer must be made again") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
     REQUIRE(window.ok());
     const SDL_WindowID id = SDL_GetWindowID((*window)->sdl_window());
     // As the GPU backends of SDL send them: pushed to the queue, read by the main loop.
@@ -141,22 +147,23 @@ TEST_CASE("window: render events say whether textures or the renderer must be ma
             }
         }
         REQUIRE(polled.type == wanted);  // the event did not arrive
-        return platform::RenderReset::None;
+        return annokit::platform::RenderReset::None;
     };
-    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id) == platform::RenderReset::Renderer);
-    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_RESET, id) == platform::RenderReset::Textures);
-    CHECK(delivered(SDL_EVENT_RENDER_TARGETS_RESET, id) == platform::RenderReset::None);
-    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id + 1) == platform::RenderReset::None);
-    CHECK(delivered(SDL_EVENT_USER, id) == platform::RenderReset::None);
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id) == annokit::platform::RenderReset::Renderer);
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_RESET, id) == annokit::platform::RenderReset::Textures);
+    CHECK(delivered(SDL_EVENT_RENDER_TARGETS_RESET, id) == annokit::platform::RenderReset::None);
+    CHECK(delivered(SDL_EVENT_RENDER_DEVICE_LOST, id + 1) == annokit::platform::RenderReset::None);
+    CHECK(delivered(SDL_EVENT_USER, id) == annokit::platform::RenderReset::None);
 }
 
 TEST_CASE("window: after a lost device the window draws with a new renderer") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
     REQUIRE(window.ok());
-    platform::Window& w = **window;
+    annokit::platform::Window& w = **window;
     const std::string name = w.renderer_name();
     REQUIRE(w.recreate_renderer().ok());
     REQUIRE(w.sdl_renderer() != nullptr);
@@ -184,9 +191,10 @@ TEST_CASE("window: after a lost device the window draws with a new renderer") {
 
 TEST_CASE("window: the application icon is compiled in, with a larger picture for HiDPI screens") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    SDL_Surface* icon = platform::load_app_icon();
+    const app::AppIcon app_icon = app::app_icon();
+    SDL_Surface* icon = annokit::platform::load_icon(app_icon.bmp, app_icon.bmp_large);
     REQUIRE(icon != nullptr);
     CHECK(icon->w == 64);
     CHECK(icon->h == 64);
@@ -214,45 +222,45 @@ TEST_CASE("window: the application icon is compiled in, with a larger picture fo
 
 TEST_CASE("window: with vertical sync on, frames that do not wait for the screen are held to its rate") {
     // A frame a whole refresh after the last waited for the screen: nothing more.
-    CHECK(platform::frame_hold_ns(16'700'000, 60.0F) == 0);
-    CHECK(platform::frame_hold_ns(15'000'000, 60.0F) == 0);  // 90 % of a refresh
+    CHECK(annokit::platform::frame_hold_ns(16'700'000, 60.0F) == 0);
+    CHECK(annokit::platform::frame_hold_ns(15'000'000, 60.0F) == 0);  // 90 % of a refresh
     // One that came at once (a hidden window, a screen switched off) waits for 90 % of it.
-    CHECK(platform::frame_hold_ns(0, 60.0F) == 15'000'000);
-    CHECK(platform::frame_hold_ns(1'000'000, 240.0F) == 2'750'000);
+    CHECK(annokit::platform::frame_hold_ns(0, 60.0F) == 15'000'000);
+    CHECK(annokit::platform::frame_hold_ns(1'000'000, 240.0F) == 2'750'000);
     // An unknown refresh rate counts as 60 Hz.
-    CHECK(platform::frame_hold_ns(0, 0.0F) == 15'000'000);
-    CHECK(platform::frame_hold_ns(0, 5000.0F) == 15'000'000);
+    CHECK(annokit::platform::frame_hold_ns(0, 0.0F) == 15'000'000);
+    CHECK(annokit::platform::frame_hold_ns(0, 5000.0F) == 15'000'000);
 }
 
 TEST_CASE("window: a fixed clock moves only by its step, the real one goes on beside it") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    CHECK(!platform::fixed_clock());
+    CHECK(!annokit::platform::fixed_clock());
 
-    platform::use_fixed_clock(16);
-    CHECK(platform::fixed_clock());
-    CHECK(platform::ticks_ms() == 0);
-    const std::uint64_t real = platform::real_ticks_ms();
+    annokit::platform::use_fixed_clock(16);
+    CHECK(annokit::platform::fixed_clock());
+    CHECK(annokit::platform::ticks_ms() == 0);
+    const std::uint64_t real = annokit::platform::real_ticks_ms();
     SDL_Delay(5);
-    CHECK(platform::ticks_ms() == 0);  // real time passing does not move it
-    CHECK(platform::real_ticks_ms() >= real + 5);
+    CHECK(annokit::platform::ticks_ms() == 0);  // real time passing does not move it
+    CHECK(annokit::platform::real_ticks_ms() >= real + 5);
     for (int frame = 0; frame < 300; ++frame) {
-        platform::advance_fixed_clock();
+        annokit::platform::advance_fixed_clock();
     }
-    CHECK(platform::ticks_ms() == 300 * 16);
+    CHECK(annokit::platform::ticks_ms() == 300 * 16);
 
     // Set again, it starts at 0 again: two runs in one program see the same times.
-    platform::use_fixed_clock(16);
-    platform::advance_fixed_clock();
-    CHECK(platform::ticks_ms() == 16);
+    annokit::platform::use_fixed_clock(16);
+    annokit::platform::advance_fixed_clock();
+    CHECK(annokit::platform::ticks_ms() == 16);
 
     // The real clock back: advancing does nothing, the time is SDL's.
-    platform::use_fixed_clock(0);
-    CHECK(!platform::fixed_clock());
-    platform::advance_fixed_clock();
-    const std::uint64_t before = platform::real_ticks_ms();
-    const std::uint64_t now = platform::ticks_ms();
+    annokit::platform::use_fixed_clock(0);
+    CHECK(!annokit::platform::fixed_clock());
+    annokit::platform::advance_fixed_clock();
+    const std::uint64_t before = annokit::platform::real_ticks_ms();
+    const std::uint64_t now = annokit::platform::ticks_ms();
     CHECK(now >= before);
-    CHECK(now <= platform::real_ticks_ms());
+    CHECK(now <= annokit::platform::real_ticks_ms());
 }

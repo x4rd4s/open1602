@@ -5,8 +5,9 @@
 #include <charconv>
 #include <optional>
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -54,12 +55,12 @@ void apply_figure_images_file(std::vector<FigureLook>& looks, std::string_view p
                               std::span<const PackageImage> images, const FigureTable& figures,
                               std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kFigureImagesFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         const std::optional<OriginalName> numbers = figures_of(t.name);
         if (!numbers) {
@@ -69,7 +70,7 @@ void apply_figure_images_file(std::vector<FigureLook>& looks, std::string_view p
         const PackageImage* image = nullptr;
         std::optional<bool> shadow;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "image") {
                 const std::string* s = e.value.string();

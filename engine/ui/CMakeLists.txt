@@ -16,11 +16,11 @@ add_library(o1602_ui
 add_library(o1602::ui ALIAS o1602_ui)
 
 target_include_directories(o1602_ui PUBLIC include)
-target_link_libraries(o1602_ui PUBLIC o1602::assets o1602::core o1602::sim)
+target_link_libraries(o1602_ui PUBLIC o1602::assets annokit::core o1602::sim)
 o1602_set_warnings(o1602_ui)
 
 file(GLOB o1602_locales CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/data/locale/*.lang")
-o1602_embed_files(o1602_ui o1602::ui::locales ${o1602_locales})
+annokit_embed_files(o1602_ui o1602::ui::locales ${o1602_locales})
 # Open1602's own icons of the interface (the build menu's tools), PNGs named by their icon.
 file(GLOB o1602_ui_icons CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/data/icons/ui/*.png")
-o1602_embed_files(o1602_ui o1602::ui::interface_icons ${o1602_ui_icons})
+annokit_embed_files(o1602_ui o1602::ui::interface_icons ${o1602_ui_icons})

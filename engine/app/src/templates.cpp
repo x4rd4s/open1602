@@ -6,8 +6,9 @@
 #include <cstdint>
 #include <system_error>
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/sim/game_data.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -64,7 +65,7 @@ std::string clean_template_name(std::string_view name) {
 
 std::string write_template(const BuildTemplate& t) {
     std::string out(kHeader);
-    out += "name = " + core::cp1252_to_utf8(t.name) + "\n";
+    out += "name = " + annokit::core::cp1252_to_utf8(t.name) + "\n";
     out += "size = " + std::to_string(t.layout.width) + " " + std::to_string(t.layout.height) + "\n";
     for (const BuildTool::Layout::Item& item : t.layout.items) {
         out += "item = " + std::to_string(item.building) + " " + std::to_string(item.x) + " " + std::to_string(item.y) +
@@ -77,7 +78,7 @@ std::string write_template(const BuildTemplate& t) {
 std::optional<BuildTemplate> read_template(std::string_view text) {
     BuildTemplate t;
     bool sized = false;
-    text = core::skip_utf8_bom(text);
+    text = annokit::core::skip_utf8_bom(text);
     while (!text.empty()) {
         const std::size_t end = text.find('\n');
         const std::string_view line = trim(text.substr(0, end));
@@ -89,7 +90,8 @@ std::optional<BuildTemplate> read_template(std::string_view text) {
         const std::string_view key = trim(line.substr(0, eq));
         const std::string_view value = trim(line.substr(eq + 1));
         if (key == "name") {
-            t.name = clean_template_name(core::is_utf8(value) ? core::utf8_to_cp1252(value) : std::string(value));
+            t.name = clean_template_name(annokit::core::is_utf8(value) ? annokit::core::utf8_to_cp1252(value)
+                                                                       : std::string(value));
         } else if (key == "size") {
             const auto v = numbers(value);
             if (v && v->size() == 2 && (*v)[0] > 0 && (*v)[1] > 0 && (*v)[0] <= kMaxSide && (*v)[1] <= kMaxSide) {
@@ -165,15 +167,15 @@ void TemplateStore::load() {
         if (path.extension() != ".txt" || !it->is_regular_file(ec)) {
             continue;
         }
-        const auto bytes = core::read_file(path);
+        const auto bytes = annokit::core::read_file(path);
         if (!bytes) {
             continue;
         }
         const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
         if (auto t = read_template(text)) {
-            t->file = core::path_to_utf8(path.filename());
+            t->file = annokit::core::path_to_utf8(path.filename());
             if (t->name.empty()) {
-                t->name = core::path_to_utf8(path.stem());
+                t->name = annokit::core::path_to_utf8(path.stem());
             }
             m_templates.push_back(std::move(*t));
         }
@@ -190,8 +192,8 @@ bool TemplateStore::write(const BuildTemplate& t) const {
     std::error_code ec;
     std::filesystem::create_directories(m_folder, ec);
     const std::string text = write_template(t);
-    return core::write_file_atomic(m_folder / t.file,
-                                   std::span(reinterpret_cast<const std::uint8_t*>(text.data()), text.size()))
+    return annokit::core::write_file_atomic(m_folder / t.file,
+                                            std::span(reinterpret_cast<const std::uint8_t*>(text.data()), text.size()))
         .ok();
 }
 

@@ -14,8 +14,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -158,9 +158,10 @@ SpecialRefusal special_fits(const sim::World& world, const assets::BuildingTable
     return SpecialRefusal::None;
 }
 
-core::Result<std::unique_ptr<Operation>> place_special(const sim::World& world, const assets::BuildingTable& buildings,
-                                                       std::uint16_t island, sim::TilePos origin,
-                                                       const SpecialPiece& piece, std::uint8_t rotation) {
+annokit::core::Result<std::unique_ptr<Operation>> place_special(const sim::World& world,
+                                                                const assets::BuildingTable& buildings,
+                                                                std::uint16_t island, sim::TilePos origin,
+                                                                const SpecialPiece& piece, std::uint8_t rotation) {
     const SpecialRefusal refused = special_fits(world, buildings, island, origin, piece, rotation);
     if (refused != SpecialRefusal::None) {
         return make_error(ErrorCode::InvalidFormat, refusal_name(refused));

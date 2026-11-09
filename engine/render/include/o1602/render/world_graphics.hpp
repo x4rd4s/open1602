@@ -13,13 +13,14 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_looks.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/package_flags.hpp"
 #include "o1602/assets/package_graphics.hpp"
 #include "o1602/assets/palette.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/render/banner.hpp"
 #include "o1602/render/dither.hpp"
 #include "o1602/render/sprite_atlas.hpp"
@@ -90,11 +91,12 @@ struct WorldGraphics {
 /// With `banners`, the generic flag is tinted once per banner with FlagStyle::Tinted (needs the
 /// ship sheet). With `banners` and `figures`, the units drawn per colour (FigureTable::kUnitFamilies)
 /// are tinted once per banner without unit_variant (needs the soldier sheet).
-core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
-                                                Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
-                                                const GraphicsOptions& options = {},
-                                                const BannerTable* banners = nullptr,
-                                                const assets::FigureTable* figures = nullptr);
+annokit::core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& game,
+                                                         const assets::Palette& palette, Zoom zoom,
+                                                         std::span<const assets::FigureSheet> figure_sheets,
+                                                         const GraphicsOptions& options = {},
+                                                         const BannerTable* banners = nullptr,
+                                                         const assets::FigureTable* figures = nullptr);
 
 /// A zoom level's graphics as far as they are made without the GPU: the atlas with its pixels and
 /// the masks of the figures for picking units. Reads only files and its arguments, so it may run
@@ -106,11 +108,12 @@ struct PreparedGraphics {
 };
 
 /// load_world_graphics plus the figures' hit mask.
-core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
-                                                      Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
-                                                      const GraphicsOptions& options = {},
-                                                      const BannerTable* banners = nullptr,
-                                                      const assets::FigureTable* figures = nullptr);
+annokit::core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game,
+                                                               const assets::Palette& palette, Zoom zoom,
+                                                               std::span<const assets::FigureSheet> figure_sheets,
+                                                               const GraphicsOptions& options = {},
+                                                               const BannerTable* banners = nullptr,
+                                                               const assets::FigureTable* figures = nullptr);
 
 /// The sheets the world renderer uses: ships, animals, shadows, effects (smoke, status icons),
 /// soldiers, carriers and carts (TRAEGER.BSH), farm workers (MAEHER.BSH), fish, jugglers and the

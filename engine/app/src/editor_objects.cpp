@@ -538,8 +538,8 @@ void MapViewer::editor_city_request(const EditorRequest& request) {
         if (op) {
             m_editor->document.perform(std::move(op).value());
             m_editor->notice.clear();
-        } else if (op.error().code == core::ErrorCode::Unsupported && setting.mode != sim::TradeSetting::Mode::None &&
-                   !setting.price && !setting.amount) {
+        } else if (op.error().code == annokit::core::ErrorCode::Unsupported &&
+                   setting.mode != sim::TradeSetting::Mode::None && !setting.price && !setting.amount) {
             editor_notice(ui::tr("editor.trade.no_slot"), true, op.error().message);
         }
     } else if (request.kind == Kind::CityTradeReset) {
@@ -1050,8 +1050,8 @@ void MapViewer::editor_remove_object(render::TilePos tile) {
         world, m_buildings, c.island,
         sim::TilePos{static_cast<std::int32_t>(c.local_x), static_cast<std::int32_t>(c.local_y)});
     if (!op) {
-        editor_notice(ui::tr(op.error().code == core::ErrorCode::NotFound ? "editor.objects.refused.nothing"
-                                                                          : "editor.objects.refused.remove"),
+        editor_notice(ui::tr(op.error().code == annokit::core::ErrorCode::NotFound ? "editor.objects.refused.nothing"
+                                                                                   : "editor.objects.refused.remove"),
                       true, op.error().message);
         return;
     }

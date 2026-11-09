@@ -16,6 +16,9 @@
 #include "mod_rules.hpp"
 #include "tool.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/figure_table.hpp"
@@ -25,8 +28,6 @@
 #include "o1602/assets/savegame.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/climates.hpp"
 #include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/new_game.hpp"
@@ -67,16 +68,17 @@ int cmd_savegames(const Args& args) {
     }
     const auto dat = game->resolve("Game.dat");
     if (!dat) {
-        return fail(core::make_error(core::ErrorCode::NotFound, "Game.dat not found (the game was never started?)"));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                              "Game.dat not found (the game was never started?)"));
     }
-    auto bytes = core::read_file(*dat);
+    auto bytes = annokit::core::read_file(*dat);
     if (!bytes) {
         return fail(bytes.error());
     }
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     for (const auto& slot : assets::parse_savegame_slots(text)) {
         const auto path = game->resolve(slot.file);
-        std::printf("%2u  %-24s %s", slot.slot, core::cp1252_to_utf8(slot.name).c_str(), slot.file.c_str());
+        std::printf("%2u  %-24s %s", slot.slot, annokit::core::cp1252_to_utf8(slot.name).c_str(), slot.file.c_str());
         if (!path) {
             std::printf("  (missing)\n");
             continue;
@@ -93,8 +95,8 @@ int cmd_savegames(const Args& args) {
                 player = players->front().name;
             }
         }
-        std::printf("  scenario \"%s\", player \"%s\"\n", core::cp1252_to_utf8(scenario).c_str(),
-                    core::cp1252_to_utf8(player).c_str());
+        std::printf("  scenario \"%s\", player \"%s\"\n", annokit::core::cp1252_to_utf8(scenario).c_str(),
+                    annokit::core::cp1252_to_utf8(player).c_str());
     }
     return 0;
 }
@@ -106,24 +108,25 @@ struct OwnSave {
     assets::BuildingTable buildings;
     sim::World world;
 };
-std::optional<core::Result<OwnSave>> read_own_save(const fs::path& path, const std::string_view* mods = nullptr) {
-    auto bytes = core::read_file(path);
+std::optional<annokit::core::Result<OwnSave>> read_own_save(const fs::path& path,
+                                                            const std::string_view* mods = nullptr) {
+    auto bytes = annokit::core::read_file(path);
     if (!bytes || !sim::is_open1602_save(*bytes)) {
         return std::nullopt;
     }
     auto game = assets::GameDirectory::from_environment();
     if (!game) {
-        return core::Result<OwnSave>(game.error());
+        return annokit::core::Result<OwnSave>(game.error());
     }
     auto buildings = assets::BuildingTable::load(*game);
     if (!buildings) {
-        return core::Result<OwnSave>(buildings.error());
+        return annokit::core::Result<OwnSave>(buildings.error());
     }
     std::vector<std::string> warnings;
     if (mods != nullptr) {
         auto figures = assets::FigureTable::load(*game);
         if (!figures) {
-            return core::Result<OwnSave>(figures.error());
+            return annokit::core::Result<OwnSave>(figures.error());
         }
         const std::vector<assets::ModPackage> packages =
             assets::load_mod_packages(fs::path(std::string(*mods)), warnings);
@@ -134,9 +137,9 @@ std::optional<core::Result<OwnSave>> read_own_save(const fs::path& path, const s
         std::fprintf(stderr, "warning: %s\n", text.c_str());
     }
     if (!world) {
-        return core::Result<OwnSave>(world.error());
+        return annokit::core::Result<OwnSave>(world.error());
     }
-    return core::Result<OwnSave>(OwnSave{std::move(buildings).value(), std::move(world).value()});
+    return annokit::core::Result<OwnSave>(OwnSave{std::move(buildings).value(), std::move(world).value()});
 }
 
 /// Per human or computer player: cities, houses, inhabitants, woodcutters, trees on its land and the
@@ -371,7 +374,7 @@ int own_state(const sim::World& world, const assets::BuildingTable& buildings, b
     for (std::size_t i = 0; i < world.players().size(); ++i) {
         const sim::Player& p = world.players()[i];
         std::printf("player %zu: role %u, banner %u, money %d %s\n", i, static_cast<unsigned>(p.role),
-                    static_cast<unsigned>(p.banner), p.money, core::cp1252_to_utf8(p.name).c_str());
+                    static_cast<unsigned>(p.banner), p.money, annokit::core::cp1252_to_utf8(p.name).c_str());
     }
     for (const sim::City& c : world.cities()) {
         std::size_t goods = 0;
@@ -379,11 +382,11 @@ int own_state(const sim::World& world, const assets::BuildingTable& buildings, b
             goods += amount != 0 ? 1U : 0U;
         }
         std::printf("city: island %u #%u, owner %u, \"%s\", %zu goods in stock\n", c.island, c.index,
-                    static_cast<unsigned>(c.owner), core::cp1252_to_utf8(c.name).c_str(), goods);
+                    static_cast<unsigned>(c.owner), annokit::core::cp1252_to_utf8(c.name).c_str(), goods);
     }
     for (const sim::Ship& s : world.ships()) {
-        std::printf("ship \"%s\": figure %u, owner %u, at %u,%u\n", core::cp1252_to_utf8(s.name).c_str(), s.figure,
-                    static_cast<unsigned>(s.owner), s.x, s.y);
+        std::printf("ship \"%s\": figure %u, owner %u, at %u,%u\n", annokit::core::cp1252_to_utf8(s.name).c_str(),
+                    s.figure, static_cast<unsigned>(s.owner), s.x, s.y);
     }
     for (const sim::ComputerProducer& p : world.balance().computer_producers) {
         std::printf("computer producer changed: %s\n", sim::producer_text(p).c_str());
@@ -480,11 +483,11 @@ int cmd_state(const Args& args) {
     }
     for (const auto& p : *players) {
         std::printf("player %u: kind 0x%02X, colour %u, money %d %s\n", p.slot, static_cast<unsigned>(p.kind),
-                    static_cast<unsigned>(p.colour), p.money, core::cp1252_to_utf8(p.name).c_str());
+                    static_cast<unsigned>(p.colour), p.money, annokit::core::cp1252_to_utf8(p.name).c_str());
     }
     for (const auto& c : state->cities) {
         std::printf("city: island %u #%u, owner %u, \"%s\"\n", c.island, c.index, c.owner,
-                    core::cp1252_to_utf8(c.name).c_str());
+                    annokit::core::cp1252_to_utf8(c.name).c_str());
     }
     for (const auto& w : state->warehouses) {
         std::size_t used = 0;
@@ -531,7 +534,7 @@ int cmd_state(const Args& args) {
     std::printf("deer: %zu on %zu islands\n", state->animals.size(), deer.size());
     for (const auto& s : *ships) {
         std::printf("ship \"%s\": figure %u, owner %u, at %u,%u, direction %u, island %s\n",
-                    core::cp1252_to_utf8(s.name).c_str(), s.figure, s.owner, s.x, s.y, s.direction,
+                    annokit::core::cp1252_to_utf8(s.name).c_str(), s.figure, s.owner, s.x, s.y, s.direction,
                     s.island == 0xFF ? "-" : std::to_string(s.island).c_str());
     }
     return 0;
@@ -606,7 +609,7 @@ int cmd_new_world(const Args& args) {
         options.world.package_islands = sim::load_package_islands(packages, problems);
         // And their climates, which take a share of the islands (their forest of the original's trees).
         for (const assets::ModPackage& package : packages) {
-            if (const auto bytes = core::read_file(package.folder / sim::kClimatesFile)) {
+            if (const auto bytes = annokit::core::read_file(package.folder / sim::kClimatesFile)) {
                 const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
                 sim::apply_climates_file(options.world.climates, package.id, text, problems, &*buildings);
             }
@@ -710,7 +713,7 @@ int cmd_new_world(const Args& args) {
     if (!bytes) {
         return fail(bytes.error());
     }
-    if (auto status = core::write_file(out_path, *bytes); !status) {
+    if (auto status = annokit::core::write_file(out_path, *bytes); !status) {
         return fail(status.error());
     }
     std::printf("-> %s\n", std::string(args.positional[0]).c_str());
@@ -731,12 +734,12 @@ int cmd_export(const Args& args) {
     if (!buildings) {
         return fail(buildings.error());
     }
-    auto bytes = core::read_file(fs::path(args.positional[0]));
+    auto bytes = annokit::core::read_file(fs::path(args.positional[0]));
     if (!bytes) {
         return fail(bytes.error());
     }
     std::vector<std::string> warnings;
-    const auto load = [&]() -> core::Result<sim::World> {
+    const auto load = [&]() -> annokit::core::Result<sim::World> {
         if (sim::is_open1602_save(*bytes)) {
             return sim::read_game(*bytes, *buildings, &warnings);
         }
@@ -746,7 +749,7 @@ int cmd_export(const Args& args) {
         }
         return sim::load_world(*file, *buildings, *game, &warnings);
     };
-    core::Result<sim::World> world = load();
+    annokit::core::Result<sim::World> world = load();
     if (!world) {
         return fail(world.error());
     }
@@ -767,7 +770,7 @@ int cmd_export(const Args& args) {
     if (!out) {
         return fail(out.error());
     }
-    if (auto status = core::write_file(fs::path(args.positional[1]), *out); !status) {
+    if (auto status = annokit::core::write_file(fs::path(args.positional[1]), *out); !status) {
         return fail(status.error());
     }
     std::printf("-> %s\n", std::string(args.positional[1]).c_str());

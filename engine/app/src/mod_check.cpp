@@ -10,8 +10,9 @@
 #include <string_view>
 #include <system_error>
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/ui/localization.hpp"
 #include "o1602/ui/resources.hpp"
 
@@ -186,7 +187,7 @@ void check_package_catalogues(std::span<const assets::ModPackage> packages, std:
         }
         std::sort(files.begin(), files.end());
         for (const std::filesystem::path& file : files) {
-            if (const auto bytes = core::read_file(file)) {
+            if (const auto bytes = annokit::core::read_file(file)) {
                 const std::u8string name = file.filename().u8string();
                 const std::string where = package.id + "/" + std::string(ui::kPackageLocaleFolder) + "/" +
                                           std::string(name.begin(), name.end());

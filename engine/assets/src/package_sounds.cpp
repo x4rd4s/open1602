@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <cstring>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/game_content.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::assets {
 
@@ -40,7 +41,7 @@ std::string lower_name(std::string_view name) {
 }  // namespace
 
 bool is_sound_file(const std::filesystem::path& path) {
-    const auto head = core::read_file_head(path, 4);
+    const auto head = annokit::core::read_file_head(path, 4);
     if (!head || head->bytes.size() < 4) {
         return false;
     }
@@ -56,12 +57,12 @@ const PackageSound* find_package_sound(std::span<const PackageSound> sounds, std
 void apply_sounds_file(std::vector<PackageSound>& sounds, std::string_view package, const std::filesystem::path& folder,
                        std::string_view utf8, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kSoundsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: a sound's name holds only lower case letters, digits and '_'");
@@ -75,7 +76,7 @@ void apply_sounds_file(std::vector<PackageSound>& sounds, std::string_view packa
         std::string file;
         std::string replaces;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             const std::string* s = e.value.string();
             if (e.key == "file") {
@@ -111,7 +112,7 @@ void apply_sounds_file(std::vector<PackageSound>& sounds, std::string_view packa
         PackageSound sound;
         sound.id = id;
         sound.number = static_cast<std::uint16_t>(kFirstPackageSound + sounds.size());
-        sound.file = folder / core::path_from_utf8(file);
+        sound.file = folder / annokit::core::path_from_utf8(file);
         sound.replaces = std::move(replaces);
         if (!is_sound_file(sound.file)) {
             warnings.push_back(at + file + " is missing or no WAV, Ogg Vorbis or FLAC file");

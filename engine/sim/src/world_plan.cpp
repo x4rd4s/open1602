@@ -196,7 +196,7 @@ public:
     Planner(const WorldSettings& s, const std::vector<TemplateInfo>& templates, std::vector<std::string>* warnings)
         : m_s(s), m_asked(s.landscape), m_templates(templates), m_warnings(warnings), m_random(s.seed, kPlanStream) {}
 
-    core::Result<WorldPlan> run();
+    annokit::core::Result<WorldPlan> run();
 
 private:
     void warn(std::string text) {
@@ -1134,19 +1134,21 @@ WorldPlan Planner::finish() {
     return out;
 }
 
-core::Result<WorldPlan> Planner::run() {
+annokit::core::Result<WorldPlan> Planner::run() {
     if (m_s.width < WorldSettings::kMinSide || m_s.height < WorldSettings::kMinSide ||
         m_s.width > WorldSettings::kMaxSide || m_s.height > WorldSettings::kMaxSide) {
-        return core::make_error(core::ErrorCode::LimitExceeded, "a world side of " +
-                                                                    std::to_string(WorldSettings::kMinSide) + " to " +
-                                                                    std::to_string(WorldSettings::kMaxSide) + " tiles");
+        return annokit::core::make_error(annokit::core::ErrorCode::LimitExceeded,
+                                         "a world side of " + std::to_string(WorldSettings::kMinSide) + " to " +
+                                             std::to_string(WorldSettings::kMaxSide) + " tiles");
     }
     // The players add_players places, not more (LC-1).
     if (m_s.players == 0 || m_s.players > kMaxPlayers) {
-        return core::make_error(core::ErrorCode::LimitExceeded, "1 to " + std::to_string(kMaxPlayers) + " players");
+        return annokit::core::make_error(annokit::core::ErrorCode::LimitExceeded,
+                                         "1 to " + std::to_string(kMaxPlayers) + " players");
     }
     if (m_templates.empty()) {
-        return core::make_error(core::ErrorCode::NotFound, "no island templates in the game directory");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "no island templates in the game directory");
     }
     grow_islands();
     std::uint32_t density = 100;
@@ -1425,8 +1427,8 @@ std::vector<TemplateInfo> island_templates(const assets::GameDirectory& game, co
     return out;
 }
 
-core::Result<WorldPlan> plan_world(const WorldSettings& settings, const std::vector<TemplateInfo>& templates,
-                                   std::vector<std::string>* warnings) {
+annokit::core::Result<WorldPlan> plan_world(const WorldSettings& settings, const std::vector<TemplateInfo>& templates,
+                                            std::vector<std::string>* warnings) {
     Planner planner(settings, templates, warnings);
     return planner.run();
 }

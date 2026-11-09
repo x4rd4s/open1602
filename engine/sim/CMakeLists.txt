@@ -86,7 +86,7 @@ o1602_set_warnings(o1602_sim)
 
 # The building values of rules such as the revised bread chain (data/balance, compiled in).
 file(GLOB o1602_balance_presets CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/data/balance/*.toml")
-o1602_embed_files(o1602_sim o1602::sim::presets ${o1602_balance_presets})
+annokit_embed_files(o1602_sim o1602::sim::presets ${o1602_balance_presets})
 # The same results on every machine (ADR 0004): no fused multiply-add where the source has two
 # operations, which compilers for arm64 contract by default (DS-2). MSVC contracts only with
 # /fp:fast, which is not set.

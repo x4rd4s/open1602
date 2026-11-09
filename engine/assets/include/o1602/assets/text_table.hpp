@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -20,7 +20,7 @@ public:
     /// Splits decoded Text.cod text (Windows-1252 or UTF-8, kept as given) into its sections.
     static TextTable parse(std::string_view text);
     /// Reads Text.cod of an installation (texts stay in Windows-1252).
-    static core::Result<TextTable> load(const GameDirectory& game);
+    static annokit::core::Result<TextTable> load(const GameDirectory& game);
 
     /// Lines of a section without the trailing blanks of each line; empty if it does not exist.
     [[nodiscard]] const std::vector<std::string>& section(std::string_view name) const;

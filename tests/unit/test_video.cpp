@@ -11,9 +11,10 @@
 #include "../test_framework.hpp"
 #include "video_queue.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/video/smacker.hpp"
+
 #include "o1602/assets/high_scores.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/video/smacker.hpp"
 
 using namespace o1602;
 
@@ -158,7 +159,7 @@ std::vector<std::uint8_t> new_colour(std::uint8_t r, std::uint8_t g, std::uint8_
 TEST_CASE("smacker: header, frame rate, flags and tracks") {
     auto file =
         smacker_file(8, 4, -6666, constant_type_trees(0x0007), {Frame{}, Frame{}}, {0xD000'5622U, 0xC000'5622U});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     const auto& info = video->info();
     CHECK(info.version == 2);
@@ -175,31 +176,31 @@ TEST_CASE("smacker: header, frame rate, flags and tracks") {
     CHECK(!(info.tracks[2].present));
 
     put32(file, 16, 100);  // positive: milliseconds
-    CHECK(video::Smacker::open(file)->info().frame_us == 100000);
+    CHECK(annokit::video::Smacker::open(file)->info().frame_us == 100000);
     put32(file, 16, 0);  // 0: ten frames a second
-    CHECK(video::Smacker::open(file)->info().frame_us == 100000);
+    CHECK(annokit::video::Smacker::open(file)->info().frame_us == 100000);
     put32(file, 20, 4);  // doubled lines
-    auto doubled = video::Smacker::open(file);
+    auto doubled = annokit::video::Smacker::open(file);
     REQUIRE(doubled.ok());
     CHECK(doubled->info().display_height() == 8);
 }
 
 TEST_CASE("smacker: damaged files fail instead of crashing") {
     auto file = smacker_file(8, 4, -6666, constant_type_trees(0x0007), {Frame{}});
-    CHECK(!(video::Smacker::open({}).ok()));
+    CHECK(!(annokit::video::Smacker::open({}).ok()));
     auto bad = file;
     bad[0] = 'X';
-    CHECK(!(video::Smacker::open(bad).ok()));
+    CHECK(!(annokit::video::Smacker::open(bad).ok()));
     for (std::size_t cut = 0; cut < file.size(); cut += 7) {
         std::vector<std::uint8_t> part(file.begin(), file.begin() + static_cast<std::ptrdiff_t>(cut));
-        auto v = video::Smacker::open(part);
+        auto v = annokit::video::Smacker::open(part);
         if (v.ok()) {
             (void)v->next();
         }
     }
     auto empty_trees = file;
     put32(empty_trees, 52, 0);  // tables missing: the first read runs out of bits
-    CHECK(!(video::Smacker::open(empty_trees).ok()));
+    CHECK(!(annokit::video::Smacker::open(empty_trees).ok()));
 }
 
 TEST_CASE("smacker: solid blocks in chains and the palette") {
@@ -210,7 +211,7 @@ TEST_CASE("smacker: solid blocks in chains and the palette") {
     auto c42 = new_colour(0x10, 0x20, 0x30);       // entry 42
     first.palette.insert(first.palette.end(), c42.begin(), c42.end());
     auto file = smacker_file(8, 4, -6666, constant_type_trees(0x2A07), {first, Frame{}});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     REQUIRE(video->next().ok());
     CHECK(video->palette_changed());
@@ -252,7 +253,7 @@ TEST_CASE("smacker: palette entries copied from the previous palette") {
     auto blue = new_colour(0x00, 0x00, 0x3F);
     second.palette.insert(second.palette.end(), blue.begin(), blue.end());
     auto file = smacker_file(4, 4, -6666, constant_type_trees(0x0002), {first, second});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     REQUIRE(video->next().ok());
     REQUIRE(video->next().ok());
@@ -317,7 +318,7 @@ TEST_CASE("smacker: mono and full blocks, recent values of the 16-bit trees") {
     Frame frame;
     frame.video = v.bytes();
     auto file = smacker_file(8, 4, -6666, t.bytes(), {frame, frame});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     REQUIRE(video->next().ok());
     const auto px = video->pixels();
@@ -345,7 +346,7 @@ TEST_CASE("smacker: mono and full blocks, recent values of the 16-bit trees") {
     Frame f2;
     f2.video = v2.bytes();
     auto file2 = smacker_file(8, 4, -6666, t.bytes(), {frame, f2});
-    auto video2 = video::Smacker::open(file2);
+    auto video2 = annokit::video::Smacker::open(file2);
     REQUIRE(video2.ok());
     REQUIRE(video2->next().ok());
     REQUIRE(video2->next().ok());
@@ -391,7 +392,7 @@ TEST_CASE("smacker: audio tracks, 8-bit DPCM, 16-bit stereo and plain PCM") {
     f.audio = {mono, stereo, plain};
     auto file =
         smacker_file(4, 4, -6666, constant_type_trees(0x0002), {f, f}, {0xC000'5622U, 0xF000'5622U, 0x4000'5622U});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     auto t0 = video->audio(0);
     REQUIRE(t0.ok());
@@ -437,14 +438,15 @@ TEST_CASE("smacker: a few bytes cannot claim more sound than the video lasts (HI
     Frame f;
     f.audio = {bomb};
     const auto file = smacker_file(4, 4, -6666, constant_type_trees(0x0002), {f, f, f}, {0xC000'5622U});
-    auto video = video::Smacker::open(file);
+    auto video = annokit::video::Smacker::open(file);
     REQUIRE(video.ok());
     CHECK(!video->audio(0).ok());  // three frames of 1/15 s hold about 26 000 samples, not 3 M
     // A chunk of the length a frame lasts goes through.
     std::vector<std::uint8_t> fits = {0xBE, 0x05, 0, 0};  // 1470: 22050 Hz / 15 frames a second
     fits.insert(fits.end(), a.bytes().begin(), a.bytes().end());
     f.audio = {fits};
-    auto ok = video::Smacker::open(smacker_file(4, 4, -6666, constant_type_trees(0x0002), {f, f, f}, {0xC000'5622U}));
+    auto ok = annokit::video::Smacker::open(
+        smacker_file(4, 4, -6666, constant_type_trees(0x0002), {f, f, f}, {0xC000'5622U}));
     REQUIRE(ok.ok());
     const auto pcm = ok->audio(0);
     REQUIRE(pcm.ok());
@@ -454,13 +456,13 @@ TEST_CASE("smacker: a few bytes cannot claim more sound than the video lasts (HI
 TEST_CASE("smacker: a frame rate that wrapped to nothing in 32 bits is refused (HI-12)") {
     auto file = smacker_file(8, 4, -6666, constant_type_trees(0x0007), {Frame{}});
     put32(file, 16, 536870912U);  // * 1000 wrapped to 0
-    CHECK(!video::Smacker::open(file).ok());
+    CHECK(!annokit::video::Smacker::open(file).ok());
     put32(file, 16, 0x8000'0000U);  // INT32_MIN
-    CHECK(!video::Smacker::open(file).ok());
+    CHECK(!annokit::video::Smacker::open(file).ok());
     put32(file, 16, 1001);  // over a second per frame
-    CHECK(!video::Smacker::open(file).ok());
+    CHECK(!annokit::video::Smacker::open(file).ok());
     put32(file, 16, 1000);
-    CHECK(video::Smacker::open(file).ok());
+    CHECK(annokit::video::Smacker::open(file).ok());
 }
 
 TEST_CASE("smacker: from a file the frames are read one by one, with the same pictures and sound (FB-14)") {
@@ -475,10 +477,10 @@ TEST_CASE("smacker: from a file the frames are read one by one, with the same pi
     std::error_code ec;
     fs::remove_all(dir, ec);
     REQUIRE(fs::create_directories(dir));
-    REQUIRE(core::write_file(dir / "video.smk", bytes).ok());
+    REQUIRE(annokit::core::write_file(dir / "video.smk", bytes).ok());
 
-    auto memory = video::Smacker::open(bytes);
-    auto file = video::Smacker::open_file(dir / "video.smk");
+    auto memory = annokit::video::Smacker::open(bytes);
+    auto file = annokit::video::Smacker::open_file(dir / "video.smk");
     REQUIRE(memory.ok());
     REQUIRE(file.ok());
     CHECK(file->info().frames == 2);
@@ -503,11 +505,11 @@ TEST_CASE("smacker: from a file the frames are read one by one, with the same pi
     // Cut short on the disk: refused when opened, as from memory.
     for (std::size_t cut : {std::size_t{0}, std::size_t{0x40}, std::size_t{0x68}, bytes.size() - 1}) {
         const std::vector<std::uint8_t> part(bytes.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(cut));
-        REQUIRE(core::write_file(dir / "short.smk", part).ok());
-        CHECK(!video::Smacker::open_file(dir / "short.smk").ok());
-        CHECK(!video::Smacker::open(part).ok());
+        REQUIRE(annokit::core::write_file(dir / "short.smk", part).ok());
+        CHECK(!annokit::video::Smacker::open_file(dir / "short.smk").ok());
+        CHECK(!annokit::video::Smacker::open(part).ok());
     }
-    CHECK(!video::Smacker::open_file(dir / "missing.smk").ok());
+    CHECK(!annokit::video::Smacker::open_file(dir / "missing.smk").ok());
     fs::remove_all(dir, ec);
 }
 

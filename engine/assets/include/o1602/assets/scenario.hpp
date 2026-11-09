@@ -12,8 +12,9 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -143,7 +144,7 @@ struct MissionRecord {
 
 /// AUFTRAG4 chunk, in file order. Files without it yield an empty list. The older chunks
 /// AUFTRAG and AUFTRAG2 are not read (no shipped file has them).
-core::Result<std::vector<MissionRecord>> load_missions(const ChunkFile& file);
+annokit::core::Result<std::vector<MissionRecord>> load_missions(const ChunkFile& file);
 
 /// The record as the original writes it: fields it does not read are 0.
 [[nodiscard]] std::vector<std::uint8_t> encode_mission(const MissionRecord& record);
@@ -215,13 +216,13 @@ struct TraderRecord {
 };
 
 /// HANDLER chunk. Files without it yield an empty list.
-core::Result<std::vector<TraderRecord>> load_traders(const ChunkFile& file);
+annokit::core::Result<std::vector<TraderRecord>> load_traders(const ChunkFile& file);
 
 /// PLAYER4 chunk. Files without it (older formats PLAYER2/PLAYER3) yield an empty list.
-core::Result<std::vector<PlayerRecord>> load_players(const ChunkFile& file);
+annokit::core::Result<std::vector<PlayerRecord>> load_players(const ChunkFile& file);
 
 /// SHIP4 chunk. Files without it yield an empty list.
-core::Result<std::vector<ShipRecord>> load_ships(const ChunkFile& file);
+annokit::core::Result<std::vector<ShipRecord>> load_ships(const ChunkFile& file);
 
 /// The world plan of a scenario that makes its islands at the start (SZENE chunk, 0x494 bytes; the
 /// endless games). For each island its number, place, size class and climate; the template, which
@@ -263,7 +264,7 @@ struct ScenarioPlan {
 };
 
 /// The SZENE chunk, nothing if the file has none.
-[[nodiscard]] core::Result<std::optional<ScenarioPlan>> load_scenario_plan(const ChunkFile& file);
+[[nodiscard]] annokit::core::Result<std::optional<ScenarioPlan>> load_scenario_plan(const ChunkFile& file);
 
 /// `base` (a SZENE chunk, or nothing) with the fields of `plan` written into it: the chunk a
 /// scenario of that plan carries. Bytes the plan does not hold stay as they were; the chunk is at

@@ -3,10 +3,10 @@
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
-core::Result<Palette> Palette::from_chunk_file(const ChunkFile& file) {
+annokit::core::Result<Palette> Palette::from_chunk_file(const ChunkFile& file) {
     const Chunk* chunk = file.find("COL");
     if (chunk == nullptr) {
         return make_error(ErrorCode::InvalidFormat, "no COL chunk");
@@ -23,7 +23,7 @@ core::Result<Palette> Palette::from_chunk_file(const ChunkFile& file) {
     return palette;
 }
 
-core::Result<Palette> Palette::load(const std::filesystem::path& path) {
+annokit::core::Result<Palette> Palette::load(const std::filesystem::path& path) {
     auto file = ChunkFile::load(path);
     if (!file) {
         return file.error();

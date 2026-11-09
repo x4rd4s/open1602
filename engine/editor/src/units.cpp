@@ -16,8 +16,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -158,9 +158,10 @@ UnitRefusal cart_fits(const sim::World& world, const assets::BuildingTable& buil
     return UnitRefusal::None;
 }
 
-core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world, const assets::BuildingTable& buildings,
-                                                    const assets::FigureTable& figures, sim::PlayerId owner,
-                                                    std::int64_t x, std::int64_t y, std::uint8_t direction) {
+annokit::core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world,
+                                                             const assets::BuildingTable& buildings,
+                                                             const assets::FigureTable& figures, sim::PlayerId owner,
+                                                             std::int64_t x, std::int64_t y, std::uint8_t direction) {
     const assets::FigureType* type = figures.get(assets::figure::kTradeCart);
     const UnitRefusal refused = type == nullptr ? UnitRefusal::NoType : cart_fits(world, buildings, owner, x, y);
     if (refused != UnitRefusal::None) {
@@ -179,10 +180,11 @@ core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world, con
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "cart_place"));
 }
 
-core::Result<std::unique_ptr<Operation>> place_ship(const sim::World& world, const assets::BuildingTable& buildings,
-                                                    const assets::FigureTable& figures, sim::PlayerId owner,
-                                                    std::uint16_t figure, std::int64_t x, std::int64_t y,
-                                                    std::uint8_t direction) {
+annokit::core::Result<std::unique_ptr<Operation>> place_ship(const sim::World& world,
+                                                             const assets::BuildingTable& buildings,
+                                                             const assets::FigureTable& figures, sim::PlayerId owner,
+                                                             std::uint16_t figure, std::int64_t x, std::int64_t y,
+                                                             std::uint8_t direction) {
     const assets::FigureType* type = figures.get(figure);
     UnitRefusal refused = UnitRefusal::None;
     // The shipyards' ships and the packages', the pirates' ship, and the free trader's for him alone.
@@ -214,10 +216,11 @@ core::Result<std::unique_ptr<Operation>> place_ship(const sim::World& world, con
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_place"));
 }
 
-core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world, const assets::BuildingTable& buildings,
-                                                    const assets::FigureTable& figures, sim::PlayerId owner,
-                                                    std::uint16_t family, std::int64_t x, std::int64_t y,
-                                                    std::uint8_t direction) {
+annokit::core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world,
+                                                             const assets::BuildingTable& buildings,
+                                                             const assets::FigureTable& figures, sim::PlayerId owner,
+                                                             std::uint16_t family, std::int64_t x, std::int64_t y,
+                                                             std::uint8_t direction) {
     const auto unit = figures.unit_of(family);
     const assets::FigureType* type = figures.get(family);
     // The natives' spearman is theirs alone, as in a game.
@@ -245,8 +248,9 @@ core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& world, con
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_place"));
 }
 
-core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id, std::size_t slot,
-                                                        std::uint8_t ware, std::uint32_t amount) {
+annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id,
+                                                                 std::size_t slot, std::uint8_t ware,
+                                                                 std::uint32_t amount) {
     const sim::Ship* ship = world.ship(id);
     if (ship == nullptr || slot >= ship->cargo.size()) {
         return make_error(ErrorCode::NotFound, "no such ship or hold");
@@ -268,7 +272,7 @@ core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world,
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_cargo"));
 }
 
-core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id) {
     if (world.ship(id) == nullptr) {
         return make_error(ErrorCode::NotFound, "no such ship");
     }
@@ -278,7 +282,7 @@ core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, st
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_remove"));
 }
 
-core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& world, std::uint32_t id) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& world, std::uint32_t id) {
     if (world.soldier(id) == nullptr) {
         return make_error(ErrorCode::NotFound, "no such unit");
     }

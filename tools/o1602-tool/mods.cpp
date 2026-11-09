@@ -17,6 +17,8 @@
 #include "mod_rules.hpp"
 #include "tool.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/chunk_writer.hpp"
@@ -26,7 +28,6 @@
 #include "o1602/assets/island.hpp"
 #include "o1602/assets/package_scenarios.hpp"
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/render/banner.hpp"
 #include "o1602/script/game_scripts.hpp"
 #include "o1602/sim/package_islands.hpp"
@@ -53,8 +54,8 @@ int cmd_check_mod(const Args& args) {
     const fs::path mods(std::string(args.positional[0]));
     std::error_code ec;
     if (!fs::is_directory(mods, ec)) {
-        return fail(
-            core::make_error(core::ErrorCode::NotFound, std::string(args.positional[0]) + ": no folder of packages"));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                              std::string(args.positional[0]) + ": no folder of packages"));
     }
     auto game = assets::GameDirectory::from_environment();
     if (!game) {
@@ -105,11 +106,11 @@ int cmd_check_mod(const Args& args) {
     (void)assets::load_package_campaigns(packages, scenarios, problems);
     // The scenarios' maps saved by Open1602, read as the game reads them: with the packages' buildings.
     for (const assets::PackageScenario& scenario : scenarios) {
-        const auto bytes = core::read_file(scenario.file);
+        const auto bytes = annokit::core::read_file(scenario.file);
         if (!bytes || !sim::is_open1602_save(*bytes)) {
             continue;
         }
-        const std::string where = scenario.id + " (" + core::path_to_utf8(scenario.file.filename()) + "): ";
+        const std::string where = scenario.id + " (" + annokit::core::path_to_utf8(scenario.file.filename()) + "): ";
         std::vector<std::string> warnings;
         const auto map = sim::read_game(*bytes, *buildings, &warnings, &*figures);
         if (!map) {
@@ -152,7 +153,8 @@ int cmd_export_island(const Args& args) {
     char* end = nullptr;
     const unsigned long number = std::strtoul(number_text.c_str(), &end, 10);
     if (end == number_text.c_str() || *end != '\0') {
-        return fail(core::make_error(core::ErrorCode::OutOfRange, "no island number: " + number_text));
+        return fail(
+            annokit::core::make_error(annokit::core::ErrorCode::OutOfRange, "no island number: " + number_text));
     }
     auto file = assets::ChunkFile::load(fs::path(std::string(args.positional[0])));
     if (!file) {
@@ -165,14 +167,16 @@ int cmd_export_island(const Args& args) {
     const auto it = std::find_if(islands->begin(), islands->end(),
                                  [&](const assets::Island& i) { return i.header.number == number; });
     if (it == islands->end()) {
-        return fail(core::make_error(core::ErrorCode::NotFound, "no island " + number_text + " in the file"));
+        return fail(
+            annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no island " + number_text + " in the file"));
     }
     if (!it->header.stored_complete || it->layers.empty() || it->header.raw.size() != kInsel5Size) {
-        return fail(core::make_error(core::ErrorCode::InvalidFormat,
-                                     "island " + number_text +
-                                         " keeps only its changes to a template of the original; only an island "
-                                         "of its own shape with all its tiles (new-world --island-shapes own) "
-                                         "can be an island of a package"));
+        return fail(
+            annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                      "island " + number_text +
+                                          " keeps only its changes to a template of the original; only an island "
+                                          "of its own shape with all its tiles (new-world --island-shapes own) "
+                                          "can be an island of a package"));
     }
     // The island alone: at the top left, no owner's state, the ground layer with all its tiles.
     std::vector<std::uint8_t> header = it->header.raw;
@@ -192,7 +196,7 @@ int cmd_export_island(const Args& args) {
         tiles.insert(tiles.end(), e.begin(), e.end());
     }
     writer.add("INSELHAUS", tiles);
-    if (auto status = core::write_file(fs::path(std::string(args.positional[2])), writer.take()); !status) {
+    if (auto status = annokit::core::write_file(fs::path(std::string(args.positional[2])), writer.take()); !status) {
         return fail(status.error());
     }
     std::printf("island %s, %u x %u tiles, %zu tiles -> %s\n", number_text.c_str(),

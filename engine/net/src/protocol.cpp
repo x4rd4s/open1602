@@ -7,8 +7,9 @@
 
 #include "wire.hpp"
 
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/hash.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/hash.hpp"
+
 #include "o1602/sim/command_io.hpp"
 
 namespace o1602::net {
@@ -19,14 +20,14 @@ using detail::In;
 
 // A message starts with its type, the index in the Message variant (appended, never reordered).
 
-void put_commands(core::ByteWriter& out, const std::vector<sim::Command>& commands) {
+void put_commands(annokit::core::ByteWriter& out, const std::vector<sim::Command>& commands) {
     out.u32(static_cast<std::uint32_t>(commands.size()));
     for (const sim::Command& c : commands) {
         sim::write_command(out, c);
     }
 }
 
-void put_packages(core::ByteWriter& out, const std::vector<assets::ContentPackage>& packages) {
+void put_packages(annokit::core::ByteWriter& out, const std::vector<assets::ContentPackage>& packages) {
     out.u32(static_cast<std::uint32_t>(packages.size()));
     for (const assets::ContentPackage& p : packages) {
         out.string(p.id);
@@ -35,7 +36,7 @@ void put_packages(core::ByteWriter& out, const std::vector<assets::ContentPackag
     }
 }
 
-void put(core::ByteWriter& out, const Hello& m) {
+void put(annokit::core::ByteWriter& out, const Hello& m) {
     out.u16(m.protocol);
     out.u64(m.content);
     out.string(m.name);
@@ -48,11 +49,11 @@ void put(core::ByteWriter& out, const Hello& m) {
     out.boolean(m.fetch_packages);
 }
 
-void put(core::ByteWriter& out, const CommandBatch& m) {
+void put(annokit::core::ByteWriter& out, const CommandBatch& m) {
     put_commands(out, m.commands);
 }
 
-void put(core::ByteWriter& out, const Progress& m) {
+void put(annokit::core::ByteWriter& out, const Progress& m) {
     out.u32(m.epoch);
     out.u64(m.frames);
     out.boolean(m.hash.has_value());
@@ -62,19 +63,19 @@ void put(core::ByteWriter& out, const Progress& m) {
     }
 }
 
-void put(core::ByteWriter& out, const Welcome& m) {
+void put(annokit::core::ByteWriter& out, const Welcome& m) {
     out.u16(m.protocol);
     out.u8(m.seat);
     out.u64(m.token);
 }
 
-void put(core::ByteWriter& out, const Refused& m) {
+void put(annokit::core::ByteWriter& out, const Refused& m) {
     out.u8(static_cast<std::uint8_t>(m.reason));
     put_packages(out, m.packages);
     out.u64(m.share_bytes);
 }
 
-void put(core::ByteWriter& out, const Snapshot& m) {
+void put(annokit::core::ByteWriter& out, const Snapshot& m) {
     out.u32(m.epoch);
     out.u64(m.frame);
     out.u32(m.speed);
@@ -83,7 +84,7 @@ void put(core::ByteWriter& out, const Snapshot& m) {
     out.bytes(m.save);
 }
 
-void put(core::ByteWriter& out, const Turn& m) {
+void put(annokit::core::ByteWriter& out, const Turn& m) {
     out.u64(m.first);
     out.u64(m.closed);
     out.u16(m.lead);
@@ -94,7 +95,7 @@ void put(core::ByteWriter& out, const Turn& m) {
     }
 }
 
-void put(core::ByteWriter& out, const Roster& m) {
+void put(annokit::core::ByteWriter& out, const Roster& m) {
     out.u32(static_cast<std::uint32_t>(m.members.size()));
     for (const Member& member : m.members) {
         out.u8(member.seat);
@@ -108,7 +109,7 @@ void put(core::ByteWriter& out, const Roster& m) {
     out.boolean(m.starting);
 }
 
-void put(core::ByteWriter& out, const Desync& m) {
+void put(annokit::core::ByteWriter& out, const Desync& m) {
     out.u64(m.frame);
     out.u32(static_cast<std::uint32_t>(m.seats.size()));
     for (const Seat s : m.seats) {
@@ -116,7 +117,7 @@ void put(core::ByteWriter& out, const Desync& m) {
     }
 }
 
-void put(core::ByteWriter& out, const Lobby& m) {
+void put(annokit::core::ByteWriter& out, const Lobby& m) {
     out.string(m.title);
     out.string(m.game);
     out.u32(static_cast<std::uint32_t>(m.seats.size()));
@@ -141,22 +142,22 @@ void put(core::ByteWriter& out, const Lobby& m) {
     out.boolean(m.spectators_chat);
 }
 
-void put(core::ByteWriter& out, const TakeSeat& m) {
+void put(annokit::core::ByteWriter& out, const TakeSeat& m) {
     out.u8(m.seat);
 }
 
-void put(core::ByteWriter& out, const SetReady& m) {
+void put(annokit::core::ByteWriter& out, const SetReady& m) {
     out.boolean(m.ready);
 }
 
-void put_seats(core::ByteWriter& out, const std::vector<Seat>& seats) {
+void put_seats(annokit::core::ByteWriter& out, const std::vector<Seat>& seats) {
     out.u32(static_cast<std::uint32_t>(seats.size()));
     for (const Seat s : seats) {
         out.u8(s);
     }
 }
 
-void put(core::ByteWriter& out, const Chat& m) {
+void put(annokit::core::ByteWriter& out, const Chat& m) {
     out.u8(m.seat);
     out.string(m.name);
     out.string(m.text);
@@ -165,29 +166,29 @@ void put(core::ByteWriter& out, const Chat& m) {
     put_seats(out, m.missed);
 }
 
-void put(core::ByteWriter& out, const SetBanner& m) {
+void put(annokit::core::ByteWriter& out, const SetBanner& m) {
     out.u16(m.banner);
 }
 
-void put(core::ByteWriter& out, const Dropped& m) {
+void put(annokit::core::ByteWriter& out, const Dropped& m) {
     out.u32(m.commands);
 }
 
-void put(core::ByteWriter& out, const LoadProgress& m) {
+void put(annokit::core::ByteWriter& out, const LoadProgress& m) {
     out.u8(m.percent);
 }
 
-void put(core::ByteWriter& out, const HostLeaving& m) {
+void put(annokit::core::ByteWriter& out, const HostLeaving& m) {
     out.string(m.successor_address);
 }
 
-void put(core::ByteWriter& out, const Part& m) {
+void put(annokit::core::ByteWriter& out, const Part& m) {
     out.u32(m.total);
     out.u32(static_cast<std::uint32_t>(m.bytes.size()));
     out.bytes(m.bytes);
 }
 
-void put(core::ByteWriter& out, const PackageFiles& m) {
+void put(annokit::core::ByteWriter& out, const PackageFiles& m) {
     put_packages(out, {m.package});
     out.u32(m.index);
     out.u32(m.count);
@@ -199,7 +200,7 @@ void put(core::ByteWriter& out, const PackageFiles& m) {
     }
 }
 
-void put(core::ByteWriter& out, const Standby& m) {
+void put(annokit::core::ByteWriter& out, const Standby& m) {
     out.u32(static_cast<std::uint32_t>(m.tokens.size()));
     for (const SeatToken& t : m.tokens) {
         out.u8(t.seat);
@@ -411,7 +412,7 @@ Standby get_standby(In& in) {
 Part get_part(In& in) {
     Part m;
     m.total = in.u32();
-    if (m.total > kMaxMessageBytes) {
+    if (m.total > annokit::net::kMaxMessageBytes) {
         in.fail();
     }
     const std::uint32_t n = in.count(static_cast<std::uint32_t>(kPartBytes));
@@ -538,7 +539,7 @@ static_assert(std::variant_size_v<Message> == 20, "a new message needs its case 
 }  // namespace
 
 std::vector<std::uint8_t> encode(const Message& message) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.u8(static_cast<std::uint8_t>(message.index()));
     std::visit([&out](const auto& m) { put(out, m); }, message);
     return out.take();
@@ -546,7 +547,7 @@ std::vector<std::uint8_t> encode(const Message& message) {
 
 std::vector<std::vector<std::uint8_t>> packets(std::span<const std::uint8_t> message) {
     std::vector<std::vector<std::uint8_t>> out;
-    if (message.size() <= kMaxPacketBytes) {
+    if (message.size() <= annokit::net::kMaxPacketBytes) {
         out.emplace_back(message.begin(), message.end());
         return out;
     }
@@ -579,10 +580,10 @@ sim::PlayerId command_player(const sim::Command& command) noexcept {
 }
 
 std::uint64_t token_verifier(std::uint64_t token, std::uint64_t salt) noexcept {
-    core::ByteWriter in;
+    annokit::core::ByteWriter in;
     in.u64(salt);
     in.u64(token);
-    const auto digest = core::sha256(in.data());
+    const auto digest = annokit::core::sha256(in.data());
     std::uint64_t v = 0;
     for (std::size_t k = 0; k < 8; ++k) {
         v |= std::uint64_t{digest[k]} << (8 * k);
@@ -594,12 +595,12 @@ std::uint64_t player_verifier(std::uint64_t player) noexcept {
     if (player == 0) {
         return 0;
     }
-    core::ByteWriter in;
+    annokit::core::ByteWriter in;
     for (const char c : std::string_view("open1602 player")) {
         in.u8(static_cast<std::uint8_t>(c));
     }
     in.u64(player);
-    const auto digest = core::sha256(in.data());
+    const auto digest = annokit::core::sha256(in.data());
     std::uint64_t v = 0;
     for (std::size_t k = 0; k < 8; ++k) {
         v |= std::uint64_t{digest[k]} << (8 * k);

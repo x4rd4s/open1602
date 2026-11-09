@@ -8,9 +8,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -48,36 +49,36 @@ enum class UnitRefusal : std::uint8_t {
 /// A trade cart for `owner` on world tile (x, y), facing `direction` (0..7), empty and idle, at
 /// home in the nearest of the owner's cities it reaches, as the city's button sends it out.
 /// Fails (InvalidFormat) with the refusal's name where it cannot go.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world,
-                                                                  const assets::BuildingTable& buildings,
-                                                                  const assets::FigureTable& figures,
-                                                                  sim::PlayerId owner, std::int64_t x, std::int64_t y,
-                                                                  std::uint8_t direction);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> place_cart(const sim::World& world,
+                                                                           const assets::BuildingTable& buildings,
+                                                                           const assets::FigureTable& figures,
+                                                                           sim::PlayerId owner, std::int64_t x,
+                                                                           std::int64_t y, std::uint8_t direction);
 
 /// A ship of `figure` (one of the shipyards' or a package's ship, or the pirates' ship) for `owner` on world tile (x,
 /// y), facing `direction` (0..7), new and empty as a shipyard launches it; unnamed, so the game names it when it
 /// starts. Fails (InvalidFormat) with the refusal's name where it cannot go.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> place_ship(
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> place_ship(
     const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
     sim::PlayerId owner, std::uint16_t figure, std::int64_t x, std::int64_t y, std::uint8_t direction);
 
 /// A land unit of the family `family` (its first figure, FigureTable::unit_families) for `owner`
 /// on world tile (x, y), facing `direction` (0..7), at full health.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> place_unit(
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> place_unit(
     const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
     sim::PlayerId owner, std::uint16_t family, std::int64_t x, std::int64_t y, std::uint8_t direction);
 
 /// The hold `slot` of ship `id` loaded with `amount` (1/32 t, at most sim::hold_capacity) of the
 /// trade ware `ware`; 0 tons or ware 0: empty. Fails (NotFound) without the ship or the hold,
 /// (OutOfRange) for a ware that is no trade ware or too much.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id,
-                                                                      std::size_t slot, std::uint8_t ware,
-                                                                      std::uint32_t amount);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world,
+                                                                               std::uint32_t id, std::size_t slot,
+                                                                               std::uint8_t ware, std::uint32_t amount);
 
 /// The ship or trade cart `id` taken away, with every order of others that names it. Fails (NotFound).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id);
 /// The land unit `id` taken away, with every order of others that names it. Fails (NotFound).
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& world, std::uint32_t id);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& world, std::uint32_t id);
 
 /// The name of a refusal for messages and logs.
 [[nodiscard]] const char* refusal_name(UnitRefusal refusal) noexcept;

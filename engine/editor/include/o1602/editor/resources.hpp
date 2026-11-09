@@ -8,8 +8,9 @@
 #include <cstdint>
 #include <memory>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/world.hpp"
@@ -51,16 +52,17 @@ enum class ResourceRefusal : std::uint8_t {
 /// `resource` on tile `tile` of island `island`: a vein in the mountain covering the tile (at its
 /// origin, as mines look for it), a treasure or deer on the tile. Nobody knows a new deposit.
 /// Fails (InvalidFormat) with the refusal's name where it cannot go.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> place_resource(const sim::World& world,
-                                                                      const assets::BuildingTable& buildings,
-                                                                      std::uint16_t island, sim::TilePos tile,
-                                                                      Resource resource);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> place_resource(const sim::World& world,
+                                                                               const assets::BuildingTable& buildings,
+                                                                               std::uint16_t island, sim::TilePos tile,
+                                                                               Resource resource);
 
 /// The treasure or deer on tile `tile` of island `island` taken away, else the vein of the
 /// mountain covering it. Fails (NotFound) where there is none.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_resource(const sim::World& world,
-                                                                       const assets::BuildingTable& buildings,
-                                                                       std::uint16_t island, sim::TilePos tile);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_resource(const sim::World& world,
+                                                                                const assets::BuildingTable& buildings,
+                                                                                std::uint16_t island,
+                                                                                sim::TilePos tile);
 
 /// The name of a refusal for messages and logs.
 [[nodiscard]] const char* refusal_name(ResourceRefusal refusal) noexcept;

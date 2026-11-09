@@ -274,7 +274,7 @@ public:
           m_landscape(std::move(landscape)),
           m_climate_random(shape_seed, kClimateStream) {}
 
-    core::Result<GeneratedWorld> run(const assets::ChunkFile& scenario, bool guarantee);
+    annokit::core::Result<GeneratedWorld> run(const assets::ChunkFile& scenario, bool guarantee);
     /// The packages' island templates, which the plan may name after the original's.
     void use_package_islands(std::span<const PackageIsland> islands) { m_package_islands = islands; }
     /// The packages' climates (Balance::climates), which take a share of the islands of an own world.
@@ -551,7 +551,8 @@ bool Generator::load(Slot& slot) {
 
 bool Generator::load_package_island(Slot& slot, const PackageIsland& island) {
     const auto file = assets::ChunkFile::load(island.file);
-    auto islands = file ? assets::load_islands(*file) : core::Result<std::vector<assets::Island>>(file.error());
+    auto islands =
+        file ? assets::load_islands(*file) : annokit::core::Result<std::vector<assets::Island>>(file.error());
     if (!islands || islands->empty() || islands->front().layers.empty()) {
         warn("island of a package not found or invalid: " + island.id);
         return false;
@@ -1881,7 +1882,7 @@ std::vector<std::uint8_t> Generator::village_records(const Slot& slot, const Sta
     return out;
 }
 
-core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, bool guarantee_wanted) {
+annokit::core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, bool guarantee_wanted) {
     // A scenario may store some islands itself (often the player's home island) and plan the
     // others: as in the original, the planned ones are made in addition to the stored ones.
     std::vector<StoredIsland> stored = stored_islands(scenario);
@@ -1903,7 +1904,7 @@ core::Result<GeneratedWorld> Generator::run(const assets::ChunkFile& scenario, b
     m_slots.reserve(slots.size());
     for (Slot& slot : slots) {
         if (stopped()) {
-            return core::make_error(core::ErrorCode::Cancelled, "the islands are no longer wanted");
+            return annokit::core::make_error(annokit::core::ErrorCode::Cancelled, "the islands are no longer wanted");
         }
         if (load(slot)) {
             m_slots.push_back(std::move(slot));
@@ -2124,9 +2125,10 @@ bool plans_islands(const assets::ChunkFile& file) {
                        [&](const ScenarioPlan::Island& e) { return !is_stored(stored, e.number); });
 }
 
-core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario, const WorldPlan& plan,
-                                              const assets::GameDirectory& game, const assets::BuildingTable& buildings,
-                                              const WorldStart& start, std::vector<std::string>* warnings) {
+annokit::core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario, const WorldPlan& plan,
+                                                       const assets::GameDirectory& game,
+                                                       const assets::BuildingTable& buildings, const WorldStart& start,
+                                                       std::vector<std::string>* warnings) {
     PlanRandom random(start.seed);
     Generator generator(plan.plan, game, buildings, random, warnings,
                         plan.shared_start ? std::vector<StartArea>{} : plan.starts, plan.gold_islands, plan.shapes,
@@ -2137,15 +2139,17 @@ core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario,
     return generator.run(scenario, start.guarantee_resources);
 }
 
-core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario, const assets::GameDirectory& game,
-                                              const assets::BuildingTable& buildings, const WorldStart& start,
-                                              std::vector<std::string>* warnings) {
+annokit::core::Result<GeneratedWorld> generate_islands(const assets::ChunkFile& scenario,
+                                                       const assets::GameDirectory& game,
+                                                       const assets::BuildingTable& buildings, const WorldStart& start,
+                                                       std::vector<std::string>* warnings) {
     auto plan = assets::load_scenario_plan(scenario);
     if (!plan) {
         return plan.error();
     }
     if (!plan->has_value()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "the scenario has no world plan (SZENE)");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "the scenario has no world plan (SZENE)");
     }
     std::optional<PlanRandom> random;
     if (start.draws == WorldStart::Draws::Seeded) {

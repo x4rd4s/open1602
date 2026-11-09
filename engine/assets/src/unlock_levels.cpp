@@ -4,9 +4,10 @@
 #include <algorithm>
 #include <charconv>
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/original_names.hpp"
 #include "o1602/assets/resident_classes.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -59,7 +60,7 @@ std::optional<std::uint8_t> level_of(std::span<const InfraLevel> levels, std::st
 bool apply_levels_file(std::vector<InfraLevel>& levels, std::string_view package, std::string_view utf8,
                        std::vector<std::string>& warnings, std::span<const ResidentClass> classes) {
     const std::string where = std::string(package) + "/" + std::string(kLevelsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return false;
@@ -68,7 +69,7 @@ bool apply_levels_file(std::vector<InfraLevel>& levels, std::string_view package
         levels.resize(1);  // number 0: no level
     }
     bool changed = false;
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         // A level there is, or a new one of this package.
         std::optional<std::uint8_t> target;
@@ -101,7 +102,7 @@ bool apply_levels_file(std::vector<InfraLevel>& levels, std::string_view package
         std::optional<std::int64_t> min_inhabitants;
         std::optional<std::string> message;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "class") {
                 const std::string* s = e.value.string();

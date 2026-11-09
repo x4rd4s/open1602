@@ -19,7 +19,7 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 class GameDirectory;
@@ -86,6 +86,6 @@ void check_catalogue(std::string_view utf8, std::string_view where, std::vector<
 
 /// What went wrong, for the player: the kind of error in the current language (Windows-1252). The
 /// technical message, which is English, goes to the log (stderr) with `context` before it.
-[[nodiscard]] std::string error_text(const core::Error& error, std::string_view context);
+[[nodiscard]] std::string error_text(const annokit::core::Error& error, std::string_view context);
 
 }  // namespace o1602::ui

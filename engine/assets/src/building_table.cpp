@@ -4,18 +4,19 @@
 #include <algorithm>
 #include <array>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/numeric.hpp"
+
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/cod_predefined.hpp"
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/savegame.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/numeric.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -35,7 +36,7 @@ std::uint32_t times(std::uint32_t v, std::uint32_t unit) {
 /// A number that names something (a ware, a figure, a ruin record): beyond `max` it would name
 /// another one after a plain cast, so the file is refused instead (HI-10).
 template <typename T>
-core::Result<T> id_field(std::int32_t nummer, const char* name, std::int32_t value, std::uint32_t max) {
+annokit::core::Result<T> id_field(std::int32_t nummer, const char* name, std::int32_t value, std::uint32_t max) {
     const std::uint32_t v = non_negative(value);
     if (v > max) {
         return make_error(ErrorCode::InvalidFormat, "HAUS #" + std::to_string(nummer) + ": " + name + " " +
@@ -46,7 +47,7 @@ core::Result<T> id_field(std::int32_t nummer, const char* name, std::int32_t val
 
 }  // namespace
 
-core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser) {
+annokit::core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser) {
     const auto* records = haeuser.root.records("HAUS");
     if (records == nullptr) {
         return make_error(ErrorCode::InvalidFormat, "haeuser.cod contains no HAUS records");
@@ -93,7 +94,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
         b.door_on_edge = (r.integer("Tuerflg") & 1) != 0;
         b.blocks_shots = (r.integer("NoShotFlg") & 1) != 0;
         if (const cod::Field* energy = r.field("Maxenergy"); energy != nullptr && !energy->values.empty()) {
-            b.max_health = core::saturating_cast<std::uint32_t>(energy->values[0].real * kStockUnitsPerTon);
+            b.max_health = annokit::core::saturating_cast<std::uint32_t>(energy->values[0].real * kStockUnitsPerTon);
         }
         if (const cod::Field* ruin = r.field("Ruinenr"); ruin != nullptr && !ruin->values.empty()) {
             // A negative number is no ruin (0xFF, as the plain cast made of -1).
@@ -135,7 +136,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
                 const cod::Field* f = prodtyp.field(name);
                 const double v = f != nullptr && !f->values.empty() ? f->values[0].real : 0.0;
                 // The original truncates (_ftol); the values in haeuser.cod are exact multiples of 1/32.
-                return core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
+                return annokit::core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
             };
             auto ware = id_field<std::uint8_t>(nummer, "Ware", prodtyp.integer("Ware"), 0xFF);
             auto raw = id_field<std::uint8_t>(nummer, "Rohstoff", prodtyp.integer("Rohstoff"), 0xFF);
@@ -184,7 +185,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             const auto goods = [&](const char* name) {
                 const cod::Field* f = c.field(name);
                 const double v = f != nullptr && !f->values.empty() ? f->values[0].real : 0.0;
-                return core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
+                return annokit::core::saturating_cast<std::uint32_t>(v * kStockUnitsPerTon);
             };
             b.build_cost.tools = goods("Werkzeug");
             b.build_cost.wood = goods("Holz");
@@ -255,8 +256,8 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
 
     // Classes of inhabitants and their needs (k = trunc(v * 8192) / 600).
     const auto per_tick = [](double v) -> std::uint32_t {
-        return core::saturating_cast<std::uint32_t>(
-            static_cast<double>(core::saturating_cast<std::int64_t>(v * 8192.0) / 600));
+        return annokit::core::saturating_cast<std::uint32_t>(
+            static_cast<double>(annokit::core::saturating_cast<std::int64_t>(v * 8192.0) / 600));
     };
     if (const cod::Field* food = haeuser.root.field("Nahrung"); food != nullptr && !food->values.empty()) {
         table.m_food_need = per_tick(food->values[0].real);
@@ -284,7 +285,7 @@ core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document& haeuser
             c.share = times(non_negative(g.integer("Prozent")), 128U) / 100U;
             c.max_per_house = non_negative(g.integer("Maxwohn"));
             if (const cod::Field* tax = g.field("Steuer"); tax != nullptr && !tax->values.empty()) {
-                c.tax = core::saturating_cast<std::uint32_t>(tax->values[0].real * 16.0 / 3.0);
+                c.tax = annokit::core::saturating_cast<std::uint32_t>(tax->values[0].real * 16.0 / 3.0);
             }
             c.hiscore = non_negative(g.integer("Hiscore"));
             if (const auto* wares = g.records("BGRUPPE_WARE")) {
@@ -379,12 +380,12 @@ const BuildingType* BuildingTable::by_record(std::uint32_t record) const noexcep
     return index < 0 ? nullptr : &m_types[static_cast<std::size_t>(index)];
 }
 
-core::Result<BuildingTable> BuildingTable::load(const GameDirectory& game) {
+annokit::core::Result<BuildingTable> BuildingTable::load(const GameDirectory& game) {
     const auto path = game.resolve("haeuser.cod");
     if (!path) {
         return make_error(ErrorCode::NotFound, "haeuser.cod not found in the game directory");
     }
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     if (!bytes) {
         return bytes.error();
     }
@@ -410,7 +411,7 @@ core::Result<BuildingTable> BuildingTable::load(const GameDirectory& game) {
     return table;
 }
 
-core::Status BuildingTable::replace(std::uint32_t id, const BuildingType& by) {
+annokit::core::Status BuildingTable::replace(std::uint32_t id, const BuildingType& by) {
     BuildingType* old = by_id(id);
     if (old == nullptr) {
         return make_error(ErrorCode::NotFound, "there is no building " + std::to_string(id));
@@ -443,10 +444,10 @@ core::Status BuildingTable::replace(std::uint32_t id, const BuildingType& by) {
         }
     }
     *old = b;
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Result<std::uint32_t> BuildingTable::add(const BuildingType& like) {
+annokit::core::Result<std::uint32_t> BuildingTable::add(const BuildingType& like) {
     // From the top down, so that a modded haeuser.cod of its own keeps the Ids after the
     // original's and a package's buildings do not take them.
     std::uint32_t id = 0;

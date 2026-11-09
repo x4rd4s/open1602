@@ -27,7 +27,7 @@
 #include "enet_library.hpp"
 #include "wire.hpp"
 
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_writer.hpp"
 
 namespace o1602::net {
 
@@ -169,15 +169,15 @@ private:
     ENetSocket m_socket;
 };
 
-core::Result<ENetSocket> acquire_socket(std::uint16_t port) {
+annokit::core::Result<ENetSocket> acquire_socket(std::uint16_t port) {
     if (!EnetLibrary::acquire()) {
-        return core::make_error(core::ErrorCode::PlatformError, "ENet could not be initialised");
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError, "ENet could not be initialised");
     }
     const ENetSocket socket = open_socket(port);
     if (socket == ENET_SOCKET_NULL) {
         EnetLibrary::release();
-        return core::make_error(core::ErrorCode::PlatformError,
-                                "cannot open UDP port " + std::to_string(port) + " (in use?)");
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError,
+                                         "cannot open UDP port " + std::to_string(port) + " (in use?)");
     }
     return socket;
 }
@@ -404,7 +404,7 @@ GameInfo game_info(const Lobby& lobby, const std::vector<Member>& roster, std::u
 }
 
 std::vector<std::uint8_t> encode_search(std::uint32_t nonce) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.bytes(kSearchMagic);
     out.u16(kProtocolVersion);
     out.u32(nonce);
@@ -422,7 +422,7 @@ std::optional<std::uint32_t> decode_search(std::span<const std::uint8_t> bytes) 
 }
 
 std::vector<std::uint8_t> encode_answer(std::uint32_t nonce, const GameInfo& info) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.bytes(kAnswerMagic);
     out.u32(nonce);
     out.u16(info.protocol);
@@ -463,7 +463,7 @@ std::optional<std::pair<std::uint32_t, GameInfo>> decode_answer(std::span<const 
     return std::pair{nonce, std::move(info)};
 }
 
-core::Result<std::unique_ptr<LanBeacon>> LanBeacon::open(std::uint16_t port) {
+annokit::core::Result<std::unique_ptr<LanBeacon>> LanBeacon::open(std::uint16_t port) {
     auto socket = acquire_socket(port);
     if (!socket) {
         return socket.error();
@@ -471,7 +471,7 @@ core::Result<std::unique_ptr<LanBeacon>> LanBeacon::open(std::uint16_t port) {
     return std::unique_ptr<LanBeacon>(std::make_unique<EnetBeacon>(socket.value()));
 }
 
-core::Result<std::unique_ptr<LanBrowser>> LanBrowser::open(std::uint16_t port) {
+annokit::core::Result<std::unique_ptr<LanBrowser>> LanBrowser::open(std::uint16_t port) {
     auto socket = acquire_socket(0);
     if (!socket) {
         return socket.error();

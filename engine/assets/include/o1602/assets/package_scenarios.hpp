@@ -130,7 +130,7 @@ void read_campaigns_file(std::vector<PackageCampaign>& campaigns, const ModPacka
 [[nodiscard]] const PackageCampaign* find_campaign(std::span<const PackageCampaign> campaigns, std::string_view id);
 
 /// What a won part of a package's campaign leaves to the next: the local player's money and the
-/// table `campaign` of the part's script (script::Sandbox::save_table).
+/// table `campaign` of the part's script (annokit::script::Sandbox::save_table).
 struct CampaignCarry {
     std::int64_t money = 0;
     std::vector<std::uint8_t> table;

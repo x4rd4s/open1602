@@ -12,10 +12,11 @@
 
 #include "map_viewer.hpp"
 
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+#include "annokit/script/sandbox.hpp"
+
 #include "o1602/editor/operations.hpp"
-#include "o1602/script/sandbox.hpp"
 #include "o1602/sim/scenario_data.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -60,8 +61,8 @@ std::string script_problem(const std::string& source) {
     if (source.empty()) {
         return {};
     }
-    script::Sandbox sandbox;
-    if (const core::Status read = sandbox.compile("scenario", source); !read) {
+    annokit::script::Sandbox sandbox;
+    if (const annokit::core::Status read = sandbox.compile("scenario", source); !read) {
         return read.error().message;
     }
     return {};
@@ -79,7 +80,7 @@ void MapViewer::editor_markers_model(EditorModel& m) const {
                                       ? ui::tr("editor.markers.point", {number(marker.x), number(marker.y)})
                                       : ui::tr("editor.markers.area", {number(marker.x), number(marker.y),
                                                                        number(marker.width), number(marker.height)});
-        m.markers.push_back(EditorMarkerRow{core::utf8_to_cp1252(marker.name), place});
+        m.markers.push_back(EditorMarkerRow{annokit::core::utf8_to_cp1252(marker.name), place});
     }
     if (m_editor->marker && *m_editor->marker < world.markers().size()) {
         m.marker = m_editor->marker;
@@ -90,13 +91,13 @@ void MapViewer::editor_markers_model(EditorModel& m) const {
                                     : static_cast<std::size_t>(std::count(source.begin(), source.end(), '\n')) +
                                           (source.back() == '\n' ? 0 : 1);
     if (!m_editor->script_file.empty()) {
-        m.script_file = core::utf8_to_cp1252(core::path_to_utf8(m_editor->script_file.filename()));
+        m.script_file = annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(m_editor->script_file.filename()));
         std::error_code ec;
         m.script_reload = std::filesystem::is_regular_file(m_editor->script_file, ec);
     }
     // Only while the dialog is open: the text is read through each frame then.
     if (m_hud && m_hud->editor_panel() != nullptr && m_hud->editor_panel()->page() == EditorPanel::Page::Script) {
-        m.script_problem = core::utf8_to_cp1252(script_problem(source));
+        m.script_problem = annokit::core::utf8_to_cp1252(script_problem(source));
     }
 }
 
@@ -137,7 +138,7 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
             }
             break;
         case Kind::MarkerRename: {
-            const std::string name = core::cp1252_to_utf8(request.name);
+            const std::string name = annokit::core::cp1252_to_utf8(request.name);
             if (request.index >= markers.size() || markers[request.index].name == name) {
                 break;
             }
@@ -160,7 +161,7 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
             if (request.index >= markers.size()) {
                 break;
             }
-            const std::string name = core::utf8_to_cp1252(markers[request.index].name);
+            const std::string name = annokit::core::utf8_to_cp1252(markers[request.index].name);
             std::vector<sim::ScenarioMarker> after = markers;
             after.erase(after.begin() + static_cast<std::ptrdiff_t>(request.index));
             m_editor->document.perform(std::make_unique<editor::MarkersEdit>(markers, std::move(after)));
@@ -176,7 +177,7 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
             std::filesystem::create_directories(folder, ec);  // so that the player finds where they go
             std::vector<std::filesystem::path> found;
             for (std::filesystem::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
-                std::string ending = core::path_to_utf8(it->path().extension());
+                std::string ending = annokit::core::path_to_utf8(it->path().extension());
                 std::transform(ending.begin(), ending.end(), ending.begin(),
                                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
                 std::error_code file_ec;
@@ -188,7 +189,8 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
             const std::string group = ui::tr("editor.script.own_files");
             for (const std::filesystem::path& p : found) {
                 m_editor_files.push_back(p);
-                m_editor_file_rows.push_back(EditorFile{core::utf8_to_cp1252(core::path_to_utf8(p.filename())), group});
+                m_editor_file_rows.push_back(
+                    EditorFile{annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(p.filename())), group});
             }
             break;
         }
@@ -236,7 +238,7 @@ void MapViewer::editor_keep_script_file() {
         at = end + 1;
     }
     if (!m_editor->script_file.empty() && !m_state->world.scenario_script().empty()) {
-        kept += std::string(kScriptKey) + core::path_to_utf8(m_editor->script_file) + "\n";
+        kept += std::string(kScriptKey) + annokit::core::path_to_utf8(m_editor->script_file) + "\n";
     }
     m_state->world.set_editor_state(std::vector<std::uint8_t>(kept.begin(), kept.end()));
 }
@@ -249,15 +251,15 @@ void MapViewer::editor_find_script_file() {
         const std::size_t end = std::min(text.find('\n', at), text.size());
         const std::string_view line(text.data() + at, end - at);
         if (line.starts_with(kScriptKey)) {
-            m_editor->script_file = core::path_from_utf8(std::string(line.substr(kScriptKey.size())));
+            m_editor->script_file = annokit::core::path_from_utf8(std::string(line.substr(kScriptKey.size())));
         }
         at = end + 1;
     }
 }
 
 bool MapViewer::editor_load_script(const std::filesystem::path& file) {
-    const std::string shown = core::utf8_to_cp1252(core::path_to_utf8(file.filename()));
-    auto bytes = core::read_file(file);
+    const std::string shown = annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(file.filename()));
+    auto bytes = annokit::core::read_file(file);
     if (!bytes) {
         editor_notice(ui::tr("editor.script.failed", {shown}), true, bytes.error().message);
         return false;
@@ -267,8 +269,8 @@ bool MapViewer::editor_load_script(const std::filesystem::path& file) {
         return false;
     }
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-    std::string source(core::skip_utf8_bom(text));
-    if (!core::is_utf8(source)) {
+    std::string source(annokit::core::skip_utf8_bom(text));
+    if (!annokit::core::is_utf8(source)) {
         editor_notice(ui::tr("editor.script.not_utf8", {shown}), true, "a script not in UTF-8");
         return false;
     }
@@ -283,7 +285,7 @@ bool MapViewer::editor_load_script(const std::filesystem::path& file) {
     if (problem.empty()) {
         editor_notice(ui::tr("editor.script.loaded", {shown}), false, "script loaded");
     } else {
-        editor_notice(ui::tr("editor.script.problem", {core::utf8_to_cp1252(problem)}), true,
+        editor_notice(ui::tr("editor.script.problem", {annokit::core::utf8_to_cp1252(problem)}), true,
                       "script loaded with an error: " + problem);
     }
     return true;

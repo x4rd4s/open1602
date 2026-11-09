@@ -9,10 +9,11 @@
 #include <string_view>
 #include <system_error>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/scenario.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/savegame_extension.hpp"
@@ -151,15 +152,15 @@ std::string endless_file(std::uint8_t difficulty, std::uint8_t layout, bool mult
     return buf;
 }
 
-core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game, std::uint8_t difficulty,
-                                            std::uint8_t layout, bool multiplayer) {
+annokit::core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game, std::uint8_t difficulty,
+                                                     std::uint8_t layout, bool multiplayer) {
     const std::string german = endless_file(difficulty, layout, multiplayer);
     if (const auto path = game.resolve(german)) {
         return EndlessFile{*path, std::string(kEndlessName)};
     }
     const auto folder = game.resolve("Szenes");
     if (!folder) {
-        return core::make_error(core::ErrorCode::NotFound, "Szenes not found in the game directory");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "Szenes not found in the game directory");
     }
     const auto lower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(),
@@ -178,13 +179,13 @@ core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game, s
     // The scenario's name: that of a single player level, as two digits end the levels' names.
     std::optional<std::string> name;
     for (const std::filesystem::path& p : files) {
-        const std::string stem = core::path_to_utf8(p.stem());
+        const std::string stem = annokit::core::path_to_utf8(p.stem());
         const std::size_t n = stem.size();
-        if (lower(core::path_to_utf8(p.extension())) != ".szs" || n < 3 || !is_digit(stem[n - 1]) ||
+        if (lower(annokit::core::path_to_utf8(p.extension())) != ".szs" || n < 3 || !is_digit(stem[n - 1]) ||
             !is_digit(stem[n - 2]) || is_digit(stem[n - 3])) {
             continue;
         }
-        auto bytes = core::read_file(p);
+        auto bytes = annokit::core::read_file(p);
         if (!bytes) {
             continue;
         }
@@ -195,20 +196,23 @@ core::Result<EndlessFile> find_endless_file(const assets::GameDirectory& game, s
         }
     }
     if (!name) {
-        return core::make_error(core::ErrorCode::NotFound,
-                                german + " not found in the game directory, nor an endless game of another name");
+        return annokit::core::make_error(
+            annokit::core::ErrorCode::NotFound,
+            german + " not found in the game directory, nor an endless game of another name");
     }
     const std::string wanted = *name + german.substr(german.size() - 6);  // "<D><V>.szs"
     for (const std::filesystem::path& p : files) {
-        if (lower(core::path_to_utf8(p.filename())) == lower(wanted)) {
-            return EndlessFile{p, core::utf8_to_cp1252(*name)};
+        if (lower(annokit::core::path_to_utf8(p.filename())) == lower(wanted)) {
+            return EndlessFile{p, annokit::core::utf8_to_cp1252(*name)};
         }
     }
-    return core::make_error(core::ErrorCode::NotFound, "Szenes/" + wanted + " not found in the game directory");
+    return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                     "Szenes/" + wanted + " not found in the game directory");
 }
 
-core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endless, const assets::TextTable& text,
-                                                  const NewGameOptions& options, std::string_view name) {
+annokit::core::Result<assets::ChunkFile> new_game_scenario(const assets::ChunkFile& endless,
+                                                           const assets::TextTable& text, const NewGameOptions& options,
+                                                           std::string_view name) {
     assets::ChunkWriter out;
     out.add("NAME", std::span(reinterpret_cast<const std::uint8_t*>(name.data()), name.size()));
     for (const assets::Chunk& c : endless.chunks()) {
@@ -272,11 +276,11 @@ void enrich_islands(World& world, const WorldStart& start) {
 
 }  // namespace
 
-core::Result<World> start_new_game(const assets::GameDirectory& game, const assets::BuildingTable& buildings,
-                                   const assets::TextTable& text, const NewGameOptions& options,
-                                   std::vector<std::string>* warnings) {
+annokit::core::Result<World> start_new_game(const assets::GameDirectory& game, const assets::BuildingTable& buildings,
+                                            const assets::TextTable& text, const NewGameOptions& options,
+                                            std::vector<std::string>* warnings) {
     if (options.difficulty >= NewGameOptions::kDifficulties || options.layout >= NewGameOptions::kLayouts) {
-        return core::make_error(core::ErrorCode::OutOfRange, "no endless game with these settings");
+        return annokit::core::make_error(annokit::core::ErrorCode::OutOfRange, "no endless game with these settings");
     }
     const auto found = find_endless_file(game, options.difficulty, options.layout, options.multiplayer);
     if (!found) {
@@ -317,7 +321,7 @@ core::Result<World> start_new_game(const assets::GameDirectory& game, const asse
         return generated.error();
     }
     if (start.stopped()) {
-        return core::make_error(core::ErrorCode::Cancelled, "the world is no longer wanted");
+        return annokit::core::make_error(annokit::core::ErrorCode::Cancelled, "the world is no longer wanted");
     }
     auto world = load_world(generated->file, buildings, game, warnings, start);
     if (!world) {
@@ -400,8 +404,9 @@ WorldPreview preview_of(const World& world, const assets::BuildingTable& buildin
     return out;
 }
 
-core::Result<WorldPreview> preview_world(const assets::GameDirectory& game, const assets::BuildingTable& buildings,
-                                         const assets::TextTable& text, const NewGameOptions& options) {
+annokit::core::Result<WorldPreview> preview_world(const assets::GameDirectory& game,
+                                                  const assets::BuildingTable& buildings, const assets::TextTable& text,
+                                                  const NewGameOptions& options) {
     auto world = start_new_game(game, buildings, text, options);
     if (!world) {
         return world.error();
@@ -409,20 +414,22 @@ core::Result<WorldPreview> preview_world(const assets::GameDirectory& game, cons
     return preview_of(*world, buildings);
 }
 
-core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t players) {
+annokit::core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t players) {
     if (players <= kOriginalPlayers) {
-        return core::Ok{};
+        return annokit::core::Ok{};
     }
     std::vector<Player> slots = world.players();
     if (players > kMaxPlayers || slots.size() < 2 || slots.size() > kFirstExtraPlayer || plan.starts.size() < players) {
-        return core::make_error(core::ErrorCode::LimitExceeded, "no room for " + std::to_string(players) + " players");
+        return annokit::core::make_error(annokit::core::ErrorCode::LimitExceeded,
+                                         "no room for " + std::to_string(players) + " players");
     }
     // The second slot is a computer as the level's file has it: money, unlocks, its ship.
     const Player model = slots[1];
     const auto model_ship =
         std::find_if(world.ships().begin(), world.ships().end(), [](const Ship& s) { return s.owner == 1; });
     if (model_ship == world.ships().end()) {
-        return core::make_error(core::ErrorCode::NotFound, "the level has no ship of a computer player to copy");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "the level has no ship of a computer player to copy");
     }
     const Ship ship = *model_ship;
     while (slots.size() < kFirstExtraPlayer) {
@@ -447,7 +454,7 @@ core::Status add_players(World& world, const WorldPlan& plan, std::uint8_t playe
         s.place(plan.starts[n].x, plan.starts[n].y);
         world.add_ship(std::move(s));
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::optional<PlayerId> take_banner(World& world, PlayerId who, BannerId banner) {
@@ -468,8 +475,8 @@ std::optional<PlayerId> take_banner(World& world, PlayerId who, BannerId banner)
     return other;
 }
 
-core::Result<assets::ChunkFile> own_world_scenario(const assets::ChunkFile& scenario, const WorldPlan& plan,
-                                                   std::uint8_t players) {
+annokit::core::Result<assets::ChunkFile> own_world_scenario(const assets::ChunkFile& scenario, const WorldPlan& plan,
+                                                            std::uint8_t players) {
     assets::ChunkWriter out;
     for (const assets::Chunk& c : scenario.chunks()) {
         const auto data = scenario.payload(c);
@@ -504,19 +511,19 @@ core::Result<assets::ChunkFile> own_world_scenario(const assets::ChunkFile& scen
     return assets::ChunkFile::from_bytes(out.take());
 }
 
-core::Result<World> roll_planned_islands(const World& world, const assets::GameDirectory& game,
-                                         const assets::BuildingTable& buildings, const WorldStart& start,
-                                         std::vector<std::string>* warnings) {
+annokit::core::Result<World> roll_planned_islands(const World& world, const assets::GameDirectory& game,
+                                                  const assets::BuildingTable& buildings, const WorldStart& start,
+                                                  std::vector<std::string>* warnings) {
     const auto& planned = world.planned_islands();
     if (!planned) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "the world plans no islands");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "the world plans no islands");
     }
     if (world.source() == nullptr) {
-        return core::make_error(core::ErrorCode::NotFound,
-                                "the islands of the plan need the scenario of the original it came from");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "the islands of the plan need the scenario of the original it came from");
     }
     if (const auto problems = check_planned_islands(*planned, world.width(), world.height()); !problems.empty()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "world plan: " + problems.front());
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "world plan: " + problems.front());
     }
     // The world as the editor left it, in the original's chunks (its islands, cities, players and
     // ships), with the plan as it is now: the generator then makes only the islands no island of the
@@ -548,7 +555,7 @@ core::Result<World> roll_planned_islands(const World& world, const assets::GameD
     };
     auto saved = write_savegame(world, buildings);
     auto saved_file = saved ? assets::ChunkFile::from_bytes(std::move(saved).value())
-                            : core::Result<assets::ChunkFile>(saved.error());
+                            : annokit::core::Result<assets::ChunkFile>(saved.error());
     if (saved_file) {
         // The plan before WIFF, where the original's chunks end; Open1602's own after it. Its chunk
         // of what the original cannot hold names the chunks before as they were, which the islands
@@ -593,7 +600,7 @@ core::Result<World> roll_planned_islands(const World& world, const assets::GameD
     rolled->set_markers(world.markers());
     rolled->set_scenario_script(world.scenario_script());
     if (const auto problems = check_markers(rolled->markers(), rolled->width(), rolled->height()); !problems.empty()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "scenario: " + problems.front());
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "scenario: " + problems.front());
     }
     return rolled;
 }

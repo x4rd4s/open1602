@@ -9,8 +9,9 @@
 
 #include "ai/ai_state.hpp"
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/houses.hpp"
 
@@ -417,8 +418,9 @@ void remove_slot(std::vector<ComputerSlot>& slots, std::size_t at) {
 }
 
 /// Reads table `table` of slots.toml into slot `at` of `slots`.
-void read_slot(const core::DataTable& table, std::vector<ComputerSlot>& slots, std::size_t at, const std::string& where,
-               const assets::Goods& goods, std::vector<std::string>& warnings, bool adding = false) {
+void read_slot(const annokit::core::DataTable& table, std::vector<ComputerSlot>& slots, std::size_t at,
+               const std::string& where, const assets::Goods& goods, std::vector<std::string>& warnings,
+               bool adding = false) {
     ComputerSlot s = slots[at];
     const auto producer = [&](const std::string* text) -> std::optional<std::uint8_t> {
         if (text == nullptr) {
@@ -433,7 +435,7 @@ void read_slot(const core::DataTable& table, std::vector<ComputerSlot>& slots, s
         }
         return k->number;
     };
-    for (const core::DataEntry& e : table.entries) {
+    for (const annokit::core::DataEntry& e : table.entries) {
         const std::string field = line_of(where, e.value.line) + "[" + table.name + "] '" + e.key + "' ";
         const std::string* text = e.value.string();
         const std::int64_t* n = e.value.integer();
@@ -606,12 +608,12 @@ void read_slot(const core::DataTable& table, std::vector<ComputerSlot>& slots, s
 
 /// Adds the public building of a kind of its own that table `table` of slots.toml declares
 /// (`kind = "public"`), or warns why it does not.
-void add_public(const core::DataTable& table, std::vector<ComputerSlot>& slots, const std::string& where,
+void add_public(const annokit::core::DataTable& table, std::vector<ComputerSlot>& slots, const std::string& where,
                 const assets::Goods& goods, std::span<const assets::OwnBuilding> own,
                 const assets::BuildingTable* buildings, std::vector<std::string>& warnings) {
     const std::string at = line_of(where, table.line) + "[" + table.name + "] ";
     const auto entry = [&](std::string_view key) -> const std::string* {
-        const auto e = std::ranges::find(table.entries, key, &core::DataEntry::key);
+        const auto e = std::ranges::find(table.entries, key, &annokit::core::DataEntry::key);
         return e == table.entries.end() ? nullptr : e->value.string();
     };
     const std::string* kind = entry("kind");
@@ -657,12 +659,12 @@ void apply_slots_file(std::vector<ComputerSlot>& slots, std::string_view package
                       std::vector<std::string>& warnings, const assets::Goods& goods,
                       std::span<const assets::OwnBuilding> own, const assets::BuildingTable* buildings) {
     const std::string where = std::string(package) + "/" + std::string(kSlotsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [table] belong to none and are passed over");

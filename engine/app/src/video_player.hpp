@@ -20,11 +20,12 @@
 #include <variant>
 #include <vector>
 
+#include "annokit/audio/wav.hpp"
+#include "annokit/video/bink.hpp"
+#include "annokit/video/smacker.hpp"
+#include "annokit/video/webm.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/audio/wav.hpp"
-#include "o1602/video/bink.hpp"
-#include "o1602/video/smacker.hpp"
-#include "o1602/video/webm.hpp"
 
 struct SDL_Renderer;
 struct SDL_Texture;
@@ -61,7 +62,9 @@ public:
     Load poll(std::uint64_t now_ms);
     [[nodiscard]] bool loading() const noexcept { return m_loading != nullptr; }
     /// The decoded sound of the video's tracks (for GameSound::start_video, also on a restart).
-    [[nodiscard]] const std::vector<std::shared_ptr<const audio::Pcm>>& audio() const noexcept { return m_audio; }
+    [[nodiscard]] const std::vector<std::shared_ptr<const annokit::audio::Pcm>>& audio() const noexcept {
+        return m_audio;
+    }
     /// The first frame stays until `ms`: the video's sound comes after what the device holds.
     void hold_until(std::uint64_t ms) noexcept;
     void stop();
@@ -87,7 +90,7 @@ public:
     void set_renderer(SDL_Renderer* renderer);
 
     /// A decoded video of either edition, or a package's WebM video.
-    using Clip = std::variant<video::Smacker, video::Bink, video::Webm>;
+    using Clip = std::variant<annokit::video::Smacker, annokit::video::Bink, annokit::video::Webm>;
 
 private:
     /// The file of a video number: the installation's, or a package's.
@@ -102,7 +105,7 @@ private:
     std::optional<Clip> m_video;
     /// The load under way; shared with its thread, which may outlive a stop().
     std::shared_ptr<Loading> m_loading;
-    std::vector<std::shared_ptr<const audio::Pcm>> m_audio;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> m_audio;
     std::uint16_t m_number = 0;
     bool m_loop = false;
     std::uint64_t m_start_ms = 0;

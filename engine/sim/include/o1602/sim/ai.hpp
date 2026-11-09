@@ -15,9 +15,10 @@
 #include <memory>
 #include <vector>
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/result.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/sim/player.hpp"
 
 namespace o1602::sim {
@@ -65,10 +66,10 @@ public:
     /// that holds the state. load() reads every version from the first to max_state_version().
     [[nodiscard]] std::uint16_t state_version() const noexcept;
     [[nodiscard]] static std::uint16_t max_state_version() noexcept;
-    void save(core::ByteWriter& out) const;
+    void save(annokit::core::ByteWriter& out) const;
     /// Restores what save() of `version` wrote; an error if the data is damaged or the computers'
     /// engine cannot take it (nothing changed then).
-    core::Status load(core::ByteReader& in, std::uint16_t version);
+    annokit::core::Status load(annokit::core::ByteReader& in, std::uint16_t version);
 
     /// What a computer player is doing, for tests and the debug display.
     struct View {

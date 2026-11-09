@@ -18,15 +18,15 @@ namespace o1602::editor {
 
 namespace {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 /// Every new island grows grain, grass, trees and fish, as the world generator's (bits from the
 /// first crop on).
 constexpr std::uint32_t kNewFertility = 0x1181;
 
 /// The first island of an island file of the original (a template, an .scp file).
-core::Result<assets::Island> first_island(const assets::ChunkFile& file, const std::string& name) {
+annokit::core::Result<assets::Island> first_island(const assets::ChunkFile& file, const std::string& name) {
     auto islands = assets::load_islands(file);
     if (!islands) {
         return islands.error();
@@ -51,7 +51,7 @@ void clear_game_state(assets::IslandHeader& header) {
     }
 }
 
-core::Result<std::unique_ptr<Operation>> edit(sim::World after, std::string_view kind) {
+annokit::core::Result<std::unique_ptr<Operation>> edit(sim::World after, std::string_view kind) {
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), kind));
 }
 
@@ -80,8 +80,8 @@ void FertilityEdit::revert(sim::World& world) {
     }
 }
 
-core::Result<std::unique_ptr<Operation>> set_fertility(const sim::World& world, std::size_t index,
-                                                       std::uint32_t fertility) {
+annokit::core::Result<std::unique_ptr<Operation>> set_fertility(const sim::World& world, std::size_t index,
+                                                                std::uint32_t fertility) {
     if (index >= world.islands().size()) {
         return make_error(ErrorCode::NotFound, "no island " + std::to_string(index + 1));
     }
@@ -127,8 +127,8 @@ bool overlaps(std::int64_t ax, std::int64_t ay, std::int64_t aw, std::int64_t ah
 }
 
 /// The world with its plan as `planned`, if the plan holds together in it.
-core::Result<std::unique_ptr<Operation>> plan_edit(const sim::World& world, sim::PlannedIslands planned,
-                                                   std::string_view kind) {
+annokit::core::Result<std::unique_ptr<Operation>> plan_edit(const sim::World& world, sim::PlannedIslands planned,
+                                                            std::string_view kind) {
     if (auto problems = sim::check_planned_islands(planned, world.width(), world.height()); !problems.empty()) {
         return make_error(ErrorCode::InvalidFormat, "world plan: " + problems.front());
     }
@@ -178,8 +178,8 @@ bool on_placeholder(const sim::World& world, std::int64_t x, std::int64_t y, std
 
 }  // namespace
 
-core::Result<std::unique_ptr<Operation>> add_placeholder(const sim::World& world, std::uint8_t climate,
-                                                         std::uint8_t size, std::uint32_t x, std::uint32_t y) {
+annokit::core::Result<std::unique_ptr<Operation>> add_placeholder(const sim::World& world, std::uint8_t climate,
+                                                                  std::uint8_t size, std::uint32_t x, std::uint32_t y) {
     const auto& planned = world.planned_islands();
     if (!planned) {
         return make_error(ErrorCode::InvalidFormat, "the world has no plan of islands made at the start");
@@ -216,8 +216,8 @@ core::Result<std::unique_ptr<Operation>> add_placeholder(const sim::World& world
     return plan_edit(world, std::move(after), "placeholder_new");
 }
 
-core::Result<std::unique_ptr<Operation>> change_placeholder(const sim::World& world, std::size_t index,
-                                                            const assets::ScenarioPlan::Island& changed) {
+annokit::core::Result<std::unique_ptr<Operation>> change_placeholder(const sim::World& world, std::size_t index,
+                                                                     const assets::ScenarioPlan::Island& changed) {
     if (!placeholder_open(world, index)) {
         return make_error(ErrorCode::NotFound, "no placeholder " + std::to_string(index + 1));
     }
@@ -235,7 +235,7 @@ core::Result<std::unique_ptr<Operation>> change_placeholder(const sim::World& wo
     return plan_edit(world, std::move(after), moved ? "placeholder_move" : "placeholder");
 }
 
-core::Result<std::unique_ptr<Operation>> remove_placeholder(const sim::World& world, std::size_t index) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_placeholder(const sim::World& world, std::size_t index) {
     if (!placeholder_open(world, index)) {
         return make_error(ErrorCode::NotFound, "no placeholder " + std::to_string(index + 1));
     }
@@ -257,9 +257,9 @@ std::size_t world_memory(const sim::World& world) noexcept {
 namespace {
 
 /// `made` as a new island of `request`, numbered `number`, at (0, 0).
-core::Result<sim::WorldIsland> finish_island(assets::Island made, const NewIsland& request, std::uint16_t number,
-                                             const assets::BuildingTable& buildings,
-                                             std::vector<std::string>* warnings) {
+annokit::core::Result<sim::WorldIsland> finish_island(assets::Island made, const NewIsland& request,
+                                                      std::uint16_t number, const assets::BuildingTable& buildings,
+                                                      std::vector<std::string>* warnings) {
     made.header.number = number;
     made.header.climate = request.climate & 1U;
     made.header.pos_x = 0;
@@ -285,9 +285,10 @@ core::Result<sim::WorldIsland> finish_island(assets::Island made, const NewIslan
 
 }  // namespace
 
-core::Result<sim::WorldIsland> make_island(const NewIsland& request, std::uint16_t number,
-                                           const assets::BuildingTable& buildings, const assets::GameDirectory* game,
-                                           std::vector<std::string>* warnings) {
+annokit::core::Result<sim::WorldIsland> make_island(const NewIsland& request, std::uint16_t number,
+                                                    const assets::BuildingTable& buildings,
+                                                    const assets::GameDirectory* game,
+                                                    std::vector<std::string>* warnings) {
     const std::uint8_t climate = request.climate & 1U;
     const std::uint8_t size = std::min<std::uint8_t>(request.size, sim::templates::kSizeClasses - 1);
     assets::Island made;
@@ -390,8 +391,9 @@ bool ship_in_way(const sim::World& world, std::int64_t x, std::int64_t y, std::u
     });
 }
 
-core::Result<std::unique_ptr<Operation>> add_island(const sim::World& world, sim::WorldIsland island, std::uint32_t x,
-                                                    std::uint32_t y, const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> add_island(const sim::World& world, sim::WorldIsland island,
+                                                             std::uint32_t x, std::uint32_t y,
+                                                             const assets::BuildingTable& buildings) {
     const bool taken = std::any_of(world.islands().begin(), world.islands().end(),
                                    [&](const sim::WorldIsland& i) { return i.header.number == island.header.number; });
     if (taken) {
@@ -412,9 +414,10 @@ core::Result<std::unique_ptr<Operation>> add_island(const sim::World& world, sim
     return edit(std::move(after), "island_new");
 }
 
-core::Result<std::unique_ptr<Operation>> grow_island(const sim::World& world, std::size_t index, std::uint32_t left,
-                                                     std::uint32_t top, std::uint32_t right, std::uint32_t bottom,
-                                                     const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> grow_island(const sim::World& world, std::size_t index,
+                                                              std::uint32_t left, std::uint32_t top,
+                                                              std::uint32_t right, std::uint32_t bottom,
+                                                              const assets::BuildingTable& buildings) {
     const assets::BuildingType* sea = buildings.by_id(assets::id::island_shape::kDarkSea);
     if (sea == nullptr) {
         return make_error(ErrorCode::NotFound, "no open sea in the buildings");
@@ -458,8 +461,9 @@ core::Result<std::unique_ptr<Operation>> grow_island(const sim::World& world, st
     return edit(std::move(after), "island_grow");
 }
 
-core::Result<std::unique_ptr<Operation>> merge_islands(const sim::World& world, std::size_t keep, std::size_t other,
-                                                       const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> merge_islands(const sim::World& world, std::size_t keep,
+                                                                std::size_t other,
+                                                                const assets::BuildingTable& buildings) {
     const assets::BuildingType* sea = buildings.by_id(assets::id::island_shape::kDarkSea);
     if (sea == nullptr) {
         return make_error(ErrorCode::NotFound, "no open sea in the buildings");
@@ -471,9 +475,10 @@ core::Result<std::unique_ptr<Operation>> merge_islands(const sim::World& world, 
     return edit(std::move(after), "island_merge");
 }
 
-core::Result<std::unique_ptr<Operation>> add_sea_island(const sim::World& world, std::uint32_t x, std::uint32_t y,
-                                                        std::uint32_t width, std::uint32_t height, std::uint8_t climate,
-                                                        const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> add_sea_island(const sim::World& world, std::uint32_t x,
+                                                                 std::uint32_t y, std::uint32_t width,
+                                                                 std::uint32_t height, std::uint8_t climate,
+                                                                 const assets::BuildingTable& buildings) {
     const assets::BuildingType* sea = buildings.by_id(assets::id::island_shape::kDarkSea);
     if (sea == nullptr) {
         return make_error(ErrorCode::NotFound, "no open sea in the buildings");
@@ -507,8 +512,9 @@ core::Result<std::unique_ptr<Operation>> add_sea_island(const sim::World& world,
     return add_island(world, sim::WorldIsland{header, std::move(map), 0, 0}, x, y, buildings);
 }
 
-core::Result<std::unique_ptr<Operation>> move_island(const sim::World& world, std::size_t index, std::uint32_t x,
-                                                     std::uint32_t y, const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> move_island(const sim::World& world, std::size_t index,
+                                                              std::uint32_t x, std::uint32_t y,
+                                                              const assets::BuildingTable& buildings) {
     sim::World after = world;
     if (auto status = after.move_island(index, x, y, &buildings); !status) {
         return status.error();
@@ -516,8 +522,8 @@ core::Result<std::unique_ptr<Operation>> move_island(const sim::World& world, st
     return edit(std::move(after), "island_move");
 }
 
-core::Result<std::unique_ptr<Operation>> rotate_island(const sim::World& world, std::size_t index,
-                                                       const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> rotate_island(const sim::World& world, std::size_t index,
+                                                                const assets::BuildingTable& buildings) {
     sim::World after = world;
     if (auto status = after.rotate_island(index, &buildings); !status) {
         return status.error();
@@ -525,8 +531,9 @@ core::Result<std::unique_ptr<Operation>> rotate_island(const sim::World& world, 
     return edit(std::move(after), "island_turn");
 }
 
-core::Result<std::unique_ptr<Operation>> copy_island(const sim::World& world, std::size_t index, std::uint32_t x,
-                                                     std::uint32_t y, const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> copy_island(const sim::World& world, std::size_t index,
+                                                              std::uint32_t x, std::uint32_t y,
+                                                              const assets::BuildingTable& buildings) {
     const auto number = world.free_island_number();
     if (!number) {
         return make_error(ErrorCode::LimitExceeded, "no island number is free");
@@ -538,8 +545,8 @@ core::Result<std::unique_ptr<Operation>> copy_island(const sim::World& world, st
     return edit(std::move(after), "island_copy");
 }
 
-core::Result<std::unique_ptr<Operation>> remove_island(const sim::World& world, std::size_t index,
-                                                       const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_island(const sim::World& world, std::size_t index,
+                                                                const assets::BuildingTable& buildings) {
     sim::World after = world;
     if (auto status = after.remove_island(index, &buildings); !status) {
         return status.error();
@@ -579,8 +586,8 @@ std::pair<std::uint32_t, std::uint32_t> used_size(const sim::World& world) noexc
             static_cast<std::uint32_t>(std::min<std::uint64_t>(h, sim::World::kMaxSide))};
 }
 
-core::Result<core::Bytes> save_island(const sim::World& world, std::size_t index,
-                                      const assets::BuildingTable& buildings) {
+annokit::core::Result<annokit::core::Bytes> save_island(const sim::World& world, std::size_t index,
+                                                        const assets::BuildingTable& buildings) {
     if (index >= world.islands().size()) {
         return make_error(ErrorCode::NotFound, "no island " + std::to_string(index + 1));
     }
@@ -601,9 +608,10 @@ core::Result<core::Bytes> save_island(const sim::World& world, std::size_t index
     return sim::write_game(alone, buildings);
 }
 
-core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
-                                           const assets::GameDirectory* game, std::vector<std::string>* warnings,
-                                           std::uint8_t climate) {
+annokit::core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes,
+                                                    const assets::BuildingTable& buildings,
+                                                    const assets::GameDirectory* game,
+                                                    std::vector<std::string>* warnings, std::uint8_t climate) {
     const auto placed = [](sim::WorldIsland island) {
         clear_game_state(island.header);
         island.x = 0;
@@ -620,7 +628,7 @@ core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes, 
         }
         return placed(world->islands().front());
     }
-    auto file = assets::ChunkFile::from_bytes(core::Bytes(bytes.begin(), bytes.end()));
+    auto file = assets::ChunkFile::from_bytes(annokit::core::Bytes(bytes.begin(), bytes.end()));
     if (!file) {
         return file.error();
     }
@@ -638,8 +646,9 @@ core::Result<sim::WorldIsland> load_island(std::span<const std::uint8_t> bytes, 
     return placed(std::move(island));
 }
 
-core::Result<std::unique_ptr<Operation>> resize_world(const sim::World& world, std::uint32_t width,
-                                                      std::uint32_t height, const assets::BuildingTable& buildings) {
+annokit::core::Result<std::unique_ptr<Operation>> resize_world(const sim::World& world, std::uint32_t width,
+                                                               std::uint32_t height,
+                                                               const assets::BuildingTable& buildings) {
     if (width == world.width() && height == world.height()) {
         return make_error(ErrorCode::InvalidFormat, "the map has this size already");
     }
