@@ -764,6 +764,58 @@ TEST_CASE("ai: land freed on its island lets a computer's city search its sites 
     }
 }
 
+TEST_CASE("ai: at its hourly new start an improved computer keeps its cities' stages, the original's starts over") {
+    for (const bool classic : {false, true}) {
+        Game g;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        found_city(g, s);
+        const auto state_of = [](const sim::ComputerPlayers& ai) {
+            sim::ai::State state;
+            const std::vector<std::uint8_t> now = saved(ai);
+            annokit::core::ByteReader in(now);
+            sim::StateIn reader(in);
+            sim::ai::Loader loader(reader, ai.state_version());
+            loader(state);
+            REQUIRE(reader.ok());
+            return state;
+        };
+        // The city has reached the main city's stage, and the hour is up.
+        sim::ai::State state = state_of(s.computers());
+        bool found = false;
+        for (sim::ai::AiPlayer& p : state.players) {
+            for (sim::ai::CityPlan& r : p.plans) {
+                r.stage = sim::ai::stage::kMain;
+                p.max_stage = sim::ai::stage::kMain;
+                found = true;
+            }
+            p.init_ms = g.world.time_ms() + 1;
+        }
+        REQUIRE(found);
+        annokit::core::ByteWriter out;
+        sim::ai::Saver saver(out);
+        saver(state);
+        const std::vector<std::uint8_t> bytes = out.take();
+        annokit::core::ByteReader in(bytes);
+        sim::ComputerPlayers computers(s);
+        REQUIRE(computers.load(in, sim::ComputerPlayers::max_state_version()));
+        for (int i = 0; i < 30; ++i) {
+            computers.tick(500);
+        }
+        bool started_over = false;
+        for (const sim::ai::AiPlayer& p : state_of(computers).players) {
+            started_over = started_over || p.init_ms <= g.world.time_ms();
+        }
+        CHECK(started_over);
+        for (const auto& v : computers.view()) {
+            for (const auto& c : v.plans) {
+                CHECK((c.stage >= sim::ai::stage::kMain) == !classic);
+            }
+        }
+    }
+}
+
 TEST_CASE("ai: the names for new cities and ships travel with the saved game") {
     Game a;
     sim::Simulation sa(a.world, a.buildings, a.figures);

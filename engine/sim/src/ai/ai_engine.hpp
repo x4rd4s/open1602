@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "ai_chains.hpp"
@@ -507,6 +508,18 @@ private:
     /// city on its island.
     void cart_supply(AiPlayer& p);
     void update_fleet_target(AiPlayer& p);
+    /// Improved computers: where a city lies on the map, its Kontor (else its island's middle).
+    [[nodiscard]] std::pair<std::int32_t, std::int32_t> city_point(const City& c) const;
+    /// Improved computers: the seconds a ship of the computer takes from (x0, y0) to (x1, y1), an
+    /// estimate from the distance and the speed of its first ship.
+    [[nodiscard]] std::uint32_t sail_seconds(const AiPlayer& p, std::pair<std::int32_t, std::int32_t> from,
+                                             std::pair<std::int32_t, std::int32_t> to);
+    /// Improved computers: the stock a city keeps of a ware that a ship brings `seconds` away: the
+    /// further, the more, so that it lasts until the ship is back.
+    [[nodiscard]] static std::uint32_t supply_buffer(std::uint32_t target, std::uint32_t seconds);
+    /// Improved computers: the ships the home city's supply takes, by the wares it lacks and how
+    /// far they come from.
+    [[nodiscard]] std::int32_t supply_ships_wanted(AiPlayer& p, const City& home);
     void order_ship(AiPlayer& p);
     /// The original's: the cheapest offered ship, for a computer without ships or yard.
     void buy_first_ship(AiPlayer& p);

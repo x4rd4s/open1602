@@ -7,6 +7,8 @@
 #include <array>
 #include <cstdlib>
 #include <limits>
+#include <utility>
+#include <vector>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -121,6 +123,26 @@ void Engine::pick_island(AiPlayer& p) {
     if (sighted && exploring(p)) {
         return;
     }
+    // Open1602: an improved computer with a home city looks at the islands nearest to it first, so
+    // that its colonies lie within reach of its ships; the original goes by the islands' numbers.
+    std::vector<std::uint16_t> order;
+    if (rivals()) {
+        if (const City* home = home_city(p)) {
+            const auto at = city_point(*home);
+            std::vector<std::pair<std::int64_t, std::uint16_t>> by_way;
+            by_way.reserve(n);
+            for (std::uint16_t i = 0; i < n; ++i) {
+                const WorldIsland& isl = island_of(i);
+                const std::int64_t dx = std::int64_t{isl.x} + isl.map.width() / 2 - at.first;
+                const std::int64_t dy = std::int64_t{isl.y} + isl.map.height() / 2 - at.second;
+                by_way.emplace_back(dx * dx + dy * dy, i);
+            }
+            std::sort(by_way.begin(), by_way.end());
+            for (const auto& [d, i] : by_way) {
+                order.push_back(i);
+            }
+        }
+    }
     for (std::uint32_t k = 0; k <= n; ++k) {
         s.cursor = static_cast<std::uint16_t>(s.cursor + 1);
         if (s.cursor >= n) {
@@ -150,7 +172,7 @@ void Engine::pick_island(AiPlayer& p) {
             s.need -= kNeedStep;
             return;
         }
-        const std::uint16_t i = s.cursor;
+        const std::uint16_t i = order.empty() ? s.cursor : order[s.cursor];
         if (!island_allowed(p, i) || !knows_island(p, i)) {
             continue;
         }

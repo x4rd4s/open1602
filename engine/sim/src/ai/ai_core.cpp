@@ -529,6 +529,15 @@ void Engine::init_player(AiPlayer& p) {
     // The jobs of the ships stay: the original keeps them on the ships themselves,
     // which its re-initialisation does not touch.
     std::vector<ShipNote> jobs = std::move(p.ships);
+    // Open1602: improved computers keep where their cities stand. The original starts every city
+    // at stage 0 again each hour; a main city then walks the founding stages anew and may stand
+    // still at the settlers for hours. Only the failed site searches are forgotten.
+    std::vector<CityPlan> kept;
+    const std::uint8_t max_stage = p.max_stage;
+    const std::uint8_t score = p.score;
+    if (!classic()) {
+        kept = std::move(p.plans);
+    }
     p = AiPlayer{};
     p.player = id;
     p.pirates = pirates;
@@ -557,7 +566,20 @@ void Engine::init_player(AiPlayer& p) {
         }
         ++p.cities;
         CityPlan& r = plan_of(p, c.island, c.index);
+        for (const CityPlan& k : kept) {
+            if (k.island == c.island && k.city == c.index) {
+                r.stage = k.stage;
+                r.stage_ms = k.stage_ms;
+                r.flags = k.flags & city_flag::kAbandon;
+                r.move_x = k.move_x;
+                r.move_y = k.move_y;
+            }
+        }
         r.land = free_land(c.island, c.index, &r.land_percent);
+    }
+    if (!classic()) {
+        p.max_stage = max_stage;
+        p.score = score;
     }
     choose_home(p);
     const std::size_t ships = own_ships(p).size();
