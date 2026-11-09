@@ -558,7 +558,7 @@ struct DryLand {
     std::uint16_t heart = 0;  ///< per mille of the dry land, the driest, that is desert floor
     std::uint16_t marks = 0;  ///< per mille of the other dry land that is a mark
     std::array<WeightedId, 10> grass{};
-    std::array<WeightedId, 3> floor{};  ///< the heart's; weight 0: none
+    std::array<WeightedId, 3> floor{};  ///< the heart's, from the least to the most dry; weight 0: none
     std::array<WeightedId, 8> scattered{};
 };
 /// The north: patches of dry grass (fallow land), drier towards their heart, with a few stones.
@@ -583,7 +583,7 @@ inline constexpr DryLand kDryNorth{
 /// cacti, rocks and bones about it.
 inline constexpr DryLand kDrySouth{
     74,
-    150,
+    100,
     80,
     {{{22782, 246},
       {22784, 137},
@@ -595,7 +595,7 @@ inline constexpr DryLand kDrySouth{
       {22796, 5},
       {22798, 4},
       {22800, 4}}},
-    {{{22780, 4}, {22778, 3}, {22768, 3}}},
+    {{{22768, 4}, {22778, 3}, {22780, 2}}},
     {{{22772, 9}, {22764, 8}, {22762, 7}, {22770, 7}, {22774, 7}, {22766, 5}, {22776, 4}}},
 };
 /// The meadows of climate 0 (north) or 1 (south).

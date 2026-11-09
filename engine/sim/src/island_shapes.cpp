@@ -194,6 +194,32 @@ std::uint32_t weighted(Random& random, std::span<const ids::WeightedId> ids) {
     return 0;
 }
 
+/// Calls `lay(k, id)` for the positions k = 0 .. count-1, the driest first, with the kinds of
+/// `kinds` (from the least to the most dry) in bands from the driest kind out, each band as long
+/// as its weight's share of `count`.
+template <std::size_t N, class Lay>
+void lay_bands(const std::array<ids::WeightedId, N>& kinds, std::size_t count, Lay&& lay) {
+    std::uint64_t total = 0;
+    for (const auto& g : kinds) {
+        total += g.weight;
+    }
+    if (total == 0) {
+        return;
+    }
+    std::size_t kind = N;       // from the driest kind
+    std::uint64_t reached = 0;  // weight of the kinds laid so far, times `count`
+    for (std::size_t k = 0; k < count; ++k) {
+        // The next kind once this one's share is laid.
+        while (kind > 1 &&
+               (kinds[kind - 1].weight == 0 ||
+                static_cast<std::uint64_t>(k) * total >= reached + std::uint64_t{kinds[kind - 1].weight} * count)) {
+            reached += std::uint64_t{kinds[kind - 1].weight} * count;
+            --kind;
+        }
+        lay(k, kinds[kind - 1].id);
+    }
+}
+
 /// The ground on the tiles `open` (indexes into `cover`, a map `width` tiles wide): the meadows
 /// of the climate mixed tile by tile as its templates mix them, and dry land in patches about the
 /// size of the forest's (`patch`), as much of it as the climate's templates have. A patch is
@@ -216,45 +242,33 @@ void lay_ground(std::vector<std::uint32_t>& cover, std::span<const std::size_t> 
         return a.first != b.first ? a.first > b.first : a.second < b.second;
     };
     std::sort(tiles.begin(), tiles.end(), driest_first);
+    // Meadow beyond the dry land, which the driest `dry_count` tiles are (before the shift below,
+    // so that its share stays the templates').
     const std::size_t dry_count = tiles.size() * dry.share / 1000;
-    std::size_t heart = 0;
-    if (std::any_of(dry.floor.begin(), dry.floor.end(), [](const auto& f) { return f.weight > 0; })) {
-        heart = dry_count * dry.heart / 1000;
-        for (std::size_t k = 0; k < heart; ++k) {
-            cover[tiles[k].second] = weighted(random, dry.floor);
-        }
-    }
-    // The dry grass about it, the driest kinds nearest the heart; a random shift of up to a few
-    // steps of the noise frays the bands, so that the kinds mix at their edges as on the templates.
-    constexpr int kJitter = 48;
-    const auto rest_begin = tiles.begin() + static_cast<std::ptrdiff_t>(heart);
-    const auto rest_end = tiles.begin() + static_cast<std::ptrdiff_t>(dry_count);
-    for (auto it = rest_begin; it != rest_end; ++it) {
+    // A random shift of a few steps of the noise frays the edges of the heart and of the bands of
+    // dry grass about it, so that the kinds mix where they meet, as on the templates.
+    constexpr int kJitter = 64;
+    const auto dry_end = tiles.begin() + static_cast<std::ptrdiff_t>(dry_count);
+    for (auto it = tiles.begin(); it != dry_end; ++it) {
         it->first += static_cast<int>(random.below(2 * kJitter + 1)) - kJitter;
     }
-    std::sort(rest_begin, rest_end, driest_first);
-    std::uint32_t grass_total = 0;
-    for (const auto& g : dry.grass) {
-        grass_total += g.weight;
-    }
-    const std::size_t rest = dry_count - heart;
-    std::size_t kind = dry.grass.size();  // from the driest kind
-    std::uint64_t reached = 0;            // weight of the kinds laid so far, scaled by `rest`
-    for (std::size_t k = 0; k < rest; ++k) {
-        // Next kind once its share of the dry grass is full.
-        while (kind > 0 &&
-               (dry.grass[kind - 1].weight == 0 || static_cast<std::uint64_t>(k) * grass_total >=
-                                                       reached + std::uint64_t{dry.grass[kind - 1].weight} * rest)) {
-            reached += std::uint64_t{dry.grass[kind - 1].weight} * rest;
-            --kind;
-        }
-        const std::size_t i = (rest_begin + static_cast<std::ptrdiff_t>(k))->second;
+    std::sort(tiles.begin(), dry_end, driest_first);
+    const bool has_floor = std::any_of(dry.floor.begin(), dry.floor.end(), [](const auto& f) { return f.weight > 0; });
+    const std::size_t heart = has_floor ? dry_count * dry.heart / 1000 : 0;
+    // The heart: desert floor, the driest kind innermost; one tile in three keeps the driest grass,
+    // so that the heart is ragged and never a block of sand.
+    const auto driest_grass = dry.grass.back().id;
+    lay_bands(dry.floor, heart, [&](std::size_t k, std::uint32_t id) {
+        cover[tiles[k].second] = random.below(3) == 0 ? driest_grass : id;
+    });
+    // The dry grass about it, the driest kinds nearest the heart, and the marks on it.
+    lay_bands(dry.grass, dry_count - heart, [&](std::size_t k, std::uint32_t id) {
         const std::uint32_t mark = random.below(1000) < dry.marks ? weighted(random, dry.scattered) : 0;
-        cover[i] = mark != 0 ? mark : dry.grass[kind > 0 ? kind - 1 : 0].id;
-    }
+        cover[tiles[heart + k].second] = mark != 0 ? mark : id;
+    });
     // Meadow everywhere else.
     const std::span<const ids::WeightedId> meadow = ids::meadow(climate);
-    for (auto it = rest_end; it != tiles.end(); ++it) {
+    for (auto it = dry_end; it != tiles.end(); ++it) {
         cover[it->second] = weighted(random, meadow);
     }
 }
