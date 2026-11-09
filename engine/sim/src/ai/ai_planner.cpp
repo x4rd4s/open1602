@@ -1767,10 +1767,7 @@ bool Engine::need_shipyard(AiPlayer& p) {
     if (!own_ships(p).empty() && !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
         return false;
     }
-    // Open1602: an improved computer's main city builds its yard without a weaving mill of its own;
-    // the cloth for the sails comes by ship as any other ware.
-    if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0 &&
-        (classic() || r->stage < stage::kMain)) {
+    if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0) {
         return false;
     }
     SlotState& s = r->slots[kSlotShipyard];
