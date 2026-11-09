@@ -1737,7 +1737,7 @@ void EditorPanel::layout_fertility(const EditorModel& model) {
                 !model.island_random_fertility);
         y += kButtonH + kGap;
     }
-    constexpr std::int32_t kFertilityNote = 4 * 20;
+    constexpr std::int32_t kFertilityNote = 6 * 20;
     f.paragraph(Rect{m_x, y, m_w, kFertilityNote},
                 ui::tr(model.island_random_fertility ? "editor.fertility.random_note" : "editor.fertility.note"),
                 Tone::Dim, 20);
@@ -2744,8 +2744,8 @@ void EditorPanel::layout_test_as(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.test_as.title"), Align::Left, Tone::Heading);
     y += 32;
-    f.paragraph(Rect{m_x, y, m_w, 60}, ui::tr("editor.test_as.note"), Tone::Dim, 20);
-    y += 64;
+    f.paragraph(Rect{m_x, y, m_w, 100}, ui::tr("editor.test_as.note"), Tone::Dim, 20);
+    y += 104;
     // One button for each player, as the page "Players" lists them; the scenario stays as it is.
     const std::int32_t bottom = m_top + m_height - kButtonH - 2 * kGap;
     for (std::size_t i = 0; i < model.player_slots.size() && i < 20; ++i) {

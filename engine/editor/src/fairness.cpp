@@ -87,7 +87,8 @@ std::vector<StartArea> start_areas(const sim::World& world, const assets::Buildi
             }
             ++a.islands;
             a.land += land[i];
-            for (std::size_t c = 0; c < kStartCrops; ++c) {
+            a.random_crops += island.random_fertility ? 1U : 0U;  // its crops are rolled at the start
+            for (std::size_t c = 0; c < kStartCrops && !island.random_fertility; ++c) {
                 const auto ware = static_cast<std::uint32_t>(assets::ware::kTobaccoField + c);
                 if ((island.header.fertility >> (ware - 45U) & 1U) != 0) {
                     ++a.crops[c];
@@ -120,6 +121,8 @@ std::vector<Unfairness> unfairness(const std::vector<StartArea>& all) {
     std::array<bool, kStartCrops> somebody{};
     bool ore = false;
     bool gold = false;
+    // Crops rolled at the start may fill any gap: no area is uneven in its crops then.
+    const bool rolled = std::any_of(areas.begin(), areas.end(), [](const StartArea& a) { return a.random_crops != 0; });
     for (const StartArea& a : areas) {
         most = std::max(most, a.land);
         for (std::size_t c = 0; c < kStartCrops; ++c) {
@@ -133,7 +136,7 @@ std::vector<Unfairness> unfairness(const std::vector<StartArea>& all) {
             out.push_back(Unfairness{Unfairness::Kind::Land, a.player});
         }
         for (std::size_t c = 0; c < kStartCrops; ++c) {
-            if (somebody[c] && a.crops[c] == 0) {
+            if (somebody[c] && a.crops[c] == 0 && !rolled) {
                 out.push_back(Unfairness{Unfairness::Kind::Crop, a.player, c});
             }
         }

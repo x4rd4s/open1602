@@ -553,3 +553,23 @@ TEST_CASE("editor islands: a package's island template and climate for a new isl
     CHECK(!editor::make_island(request, 4, buildings, nullptr).ok());
     std::filesystem::remove(file);
 }
+
+TEST_CASE("editor islands: a new island takes no number a placeholder has") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings);
+    std::vector<std::uint16_t> numbers;
+    for (const sim::WorldIsland& i : world.islands()) {
+        numbers.push_back(static_cast<std::uint16_t>(i.header.number));
+    }
+    const auto free = world.free_island_number();
+    REQUIRE(free.has_value());
+    sim::PlannedIslands planned;
+    assets::ScenarioPlan::Island placeholder;
+    placeholder.number = static_cast<std::uint8_t>(*free);
+    planned.plan.islands.push_back(placeholder);
+    world.set_planned_islands(planned);
+    const auto next = world.free_island_number();
+    REQUIRE(next.has_value());
+    CHECK(*next != *free);
+    CHECK(std::find(numbers.begin(), numbers.end(), *next) == numbers.end());
+}

@@ -1910,6 +1910,10 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
                     crops += (crops.empty() ? "" : ", ") + ui::tr(kCrops[c]);
                 }
             }
+            if (a.random_crops != 0) {
+                crops +=
+                    (crops.empty() ? "" : ", ") + ui::tr("editor.check.start_random_crops", {number(a.random_crops)});
+            }
             if (a.islands == 0) {
                 lines.push_back(
                     Line{ui::tr("editor.check.start_sea", {who(a.player), number(a.rival)}), Line::Kind::Note});
@@ -3037,7 +3041,12 @@ void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
             editor_rotate_tool();
             break;
         case ui::KeyAction::EditorTestPlay:
-            editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            // As the menu's entry: with more than one player, the page asks whom it is played as.
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::TestPlay);
+            } else {
+                editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            }
             break;
         case ui::KeyAction::EditorFind:
             if (m_hud) {
