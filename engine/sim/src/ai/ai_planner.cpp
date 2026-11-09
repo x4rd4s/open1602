@@ -544,6 +544,11 @@ std::int32_t Engine::land_rank(const AiPlayer& p) const {
         if (c == nullptr || c->owner != p.player) {
             continue;
         }
+        // Open1602: an improved computer's young colony (before its settlers) does not make the
+        // older city a second one; were it given up, the older one would stay a second city for good.
+        if (!classic() && r.stage < stage::kSettlers) {
+            continue;
+        }
         if (r.land == 0) {
             return -1;
         }
@@ -814,6 +819,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const auto give_up = [&](std::uint32_t seconds) {
         if (now_ms() - r.stage_ms >= std::uint64_t{seconds} * 1000 && (r.flags & city_flag::kAbandon) == 0) {
             r.flags |= city_flag::kAbandon;
+            if (!classic()) {
+                p.left_islands.emplace_back(r.island, std::max<std::uint64_t>(now_ms(), 1));
+            }
             log(p, "city %u/%u: given up, %u inhabitants after %u s at stage 0x%02x (money %d)", r.island, r.city,
                 population(c), seconds, unsigned{r.stage}, money);
         }
@@ -849,9 +857,10 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     if (r.move_x >= 0 && !classic() && relocate_farm(p, c, r)) {
         return;
     }
-    // Open1602: a second city with land enough for a main city becomes one (see land_rank).
+    // Open1602: a second city with land enough for a main city becomes one (see land_rank), and so
+    // does one that no longer has a larger city beside it.
     if ((r.stage == stage::kSecond || r.stage == stage::kSecondLuxury || r.stage == stage::kSecondFarming) &&
-        !classic() && r.land >= kGrowFrom) {
+        !classic() && (r.land >= kGrowFrom || land_rank(p) == 1)) {
         set_stage(p, r, stage::kMain);
         return;
     }

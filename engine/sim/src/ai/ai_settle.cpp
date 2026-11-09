@@ -7,6 +7,8 @@
 #include <array>
 #include <cstdlib>
 #include <limits>
+#include <utility>
+#include <vector>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -17,7 +19,9 @@ namespace {
 
 constexpr std::uint64_t kColonyCooldownMs = 60'000;  // 60 s between settlement events
 constexpr std::int32_t kNeedStep = 50;
-constexpr std::uint32_t kPirateRegionPasses = 6;  // passes a further nest keeps to a part without one
+constexpr std::int32_t kColonyMoney = 3000;         // improved computers: gold in hand to found a colony
+constexpr std::uint64_t kLeftIslandMs = 2'700'000;  // improved computers: 45 min before they settle a left island again
+constexpr std::uint32_t kPirateRegionPasses = 6;    // passes a further nest keeps to a part without one
 constexpr std::uint8_t kLandRetries = 4;
 constexpr std::uint32_t kReach = 5;       // a ship within 5 tiles of a Kontor lies at it
 constexpr std::uint32_t kLandRange = 12;  // founding: the ship within 12 tiles of the site
@@ -121,6 +125,26 @@ void Engine::pick_island(AiPlayer& p) {
     if (sighted && exploring(p)) {
         return;
     }
+    // Open1602: an improved computer with a home city looks at the islands nearest to it first, so
+    // that its colonies lie within reach of its ships; the original goes by the islands' numbers.
+    std::vector<std::uint16_t> order;
+    if (rivals()) {
+        if (const City* home = home_city(p)) {
+            const auto at = city_point(*home);
+            std::vector<std::pair<std::int64_t, std::uint16_t>> by_way;
+            by_way.reserve(n);
+            for (std::uint16_t i = 0; i < n; ++i) {
+                const WorldIsland& isl = island_of(i);
+                const std::int64_t dx = std::int64_t{isl.x} + isl.map.width() / 2 - at.first;
+                const std::int64_t dy = std::int64_t{isl.y} + isl.map.height() / 2 - at.second;
+                by_way.emplace_back(dx * dx + dy * dy, i);
+            }
+            std::sort(by_way.begin(), by_way.end());
+            for (const auto& [d, i] : by_way) {
+                order.push_back(i);
+            }
+        }
+    }
     for (std::uint32_t k = 0; k <= n; ++k) {
         s.cursor = static_cast<std::uint16_t>(s.cursor + 1);
         if (s.cursor >= n) {
@@ -150,8 +174,8 @@ void Engine::pick_island(AiPlayer& p) {
             s.need -= kNeedStep;
             return;
         }
-        const std::uint16_t i = s.cursor;
-        if (!island_allowed(p, i) || !knows_island(p, i)) {
+        const std::uint16_t i = order.empty() ? s.cursor : order[s.cursor];
+        if (!island_allowed(p, i) || !knows_island(p, i) || left_lately(p, i)) {
             continue;
         }
         if (s.crop != 0 && (!knows_crops(p, i) || fertility(i, s.crop) != 128)) {
@@ -169,6 +193,15 @@ void Engine::pick_island(AiPlayer& p) {
         push(p, kSettleArea, true);
         return;
     }
+}
+
+bool Engine::left_lately(AiPlayer& p, std::uint16_t island) {
+    // Open1602: an island an improved computer gave a city up on is passed over for 45 minutes;
+    // before, it founded there again at once and gave the city up again.
+    // A computer without a city founds where it can.
+    std::erase_if(p.left_islands, [&](const auto& e) { return now_ms() - e.second >= kLeftIslandMs; });
+    return home_city(p) != nullptr &&
+           std::any_of(p.left_islands.begin(), p.left_islands.end(), [&](const auto& e) { return e.first == island; });
 }
 
 bool Engine::knows_island(const AiPlayer& p, std::uint16_t island) const {
@@ -1023,6 +1056,11 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     if (now_ms() - p.settle.last_ms < kColonyCooldownMs) {
+        return false;
+    }
+    // Open1602: an improved computer founds a colony only with the gold to build it up; founded
+    // with its last gold, the colony stood empty and was given up.
+    if (!classic() && player(p).money < kColonyMoney) {
         return false;
     }
     const std::uint32_t n = p.cities;

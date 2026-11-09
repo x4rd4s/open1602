@@ -396,6 +396,10 @@ void io(A& a, AiPlayer& p) {
     if (a.version() >= kStateWithTownSeed) {
         a(p.town_seed);
     }
+    if (a.version() >= kStateWithLeftIslands) {
+        a(p.fleet_ms);
+        a(p.left_islands);
+    }
 }
 
 template <class A>

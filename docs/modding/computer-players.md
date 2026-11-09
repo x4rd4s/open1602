@@ -410,6 +410,31 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   not either. The computer gives them attack moves instead (`attack_move` of the orders): to a
   target city, against soldiers on its islands and on the ships' attack missions.
 
+## Ships, ways and colonies
+
+The original's computers keep about one ship per city, fetch goods from the first own city with
+some to spare or the cheapest partner wherever it lies, and choose a colony's island by its number.
+Improved computers weigh the way at sea:
+
+- **Sources.** A supply ship fetches from the nearest own city with goods to spare; else from the
+  partner with a trade treaty whose price, raised by the time at sea, is lowest (ten minutes away
+  count as the price twice).
+- **Stock and loads.** The home city keeps more of a ware the further away it comes from (a round
+  trip of ten minutes doubles the stock it keeps, at most four times as much), and the ship brings
+  what lasts until it is back, up to half its holds per ware.
+- **Fleet.** One ship guards each city; on top come as many ships as the supply takes: a ship per
+  two wares the home city lacks, half a ship more per ten minutes of a ware's round trip, at most
+  four, and in all at most two per city and one more; none while it is in debt. The target falls
+  only after ten minutes of lower needs. A ship is ordered at the yard once the gold covers its
+  price (the original's computers order with half of it), or bought as before.
+- **Colonies.** The island search of a computer with a home city looks at the islands nearest to
+  it first, so that its colonies lie within reach of its ships. It founds one only with 3000 gold
+  in hand, passes over an island it gave a city up on for 45 minutes, and a young colony (before
+  its settlers) no longer makes the older city a second city.
+- **Hourly new start.** The original's computers start again every hour and walk every city
+  through the founding stages anew; improved ones keep each city's stage and forget only their
+  failed site searches.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything

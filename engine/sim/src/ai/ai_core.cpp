@@ -529,6 +529,18 @@ void Engine::init_player(AiPlayer& p) {
     // The jobs of the ships stay: the original keeps them on the ships themselves,
     // which its re-initialisation does not touch.
     std::vector<ShipNote> jobs = std::move(p.ships);
+    // Open1602: improved computers keep where their cities stand. The original starts every city
+    // at stage 0 again each hour; a main city then walks the founding stages anew and may stand
+    // still at the settlers for hours. Only the failed site searches are forgotten.
+    std::vector<CityPlan> kept;
+    const std::uint8_t max_stage = p.max_stage;
+    const std::uint8_t score = p.score;
+    const std::uint64_t fleet_ms = p.fleet_ms;
+    const std::int32_t fleet_target = p.fleet_target;
+    std::vector<std::pair<std::uint16_t, std::uint64_t>> left = std::move(p.left_islands);
+    if (!classic()) {
+        kept = std::move(p.plans);
+    }
     p = AiPlayer{};
     p.player = id;
     p.pirates = pirates;
@@ -557,7 +569,23 @@ void Engine::init_player(AiPlayer& p) {
         }
         ++p.cities;
         CityPlan& r = plan_of(p, c.island, c.index);
+        for (const CityPlan& k : kept) {
+            if (k.island == c.island && k.city == c.index) {
+                r.stage = k.stage;
+                r.stage_ms = k.stage_ms;
+                r.flags = k.flags & city_flag::kAbandon;
+                r.move_x = k.move_x;
+                r.move_y = k.move_y;
+            }
+        }
         r.land = free_land(c.island, c.index, &r.land_percent);
+    }
+    if (!classic()) {
+        p.max_stage = max_stage;
+        p.score = score;
+        p.fleet_ms = fleet_ms;
+        p.fleet_target = fleet_target;
+        p.left_islands = std::move(left);
     }
     choose_home(p);
     const std::size_t ships = own_ships(p).size();
@@ -752,6 +780,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (p.fleet_ms != 0 || !p.left_islands.empty()) {
+            return static_cast<std::uint16_t>(ai::kStateWithLeftIslands);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.town_seed != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithTownSeed);

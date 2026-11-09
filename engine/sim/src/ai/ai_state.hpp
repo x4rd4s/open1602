@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 8;
+inline constexpr std::uint32_t kStateVersion = 9;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -30,6 +30,9 @@ inline constexpr std::uint32_t kStateWithWideFlags = 6;
 inline constexpr std::uint32_t kStateWithMove = 7;
 /// Version 8: the number a computer's town plans are drawn from (AiPlayer::town_seed).
 inline constexpr std::uint32_t kStateWithTownSeed = 8;
+/// Version 9: when an improved computer's fleet target last held and the islands it gave a city up on
+/// (AiPlayer::fleet_ms, AiPlayer::left_islands). Written only once one of them is set.
+inline constexpr std::uint32_t kStateWithLeftIslands = 9;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -442,6 +445,12 @@ struct AiPlayer {
     std::unordered_map<std::uint32_t, std::uint32_t> ship_slots;
     std::int32_t fleet_target = 0;  ///< pirates: the last new ship is armed
     std::int32_t ships_per_city = 1;
+    /// Open1602, improved computers: game time the fleet target last held; it falls only ten
+    /// minutes later, so that it does not follow every ton of the stock (state 9).
+    std::uint64_t fleet_ms = 0;
+    /// Open1602, improved computers: the islands a city was given up on, with the game time; the
+    /// island search passes them over for a while (state 9).
+    std::vector<std::pair<std::uint16_t, std::uint64_t>> left_islands;
 };
 
 /// Everything of all computer players.
