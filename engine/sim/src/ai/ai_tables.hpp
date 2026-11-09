@@ -162,6 +162,9 @@ inline constexpr std::uint32_t kFoodMargin = 2;
 /// A city short of food with no way to more food (no site for a fisher, its farms not yet open to
 /// it) builds houses all the same while its stock feeds its inhabitants for kFoodMinutes minutes.
 inline constexpr std::uint32_t kFoodMinutes = 15;
+/// Open1602: a city whose houses wait for wood builds woodcutters up to one for every four houses,
+/// at most kMostWoodcutters that way.
+inline constexpr std::uint32_t kMostWoodcutters = 4;
 /// A producer is not built while its good fills kFullStock sixteenths of the city's room, and an
 /// order's producers grow with the land only while the city has less than kGrowStock tons of it.
 inline constexpr std::uint32_t kFullStock = 12;

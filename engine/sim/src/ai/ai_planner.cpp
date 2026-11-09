@@ -1524,8 +1524,28 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         return false;
     }
     const assets::BuildingType* b = by_id(id::kHouse);
-    if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b) || c->stock(m_buildings.food_ware()) <= kTon / 2 ||
-        player(p).money <= 1000) {
+    if (b == nullptr || !unlocked(p, *b)) {
+        return false;
+    }
+    if (!affordable(p, *c, *b)) {
+        // Open1602: a city whose houses wait for wood gets another woodcutter, one for every four
+        // houses (a town's first roads and markets take the wood its one woodcutter makes).
+        const auto& m = m_buildings.materials();
+        if (!classic() && c->stock(m.wood) < b->build_cost.wood &&
+            std::int64_t{player(p).money} >= b->build_cost.money && c->stock(m.tools) >= b->build_cost.tools) {
+            const std::uint32_t woodcutters = r->slots[kSlotWoodcutter].count;
+            const std::size_t before = p.stack.size();
+            if (woodcutters < std::min<std::uint32_t>(1 + s.count / 4, kMostWoodcutters)) {
+                (void)need(p, kSlotWoodcutter, woodcutters + 1);
+            }
+            if (p.stack.size() > before) {
+                log(p, "city %u/%u: houses wait for wood, woodcutter %u", r->island, r->city, woodcutters + 1);
+                return true;
+            }
+        }
+        return false;
+    }
+    if (c->stock(m_buildings.food_ware()) <= kTon / 2 || player(p).money <= 1000) {
         return false;
     }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
