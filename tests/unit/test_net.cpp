@@ -326,6 +326,7 @@ TEST_CASE("net: every message goes to bytes and back") {
     lobby.computer_takes_over = false;
     lobby.host_controls_speed = true;
     lobby.spectators_chat = false;
+    lobby.spectators_speed = true;
     all.emplace_back(lobby);
     all.emplace_back(net::TakeSeat{3});
     all.emplace_back(net::SetReady{true});
@@ -940,6 +941,56 @@ TEST_CASE("net: without the setting, every player pauses, resumes and sets the s
     CHECK(!host.game.simulation->paused());
     CHECK(a.game.simulation->speed() == 2);
     CHECK(a.count(net::SessionEvent::Kind::SpeedRefused) == 0);
+}
+
+TEST_CASE("net: with the setting, a spectator sets the speed for everyone; without, nothing happens") {
+    for (const bool allowed : {false, true}) {
+        annokit::net::LoopbackNetwork network(5, 0);
+        net::SessionConfig config;
+        config.spectators_speed = allowed;
+        Host host(network, config);
+        Computer anna(network, "Anna");
+        Computer bernd(network, "Bernd");
+        Computer clara(network, "Clara");
+        Computer wim(network, "Wim");
+        const std::vector<Computer*> all = {&anna, &bernd, &clara, &wim};
+        run_for(network, host, all, 1500);
+        REQUIRE(wim.session->local_seat() == sim::kNoPlayer);
+        REQUIRE(wim.session->playing());
+        CHECK(wim.session->lobby().spectators_speed == allowed);
+        CHECK(wim.session->may_change_speed() == allowed);
+        CHECK(anna.session->may_change_speed());
+
+        wim.session->submit(sim::GameSpeedOrder{sim::kNoPlayer, sim::GameSpeedOrder::Op::SetSpeed, 4});
+        run_for(network, host, all, 1000);
+        for (const Computer* c : {&anna, &wim}) {
+            CHECK(c->game.simulation->speed() == (allowed ? 4U : 1U));
+        }
+        CHECK(host.game.simulation->speed() == (allowed ? 4U : 1U));
+        CHECK(wim.count(net::SessionEvent::Kind::SpeedRefused) == 0);
+        wim.session->submit(sim::GameSpeedOrder{sim::kNoPlayer, sim::GameSpeedOrder::Op::Pause, 4});
+        run_for(network, host, all, 1000);
+        CHECK(host.game.simulation->paused() == allowed);
+        CHECK(anna.game.simulation->paused() == allowed);
+    }
+
+    // Only the host controls the speed: spectators are refused too.
+    annokit::net::LoopbackNetwork network(5, 0);
+    net::SessionConfig config;
+    config.spectators_speed = true;
+    config.host_controls_speed = true;
+    Host host(network, config);
+    Computer anna(network, "Anna");
+    Computer bernd(network, "Bernd");
+    Computer clara(network, "Clara");
+    Computer wim(network, "Wim");
+    const std::vector<Computer*> all = {&anna, &bernd, &clara, &wim};
+    run_for(network, host, all, 1500);
+    REQUIRE(wim.session->local_seat() == sim::kNoPlayer);
+    CHECK(!wim.session->may_change_speed());
+    wim.session->submit(sim::GameSpeedOrder{sim::kNoPlayer, sim::GameSpeedOrder::Op::SetSpeed, 4});
+    run_for(network, host, all, 1000);
+    CHECK(host.game.simulation->speed() == 1U);
 }
 
 TEST_CASE("net: a slot's token is good only for the one it was given to") {

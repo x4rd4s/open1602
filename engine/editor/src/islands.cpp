@@ -92,6 +92,29 @@ annokit::core::Result<std::unique_ptr<Operation>> set_fertility(const sim::World
     return std::unique_ptr<Operation>(std::make_unique<FertilityEdit>(index, before, fertility));
 }
 
+void RandomFertilityEdit::apply(sim::World& world) {
+    if (m_island < world.islands().size()) {
+        world.island(m_island).random_fertility = m_after;
+    }
+}
+
+void RandomFertilityEdit::revert(sim::World& world) {
+    if (m_island < world.islands().size()) {
+        world.island(m_island).random_fertility = !m_after;
+    }
+}
+
+annokit::core::Result<std::unique_ptr<Operation>> set_random_fertility(const sim::World& world, std::size_t index,
+                                                                       bool on) {
+    if (index >= world.islands().size()) {
+        return make_error(ErrorCode::NotFound, "no island " + std::to_string(index + 1));
+    }
+    if (world.islands()[index].random_fertility == on) {
+        return make_error(ErrorCode::InvalidFormat, "the island's fertility is so already");
+    }
+    return std::unique_ptr<Operation>(std::make_unique<RandomFertilityEdit>(index, on));
+}
+
 std::size_t PlanEdit::memory() const noexcept {
     const auto size = [](const std::optional<sim::PlannedIslands>& p) {
         return p ? p->plan.islands.size() * sizeof(assets::ScenarioPlan::Island) : std::size_t{0};

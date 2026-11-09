@@ -1845,7 +1845,9 @@ SelectionPanel* SelectionPanels::panel_for(const Selection& s, const PanelContex
         return nullptr;
     }
     const sim::MapCell& top = c.world().islands()[s.island].map.top(s.x, s.y);
-    if (top.owner != c.local) {
+    // A spectator (no player of its own) reads every building's window as its owner sees it; what
+    // it clicks changes nothing (Hud drops the orders).
+    if (top.owner != c.local && c.local != sim::kNoPlayer) {
         // Foreign buildings: only Kontor and market, and only with a trade treaty.
         const sim::City* city = city_at(s, c);
         if ((b->prod_kind == sim::prod::kMarket || b->prod_kind == sim::prod::kKontor) && city != nullptr &&

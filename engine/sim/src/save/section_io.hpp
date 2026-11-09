@@ -89,12 +89,13 @@ struct Decoded {
     };
     std::optional<BlueprintPart> blueprints;
     std::optional<std::string> package_scenario;
-    std::optional<ScenarioInfo> scenario_info;              ///< SCNI
-    std::optional<Rules> scenario_rules;                    ///< SRUL
-    std::optional<std::vector<ScenarioMarker>> markers;     ///< MARK
-    std::optional<std::string> scenario_script;             ///< SLUA
-    std::optional<std::vector<std::uint8_t>> editor_state;  ///< EDIT
-    std::optional<PlannedIslands> planned_islands;          ///< PLAN
+    std::optional<ScenarioInfo> scenario_info;                   ///< SCNI
+    std::optional<Rules> scenario_rules;                         ///< SRUL
+    std::optional<std::vector<ScenarioMarker>> markers;          ///< MARK
+    std::optional<std::string> scenario_script;                  ///< SLUA
+    std::optional<std::vector<std::uint8_t>> editor_state;       ///< EDIT
+    std::optional<PlannedIslands> planned_islands;               ///< PLAN
+    std::optional<std::vector<std::uint16_t>> random_fertility;  ///< RFRT: island numbers
     std::optional<World::CampaignPart> campaign_part;
     /// The goods the packages added (GOOD).
     std::optional<assets::Goods> goods;

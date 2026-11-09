@@ -392,6 +392,21 @@ TEST_CASE("editor islands: the crops an island grows are one step") {
     CHECK(document.world().islands()[1].header.fertility == before);
 }
 
+TEST_CASE("editor islands: an island rolls its crops at the start, a step that can be undone") {
+    const auto buildings = make_buildings();
+    editor::Document document(make_world(buildings));
+    auto op = editor::set_random_fertility(document.world(), 1, true);
+    REQUIRE(op.ok());
+    document.perform(std::move(op).value());
+    CHECK(document.world().islands()[1].random_fertility);
+    CHECK(!document.world().islands()[0].random_fertility);
+    CHECK(document.history().next_undo() == "island_random_fertility");
+    CHECK(!editor::set_random_fertility(document.world(), 1, true).ok());  // nothing changes
+    CHECK(!editor::set_random_fertility(document.world(), 5, true).ok());
+    CHECK(document.undo());
+    CHECK(!document.world().islands()[1].random_fertility);
+}
+
 TEST_CASE("editor islands: an island saved alone comes back with its tiles, without who knew it") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings);
@@ -537,4 +552,24 @@ TEST_CASE("editor islands: a package's island template and climate for a new isl
     request.seed = sim::package_template_number(islands, 0);
     CHECK(!editor::make_island(request, 4, buildings, nullptr).ok());
     std::filesystem::remove(file);
+}
+
+TEST_CASE("editor islands: a new island takes no number a placeholder has") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings);
+    std::vector<std::uint16_t> numbers;
+    for (const sim::WorldIsland& i : world.islands()) {
+        numbers.push_back(static_cast<std::uint16_t>(i.header.number));
+    }
+    const auto free = world.free_island_number();
+    REQUIRE(free.has_value());
+    sim::PlannedIslands planned;
+    assets::ScenarioPlan::Island placeholder;
+    placeholder.number = static_cast<std::uint8_t>(*free);
+    planned.plan.islands.push_back(placeholder);
+    world.set_planned_islands(planned);
+    const auto next = world.free_island_number();
+    REQUIRE(next.has_value());
+    CHECK(*next != *free);
+    CHECK(std::find(numbers.begin(), numbers.end(), *next) == numbers.end());
 }

@@ -262,6 +262,8 @@ std::string MapViewer::editor_building_name(const assets::BuildingType& b, const
 sim::World MapViewer::sea_world(std::uint32_t width, std::uint32_t height) const {
     sim::World world(width, height);
     give_mod_content(world);
+    // A plan of its own, so that placeholders and random elements work on a new map too.
+    world.set_planned_islands(sim::blank_plan(m_game));
     return world;
 }
 
@@ -420,6 +422,9 @@ annokit::core::Status MapViewer::editor_new(const EditorNewMap& map) {
     }
     give_mod_content(*world);
     name_more_players(*world);
+    if (!world->planned_islands()) {
+        world->set_planned_islands(sim::blank_plan(m_game));
+    }
     log_world_notes(notes);
     return enter_editor(std::move(world).value(), {});
 }
@@ -685,8 +690,8 @@ void MapViewer::editor_test_play(std::optional<sim::PlayerId> as) {
     std::vector<std::string> warnings;
     std::vector<std::string> notes;
     auto world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
-    if (world && world->planned_islands()) {
-        world = sim::roll_planned_islands(*world, m_game, m_buildings, m_options.world, &notes);
+    if (world) {
+        world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, m_options.world, &notes);
     }
     if (!world) {
         failed(world.error());
@@ -889,6 +894,7 @@ EditorModel MapViewer::editor_model() const {
         m.island_free = world.island_use(m_editor->pick.island) == sim::World::IslandUse::None;
         m.island_fertility = world.islands()[m_editor->pick.island].header.fertility;
         m.island_climate = world.islands()[m_editor->pick.island].header.climate;
+        m.island_random_fertility = world.islands()[m_editor->pick.island].random_fertility;
         m.island_crops = sim::climate_crops(world.balance().climates, world.islands()[m_editor->pick.island]);
     }
     m.placing = m_editor->placing.has_value();
@@ -1265,6 +1271,13 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             break;
         case Kind::SetFertility: {
             auto op = editor::set_fertility(m_editor->document.world(), request.index, request.fertility);
+            if (op) {
+                m_editor->document.perform(std::move(op).value());
+            }
+            break;
+        }
+        case Kind::SetRandomFertility: {
+            auto op = editor::set_random_fertility(m_editor->document.world(), request.index, request.fertility != 0);
             if (op) {
                 m_editor->document.perform(std::move(op).value());
             }
@@ -1896,6 +1909,10 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
                 if (a.crops[c] != 0) {
                     crops += (crops.empty() ? "" : ", ") + ui::tr(kCrops[c]);
                 }
+            }
+            if (a.random_crops != 0) {
+                crops +=
+                    (crops.empty() ? "" : ", ") + ui::tr("editor.check.start_random_crops", {number(a.random_crops)});
             }
             if (a.islands == 0) {
                 lines.push_back(
@@ -3024,7 +3041,12 @@ void MapViewer::editor_key(ui::KeyAction action, std::uint8_t param) {
             editor_rotate_tool();
             break;
         case ui::KeyAction::EditorTestPlay:
-            editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            // As the menu's entry: with more than one player, the page asks whom it is played as.
+            if (m_hud) {
+                m_hud->editor_command(EditorCommand::TestPlay);
+            } else {
+                editor_request(EditorRequest{EditorRequest::Kind::TestPlay});
+            }
             break;
         case ui::KeyAction::EditorFind:
             if (m_hud) {

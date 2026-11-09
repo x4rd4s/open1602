@@ -416,6 +416,8 @@ struct EditorModel {
     /// The selected island's fertility (assets::IslandHeader::fertility) and climate.
     std::uint32_t island_fertility = 0;
     std::uint8_t island_climate = 0;
+    /// Whether a game rolls the selected island's crops when it starts (WorldIsland::random_fertility).
+    bool island_random_fertility = false;
     /// The crops the selected island's climate grows half without its fertility for them, as
     /// fertility bits (sim::climate_crops).
     std::uint32_t island_crops = 0;
@@ -542,7 +544,9 @@ struct EditorRequest {
         StopPlacing,   ///< what is being placed goes back
         ResizeWorld,   ///< the map made `width` x `height` tiles large
         SetFertility,  ///< the island `index` fertile for the crops of `fertility`
-        SaveIsland,    ///< the island `index` saved alone, in the folder of own islands
+        /// The island `index` rolls its crops at the start (`fertility` 1) or keeps them (0).
+        SetRandomFertility,
+        SaveIsland,  ///< the island `index` saved alone, in the folder of own islands
         /// The page "Load island" opens: the model's list of files is due, the island files.
         ListIslandFiles,
         LoadIsland,         ///< the island of file `index` of the model's list to place

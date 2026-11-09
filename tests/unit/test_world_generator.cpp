@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -1842,4 +1843,79 @@ TEST_CASE("package islands: an own world draws them with the templates and keeps
         }
     }
     CHECK(drawn);
+}
+
+TEST_CASE("world generator: a new map without a scenario of the original makes its placeholders and rolls crops") {
+    const auto& fake = full_game();
+    sim::WorldStart start;
+    start.seed = 91;
+    auto full = sim::load_world(scenario(standard_plan()), buildings(), fake.game, nullptr, start);
+    REQUIRE(full.ok());
+    REQUIRE(full->islands().size() >= 2);
+
+    // The editor's new map: no scenario of the original behind it, an island set to roll its crops.
+    sim::World edited = *full;
+    edited.set_source(nullptr);
+    edited.island(0).header.fertility = 0;
+    edited.island(0).random_fertility = true;
+    const std::uint32_t kept = edited.islands()[1].header.fertility;
+
+    // Its plan has no islands: the start drops it and rolls the crops alone.
+    sim::PlannedIslands blank;
+    blank.plan = standard_plan();
+    blank.plan.islands.clear();
+    edited.set_planned_islands(blank);
+    auto plain = sim::start_scenario(edited, fake.game, buildings(), start);
+    REQUIRE(plain.ok());
+    CHECK(!plain->planned_islands().has_value());
+    CHECK(plain->islands().size() == edited.islands().size());
+    const auto crops_of = [&](const sim::World& w, std::size_t i) {
+        return sim::original_climate_crops(w.islands()[i].header.climate % 2U);
+    };
+    const std::uint32_t rolled_crops = plain->islands()[0].header.fertility;
+    CHECK(std::popcount(rolled_crops) == 2);
+    CHECK((rolled_crops & ~crops_of(*plain, 0)) == 0U);
+    const std::uint32_t sugar = 1U << (assets::ware::kSugarField - assets::ware::kCornField);
+    const std::uint32_t wine = 1U << (assets::ware::kWineField - assets::ware::kCornField);
+    CHECK((rolled_crops & (sugar | wine)) != (sugar | wine));
+    CHECK(!plain->islands()[0].random_fertility);
+    CHECK(plain->islands()[1].header.fertility == kept);
+
+    // The mark goes into the savegame and comes back.
+    auto bytes = sim::write_game(edited, buildings());
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings());
+    REQUIRE(loaded.ok());
+    CHECK(loaded->islands()[0].random_fertility);
+    CHECK(!loaded->islands()[1].random_fertility);
+
+    // With a placeholder the plan makes it, still without the original's scenario; the mark survives
+    // the making and the crops are rolled.
+    std::optional<std::pair<std::uint32_t, std::uint32_t>> free;
+    for (std::uint32_t y = 0; y + 30 <= edited.height() && !free; y += 5) {
+        for (std::uint32_t x = 0; x + 30 <= edited.width() && !free; x += 5) {
+            bool sea = true;
+            for (std::uint32_t dy = 0; dy < 30 && sea; ++dy) {
+                for (std::uint32_t dx = 0; dx < 30 && sea; ++dx) {
+                    sea = edited.cell(x + dx, y + dy).island == sim::World::kSea;
+                }
+            }
+            if (sea) {
+                free.emplace(x, y);
+            }
+        }
+    }
+    REQUIRE(free.has_value());
+    blank.plan.islands.push_back(island(40, 0, 0, free->first, free->second));
+    edited.set_planned_islands(blank);
+    auto made = sim::start_scenario(edited, fake.game, buildings(), start);
+    REQUIRE(made.ok());
+    CHECK(!made->planned_islands().has_value());
+    CHECK(made->islands().size() == edited.islands().size() + 1);
+    const auto first = std::find_if(made->islands().begin(), made->islands().end(), [&](const sim::WorldIsland& w) {
+        return w.header.number == edited.islands()[0].header.number;
+    });
+    REQUIRE(first != made->islands().end());
+    CHECK(!first->random_fertility);
+    CHECK(std::popcount(first->header.fertility) == 2);
 }

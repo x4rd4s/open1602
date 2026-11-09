@@ -488,8 +488,11 @@ std::vector<GoalProblem> goal_problems(const sim::World& world) {
         }
         for (std::size_t i = 0; i < 2; ++i) {
             const std::uint32_t bit = i == 0 ? goal::kIslands1 : goal::kIslands2;
-            if ((m.goals & bit) == 0 || world.planned_islands()) {
-                continue;  // a world plan makes islands at the start: they may have it
+            const bool rolled = (world.planned_islands() && !world.planned_islands()->plan.islands.empty()) ||
+                                std::any_of(world.islands().begin(), world.islands().end(),
+                                            [](const sim::WorldIsland& w) { return w.random_fertility; });
+            if ((m.goals & bit) == 0 || rolled) {
+                continue;  // a world plan makes islands, or islands roll their crops, at the start
             }
             const std::uint8_t r = m.islands[i].resource;
             const bool some =

@@ -312,9 +312,9 @@ annokit::core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets
         }
         if (sim::is_open1602_save(*bytes)) {
             world = sim::read_game(*bytes, *buildings, &warnings, &*figures);
-            if (world && world->planned_islands()) {
-                // A scenario that makes its islands when the game starts (ADR 0013).
-                world = sim::roll_planned_islands(*world, game, *buildings, options.world, &world_notes);
+            if (world) {
+                // A scenario that makes its islands or crops when the game starts (ADR 0013).
+                world = sim::start_scenario(std::move(world).value(), game, *buildings, options.world, &world_notes);
             }
         } else {
             auto file = assets::ChunkFile::from_bytes(std::move(bytes).value());
@@ -3794,9 +3794,9 @@ annokit::core::Result<sim::World> MapViewer::read_world(const std::filesystem::p
     annokit::core::Result<sim::World> world = annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no game");
     if (sim::is_open1602_save(*bytes)) {
         world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
-        if (world && world->planned_islands()) {
-            // A scenario that makes its islands when the game starts (ADR 0013).
-            world = sim::roll_planned_islands(*world, m_game, m_buildings, m_options.world, &world_notes);
+        if (world) {
+            // A scenario that makes its islands or crops when the game starts (ADR 0013).
+            world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, m_options.world, &world_notes);
         }
     } else {
         auto file = assets::ChunkFile::from_bytes(std::move(bytes).value());

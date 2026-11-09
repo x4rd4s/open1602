@@ -83,6 +83,9 @@ struct WorldIsland {
     std::uint8_t climate = 0;
     /// Players who know the island: a ship of theirs came close.
     std::vector<bool> discovered{};
+    /// The editor's "fertility at random": a game of the scenario rolls the island's crops when it
+    /// starts (roll_random_fertility, new_game.hpp), which clears the mark.
+    bool random_fertility = false;
 
     /// Players who explored the island's crops with a ship.
     std::vector<bool> explored{};
@@ -535,7 +538,8 @@ public:
     /// Only islands without use; on failure the world is as it was.
     annokit::core::Status merge_islands(std::size_t keep, std::size_t other, const assets::BuildingType& sea,
                                         const assets::BuildingTable* buildings = nullptr);
-    /// The smallest island number no island has, nothing if all are taken.
+    /// The smallest island number neither an island nor a placeholder of the plan has, nothing if all are
+    /// taken.
     [[nodiscard]] std::optional<std::uint16_t> free_island_number() const;
     /// The map made `width` x `height` tiles large (at least 1, at most kMaxSide), growing or cut
     /// at the right and the bottom: everything keeps its place. Fails if an island, a ship, a

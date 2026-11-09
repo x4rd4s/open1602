@@ -126,6 +126,9 @@ struct SessionConfig {
     /// (Host, also after a host migration) Spectators may write in the chat, to everyone; without,
     /// they only read it.
     bool spectators_chat = true;
+    /// (Host, also after a host migration) Spectators may pause, resume and set the speed of the
+    /// game, for everyone; not while host_controls_speed holds.
+    bool spectators_speed = false;
     /// (Host migration) How long a computer whose host left tries to get into the successor's game;
     /// the successor may notice the host's leaving a few seconds later than the others.
     std::uint32_t migration_ms = 30'000;
@@ -367,6 +370,9 @@ private:
     void receive(annokit::net::LinkId link, std::span<const std::uint8_t> bytes);
     void hello(Peer& peer, const Hello& m);
     void commands(Peer& peer, CommandBatch& m);
+    /// A spectator's speed order, carried out for everyone if the game lets spectators set the speed
+    /// (SessionConfig::spectators_speed); false if it does not.
+    bool spectator_speed(sim::Command command);
     void progress(Peer& peer, const Progress& m);
     void load_progress(Peer& peer, const LoadProgress& m);
     /// While the game starts (m_starting): whether its first frame still waits for a player; once
@@ -570,7 +576,9 @@ public:
     void submit(sim::Command command) override;
     void update(std::uint32_t real_ms, const sim::Simulation::BeforeTick& before_tick = {}) override;
     void say(std::string text, std::vector<Seat> to = {}) override;
-    [[nodiscard]] bool may_change_speed() const noexcept override { return !m_lobby.host_controls_speed; }
+    [[nodiscard]] bool may_change_speed() const noexcept override {
+        return !m_lobby.host_controls_speed && (m_seat != sim::kNoPlayer || m_lobby.spectators_speed);
+    }
     /// In the lobby: asks for an open slot, or kNoPlayer to watch.
     void take_seat(Seat seat);
     /// In the lobby: ready to start, or not.

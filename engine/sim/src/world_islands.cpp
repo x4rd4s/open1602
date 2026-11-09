@@ -724,6 +724,12 @@ std::optional<std::uint16_t> World::free_island_number() const {
     for (const WorldIsland& island : m_islands) {
         used[island.header.number] = true;
     }
+    // A placeholder's number is taken too: the start makes no island whose number a world island has.
+    if (m_planned_islands) {
+        for (const assets::ScenarioPlan::Island& e : m_planned_islands->plan.islands) {
+            used[e.number] = true;
+        }
+    }
     for (std::size_t n = 0; n < used.size(); ++n) {
         if (!used[n]) {
             return static_cast<std::uint16_t>(n);

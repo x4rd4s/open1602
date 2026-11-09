@@ -1845,6 +1845,13 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down,
     } else if (m_mode == kModeInfo || m_mode == kModeMilitary) {
         std::optional<PanelContext> context;
         if (SelectionPanel* p = selection_panel(context)) {
+            // A spectator reads the windows: its clicks turn pages, they give no orders.
+            const std::size_t orders_before = m_commands.size();
+            const auto drop_orders = [&] {
+                if (m_local == sim::kNoPlayer && m_commands.size() > orders_before) {
+                    m_commands.erase(m_commands.begin() + static_cast<std::ptrdiff_t>(orders_before), m_commands.end());
+                }
+            };
             for (const ui::PanelEvent& e : p->panel().mouse(x - panel.x, y - panel.y, down)) {
                 // A click elsewhere in the window keeps the name being typed.
                 m_names.begin_click();
@@ -1855,6 +1862,7 @@ std::optional<Hud::Action> Hud::mouse(std::int32_t x, std::int32_t y, bool down,
                     }
                 }
             }
+            drop_orders();
             if (const auto r = p->take_request()) {
                 switch (r->kind) {
                     case SelectionPanel::Request::Kind::FoundKontor:
