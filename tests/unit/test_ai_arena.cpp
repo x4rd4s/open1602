@@ -572,7 +572,7 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
         // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
         // their ships saw.
-        test::check_golden("arena after an hour", s.state_hash(), 0x24adf7cb11903851ULL);
+        test::check_golden("arena after an hour", s.state_hash(), 0xf0b4d713a2f14c98ULL);
     }
 }
 
@@ -590,6 +590,36 @@ TEST_CASE("ai arena: improved computers make peace with each other, the original
         const sim::Treaty peace = a.world.diplomacy().relation(kFirst, kSecond).peace;
         CHECK((peace == sim::Treaty::Signed) == !classic);
         CHECK(a.world.diplomacy().relation(kFirst, kSecond).trade == sim::Treaty::Signed);
+    }
+}
+
+TEST_CASE("ai arena: improved computers draw a character and keep it through a save, the original's draw none") {
+    for (const bool classic : {false, true}) {
+        Arena a;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 5 * 60'000);
+        const auto view = s.computers().view();
+        REQUIRE(view.size() == 2);
+        for (const auto& v : view) {
+            CHECK((v.character != 0) == !classic);
+            CHECK(v.character <= 3);
+            CHECK(v.goal <= 3);
+        }
+        if (!classic) {
+            CHECK(s.computers().state_version() == sim::ComputerPlayers::max_state_version());
+            const std::vector<std::uint8_t> bytes = saved(s.computers());
+            annokit::core::ByteReader in(bytes);
+            sim::ComputerPlayers computers(s);
+            REQUIRE(computers.load(in, s.computers().state_version()).ok());
+            const auto back = computers.view();
+            REQUIRE(back.size() == 2);
+            for (std::size_t i = 0; i < 2; ++i) {
+                CHECK(back[i].character == view[i].character);
+                CHECK(back[i].goal == view[i].goal);
+            }
+        }
     }
 }
 

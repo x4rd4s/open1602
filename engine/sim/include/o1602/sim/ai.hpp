@@ -80,6 +80,10 @@ public:
         bool settling = false;
         bool settle_failed = false;
         std::vector<std::uint8_t> stack;
+        /// Improved computers: the character drawn (1 trader, 2 conqueror, 3 settler; 0 none yet)
+        /// and the goal (0 economy, 1 military, 2 gold, 3 land).
+        std::uint8_t character = 0;
+        std::uint8_t goal = 0;
         struct City {
             std::uint16_t island = 0;
             std::uint8_t city = 0;

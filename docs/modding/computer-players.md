@@ -448,6 +448,36 @@ to another computer whose mood toward them is not below 0 and not falling, and s
 as long as the mood is above -20, as they do with humans; war among computers comes with their war
 plans.
 
+## Strategy
+
+The original's computers have no strategy of their own: they build, and they arm against the
+humans. Improved computers each draw a character at the start of a game, with the computers'
+random numbers, so that it is saved with the game and the same on every machine of a network
+game. The characters are dealt out: each computer gets one the fewest others have.
+
+- **Trader:** economy and diplomacy. A partner of everyone with a trade treaty it is not angry with;
+  a smaller army (`trader_army_percent`).
+- **Conqueror:** military might. A larger army (`conqueror_army_percent`), presses weaker
+  neighbours sooner and arms to do so.
+- **Settler:** land. Goes after new colonies with less gold in hand (`land_colony_money`).
+
+Every minute on the easiest level, ten seconds sooner per level (`[computer_strategy]` in
+[balance.md](balance.md)), a computer looks at every rival, human or computer:
+
+- **Stance.** Hostile when its mood towards the rival is below -60; a partner when it is above 20
+  (a trader: from 0 on with a trade treaty); pressed when the rival is near (a city on its home
+  island or within four minutes at sea), not liked (mood 0 or below) and so much weaker (`pressure_percent`); else neutral. A
+  computer offers no peace to one it presses or is hostile to. On the harder levels a human
+  counts as stronger than its army (`human_threat_percent`).
+- **Goal.** The economy in debt or with a falling income; military against a stronger rival
+  nearby that is hostile or at war with it, or as a conqueror that presses someone (a larger army,
+  `military_army_percent`); gold when a city nears the aristocrats without a gold mine; land as a
+  settler, or with 8000 gold and fewer than three cities, once the home city is past its second
+  stage; else the economy. A goal holds ten minutes, unless debt or a threat end it sooner.
+
+The stances and the goal steer the army, the colonies and the peace offers so far; the war plans
+will follow them.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything

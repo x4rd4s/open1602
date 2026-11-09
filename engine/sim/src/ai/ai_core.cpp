@@ -144,6 +144,11 @@ bool Engine::accepts(const State& state) const {
                 return false;
             }
         }
+        const Strategy& st = p.strategy;
+        if (st.character > character::kCount || st.goal > goal::kLand || st.stances.size() > seen.size() ||
+            std::any_of(st.stances.begin(), st.stances.end(), [](std::uint8_t x) { return x > stance::kHostile; })) {
+            return false;
+        }
     }
     return true;
 }
@@ -234,6 +239,9 @@ void Engine::tick(std::uint32_t dt_ms) {
             p.diplomacy_due = false;
             diplomacy(p);
             check_city_loss(p);
+        }
+        if (rivals() && !p.pirates && p.has_plan && now_ms() >= p.strategy.next_ms) {
+            plan_strategy(p);
         }
     }
 }
@@ -781,6 +789,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
     for (const ai::AiPlayer& p : m_state->players) {
+        if (p.strategy.character != ai::character::kNone) {
+            return static_cast<std::uint16_t>(ai::kStateWithStrategy);
+        }
+    }
+    for (const ai::AiPlayer& p : m_state->players) {
         if (p.fleet_ms != 0 || !p.left_islands.empty()) {
             return static_cast<std::uint16_t>(ai::kStateWithLeftIslands);
         }
@@ -865,6 +878,8 @@ std::vector<ComputerPlayers::View> ComputerPlayers::view() const {
         v.settling = p.settle.active;
         v.settle_failed = p.settle.failed;
         v.stack = p.stack;
+        v.character = p.strategy.character;
+        v.goal = p.strategy.goal;
         for (const ai::CityPlan& r : p.plans) {
             View::City c{r.island, r.city, r.stage, r.flags, {}};
             for (std::size_t k = 0; k < ai::kSlots + m_engine->package_needs().size(); ++k) {

@@ -582,6 +582,18 @@ private:
     [[nodiscard]] std::optional<std::uint16_t> next_watched_island();
     void island_controller();
     void diplomacy(AiPlayer& p);
+    // Strategy (ai_strategy.cpp), improved computers only.
+    /// Draws the character once, then looks at every rival: the stances and the goal.
+    void plan_strategy(AiPlayer& p);
+    /// The armies and the fleets' cannons of `owner`, weighted as stronger() does.
+    [[nodiscard]] std::uint32_t strength(PlayerId owner) const;
+    /// strength(), a human's raised on the harder levels (Balance::ai_human_threat_percent).
+    [[nodiscard]] std::uint32_t threat_of(PlayerId owner) const;
+    [[nodiscard]] std::uint8_t stance_of(const AiPlayer& p, PlayerId other) const;
+    /// The gold in hand an improved computer founds a colony with: less while it is after land.
+    [[nodiscard]] std::int32_t colony_money(const AiPlayer& p) const;
+    /// The share in percent of the army target the character and the goal ask for.
+    [[nodiscard]] std::uint32_t army_percent(const AiPlayer& p) const;
     void pirate_step(AiPlayer& p);
     void pirate_develop(AiPlayer& p);
 

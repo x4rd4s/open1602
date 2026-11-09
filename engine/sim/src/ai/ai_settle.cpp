@@ -19,7 +19,6 @@ namespace {
 
 constexpr std::uint64_t kColonyCooldownMs = 60'000;  // 60 s between settlement events
 constexpr std::int32_t kNeedStep = 50;
-constexpr std::int32_t kColonyMoney = 3000;         // improved computers: gold in hand to found a colony
 constexpr std::uint64_t kLeftIslandMs = 2'700'000;  // improved computers: 45 min before they settle a left island again
 constexpr std::uint32_t kPirateRegionPasses = 6;    // passes a further nest keeps to a part without one
 constexpr std::uint8_t kLandRetries = 4;
@@ -1060,7 +1059,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     }
     // Open1602: an improved computer founds a colony only with the gold to build it up; founded
     // with its last gold, the colony stood empty and was given up.
-    if (!classic() && player(p).money < kColonyMoney) {
+    if (!classic() && player(p).money < colony_money(p)) {
         return false;
     }
     const std::uint32_t n = p.cities;
