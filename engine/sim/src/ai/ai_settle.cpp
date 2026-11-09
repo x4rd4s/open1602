@@ -89,14 +89,12 @@ bool Engine::free_deposit(std::uint16_t island, std::uint8_t w) const {
 
 bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     // Open1602, improved computers: an island with a city of a small rival (two cities at most),
-    // that the original's computers never settle, when it has what the colony looks for: the crop,
-    // or a free vein of ore or gold. Not next to a partner or an ally, not next to a rival stronger
-    // than itself, and never on an island with a city of its own.
+    // that the original's computers never settle, when it has a free vein of the ore or gold the
+    // colony looks for. Not next to a partner or an ally, not next to a rival stronger than itself,
+    // and never on an island with a city of its own.
     const std::uint8_t crop = p.settle.crop;
-    if (!rivals() || p.pirates || crop == 0 || !knows_crops(p, island)) {
-        return false;
-    }
-    if ((crop == ware::kOre || crop == ware::kGold) && !free_deposit(island, crop)) {
+    if (!rivals() || p.pirates || (crop != ware::kOre && crop != ware::kGold) || !knows_crops(p, island) ||
+        !free_deposit(island, crop)) {
         return false;
     }
     const std::uint32_t own = strength(p.player);
@@ -236,7 +234,7 @@ void Engine::pick_island(AiPlayer& p) {
         if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need}) {
             continue;
         }
-        if (!island_allowed(p, i)) {
+        if (!island_allowed(p, i) && s.island != i) {
             log(p, "contests island %u for crop %u", i, s.crop);
         }
         s.island = i;
@@ -1126,9 +1124,7 @@ bool Engine::wants_room(const AiPlayer& p) const {
     if (p.cities == 0 || p.max_stage < stage::kCitizens || p.settle.active) {
         return false;
     }
-    // Open1602: with land as its goal, an improved computer settles on after half the pause.
-    const std::uint64_t pause = rivals() && p.strategy.goal == goal::kLand ? kRoomPauseMs / 2 : kRoomPauseMs;
-    if (now_ms() - p.settle.last_ms < pause || p.cities >= city_limit()) {
+    if (now_ms() - p.settle.last_ms < kRoomPauseMs || p.cities >= city_limit()) {
         return false;
     }
     if (p.settle.ship != 0) {
