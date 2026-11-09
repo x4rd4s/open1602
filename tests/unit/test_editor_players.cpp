@@ -399,3 +399,17 @@ TEST_CASE("editor players: the natives and the pirates come to a map that lacks 
     CHECK(!editor::can_add_party(full, Neutral::Natives));
     CHECK(!editor::can_add_party(full, Neutral::Pirates));
 }
+
+TEST_CASE("editor players: the test game is played as the player chosen, the other humans as computers") {
+    sim::World world = seven_slots();
+    world.player(2)->role = sim::PlayerRole::Human;
+    CHECK(sim::first_human_player(world) == 0);
+    CHECK(editor::test_as(world, 3));
+    CHECK(world.players()[3].role == sim::PlayerRole::Human);
+    CHECK(world.players()[0].role == sim::PlayerRole::Computer);
+    CHECK(world.players()[2].role == sim::PlayerRole::Computer);
+    CHECK(sim::first_human_player(world) == 3);
+    // Not a human's or computer's slot: nothing changes.
+    CHECK(!editor::test_as(world, 5));
+    CHECK(world.players()[5].role == sim::PlayerRole::Neutral);
+}

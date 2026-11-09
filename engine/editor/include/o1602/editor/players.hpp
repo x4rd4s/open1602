@@ -73,6 +73,12 @@ struct PlayerValues {
 /// has, and (Unsupported) while the player owns a city, ship or soldier.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world);
 
+/// `world` (a game started from the scenario) played as `player`, a human or computer of
+/// player_slots(): it becomes the human, the other humans computers, so that the game's player
+/// (sim::first_human_player) is it. For the editor's test game; false (nothing changed) for no
+/// such player.
+bool test_as(sim::World& world, sim::PlayerId player);
+
 /// The slot the neutral buildings' player takes (sim::FactionBehaviour::Neutral): behind the slots
 /// of every human and computer, so that adding and taking them away leaves it where it is.
 inline constexpr sim::PlayerId kNeutralSlot = static_cast<sim::PlayerId>(sim::kMaxPlayerSlots);

@@ -57,7 +57,13 @@ enum class BuildRefusal : std::uint8_t {
     ShipTooFar,  ///< founding from a ship: the ship is more than 16 tiles away
     Immovable,   ///< moving: the building cannot be moved (movable_at)
     Neutral,     ///< the neutral buildings: no Kontor, no market
+    /// A watchtower: an enemy soldier stands within its range and kTowerGraceTiles more
+    /// (OriginalBugs::towers_near_enemies brings the original's way back).
+    EnemyNear,
 };
+
+/// How far beyond a watchtower's range an enemy soldier keeps it from being built, in tiles.
+inline constexpr std::int32_t kTowerGraceTiles = 2;
 
 [[nodiscard]] const char* refusal_name(BuildRefusal refusal) noexcept;
 

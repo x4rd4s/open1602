@@ -359,6 +359,27 @@ struct Planner {
     /// city (neutral_city()).
     bool neutral = false;
 
+    /// Whether a soldier of a player at war with the order's player stands on the island within
+    /// `reach` tiles of the footprint (from its nearest tile).
+    [[nodiscard]] bool enemy_near(const Footprint& f, std::int32_t reach) const {
+        const std::int64_t left = (std::int64_t{island.x} + f.x) * kPosUnit;
+        const std::int64_t top = (std::int64_t{island.y} + f.y) * kPosUnit;
+        const std::int64_t right = left + std::int64_t{f.w} * kPosUnit;
+        const std::int64_t bottom = top + std::int64_t{f.h} * kPosUnit;
+        const std::int64_t r = std::int64_t{reach} * kPosUnit;
+        for (const Soldier& s : world.soldiers()) {
+            if (s.island != order.island || !world.diplomacy().hostile(order.player, s.owner)) {
+                continue;
+            }
+            const std::int64_t dx = std::max({left - s.pos_x, std::int64_t{0}, s.pos_x - right});
+            const std::int64_t dy = std::max({top - s.pos_y, std::int64_t{0}, s.pos_y - bottom});
+            if (dx * dx + dy * dy <= r * r) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether the footprint fits (with the fixes of Open1602).
     BuildRefusal can_place(const assets::BuildingType& b, std::uint8_t city_of_tiles, std::uint8_t rotation,
                            std::int32_t x, std::int32_t y) const {
@@ -406,6 +427,12 @@ struct Planner {
         if (std::find(kNoUnitCheck.begin(), kNoUnitCheck.end(), b.kind) == kNoUnitCheck.end() &&
             units.in_the_way(world, island, f)) {
             return BuildRefusal::UnitInTheWay;
+        }
+        // Open1602: no watchtower under the eyes of an enemy, its range and a little more. The
+        // editor places what it is told.
+        if (b.prod_kind == prod::kTower && !order.free && !world.original_bugs().towers_near_enemies &&
+            enemy_near(f, std::int32_t{b.radius} + kTowerGraceTiles)) {
+            return BuildRefusal::EnemyNear;
         }
         return BuildRefusal::None;
     }
@@ -684,6 +711,8 @@ const char* refusal_name(BuildRefusal r) noexcept {
             return "the city has a Kontor";
         case BuildRefusal::Neutral:
             return "no Kontor or market for the neutral buildings";
+        case BuildRefusal::EnemyNear:
+            return "an enemy soldier is near";
         case BuildRefusal::NoCoast:
             return "no coast";
         case BuildRefusal::NoDeposit:
