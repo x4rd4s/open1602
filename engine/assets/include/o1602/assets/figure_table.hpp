@@ -11,9 +11,10 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/game_data.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -165,8 +166,8 @@ public:
     /// Ship flags by player colour: FAHNE1..4, FAHNEPIRAT.
     static constexpr std::array<std::uint32_t, 5> kFlagFigures = figure::kFlags;
 
-    static core::Result<FigureTable> from_cod(const cod::Document& figuren);
-    static core::Result<FigureTable> load(const GameDirectory& game);
+    static annokit::core::Result<FigureTable> from_cod(const cod::Document& figuren);
+    static annokit::core::Result<FigureTable> load(const GameDirectory& game);
 
     /// Upkeep of soldiers per unit type (FIGTYP 1..4: swordsman, rider, musketeer, gunner) and of
     /// a cannon tower, gold per minute (`Soldat:` / `Turm:` lines of figuren.cod).
@@ -194,17 +195,17 @@ public:
     /// Adds a copy of `like` under the highest free number below kMaxFigures (figures of a
     /// package's own, own_figures.hpp): from the top down, so that a modded figuren.cod keeps the
     /// numbers after the original's. The number, or an error when every one is taken.
-    core::Result<std::uint32_t> add(const FigureType& like);
+    annokit::core::Result<std::uint32_t> add(const FigureType& like);
     /// Adds a unit family of a package: one copy per player colour (`colours`, red, blue, yellow and
     /// white) under the highest kUnitVariants consecutive free numbers below kMaxFigures, and lets
     /// castles train it (unit_families). The number of its red figure, or an error when there is no
     /// room.
-    core::Result<std::uint32_t> add_unit_family(std::span<const FigureType> colours);
+    annokit::core::Result<std::uint32_t> add_unit_family(std::span<const FigureType> colours);
     /// Adds a ship of a package that shipyards build beside the original's ship of `type` (an index
     /// of figure::kShips): the ship and its wreck (`ship_and_wreck`, as the original's ship is
     /// followed by its wreck) under the highest two consecutive free numbers below kMaxFigures.
     /// The ship's number, or an error when there is no room or `type` is no ship type.
-    core::Result<std::uint32_t> add_ship(std::span<const FigureType> ship_and_wreck, std::uint8_t type);
+    annokit::core::Result<std::uint32_t> add_ship(std::span<const FigureType> ship_and_wreck, std::uint8_t type);
     /// The ship type (an index of figure::kShips) of a ship shipyards build: the original's or a
     /// package's (add_ship); nothing for other figures.
     [[nodiscard]] std::optional<std::uint8_t> ship_type_of(std::uint32_t figure) const noexcept {

@@ -12,11 +12,12 @@
 #include <string>
 #include <vector>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/editor/history.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/world.hpp"
@@ -37,18 +38,18 @@ public:
     /// Problems that do not stop it are added to `warnings`. With the `figures` an Open1602 file
     /// whose running game cannot be read is refused (sim::read_game). Files of the original need
     /// the `game` (its islands); without it only Open1602's open.
-    [[nodiscard]] static core::Result<sim::World> read(std::span<const std::uint8_t> bytes,
-                                                       const assets::BuildingTable& buildings,
-                                                       const assets::GameDirectory* game,
-                                                       std::vector<std::string>* warnings = nullptr,
-                                                       const assets::FigureTable* figures = nullptr);
+    [[nodiscard]] static annokit::core::Result<sim::World> read(std::span<const std::uint8_t> bytes,
+                                                                const assets::BuildingTable& buildings,
+                                                                const assets::GameDirectory* game,
+                                                                std::vector<std::string>* warnings = nullptr,
+                                                                const assets::FigureTable* figures = nullptr);
 
     /// Opens a file as read() reads it.
-    [[nodiscard]] static core::Result<Document> open(std::span<const std::uint8_t> bytes,
-                                                     const assets::BuildingTable& buildings,
-                                                     const assets::GameDirectory* game,
-                                                     std::vector<std::string>* warnings = nullptr,
-                                                     const assets::FigureTable* figures = nullptr);
+    [[nodiscard]] static annokit::core::Result<Document> open(std::span<const std::uint8_t> bytes,
+                                                              const assets::BuildingTable& buildings,
+                                                              const assets::GameDirectory* game,
+                                                              std::vector<std::string>* warnings = nullptr,
+                                                              const assets::FigureTable* figures = nullptr);
 
     [[nodiscard]] const sim::World& world() const noexcept { return *m_world; }
 
@@ -70,13 +71,13 @@ public:
     /// empty description (ScenarioInfo) first, as one step of the history. Refused, with nothing
     /// changed, while the world does not hold together (sim::validate) or its description or
     /// markers are wrong. Saving makes the document unmodified.
-    [[nodiscard]] core::Result<core::Bytes> save(const assets::BuildingTable& buildings);
+    [[nodiscard]] annokit::core::Result<annokit::core::Bytes> save(const assets::BuildingTable& buildings);
 
     /// The file of the document as an Open1602 savegame: the running game it was opened as (its
     /// state kept), marked as changed in the editor (World::GameSettings::edited), so that it
     /// enters no list of best results. Refused while the world does not hold together. Saving
     /// makes the document unmodified.
-    [[nodiscard]] core::Result<core::Bytes> save_game(const assets::BuildingTable& buildings);
+    [[nodiscard]] annokit::core::Result<annokit::core::Bytes> save_game(const assets::BuildingTable& buildings);
 
     /// What is wrong with the scenario's own parts (description, markers, script), one line each.
     [[nodiscard]] std::vector<std::string> check_scenario() const;

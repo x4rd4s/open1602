@@ -12,8 +12,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -119,8 +119,8 @@ PlayerValues player_values(const sim::Player& player) {
     return v;
 }
 
-core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world, sim::PlayerId player,
-                                                    const PlayerValues& values) {
+annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world, sim::PlayerId player,
+                                                             const PlayerValues& values) {
     const sim::Player* p = world.player(player);
     if (p == nullptr || !playing(*p)) {
         return make_error(ErrorCode::NotFound, "no human or computer in slot " + std::to_string(player));
@@ -160,7 +160,7 @@ core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world, sim
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_change"));
 }
 
-core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world) {
+annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world) {
     const std::vector<sim::PlayerId> slots = player_slots(world);
     if (slots.size() >= sim::kMaxPlayers) {
         return make_error(ErrorCode::LimitExceeded,
@@ -208,7 +208,7 @@ core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world) {
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_add"));
 }
 
-core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world) {
     const std::vector<sim::PlayerId> slots = player_slots(world);
     if (slots.empty() || slots.back() < sim::kOriginalPlayers) {
         return make_error(ErrorCode::Unsupported, "the first four slots stay");
@@ -283,7 +283,7 @@ sim::PlayerId add_neutral_player(sim::World& world) {
     return static_cast<sim::PlayerId>(world.players().size() - 1);
 }
 
-core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world) {
+annokit::core::Result<std::unique_ptr<Operation>> add_neutral(const sim::World& world) {
     if (neutral_player(world) != sim::kNoPlayer) {
         return make_error(ErrorCode::Unsupported, "the world has the neutral buildings' player already");
     }
@@ -299,8 +299,8 @@ Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {
     return Relations{r.peace == sim::Treaty::Signed, r.trade == sim::Treaty::Signed};
 }
 
-core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b,
-                                                       Relations r) {
+annokit::core::Result<std::unique_ptr<Operation>> set_relations(const sim::World& world, sim::PlayerId a,
+                                                                sim::PlayerId b, Relations r) {
     const sim::Player* pa = world.player(a);
     const sim::Player* pb = world.player(b);
     if (pa == nullptr || pb == nullptr || !playing(*pa) || !playing(*pb)) {
@@ -369,8 +369,8 @@ NeutralRelations neutral_relations(const sim::World& world, sim::PlayerId player
     return r;
 }
 
-core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world, sim::PlayerId player,
-                                                               Neutral party, const NeutralRelations& r) {
+annokit::core::Result<std::unique_ptr<Operation>> set_neutral_relations(const sim::World& world, sim::PlayerId player,
+                                                                        Neutral party, const NeutralRelations& r) {
     const sim::Player* p = world.player(player);
     const std::vector<sim::PlayerId> slots = party_slots(world, party);
     if (p == nullptr || !playing(*p) || slots.empty()) {

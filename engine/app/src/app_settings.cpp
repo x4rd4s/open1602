@@ -9,7 +9,8 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -78,11 +79,11 @@ std::string clean_name(std::string_view text) {
 }
 
 std::string from_file(std::string_view value) {
-    return clean_name(core::is_utf8(value) ? core::utf8_to_cp1252(value) : std::string(value));
+    return clean_name(annokit::core::is_utf8(value) ? annokit::core::utf8_to_cp1252(value) : std::string(value));
 }
 
 std::string to_file(std::string_view name) {
-    return core::cp1252_to_utf8(clean_name(name));
+    return annokit::core::cp1252_to_utf8(clean_name(name));
 }
 
 std::string flags_text(const std::array<bool, audio::kMessageKinds>& a) {
@@ -138,7 +139,7 @@ std::optional<std::uint64_t> parse_player_id(std::string_view text) {
 AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
     AppSettings s = defaults;
     bool songs_listed = false;
-    for_lines(core::skip_utf8_bom(text), [&](std::string_view line) {
+    for_lines(annokit::core::skip_utf8_bom(text), [&](std::string_view line) {
         if (line.empty() || line.front() == '#') {
             return;
         }
@@ -316,7 +317,7 @@ void SaveSlots::set(std::size_t slot, std::string name, std::uint8_t human_playe
 
 SaveSlots parse_slots(std::string_view text) {
     SaveSlots slots;
-    for_lines(core::skip_utf8_bom(text), [&](std::string_view line) {
+    for_lines(annokit::core::skip_utf8_bom(text), [&](std::string_view line) {
         if (line.empty() || line.front() == '#') {
             return;
         }
@@ -374,7 +375,7 @@ void read_slot_meta(SaveSlots& slots, const std::filesystem::path& folder, std::
             continue;
         }
         // Only the head of each file: a list of large games starts quickly (FB-15).
-        if (const auto head = core::read_file_head(slot_file(folder, i), sim::kSaveInfoHead)) {
+        if (const auto head = annokit::core::read_file_head(slot_file(folder, i), sim::kSaveInfoHead)) {
             if (const auto info = sim::save_info(head->bytes, head->size)) {
                 slots.meta[i] = info->meta;
             }

@@ -11,10 +11,11 @@
 #include "../unit/test_support.hpp"
 #include "sdl_support.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+#include "annokit/platform/window.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
-#include "o1602/platform/window.hpp"
 #include "o1602/render/sdl_ui_renderer.hpp"
 #include "o1602/ui/font.hpp"
 #include "o1602/ui/package_icons.hpp"
@@ -48,7 +49,7 @@ struct GameFolder {
 
     void write(const std::string& name, const std::vector<std::uint8_t>& bytes) const {
         std::filesystem::create_directories((root / name).parent_path());
-        REQUIRE(core::write_file(root / name, bytes).ok());
+        REQUIRE(annokit::core::write_file(root / name, bytes).ok());
     }
     [[nodiscard]] assets::GameDirectory game() const {
         auto game = assets::GameDirectory::open(root);
@@ -306,9 +307,10 @@ TEST_CASE("sdl ui renderer: after the textures are released everything is drawn 
 
 TEST_CASE("sdl ui renderer: after the window's renderer is made again it draws with the new one") {
     test::use_dummy_drivers();
-    auto sdl = platform::SdlSystem::init();
+    auto sdl = annokit::platform::SdlSystem::init();
     REQUIRE(sdl.ok());
-    auto window = platform::Window::create(platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
+    auto window =
+        annokit::platform::Window::create(annokit::platform::WindowConfig{.width = 64, .height = 48, .vsync = false});
     REQUIRE(window.ok());
     const GameFolder folder;
     render::SdlUiRenderer ui{(*window)->sdl_renderer(), folder.game(), test::make_palette(), ui::ArtSize::Large};
@@ -384,7 +386,7 @@ TEST_CASE("sdl ui renderer: a sprite of the original a package draws anew is its
         rgba[i + 1] = 200;
         rgba[i + 3] = 255;
     }
-    REQUIRE(core::write_png_rgba(png, 3, 5, rgba).ok());
+    REQUIRE(annokit::core::write_png_rgba(png, 3, 5, rgba).ok());
     assets::PackageIcon icon;
     icon.id = "test:button";
     icon.sprite = assets::kFirstPackageIcon;

@@ -14,8 +14,9 @@
 #include <span>
 #include <vector>
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/sim/simulation.hpp"
 
 namespace o1602::sim {
@@ -30,12 +31,12 @@ struct ScheduledCommand {
     Command command;
 };
 
-void write_command(core::ByteWriter& out, const Command& command);
+void write_command(annokit::core::ByteWriter& out, const Command& command);
 /// Reads one command; nothing if the bytes are cut off, of an unknown kind or out of range.
-[[nodiscard]] std::optional<Command> read_command(core::ByteReader& in);
+[[nodiscard]] std::optional<Command> read_command(annokit::core::ByteReader& in);
 
-void write_scheduled(core::ByteWriter& out, const ScheduledCommand& command);
-[[nodiscard]] std::optional<ScheduledCommand> read_scheduled(core::ByteReader& in);
+void write_scheduled(annokit::core::ByteWriter& out, const ScheduledCommand& command);
+[[nodiscard]] std::optional<ScheduledCommand> read_scheduled(annokit::core::ByteReader& in);
 
 /// Convenience: one command as a block of bytes and back (the whole block must be used).
 [[nodiscard]] std::vector<std::uint8_t> encode_command(const Command& command);

@@ -15,13 +15,14 @@
 #include "mod_rules.hpp"
 #include "tool.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/sim/balance.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -162,8 +163,8 @@ int cmd_bench(const Args& args) {
         const fs::path mods(std::string(it->second));
         std::error_code ec;
         if (!fs::is_directory(mods, ec)) {
-            return fail(
-                core::make_error(core::ErrorCode::NotFound, std::string(it->second) + ": no folder of packages"));
+            return fail(annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                                  std::string(it->second) + ": no folder of packages"));
         }
         std::vector<std::string> problems;
         packages = assets::load_mod_packages(mods, problems);
@@ -178,7 +179,7 @@ int cmd_bench(const Args& args) {
     const assets::BuildingTable original_buildings = *buildings;
     const assets::FigureTable original_figures = *figures;
     std::vector<std::string> warnings;
-    const auto use_rules = [&](core::Result<sim::World> world) {
+    const auto use_rules = [&](annokit::core::Result<sim::World> world) {
         if (world && rules) {
             world->set_factions(rules->factions);
             world->replace_factions(rules->faction_replacements);
@@ -192,9 +193,9 @@ int cmd_bench(const Args& args) {
         }
         return world;
     };
-    const auto make_world = [&]() -> core::Result<sim::World> {
+    const auto make_world = [&]() -> annokit::core::Result<sim::World> {
         if (!args.positional.empty()) {
-            auto bytes = core::read_file(fs::path(args.positional[0]));
+            auto bytes = annokit::core::read_file(fs::path(args.positional[0]));
             if (!bytes) {
                 return bytes.error();
             }
@@ -280,8 +281,9 @@ int cmd_bench(const Args& args) {
         for (sim::PlayerId p = sim::first_human_player(*world); p != sim::kNoPlayer;
              p = sim::first_human_player(*world)) {
             if (!simulation->execute(sim::PlayerControl{p, true}).accepted) {
-                return fail(core::make_error(core::ErrorCode::Unsupported,
-                                             "player " + std::to_string(p) + " cannot be handed to the computer"));
+                return fail(
+                    annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                              "player " + std::to_string(p) + " cannot be handed to the computer"));
             }
             ++handed_over;
         }
@@ -395,7 +397,7 @@ int cmd_bench(const Args& args) {
         std::printf("peak memory %.0f MB\n", *memory);
     }
     if (const auto it = args.options.find("--out"); it != args.options.end()) {
-        if (auto status = core::write_file(fs::path(it->second), *save); !status) {
+        if (auto status = annokit::core::write_file(fs::path(it->second), *save); !status) {
             return fail(status.error());
         }
         std::printf("-> %s\n", std::string(it->second).c_str());

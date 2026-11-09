@@ -5,7 +5,8 @@
 #include <array>
 #include <string>
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -151,7 +152,7 @@ static_assert(kTexts.size() == static_cast<std::size_t>(MpText::StartNow) + 1, "
 std::string package_names(std::span<const assets::ContentPackage> packages) {
     std::string names;
     for (const assets::ContentPackage& p : packages) {
-        names += (names.empty() ? "" : ", ") + core::utf8_to_cp1252(assets::package_label(p));
+        names += (names.empty() ? "" : ", ") + annokit::core::utf8_to_cp1252(assets::package_label(p));
     }
     return names;
 }
@@ -169,7 +170,7 @@ std::string mp_text(MpText id) {
 std::string mp_log(MpText id, std::string_view value) {
     std::string out(mp_key(id));
     if (!value.empty()) {
-        out += " " + core::cp1252_to_utf8(value);
+        out += " " + annokit::core::cp1252_to_utf8(value);
     }
     return out;
 }

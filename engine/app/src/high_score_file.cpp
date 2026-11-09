@@ -3,12 +3,12 @@
 
 #include <cstddef>
 
-#include "o1602/core/text.hpp"
+#include "annokit/core/text.hpp"
 
 namespace o1602::app {
 
 std::filesystem::path file_name_of(std::string_view cp1252) {
-    std::string utf8 = core::cp1252_to_utf8(cp1252);
+    std::string utf8 = annokit::core::cp1252_to_utf8(cp1252);
     std::erase_if(utf8, [](char c) {
         return static_cast<unsigned char>(c) < 0x20 ||
                std::string_view("/\\:*?\"<>|").find(c) != std::string_view::npos;

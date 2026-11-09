@@ -2005,7 +2005,7 @@ void Logistics::robber_flee(Handle h, Walker& r) {
 
 namespace {
 
-void put_walker(core::ByteWriter& out, const Walker& w) {
+void put_walker(annokit::core::ByteWriter& out, const Walker& w) {
     out.u8(static_cast<std::uint8_t>(w.kind));
     out.u16(w.island);
     out.u16(w.figure);
@@ -2102,7 +2102,7 @@ Walker get_walker(StateIn& in, std::uint16_t version) {
 
 }  // namespace
 
-void Logistics::save(core::ByteWriter& out) const {
+void Logistics::save(annokit::core::ByteWriter& out) const {
     out.u32(m_walkers.slot_count());
     for (std::uint32_t i = 0; i < m_walkers.slot_count(); ++i) {
         out.u32(m_walkers.generation(i));
@@ -2130,9 +2130,10 @@ void Logistics::save(core::ByteWriter& out) const {
     }
 }
 
-core::Status Logistics::load(core::ByteReader& reader, std::uint16_t version) {
+annokit::core::Status Logistics::load(annokit::core::ByteReader& reader, std::uint16_t version) {
     if (version < 1 || version > kStateVersion) {
-        return core::make_error(core::ErrorCode::Unsupported, "LOGI: version " + std::to_string(version));
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "LOGI: version " + std::to_string(version));
     }
     StateIn in(reader);
     std::vector<std::pair<std::optional<Walker>, std::uint32_t>> slots;
@@ -2176,14 +2177,15 @@ core::Status Logistics::load(core::ByteReader& reader, std::uint16_t version) {
         *v = in.u64();
     }
     if (!in.ok()) {
-        return core::make_error(core::ErrorCode::InvalidFormat, "LOGI: figures cut off or not fitting the world");
+        return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                         "LOGI: figures cut off or not fitting the world");
     }
     m_walkers.restore(std::move(slots));
     m_jobs = std::move(jobs);
     m_reserved_tiles = std::move(tiles);
     m_stats = stats;
     m_hunt_calls.clear();
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 std::unordered_map<std::uint32_t, std::uint32_t> city_capacities(const World& world,

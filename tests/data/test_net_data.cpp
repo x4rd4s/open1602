@@ -11,11 +11,12 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/net/loopback.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/net/loopback.hpp"
 #include "o1602/net/session.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -79,7 +80,7 @@ struct Computer {
     Game game;
     std::unique_ptr<net::ClientSession> session;
 
-    Computer(const Data& d, net::LoopbackNetwork& network, std::string name) {
+    Computer(const Data& d, annokit::net::LoopbackNetwork& network, std::string name) {
         game.data = &d;
         net::Hello hello;
         hello.content = 1;
@@ -92,7 +93,7 @@ struct Computer {
 /// Runs a session of `world` for `minutes` of real time at `speed`, with a second computer coming
 /// in halfway; at the end the games of all must be the same at one frame.
 void play(const Data& d, sim::World world, sim::PlayerId host_seat, std::uint32_t minutes, std::uint32_t speed) {
-    net::LoopbackNetwork network(40, 20);
+    annokit::net::LoopbackNetwork network(40, 20);
     Game host_game;
     host_game.data = &d;
     host_game.start(std::move(world));

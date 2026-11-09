@@ -15,8 +15,9 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -97,6 +98,6 @@ inline constexpr std::int32_t kMaxGadgets = 4096;
                                      const std::function<std::optional<std::string>(std::string_view)>& include = {});
 
 /// Loads GADDATA/<name> of the game directory (case does not matter).
-[[nodiscard]] core::Result<GadgetLayout> load_gad(const GameDirectory& game, std::string_view name);
+[[nodiscard]] annokit::core::Result<GadgetLayout> load_gad(const GameDirectory& game, std::string_view name);
 
 }  // namespace o1602::assets

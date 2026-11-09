@@ -12,10 +12,11 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/palette.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::ui {
 
@@ -74,8 +75,8 @@ inline constexpr std::int32_t kTextBrightRed = 15;
 class Font {
 public:
     /// From a ZEI file of the game directory ("TOOLGFX/ZEI20V.ZEI").
-    static core::Result<Font> load(const assets::GameDirectory& game, std::string_view file);
-    static core::Result<Font> from_sheet(const assets::SpriteSheet& sheet);
+    static annokit::core::Result<Font> load(const assets::GameDirectory& game, std::string_view file);
+    static annokit::core::Result<Font> from_sheet(const assets::SpriteSheet& sheet);
 
     /// Font pixels per pixel of the 1024 x 768 design the layouts are made for: 1 for the large
     /// screen's fonts, 0.625 / 0.78125 for the small and medium ones (set by who loads the font).

@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <optional>
 
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
 
 namespace o1602::sim {
 
@@ -55,13 +55,13 @@ const PackageLandscape* find_package_landscape(std::span<const PackageLandscape>
 void apply_landscapes_file(std::vector<PackageLandscape>& presets, std::string_view package, std::string_view utf8,
                            std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kLandscapesFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
     std::size_t added = 0;
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: a preset's name holds only lower case letters, digits and '_'");
@@ -79,7 +79,7 @@ void apply_landscapes_file(std::vector<PackageLandscape>& presets, std::string_v
             return;
         }
         // `like` first, wherever it stands: the other fields change what it brings.
-        if (const core::DataValue* like = t.find("like")) {
+        if (const annokit::core::DataValue* like = t.find("like")) {
             const std::string* s = like->string();
             const auto from = s != nullptr ? landscape_of(presets, *s) : std::nullopt;
             if (from) {
@@ -90,7 +90,7 @@ void apply_landscapes_file(std::vector<PackageLandscape>& presets, std::string_v
                                    "<package>:<name>)");
             }
         }
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "like") {
                 continue;
@@ -101,7 +101,7 @@ void apply_landscapes_file(std::vector<PackageLandscape>& presets, std::string_v
                     warnings.push_back(field + "is a text of 1 to 64 bytes");
                 } else {
                     const std::string code = e.key == "title" ? std::string() : e.key.substr(6);
-                    preset.titles.insert_or_assign(code, core::utf8_to_cp1252(*s));
+                    preset.titles.insert_or_assign(code, annokit::core::utf8_to_cp1252(*s));
                 }
                 continue;
             }

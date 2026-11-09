@@ -18,11 +18,12 @@
 #include "../test_framework.hpp"
 #include "golden.hpp"
 
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/file.hpp"
 #include "o1602/sim/ai.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/logistics.hpp"
@@ -286,7 +287,7 @@ void run(sim::Simulation& s, std::uint32_t ms) {
 }
 
 std::vector<std::uint8_t> saved(const sim::ComputerPlayers& ai) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     ai.save(out);
     return out.take();
 }
@@ -532,7 +533,7 @@ TEST_CASE("ai arena: a game saved while the computers build goes on as if never 
 // or shorter (the golden value is for 60), O1602_HASH_OUT writes the hash of every minute to a file:
 // two platforms' files show the first minute they differ.
 TEST_CASE("ai arena: an hour of two computers develops the same on every platform (golden hash)") {
-    const auto minutes_text = core::environment_variable("O1602_DETERMINISM_MINUTES");
+    const auto minutes_text = annokit::core::environment_variable("O1602_DETERMINISM_MINUTES");
     const unsigned long minutes = minutes_text ? std::stoul(*minutes_text) : 60UL;
     Arena a;
     sim::Simulation s(a.world, a.buildings, a.figures);
@@ -560,7 +561,7 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
     CHECK(!s.state_damaged());
     CHECK(a.houses(kFirst) >= 100);
     CHECK(a.houses(kSecond) >= 100);
-    if (const auto path = core::environment_variable("O1602_HASH_OUT")) {
+    if (const auto path = annokit::core::environment_variable("O1602_HASH_OUT")) {
         std::ofstream(*path, std::ios::binary) << out;
     }
     if (minutes == 60) {

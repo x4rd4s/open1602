@@ -12,7 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/mission.hpp"
 #include "o1602/sim/world.hpp"
@@ -95,15 +96,17 @@ void step_goal(const sim::World& world, sim::Mission& m, GoalField field, bool f
 /// The mission `index` of `world` as `mission`; `index` one past the last adds it (up to
 /// kMaxMissions). Fails (NotFound) for an index beyond, (InvalidFormat) for a text the game could
 /// not show or that is too long, (LimitExceeded) for too many missions.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_mission(const sim::World& world, std::size_t index,
-                                                                   sim::Mission mission);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_mission(const sim::World& world, std::size_t index,
+                                                                            sim::Mission mission);
 /// Takes the mission `index` away: whoever held it holds none, those after it move down. Fails
 /// (NotFound) for no such mission.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> remove_mission(const sim::World& world, std::size_t index);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_mission(const sim::World& world,
+                                                                               std::size_t index);
 /// `player` (a human or computer) holding the mission `mission`, or none (sim::kNoMission). Fails
 /// (NotFound) for no such player or mission.
-[[nodiscard]] core::Result<std::unique_ptr<Operation>> set_mission_holder(const sim::World& world, sim::PlayerId player,
-                                                                          sim::MissionId mission);
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_mission_holder(const sim::World& world,
+                                                                                   sim::PlayerId player,
+                                                                                   sim::MissionId mission);
 
 /// Something about the missions that a scenario's author should know before the game starts.
 struct GoalProblem {

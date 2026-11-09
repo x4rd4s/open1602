@@ -9,8 +9,8 @@
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -42,7 +42,7 @@ std::string read_string(std::span<const std::uint8_t> d, std::size_t o, std::siz
 
 }  // namespace
 
-core::Result<std::vector<PlayerRecord>> load_players(const ChunkFile& file) {
+annokit::core::Result<std::vector<PlayerRecord>> load_players(const ChunkFile& file) {
     std::vector<PlayerRecord> players;
     const Chunk* chunk = file.find("PLAYER4");
     if (chunk == nullptr) {
@@ -118,7 +118,7 @@ void put_city_goal(std::vector<std::uint8_t>& d, std::size_t o, const MissionRec
 
 }  // namespace
 
-core::Result<std::vector<MissionRecord>> load_missions(const ChunkFile& file) {
+annokit::core::Result<std::vector<MissionRecord>> load_missions(const ChunkFile& file) {
     std::vector<MissionRecord> missions;
     const Chunk* chunk = file.find("AUFTRAG4");
     if (chunk == nullptr) {
@@ -200,7 +200,7 @@ std::vector<std::uint8_t> encode_mission(const MissionRecord& m) {
     return d;
 }
 
-core::Result<std::vector<ShipRecord>> load_ships(const ChunkFile& file) {
+annokit::core::Result<std::vector<ShipRecord>> load_ships(const ChunkFile& file) {
     std::vector<ShipRecord> ships;
     const Chunk* chunk = file.find("SHIP4");
     if (chunk == nullptr) {
@@ -257,7 +257,7 @@ core::Result<std::vector<ShipRecord>> load_ships(const ChunkFile& file) {
     return ships;
 }
 
-core::Result<std::vector<TraderRecord>> load_traders(const ChunkFile& file) {
+annokit::core::Result<std::vector<TraderRecord>> load_traders(const ChunkFile& file) {
     constexpr std::size_t kSize = 0x25C;
     constexpr std::size_t kGoods = 50;
     std::vector<TraderRecord> traders;
@@ -293,7 +293,7 @@ core::Result<std::vector<TraderRecord>> load_traders(const ChunkFile& file) {
     return traders;
 }
 
-core::Result<std::optional<ScenarioPlan>> load_scenario_plan(const ChunkFile& file) {
+annokit::core::Result<std::optional<ScenarioPlan>> load_scenario_plan(const ChunkFile& file) {
     const Chunk* chunk = file.find("SZENE");
     if (chunk == nullptr) {
         return std::optional<ScenarioPlan>{};

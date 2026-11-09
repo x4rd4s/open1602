@@ -4,14 +4,15 @@
 #include <algorithm>
 #include <charconv>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/rda_archive.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -121,8 +122,8 @@ std::optional<std::pair<std::string_view, std::size_t>> element_text(std::string
 
 }  // namespace
 
-core::Result<HistoryTexts> HistoryTexts::parse(std::string_view xml) {
-    xml = core::skip_utf8_bom(xml);
+annokit::core::Result<HistoryTexts> HistoryTexts::parse(std::string_view xml) {
+    xml = annokit::core::skip_utf8_bom(xml);
     HistoryTexts texts;
     // <language languageID="16">de_de</language>
     for (std::size_t at = xml.find("<language "); at != std::string_view::npos; at = xml.find("<language ", at + 1)) {
@@ -170,14 +171,14 @@ core::Result<HistoryTexts> HistoryTexts::parse(std::string_view xml) {
     return texts;
 }
 
-core::Result<HistoryTexts> HistoryTexts::load(const std::filesystem::path& rda) {
+annokit::core::Result<HistoryTexts> HistoryTexts::load(const std::filesystem::path& rda) {
     auto archive = RdaArchive::open(rda);
     if (!archive) {
         return archive.error();
     }
     auto bytes = archive->read(kTextsFile);
     if (!bytes) {
-        return make_error(bytes.error().code, core::path_to_utf8(rda) + ": " + bytes.error().message);
+        return make_error(bytes.error().code, annokit::core::path_to_utf8(rda) + ": " + bytes.error().message);
     }
     return parse(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
 }

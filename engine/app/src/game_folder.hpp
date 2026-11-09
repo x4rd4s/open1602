@@ -13,15 +13,16 @@
 #include <string>
 #include <string_view>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::app {
 
 struct GameFolderSearch {
     /// The installation found; if none, `error` says why and `ask` whether the player may choose one.
     std::optional<assets::GameDirectory> game;
-    core::Error error{core::ErrorCode::NotFound, {}};
+    annokit::core::Error error{annokit::core::ErrorCode::NotFound, {}};
     /// No folder was named (or only the saved one, which no longer counts): the folder dialog may ask.
     bool ask = false;
     /// The saved folder that no longer counts, for the dialog to say so; empty if there was none.
@@ -36,7 +37,7 @@ struct GameFolderSearch {
 
 /// The folder the player chose in the dialog, or the single installation directly inside it (a
 /// player who picks "GOG Games" means the "Anno 1602" folder in it).
-[[nodiscard]] core::Result<assets::GameDirectory> open_chosen_folder(const std::filesystem::path& folder);
+[[nodiscard]] annokit::core::Result<assets::GameDirectory> open_chosen_folder(const std::filesystem::path& folder);
 
 /// Why `folder` is no installation, in the current language (UTF-8, for the system's dialogs): it
 /// does not exist, it holds several installations (the player chooses one), or a file of the game

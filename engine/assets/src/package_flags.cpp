@@ -3,8 +3,9 @@
 
 #include <algorithm>
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/package_arms.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -24,12 +25,12 @@ const PackageFlag* find_package_flag(std::span<const PackageFlag> flags, std::st
 void apply_flags_file(std::vector<PackageFlag>& flags, std::string_view package, std::string_view utf8,
                       std::span<const PackageImage> images, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kFlagsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_banner_id(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: names no banner (\"anno1602:red\", \"open1602:orange\", ...)");
@@ -38,7 +39,7 @@ void apply_flags_file(std::vector<PackageFlag>& flags, std::string_view package,
         const PackageImage* image = nullptr;
         bool tint = false;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "image") {
                 const std::string* s = e.value.string();

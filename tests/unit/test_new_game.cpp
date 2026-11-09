@@ -508,7 +508,7 @@ TEST_CASE("new game: settings without a level are refused") {
     o.difficulty = sim::NewGameOptions::kDifficulties;
     auto difficulty = sim::start_new_game(fake.game, buildings(), texts(), o);
     REQUIRE(!difficulty.ok());
-    CHECK(difficulty.error().code == core::ErrorCode::OutOfRange);
+    CHECK(difficulty.error().code == annokit::core::ErrorCode::OutOfRange);
     o = options(1);
     o.layout = sim::NewGameOptions::kLayouts;
     CHECK(!sim::start_new_game(fake.game, buildings(), texts(), o).ok());
@@ -516,7 +516,7 @@ TEST_CASE("new game: settings without a level are refused") {
     o.layout = 0;  // Endlosspiel10.szs is not there
     auto missing = sim::start_new_game(fake.game, buildings(), texts(), o);
     REQUIRE(!missing.ok());
-    CHECK(missing.error().code == core::ErrorCode::NotFound);
+    CHECK(missing.error().code == annokit::core::ErrorCode::NotFound);
 }
 
 TEST_CASE("new game: a multiplayer endless game starts every player with the small trading cog") {
@@ -546,7 +546,7 @@ TEST_CASE("new game: a multiplayer endless game starts every player with the sma
     o.layout = 2;  // Endlosspiel12.szm is not there
     auto missing = sim::start_new_game(fake.game, buildings(), texts(), o);
     REQUIRE(!missing.ok());
-    CHECK(missing.error().code == core::ErrorCode::NotFound);
+    CHECK(missing.error().code == annokit::core::ErrorCode::NotFound);
 }
 
 TEST_CASE("new game: the levels of an installation in another language are found by their scenario") {
@@ -565,7 +565,7 @@ TEST_CASE("new game: the levels of an installation in another language are found
     CHECK(multi->path.filename() == "Endless Game00.szm");
     const auto missing = sim::find_endless_file(fake.game, 1, 2, true);
     REQUIRE(!missing.ok());
-    CHECK(missing.error().code == core::ErrorCode::NotFound);
+    CHECK(missing.error().code == annokit::core::ErrorCode::NotFound);
 
     // The game is that of the German installation, under the installation's name.
     auto world = sim::start_new_game(fake.game, buildings(), texts(), options(7));

@@ -3,10 +3,11 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/savegame.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
 #include "o1602/render/land_figures.hpp"
 #include "o1602/render/walker_figures.hpp"
 #include "o1602/sim/logistics.hpp"
@@ -333,18 +334,18 @@ TEST_CASE("logistics: a saved walker whose buildings do not exist is refused") {
     sim::Logistics logistics(town.world, town.buildings, town.figures);
     logistics.handle(needs(town.index(16, 6), kFlour));
     REQUIRE(logistics.walkers().size() == 1);
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     logistics.save(out);
     const auto loads = [&](const std::vector<std::uint8_t>& bytes) {
         sim::Logistics other(town.world, town.buildings, town.figures);
-        core::ByteReader reader(bytes);
+        annokit::core::ByteReader reader(bytes);
         return other.load(reader, 2);
     };
     CHECK(loads(out.data()));
     // Slot count, generation, present, kind, island, figure, city, then the home (offset 15) and,
     // after the home tile and the "has source" flag, the source (offset 28).
     for (const std::size_t offset : {std::size_t{15}, std::size_t{28}}) {
-        core::ByteWriter damaged;
+        annokit::core::ByteWriter damaged;
         damaged.bytes(out.data());
         damaged.patch_u32(offset, 0x7FFFFFFFU);
         CHECK(!loads(damaged.data()));

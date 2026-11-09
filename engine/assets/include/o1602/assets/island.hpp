@@ -10,8 +10,9 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -196,6 +197,6 @@ inline constexpr std::string_view kLargeTilesChunk = "O1602HAUS";
 [[nodiscard]] std::vector<std::uint8_t> large_tile_bytes(const std::vector<IslandTile>& tiles);
 
 /// Extracts all islands from a chunk file (.SCP island template, .SZS/.SZM scenario, .GAM savegame).
-core::Result<std::vector<Island>> load_islands(const ChunkFile& file);
+annokit::core::Result<std::vector<Island>> load_islands(const ChunkFile& file);
 
 }  // namespace o1602::assets

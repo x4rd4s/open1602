@@ -26,10 +26,11 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/result.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::sim {
@@ -42,7 +43,7 @@ inline constexpr std::string_view kExtensionChunk = "O1602";
 /// Size of a world other than the original's 500 x 350 (u32 width, u32 height): a chunk of its own,
 /// read before the islands are placed.
 inline constexpr std::string_view kMapChunk = "O1602MAP";
-[[nodiscard]] core::Bytes encode_map_size(std::uint32_t width, std::uint32_t height);
+[[nodiscard]] annokit::core::Bytes encode_map_size(std::uint32_t width, std::uint32_t height);
 /// The size the file's O1602MAP gives, nothing without one (or a damaged one).
 [[nodiscard]] std::optional<std::pair<std::uint32_t, std::uint32_t>> map_size(const assets::ChunkFile& file);
 
@@ -51,14 +52,14 @@ inline constexpr std::string_view kMapChunk = "O1602MAP";
 
 /// The chunk's payload. `before` is the file up to the chunk (the original's chunks and WIFF);
 /// `simulation`, if given, adds its clocks and figures.
-[[nodiscard]] core::Bytes encode_extension(const World& world, const assets::BuildingTable& buildings,
-                                           const Simulation* simulation, std::span<const std::uint8_t> before);
+[[nodiscard]] annokit::core::Bytes encode_extension(const World& world, const assets::BuildingTable& buildings,
+                                                    const Simulation* simulation, std::span<const std::uint8_t> before);
 
 /// Applies the chunk to a world loaded from the original's chunks in front of it (`before`).
 /// Unchanged world and an error if it does not belong to them, is damaged or has a required section
 /// of a later version; other sections of a later version are skipped and reported in `warnings`.
-core::Status apply_extension(World& world, const assets::BuildingTable& buildings,
-                             std::span<const std::uint8_t> payload, std::span<const std::uint8_t> before,
-                             std::vector<std::string>* warnings = nullptr);
+annokit::core::Status apply_extension(World& world, const assets::BuildingTable& buildings,
+                                      std::span<const std::uint8_t> payload, std::span<const std::uint8_t> before,
+                                      std::vector<std::string>* warnings = nullptr);
 
 }  // namespace o1602::sim

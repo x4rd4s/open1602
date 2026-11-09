@@ -17,16 +17,17 @@
 
 #include "message_table.hpp"
 
+#include "annokit/platform/audio_output.hpp"
+#include "annokit/video/smacker.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/package_sounds.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/audio/package_music.hpp"
-#include "o1602/platform/audio_output.hpp"
 #include "o1602/render/ambient.hpp"
 #include "o1602/sim/simulation.hpp"
-#include "o1602/video/smacker.hpp"
 
 namespace o1602::app {
 
@@ -98,7 +99,7 @@ public:
     [[nodiscard]] std::optional<std::uint16_t> take_video() noexcept { return m_voices.take_video(); }
     /// A video starts: its tracks, decoded beforehand (VideoPlayer), play at
     /// the effects' volume, the music stops, voices and music wait until stop_video().
-    void start_video(const std::vector<std::shared_ptr<const audio::Pcm>>& tracks);
+    void start_video(const std::vector<std::shared_ptr<const annokit::audio::Pcm>>& tracks);
     void stop_video();
 
     // Events of the simulation that sound, for the local player `local`.
@@ -138,8 +139,8 @@ private:
     void top_up(std::uint32_t ms);
 
     const assets::GameDirectory* m_game;
-    std::unique_ptr<platform::AudioOutput> m_output;
-    audio::Mixer m_mixer;
+    std::unique_ptr<annokit::platform::AudioOutput> m_output;
+    annokit::audio::Mixer m_mixer;
     audio::SoundBank m_bank;
     audio::Effects m_effects;
     audio::Voices m_voices;
@@ -158,7 +159,7 @@ private:
     std::uint32_t m_variant = 0;  ///< own counter for the variants: no game random numbers (S-112)
     std::vector<std::int16_t> m_buffer;
     std::uint32_t m_queue_ms = 50;  ///< what the device holds now (kQueueMs, more after a slow frame)
-    std::vector<audio::Mixer::VoiceId> m_video_voices;
+    std::vector<annokit::audio::Mixer::VoiceId> m_video_voices;
     bool m_video = false;
     std::map<std::pair<std::uint16_t, std::uint8_t>, std::uint64_t> m_cycles;  ///< figure, anim -> last cycle heard
 };

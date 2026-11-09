@@ -23,9 +23,10 @@
 
 #include "video_queue.hpp"
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/game_content.hpp"
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::app {
 
@@ -88,8 +89,8 @@ public:
     /// (tables named with a package, ["anno1602:42"]). Sound files are found in `folder`. What is
     /// wrong in a single field is passed over with a warning ("mymod/messages.toml line 3: ...");
     /// a file that cannot be read at all is an error and changes nothing.
-    core::Status load_package(std::string_view package, std::string_view utf8, const std::filesystem::path& folder,
-                              std::vector<std::string>& warnings);
+    annokit::core::Status load_package(std::string_view package, std::string_view utf8,
+                                       const std::filesystem::path& folder, std::vector<std::string>& warnings);
     /// The messages.toml of every package that has one (<package folder>/messages.toml), in the
     /// order given (their load order, assets::load_mod_packages).
     void load_mods(std::span<const assets::ModPackage> packages, std::vector<std::string>& warnings);
@@ -100,7 +101,7 @@ public:
 
 private:
     /// Applies the fields of `table` to `m`.
-    void apply(const core::DataTable& table, MessageDefinition& m, const std::filesystem::path& folder,
+    void apply(const annokit::core::DataTable& table, MessageDefinition& m, const std::filesystem::path& folder,
                const std::string& where, std::vector<std::string>& warnings);
     /// The video number of a package's video file, given one the first time; nullopt (with a
     /// warning) when it is no Smacker or Bink 2 file or there are too many.

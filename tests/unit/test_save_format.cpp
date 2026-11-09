@@ -21,11 +21,12 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/compress.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/chunk_writer.hpp"
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/assets/resident_classes.hpp"
-#include "o1602/core/compress.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_extension.hpp"
 #include "o1602/sim/world.hpp"
@@ -791,7 +792,7 @@ bool matches(const char* name, std::span<const std::uint8_t> data, std::span<con
         s.flags = u16(at + 6);
         s.size = u16(at + 8) | static_cast<std::uint32_t>(u16(at + 10)) << 16U;
         REQUIRE(s.size <= data.size() - at - 12);
-        s.crc = core::crc32(data.subspan(at + 12, s.size));
+        s.crc = annokit::core::crc32(data.subspan(at + 12, s.size));
         got.push_back(s);
         at += 12 + s.size;
     }
@@ -811,7 +812,7 @@ bool matches(const char* name, std::span<const std::uint8_t> data, std::span<con
 }
 
 /// The version of the section `tag` in an own savegame, 0 if it has none.
-std::uint16_t section_version(const core::Bytes& bytes, std::string_view tag) {
+std::uint16_t section_version(const annokit::core::Bytes& bytes, std::string_view tag) {
     std::size_t at = kFileHeader;
     while (at + 12 <= bytes.size()) {
         const auto u16 = [&](std::size_t i) { return static_cast<std::uint16_t>(bytes[i] | bytes[i + 1] << 8U); };
@@ -967,7 +968,7 @@ constexpr Golden kChunkWide[] = {
 };
 // clang-format on
 
-core::Bytes save(const sim::World& world, const assets::BuildingTable& buildings) {
+annokit::core::Bytes save(const sim::World& world, const assets::BuildingTable& buildings) {
     auto bytes = sim::write_game(world, buildings, nullptr, sim::SaveOptions{false});
     REQUIRE(bytes.ok());
     return std::move(bytes).value();
@@ -978,7 +979,7 @@ core::Bytes save(const sim::World& world, const assets::BuildingTable& buildings
 TEST_CASE("save format: the sections of the own savegame keep their bytes") {
     const auto buildings = make_buildings();
     for (const bool wide : {false, true}) {
-        const core::Bytes bytes = save(make_world(buildings, wide), buildings);
+        const annokit::core::Bytes bytes = save(make_world(buildings, wide), buildings);
         CHECK(matches(wide ? "kSaveWide" : "kSaveNarrow", std::span<const std::uint8_t>(bytes).subspan(kFileHeader),
                       wide ? std::span<const Golden>(kSaveWide) : std::span<const Golden>(kSaveNarrow)));
     }
@@ -987,7 +988,7 @@ TEST_CASE("save format: the sections of the own savegame keep their bytes") {
 TEST_CASE("save format: the sections of the chunk in a .GAM keep their bytes") {
     const auto buildings = make_buildings();
     for (const bool wide : {false, true}) {
-        const core::Bytes bytes = sim::encode_extension(make_world(buildings, wide), buildings, nullptr, {});
+        const annokit::core::Bytes bytes = sim::encode_extension(make_world(buildings, wide), buildings, nullptr, {});
         CHECK(matches(wide ? "kChunkWide" : "kChunkNarrow", std::span<const std::uint8_t>(bytes).subspan(kChunkHeader),
                       wide ? std::span<const Golden>(kChunkWide) : std::span<const Golden>(kChunkNarrow)));
     }
@@ -997,7 +998,7 @@ TEST_CASE("save format: every field read comes back where it was written") {
     const auto buildings = make_buildings();
     for (const bool wide : {false, true}) {
         // Own savegame: the whole world from the sections.
-        const core::Bytes bytes = save(make_world(buildings, wide), buildings);
+        const annokit::core::Bytes bytes = save(make_world(buildings, wide), buildings);
         std::vector<std::string> warnings;
         auto loaded = sim::read_game(bytes, buildings, &warnings);
         REQUIRE(loaded.ok());
@@ -1005,7 +1006,7 @@ TEST_CASE("save format: every field read comes back where it was written") {
         CHECK(save(*loaded, buildings) == bytes);
 
         // Chunk in a .GAM: applied to a world with the same islands and nothing else.
-        const core::Bytes chunk = sim::encode_extension(make_world(buildings, wide), buildings, nullptr, {});
+        const annokit::core::Bytes chunk = sim::encode_extension(make_world(buildings, wide), buildings, nullptr, {});
         sim::World bare(400, 300);
         add_islands(bare, buildings, wide);
         REQUIRE(sim::apply_extension(bare, buildings, chunk, {}).ok());
@@ -1016,10 +1017,10 @@ TEST_CASE("save format: every field read comes back where it was written") {
 TEST_CASE("save format: who played each player comes back (version 4 of PSTA)") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings, false);
-    const core::Bytes before = save(world, buildings);
+    const annokit::core::Bytes before = save(world, buildings);
     world.player(1)->owner = 0x1234'5678'9ABC'DEF0ULL;
     world.player(2)->gates_closed = true;
-    const core::Bytes bytes = save(world, buildings);
+    const annokit::core::Bytes bytes = save(world, buildings);
     CHECK(bytes != before);
     auto loaded = sim::read_game(bytes, buildings, nullptr);
     REQUIRE(loaded.ok());
@@ -1029,7 +1030,7 @@ TEST_CASE("save format: who played each player comes back (version 4 of PSTA)") 
     }
     CHECK(save(*loaded, buildings) == bytes);
 
-    const core::Bytes chunk = sim::encode_extension(world, buildings, nullptr, {});
+    const annokit::core::Bytes chunk = sim::encode_extension(world, buildings, nullptr, {});
     sim::World bare(400, 300);
     add_islands(bare, buildings, false);
     REQUIRE(sim::apply_extension(bare, buildings, chunk, {}).ok());
@@ -1042,7 +1043,7 @@ TEST_CASE("save format: closed city gates come back (version 3 of PSTA)") {
     for (const bool wide : {false, true}) {
         sim::World world = make_world(buildings, wide);
         world.player(2)->gates_closed = true;
-        const core::Bytes bytes = save(world, buildings);
+        const annokit::core::Bytes bytes = save(world, buildings);
         auto loaded = sim::read_game(bytes, buildings, nullptr);
         REQUIRE(loaded.ok());
         for (std::size_t p = 0; p < world.players().size(); ++p) {
@@ -1051,7 +1052,7 @@ TEST_CASE("save format: closed city gates come back (version 3 of PSTA)") {
         }
         CHECK(save(*loaded, buildings) == bytes);
 
-        const core::Bytes chunk = sim::encode_extension(world, buildings, nullptr, {});
+        const annokit::core::Bytes chunk = sim::encode_extension(world, buildings, nullptr, {});
         sim::World bare(400, 300);
         add_islands(bare, buildings, wide);
         REQUIRE(sim::apply_extension(bare, buildings, chunk, {}).ok());
@@ -1078,7 +1079,7 @@ TEST_CASE("save format: the goods statistics of the cities come back (GLDG)") {
     city.book(19, sim::GoodsFlow::Sold, 32);  // the running minute
     city.book(19, sim::GoodsFlow::SoldValue, 75);
     city.ledger.set_warned(14, true);
-    const core::Bytes bytes = save(world, buildings);
+    const annokit::core::Bytes bytes = save(world, buildings);
     std::vector<std::string> warnings;
     auto loaded = sim::read_game(bytes, buildings, &warnings);
     REQUIRE(loaded.ok());
@@ -1099,7 +1100,7 @@ TEST_CASE("save format: the goods statistics of the cities come back (GLDG)") {
     // What producers withheld for a full warehouse needs version 2.
     city.book(19, sim::GoodsFlow::Withheld, 40);
     city.ledger.close_minute(city.goods);
-    const core::Bytes withheld = save(world, buildings);
+    const annokit::core::Bytes withheld = save(world, buildings);
     CHECK(section_version(withheld, "GLDG") == 2);
     auto again = sim::read_game(withheld, buildings, &warnings);
     REQUIRE(again.ok());
@@ -1117,12 +1118,12 @@ TEST_CASE("save format: public buildings of a kind of their own beyond the 16 bi
     REQUIRE(!world.houses().empty());
     namespace pb = assets::public_building;
     world.houses()[0].services = pb::kChapel | pb::own(1);  // still 16 bits: version 1
-    const core::Bytes narrow = save(world, buildings);
+    const annokit::core::Bytes narrow = save(world, buildings);
     CHECK(section_version(narrow, "HOUS") == 1);
 
     const assets::ServiceBits wide = pb::kChapel | pb::own(2) | pb::own(pb::kOwnCount - 1);
     world.houses()[0].services = wide;
-    const core::Bytes bytes = save(world, buildings);
+    const annokit::core::Bytes bytes = save(world, buildings);
     CHECK(section_version(bytes, "HOUS") == 2);
     std::vector<std::string> warnings;
     auto loaded = sim::read_game(bytes, buildings, &warnings);

@@ -21,7 +21,8 @@
 #include "app_settings.hpp"
 #include "diagnostics.hpp"
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -112,7 +113,7 @@ void SDLCALL on_folder(void* userdata, const char* const* filelist, int /*filter
 void choose_folder(Pick& pick, const fs::path& start) {
     const SDL_PropertiesID props = SDL_CreateProperties();
     const std::string title = tr_utf8("game_folder.dialog_title");
-    const std::string location = start.empty() ? std::string() : core::path_to_utf8(start / "");  // inside it
+    const std::string location = start.empty() ? std::string() : annokit::core::path_to_utf8(start / "");  // inside it
     SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, title.c_str());
     if (!location.empty()) {
         SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, location.c_str());
@@ -146,7 +147,7 @@ fs::path start_folder(const fs::path& tried) {
 
 void save_game_folder(const fs::path& settings_file, const fs::path& folder) {
     std::string text;
-    if (auto bytes = core::read_file(settings_file)) {
+    if (auto bytes = annokit::core::read_file(settings_file)) {
         text.assign(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     } else if (std::error_code exists_ec; fs::exists(settings_file, exists_ec) || exists_ec) {
         // There but not readable (a virus scanner holds it): written now it would lose every other
@@ -154,11 +155,11 @@ void save_game_folder(const fs::path& settings_file, const fs::path& folder) {
         std::fprintf(stderr, "settings: %s; the game folder is not remembered\n", bytes.error().message.c_str());
         return;
     }
-    text = set_setting_line(text, "game_folder", core::path_to_utf8(folder));
+    text = set_setting_line(text, "game_folder", annokit::core::path_to_utf8(folder));
     std::error_code ec;
     fs::create_directories(settings_file.parent_path(), ec);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file_atomic(settings_file, std::span<const std::uint8_t>(data, text.size()));
+    if (auto status = annokit::core::write_file_atomic(settings_file, std::span<const std::uint8_t>(data, text.size()));
         !status) {
         std::fprintf(stderr, "settings: %s\n", status.error().message.c_str());
     }
@@ -226,9 +227,9 @@ std::optional<assets::GameDirectory> ask_for_game_folder(const GameFolderSearch&
             problem.clear();  // cancelled: the question again, the player may quit there
             continue;
         }
-        const fs::path folder = core::path_from_utf8(pick.folder);
+        const fs::path folder = annokit::core::path_from_utf8(pick.folder);
         if (auto game = open_chosen_folder(folder)) {
-            std::fprintf(stderr, "game folder chosen: %s\n", core::path_to_utf8(game->root()).c_str());
+            std::fprintf(stderr, "game folder chosen: %s\n", annokit::core::path_to_utf8(game->root()).c_str());
             save_game_folder(settings_file, game->root());
             return std::move(game).value();
         }

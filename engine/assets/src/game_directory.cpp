@@ -6,9 +6,10 @@
 #include <string>
 #include <system_error>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/history_texts.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -24,8 +25,8 @@ namespace o1602::assets {
 
 namespace fs = std::filesystem;
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -72,11 +73,11 @@ void add_prefixes_below(std::vector<fs::path>& out, const fs::path& parent) {
 }
 
 std::optional<fs::path> environment_path(const char* name) {
-    const auto value = core::environment_variable(name);
+    const auto value = annokit::core::environment_variable(name);
     if (!value) {
         return std::nullopt;
     }
-    return core::path_from_utf8(GameDirectory::clean_path_text(*value));
+    return annokit::core::path_from_utf8(GameDirectory::clean_path_text(*value));
 }
 
 std::string lower_ascii(std::string_view text) {
@@ -99,10 +100,10 @@ std::optional<fs::path> history_user_folder(const fs::path& root) {
 #endif
     std::error_code ec;
     for (fs::path p = fs::absolute(root, ec); !ec && p.has_relative_path(); p = p.parent_path()) {
-        if (lower_ascii(core::path_to_utf8(p.filename())) != "drive_c") {
+        if (lower_ascii(annokit::core::path_to_utf8(p.filename())) != "drive_c") {
             continue;
         }
-        if (const auto users = core::find_case_insensitive(p, "users")) {
+        if (const auto users = annokit::core::find_case_insensitive(p, "users")) {
             std::vector<fs::path> found;
             for (fs::directory_iterator it(*users, ec), last; !ec && it != last; it.increment(ec)) {
                 if (it->is_directory(ec)) {
@@ -115,7 +116,7 @@ std::optional<fs::path> history_user_folder(const fs::path& root) {
         break;
     }
     for (const fs::path& home : homes) {
-        if (auto folder = core::find_case_insensitive(home, kFolder)) {
+        if (auto folder = annokit::core::find_case_insensitive(home, kFolder)) {
             return folder;
         }
     }
@@ -142,7 +143,7 @@ std::string system_language() {
 #else
     // The order of precedence of the C library (LANGUAGE may list several: the first counts).
     for (const char* variable : {"LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"}) {
-        if (const auto value = core::environment_variable(variable); value && !value->empty()) {
+        if (const auto value = annokit::core::environment_variable(variable); value && !value->empty()) {
             std::string code = primary_language(std::string_view(*value).substr(0, value->find(':')));
             if (!code.empty() && code != "c" && code != "posix") {
                 return code;
@@ -208,7 +209,7 @@ void add_ubisoft_registry(std::vector<fs::path>& out) {
             const fs::path folder = fs::path(value.data()).lexically_normal();
             // "C:/.../games/Anno 1602 - History Edition/" ends with a separator: its name is the parent's.
             const fs::path name = folder.has_filename() ? folder.filename() : folder.parent_path().filename();
-            if (core::path_to_utf8(name).find("1602") != std::string::npos) {
+            if (annokit::core::path_to_utf8(name).find("1602") != std::string::npos) {
                 add_if_folder(out, folder);
             }
         }
@@ -224,23 +225,23 @@ std::optional<std::string_view> GameDirectory::missing_file(const fs::path& root
     constexpr std::array<std::string_view, 4> kRequired = {"haeuser.cod", "figuren.cod", "toolgfx/stadtfld.col",
                                                            "gfx/stadtfld.bsh"};
     for (const std::string_view file : kRequired) {
-        if (!core::find_case_insensitive(root, file)) {
+        if (!annokit::core::find_case_insensitive(root, file)) {
             return file;
         }
     }
     return std::nullopt;
 }
 
-core::Result<GameDirectory> GameDirectory::open(const fs::path& root) {
+annokit::core::Result<GameDirectory> GameDirectory::open(const fs::path& root) {
     if (const auto file = missing_file(root)) {
-        return make_error(ErrorCode::NotFound, core::path_to_utf8(root) +
+        return make_error(ErrorCode::NotFound, annokit::core::path_to_utf8(root) +
                                                    " does not look like an Anno 1602 installation (missing " +
                                                    std::string(*file) + ")");
     }
     GameDirectory dir;
     dir.m_root = root;
     dir.m_localized = language_folder(root).value_or(fs::path());
-    if (const auto rda = core::find_case_insensitive(root, kHistoryArchive)) {
+    if (const auto rda = annokit::core::find_case_insensitive(root, kHistoryArchive)) {
         if (auto texts = HistoryTexts::load(*rda)) {
             dir.m_history_texts = std::make_shared<const HistoryTexts>(std::move(texts).value());
         }
@@ -252,14 +253,14 @@ core::Result<GameDirectory> GameDirectory::open(const fs::path& root) {
 void GameDirectory::choose_language(std::string_view language) {
     // language_folder() falls back to other languages; only one of `language` replaces the folder.
     if (auto folder = language_folder(m_root, language);
-        folder && primary_language(core::path_to_utf8(folder->filename())) == primary_language(language)) {
+        folder && primary_language(annokit::core::path_to_utf8(folder->filename())) == primary_language(language)) {
         m_localized = std::move(*folder);
     } else if (!m_localized.empty() && primary_language(language) == "en") {
         m_localized.clear();  // the History Edition's own folders are English
     }
 }
 
-core::Result<GameDirectory> GameDirectory::from_environment() {
+annokit::core::Result<GameDirectory> GameDirectory::from_environment() {
     const auto root = environment_path(kEnvVar);
     if (!root || root->empty()) {
         return make_error(ErrorCode::NotFound, std::string("environment variable ") + kEnvVar + " is not set");
@@ -320,7 +321,8 @@ std::vector<fs::path> GameDirectory::folders_named_1602(const fs::path& parent) 
     std::vector<fs::path> out;
     std::error_code ec;
     for (fs::directory_iterator it(parent, ec), last; !ec && it != last; it.increment(ec)) {
-        if (it->is_directory(ec) && core::path_to_utf8(it->path().filename()).find("1602") != std::string::npos) {
+        if (it->is_directory(ec) &&
+            annokit::core::path_to_utf8(it->path().filename()).find("1602") != std::string::npos) {
             out.push_back(it->path());
         }
     }
@@ -329,7 +331,7 @@ std::vector<fs::path> GameDirectory::folders_named_1602(const fs::path& parent) 
 }
 
 std::optional<fs::path> GameDirectory::language_folder(const fs::path& root, std::string_view language) {
-    const auto loca = core::find_case_insensitive(root, "Loca");
+    const auto loca = annokit::core::find_case_insensitive(root, "Loca");
     if (!loca) {
         return std::nullopt;
     }
@@ -350,12 +352,12 @@ std::optional<fs::path> GameDirectory::language_folder(const fs::path& root, std
         }
         // An exact code first ("en-GB" before "en-US" when en-GB is asked for), then the language.
         for (const fs::path& folder : folders) {
-            if (lower_ascii(core::path_to_utf8(folder.filename())) == lower_ascii(language)) {
+            if (lower_ascii(annokit::core::path_to_utf8(folder.filename())) == lower_ascii(language)) {
                 return folder;
             }
         }
         for (const fs::path& folder : folders) {
-            if (primary_language(core::path_to_utf8(folder.filename())) == wanted) {
+            if (primary_language(annokit::core::path_to_utf8(folder.filename())) == wanted) {
                 return folder;
             }
         }
@@ -392,15 +394,15 @@ std::string GameDirectory::clean_path_text(std::string_view text) {
 
 std::optional<fs::path> GameDirectory::resolve(std::string_view relative) const {
     if (!m_localized.empty()) {
-        if (auto path = core::find_case_insensitive(m_localized, relative)) {
+        if (auto path = annokit::core::find_case_insensitive(m_localized, relative)) {
             return path;
         }
     }
-    if (auto path = core::find_case_insensitive(m_root, relative)) {
+    if (auto path = annokit::core::find_case_insensitive(m_root, relative)) {
         return path;
     }
     if (!m_user.empty()) {
-        if (auto path = core::find_case_insensitive(m_user, relative)) {
+        if (auto path = annokit::core::find_case_insensitive(m_user, relative)) {
             return path;
         }
     }
@@ -414,7 +416,7 @@ std::optional<fs::path> GameDirectory::resolve_named_scenario(std::string_view r
         return std::nullopt;
     }
     const std::size_t slash = relative.find_last_of("/\\");
-    if (slash == std::string_view::npos || !core::equals_ignore_case(relative.substr(0, slash), "Szenes")) {
+    if (slash == std::string_view::npos || !annokit::core::equals_ignore_case(relative.substr(0, slash), "Szenes")) {
         return std::nullopt;
     }
     const std::string_view file = relative.substr(slash + 1);
@@ -434,7 +436,7 @@ std::optional<fs::path> GameDirectory::resolve_named_scenario(std::string_view r
     const std::string language = text_language();
     for (const std::int32_t id : m_history_texts->find_all(stem.substr(0, digits), language)) {
         const std::string name = "Szenes/[[" + std::to_string(id) + "]]" + std::string(suffix) + std::string(extension);
-        if (auto path = core::find_case_insensitive(m_root, name)) {
+        if (auto path = annokit::core::find_case_insensitive(m_root, name)) {
             return path;
         }
     }
@@ -443,7 +445,7 @@ std::optional<fs::path> GameDirectory::resolve_named_scenario(std::string_view r
 
 std::string GameDirectory::text_language() const {
     if (!m_localized.empty()) {
-        return primary_language(core::path_to_utf8(m_localized.filename()));
+        return primary_language(annokit::core::path_to_utf8(m_localized.filename()));
     }
     return m_history_texts != nullptr ? "en" : std::string();
 }
@@ -452,7 +454,7 @@ std::string GameDirectory::expand(std::string_view text) const {
     if (m_history_texts == nullptr || text.find("[[") == std::string_view::npos) {
         return std::string(text);
     }
-    return core::utf8_to_cp1252(m_history_texts->expand(core::cp1252_to_utf8(text), text_language()));
+    return annokit::core::utf8_to_cp1252(m_history_texts->expand(annokit::core::cp1252_to_utf8(text), text_language()));
 }
 
 }  // namespace o1602::assets

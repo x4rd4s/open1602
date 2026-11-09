@@ -9,12 +9,12 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/core/byte_reader.hpp"
+#include "annokit/core/byte_reader.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -35,11 +35,11 @@ std::uint16_t size_class_of_width(std::uint32_t width, std::uint16_t stored) {
     return stored;
 }
 
-core::Result<IslandHeader> parse_header(const Chunk& chunk, std::span<const std::uint8_t> data) {
+annokit::core::Result<IslandHeader> parse_header(const Chunk& chunk, std::span<const std::uint8_t> data) {
     if (data.size() < kMinHeaderSize) {
         return make_error(ErrorCode::InvalidFormat, chunk.name + " chunk too small");
     }
-    core::ByteReader r(data);
+    annokit::core::ByteReader r(data);
     IslandHeader h;
     h.chunk_name = chunk.name;
     h.number = *r.u8();
@@ -97,7 +97,7 @@ core::Result<IslandHeader> parse_header(const Chunk& chunk, std::span<const std:
     return h;
 }
 
-core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> data, bool large) {
+annokit::core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> data, bool large) {
     const std::size_t size = large ? kLargeTileSize : kTileSize;
     if (data.size() % size != 0) {
         return make_error(ErrorCode::InvalidFormat,
@@ -105,7 +105,7 @@ core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> 
     }
     std::vector<IslandTile> tiles;
     tiles.reserve(data.size() / size);
-    core::ByteReader r(data);
+    annokit::core::ByteReader r(data);
     while (!r.at_end()) {
         IslandTile t;
         t.id = *r.u16();
@@ -123,8 +123,8 @@ core::Result<std::vector<IslandTile>> parse_tiles(std::span<const std::uint8_t> 
 }
 
 /// kLargeIslandChunk: the sizes and deposit places the header's bytes cannot hold.
-core::Status apply_large_island(IslandHeader& h, std::span<const std::uint8_t> data) {
-    core::ByteReader r(data);
+annokit::core::Status apply_large_island(IslandHeader& h, std::span<const std::uint8_t> data) {
+    annokit::core::ByteReader r(data);
     const auto width = r.u16();
     const auto height = r.u16();
     const auto count = r.u8();
@@ -167,7 +167,7 @@ core::Status apply_large_island(IslandHeader& h, std::span<const std::uint8_t> d
             h.deposits.push_back(d);
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace
@@ -200,7 +200,7 @@ std::string IslandHeader::template_path() const {
     return name;
 }
 
-core::Result<std::vector<Island>> load_islands(const ChunkFile& file) {
+annokit::core::Result<std::vector<Island>> load_islands(const ChunkFile& file) {
     std::vector<Island> islands;
     for (const Chunk& chunk : file.chunks()) {
         if (chunk.name == "INSEL3" || chunk.name == "INSEL4" || chunk.name == "INSEL5") {

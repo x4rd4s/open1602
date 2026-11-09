@@ -3,11 +3,11 @@
 
 #include <utility>
 
-#include "o1602/core/embedded_file.hpp"
-#include "o1602/core/png_reader.hpp"
+#include "annokit/core/embedded_file.hpp"
+#include "annokit/core/png_reader.hpp"
 
 namespace o1602::ui::interface_icons {
-extern const core::EmbeddedFile kEmbeddedFiles[];
+extern const annokit::core::EmbeddedFile kEmbeddedFiles[];
 }  // namespace o1602::ui::interface_icons
 
 namespace o1602::ui {
@@ -33,8 +33,8 @@ std::vector<assets::InterfaceSprite>& interface_sprites() {
 
 std::vector<assets::PackageIcon> builtin_icons() {
     std::vector<assets::PackageIcon> list;
-    for (const core::EmbeddedFile* f = interface_icons::kEmbeddedFiles; f->name != nullptr; ++f) {
-        const auto size = core::png_size(std::span<const std::uint8_t>(f->data, f->size));
+    for (const annokit::core::EmbeddedFile* f = interface_icons::kEmbeddedFiles; f->name != nullptr; ++f) {
+        const auto size = annokit::core::png_size(std::span<const std::uint8_t>(f->data, f->size));
         if (!size) {
             continue;  // checked by the tests; a broken file is left out
         }

@@ -1,17 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Tests of the SDL layer (engine/platform, engine/render/sdl), built with the game. They run
+# Tests of the SDL layer (the window on annokit::platform, engine/render/sdl), built with the game. They run
 # headless: SDL's dummy video and audio drivers, and software renderers drawing into surfaces.
 
 add_executable(o1602_sdl_tests
     ../test_main.cpp
     test_window.cpp
-    test_audio_output.cpp
     test_sdl_map_canvas.cpp
     test_sdl_sprite_renderer.cpp
     test_sdl_ui_renderer.cpp
 )
-target_link_libraries(o1602_sdl_tests PRIVATE o1602::render_sdl o1602::platform)
+target_link_libraries(o1602_sdl_tests PRIVATE o1602::render_sdl o1602::menus annokit::platform)  # menus: the icon
 o1602_set_warnings(o1602_sdl_tests)
 o1602_utf8_manifest(o1602_sdl_tests)
 

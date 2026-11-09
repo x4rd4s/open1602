@@ -10,14 +10,15 @@
 
 #include "section_io.hpp"
 
+#include "annokit/core/hash.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/island.hpp"
-#include "o1602/core/hash.hpp"
 
 namespace o1602::sim::save {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -112,7 +113,7 @@ struct Layer {
 /// A column of MAPW version 2: a byte 0 and the values as they are, or a byte 1, the number of
 /// runs (u32) and each run as its length (u32) and value. The writer takes the shorter.
 template <class T>
-void put_column(core::ByteWriter& out, const std::vector<T>& v) {
+void put_column(annokit::core::ByteWriter& out, const std::vector<T>& v) {
     std::size_t runs = 0;
     for (std::size_t k = 0; k < v.size(); ++k) {
         runs += k == 0 || v[k] != v[k - 1] ? 1U : 0U;
@@ -198,7 +199,7 @@ void get_column(Reader& a, std::vector<T>& v) {
 template <class A, class L>
 void io_compact_layer(A& a, L& layer) {
     if constexpr (!A::kReading) {
-        core::ByteWriter& out = a.out();
+        annokit::core::ByteWriter& out = a.out();
         put_column(out, layer.ids);
         put_column(out, layer.subs);
         for (const auto* column : {&layer.rotation_anim, &layer.owner, &layer.city, &layer.random}) {
@@ -219,7 +220,7 @@ void io_layer(A& a, L& layer) {
     if constexpr (!A::kReading) {
         // Column by column in one go: the map is most of a savegame, and of the fingerprint of the
         // game that multiplayer takes every few seconds (Simulation::state_hash()).
-        core::ByteWriter& out = a.out();
+        annokit::core::ByteWriter& out = a.out();
         out.u32s(layer.ids);
         out.u16s(layer.subs);
         for (const auto* column : {&layer.rotation_anim, &layer.owner, &layer.city, &layer.random}) {
@@ -259,7 +260,8 @@ Layer layer_of(const IslandMap& map, bool ground, const assets::BuildingTable& b
 }
 
 /// Puts a layer read into the map; an error names a building the game's data does not have.
-core::Status set_layer(IslandMap& map, bool ground, const Layer& layer, const assets::BuildingTable& buildings) {
+annokit::core::Status set_layer(IslandMap& map, bool ground, const Layer& layer,
+                                const assets::BuildingTable& buildings) {
     const std::uint32_t w = map.width();
     for (std::size_t k = 0; k < layer.ids.size(); ++k) {
         MapCell c;
@@ -289,7 +291,7 @@ core::Status set_layer(IslandMap& map, bool ground, const Layer& layer, const as
             map.set_top_cell(x, y, c);
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 }  // namespace
@@ -341,7 +343,7 @@ std::uint64_t block_hash(const IslandMap& map, std::size_t block, const assets::
             }
         }
     }
-    return core::xxh64(std::span<const std::uint8_t>(bytes.data(), n));
+    return annokit::core::xxh64(std::span<const std::uint8_t>(bytes.data(), n));
 }
 
 }  // namespace
@@ -373,7 +375,7 @@ void write_map_fingerprint(Writer& out, const World& w, const assets::BuildingTa
 
 /// A world with the size and islands of the MAPW section, nothing else yet. Not through
 /// Reader::list: each island is checked and placed as it is read.
-core::Result<World> read_map(Reader& in, const assets::BuildingTable& buildings, std::uint16_t version) {
+annokit::core::Result<World> read_map(Reader& in, const assets::BuildingTable& buildings, std::uint16_t version) {
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     in.u32(width);
@@ -440,7 +442,7 @@ core::Result<World> read_map(Reader& in, const assets::BuildingTable& buildings,
 void write_tiles(Writer& out, const World& w, const assets::BuildingTable& buildings,
                  std::span<const std::uint8_t> before) {
     std::map<std::uint16_t, IslandMap> reloaded;
-    if (auto file = assets::ChunkFile::from_bytes(core::Bytes(before.begin(), before.end()))) {
+    if (auto file = assets::ChunkFile::from_bytes(annokit::core::Bytes(before.begin(), before.end()))) {
         if (auto islands = assets::load_islands(*file)) {
             for (const assets::Island& island : *islands) {
                 reloaded.emplace(island.header.number, IslandMap::from_island(island, buildings));

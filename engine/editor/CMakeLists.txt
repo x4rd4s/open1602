@@ -24,5 +24,5 @@ add_library(o1602_editor
 add_library(o1602::editor ALIAS o1602_editor)
 
 target_include_directories(o1602_editor PUBLIC include)
-target_link_libraries(o1602_editor PUBLIC o1602::sim o1602::assets o1602::core)
+target_link_libraries(o1602_editor PUBLIC o1602::sim o1602::assets annokit::core)
 o1602_set_warnings(o1602_editor)

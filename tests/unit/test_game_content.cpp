@@ -13,8 +13,9 @@
 #include "test_support.hpp"
 #include "zip_support.hpp"
 
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/game_content.hpp"
-#include "o1602/core/file.hpp"
 
 using namespace o1602;
 
@@ -405,12 +406,12 @@ TEST_CASE("game content: a received package is kept in the cache only with the p
 namespace {
 
 void write_zip(const std::filesystem::path& path, const std::vector<test::ZipFile>& files) {
-    REQUIRE(core::write_file(path, test::make_zip(files)).ok());
+    REQUIRE(annokit::core::write_file(path, test::make_zip(files)).ok());
 }
 
 /// A file of exactly these bytes (an ofstream in text mode writes "\r\n" on Windows).
 void write_bytes(const std::filesystem::path& path, std::string_view text) {
-    REQUIRE(core::write_file(path, std::vector<std::uint8_t>(text.begin(), text.end())).ok());
+    REQUIRE(annokit::core::write_file(path, std::vector<std::uint8_t>(text.begin(), text.end())).ok());
 }
 
 }  // namespace
@@ -421,7 +422,7 @@ TEST_CASE("game content: a zip archive is a package with the hash of the same fi
     std::filesystem::create_directories(mods / "folder" / "gfx");
     write_bytes(mods / "folder" / "mod.toml", "version = \"1\"\n");
     write_bytes(mods / "folder" / "gfx" / "tower.txt", "tower");
-    const bool deflate = core::has_zlib();
+    const bool deflate = annokit::core::has_zlib();
     // The same files packed with their folder, and a package of its own.
     write_zip(mods / "Packed.ZIP", {{"packed/", ""},
                                     {"packed/mod.toml", "version = \"1\"\n"},

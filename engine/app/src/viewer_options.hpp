@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "o1602/net/enet_transport.hpp"
+#include "o1602/net/protocol.hpp"
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/rules.hpp"
@@ -104,7 +104,7 @@ struct ViewerOptions {
 /// runs with the same game and seed give the same pictures (screenshots compared pixel by pixel).
 inline constexpr std::uint32_t kFixedFrameMs = 16;
 
-/// The step of the fixed clock (platform::use_fixed_clock) these options ask for: kFixedFrameMs for
+/// The step of the fixed clock (annokit::platform::use_fixed_clock) these options ask for: kFixedFrameMs for
 /// a run of N frames, 0 (real time) otherwise. A multiplayer game keeps real time: the others do too.
 [[nodiscard]] constexpr std::uint32_t fixed_frame_ms(const ViewerOptions& options) noexcept {
     return options.max_frames != 0 && !options.multiplayer ? kFixedFrameMs : 0;

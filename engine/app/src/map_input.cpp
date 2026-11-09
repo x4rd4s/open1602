@@ -13,7 +13,8 @@
 #include "key_help.hpp"
 #include "order_questions.hpp"
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/construction.hpp"
@@ -373,26 +374,27 @@ void MapInput::load_key_settings(const std::filesystem::path& default_file) {
     std::error_code ec;
     if (!std::filesystem::exists(path, ec)) {
         if (!m_keys_file.empty()) {
-            std::fprintf(stderr, "keys: %s not found, defaults used\n", core::path_to_utf8(path).c_str());
+            std::fprintf(stderr, "keys: %s not found, defaults used\n", annokit::core::path_to_utf8(path).c_str());
             return;
         }
         // The defaults as a file to edit (in the user's folder, never in the installation).
         const std::string text = m_keys.write_text(key_name, true);
         std::filesystem::create_directories(path.parent_path(), ec);
         const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-        if (auto status = core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size())); !status) {
+        if (auto status = annokit::core::write_file_atomic(path, std::span<const std::uint8_t>(data, text.size()));
+            !status) {
             std::fprintf(stderr, "keys: %s\n", status.error().message.c_str());
         }
         return;
     }
-    auto bytes = core::read_file(path);
+    auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         std::fprintf(stderr, "keys: %s\n", bytes.error().message.c_str());
         return;
     }
     const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
     for (const std::string& w : m_keys.read_text(text, key_from_name)) {
-        std::fprintf(stderr, "keys: %s: %s\n", core::path_to_utf8(path).c_str(), w.c_str());
+        std::fprintf(stderr, "keys: %s: %s\n", annokit::core::path_to_utf8(path).c_str(), w.c_str());
     }
 }
 
@@ -419,7 +421,8 @@ void MapInput::save_key_settings() const {
     std::error_code ec;
     std::filesystem::create_directories(m_keys_path.parent_path(), ec);
     const auto* data = reinterpret_cast<const std::uint8_t*>(text.data());
-    if (auto status = core::write_file_atomic(m_keys_path, std::span<const std::uint8_t>(data, text.size())); !status) {
+    if (auto status = annokit::core::write_file_atomic(m_keys_path, std::span<const std::uint8_t>(data, text.size()));
+        !status) {
         std::fprintf(stderr, "keys: %s\n", status.error().message.c_str());
     }
 }
@@ -955,7 +958,7 @@ void MapInput::run_action(const ui::KeyBinding& b) {
             m_units.add_to_group(world(), b.param);
             break;
         case KeyAction::GroupRecall: {
-            const bool twice = m_group_key.press(b.param, platform::ticks_ms());
+            const bool twice = m_group_key.press(b.param, annokit::platform::ticks_ms());
             if (m_units.recall_group(world(), b.param)) {
                 selection_changed(false);
                 if (twice) {

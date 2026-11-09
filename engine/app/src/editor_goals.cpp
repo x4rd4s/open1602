@@ -13,8 +13,9 @@
 #include "map_viewer.hpp"
 #include "names.hpp"
 
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_data.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/editor/goals.hpp"
 #include "o1602/editor/operations.hpp"
 #include "o1602/editor/players.hpp"
@@ -152,7 +153,8 @@ void MapViewer::editor_goals_model(EditorModel& m) const {
 void MapViewer::editor_goals_request(const EditorRequest& request) {
     using Kind = EditorRequest::Kind;
     const sim::World& world = m_editor->document.world();
-    core::Result<std::unique_ptr<editor::Operation>> op = core::make_error(core::ErrorCode::NotFound, "nothing to do");
+    annokit::core::Result<std::unique_ptr<editor::Operation>> op =
+        annokit::core::make_error(annokit::core::ErrorCode::NotFound, "nothing to do");
     switch (request.kind) {
         case Kind::MissionAdd: {
             sim::Mission fresh;
@@ -240,7 +242,7 @@ void MapViewer::editor_scenario_model(EditorModel& m) const {
     m.scenario_texts.resize(kEditorScenarioRows);
     const auto text = [&](Row row, const char* label, const std::string& utf8) {
         const auto i = static_cast<std::size_t>(row);
-        std::string shown = core::utf8_to_cp1252(utf8);
+        std::string shown = annokit::core::utf8_to_cp1252(utf8);
         m.scenario_texts[i] = shown;
         std::replace(shown.begin(), shown.end(), '\n', ' ');
         m.scenario_rows[i] = EditorRule{ui::tr(label), shown.empty() ? ui::tr("editor.scenario.empty") : shown, true};
@@ -277,7 +279,7 @@ void MapViewer::editor_scenario_request(const EditorRequest& request) {
             return;
         }
     } else {
-        std::string text = core::cp1252_to_utf8(request.name);
+        std::string text = annokit::core::cp1252_to_utf8(request.name);
         switch (row) {
             case Row::NameDe:
                 set_text(info.names, "de", std::move(text));

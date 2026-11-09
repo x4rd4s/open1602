@@ -16,7 +16,8 @@
 #include <utility>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
+
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/render/world_graphics.hpp"
 
@@ -31,8 +32,8 @@ public:
     /// Makes one zoom level. Called on the background thread: it must own everything it reads
     /// (copies, not references to state the caller changes). It may give up with an error once
     /// `cancel` is set (GraphicsOptions::cancel): nobody waits for the level any more.
-    using Prepare = std::function<core::Result<PreparedGraphics>(Zoom, const std::atomic<bool>& cancel)>;
-    using Ready = std::pair<Zoom, core::Result<PreparedGraphics>>;
+    using Prepare = std::function<annokit::core::Result<PreparedGraphics>(Zoom, const std::atomic<bool>& cancel)>;
+    using Ready = std::pair<Zoom, annokit::core::Result<PreparedGraphics>>;
 
     /// Without `background` (or if no thread can be started) nothing is made ahead: take() makes
     /// the level on the calling thread.
@@ -51,12 +52,12 @@ public:
     [[nodiscard]] std::optional<Ready> take_ready();
     /// The level `zoom`: made in the background (it goes first if still queued; meanwhile
     /// `wait_step` is called every few milliseconds, e.g. to feed the sound), else made now.
-    [[nodiscard]] core::Result<PreparedGraphics> take(Zoom zoom, const std::function<void()>& wait_step = {});
+    [[nodiscard]] annokit::core::Result<PreparedGraphics> take(Zoom zoom, const std::function<void()>& wait_step = {});
 
 private:
     void work();
     /// m_prepare, with exceptions (out of memory) as errors.
-    core::Result<PreparedGraphics> prepare(Zoom zoom) const;
+    annokit::core::Result<PreparedGraphics> prepare(Zoom zoom) const;
 
     Prepare m_prepare;
     bool m_background;

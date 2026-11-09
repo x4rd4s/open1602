@@ -15,10 +15,11 @@
 #include "main_menu.hpp"
 #include "map_viewer.hpp"
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/package_scenarios.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/scenario_data.hpp"
 #include "o1602/ui/localization.hpp"
 
@@ -60,9 +61,9 @@ bool language_code(std::string_view code) noexcept {
 /// The lines of the scenario's table in scenarios.toml that the editor writes: the map, the stars,
 /// and the name and briefing in each language of the description; and the keys of the languages
 /// it has no text in (German and English), taken out.
-std::pair<std::vector<core::DataLine>, std::vector<std::string>> scenario_lines(const sim::World& world,
-                                                                                const std::string& map) {
-    std::vector<core::DataLine> lines{{"file", core::data_string(map)}};
+std::pair<std::vector<annokit::core::DataLine>, std::vector<std::string>> scenario_lines(const sim::World& world,
+                                                                                         const std::string& map) {
+    std::vector<annokit::core::DataLine> lines{{"file", annokit::core::data_string(map)}};
     std::vector<std::string> removed;
     const auto& info = world.scenario_info();
     if (info) {
@@ -73,7 +74,7 @@ std::pair<std::vector<core::DataLine>, std::vector<std::string>> scenario_lines(
         if (given != nullptr) {
             for (const sim::ScenarioText& t : *given) {
                 if (!t.text.empty() && language_code(t.language)) {
-                    lines.push_back({std::string(key) + "." + t.language, core::data_string(t.text)});
+                    lines.push_back({std::string(key) + "." + t.language, annokit::core::data_string(t.text)});
                     languages.erase(std::remove(languages.begin(), languages.end(), t.language), languages.end());
                 }
             }
@@ -102,12 +103,12 @@ void MapViewer::package_written(assets::ModPackage& package) {
 
 std::optional<std::pair<std::string, std::string>> MapViewer::editor_package_of(
     const std::filesystem::path& file) const {
-    if (file.empty() || core::path_to_utf8(file.extension()) != kMapEnding) {
+    if (file.empty() || annokit::core::path_to_utf8(file.extension()) != kMapEnding) {
         return std::nullopt;
     }
     std::error_code ec;
     const std::filesystem::path maps = std::filesystem::weakly_canonical(file.parent_path(), ec);
-    if (ec || core::path_to_utf8(maps.filename()) != kMapsFolder) {
+    if (ec || annokit::core::path_to_utf8(maps.filename()) != kMapsFolder) {
         return std::nullopt;
     }
     for (const assets::ModPackage& p : m_packages) {
@@ -115,7 +116,7 @@ std::optional<std::pair<std::string, std::string>> MapViewer::editor_package_of(
             continue;
         }
         const std::filesystem::path folder = std::filesystem::weakly_canonical(p.folder, ec);
-        const std::string name = core::path_to_utf8(file.stem());
+        const std::string name = annokit::core::path_to_utf8(file.stem());
         if (!ec && maps.parent_path() == folder && sim::valid_marker_name(name)) {
             return std::pair{p.id, name};
         }
@@ -134,12 +135,12 @@ void MapViewer::editor_packages_model(EditorModel& m) const {
                 state = ui::tr("editor.packages.missing");
             } else if (it->version != p.version) {
                 state = ui::tr("editor.packages.other_version",
-                               {core::utf8_to_cp1252(it->version.empty() ? "-" : it->version)});
+                               {annokit::core::utf8_to_cp1252(it->version.empty() ? "-" : it->version)});
             } else {
                 state = ui::tr("editor.packages.installed");
             }
             m.packages.push_back(
-                EditorRule{core::utf8_to_cp1252(assets::package_label(p)), state, it != m_packages.end()});
+                EditorRule{annokit::core::utf8_to_cp1252(assets::package_label(p)), state, it != m_packages.end()});
         }
     }
     for (const assets::ModPackage& p : m_packages) {
@@ -170,14 +171,14 @@ void MapViewer::editor_packages_model(EditorModel& m) const {
     // The name offered: the scenario's in its package, else the file's, else the description's.
     m.package_name = m_editor->package_scenario;
     if (m.package_name.empty()) {
-        m.package_name =
-            scenario_name_of(m_editor->file.empty() ? m_editor->source_name
-                                                    : core::utf8_to_cp1252(core::path_to_utf8(m_editor->file.stem())));
+        m.package_name = scenario_name_of(
+            m_editor->file.empty() ? m_editor->source_name
+                                   : annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(m_editor->file.stem())));
     }
     if (const auto& info = world.scenario_info(); m.package_name.empty() && info) {
         for (const sim::ScenarioText& t : info->names) {
             if (m.package_name.empty()) {
-                m.package_name = scenario_name_of(core::utf8_to_cp1252(t.text));
+                m.package_name = scenario_name_of(annokit::core::utf8_to_cp1252(t.text));
             }
         }
     }
@@ -188,7 +189,7 @@ void MapViewer::editor_save_to_package(const std::string& package, const std::st
         return;
     }
     const auto failed = [&](const std::string& why) {
-        editor_notice(ui::tr("editor.package_save.failed", {core::utf8_to_cp1252(why)}), true,
+        editor_notice(ui::tr("editor.package_save.failed", {annokit::core::utf8_to_cp1252(why)}), true,
                       "saving into package " + package + " failed: " + why);
     };
     const auto it = std::find_if(m_packages.begin(), m_packages.end(),
@@ -206,7 +207,7 @@ void MapViewer::editor_save_to_package(const std::string& package, const std::st
     std::string text;
     std::error_code ec;
     if (std::filesystem::exists(toml, ec)) {
-        auto bytes = core::read_file(toml);
+        auto bytes = annokit::core::read_file(toml);
         if (!bytes) {
             failed(bytes.error().message);
             return;
@@ -215,16 +216,16 @@ void MapViewer::editor_save_to_package(const std::string& package, const std::st
     }
     const std::string map = std::string(kMapsFolder) + "/" + name + std::string(kMapEnding);
     const auto [lines, removed] = scenario_lines(m_editor->document.world(), map);
-    auto updated = core::set_data_table(text, name, lines, removed);
+    auto updated = annokit::core::set_data_table(text, name, lines, removed);
     if (!updated) {
         failed(std::string(assets::kScenariosFile) + ": " + updated.error().message);
         return;
     }
-    if (!editor_save(it->folder / core::path_from_utf8(map))) {
+    if (!editor_save(it->folder / annokit::core::path_from_utf8(map))) {
         return;  // the notice says why
     }
     const std::vector<std::uint8_t> bytes(updated->begin(), updated->end());
-    if (auto written = core::write_file_atomic(toml, bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(toml, bytes); !written) {
         failed(std::string(assets::kScenariosFile) + ": " + written.error().message);
         return;
     }
@@ -232,7 +233,7 @@ void MapViewer::editor_save_to_package(const std::string& package, const std::st
     m_editor->package_scenario = name;
     package_written(*it);
     const std::string id = package + ":" + name;
-    editor_notice(ui::tr("editor.package_save.saved", {core::utf8_to_cp1252(id)}), false,
+    editor_notice(ui::tr("editor.package_save.saved", {annokit::core::utf8_to_cp1252(id)}), false,
                   "saved as the package's scenario " + id);
 }
 
@@ -243,7 +244,7 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
     const std::string& package = m_editor->package;
     const std::string id = package + ":" + m_editor->package_scenario;
     const auto failed = [&](const std::string& why) {
-        editor_notice(ui::tr("editor.campaign.failed", {core::utf8_to_cp1252(why)}), true,
+        editor_notice(ui::tr("editor.campaign.failed", {annokit::core::utf8_to_cp1252(why)}), true,
                       "campaign " + package + ":" + campaign + " not changed: " + why);
     };
     const auto it = std::find_if(m_packages.begin(), m_packages.end(),
@@ -256,7 +257,7 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
                                     [&](const assets::PackageCampaign& c) { return c.id == package + ":" + campaign; });
     const std::vector<std::string> parts =
         known != m_package_campaigns.end() ? known->parts : std::vector<std::string>{};
-    std::vector<core::DataLine> lines;
+    std::vector<annokit::core::DataLine> lines;
     std::vector<std::string> removed;
     std::size_t part = 0;  // from 1
     if (add) {
@@ -265,7 +266,7 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
             return;
         }
         part = parts.size() + 1;
-        lines.push_back({"part." + std::to_string(part), core::data_string(m_editor->package_scenario)});
+        lines.push_back({"part." + std::to_string(part), annokit::core::data_string(m_editor->package_scenario)});
         if (parts.empty()) {
             // A new campaign: its name in the list as the scenario's, until the file gives another.
             if (const auto& info = m_editor->document.world().scenario_info()) {
@@ -273,7 +274,7 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
                 for (const sim::ScenarioText& t : info->names) {
                     if (!t.text.empty() && (t.language == "de" || t.language == "en")) {
                         const std::string& word = t.language == "de" ? "Kampagne" : "campaign";
-                        lines.push_back({"name." + t.language, core::data_string(t.text + " (" + word + ")")});
+                        lines.push_back({"name." + t.language, annokit::core::data_string(t.text + " (" + word + ")")});
                     }
                 }
             }
@@ -290,25 +291,25 @@ void MapViewer::editor_campaign(const std::string& campaign, bool add) {
     std::string text;
     std::error_code ec;
     if (std::filesystem::exists(toml, ec)) {
-        auto bytes = core::read_file(toml);
+        auto bytes = annokit::core::read_file(toml);
         if (!bytes) {
             failed(bytes.error().message);
             return;
         }
         text.assign(bytes->begin(), bytes->end());
     }
-    auto updated = core::set_data_table(text, campaign, lines, removed);
+    auto updated = annokit::core::set_data_table(text, campaign, lines, removed);
     if (!updated) {
         failed(std::string(assets::kCampaignsFile) + ": " + updated.error().message);
         return;
     }
     const std::vector<std::uint8_t> bytes(updated->begin(), updated->end());
-    if (auto written = core::write_file_atomic(toml, bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(toml, bytes); !written) {
         failed(std::string(assets::kCampaignsFile) + ": " + written.error().message);
         return;
     }
     package_written(*it);
-    const std::string name = core::utf8_to_cp1252(package + ":" + campaign);
+    const std::string name = annokit::core::utf8_to_cp1252(package + ":" + campaign);
     editor_notice(ui::tr(add ? "editor.campaign.added" : "editor.campaign.removed", {name, std::to_string(part)}),
                   false, std::string(add ? "added to" : "taken out of") + " campaign " + package + ":" + campaign);
 }

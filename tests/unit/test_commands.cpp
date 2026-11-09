@@ -12,9 +12,10 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/command_io.hpp"
 #include "o1602/sim/simulation.hpp"
 
@@ -206,11 +207,11 @@ TEST_CASE("commands: every kind of command goes to bytes and back") {
     CHECK(!move.orient_to_road);
 
     // With the tick, as the network carries them, one after another.
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     sim::write_scheduled(out, {1234567890123ULL, all[0]});
     sim::write_scheduled(out, {7, sim::Command{sim::PlayerRename{1, "Merlin"}}});
     const auto stream = out.take();
-    core::ByteReader in(stream);
+    annokit::core::ByteReader in(stream);
     const auto first = sim::read_scheduled(in);
     const auto second = sim::read_scheduled(in);
     REQUIRE(first.has_value());
@@ -327,7 +328,7 @@ TEST_CASE("commands: a saved game keeps its speed and its pause; older saves loa
     a.simulation.tick();
     REQUIRE(a.simulation.paused());
     REQUIRE(a.simulation.speed() == 4);
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     a.simulation.save_state(out);
     const std::vector<std::uint8_t> state = out.take();
     REQUIRE(state.size() > 5);

@@ -9,13 +9,13 @@
 
 #include "save/sections.hpp"
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -24,8 +24,8 @@ constexpr std::uint16_t kFormatVersion = 1;
 
 }  // namespace
 
-core::Bytes encode_map_size(std::uint32_t width, std::uint32_t height) {
-    core::ByteWriter out;
+annokit::core::Bytes encode_map_size(std::uint32_t width, std::uint32_t height) {
+    annokit::core::ByteWriter out;
     out.u32(width);
     out.u32(height);
     return out.take();
@@ -36,7 +36,7 @@ std::optional<std::pair<std::uint32_t, std::uint32_t>> map_size(const assets::Ch
     if (c == nullptr) {
         return std::nullopt;
     }
-    core::ByteReader in(file.payload(*c));
+    annokit::core::ByteReader in(file.payload(*c));
     const auto w = in.u32();
     const auto h = in.u32();
     if (!w || !h || *w == 0 || *h == 0 || *w > World::kMaxSide || *h > World::kMaxSide) {
@@ -54,9 +54,9 @@ std::uint64_t savegame_fingerprint(std::span<const std::uint8_t> bytes) noexcept
     return h;
 }
 
-core::Bytes encode_extension(const World& world, const assets::BuildingTable& buildings, const Simulation* simulation,
-                             std::span<const std::uint8_t> before) {
-    core::ByteWriter out;
+annokit::core::Bytes encode_extension(const World& world, const assets::BuildingTable& buildings,
+                                      const Simulation* simulation, std::span<const std::uint8_t> before) {
+    annokit::core::ByteWriter out;
     out.bytes(kMagic);
     out.u16(kFormatVersion);
     out.u16(0);
@@ -65,10 +65,10 @@ core::Bytes encode_extension(const World& world, const assets::BuildingTable& bu
     return out.take();
 }
 
-core::Status apply_extension(World& world, const assets::BuildingTable& buildings,
-                             std::span<const std::uint8_t> payload, std::span<const std::uint8_t> before,
-                             std::vector<std::string>* warnings) {
-    core::ByteReader reader(payload);
+annokit::core::Status apply_extension(World& world, const assets::BuildingTable& buildings,
+                                      std::span<const std::uint8_t> payload, std::span<const std::uint8_t> before,
+                                      std::vector<std::string>* warnings) {
+    annokit::core::ByteReader reader(payload);
     const auto magic = reader.bytes(kMagic.size());
     if (!magic || !std::equal(magic->begin(), magic->end(), kMagic.begin())) {
         return make_error(ErrorCode::InvalidFormat, "O1602: not Open1602's chunk");

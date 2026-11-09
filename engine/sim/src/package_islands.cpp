@@ -5,11 +5,12 @@
 #include <system_error>
 #include <utility>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/island.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/island_templates.hpp"
 
 namespace o1602::sim {
@@ -48,12 +49,12 @@ std::optional<std::uint8_t> size_class_of(std::uint32_t width, std::uint32_t hei
 void apply_islands_file(std::vector<PackageIsland>& islands, const assets::ModPackage& package, std::string_view utf8,
                         std::vector<std::string>& warnings) {
     const std::string where = package.id + "/" + std::string(kIslandsFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: an island's name holds only lower case letters, digits and '_'");
@@ -69,16 +70,16 @@ void apply_islands_file(std::vector<PackageIsland>& islands, const assets::ModPa
         island.package = package.id;
         std::optional<std::uint8_t> climate;
         bool ok = true;
-        const auto refuse = [&](const core::DataEntry& e, const std::string& what) {
+        const auto refuse = [&](const annokit::core::DataEntry& e, const std::string& what) {
             warnings.push_back(line_of(where, e.value.line) + "'" + e.key + "' " + what);
             ok = false;
         };
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string* text = e.value.string();
             if (e.key == "file") {
                 std::error_code ec;
                 const std::filesystem::path path = text != nullptr && assets::safe_package_path(*text)
-                                                       ? package.folder / core::path_from_utf8(*text)
+                                                       ? package.folder / annokit::core::path_from_utf8(*text)
                                                        : std::filesystem::path{};
                 if (path.empty() || !std::filesystem::is_regular_file(path, ec)) {
                     refuse(e, "names no island file of the package (a .scp file in its folder)");
@@ -98,7 +99,7 @@ void apply_islands_file(std::vector<PackageIsland>& islands, const assets::ModPa
                 }
             } else if (const std::string_view language = assets::name_key_language(e.key); !language.empty()) {
                 if (text != nullptr) {
-                    island.names.emplace_back(std::string(language), core::utf8_to_cp1252(*text));
+                    island.names.emplace_back(std::string(language), annokit::core::utf8_to_cp1252(*text));
                 } else {
                     refuse(e, "is a text");
                 }
@@ -115,7 +116,8 @@ void apply_islands_file(std::vector<PackageIsland>& islands, const assets::ModPa
             continue;
         }
         auto file = assets::ChunkFile::load(island.file);
-        auto loaded = file ? assets::load_islands(*file) : core::Result<std::vector<assets::Island>>(file.error());
+        auto loaded =
+            file ? assets::load_islands(*file) : annokit::core::Result<std::vector<assets::Island>>(file.error());
         if (!loaded || loaded->empty() || loaded->front().layers.empty()) {
             warnings.push_back(at + island.id + ": its file holds no island" +
                                (loaded ? std::string{} : " (" + loaded.error().message + ")"));
@@ -147,13 +149,13 @@ std::vector<PackageIsland> load_package_islands(std::span<const assets::ModPacka
         if (!std::filesystem::is_regular_file(path, ec)) {
             continue;
         }
-        const auto bytes = core::read_file(path);
+        const auto bytes = annokit::core::read_file(path);
         if (!bytes) {
             warnings.push_back(package.id + "/" + std::string(kIslandsFile) + ": " + bytes.error().message);
             continue;
         }
         const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-        apply_islands_file(islands, package, core::skip_utf8_bom(text), warnings);
+        apply_islands_file(islands, package, annokit::core::skip_utf8_bom(text), warnings);
     }
     return islands;
 }

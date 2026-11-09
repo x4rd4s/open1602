@@ -11,7 +11,8 @@
 
 #include "../test_framework.hpp"
 
-#include "o1602/core/hash.hpp"
+#include "annokit/core/hash.hpp"
+
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -21,7 +22,7 @@ namespace o1602::test {
 inline std::uint64_t world_hash(const sim::World& world, const assets::BuildingTable& buildings) {
     auto bytes = sim::write_game(world, buildings, nullptr, sim::SaveOptions{false});
     REQUIRE(bytes.ok());
-    return core::xxh64(*bytes);
+    return annokit::core::xxh64(*bytes);
 }
 
 /// Checks `hash` against the golden value, printing the hash when they differ.

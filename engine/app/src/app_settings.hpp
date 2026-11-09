@@ -18,8 +18,9 @@
 #include "display_settings.hpp"
 #include "endless_setup.hpp"
 
+#include "annokit/core/text.hpp"
+
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/sim/save_game.hpp"
 
 namespace o1602::app {
@@ -113,6 +114,6 @@ void read_slot_meta(SaveSlots& slots, const std::filesystem::path& folder,
 /// Game time as hours and minutes.
 [[nodiscard]] std::string save_time(std::uint64_t ms);
 
-using core::utf8_to_cp1252;
+using annokit::core::utf8_to_cp1252;
 
 }  // namespace o1602::app

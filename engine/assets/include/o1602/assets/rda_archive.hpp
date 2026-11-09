@@ -11,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -26,15 +26,15 @@ public:
     };
 
     /// Reads the directory of the archive at `path` (the files stay on disk until read()).
-    static core::Result<RdaArchive> open(const std::filesystem::path& path);
+    static annokit::core::Result<RdaArchive> open(const std::filesystem::path& path);
     /// The same from the archive's bytes (tests).
-    static core::Result<RdaArchive> from_bytes(std::vector<std::uint8_t> bytes);
+    static annokit::core::Result<RdaArchive> from_bytes(std::vector<std::uint8_t> bytes);
 
     [[nodiscard]] const std::vector<Entry>& entries() const noexcept { return m_entries; }
     /// The entry named `name` (case-insensitive, '/' or '\\'), nullptr if there is none.
     [[nodiscard]] const Entry* find(std::string_view name) const;
     /// The bytes of the file `name`.
-    [[nodiscard]] core::Result<std::vector<std::uint8_t>> read(std::string_view name) const;
+    [[nodiscard]] annokit::core::Result<std::vector<std::uint8_t>> read(std::string_view name) const;
 
 private:
     std::filesystem::path m_path;  ///< empty: the archive is m_bytes

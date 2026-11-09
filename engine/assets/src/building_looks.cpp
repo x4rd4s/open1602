@@ -3,8 +3,9 @@
 
 #include <algorithm>
 
+#include "annokit/core/data_file.hpp"
+
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -25,12 +26,12 @@ void apply_building_images_file(std::vector<SpriteRedirect>& redirects, std::str
                                 std::span<const PackageImage> images, const BuildingTable& buildings,
                                 std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kBuildingImagesFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         const auto id = original_building_id(t.name);
         const BuildingType* building = id ? buildings.by_id(*id) : nullptr;
@@ -40,7 +41,7 @@ void apply_building_images_file(std::vector<SpriteRedirect>& redirects, std::str
         }
         const PackageImage* image = nullptr;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "image") {
                 const std::string* s = e.value.string();

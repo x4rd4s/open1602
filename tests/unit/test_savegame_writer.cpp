@@ -251,7 +251,7 @@ sim::World make_world(const assets::BuildingTable& buildings) {
 }
 
 /// The bytes the original would see: the chunks of the writer and WIFF, without Open1602's chunk.
-core::Bytes original_chunks_only(const sim::World& world, const assets::BuildingTable& buildings) {
+annokit::core::Bytes original_chunks_only(const sim::World& world, const assets::BuildingTable& buildings) {
     auto chunks = sim::savegame_chunks(world, buildings);
     REQUIRE(chunks.ok());
     assets::ChunkWriter out;
@@ -262,7 +262,7 @@ core::Bytes original_chunks_only(const sim::World& world, const assets::Building
     return out.take();
 }
 
-sim::World load(const core::Bytes& bytes, const assets::BuildingTable& buildings) {
+sim::World load(const annokit::core::Bytes& bytes, const assets::BuildingTable& buildings) {
     auto file = assets::ChunkFile::from_bytes(bytes);
     REQUIRE(file.ok());
     std::vector<std::string> warnings;
@@ -544,7 +544,7 @@ TEST_CASE("save game: the original's chunks of a .GAM alone hold the synthetic w
     const auto buildings = make_buildings();
     const sim::World world = make_world(buildings);
     // As if the original had saved the game again: Open1602's own chunk is gone.
-    const core::Bytes bytes = original_chunks_only(world, buildings);
+    const annokit::core::Bytes bytes = original_chunks_only(world, buildings);
     const sim::World loaded = load(bytes, buildings);
     check_same(world, loaded);
     // Its chunks written again are the same chunks.
@@ -615,7 +615,7 @@ TEST_CASE("save game: a satisfaction, tax rate or food supply of 0 loads as 128,
     cities[0].food_ratio = 0;
     world.set_cities(std::move(cities));
     // The original's loader makes 128 of each stored 0.
-    const core::Bytes bytes = original_chunks_only(world, buildings);
+    const annokit::core::Bytes bytes = original_chunks_only(world, buildings);
     const sim::World loaded = load(bytes, buildings);
     const sim::City& c = loaded.cities().at(0);
     CHECK(c.food_ratio == 128);

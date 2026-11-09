@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <charconv>
 
-#include "o1602/core/data_file.hpp"
+#include "annokit/core/data_file.hpp"
 
 namespace o1602::assets {
 
@@ -53,12 +53,12 @@ const InterfaceSprite* find_interface_sprite(std::span<const InterfaceSprite> sp
 void apply_interface_file(std::vector<InterfaceSprite>& sprites, std::string_view package, std::string_view utf8,
                           std::span<const PackageIcon> icons, std::vector<std::string>& warnings) {
     const std::string where = std::string(package) + "/" + std::string(kInterfaceFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         std::optional<InterfaceSprite> sprite = parse_interface_sprite(t.name);
         if (!sprite) {
@@ -68,7 +68,7 @@ void apply_interface_file(std::vector<InterfaceSprite>& sprites, std::string_vie
             continue;
         }
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "icon") {
                 const std::string* s = e.value.string();

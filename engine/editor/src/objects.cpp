@@ -13,8 +13,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -112,9 +112,9 @@ std::string numbered_name(const sim::World& world, std::string_view name) {
     return candidate;
 }
 
-core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world,
-                                                         const assets::BuildingTable& buildings, std::uint16_t island,
-                                                         sim::TilePos tile) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world,
+                                                                  const assets::BuildingTable& buildings,
+                                                                  std::uint16_t island, sim::TilePos tile) {
     if (island >= world.islands().size()) {
         return make_error(ErrorCode::NotFound, "no such island");
     }

@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -23,6 +23,6 @@ std::string decode_cod(std::span<const std::uint8_t> encoded);
 std::vector<std::uint8_t> encode_cod(std::string_view plain);
 
 /// Loads a .cod file and returns its content converted to UTF-8.
-core::Result<std::string> load_cod_utf8(const std::filesystem::path& path);
+annokit::core::Result<std::string> load_cod_utf8(const std::filesystem::path& path);
 
 }  // namespace o1602::assets

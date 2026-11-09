@@ -31,9 +31,10 @@
 #include "game_folder_dialog.hpp"
 #include "map_viewer.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/scenario.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/ui/localization.hpp"
 
 using namespace o1602;
@@ -168,12 +169,12 @@ int run_program(int argc, char** argv) {
     // --game-dir, ANNO1602_DIR, the folder chosen before, the usual folders; else the player is asked.
     const std::filesystem::path settings_file = app::MapViewer::data_folder() / "settings.cfg";
     app::AppSettings settings;
-    if (auto bytes = core::read_file(settings_file)) {
+    if (auto bytes = annokit::core::read_file(settings_file)) {
         settings = app::parse_settings(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()),
                                        settings);
     }
-    app::GameFolderSearch search = app::find_game_folder(command.game_dir, settings.game_folder,
-                                                         core::environment_variable(assets::GameDirectory::kEnvVar));
+    app::GameFolderSearch search = app::find_game_folder(
+        command.game_dir, settings.game_folder, annokit::core::environment_variable(assets::GameDirectory::kEnvVar));
     if (!search.game && search.ask && command.dialogs) {
         ui::set_language(app::startup_language(options.language, settings.language),
                          app::MapViewer::data_folder() / "locale");
@@ -197,10 +198,10 @@ int run_program(int argc, char** argv) {
     if (const std::string& savegame = command.savegame; !savegame.empty()) {
         // The name shown in the game (Game.dat, "SPIELNAME") or a file name in SAVEGAME/.
         if (const auto dat = game->resolve("Game.dat")) {
-            if (auto bytes = core::read_file(*dat)) {
+            if (auto bytes = annokit::core::read_file(*dat)) {
                 const std::string_view text(reinterpret_cast<const char*>(bytes->data()), bytes->size());
                 for (const auto& slot : assets::parse_savegame_slots(text)) {
-                    if (core::equals_ignore_case(slot.name, savegame)) {
+                    if (annokit::core::equals_ignore_case(slot.name, savegame)) {
                         savegame_path = slot.file;
                     }
                 }
@@ -217,14 +218,14 @@ int run_program(int argc, char** argv) {
     if (!command.editor_file.empty()) {
         // As --scenario: a relative path in the game directory first.
         const auto resolved = game->resolve(command.editor_file);
-        options.editor_file = resolved ? *resolved : core::path_from_utf8(command.editor_file);
+        options.editor_file = resolved ? *resolved : annokit::core::path_from_utf8(command.editor_file);
     }
     if (!command.load.empty()) {
-        options.scenario = core::path_from_utf8(command.load);
+        options.scenario = annokit::core::path_from_utf8(command.load);
     } else if (const auto resolved = game->resolve(scenario)) {
         options.scenario = *resolved;
     } else {
-        options.scenario = core::path_from_utf8(scenario);
+        options.scenario = annokit::core::path_from_utf8(scenario);
     }
 
     // What the original rolls with rand(): the map layout and where the island table starts; the
@@ -260,7 +261,7 @@ int run_program(int argc, char** argv) {
         options.new_game = new_game_options;
     }
     // Before the game is made: what it notes while loading already goes by the clock of the frames.
-    platform::use_fixed_clock(app::fixed_frame_ms(options));
+    annokit::platform::use_fixed_clock(app::fixed_frame_ms(options));
     auto viewer = app::MapViewer::create(*game, options);
     if (!viewer) {
         app::report_fatal(viewer.error().message);

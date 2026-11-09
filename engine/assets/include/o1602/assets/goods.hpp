@@ -15,10 +15,11 @@
 #include <utility>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/localized_names.hpp"
 #include "o1602/assets/package_graphics.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::assets {
 
@@ -81,10 +82,10 @@ public:
 
     /// Adds `good` with the next free ware number (the one it has is replaced); fails when none is
     /// left or a good of that id is there already.
-    core::Result<std::uint8_t> add(OwnGood good);
+    annokit::core::Result<std::uint8_t> add(OwnGood good);
     /// Adds `good` with the number it has (a savegame's): fails when the number is no package's,
     /// is taken, or the good is wrong (no id, no price, no icon of the original's).
-    core::Status restore(OwnGood good);
+    annokit::core::Status restore(OwnGood good);
 
     friend bool operator==(const Goods& a, const Goods& b) { return a.m_own == b.m_own; }
 

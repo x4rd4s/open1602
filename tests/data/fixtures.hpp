@@ -15,9 +15,10 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/compress.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/game_directory.hpp"
-#include "o1602/core/compress.hpp"
-#include "o1602/core/file.hpp"
 
 namespace o1602::test {
 
@@ -54,8 +55,8 @@ inline std::optional<std::filesystem::path> fixture(const assets::GameDirectory&
     if (std::filesystem::file_size(*file, error) != known->size || error) {
         return std::nullopt;
     }
-    auto bytes = core::read_file(*file);
-    if (!bytes.ok() || core::crc32(*bytes) != known->crc) {
+    auto bytes = annokit::core::read_file(*file);
+    if (!bytes.ok() || annokit::core::crc32(*bytes) != known->crc) {
         return std::nullopt;
     }
     return file;

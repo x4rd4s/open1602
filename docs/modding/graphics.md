@@ -242,7 +242,7 @@ back.
 
 ## In the code
 
-`engine/core/include/o1602/core/png_reader.hpp`: the PNG reader.
+`modules/core/include/annokit/core/png_reader.hpp` of annokit: the PNG reader.
 `engine/assets/include/o1602/assets/package_graphics.hpp`: `apply_graphics_file` and
 `PackageImage`. `engine/render/include/o1602/render/package_sprites.hpp`: the sprites of an image
 at a zoom level (`PackageImageSource`), which `render::load_world_graphics` places at their numbers

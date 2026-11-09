@@ -6,17 +6,18 @@
 #include <cstdio>
 #include <system_error>
 
+#include "annokit/core/embedded_file.hpp"
+#include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/embedded_file.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::ui {
 
 // data/locale/*.lang, compiled in by o1602_embed_files (engine/ui/CMakeLists.txt).
 namespace locales {
-extern const core::EmbeddedFile kEmbeddedFiles[];
+extern const annokit::core::EmbeddedFile kEmbeddedFiles[];
 extern const std::size_t kEmbeddedFileCount;
 }  // namespace locales
 
@@ -93,7 +94,8 @@ Catalogue Catalogue::parse(std::string_view utf8) {
         }
         const std::string_view key = trim(line.substr(0, eq));
         if (!key.empty()) {
-            c.m_texts.insert_or_assign(std::string(key), core::utf8_to_cp1252(unescape(trim(line.substr(eq + 1)))));
+            c.m_texts.insert_or_assign(std::string(key),
+                                       annokit::core::utf8_to_cp1252(unescape(trim(line.substr(eq + 1)))));
         }
     }
     return c;
@@ -129,7 +131,7 @@ std::vector<std::string> builtin_languages() {
 
 Catalogue builtin_catalogue(std::string_view code) {
     for (std::size_t i = 0; i < locales::kEmbeddedFileCount; ++i) {
-        if (core::equals_ignore_case(locales::kEmbeddedFiles[i].name, code)) {
+        if (annokit::core::equals_ignore_case(locales::kEmbeddedFiles[i].name, code)) {
             return Catalogue::parse(locales::kEmbeddedFiles[i].text());
         }
     }
@@ -151,7 +153,7 @@ std::string detect_language(const assets::TextTable& texts) {
             const std::string_view wanted = trim(rest.substr(0, bar));
             rest = bar == std::string_view::npos ? std::string_view{} : rest.substr(bar + 1);
             const bool found = std::any_of(colours.begin(), colours.end(), [&](const std::string& line) {
-                return !wanted.empty() && core::equals_ignore_case(trim(line), wanted);
+                return !wanted.empty() && annokit::core::equals_ignore_case(trim(line), wanted);
             });
             if (found) {
                 return code;
@@ -170,7 +172,7 @@ std::string gog_language(const assets::GameDirectory& game) {
         if (!name.starts_with("goggame-") || !name.ends_with(".info")) {
             continue;
         }
-        const auto bytes = core::read_file(entry.path());
+        const auto bytes = annokit::core::read_file(entry.path());
         if (!bytes) {
             continue;
         }
@@ -215,7 +217,7 @@ void set_language(std::string_view code, const std::filesystem::path& user_folde
     next.language = lower_ascii(code);
     next.texts.merge(builtin_catalogue(next.language));
     const auto merge_file = [&](const std::filesystem::path& path) {
-        if (const auto bytes = core::read_file(path)) {
+        if (const auto bytes = annokit::core::read_file(path)) {
             next.texts.merge(
                 Catalogue::parse(std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size())));
         }
@@ -311,24 +313,24 @@ std::string tr(std::string_view key, std::initializer_list<std::string_view> arg
     return out;
 }
 
-std::string error_text(const core::Error& error, std::string_view context) {
+std::string error_text(const annokit::core::Error& error, std::string_view context) {
     std::fprintf(stderr, "%.*s: %s\n", static_cast<int>(context.size()), context.data(), error.message.c_str());
     switch (error.code) {
-        case core::ErrorCode::IoError:
+        case annokit::core::ErrorCode::IoError:
             return tr("error.io");
-        case core::ErrorCode::NotFound:
+        case annokit::core::ErrorCode::NotFound:
             return tr("error.not_found");
-        case core::ErrorCode::InvalidFormat:
-        case core::ErrorCode::OutOfRange:
+        case annokit::core::ErrorCode::InvalidFormat:
+        case annokit::core::ErrorCode::OutOfRange:
             return tr("error.damaged");
-        case core::ErrorCode::LimitExceeded:
+        case annokit::core::ErrorCode::LimitExceeded:
             return tr("error.limit", {error.message});
-        case core::ErrorCode::Unsupported:
+        case annokit::core::ErrorCode::Unsupported:
             return tr("error.unsupported");
-        case core::ErrorCode::ScriptError:
+        case annokit::core::ErrorCode::ScriptError:
             return tr("error.script", {error.message});
-        case core::ErrorCode::PlatformError:
-        case core::ErrorCode::Cancelled:
+        case annokit::core::ErrorCode::PlatformError:
+        case annokit::core::ErrorCode::Cancelled:
             break;
     }
     return tr("error.platform");

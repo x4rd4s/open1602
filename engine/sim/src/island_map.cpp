@@ -8,8 +8,8 @@
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 IslandMap::IslandMap(std::uint32_t width, std::uint32_t height)
     : m_width(width),
@@ -42,30 +42,32 @@ std::uint8_t city_of(const assets::IslandTile& tile) {
 
 }  // namespace
 
-core::Status IslandMap::place(const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                              std::uint8_t anim_phase, PlayerId owner, std::uint8_t city) {
+annokit::core::Status IslandMap::place(const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                       std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner,
+                                       std::uint8_t city) {
     return write(b, x, y, rotation, anim_phase, owner, city, Mode::Place);
 }
 
-core::Status IslandMap::build(const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                              std::uint8_t anim_phase, PlayerId owner, std::uint8_t city) {
+annokit::core::Status IslandMap::build(const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                       std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner,
+                                       std::uint8_t city) {
     return write(b, x, y, rotation, anim_phase, owner, city, Mode::Build);
 }
 
-core::Status IslandMap::load(const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                             std::uint8_t anim_phase, PlayerId owner, std::uint8_t city, bool to_ground,
-                             std::uint8_t random) {
+annokit::core::Status IslandMap::load(const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                      std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner, std::uint8_t city,
+                                      bool to_ground, std::uint8_t random) {
     return write(b, x, y, rotation, anim_phase, owner, city, to_ground ? Mode::LoadGround : Mode::Load, random);
 }
 
-core::Status IslandMap::replace(const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                                std::uint8_t anim_phase) {
+annokit::core::Status IslandMap::replace(const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                         std::uint8_t rotation, std::uint8_t anim_phase) {
     return write(b, x, y, rotation, anim_phase, kNoPlayer, MapCell::kNoCity, Mode::Replace);
 }
 
-core::Status IslandMap::write(const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::uint8_t rotation,
-                              std::uint8_t anim_phase, PlayerId owner, std::uint8_t city, Mode mode,
-                              std::uint8_t random) {
+annokit::core::Status IslandMap::write(const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                       std::uint8_t rotation, std::uint8_t anim_phase, PlayerId owner,
+                                       std::uint8_t city, Mode mode, std::uint8_t random) {
     rotation &= 3U;
     std::uint32_t fw = 0;
     std::uint32_t fh = 0;
@@ -103,7 +105,7 @@ core::Status IslandMap::write(const assets::BuildingType& b, std::int32_t x, std
             m_revisions[std::size_t{by} * blocks_x() + bx] = next_revision();
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 SubTile IslandMap::sub_tile(const assets::BuildingTable& buildings, std::uint32_t x, std::uint32_t y) const {

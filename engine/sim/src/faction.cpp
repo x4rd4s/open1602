@@ -7,8 +7,8 @@
 #include <string>
 #include <utility>
 
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
 
 namespace o1602::sim {
 
@@ -110,28 +110,28 @@ std::optional<FactionId> find_faction(const std::vector<Faction>& factions, std:
 void apply_faction_file(std::vector<Faction>& factions, std::string_view package, std::string_view utf8,
                         std::vector<std::string>& warnings, std::vector<FactionReplacement>* replacements) {
     const std::string where = std::string(package) + "/" + std::string(kFactionFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
-    for (const core::DataTable& table : *tables) {
+    for (const annokit::core::DataTable& table : *tables) {
         if (table.name.empty()) {
             warnings.push_back(line_of(where, table.entries.front().value.line) +
                                "fields before the first [faction] belong to none and are passed over");
             continue;
         }
         const std::string id = full_id(package, table.name);
-        const auto entry = [&](std::string_view key) -> const core::DataEntry* {
+        const auto entry = [&](std::string_view key) -> const annokit::core::DataEntry* {
             const auto e = std::find_if(table.entries.begin(), table.entries.end(),
-                                        [&](const core::DataEntry& d) { return d.key == key; });
+                                        [&](const annokit::core::DataEntry& d) { return d.key == key; });
             return e != table.entries.end() ? &*e : nullptr;
         };
         std::optional<FactionId> index = find_faction(factions, id);
         const bool own = id.size() > package.size() && id.starts_with(package) && id[package.size()] == ':';
         if (!index) {
             // A faction of the package's own: it acts as one of the base game's.
-            const core::DataEntry* b = entry("behaviour");
+            const annokit::core::DataEntry* b = entry("behaviour");
             const std::string* name = b != nullptr ? b->value.string() : nullptr;
             const auto behaviour = name != nullptr ? behaviour_of(*name) : std::nullopt;
             if (!own) {
@@ -155,7 +155,7 @@ void apply_faction_file(std::vector<Faction>& factions, std::string_view package
             index = static_cast<FactionId>(factions.size() - 1);
         }
         Faction& faction = factions[*index];
-        for (const core::DataEntry& e : table.entries) {
+        for (const annokit::core::DataEntry& e : table.entries) {
             const std::string at = line_of(where, e.value.line);
             if (e.key == "behaviour") {
                 const std::string* name = e.value.string();
@@ -191,7 +191,7 @@ void apply_faction_file(std::vector<Faction>& factions, std::string_view package
                 } else {
                     auto& names = faction.names;
                     std::erase_if(names, [&](const auto& n) { return n.first == language; });
-                    names.emplace_back(language, core::utf8_to_cp1252(*text));
+                    names.emplace_back(language, annokit::core::utf8_to_cp1252(*text));
                 }
                 continue;
             }

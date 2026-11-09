@@ -4,19 +4,20 @@
 #include <algorithm>
 #include <string>
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/numeric.hpp"
+
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/cod_predefined.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/savegame.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/numeric.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
-core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
+annokit::core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
     const auto* records = figuren.root.records("FIGUR");
     if (records == nullptr) {
         return make_error(ErrorCode::InvalidFormat, "figuren.cod contains no FIGUR records");
@@ -46,18 +47,18 @@ core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
         f.speed_type = static_cast<std::uint8_t>(std::clamp(r.integer("Speedtyp"), 0, 3));
         f.max_carry = static_cast<std::uint32_t>(std::max(0, r.integer("Maxtrag"))) * kStockUnitsPerTon;
         if (const cod::Field* work = r.field("Worktime"); work != nullptr && !work->values.empty()) {
-            f.work_time_ms = core::saturating_cast<std::uint32_t>(work->values[0].real * 1000.0 + 0.5);
+            f.work_time_ms = annokit::core::saturating_cast<std::uint32_t>(work->values[0].real * 1000.0 + 0.5);
         }
         const auto seconds_ms = [&](const char* key) -> std::uint32_t {
             const cod::Field* field = r.field(key);
             return field != nullptr && !field->values.empty()
-                       ? core::saturating_cast<std::uint32_t>(field->values[0].real * 1000.0 + 0.5)
+                       ? annokit::core::saturating_cast<std::uint32_t>(field->values[0].real * 1000.0 + 0.5)
                        : 0U;
         };
         const auto tons = [&](const char* key) -> std::uint32_t {
             const cod::Field* field = r.field(key);
             return field != nullptr && !field->values.empty()
-                       ? core::saturating_cast<std::uint32_t>(field->values[0].real * kStockUnitsPerTon)
+                       ? annokit::core::saturating_cast<std::uint32_t>(field->values[0].real * kStockUnitsPerTon)
                        : 0U;
         };
         f.ship.cargo_slots = static_cast<std::uint8_t>(std::clamp(r.integer("Maxware"), 0, 255));
@@ -74,7 +75,7 @@ core::Result<FigureTable> FigureTable::from_cod(const cod::Document& figuren) {
         f.combat.max_health = f.ship.max_health;
         f.combat.hit = f.ship.hit;
         if (const cod::Field* radius = r.field("Shotradius"); radius != nullptr && !radius->values.empty()) {
-            f.combat.range8 = core::saturating_cast<std::uint32_t>(radius->values[0].real * 8.0);
+            f.combat.range8 = annokit::core::saturating_cast<std::uint32_t>(radius->values[0].real * 8.0);
         }
         f.combat.hit_delay_ms = f.ship.shot_ms;
         if (r.field("Stirbtime") != nullptr) {
@@ -175,7 +176,7 @@ std::uint32_t figure_sprite(const FigureType& type, std::size_t anim, std::uint3
     return type.gfx + dir * type.rotate;
 }
 
-core::Result<std::uint32_t> FigureTable::add(const FigureType& like) {
+annokit::core::Result<std::uint32_t> FigureTable::add(const FigureType& like) {
     for (std::uint32_t number = kMaxFigures; number-- > 0;) {
         if (number >= m_types.size() || !m_types[number].defined) {
             if (number >= m_types.size()) {
@@ -192,7 +193,7 @@ core::Result<std::uint32_t> FigureTable::add(const FigureType& like) {
                       "figuren.cod has no number free below " + std::to_string(kMaxFigures) + " for another figure");
 }
 
-core::Result<std::uint32_t> FigureTable::add_unit_family(std::span<const FigureType> colours) {
+annokit::core::Result<std::uint32_t> FigureTable::add_unit_family(std::span<const FigureType> colours) {
     if (colours.size() != kUnitVariants) {
         return make_error(ErrorCode::OutOfRange, "a unit family has " + std::to_string(kUnitVariants) + " colours");
     }
@@ -206,7 +207,8 @@ core::Result<std::uint32_t> FigureTable::add_unit_family(std::span<const FigureT
     return *first;
 }
 
-core::Result<std::uint32_t> FigureTable::add_ship(std::span<const FigureType> ship_and_wreck, std::uint8_t type) {
+annokit::core::Result<std::uint32_t> FigureTable::add_ship(std::span<const FigureType> ship_and_wreck,
+                                                           std::uint8_t type) {
     if (ship_and_wreck.size() != 2 || type >= figure::kShips.size()) {
         return make_error(ErrorCode::OutOfRange, "a ship of a package is a ship and its wreck, of one of " +
                                                      std::to_string(figure::kShips.size()) + " types");
@@ -248,12 +250,12 @@ std::optional<std::uint32_t> FigureTable::add_block(std::span<const FigureType> 
     return std::nullopt;
 }
 
-core::Result<FigureTable> FigureTable::load(const GameDirectory& game) {
+annokit::core::Result<FigureTable> FigureTable::load(const GameDirectory& game) {
     const auto path = game.resolve("figuren.cod");
     if (!path) {
         return make_error(ErrorCode::NotFound, "figuren.cod not found in the game directory");
     }
-    auto bytes = core::read_file(*path);
+    auto bytes = annokit::core::read_file(*path);
     if (!bytes) {
         return bytes.error();
     }

@@ -13,13 +13,14 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/audio/mixer.hpp"
+#include "annokit/audio/sound_file.hpp"
+#include "annokit/audio/wav.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/assets/package_sounds.hpp"
 #include "o1602/audio/game_audio.hpp"
-#include "o1602/audio/mixer.hpp"
 #include "o1602/audio/package_music.hpp"
-#include "o1602/audio/sound_file.hpp"
-#include "o1602/audio/wav.hpp"
-#include "o1602/core/file.hpp"
 
 using namespace o1602;
 
@@ -58,8 +59,8 @@ std::vector<std::uint8_t> wave(std::uint16_t format, std::uint16_t channels, std
     return v;
 }
 
-std::shared_ptr<audio::Pcm> constant(std::uint32_t rate, std::size_t frames, std::int16_t value) {
-    auto p = std::make_shared<audio::Pcm>();
+std::shared_ptr<annokit::audio::Pcm> constant(std::uint32_t rate, std::size_t frames, std::int16_t value) {
+    auto p = std::make_shared<annokit::audio::Pcm>();
     p->rate = rate;
     p->channels = 1;
     p->samples.assign(frames, value);
@@ -70,7 +71,7 @@ std::shared_ptr<audio::Pcm> constant(std::uint32_t rate, std::size_t frames, std
 
 TEST_CASE("audio: 8-bit PCM as in SAMPLES and Speech8") {
     const auto bytes = wave(1, 1, 22050, 8, {128, 255, 0, 192});
-    auto pcm = audio::decode_wav(bytes);
+    auto pcm = annokit::audio::decode_wav(bytes);
     REQUIRE(pcm.ok());
     CHECK(pcm->rate == 22050);
     CHECK(pcm->channels == 1);
@@ -83,19 +84,19 @@ TEST_CASE("audio: 8-bit PCM as in SAMPLES and Speech8") {
 }
 
 TEST_CASE("audio: damaged and unknown files fail without crashing") {
-    CHECK(!audio::decode_wav(std::vector<std::uint8_t>{1, 2, 3}).ok());
+    CHECK(!annokit::audio::decode_wav(std::vector<std::uint8_t>{1, 2, 3}).ok());
     auto bytes = wave(1, 1, 22050, 8, {128, 128});
     bytes.resize(30);  // cut inside the fmt chunk
-    CHECK(!audio::decode_wav(bytes).ok());
-    CHECK(!audio::decode_wav(wave(0x55, 2, 22050, 16, {0, 0, 0, 0})).ok());  // MP3
-    CHECK(!audio::decode_wav(wave(1, 7, 22050, 8, {0})).ok());
+    CHECK(!annokit::audio::decode_wav(bytes).ok());
+    CHECK(!annokit::audio::decode_wav(wave(0x55, 2, 22050, 16, {0, 0, 0, 0})).ok());  // MP3
+    CHECK(!annokit::audio::decode_wav(wave(1, 7, 22050, 8, {0})).ok());
 }
 
 TEST_CASE("audio: the mixer resamples, pans and clips") {
-    audio::Mixer m(44100, 4);
+    annokit::audio::Mixer m(44100, 4);
     // A 22050 Hz sound lasts twice as many output frames.
     const auto id = m.play(constant(22050, 100, 10000));
-    REQUIRE(id != audio::Mixer::kNoVoice);
+    REQUIRE(id != annokit::audio::Mixer::kNoVoice);
     std::vector<std::int16_t> out(2 * 150);
     m.mix(out.data(), 150);
     CHECK(out[0] == 10000);
@@ -104,7 +105,7 @@ TEST_CASE("audio: the mixer resamples, pans and clips") {
     m.mix(out.data(), 60);
     CHECK(!m.playing(id));
     // Hard left.
-    audio::PlayOptions left;
+    annokit::audio::PlayOptions left;
     left.pan = -1.0F;
     m.play(constant(44100, 10, 8000), left);
     m.mix(out.data(), 1);
@@ -118,9 +119,9 @@ TEST_CASE("audio: the mixer resamples, pans and clips") {
 }
 
 TEST_CASE("audio: group volumes; a full mixer drops the oldest effect, never the music") {
-    audio::Mixer m(22050, 2);
-    audio::PlayOptions music;
-    music.group = audio::Group::Music;
+    annokit::audio::Mixer m(22050, 2);
+    annokit::audio::PlayOptions music;
+    music.group = annokit::audio::Group::Music;
     music.loop = true;
     const auto song = m.play(constant(22050, 4, 1000), music);
     const auto first = m.play(constant(22050, 1000, 1000));
@@ -131,13 +132,13 @@ TEST_CASE("audio: group volumes; a full mixer drops the oldest effect, never the
     std::vector<std::int16_t> out(2 * 16);
     m.mix(out.data(), 16);  // the music loops
     CHECK(m.playing(song));
-    m.stop_group(audio::Group::Effects);
-    m.set_group_volume(audio::Group::Effects, 0.5F);
+    m.stop_group(annokit::audio::Group::Effects);
+    m.set_group_volume(annokit::audio::Group::Effects, 0.5F);
     m.play(constant(22050, 10, 2000));
     m.stop(song);
     m.mix(out.data(), 1);
     CHECK(out[0] == 1000);
-    CHECK(m.playing_count(audio::Group::Music) == 0);
+    CHECK(m.playing_count(annokit::audio::Group::Music) == 0);
 }
 
 namespace {
@@ -169,7 +170,7 @@ struct FakeGame {
         std::filesystem::remove_all(root, ec);
     }
     void write(const std::string& path, const std::vector<std::uint8_t>& bytes) const {
-        REQUIRE(core::write_file(root / path, bytes).ok());
+        REQUIRE(annokit::core::write_file(root / path, bytes).ok());
     }
 };
 
@@ -177,7 +178,7 @@ struct FakeGame {
 
 TEST_CASE("audio: the 4-bit music of MUSIC8 (IMA steps without the rounding term)") {
     // 0x7F: left nibble 7 (step 7: (28 + 14 + 7) >> 2 = 12), right nibble 15 (-12).
-    auto pcm = audio::decode_wav(wave(1, 2, 22050, 4, {0x7F, 0x00}, 4));
+    auto pcm = annokit::audio::decode_wav(wave(1, 2, 22050, 4, {0x7F, 0x00}, 4));
     REQUIRE(pcm.ok());
     CHECK(pcm->channels == 2);
     REQUIRE(pcm->samples.size() == 4);
@@ -227,7 +228,7 @@ TEST_CASE("audio: effects play inside the view only, pan with x, and ten per fra
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 64);
+    annokit::audio::Mixer mixer(22050, 64);
     audio::Effects effects(mixer, bank);
     effects.set_copies(64);  // the limit per frame alone
     for (int i = 0; i < 15; ++i) {
@@ -235,7 +236,7 @@ TEST_CASE("audio: effects play inside the view only, pan with x, and ten per fra
     }
     effects.request(audio::kWavEvent, 2.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 10);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 10);
 }
 
 TEST_CASE("audio: a sound still playing is not started again, as in the History Edition") {
@@ -243,7 +244,7 @@ TEST_CASE("audio: a sound still playing is not started again, as in the History 
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 64);
+    annokit::audio::Mixer mixer(22050, 64);
     audio::Effects effects(mixer, bank);
     CHECK(effects.copies() == 1);
     // A wood full of birds asks for the same call again and again: one plays.
@@ -251,24 +252,24 @@ TEST_CASE("audio: a sound still playing is not started again, as in the History 
         effects.request(audio::kWavEvent, 0.0F, 0.0F);
         effects.request(audio::kWavEvent, 0.5F, 0.0F);
         effects.flush();
-        CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+        CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     }
     // Once it has finished, it plays again.
     std::vector<std::int16_t> out(2 * 22050);
-    for (int i = 0; i < 20 && mixer.playing_count(audio::Group::Effects) > 0; ++i) {
+    for (int i = 0; i < 20 && mixer.playing_count(annokit::audio::Group::Effects) > 0; ++i) {
         mixer.mix(out.data(), 22050);
     }
-    REQUIRE(mixer.playing_count(audio::Group::Effects) == 0);
+    REQUIRE(mixer.playing_count(annokit::audio::Group::Effects) == 0);
     effects.request(audio::kWavEvent, 0.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     // Up to five at once, as the King's Edition allowed.
     effects.set_copies(5);
     for (int i = 0; i < 8; ++i) {
         effects.request(audio::kWavEvent, 0.0F, 0.0F);
     }
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 5);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 5);
 }
 
 TEST_CASE("audio: a voice without a message (the menu's banner choice), not when speech is off") {
@@ -276,7 +277,7 @@ TEST_CASE("audio: a voice without a message (the menu's banner choice), not when
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Effects effects(mixer, bank);
     audio::Voices voices(mixer, bank, effects);
     CHECK(voices.speak(107, 5));
@@ -293,7 +294,7 @@ TEST_CASE("audio: voice messages wait in four slots and speak one at a time") {
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Effects effects(mixer, bank);
     audio::Voices voices(mixer, bank, effects);
     // Plague (message 1): voices 282, 284, 286; it asks for normal speed.
@@ -303,7 +304,7 @@ TEST_CASE("audio: voice messages wait in four slots and speak one at a time") {
     }
     CHECK(voices.waiting() == 4);
     effects.flush();  // the fifth found no room: event.wav
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     voices.update();
     CHECK(voices.speaking());
     CHECK(voices.waiting() == 3);
@@ -340,7 +341,7 @@ TEST_CASE("audio: messages with a video play it instead of their voice") {
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Effects effects(mixer, bank);
     audio::Voices voices(mixer, bank, effects);
     // Without a way to play videos (the viewer without --videos, the tests): the voice.
@@ -401,7 +402,7 @@ TEST_CASE("audio: a message of a mod speaks its own sound and picks voices and v
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Effects effects(mixer, bank);
     audio::Voices voices(mixer, bank, effects);
     audio::MessagePlayback own;
@@ -422,7 +423,7 @@ TEST_CASE("audio: a message of a mod speaks its own sound and picks voices and v
     voices.message(own, false);
     CHECK(voices.waiting() == 0);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     // A video of its own number, not the voices' base.
     voices.set_settings(audio::AudioSettings{});
     voices.set_video_check([](std::uint16_t) { return true; });
@@ -447,7 +448,7 @@ TEST_CASE("audio: music by name, battle music near shots, back after 25 s with a
     CHECK((tracks == std::vector<std::string>{"A Song", "b Song", "c song"}));
     CHECK((fights == std::vector<std::string>{"Fight1", "Fight2"}));
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Music music(mixer, bank, tracks, fights);
     audio::AudioSettings s;
     s.random_music = false;
@@ -536,7 +537,7 @@ TEST_CASE("audio: scenery is heard no farther than in the original's view at tha
 namespace {
 
 std::vector<std::uint8_t> sound_fixture(const char* name) {
-    auto bytes = core::read_file(std::filesystem::path(O1602_TEST_SOUNDS) / name);
+    auto bytes = annokit::core::read_file(std::filesystem::path(O1602_TEST_SOUNDS) / name);
     REQUIRE(bytes.ok());
     return std::move(bytes).value();
 }
@@ -545,7 +546,7 @@ std::vector<std::uint8_t> sound_fixture(const char* name) {
 
 TEST_CASE("audio: Ogg Vorbis and FLAC files of packages are decoded, others refused") {
     // tone.flac: 0.05 s of 440 Hz at 8000 Hz, the right channel at half the left's level.
-    const auto flac = audio::decode_sound(sound_fixture("tone.flac"));
+    const auto flac = annokit::audio::decode_sound(sound_fixture("tone.flac"));
     REQUIRE(flac.ok());
     CHECK(flac->rate == 8000);
     CHECK(flac->channels == 2);
@@ -560,7 +561,7 @@ TEST_CASE("audio: Ogg Vorbis and FLAC files of packages are decoded, others refu
     CHECK(loudest > 1000);
 
     // tone.ogg: the same tone, mono.
-    const auto ogg = audio::decode_sound(sound_fixture("tone.ogg"));
+    const auto ogg = annokit::audio::decode_sound(sound_fixture("tone.ogg"));
     REQUIRE(ogg.ok());
     CHECK(ogg->rate == 8000);
     CHECK(ogg->channels == 1);
@@ -569,16 +570,16 @@ TEST_CASE("audio: Ogg Vorbis and FLAC files of packages are decoded, others refu
     CHECK(*std::max_element(ogg->samples.begin(), ogg->samples.end()) > 1000);
 
     // WAVE goes on through decode_wav; anything else, or a stream cut off at its start, is refused.
-    const auto wav = audio::decode_sound(wave(1, 1, 22050, 8, std::vector<std::uint8_t>(100, 200)));
+    const auto wav = annokit::audio::decode_sound(wave(1, 1, 22050, 8, std::vector<std::uint8_t>(100, 200)));
     REQUIRE(wav.ok());
     CHECK(wav->frames() == 100);
-    CHECK(!audio::decode_sound(std::vector<std::uint8_t>{'I', 'D', '3', 4, 0, 0}).ok());
+    CHECK(!annokit::audio::decode_sound(std::vector<std::uint8_t>{'I', 'D', '3', 4, 0, 0}).ok());
     auto cut = sound_fixture("tone.ogg");
     cut.resize(60);
-    CHECK(!audio::decode_sound(cut).ok());
+    CHECK(!annokit::audio::decode_sound(cut).ok());
     auto cut_flac = sound_fixture("tone.flac");
     cut_flac.resize(20);
-    CHECK(!audio::decode_sound(cut_flac).ok());
+    CHECK(!annokit::audio::decode_sound(cut_flac).ok());
 }
 
 TEST_CASE("audio: music.toml adds a package's tracks after MUSIC8's") {
@@ -631,7 +632,7 @@ TEST_CASE("audio: music.toml adds a package's tracks after MUSIC8's") {
     std::vector<std::string> fights;
     audio::Music::scan(*game, tracks, fights);
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Music music(mixer, bank, tracks, fights, 1602, own);
     CHECK((music.tracks() == std::vector<std::string>{"A Song", "b Song", "c song", "Sea Shanty"}));
     music.play("Sea Shanty");
@@ -671,7 +672,7 @@ TEST_CASE("audio: music.toml replaces a track of MUSIC8 by its title") {
     // The original's file no longer decodes: what plays is the package's.
     fake.write("MUSIC8/b Song.wav", {'n', 'o'});
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 8);
+    annokit::audio::Mixer mixer(22050, 8);
     audio::Music music(mixer, bank, tracks, fights, 1602, own);
     CHECK((music.tracks() == std::vector<std::string>{"A Song", "b Song", "c song"}));
     music.play("b Song");
@@ -688,22 +689,22 @@ TEST_CASE("audio: a package's sound plays by its number among the original's") {
     auto game = assets::GameDirectory::open(fake.root);
     REQUIRE(game.ok());
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 64);
+    annokit::audio::Mixer mixer(22050, 64);
     audio::Effects effects(mixer, bank);
-    auto pcm = std::make_shared<audio::Pcm>();
+    auto pcm = std::make_shared<annokit::audio::Pcm>();
     pcm->samples.assign(2205, 1000);
     effects.set_package_sounds({pcm, nullptr});
     effects.request(assets::kFirstPackageSound, 0.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     // One that could not be decoded, and one beyond the packages', stay silent.
     effects.request(static_cast<audio::SampleId>(assets::kFirstPackageSound + 1), 0.0F, 0.0F);
     effects.request(static_cast<audio::SampleId>(assets::kFirstPackageSound + 7), 0.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
     effects.request(audio::kWavEvent, 0.0F, 0.0F);  // the original's still
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 2);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 2);
 }
 
 TEST_CASE("audio: a package's sound plays in place of the original's") {
@@ -730,19 +731,19 @@ TEST_CASE("audio: a package's sound plays in place of the original's") {
     // The original's file no longer decodes: what plays is the package's.
     fake.write("SAMPLES/Event.wav", {'n', 'o'});
     audio::SoundBank bank(*game);
-    audio::Mixer mixer(22050, 64);
+    annokit::audio::Mixer mixer(22050, 64);
     audio::Effects effects(mixer, bank);
     effects.request(audio::kWavEvent, 0.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 0);
-    auto pcm = std::make_shared<audio::Pcm>();
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 0);
+    auto pcm = std::make_shared<annokit::audio::Pcm>();
     pcm->samples.assign(2205, 1000);
-    std::vector<std::shared_ptr<const audio::Pcm>> replaced(audio::kWavEvent + 1);
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> replaced(audio::kWavEvent + 1);
     replaced[audio::kWavEvent] = pcm;
     effects.set_replaced_sounds(std::move(replaced));
     effects.request(audio::kWavEvent, 0.0F, 0.0F);
     effects.flush();
-    CHECK(mixer.playing_count(audio::Group::Effects) == 1);
+    CHECK(mixer.playing_count(annokit::audio::Group::Effects) == 1);
 }
 
 TEST_CASE("audio: sounds.toml numbers a package's sounds after the original's") {

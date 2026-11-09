@@ -5,7 +5,8 @@
 #include <cstdio>
 #include <string>
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
+
 #include "o1602/sim/game_data.hpp"
 
 namespace o1602::app {
@@ -94,7 +95,7 @@ GameSound::GameSound(const assets::GameDirectory& game, bool effects, bool music
       m_allow_music(music) {
     // The settings of the original's Game.dat, read only (Open1602 never writes it).
     if (const auto path = game.resolve("Game.dat")) {
-        if (auto text = core::read_file(*path)) {
+        if (auto text = annokit::core::read_file(*path)) {
             m_settings = audio::parse_audio_settings(std::string(text->begin(), text->end()));
         }
     }
@@ -126,7 +127,7 @@ bool GameSound::open_device() {
     if (m_output != nullptr) {
         return true;
     }
-    auto output = platform::AudioOutput::open(kRate);
+    auto output = annokit::platform::AudioOutput::open(kRate);
     if (!output) {
         std::fprintf(stderr, "no sound: %s\n", output.error().message.c_str());
         return false;
@@ -157,7 +158,7 @@ void GameSound::set_package_sounds(std::span<const assets::PackageSound> sounds)
         return;
     }
     m_package_sounds.assign(sounds.begin(), sounds.end());
-    std::vector<std::shared_ptr<const audio::Pcm>> decoded;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> decoded;
     for (const assets::PackageSound& sound : m_package_sounds) {
         const std::size_t slot = sound.number - assets::kFirstPackageSound;
         if (decoded.size() <= slot) {
@@ -168,10 +169,10 @@ void GameSound::set_package_sounds(std::span<const assets::PackageSound> sounds)
             std::fprintf(stderr, "sounds.toml: %s: %s\n", sound.id.c_str(), pcm.error().message.c_str());
             continue;
         }
-        decoded[slot] = std::make_shared<const audio::Pcm>(std::move(pcm).value());
+        decoded[slot] = std::make_shared<const annokit::audio::Pcm>(std::move(pcm).value());
     }
     // In place of the original's: a later package's wins.
-    std::vector<std::shared_ptr<const audio::Pcm>> replaced;
+    std::vector<std::shared_ptr<const annokit::audio::Pcm>> replaced;
     for (const assets::PackageSound& sound : m_package_sounds) {
         const std::size_t slot = sound.number - assets::kFirstPackageSound;
         if (sound.replaces.empty() || !decoded[slot]) {
@@ -551,7 +552,7 @@ void GameSound::order(bool ship, bool attack, double tile_x, double tile_y) {
     }
 }
 
-void GameSound::start_video(const std::vector<std::shared_ptr<const audio::Pcm>>& tracks) {
+void GameSound::start_video(const std::vector<std::shared_ptr<const annokit::audio::Pcm>>& tracks) {
     stop_video();
     m_video = true;
     if (m_output == nullptr) {
@@ -563,8 +564,8 @@ void GameSound::start_video(const std::vector<std::shared_ptr<const audio::Pcm>>
     }
     for (const auto& pcm : tracks) {
         // The sample volume, for every track (the original leaves track 2 at full volume, U-019).
-        audio::PlayOptions o;
-        o.group = audio::Group::Speech;
+        annokit::audio::PlayOptions o;
+        o.group = annokit::audio::Group::Speech;
         o.volume = audio::gain_of(m_settings.effect_volume);
         m_video_voices.push_back(m_mixer.play(pcm, o));
     }

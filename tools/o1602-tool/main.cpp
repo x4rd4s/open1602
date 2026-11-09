@@ -36,7 +36,7 @@
 
 namespace o1602::tool {
 
-int fail(const core::Error& error) {
+int fail(const annokit::core::Error& error) {
     std::fprintf(stderr, "error: %s\n", error.message.c_str());
     return 1;
 }
@@ -115,17 +115,18 @@ int usage() {
     return 2;
 }
 
-core::Result<assets::Palette> load_palette(const Args& args) {
+annokit::core::Result<assets::Palette> load_palette(const Args& args) {
     if (const auto it = args.options.find("--palette"); it != args.options.end()) {
         return assets::Palette::load(fs::path(it->second));
     }
     auto dir = assets::GameDirectory::from_environment();
     if (!dir) {
-        return core::make_error(core::ErrorCode::NotFound, "no --palette given and " + dir.error().message);
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         "no --palette given and " + dir.error().message);
     }
     const auto path = dir->resolve("toolgfx/stadtfld.col");
     if (!path) {
-        return core::make_error(core::ErrorCode::NotFound, "TOOLGFX/STADTFLD.COL not found");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound, "TOOLGFX/STADTFLD.COL not found");
     }
     return assets::Palette::load(*path);
 }

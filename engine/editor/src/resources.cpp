@@ -10,8 +10,8 @@
 
 namespace o1602::editor {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 using Deposit = assets::IslandHeader::Deposit;
 
 namespace {
@@ -93,8 +93,10 @@ ResourceRefusal resource_fits(const sim::World& world, const assets::BuildingTab
     return ResourceRefusal::NoIsland;
 }
 
-core::Result<std::unique_ptr<Operation>> place_resource(const sim::World& world, const assets::BuildingTable& buildings,
-                                                        std::uint16_t island, sim::TilePos tile, Resource resource) {
+annokit::core::Result<std::unique_ptr<Operation>> place_resource(const sim::World& world,
+                                                                 const assets::BuildingTable& buildings,
+                                                                 std::uint16_t island, sim::TilePos tile,
+                                                                 Resource resource) {
     const ResourceRefusal refused = resource_fits(world, buildings, island, tile, resource);
     if (refused != ResourceRefusal::None) {
         return make_error(ErrorCode::InvalidFormat, refusal_name(refused));
@@ -132,9 +134,9 @@ core::Result<std::unique_ptr<Operation>> place_resource(const sim::World& world,
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "resource_place"));
 }
 
-core::Result<std::unique_ptr<Operation>> remove_resource(const sim::World& world,
-                                                         const assets::BuildingTable& buildings, std::uint16_t island,
-                                                         sim::TilePos tile) {
+annokit::core::Result<std::unique_ptr<Operation>> remove_resource(const sim::World& world,
+                                                                  const assets::BuildingTable& buildings,
+                                                                  std::uint16_t island, sim::TilePos tile) {
     if (island >= world.islands().size() || !world.islands()[island].map.contains(tile.x, tile.y)) {
         return make_error(ErrorCode::NotFound, "not on an island");
     }

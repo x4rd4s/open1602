@@ -6,11 +6,12 @@
 
 #include "../test_framework.hpp"
 
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/world.hpp"
@@ -195,13 +196,13 @@ TEST_CASE("explore: a running exploration is saved with the fleet (S-092)") {
     const std::uint32_t id = c.add(41, 21);
     REQUIRE(c.fleet->explore(sim::ExploreOrder{0, id}));
     c.run(4'000);
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     c.fleet->save(out);
     const std::uint8_t steps = c.world.ship(id)->explore_steps;
     const std::uint64_t next = c.world.ship(id)->explore_next_ms;
     c.world.ship(id)->explore_steps = 0;
     sim::Fleet loaded(c.world, c.buildings, c.figures, c.rules);
-    core::ByteReader in(out.data());
+    annokit::core::ByteReader in(out.data());
     REQUIRE(loaded.load(in, c.fleet->state_version()));
     CHECK(c.world.ship(id)->explore_steps == steps);
     CHECK(c.world.ship(id)->explore_next_ms == next);

@@ -8,12 +8,12 @@
 #include <functional>
 #include <system_error>
 
-#include "o1602/core/file.hpp"
+#include "annokit/core/file.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -77,7 +77,7 @@ std::string name_at(const std::uint8_t* p) {
 /// Reads `count` bytes at `offset` of the archive, from the file or from memory.
 using ReadAt = std::function<bool(std::uint64_t offset, std::size_t count, std::uint8_t* out)>;
 
-core::Result<std::vector<RdaArchive::Entry>> read_directory(std::uint64_t size, const ReadAt& read_at) {
+annokit::core::Result<std::vector<RdaArchive::Entry>> read_directory(std::uint64_t size, const ReadAt& read_at) {
     std::array<std::uint8_t, 8> word{};
     std::array<std::uint8_t, kMagic.size()> magic{};
     if (size < kFirstBlockAt + 8 || !read_at(0, magic.size(), magic.data()) ||
@@ -145,15 +145,15 @@ bool same_name(std::string_view a, std::string_view b) {
 
 }  // namespace
 
-core::Result<RdaArchive> RdaArchive::open(const std::filesystem::path& path) {
+annokit::core::Result<RdaArchive> RdaArchive::open(const std::filesystem::path& path) {
     std::error_code ec;
     const std::uintmax_t size = std::filesystem::file_size(path, ec);
     if (ec) {
-        return make_error(ErrorCode::NotFound, core::path_to_utf8(path) + ": " + ec.message());
+        return make_error(ErrorCode::NotFound, annokit::core::path_to_utf8(path) + ": " + ec.message());
     }
     std::ifstream in(path, std::ios::binary);
     if (!in) {
-        return make_error(ErrorCode::NotFound, core::path_to_utf8(path) + " cannot be read");
+        return make_error(ErrorCode::NotFound, annokit::core::path_to_utf8(path) + " cannot be read");
     }
     const ReadAt read_at = [&](std::uint64_t offset, std::size_t count, std::uint8_t* out) {
         if (offset > size || count > size - offset) {
@@ -165,7 +165,7 @@ core::Result<RdaArchive> RdaArchive::open(const std::filesystem::path& path) {
     };
     auto entries = read_directory(size, read_at);
     if (!entries) {
-        return make_error(entries.error().code, core::path_to_utf8(path) + ": " + entries.error().message);
+        return make_error(entries.error().code, annokit::core::path_to_utf8(path) + ": " + entries.error().message);
     }
     RdaArchive archive;
     archive.m_path = path;
@@ -173,7 +173,7 @@ core::Result<RdaArchive> RdaArchive::open(const std::filesystem::path& path) {
     return archive;
 }
 
-core::Result<RdaArchive> RdaArchive::from_bytes(std::vector<std::uint8_t> bytes) {
+annokit::core::Result<RdaArchive> RdaArchive::from_bytes(std::vector<std::uint8_t> bytes) {
     const std::uint64_t size = bytes.size();
     const ReadAt read_at = [&](std::uint64_t offset, std::size_t count, std::uint8_t* out) {
         if (offset > size || count > size - offset) {
@@ -198,7 +198,7 @@ const RdaArchive::Entry* RdaArchive::find(std::string_view name) const {
     return it == m_entries.end() ? nullptr : &*it;
 }
 
-core::Result<std::vector<std::uint8_t>> RdaArchive::read(std::string_view name) const {
+annokit::core::Result<std::vector<std::uint8_t>> RdaArchive::read(std::string_view name) const {
     const Entry* entry = find(name);
     if (entry == nullptr) {
         return make_error(ErrorCode::NotFound, std::string(name) + " is not in the archive");
@@ -206,7 +206,7 @@ core::Result<std::vector<std::uint8_t>> RdaArchive::read(std::string_view name) 
     if (!entry->readable) {
         return make_error(ErrorCode::InvalidFormat, std::string(name) + " is compressed or encrypted");
     }
-    if (entry->size > core::kMaxReadSize) {
+    if (entry->size > annokit::core::kMaxReadSize) {
         return make_error(ErrorCode::InvalidFormat, std::string(name) + " is too large");
     }
     std::vector<std::uint8_t> out(static_cast<std::size_t>(entry->size));

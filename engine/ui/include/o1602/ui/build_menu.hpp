@@ -16,11 +16,12 @@
 #include <string_view>
 #include <vector>
 
+#include "annokit/core/result.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/gad.hpp"
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/own_buildings.hpp"
-#include "o1602/core/result.hpp"
 
 namespace o1602::ui {
 
@@ -85,9 +86,10 @@ inline constexpr std::size_t kMaxRowIcons = 4;
 /// into a category's row, moving it if it is listed already, or takes it out of the
 /// menu (`remove = true`). What is wrong in a table is passed over with a warning that names the
 /// file and the line; a file that cannot be read is an error and changes nothing.
-core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_view package, std::string_view utf8,
-                                      const assets::BuildingTable& buildings, std::vector<std::string>& warnings,
-                                      std::span<const assets::OwnBuilding> own = {});
+annokit::core::Status apply_build_menu_package(BuildMenuDefinition& menu, std::string_view package,
+                                               std::string_view utf8, const assets::BuildingTable& buildings,
+                                               std::vector<std::string>& warnings,
+                                               std::span<const assets::OwnBuilding> own = {});
 /// The build_menu.toml of every package that has one (<package folder>/build_menu.toml), in the
 /// order given (their load order), applied to a copy of `menu`.
 [[nodiscard]] BuildMenuDefinition load_build_menu_mods(const BuildMenuDefinition& menu,

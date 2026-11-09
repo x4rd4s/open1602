@@ -11,7 +11,7 @@
 
 #include "viewer_options.hpp"
 
-#include "o1602/core/result.hpp"
+#include "annokit/core/result.hpp"
 
 namespace o1602::app {
 
@@ -47,6 +47,6 @@ struct CommandLine {
 
 /// The arguments after the program's name (argv[1] ...). An unknown option, a missing value or one
 /// out of range is an error that names it.
-[[nodiscard]] core::Result<CommandLine> parse_command_line(int argc, const char* const* argv);
+[[nodiscard]] annokit::core::Result<CommandLine> parse_command_line(int argc, const char* const* argv);
 
 }  // namespace o1602::app

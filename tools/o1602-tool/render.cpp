@@ -14,6 +14,8 @@
 #include "mod_rules.hpp"
 #include "tool.hpp"
 
+#include "annokit/core/png_writer.hpp"
+
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/chunk_file.hpp"
 #include "o1602/assets/data_fixes.hpp"
@@ -24,7 +26,6 @@
 #include "o1602/assets/savegame.hpp"
 #include "o1602/assets/sprite_sheet.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/png_writer.hpp"
 #include "o1602/render/animation_clock.hpp"
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/render/land_figures.hpp"
@@ -64,8 +65,8 @@ int cmd_render_island(const Args& args) {
     }
     const std::size_t island_index = args.number("--island").value_or(0);
     if (island_index >= islands->size()) {
-        return fail(core::make_error(core::ErrorCode::OutOfRange,
-                                     "file has " + std::to_string(islands->size()) + " island(s)"));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::OutOfRange,
+                                              "file has " + std::to_string(islands->size()) + " island(s)"));
     }
     // Base terrain: islands in scenarios/savegames only store deviations from a template .SCP.
     const assets::Island& island = (*islands)[island_index];
@@ -76,8 +77,8 @@ int cmd_render_island(const Args& args) {
     } else if (!args.flag("--no-template") && !island.header.template_path().empty()) {
         const auto resolved = game->resolve(island.header.template_path());
         if (!resolved) {
-            return fail(core::make_error(core::ErrorCode::NotFound,
-                                         "island template not found: " + island.header.template_path()));
+            return fail(annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                                  "island template not found: " + island.header.template_path()));
         }
         base_path = resolved->string();
     }
@@ -88,7 +89,8 @@ int cmd_render_island(const Args& args) {
         }
         auto loaded = assets::load_islands(*base_file);
         if (!loaded || loaded->empty()) {
-            return fail(core::make_error(core::ErrorCode::InvalidFormat, base_path + " has no island"));
+            return fail(
+                annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, base_path + " has no island"));
         }
         base = std::move(loaded).value();
         std::printf("template: %s\n", base_path.c_str());
@@ -115,9 +117,10 @@ int cmd_render_island(const Args& args) {
     std::size_t missing = 0;
     const auto image = render::rasterize(commands, *sheet, *palette, assets::Rgba{24, 40, 72, 255}, &missing);
     if (image.width == 0) {
-        return fail(core::make_error(core::ErrorCode::InvalidFormat, "nothing to draw"));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat, "nothing to draw"));
     }
-    if (auto status = core::write_png_rgba(fs::path(args.positional[1]), image.width, image.height, image.pixels);
+    if (auto status =
+            annokit::core::write_png_rgba(fs::path(args.positional[1]), image.width, image.height, image.pixels);
         !status) {
         return fail(status.error());
     }
@@ -159,7 +162,7 @@ int cmd_render_world(const Args& args) {
 
     const auto palette_path = game->resolve(render::kTerrainPalettePath);
     if (!palette_path) {
-        return fail(core::make_error(core::ErrorCode::NotFound, "stadtfld.col not found"));
+        return fail(annokit::core::make_error(annokit::core::ErrorCode::NotFound, "stadtfld.col not found"));
     }
     auto palette = assets::Palette::load(*palette_path);
     if (!palette) {
@@ -296,7 +299,8 @@ int cmd_render_world(const Args& args) {
         const auto rgb = static_cast<std::uint32_t>(std::strtoul(spec.substr(colon + 1).c_str(), nullptr, 16));
         auto players = world->players();
         if (slot >= players.size()) {
-            return fail(core::make_error(core::ErrorCode::OutOfRange, "no player " + std::to_string(slot)));
+            return fail(
+                annokit::core::make_error(annokit::core::ErrorCode::OutOfRange, "no player " + std::to_string(slot)));
         }
         players[slot].banner =
             banners.add_colour("custom:" + spec.substr(colon + 1),
@@ -329,8 +333,9 @@ int cmd_render_world(const Args& args) {
         viewport.top = cy - viewport.height / 2;
     }
     if (std::int64_t{viewport.width} * viewport.height > 200'000'000) {
-        return fail(core::make_error(core::ErrorCode::OutOfRange,
-                                     "image too large; use --zoom 2 or --size/--tile for a part of the world"));
+        return fail(
+            annokit::core::make_error(annokit::core::ErrorCode::OutOfRange,
+                                      "image too large; use --zoom 2 or --size/--tile for a part of the world"));
     }
 
     render::WorldLayers layers;
@@ -372,7 +377,8 @@ int cmd_render_world(const Args& args) {
         image.pixels[i] = 255;  // black outside the map, as in the original
     }
     render::blit_draw_list(commands, *atlas, image, viewport.left, viewport.top);
-    if (auto status = core::write_png_rgba(fs::path(args.positional[1]), image.width, image.height, image.pixels);
+    if (auto status =
+            annokit::core::write_png_rgba(fs::path(args.positional[1]), image.width, image.height, image.pixels);
         !status) {
         return fail(status.error());
     }

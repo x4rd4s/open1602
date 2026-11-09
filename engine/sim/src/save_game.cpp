@@ -8,16 +8,17 @@
 
 #include "save/sections.hpp"
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/byte_writer.hpp"
-#include "o1602/core/compress.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/byte_writer.hpp"
+#include "annokit/core/compress.hpp"
+
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/validate.hpp"
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 
@@ -48,7 +49,7 @@ std::uint64_t max_size_for(const SaveMeta& meta) noexcept {
 /// META at the start of the stored sections, without unpacking more than its prefix.
 std::optional<SaveMeta> meta_of(std::span<const std::uint8_t> stored, bool compressed, std::size_t head_size = kHead) {
     if (compressed) {
-        auto head = core::zlib_inflate_prefix(stored, head_size);
+        auto head = annokit::core::zlib_inflate_prefix(stored, head_size);
         return head ? save::read_meta(*head) : std::nullopt;
     }
     return save::read_meta(stored.subspan(0, std::min(stored.size(), head_size)));
@@ -63,11 +64,11 @@ struct Header {
 };
 
 /// The header of a file of `file_size` bytes, `bytes` its start (at least the header).
-core::Result<Header> read_header(std::span<const std::uint8_t> bytes, std::uint64_t file_size) {
+annokit::core::Result<Header> read_header(std::span<const std::uint8_t> bytes, std::uint64_t file_size) {
     if (!is_open1602_save(bytes)) {
         return make_error(ErrorCode::InvalidFormat, "not an Open1602 savegame");
     }
-    core::ByteReader in(bytes.subspan(kMagic.size()));
+    annokit::core::ByteReader in(bytes.subspan(kMagic.size()));
     Header h;
     const auto version = in.u16();
     const auto flags = in.u16();
@@ -99,8 +100,8 @@ bool is_open1602_save(std::span<const std::uint8_t> bytes) noexcept {
     return bytes.size() >= kHeaderSize && std::equal(kMagic.begin(), kMagic.end(), bytes.begin());
 }
 
-core::Result<core::Bytes> write_game(const World& world, const assets::BuildingTable& buildings,
-                                     const Simulation* simulation, const SaveOptions& options) {
+annokit::core::Result<annokit::core::Bytes> write_game(const World& world, const assets::BuildingTable& buildings,
+                                                       const Simulation* simulation, const SaveOptions& options) {
     auto sections = encode_game(world, buildings, simulation);
     if (!sections) {
         return sections.error();
@@ -108,9 +109,9 @@ core::Result<core::Bytes> write_game(const World& world, const assets::BuildingT
     return pack_game(*sections, options);
 }
 
-core::Result<core::Bytes> encode_game(const World& world, const assets::BuildingTable& buildings,
-                                      const Simulation* simulation) {
-    core::Bytes sections =
+annokit::core::Result<annokit::core::Bytes> encode_game(const World& world, const assets::BuildingTable& buildings,
+                                                        const Simulation* simulation) {
+    annokit::core::Bytes sections =
         save::encode_sections(world, buildings, simulation, save::TileMode::Full, std::span<const std::uint8_t>{});
     // Before packing: a game too large to read back fails at once, not after seconds of deflate,
     // and with a message that says why (DS-4).
@@ -123,14 +124,15 @@ core::Result<core::Bytes> encode_game(const World& world, const assets::Building
     return sections;
 }
 
-core::Result<core::Bytes> pack_game(const core::Bytes& sections, const SaveOptions& options) {
+annokit::core::Result<annokit::core::Bytes> pack_game(const annokit::core::Bytes& sections,
+                                                      const SaveOptions& options) {
     std::uint16_t flags = 0;
-    core::Bytes stored;
-    if (options.compress && core::has_zlib()) {
+    annokit::core::Bytes stored;
+    if (options.compress && annokit::core::has_zlib()) {
         // SaveOptions::fast: a world of 4000 x 3346 with giants saves in 0.5 s instead of 2.2 s,
         // 59 MB instead of 38 MB.
         constexpr std::size_t kLarge = std::size_t{64} << 20;
-        auto packed = core::zlib_deflate(sections, options.fast && sections.size() > kLarge ? 1 : 6);
+        auto packed = annokit::core::zlib_deflate(sections, options.fast && sections.size() > kLarge ? 1 : 6);
         if (!packed) {
             return packed.error();
         }
@@ -142,23 +144,23 @@ core::Result<core::Bytes> pack_game(const core::Bytes& sections, const SaveOptio
     if (stored.size() > 0xFFFFFFFFULL) {
         return make_error(ErrorCode::LimitExceeded, "savegame: the game is too large");
     }
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     out.bytes(kMagic);
     out.u16(kVersion);
     out.u16(flags);
     out.u32(0);
     out.u64(sections.size());
-    out.u32(core::crc32(sections));
+    out.u32(annokit::core::crc32(sections));
     out.u32(static_cast<std::uint32_t>(stored.size()));
     out.bytes(stored);
     return out.take();
 }
 
-core::Result<SaveInfo> save_info(std::span<const std::uint8_t> bytes) {
+annokit::core::Result<SaveInfo> save_info(std::span<const std::uint8_t> bytes) {
     return save_info(bytes, bytes.size());
 }
 
-core::Result<SaveInfo> save_info(std::span<const std::uint8_t> head, std::uint64_t file_size) {
+annokit::core::Result<SaveInfo> save_info(std::span<const std::uint8_t> head, std::uint64_t file_size) {
     const std::span<const std::uint8_t> bytes = head;
     auto h = read_header(bytes, file_size);
     if (!h) {
@@ -180,8 +182,8 @@ std::optional<ScenarioInfo> scenario_info_of(std::span<const std::uint8_t> bytes
     return meta ? std::move(meta->scenario) : std::nullopt;
 }
 
-core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
-                              std::vector<std::string>* warnings, const assets::FigureTable* figures) {
+annokit::core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets::BuildingTable& buildings,
+                                       std::vector<std::string>* warnings, const assets::FigureTable* figures) {
     auto h = read_header(bytes, bytes.size());
     if (!h) {
         return h.error();
@@ -192,10 +194,10 @@ core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets:
     if (h->size > (meta ? max_size_for(*meta) : kMaxSizeWithoutMeta)) {
         return make_error(ErrorCode::InvalidFormat, "savegame: larger than its world can be (damaged)");
     }
-    core::Bytes unpacked;
+    annokit::core::Bytes unpacked;
     std::span<const std::uint8_t> sections = stored;
     if ((h->flags & kCompressed) != 0) {
-        auto data = core::zlib_inflate(stored, static_cast<std::size_t>(h->size));
+        auto data = annokit::core::zlib_inflate(stored, static_cast<std::size_t>(h->size));
         if (!data) {
             return data.error();
         }
@@ -204,7 +206,7 @@ core::Result<World> read_game(std::span<const std::uint8_t> bytes, const assets:
     } else if (stored.size() != h->size) {
         return make_error(ErrorCode::InvalidFormat, "savegame: cut off or damaged");
     }
-    if (core::crc32(sections) != h->crc) {
+    if (annokit::core::crc32(sections) != h->crc) {
         return make_error(ErrorCode::InvalidFormat, "savegame: damaged (checksum)");
     }
     auto world = save::world_from_sections(sections, buildings, warnings);

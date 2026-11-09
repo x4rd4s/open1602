@@ -353,7 +353,7 @@ void io(A& a, T& t)
 
 class Writer {
 public:
-    explicit Writer(core::ByteWriter& out) noexcept : m_out(out) {}
+    explicit Writer(annokit::core::ByteWriter& out) noexcept : m_out(out) {}
 
     void operator()(const bool& v) { m_out.boolean(v); }
     void operator()(const std::uint8_t& v) { m_out.u8(v); }
@@ -394,12 +394,12 @@ public:
     }
 
 private:
-    core::ByteWriter& m_out;
+    annokit::core::ByteWriter& m_out;
 };
 
 class Reader {
 public:
-    explicit Reader(core::ByteReader& in) noexcept : m_in(in), m_state(in) {}
+    explicit Reader(annokit::core::ByteReader& in) noexcept : m_in(in), m_state(in) {}
 
     [[nodiscard]] bool ok() const noexcept { return m_state.ok(); }
     void fail() noexcept { m_state.fail(); }
@@ -477,7 +477,7 @@ public:
     }
 
 private:
-    core::ByteReader& m_in;
+    annokit::core::ByteReader& m_in;
     StateIn m_state;
 };
 
@@ -501,14 +501,14 @@ std::optional<Command> read_kind(Reader& r, std::uint8_t kind) {
 
 }  // namespace
 
-void write_command(core::ByteWriter& out, const Command& command) {
+void write_command(annokit::core::ByteWriter& out, const Command& command) {
     static_assert(std::variant_size_v<Command> < 256);
     out.u8(static_cast<std::uint8_t>(command.index()));
     Writer w(out);
     std::visit([&](const auto& c) { w(c); }, command);
 }
 
-std::optional<Command> read_command(core::ByteReader& in) {
+std::optional<Command> read_command(annokit::core::ByteReader& in) {
     const auto kind = in.u8();
     if (!kind) {
         return std::nullopt;
@@ -517,12 +517,12 @@ std::optional<Command> read_command(core::ByteReader& in) {
     return read_kind(r, *kind);
 }
 
-void write_scheduled(core::ByteWriter& out, const ScheduledCommand& command) {
+void write_scheduled(annokit::core::ByteWriter& out, const ScheduledCommand& command) {
     out.u64(command.tick);
     write_command(out, command.command);
 }
 
-std::optional<ScheduledCommand> read_scheduled(core::ByteReader& in) {
+std::optional<ScheduledCommand> read_scheduled(annokit::core::ByteReader& in) {
     const auto tick = in.u64();
     if (!tick) {
         return std::nullopt;
@@ -535,13 +535,13 @@ std::optional<ScheduledCommand> read_scheduled(core::ByteReader& in) {
 }
 
 std::vector<std::uint8_t> encode_command(const Command& command) {
-    core::ByteWriter out;
+    annokit::core::ByteWriter out;
     write_command(out, command);
     return out.take();
 }
 
 std::optional<Command> decode_command(std::span<const std::uint8_t> bytes) {
-    core::ByteReader in(bytes);
+    annokit::core::ByteReader in(bytes);
     auto command = read_command(in);
     if (!command || !in.at_end()) {
         return std::nullopt;

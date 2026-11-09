@@ -3,13 +3,13 @@
 
 #include <algorithm>
 
-#include "o1602/core/byte_reader.hpp"
-#include "o1602/core/file.hpp"
+#include "annokit/core/byte_reader.hpp"
+#include "annokit/core/file.hpp"
 
 namespace o1602::assets {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 namespace {
 constexpr std::uint32_t kRecordHeaderSize = 16;
@@ -50,7 +50,7 @@ std::vector<std::uint8_t> IndexedImage::to_rgba(const Palette& palette) const {
     return out;
 }
 
-core::Result<SpriteSheet> SpriteSheet::from_chunk_file(ChunkFile file) {
+annokit::core::Result<SpriteSheet> SpriteSheet::from_chunk_file(ChunkFile file) {
     SpriteSheet sheet;
     sheet.m_file = std::move(file);
     const Chunk* chunk = sheet.m_file.find("BSH");
@@ -69,12 +69,12 @@ core::Result<SpriteSheet> SpriteSheet::from_chunk_file(ChunkFile file) {
 
     // The payload starts with a table of uint32 offsets. The table has no explicit count;
     // it ends where the first (lowest) sprite record begins.
-    std::size_t count = core::ByteReader::load_u32(data, 0) / 4;
+    std::size_t count = annokit::core::ByteReader::load_u32(data, 0) / 4;
     for (std::size_t i = 0; i < count; ++i) {
         if ((i + 1) * 4 > data.size()) {
             return make_error(ErrorCode::InvalidFormat, "offset table exceeds chunk");
         }
-        const std::uint32_t offset = core::ByteReader::load_u32(data, i * 4);
+        const std::uint32_t offset = annokit::core::ByteReader::load_u32(data, i * 4);
         count = std::min<std::size_t>(count, offset / 4);
     }
 
@@ -82,14 +82,14 @@ core::Result<SpriteSheet> SpriteSheet::from_chunk_file(ChunkFile file) {
     std::uint64_t pixels = 0;
     for (std::size_t i = 0; i < count; ++i) {
         SpriteInfo info;
-        info.offset = core::ByteReader::load_u32(data, i * 4);
+        info.offset = annokit::core::ByteReader::load_u32(data, i * 4);
         if (std::size_t{info.offset} + kRecordHeaderSize > data.size()) {
             return make_error(ErrorCode::InvalidFormat, "sprite " + std::to_string(i) + " outside of chunk");
         }
-        info.width = core::ByteReader::load_u32(data, info.offset);
-        info.height = core::ByteReader::load_u32(data, info.offset + 4);
-        info.type = core::ByteReader::load_u32(data, info.offset + 8);
-        info.length = core::ByteReader::load_u32(data, info.offset + 12);
+        info.width = annokit::core::ByteReader::load_u32(data, info.offset);
+        info.height = annokit::core::ByteReader::load_u32(data, info.offset + 4);
+        info.type = annokit::core::ByteReader::load_u32(data, info.offset + 8);
+        info.length = annokit::core::ByteReader::load_u32(data, info.offset + 12);
         if (info.width > kMaxDimension || info.height > kMaxDimension) {
             return make_error(ErrorCode::InvalidFormat, "sprite " + std::to_string(i) + " has invalid size");
         }
@@ -120,25 +120,25 @@ core::Result<SpriteSheet> SpriteSheet::from_chunk_file(ChunkFile file) {
     return sheet;
 }
 
-core::Result<SpriteSheet> SpriteSheet::load(const std::filesystem::path& path) {
+annokit::core::Result<SpriteSheet> SpriteSheet::load(const std::filesystem::path& path) {
     auto file = ChunkFile::load(path);
     if (!file) {
         return file.error();
     }
     auto sheet = from_chunk_file(std::move(file).value());
     if (!sheet) {
-        return make_error(sheet.error().code, core::path_to_utf8(path) + ": " + sheet.error().message);
+        return make_error(sheet.error().code, annokit::core::path_to_utf8(path) + ": " + sheet.error().message);
     }
     return sheet;
 }
 
-core::Result<IndexedImage> SpriteSheet::decode_true_colour(std::size_t index, const SpriteInfo& info,
-                                                           IndexedImage image) const {
+annokit::core::Result<IndexedImage> SpriteSheet::decode_true_colour(std::size_t index, const SpriteInfo& info,
+                                                                    IndexedImage image) const {
     // As the RLE of type 1 in little-endian words: [skip][count][count pixels B, G, R, 0],
     // 0xFE = next row, 0xFF = end.
     const auto data = m_file.payload(m_chunk);
     image.rgba.assign(image.indices.size() * 4, 0);
-    core::ByteReader reader(data.first(std::size_t{info.offset} + info.length));
+    annokit::core::ByteReader reader(data.first(std::size_t{info.offset} + info.length));
     (void)reader.seek(info.offset + kRecordHeaderSize);
     std::uint32_t x = 0;
     std::uint32_t y = 0;
@@ -182,7 +182,7 @@ core::Result<IndexedImage> SpriteSheet::decode_true_colour(std::size_t index, co
     return image;
 }
 
-core::Result<IndexedImage> SpriteSheet::decode(std::size_t index, std::uint32_t extra_width) const {
+annokit::core::Result<IndexedImage> SpriteSheet::decode(std::size_t index, std::uint32_t extra_width) const {
     if (index >= m_infos.size()) {
         return make_error(ErrorCode::OutOfRange, "sprite index out of range");
     }
@@ -218,7 +218,7 @@ core::Result<IndexedImage> SpriteSheet::decode(std::size_t index, std::uint32_t 
     }
 
     // RLE stream: repeated [skip][count][count palette indices], 0xFE = next row, 0xFF = end.
-    core::ByteReader reader(data.first(std::size_t{info.offset} + info.length));
+    annokit::core::ByteReader reader(data.first(std::size_t{info.offset} + info.length));
     (void)reader.seek(info.offset + kRecordHeaderSize);
     std::uint32_t x = 0;
     std::uint32_t y = 0;

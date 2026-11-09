@@ -1,7 +1,7 @@
 # WAV – sounds, speech, music
 
 RIFF WAVE files in three folders.
-Open1602: `audio::decode_wav` (`engine/audio/src/wav.cpp`).
+Open1602: `audio::decode_wav` (`modules/audio/src/wav.cpp` of annokit).
 
 | Folder | Contents | Format |
 |---|---|---|

@@ -19,8 +19,8 @@
 
 namespace o1602::sim {
 
-using core::ErrorCode;
-using core::make_error;
+using annokit::core::ErrorCode;
+using annokit::core::make_error;
 
 bool valid_name(std::string_view name, std::size_t max_length) noexcept {
     return !name.empty() && name.size() <= max_length &&
@@ -30,7 +30,7 @@ bool valid_name(std::string_view name, std::size_t max_length) noexcept {
 World::World(std::uint32_t width, std::uint32_t height)
     : m_width(width), m_height(height), m_cells(std::size_t{width} * height) {}
 
-core::Status World::add_island(WorldIsland island, const assets::BuildingTable* buildings) {
+annokit::core::Status World::add_island(WorldIsland island, const assets::BuildingTable* buildings) {
     static_assert(kMaxIslands <= kSea, "the sea's number is no island's");
     if (m_islands.size() >= kMaxIslands) {  // named limit instead of the original's 255 (L-003)
         return make_error(ErrorCode::LimitExceeded, "more than " + std::to_string(kMaxIslands) + " islands");
@@ -50,11 +50,11 @@ core::Status World::add_island(WorldIsland island, const assets::BuildingTable* 
         }
     }
     m_islands.push_back(std::move(island));
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
-core::Status World::claim_cells(const WorldIsland& island, const assets::BuildingTable* buildings,
-                                std::vector<bool>& taken) const {
+annokit::core::Status World::claim_cells(const WorldIsland& island, const assets::BuildingTable* buildings,
+                                         std::vector<bool>& taken) const {
     const std::uint32_t w = island.map.width();
     const std::uint32_t h = island.map.height();
     // In 64 bits: a position near 2^32 from a file must not wrap around into the map.
@@ -93,7 +93,7 @@ core::Status World::claim_cells(const WorldIsland& island, const assets::Buildin
             taken[std::size_t{ly} * w + lx] = !new_sea;
         }
     }
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 City* World::city(std::uint16_t island, std::uint8_t index) noexcept {
@@ -1321,9 +1321,9 @@ void trim_all_trade_settings(World& world, const assets::BuildingTable& building
 
 }  // namespace
 
-core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
-                               const assets::GameDirectory& game, std::vector<std::string>* warnings,
-                               const WorldStart& start) {
+annokit::core::Result<World> load_world(const assets::ChunkFile& file, const assets::BuildingTable& buildings,
+                                        const assets::GameDirectory& game, std::vector<std::string>* warnings,
+                                        const WorldStart& start) {
     const bool keep_plan = start.keep_plan && plans_islands(file);
     if (!keep_plan && plans_islands(file)) {
         // The SZENE handler of the original makes the islands while the scenario loads.

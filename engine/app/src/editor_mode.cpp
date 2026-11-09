@@ -16,12 +16,13 @@
 #include "map_viewer.hpp"
 #include "names.hpp"
 
+#include "annokit/core/file.hpp"
+#include "annokit/core/png_writer.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/game_data.hpp"
 #include "o1602/assets/resident_classes.hpp"
 #include "o1602/assets/text_table.hpp"
-#include "o1602/core/file.hpp"
-#include "o1602/core/png_writer.hpp"
-#include "o1602/core/text.hpp"
 #include "o1602/editor/fairness.hpp"
 #include "o1602/editor/goals.hpp"
 #include "o1602/editor/islands.hpp"
@@ -66,12 +67,12 @@ std::string lower(std::string text) {
 }
 
 bool own_file(const std::filesystem::path& path) {
-    return lower(core::path_to_utf8(path.extension())) == kScenarioEnding;
+    return lower(annokit::core::path_to_utf8(path.extension())) == kScenarioEnding;
 }
 
 /// The name a document shows for its file (Windows-1252): the file's name without its ending.
 std::string shown_name(const std::filesystem::path& path) {
-    return core::utf8_to_cp1252(core::path_to_utf8(path.stem()));
+    return annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(path.stem()));
 }
 
 /// The files with one of `endings` (lower case) in `folder`, sorted by name.
@@ -83,13 +84,13 @@ std::vector<std::filesystem::path> files_in(const std::filesystem::path& folder,
         if (!it->is_regular_file(ec)) {
             continue;
         }
-        const std::string ending = lower(core::path_to_utf8(it->path().extension()));
+        const std::string ending = lower(annokit::core::path_to_utf8(it->path().extension()));
         if (std::find(endings.begin(), endings.end(), ending) != endings.end()) {
             out.push_back(it->path());
         }
     }
     std::sort(out.begin(), out.end(), [](const std::filesystem::path& a, const std::filesystem::path& b) {
-        return lower(core::path_to_utf8(a.filename())) < lower(core::path_to_utf8(b.filename()));
+        return lower(annokit::core::path_to_utf8(a.filename())) < lower(annokit::core::path_to_utf8(b.filename()));
     });
     return out;
 }
@@ -262,10 +263,11 @@ sim::World MapViewer::sea_world(std::uint32_t width, std::uint32_t height) const
     return world;
 }
 
-core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::path& file,
-                                     std::optional<std::size_t> slot) {
+annokit::core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::path& file,
+                                              std::optional<std::size_t> slot) {
     if (m_session) {
-        return core::make_error(core::ErrorCode::Unsupported, "no editor while a multiplayer game runs");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                         "no editor while a multiplayer game runs");
     }
     std::unique_ptr<GameState> next;
     try {
@@ -278,7 +280,7 @@ core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::pa
             sim::apply_infra_levels(m_buildings, m_original_buildings, m_state->world.infra_levels());
             sim::apply_figure_values(m_figures, m_original_figures, m_state->world.balance());
         }
-        return core::make_error(core::ErrorCode::PlatformError, "not enough memory for the map");
+        return annokit::core::make_error(annokit::core::ErrorCode::PlatformError, "not enough memory for the map");
     }
     finish_autosave();  // the old game's, before its world goes
     // The old document edits the old world: it goes first, and an editor waiting for its test game.
@@ -330,9 +332,9 @@ core::Status MapViewer::enter_editor(sim::World world, const std::filesystem::pa
         }
     }
     std::fprintf(stderr, "editor: %s, %ux%u, %zu islands\n",
-                 file.empty() ? "new map" : core::path_to_utf8(file).c_str(), m_state->world.width(),
+                 file.empty() ? "new map" : annokit::core::path_to_utf8(file).c_str(), m_state->world.width(),
                  m_state->world.height(), m_state->world.islands().size());
-    return core::Ok{};
+    return annokit::core::Ok{};
 }
 
 void MapViewer::start_editor() {
@@ -340,7 +342,7 @@ void MapViewer::start_editor() {
         if (auto opened = editor_open(m_options.editor_file, editor_slot_of(m_options.editor_file)); opened) {
             return;
         } else {
-            std::fprintf(stderr, "error: --editor %s: %s\n", core::path_to_utf8(m_options.editor_file).c_str(),
+            std::fprintf(stderr, "error: --editor %s: %s\n", annokit::core::path_to_utf8(m_options.editor_file).c_str(),
                          opened.error().message.c_str());
         }
     }
@@ -349,8 +351,8 @@ void MapViewer::start_editor() {
     }
 }
 
-core::Status MapViewer::editor_open(const std::filesystem::path& file, std::optional<std::size_t> slot) {
-    auto bytes = core::read_file(file);
+annokit::core::Status MapViewer::editor_open(const std::filesystem::path& file, std::optional<std::size_t> slot) {
+    auto bytes = annokit::core::read_file(file);
     if (!bytes) {
         return bytes.error();
     }
@@ -386,7 +388,7 @@ core::Status MapViewer::editor_open(const std::filesystem::path& file, std::opti
     return entered;
 }
 
-core::Status MapViewer::editor_new(const EditorNewMap& map) {
+annokit::core::Status MapViewer::editor_new(const EditorNewMap& map) {
     if (map.islands == EditorNewMap::Islands::None) {
         return enter_editor(sea_world(map.width(), map.height()), {});
     }
@@ -463,7 +465,7 @@ void MapViewer::editor_save_game() {
     }
     std::error_code ec;
     std::filesystem::create_directories(target->parent_path(), ec);
-    if (auto written = core::write_file_atomic(*target, *bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(*target, *bytes); !written) {
         editor_notice(ui::tr("editor.save_failed", {ui::error_text(written.error(), "editor")}), true,
                       written.error().message);
         return;
@@ -471,7 +473,7 @@ void MapViewer::editor_save_game() {
     remember_slot(slot, m_editor->source_name, human_players());
     drop_editor_recovery();
     editor_notice(ui::tr("editor.saved_game", {m_editor->source_name}), false,
-                  "saved the game " + core::path_to_utf8(*target));
+                  "saved the game " + annokit::core::path_to_utf8(*target));
 }
 
 bool MapViewer::editor_save(const std::filesystem::path& file) {
@@ -493,7 +495,7 @@ bool MapViewer::editor_save(const std::filesystem::path& file) {
     }
     std::error_code ec;
     std::filesystem::create_directories(target->parent_path(), ec);
-    if (auto written = core::write_file_atomic(*target, *bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(*target, *bytes); !written) {
         editor_notice(ui::tr("editor.save_failed", {ui::error_text(written.error(), "editor")}), true,
                       written.error().message);
         return false;
@@ -501,7 +503,8 @@ bool MapViewer::editor_save(const std::filesystem::path& file) {
     m_editor->file = *target;
     m_editor->source_name = shown_name(*target);
     m_editor->slot.reset();  // a savegame saved as a scenario: Save writes the scenario now
-    editor_notice(ui::tr("editor.saved", {shown_name(*target)}), false, "saved " + core::path_to_utf8(*target));
+    editor_notice(ui::tr("editor.saved", {shown_name(*target)}), false,
+                  "saved " + annokit::core::path_to_utf8(*target));
     return true;
 }
 
@@ -536,7 +539,7 @@ std::filesystem::path recovery_note(const std::filesystem::path& file) {
 
 /// The path (UTF-8) and the name (Windows-1252) of the document the recovery holds, one a line.
 std::pair<std::string, std::string> read_recovery_note(const std::filesystem::path& file) {
-    auto bytes = core::read_file(recovery_note(file));
+    auto bytes = annokit::core::read_file(recovery_note(file));
     if (!bytes) {
         return {};
     }
@@ -580,7 +583,7 @@ void MapViewer::editor_keep_recovery(bool now_or_never) {
     if (m_editor_recovery_written && doc.history().state() == m_editor_recovery_state) {
         return;
     }
-    const std::uint64_t now = platform::real_ticks_ms();
+    const std::uint64_t now = annokit::platform::real_ticks_ms();
     if (m_editor->stroke || m_editor->preview_plan) {
         return;  // not while a stroke is drawn or the map shows a roll of the dice
     }
@@ -605,13 +608,13 @@ void MapViewer::editor_keep_recovery(bool now_or_never) {
     std::filesystem::create_directories(file.parent_path(), ec);
     // The file it came from: a savegame's, so that it is recovered as that savegame.
     const std::filesystem::path from = m_editor->slot ? slot_file(save_folder(), *m_editor->slot) : m_editor->file;
-    const std::string note = core::path_to_utf8(from) + "\n" + m_editor->source_name + "\n";
+    const std::string note = annokit::core::path_to_utf8(from) + "\n" + m_editor->source_name + "\n";
     const auto* data = reinterpret_cast<const std::uint8_t*>(note.data());
-    if (auto written = core::write_file_atomic(file, *bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(file, *bytes); !written) {
         std::fprintf(stderr, "editor: no recovery: %s\n", written.error().message.c_str());
         return;
     }
-    (void)core::write_file_atomic(recovery_note(file), std::span<const std::uint8_t>(data, note.size()));
+    (void)annokit::core::write_file_atomic(recovery_note(file), std::span<const std::uint8_t>(data, note.size()));
     m_editor_recovery_written = true;
 }
 
@@ -629,7 +632,7 @@ void MapViewer::editor_offer_recovery() {
 void MapViewer::editor_recover() {
     const std::filesystem::path file = editor_recovery_file();
     const auto [path, name] = read_recovery_note(file);
-    const std::filesystem::path source = core::path_from_utf8(path);
+    const std::filesystem::path source = annokit::core::path_from_utf8(path);
     const std::optional<std::size_t> slot = editor_slot_of(source);
     if (auto opened = editor_open(file, slot); !opened) {
         editor_notice(ui::tr("editor.open_failed", {ui::error_text(opened.error(), "editor")}), true,
@@ -661,7 +664,7 @@ void MapViewer::editor_test_play() {
     }
     // The game starts from the bytes a save would write, as the scenario list would start it:
     // what the test shows is what the file gives.
-    const auto failed = [&](const core::Error& e) {
+    const auto failed = [&](const annokit::core::Error& e) {
         editor_notice(ui::tr("editor.test_play.failed", {ui::error_text(e, "editor")}), true, e.message);
     };
     auto bytes = sim::write_game(m_state->world, m_buildings);
@@ -708,7 +711,7 @@ void MapViewer::editor_test_play() {
     }
     const std::string key = m_input->key_of(ui::KeyAction::QuickSave);
     m_events.notify(ui::tr("notice.test_play", {key.empty() ? std::string("F5") : key}), "notice.test_play",
-                    platform::ticks_ms());
+                    annokit::platform::ticks_ms());
     std::fprintf(stderr, "editor: test game started\n");
 }
 
@@ -760,17 +763,19 @@ void MapViewer::list_editor_files() {
         if (!package.archive.empty()) {
             continue;
         }
-        const std::string group = ui::tr("editor.open.package", {core::utf8_to_cp1252(package.id)});
+        const std::string group = ui::tr("editor.open.package", {annokit::core::utf8_to_cp1252(package.id)});
         for (const std::filesystem::path& p : files_in(package.folder / "maps", {kScenarioEnding, ".szs", ".szm"})) {
             m_editor_files.push_back(p);
-            m_editor_file_rows.push_back(EditorFile{core::utf8_to_cp1252(core::path_to_utf8(p.filename())), group});
+            m_editor_file_rows.push_back(
+                EditorFile{annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(p.filename())), group});
         }
     }
     if (const auto folder = m_game.resolve("Szenes")) {
         const std::string original = ui::tr("editor.open.original");
         for (const std::filesystem::path& p : files_in(*folder, {".szs", ".szm"})) {
             m_editor_files.push_back(p);
-            m_editor_file_rows.push_back(EditorFile{core::utf8_to_cp1252(core::path_to_utf8(p.filename())), original});
+            m_editor_file_rows.push_back(
+                EditorFile{annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(p.filename())), original});
         }
     }
 }
@@ -1027,8 +1032,8 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::SaveAs: {
             const std::string name = EditorPanel::clean_name(request.name);
             if (!name.empty() &&
-                editor_save(own_scenario_folder() /
-                            core::path_from_utf8(core::cp1252_to_utf8(name) + std::string(kScenarioEnding)))) {
+                editor_save(own_scenario_folder() / annokit::core::path_from_utf8(annokit::core::cp1252_to_utf8(name) +
+                                                                                  std::string(kScenarioEnding)))) {
                 m_editor->package.clear();  // an own scenario now: Save writes it there
                 m_editor->package_scenario.clear();
             }
@@ -1196,16 +1201,17 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::ExportImage: {
             const editor::MapImage image = editor::map_image(m_editor->document.world(), m_buildings);
             std::filesystem::path path = next_screenshot_path();
-            path.replace_filename("map" + core::path_to_utf8(path.filename()).substr(std::string("open1602").size()));
+            path.replace_filename("map" +
+                                  annokit::core::path_to_utf8(path.filename()).substr(std::string("open1602").size()));
             std::error_code ec;
             std::filesystem::create_directories(path.parent_path(), ec);
-            if (auto written = core::write_png_rgba(path, image.width, image.height, image.rgba); !written) {
+            if (auto written = annokit::core::write_png_rgba(path, image.width, image.height, image.rgba); !written) {
                 editor_notice(ui::tr("editor.export_image.failed", {ui::error_text(written.error(), "editor")}), true,
                               written.error().message);
             } else {
-                editor_notice(
-                    ui::tr("editor.export_image.done", {core::utf8_to_cp1252(core::path_to_utf8(path.filename()))}),
-                    false, "map picture " + core::path_to_utf8(path));
+                editor_notice(ui::tr("editor.export_image.done",
+                                     {annokit::core::utf8_to_cp1252(annokit::core::path_to_utf8(path.filename()))}),
+                              false, "map picture " + annokit::core::path_to_utf8(path));
             }
             break;
         }
@@ -1330,8 +1336,8 @@ void MapViewer::editor_island_request(const EditorRequest& request) {
         wanted.package_islands = m_options.world.package_islands;
         std::vector<std::string> warnings;
         auto made = number ? editor::make_island(wanted, *number, m_buildings, &m_game, &warnings)
-                           : core::Result<sim::WorldIsland>(
-                                 core::make_error(core::ErrorCode::LimitExceeded, "no island number is free"));
+                           : annokit::core::Result<sim::WorldIsland>(annokit::core::make_error(
+                                 annokit::core::ErrorCode::LimitExceeded, "no island number is free"));
         for (const std::string& w : warnings) {
             std::fprintf(stderr, "warning: %s\n", w.c_str());
         }
@@ -1481,20 +1487,20 @@ void MapViewer::editor_save_island(std::size_t index) {
             break;
         }
     }
-    if (auto written = core::write_file_atomic(file, *bytes); !written) {
+    if (auto written = annokit::core::write_file_atomic(file, *bytes); !written) {
         editor_notice(ui::tr("editor.save_failed", {ui::error_text(written.error(), "editor")}), true,
                       written.error().message);
         return;
     }
     editor_notice(ui::tr("editor.islands.saved", {shown_name(file)}), false,
-                  "island saved " + core::path_to_utf8(file));
+                  "island saved " + annokit::core::path_to_utf8(file));
 }
 
 void MapViewer::editor_load_island(const std::filesystem::path& file, std::uint8_t climate) {
-    auto bytes = core::read_file(file);
+    auto bytes = annokit::core::read_file(file);
     std::vector<std::string> warnings;
     auto island = bytes ? editor::load_island(*bytes, m_buildings, &m_game, &warnings, climate)
-                        : core::Result<sim::WorldIsland>(bytes.error());
+                        : annokit::core::Result<sim::WorldIsland>(bytes.error());
     for (const std::string& w : warnings) {
         std::fprintf(stderr, "warning: %s\n", w.c_str());
     }
@@ -1510,10 +1516,11 @@ void MapViewer::editor_load_island(const std::filesystem::path& file, std::uint8
     p.island = std::move(island).value();
     p.page = EditorPanel::Page::Islands;
     m_editor->placing = std::move(p);
-    editor_notice(ui::tr("editor.islands.placing"), false, "placing an island from " + core::path_to_utf8(file));
+    editor_notice(ui::tr("editor.islands.placing"), false,
+                  "placing an island from " + annokit::core::path_to_utf8(file));
 }
 
-bool MapViewer::editor_perform(core::Result<std::unique_ptr<editor::Operation>> op) {
+bool MapViewer::editor_perform(annokit::core::Result<std::unique_ptr<editor::Operation>> op) {
     if (!op) {
         editor_notice(ui::tr("editor.islands.no_room"), true, op.error().message);
         return false;
@@ -1826,11 +1833,11 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     lines.push_back(Line{ui::tr("editor.check.saving"), Line::Kind::Heading});
     const std::size_t first = lines.size();
     if (auto valid = sim::validate(world); !valid) {
-        lines.push_back(
-            Line{ui::tr("editor.check.world", {core::utf8_to_cp1252(valid.error().message)}), Line::Kind::Error});
+        lines.push_back(Line{ui::tr("editor.check.world", {annokit::core::utf8_to_cp1252(valid.error().message)}),
+                             Line::Kind::Error});
     }
     for (const std::string& p : doc.check_scenario()) {
-        lines.push_back(Line{ui::tr("editor.check.scenario", {core::utf8_to_cp1252(p)}), Line::Kind::Error,
+        lines.push_back(Line{ui::tr("editor.check.scenario", {annokit::core::utf8_to_cp1252(p)}), Line::Kind::Error,
                              Line::Target::Scenario});
     }
     // Packages the scenario needs that are not installed: what they bring is missing in the game.
@@ -1838,9 +1845,9 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
         for (const assets::ContentPackage& p : *needed) {
             if (std::none_of(m_packages.begin(), m_packages.end(),
                              [&](const assets::ModPackage& q) { return q.id == p.id; })) {
-                lines.push_back(
-                    Line{ui::tr("editor.check.package_missing", {core::utf8_to_cp1252(assets::package_label(p))}),
-                         Line::Kind::Warning, Line::Target::Scenario});
+                lines.push_back(Line{
+                    ui::tr("editor.check.package_missing", {annokit::core::utf8_to_cp1252(assets::package_label(p))}),
+                    Line::Kind::Warning, Line::Target::Scenario});
             }
         }
     }
@@ -2029,7 +2036,7 @@ void MapViewer::draw_editor_marks() {
         for (std::size_t i = 0; i < markers.size(); ++i) {
             const sim::ScenarioMarker& mk = markers[i];
             outline(mk.x, mk.y, mk.width, mk.height, m_editor->marker == i ? chosen : ink);
-            text_at(mk.x + mk.width / 2.0, mk.y + mk.height / 2.0, core::utf8_to_cp1252(mk.name));
+            text_at(mk.x + mk.width / 2.0, mk.y + mk.height / 2.0, annokit::core::utf8_to_cp1252(mk.name));
         }
         if (m_editor->marker_from && m_editor->marker_to) {
             const auto [ax, ay] = *m_editor->marker_from;
@@ -2895,11 +2902,11 @@ bool MapViewer::editor_stroke(std::optional<render::TilePos> tile, Stroke phase,
                     m_editor->notice.clear();
                 } else {
                     const char* why =
-                        op.error().code == core::ErrorCode::Unsupported && (b->size_x != 1 || b->size_y != 1)
+                        op.error().code == annokit::core::ErrorCode::Unsupported && (b->size_x != 1 || b->size_y != 1)
                             ? "editor.terrain.refused.large"
-                        : op.error().code == core::ErrorCode::NotFound    ? "editor.terrain.refused.no_island"
-                        : op.error().code == core::ErrorCode::Unsupported ? "editor.terrain.refused.tiles"
-                                                                          : "editor.terrain.unchanged";
+                        : op.error().code == annokit::core::ErrorCode::NotFound    ? "editor.terrain.refused.no_island"
+                        : op.error().code == annokit::core::ErrorCode::Unsupported ? "editor.terrain.refused.tiles"
+                                                                                   : "editor.terrain.unchanged";
                     editor_notice(ui::tr(why), true, op.error().message);
                 }
                 return true;

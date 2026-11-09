@@ -23,10 +23,11 @@ std::string sheet_path(assets::FigureSheet sheet, Zoom zoom) {
     return std::string(kDirs[static_cast<int>(zoom) % 3]) + assets::figure_sheet_file(sheet);
 }
 
-core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
-                                                Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
-                                                const GraphicsOptions& options, const BannerTable* banners,
-                                                const assets::FigureTable* figures) {
+annokit::core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& game,
+                                                         const assets::Palette& palette, Zoom zoom,
+                                                         std::span<const assets::FigureSheet> figure_sheets,
+                                                         const GraphicsOptions& options, const BannerTable* banners,
+                                                         const assets::FigureTable* figures) {
     struct Loaded {
         assets::FigureSheet id;
         assets::SpriteSheet sheet;
@@ -47,8 +48,8 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
 
     auto terrain = load(assets::FigureSheet::Stadtfld, zoom);
     if (!terrain) {
-        return core::make_error(core::ErrorCode::NotFound,
-                                sheet_path(assets::FigureSheet::Stadtfld, zoom) + " not found or invalid");
+        return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                         sheet_path(assets::FigureSheet::Stadtfld, zoom) + " not found or invalid");
     }
     loaded.push_back(Loaded{assets::FigureSheet::Stadtfld, std::move(*terrain), false});
     for (const assets::FigureSheet id : figure_sheets) {
@@ -118,9 +119,10 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
             const FlagTemplate& t = *banners->flag_template();
             // A bad mod would throw out_of_range while the atlas is built (HI-13): say which.
             if (std::uint64_t{t.gfx} + t.frames > ship->count()) {
-                return core::make_error(core::ErrorCode::InvalidFormat,
-                                        "the flag sprites " + std::to_string(t.gfx) + " + " + std::to_string(t.frames) +
-                                            " lie beyond the " + std::to_string(ship->count()) + " ship sprites");
+                return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                                 "the flag sprites " + std::to_string(t.gfx) + " + " +
+                                                     std::to_string(t.frames) + " lie beyond the " +
+                                                     std::to_string(ship->count()) + " ship sprites");
             }
             sources.push_back(std::make_unique<TintedFlagSource>(*ship, t.gfx, t.frames, colours, t.from_original));
             pointers.push_back(sources.back().get());
@@ -194,11 +196,11 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
             // A bad mod would throw out_of_range while the atlas is built (HI-13): say which figure.
             for (const UnitImageGroup& g : unit_groups) {
                 if (std::uint64_t{g.first} + std::uint64_t{g.stride} * g.variants > soldat->count()) {
-                    return core::make_error(core::ErrorCode::InvalidFormat,
-                                            "figure " + std::to_string(g.family) + ": its " +
-                                                std::to_string(g.variants) + " colours from sprite " +
-                                                std::to_string(g.first) + " lie beyond the " +
-                                                std::to_string(soldat->count()) + " soldier sprites");
+                    return annokit::core::make_error(annokit::core::ErrorCode::InvalidFormat,
+                                                     "figure " + std::to_string(g.family) + ": its " +
+                                                         std::to_string(g.variants) + " colours from sprite " +
+                                                         std::to_string(g.first) + " lie beyond the " +
+                                                         std::to_string(soldat->count()) + " soldier sprites");
                 }
             }
             // Player colours of the drawn variants: the original red, blue, yellow and white.
@@ -375,10 +377,12 @@ core::Result<WorldGraphics> load_world_graphics(const assets::GameDirectory& gam
     return g;
 }
 
-core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game, const assets::Palette& palette,
-                                                      Zoom zoom, std::span<const assets::FigureSheet> figure_sheets,
-                                                      const GraphicsOptions& options, const BannerTable* banners,
-                                                      const assets::FigureTable* figures) {
+annokit::core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirectory& game,
+                                                               const assets::Palette& palette, Zoom zoom,
+                                                               std::span<const assets::FigureSheet> figure_sheets,
+                                                               const GraphicsOptions& options,
+                                                               const BannerTable* banners,
+                                                               const assets::FigureTable* figures) {
     const auto start = std::chrono::steady_clock::now();
     auto graphics = load_world_graphics(game, palette, zoom, figure_sheets, options, banners, figures);
     if (!graphics) {
@@ -386,7 +390,7 @@ core::Result<PreparedGraphics> prepare_world_graphics(const assets::GameDirector
     }
     PreparedGraphics p{std::move(graphics).value(), {}, 0};
     if (options.cancel != nullptr && options.cancel->load(std::memory_order_relaxed)) {
-        return core::make_error(core::ErrorCode::Unsupported, "cancelled");
+        return annokit::core::make_error(annokit::core::ErrorCode::Unsupported, "cancelled");
     }
     // Buildings and units are picked by their visible pixels: every sprite keeps a mask, the
     // terrain sheet's (buildings, also those of mods) as the figures'.

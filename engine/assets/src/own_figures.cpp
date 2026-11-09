@@ -5,10 +5,11 @@
 #include <array>
 #include <charconv>
 
+#include "annokit/core/data_file.hpp"
+#include "annokit/core/text.hpp"
+
 #include "o1602/assets/figure_looks.hpp"
 #include "o1602/assets/original_names.hpp"
-#include "o1602/core/data_file.hpp"
-#include "o1602/core/text.hpp"
 
 namespace o1602::assets {
 
@@ -141,13 +142,13 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                             std::span<const PackageImage> images, std::span<const PackageSound> sounds,
                             std::vector<OwnUnit>* units, std::vector<OwnShip>* ships) {
     const std::string where = std::string(package) + "/" + std::string(kOwnFiguresFile);
-    auto tables = core::parse_data_file(utf8);
+    auto tables = annokit::core::parse_data_file(utf8);
     if (!tables) {
         warnings.push_back(where + " " + tables.error().message);
         return;
     }
     std::size_t added = 0;
-    for (const core::DataTable& t : *tables) {
+    for (const annokit::core::DataTable& t : *tables) {
         const std::string at = line_of(where, t.line);
         if (!is_name(t.name)) {
             warnings.push_back(at + "[" + t.name + "]: a figure's name holds only lower case letters, digits and '_'");
@@ -167,7 +168,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
         std::optional<std::uint32_t> family;  // `like` names a unit family: the figure is one too
         std::string icon;
         LocalizedNames names;
-        std::vector<const core::DataEntry*> unit_fields;
+        std::vector<const annokit::core::DataEntry*> unit_fields;
         const PackageImage* image = nullptr;
         std::optional<bool> shadow;
         bool tint = false;
@@ -175,7 +176,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
         const PackageSound* shot_sound = nullptr;
         const PackageSound* hit_sound = nullptr;
         bool ok = true;
-        for (const core::DataEntry& e : t.entries) {
+        for (const annokit::core::DataEntry& e : t.entries) {
             const std::string field = line_of(where, e.value.line) + "'" + e.key + "' ";
             if (e.key == "like") {
                 const std::string* s = e.value.string();
@@ -199,7 +200,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
                 }
             } else if (const std::string_view language = name_key_language(e.key); !language.empty()) {
                 if (const std::string* s = e.value.string()) {
-                    names.emplace_back(std::string(language), core::utf8_to_cp1252(*s));
+                    names.emplace_back(std::string(language), annokit::core::utf8_to_cp1252(*s));
                     unit_fields.push_back(&e);
                 } else {
                     warnings.push_back(field + "is a text");
@@ -253,7 +254,7 @@ void apply_own_figures_file(FigureTable& table, std::vector<OwnFigure>& own, std
             ship_type = *type;
         }
         if (!family && ship_type < 0 && !unit_fields.empty()) {
-            for (const core::DataEntry* e : unit_fields) {
+            for (const annokit::core::DataEntry* e : unit_fields) {
                 warnings.push_back(line_of(where, e->value.line) + "'" + e->key +
                                    "' is a field of a unit or a ship only (a figure whose 'like' names a unit or a "
                                    "ship that shipyards build) and is passed over");

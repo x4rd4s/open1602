@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Checks the module layering of ADR 0005 on the sources: every engine module may only include
-# headers of the modules it links (directly or through them), and only platform, render_sdl and the
-# game include SDL. The include directories of all modules are visible to the tests and tools
+# headers of the modules it links (directly or through them), and only render_sdl and the game
+# include SDL. The modules of annokit are named here with "annokit/" (annokit/core and so on). The include directories of all modules are visible to the tests and tools
 # through PUBLIC links, so a stray #include "o1602/render/..." in sim would compile; this check
 # catches it.
 #
@@ -18,18 +18,15 @@ endif()
 # engine/*/CMakeLists.txt. engine/app (the game) may include everything; the parts of it in
 # o1602::menus are checked below.
 set(rules
-    "core=core"
-    "assets=core assets"
-    "sim=core assets sim"
-    "net=core assets sim net"
-    "render=core assets sim render"
-    "audio=core assets sim audio"
-    "video=core assets sim audio video"
-    "ui=core assets sim ui"
-    "script=core assets sim script"
-    "editor=core assets sim editor"
-    "platform=core platform SDL3"
-    "render/sdl=core assets sim render ui platform SDL3"
+    "assets=annokit/core assets"
+    "sim=annokit/core assets sim"
+    "net=annokit/core assets sim net annokit/net"
+    "render=annokit/core assets sim render"
+    "audio=annokit/core assets sim audio annokit/audio"
+    "ui=annokit/core assets sim ui"
+    "script=annokit/core assets sim script annokit/script"
+    "editor=annokit/core assets sim editor"
+    "render/sdl=annokit/core assets sim render ui annokit/platform SDL3"
 )
 
 set(violations "")
@@ -48,10 +45,12 @@ foreach(rule IN LISTS rules)
     endif()
     foreach(file IN LISTS files)
         math(EXPR checked "${checked} + 1")
-        file(STRINGS "${file}" includes REGEX "^[ \t]*#[ \t]*include[ \t]*[<\"](o1602/[a-z_]+/|SDL3/)")
+        file(STRINGS "${file}" includes REGEX "^[ \t]*#[ \t]*include[ \t]*[<\"](o1602/[a-z_]+/|annokit/[a-z_]+/|SDL3/)")
         foreach(line IN LISTS includes)
-            string(REGEX MATCH "(o1602/([a-z_]+)/|SDL3/)" _ "${line}")
-            if(CMAKE_MATCH_2)
+            string(REGEX MATCH "o1602/([a-z_]+)/|(annokit/[a-z_]+)/|SDL3/" _ "${line}")
+            if(CMAKE_MATCH_1)
+                set(module "${CMAKE_MATCH_1}")
+            elseif(CMAKE_MATCH_2)
                 set(module "${CMAKE_MATCH_2}")
             else()
                 set(module "SDL3")
@@ -68,7 +67,7 @@ endforeach()
 # o1602::menus: the sources engine/app/menus/CMakeLists.txt lists (and the headers beside them)
 # are built without the platform, so that tests and tools have them (LC-17): no platform,
 # render_sdl, video or SDL.
-set(menus_allowed core assets audio net render sim ui)
+set(menus_allowed annokit/core assets audio annokit/audio net annokit/net render sim ui)
 string(REPLACE ";" ", " menus_allowed_text "${menus_allowed}")
 file(READ "${ENGINE_DIR}/app/menus/CMakeLists.txt" menus_list)
 string(REGEX MATCHALL "\\.\\./src/[a-z_]+\\.cpp" menus_sources "${menus_list}")
@@ -83,11 +82,11 @@ foreach(source IN LISTS menus_sources)
             continue()
         endif()
         math(EXPR checked "${checked} + 1")
-        file(STRINGS "${f}" includes REGEX "^[ \t]*#[ \t]*include[ \t]*[<\"](o1602/[a-z_]+/|SDL3/)")
+        file(STRINGS "${f}" includes REGEX "^[ \t]*#[ \t]*include[ \t]*[<\"](o1602/[a-z_]+/|annokit/[a-z_]+/|SDL3/)")
         foreach(line IN LISTS includes)
-            string(REGEX MATCH "(o1602/([a-z_]+)/|SDL3/)" _ "${line}")
-            set(module "${CMAKE_MATCH_2}")
-            if(NOT CMAKE_MATCH_2 OR NOT module IN_LIST menus_allowed)
+            string(REGEX MATCH "o1602/([a-z_]+)/|(annokit/[a-z_]+)/|SDL3/" _ "${line}")
+            set(module "${CMAKE_MATCH_1}${CMAKE_MATCH_2}")
+            if(NOT module OR NOT module IN_LIST menus_allowed)
                 file(RELATIVE_PATH rel "${ENGINE_DIR}/.." "${f}")
                 string(STRIP "${line}" line)
                 list(APPEND violations "${rel}: ${line} (o1602::menus may include: ${menus_allowed_text})")
