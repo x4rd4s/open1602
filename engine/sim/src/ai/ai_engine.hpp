@@ -451,6 +451,9 @@ private:
     /// Improved computers: the gold kept for a colony whose crop its people want and none of its
     /// islands grows, else 0.
     [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
+    /// Improved computers: settlers in the home city want a good whose crop none of the computer's
+    /// islands grows, and it may found a colony for it.
+    [[nodiscard]] bool colony_crop_missing(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -622,7 +625,6 @@ private:
     static constexpr std::uint32_t kMaxRunsPerWare = 4;
     static constexpr std::uint32_t kMaxSupplyShips = 8;
     static constexpr std::uint32_t kMinSupplyRun = 10 * kTon;  ///< the least a supply run loads
-    static constexpr std::uint32_t kSupplyCannons = 2;         ///< what a supply ship carries against pirates
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,

@@ -1068,21 +1068,6 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     if (!first) {
         return false;
     }
-    // Open1602: an improved computer arms its supply ship at the home city with up to
-    // kSupplyCannons from the stock it can spare: armed, it fights pirates off instead of handing
-    // them its load (about one run in seventeen was plundered).
-    if (rivals()) {
-        if (City* own = home_city(p); own != nullptr && ship_at_city(s, *own)) {
-            const std::uint8_t guns = m_buildings.materials().cannons;
-            while (s.cannons < kSupplyCannons && own->stock(guns) > 4 * kTon) {
-                const std::uint32_t before = s.cannons;
-                arm_one(*own, s);
-                if (s.cannons == before) {
-                    break;
-                }
-            }
-        }
-    }
     const auto second = choose(first->ware);
     struct Stop {
         Target target;
@@ -1192,6 +1177,10 @@ void Engine::update_fleet_target(AiPlayer& p) {
         // In debt it wants no ships beyond its guards.
         if (const City* home = home_city(p); home != nullptr && player(p).money >= 0) {
             supply = supply_ships_wanted(p, *home);
+            // Open1602: and one more for a colony it wants while no ship is free to sail for it.
+            if (colony_crop_missing(p) && colony_ship_candidate(p) == 0) {
+                ++supply;
+            }
         }
         t = std::min(t + supply, std::max(n, 1) + static_cast<std::int32_t>(kMaxSupplyShips));
     }

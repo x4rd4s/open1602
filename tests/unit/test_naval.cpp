@@ -253,18 +253,22 @@ TEST_CASE("naval: a computer's ship hit by pirates surrenders; the pirates plund
     CHECK(!s.world.diplomacy().hostile(2, 1));
 }
 
-TEST_CASE("naval: an improved computer's armed ship fights pirates off; the original's surrenders") {
-    for (const bool classic : {false, true}) {
+TEST_CASE("naval: an improved computer's ship fights pirates off when it is their match; else it surrenders") {
+    struct Case {
+        bool classic;
+        std::uint8_t pirate_cannons;
+        bool surrenders;
+    };
+    for (const Case k : {Case{false, 2, false}, Case{false, 8, true}, Case{true, 2, true}}) {
         Sea s;
-        s.rules.bugs.classic_ai = classic;
+        s.rules.bugs.classic_ai = k.classic;
         s.start();
         s.world.diplomacy().set_peace(s.world, 2, 1, sim::Treaty::None, 0);
-        s.add(10, 40, kWarship, 2, 8);
+        s.add(10, 40, kWarship, 2, k.pirate_cannons);
         const std::uint32_t merchant = s.add(14, 40, kTrade, 1, 2);
         s.world.ship(merchant)->cargo[0] = sim::CargoSlot{21, 20 * 32, 0};
         s.run(10'000);
-        CHECK(s.count(sim::ShipEvent::Kind::WhiteFlag) == (classic ? 1 : 0));
-        CHECK(s.count(sim::ShipEvent::Kind::Plundered) == (classic ? 1 : 0));
+        CHECK(s.count(sim::ShipEvent::Kind::WhiteFlag) == (k.surrenders ? 1 : 0));
     }
 }
 

@@ -2256,16 +2256,30 @@ bool Engine::roads_if_mason(AiPlayer& p) {
 }
 
 std::int64_t Engine::colony_savings(AiPlayer& p) {
-    // The gold of a colony while an improved computer's home city has people who want a good whose
-    // crop none of its islands grows (alcohol: wine or sugar; tobacco, spices, cocoa) and it may
-    // found one, else 0. Without it, the houses took every coin and the colony came hours late.
-    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_limit() ||
-        player(p).scenario.has(scenario_flag::kNoColonies)) {
+    // The gold of a colony while an improved computer wants one for a crop none of its islands
+    // grows (colony_crop_missing), else 0. Without it, the houses took every coin and the colony
+    // came hours late.
+    if (!rivals() || p.pirates || p.settle.failed || player(p).scenario.has(scenario_flag::kNoColonies)) {
         return 0;
     }
+    // A settlement under way keeps the gold until the Kontor stands: spent meanwhile, the ship
+    // arrived to find too little to found the city.
+    if (p.settle.active) {
+        return colony_money(p);
+    }
+    // Only with a ship to sail: without one the gold lay idle (update_fleet_target orders one).
+    return colony_crop_missing(p) && colony_ship_candidate(p) != 0 ? colony_money(p) : 0;
+}
+
+bool Engine::colony_crop_missing(AiPlayer& p) {
+    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_limit() ||
+        player(p).scenario.has(scenario_flag::kNoColonies)) {
+        return false;
+    }
     const City* home = home_city(p);
-    if (home == nullptr) {
-        return 0;
+    // Only once settlers live there: pioneers saving for it stood still for up to two hours.
+    if (home == nullptr || population(*home, 1) == 0) {
+        return false;
     }
     struct Need {
         std::uint8_t good;
@@ -2275,15 +2289,10 @@ std::int64_t Engine::colony_savings(AiPlayer& p) {
                                                  {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
                                                  {ware::kSpices, {ware::kSpiceField, 0}},
                                                  {ware::kCocoa, {ware::kCocoaField, 0}}}};
-    for (const Need& n : kNeeds) {
-        if (demand(*home, n.good) == 0) {
-            continue;
-        }
-        if (std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); })) {
-            return colony_money(p);
-        }
-    }
-    return 0;
+    return std::ranges::any_of(kNeeds, [&](const Need& n) {
+        return demand(*home, n.good) != 0 &&
+               std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); });
+    });
 }
 
 std::int64_t Engine::yard_savings(AiPlayer& p) {
