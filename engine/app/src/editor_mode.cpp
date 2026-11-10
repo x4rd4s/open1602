@@ -2211,6 +2211,18 @@ void MapViewer::draw_editor_marks() {
                 }
                 outline(tile->x, tile->y, 1, 1,
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
+            } else if (tool == EditorObjects::Tool::Territory) {
+                // The brush in its shape: white where it gives, red where it takes back, where the
+                // owner has a city on the island.
+                const std::uint32_t side =
+                    editor::kBrushSizes[std::min(m_editor->objects.brush, editor::kBrushSizes.size() - 1)];
+                const auto shape = static_cast<editor::BrushShape>(m_editor->terrain.shape % editor::kBrushShapes);
+                const bool taking = m_input->right_stroke();
+                const bool city = editor_claim_city(tile->x, tile->y).has_value();
+                rim(editor::brush_tiles(tile->x, tile->y, side, world.width(), world.height(), shape),
+                    ui::rgb_ink(!city    ? assets::Rgba{230, 60, 60, 255}
+                                : taking ? assets::Rgba{235, 120, 80, 255}
+                                         : assets::Rgba{250, 250, 250, 255}));
             } else if (tool == EditorObjects::Tool::Remove || b == nullptr) {
                 outline(tile->x, tile->y, 1, 1, ui::rgb_ink(assets::Rgba{250, 250, 250, 255}));
             } else if (editor_special_piece()) {
@@ -2888,6 +2900,12 @@ bool MapViewer::editor_stroke(std::optional<render::TilePos> tile, Stroke phase,
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (panel != nullptr && panel->page() == EditorPanel::Page::Objects && !m_editor->placing) {
         editor_end_stroke();
+        if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+            if (phase == Stroke::Begin) {
+                m_editor->claim_take = erase;  // the right button takes land back
+            }
+            return editor_objects_stroke(tile, phase);
+        }
         if (erase) {
             return false;  // the right button drags the map, it never builds
         }

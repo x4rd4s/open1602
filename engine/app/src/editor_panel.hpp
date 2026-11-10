@@ -83,9 +83,10 @@ struct EditorObjects {
     /// longer covers the last); Template: one of the player's saved templates (templates.hpp) about
     /// the mouse, for the owner, without costs; Ship, Unit: a ship on the water, a land unit on an island, for the
     /// owner; Resource: an ore or gold vein in a mountain, a treasure, deer in a forest; Remove:
-    /// takes the ship, unit, resource or building clicked away.
-    enum class Tool : std::uint8_t { Build, Template, Ship, Unit, Resource, Remove };
-    static constexpr std::size_t kTools = 6;
+    /// takes the ship, unit, resource or building clicked away; Territory: land painted to the
+    /// owner's city on the island without a building (the right button takes it back).
+    enum class Tool : std::uint8_t { Build, Template, Ship, Unit, Resource, Remove, Territory };
+    static constexpr std::size_t kTools = 7;
     Tool tool = Tool::Build;
     std::size_t group = 0;      ///< index into the build menu's categories that list buildings
     std::size_t piece = 0;      ///< index into the group's buildings
@@ -95,6 +96,7 @@ struct EditorObjects {
     std::size_t resource = 0;   ///< editor::Resource: veins, treasure, deer
     std::uint8_t rotation = 0;  ///< 0..3, a quarter clockwise each; ships and units face 2 * rotation
     std::size_t owner = 0;      ///< index into the world's players
+    std::size_t brush = 2;      ///< Territory: index into editor::kBrushSizes
     friend bool operator==(const EditorObjects&, const EditorObjects&) = default;
 };
 
@@ -128,10 +130,11 @@ enum class EditorTool : std::uint8_t {
     Ship,
     Unit,
     Resource,
+    Territory,  ///< land of a city without a building (the page "Objects")
     Remove,
     Marker,  ///< a named point or area for the scenario's scripts (the page "Markers")
 };
-inline constexpr std::size_t kEditorTools = 20;
+inline constexpr std::size_t kEditorTools = 21;
 
 /// What the editor's menu bar asks for (EditorChrome), the same as the keys do.
 enum class EditorCommand : std::uint8_t {

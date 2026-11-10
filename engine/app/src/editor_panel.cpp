@@ -254,14 +254,15 @@ constexpr std::array<const char*, 4> kTerrainRotationTexts = {"editor.terrain.ro
                                                               "editor.terrain.rotation.2", "editor.terrain.rotation.3"};
 
 constexpr std::array<const char*, EditorObjects::kTools> kObjectToolTitles = {
-    "editor.tool.build", "editor.tool.template", "editor.tool.ship",
-    "editor.tool.unit",  "editor.tool.resource", "editor.tool.remove"};
+    "editor.tool.build",    "editor.tool.template", "editor.tool.ship",     "editor.tool.unit",
+    "editor.tool.resource", "editor.tool.remove",   "editor.tool.territory"};
 constexpr std::array<const char*, EditorObjects::kTools> kObjectToolNotes = {
-    "editor.objects.note.build", "editor.objects.note.template", "editor.objects.note.ship",
-    "editor.objects.note.unit",  "editor.objects.note.resource", "editor.objects.note.remove"};
+    "editor.objects.note.build",    "editor.objects.note.template", "editor.objects.note.ship",
+    "editor.objects.note.unit",     "editor.objects.note.resource", "editor.objects.note.remove",
+    "editor.objects.note.territory"};
 constexpr std::array<const char*, EditorObjects::kTools> kObjectPieceLabels = {
-    "editor.objects.building", "editor.objects.template", "editor.objects.ship",
-    "editor.objects.unit",     "editor.objects.resource", "editor.objects.piece"};
+    "editor.objects.building", "editor.objects.template", "editor.objects.ship", "editor.objects.unit",
+    "editor.objects.resource", "editor.objects.piece",    "editor.objects.brush"};
 
 constexpr std::uint32_t kSizeStep = 50;
 constexpr std::uint32_t kFitMargin = 8;
@@ -567,13 +568,14 @@ constexpr std::array<std::pair<EditorTool, EditorTerrain::Tool>, 10> kTerrainToo
     {EditorTool::Paste, EditorTerrain::Tool::Paste},
 }};
 
-constexpr std::array<std::pair<EditorTool, EditorObjects::Tool>, 6> kObjectTools = {{
+constexpr std::array<std::pair<EditorTool, EditorObjects::Tool>, 7> kObjectTools = {{
     {EditorTool::Build, EditorObjects::Tool::Build},
     {EditorTool::Template, EditorObjects::Tool::Template},
     {EditorTool::Ship, EditorObjects::Tool::Ship},
     {EditorTool::Unit, EditorObjects::Tool::Unit},
     {EditorTool::Resource, EditorObjects::Tool::Resource},
     {EditorTool::Remove, EditorObjects::Tool::Remove},
+    {EditorTool::Territory, EditorObjects::Tool::Territory},
 }};
 
 }  // namespace
@@ -1860,12 +1862,15 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     // Ships and land units: the piece is their type, the rotation the way they face.
     const bool figure =
         o.tool == Tool::Template || o.tool == Tool::Ship || o.tool == Tool::Unit || o.tool == Tool::Resource;
+    // Territory: the piece is the brush's size, the owner the city's.
+    const bool territory = o.tool == Tool::Territory;
     // What is placed for an owner, turned.
     const bool owned = build || o.tool == Tool::Template || o.tool == Tool::Ship || o.tool == Tool::Unit;
     const std::size_t chosen = o.tool == Tool::Template   ? o.stamp
                                : o.tool == Tool::Ship     ? o.ship
                                : o.tool == Tool::Unit     ? o.unit
                                : o.tool == Tool::Resource ? o.resource
+                               : territory                ? o.brush
                                                           : o.piece;
     const auto value = [&](Id id, const std::string& label, std::string text, bool enabled) {
         f.label(Rect{m_x, y, m_w, 18}, label, Align::Left, enabled ? Tone::Normal : Tone::Dim);
@@ -1875,7 +1880,7 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     };
     value(kObjectsGroup, ui::tr("editor.objects.group"), model.object_group, build && model.object_groups > 0);
     // A name is long: its number goes on the label above it.
-    const bool pieces = (build || figure) && model.object_pieces > 0;
+    const bool pieces = (build || figure || territory) && model.object_pieces > 0;
     std::string piece = ui::tr("editor.terrain.no_piece");
     const char* piece_label = kObjectPieceLabels[static_cast<std::size_t>(o.tool)];
     std::string label = ui::tr(piece_label, {"-", "-"});
@@ -1890,11 +1895,11 @@ void EditorPanel::layout_objects(const EditorModel& model) {
           model.object_ownerless    ? ui::tr("editor.objects.ownerless")
           : model.object_owners > 0 ? model.object_owner
                                     : ui::tr("editor.objects.no_owner"),
-          owned && model.object_owners > 0 && !model.object_ownerless);
+          (owned || territory) && model.object_owners > 0 && !model.object_ownerless);
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
     if (model.object_ownerless) {
         note = ui::tr("editor.objects.note.special");
-    } else if (owned && model.object_owners == 0) {
+    } else if ((owned || territory) && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
     } else if (build && model.object_neutral) {
         note = ui::tr("editor.objects.note.neutral");
@@ -3188,11 +3193,12 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 o.rotation = 0;
             } else if (*id == kObjectsPiece) {
                 using Tool = EditorObjects::Tool;
-                std::size_t& chosen = o.tool == Tool::Template   ? o.stamp
-                                      : o.tool == Tool::Ship     ? o.ship
-                                      : o.tool == Tool::Unit     ? o.unit
-                                      : o.tool == Tool::Resource ? o.resource
-                                                                 : o.piece;
+                std::size_t& chosen = o.tool == Tool::Template    ? o.stamp
+                                      : o.tool == Tool::Ship      ? o.ship
+                                      : o.tool == Tool::Unit      ? o.unit
+                                      : o.tool == Tool::Resource  ? o.resource
+                                      : o.tool == Tool::Territory ? o.brush
+                                                                  : o.piece;
                 chosen = model.object_pieces > 0 ? step(chosen, model.object_pieces, forward) : 0;
                 if (o.tool == Tool::Build) {
                     o.rotation = 0;

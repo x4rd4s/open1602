@@ -86,6 +86,17 @@ struct WorldIsland {
     /// The editor's "fertility at random": a game of the scenario rolls the island's crops when it
     /// starts (roll_random_fertility, new_game.hpp), which clears the mark.
     bool random_fertility = false;
+    /// Land the editor gave a city without a building that claims it (the page "Objects", tool
+    /// "Territory"): the city number per tile (MapCell::kNoCity: none), width x height of the map,
+    /// or empty when the island has none. It counts as covered as a market's circle does
+    /// (territory_coverage), while the city stands.
+    std::vector<std::uint8_t> claimed{};
+
+    /// The city that claims tile (x, y) by the editor's hand; MapCell::kNoCity for none.
+    [[nodiscard]] std::uint8_t claimed_city(std::uint32_t tx, std::uint32_t ty) const noexcept {
+        const std::size_t i = std::size_t{ty} * map.width() + tx;
+        return tx < map.width() && i < claimed.size() ? claimed[i] : MapCell::kNoCity;
+    }
 
     /// Players who explored the island's crops with a ship.
     std::vector<bool> explored{};

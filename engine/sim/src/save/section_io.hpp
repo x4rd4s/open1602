@@ -96,6 +96,17 @@ struct Decoded {
     std::optional<std::vector<std::uint8_t>> editor_state;       ///< EDIT
     std::optional<PlannedIslands> planned_islands;               ///< PLAN
     std::optional<std::vector<std::uint16_t>> random_fertility;  ///< RFRT: island numbers
+    /// CLMD: the land the editor gave cities (WorldIsland::claimed), per island number its tiles.
+    struct ClaimedTile {
+        std::uint16_t x = 0;
+        std::uint16_t y = 0;
+        std::uint8_t city = 0;
+    };
+    struct ClaimedIsland {
+        std::uint16_t number = 0;
+        std::vector<ClaimedTile> tiles;
+    };
+    std::optional<std::vector<ClaimedIsland>> claimed;
     std::optional<World::CampaignPart> campaign_part;
     /// The goods the packages added (GOOD).
     std::optional<assets::Goods> goods;

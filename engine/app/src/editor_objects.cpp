@@ -453,6 +453,12 @@ void MapViewer::editor_object_model(EditorModel& m) const {
         const BuildTemplate* t = editor_template();
         m.object_name = t != nullptr ? t->name : std::string();
     }
+    if (tool == Tool::Territory) {
+        const std::size_t side = editor::kBrushSizes[std::min(m.objects.brush, editor::kBrushSizes.size() - 1)];
+        m.object_pieces = editor::kBrushSizes.size();
+        m.object_turns = false;
+        m.object_name = ui::tr("editor.objects.brush_size", {std::to_string(side)});
+    }
     if (tool == Tool::Resource) {
         m.object_pieces = editor::kResources;
         m.object_turns = false;
@@ -1047,6 +1053,12 @@ bool MapViewer::editor_objects_stroke(std::optional<render::TilePos> tile, Strok
                 editor_remove_object(*tile);
                 return true;
             }
+            if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+                m_editor->object_at = {tile->x, tile->y};
+                m_editor->object_drag = true;
+                editor_claim(tile->x, tile->y, true);
+                return true;
+            }
             if (m_editor->objects.tool == EditorObjects::Tool::Resource) {
                 editor_place_resource(*tile);
                 return true;
@@ -1071,6 +1083,17 @@ bool MapViewer::editor_objects_stroke(std::optional<render::TilePos> tile, Strok
         case Stroke::Continue: {
             if (!m_editor->object_drag || !tile || !m_editor->object_at) {
                 return m_editor->object_drag;
+            }
+            if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+                // The brush along the way, a tile at a time.
+                const auto [lx, ly] = *m_editor->object_at;
+                for (const auto& [px, py] : editor::line_tiles(lx, ly, tile->x, tile->y)) {
+                    if (px != lx || py != ly) {
+                        editor_claim(px, py, false);
+                    }
+                }
+                m_editor->object_at = {tile->x, tile->y};
+                return true;
             }
             const assets::BuildingType* b = editor_object_piece();
             if (b == nullptr) {
@@ -1326,11 +1349,15 @@ void MapViewer::editor_end_objects() {
     if (m_editor->object_steps.empty()) {
         return;
     }
-    editor_remember_object();
+    const bool territory = m_editor->objects.tool == EditorObjects::Tool::Territory;
+    if (!territory) {
+        editor_remember_object();  // a brush is no object to place again
+    }
     if (m_editor->object_steps.size() == 1) {
         m_editor->document.record(std::move(m_editor->object_steps.front()));
     } else {
-        m_editor->document.record(std::make_unique<editor::Steps>(std::move(m_editor->object_steps), "building_place"));
+        m_editor->document.record(std::make_unique<editor::Steps>(std::move(m_editor->object_steps),
+                                                                  territory ? "territory" : "building_place"));
     }
     m_editor->object_steps.clear();
     m_editor->notice.clear();
@@ -1370,6 +1397,57 @@ void MapViewer::editor_remember_object() {
     }
 }
 
+std::optional<std::pair<std::uint16_t, std::uint8_t>> MapViewer::editor_claim_city(std::int64_t x,
+                                                                                   std::int64_t y) const {
+    const sim::World& world = m_state->world;
+    const sim::PlayerId owner = editor_object_owner();
+    if (owner == sim::kNoPlayer || x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    // A player has one city on an island (editor::refuse_second_city).
+    for (const sim::City& city : world.cities()) {
+        if (city.island == c.island && city.owner == owner) {
+            return std::pair<std::uint16_t, std::uint8_t>{c.island, city.index};
+        }
+    }
+    return std::nullopt;
+}
+
+void MapViewer::editor_claim(std::int64_t x, std::int64_t y, bool tell) {
+    sim::World& world = m_state->world;
+    const auto city = editor_claim_city(x, y);
+    if (!city) {
+        if (tell) {
+            editor_notice(ui::tr(object_owners(world).empty() ? "editor.objects.note.no_players"
+                                                              : "editor.objects.refused.territory"),
+                          true, "no city to give land to");
+        }
+        return;
+    }
+    const auto [island, index] = *city;
+    const std::uint32_t side = editor::kBrushSizes[std::min(m_editor->objects.brush, editor::kBrushSizes.size() - 1)];
+    const auto shape = static_cast<editor::BrushShape>(m_editor->terrain.shape % editor::kBrushShapes);
+    // The brush's tiles on this island, by the island's own coordinates.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> tiles;
+    for (const auto& [wx, wy] : editor::brush_tiles(x, y, side, world.width(), world.height(), shape)) {
+        const sim::World::Cell& c = world.cell(wx, wy);
+        if (c.island == island) {
+            tiles.emplace_back(c.local_x, c.local_y);
+        }
+    }
+    auto op = editor::claim_land(world, m_buildings, island, index, tiles, m_editor->claim_take);
+    if (!op) {
+        return;  // nothing to give or take there: no note at every tile of a drag
+    }
+    (*op)->apply(world);
+    m_editor->object_steps.push_back(std::move(op).value());
+    m_editor->notice.clear();
+}
+
 std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) const {
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (!m_editor || panel == nullptr || panel->page() != EditorPanel::Page::Objects || m_editor->placing ||
@@ -1401,6 +1479,12 @@ std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) cons
             return ui::tr("editor.objects.note.no_players");
         }
         return editor_figure_refusal(editor_figure_fits(x, y));
+    }
+    if (tool == Tool::Territory) {
+        if (object_owners(world).empty()) {
+            return ui::tr("editor.objects.note.no_players");
+        }
+        return editor_claim_city(x, y) ? std::string() : ui::tr("editor.objects.refused.territory");
     }
     if (tool == Tool::Resource) {
         const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));

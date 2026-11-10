@@ -1187,7 +1187,8 @@ bool standing(const assets::BuildingType& b) noexcept {
 /// the neutral buildings' city holds the tiles of its standing buildings.
 /// Buildings with their origin in `gone` count as removed.
 std::vector<CityMask> territory_coverage(const World& world, const assets::BuildingTable& buildings,
-                                         std::uint16_t island, const std::vector<TilePos>& gone) {
+                                         std::uint16_t island, const std::vector<TilePos>& gone,
+                                         bool with_claims = true) {
     const IslandMap& m = world.islands()[island].map;
     const std::uint32_t w = m.width();
     const std::uint32_t h = m.height();
@@ -1205,6 +1206,16 @@ std::vector<CityMask> territory_coverage(const World& world, const assets::Build
             }
         }
     };
+    // Land the editor gave a city, while the city stands.
+    const WorldIsland& isl = world.islands()[island];
+    if (with_claims && isl.claimed.size() == std::size_t{w} * h) {
+        for (std::size_t i = 0; i < isl.claimed.size(); ++i) {
+            const std::uint8_t c = isl.claimed[i];
+            if (c < kCitySlotsPerIsland && world.city(island, c) != nullptr) {
+                covered[i] |= CityMask{1} << c;
+            }
+        }
+    }
     for (std::uint32_t y = 0; y < h; ++y) {
         for (std::uint32_t x = 0; x < w; ++x) {
             const MapCell& cell = m.top(x, y);
@@ -2139,6 +2150,12 @@ public:
                 }
             }
         }
+        // The land the editor gave it goes with it: a later city of the same number gets none.
+        for (std::uint8_t& claimed : m_world.island(m_island).claimed) {
+            if (claimed == index) {
+                claimed = MapCell::kNoCity;
+            }
+        }
         // Houses, productions and cost buildings of the city are gone with their buildings.
         m_world.remove_city(m_island, index);
         ConstructionEvent e;
@@ -2655,6 +2672,14 @@ DemolishResult execute_demolish(World& world, const assets::BuildingTable& build
     }
     builder.finish();
     return result;
+}
+
+std::vector<CityMask> building_coverage(const World& world, const assets::BuildingTable& buildings,
+                                        std::uint16_t island) {
+    if (island >= world.islands().size()) {
+        return {};
+    }
+    return territory_coverage(world, buildings, island, {}, false);
 }
 
 MovablePiece movable_at(const World& world, const assets::BuildingTable& buildings, PlayerId player,

@@ -1647,6 +1647,54 @@ TEST_CASE("construction: the editor renames a city, fills its stock and gives it
     CHECK(island.world.islands()[0].map.top(5, 10).owner == 0);
 }
 
+TEST_CASE("construction: the editor gives a city land without a building, and takes it back") {
+    Island island;
+    island.found();
+    const std::vector<std::pair<std::uint32_t, std::uint32_t>> far{{25, 25}, {26, 25}, {2, 2}, {25, 25}};
+    CHECK(island.city_at(25, 25) == sim::MapCell::kNoCity);
+    CHECK(!editor::claim_land(island.world, island.buildings, 0, 5, far, false).ok());  // no such city
+    auto given = editor::claim_land(island.world, island.buildings, 0, 0, far, false);
+    REQUIRE(given.ok());
+    (*given)->apply(island.world);
+    CHECK(island.city_at(25, 25) == 0);
+    CHECK(island.city_at(26, 25) == 0);
+    CHECK(island.city_at(2, 2) == sim::MapCell::kNoCity);  // never the sea
+    CHECK(island.world.islands()[0].map.top(25, 25).owner == 0);
+    CHECK(island.world.islands()[0].claimed_city(25, 25) == 0);
+    // Given already: nothing changes.
+    CHECK(!editor::claim_land(island.world, island.buildings, 0, 0, far, false).ok());
+    // The city builds there, and its land stays when a market's circle goes.
+    REQUIRE(island.build({{kRoad, 25, 25, 0, 0}}).placed == 1);
+    REQUIRE(island.build({{kMarket, 11, 11, 0, 0}}).placed == 1);
+    CHECK(island.demolish({11, 11}, {11, 11}) == 1);
+    CHECK(island.city_at(26, 25) == 0);
+    CHECK(island.at(25, 25)->id == kRoad);
+    // The savegame keeps it.
+    {
+        auto bytes = sim::write_game(island.world, island.buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, island.buildings);
+        REQUIRE(loaded.ok());
+        CHECK(loaded->islands()[0].claimed_city(26, 25) == 0);
+        CHECK(loaded->islands()[0].claimed_city(20, 20) == sim::MapCell::kNoCity);
+    }
+    // Taken back: open land goes, the road stays the city's, as does land the Kontor covers.
+    auto kontor_land = editor::claim_land(island.world, island.buildings, 0, 0, {{8, 10}}, false);
+    REQUIRE(kontor_land.ok());
+    (*kontor_land)->apply(island.world);
+    auto taken = editor::claim_land(island.world, island.buildings, 0, 0, {{25, 25}, {26, 25}, {8, 10}}, true);
+    REQUIRE(taken.ok());
+    (*taken)->apply(island.world);
+    CHECK(island.city_at(26, 25) == sim::MapCell::kNoCity);
+    CHECK(island.world.islands()[0].map.top(26, 25).owner == sim::kNoPlayer);
+    CHECK(island.city_at(25, 25) == 0);
+    CHECK(island.city_at(8, 10) == 0);
+    CHECK(island.world.islands()[0].claimed.empty());  // no claim left
+    (*taken)->revert(island.world);
+    CHECK(island.city_at(26, 25) == 0);
+    CHECK(island.world.islands()[0].claimed_city(26, 25) == 0);
+}
+
 TEST_CASE("construction: the editor sets what a Kontor sells and buys, and a village trades its goods") {
     Island island;
     sim::BuildOrder order;

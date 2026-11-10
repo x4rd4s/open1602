@@ -292,6 +292,12 @@ struct MovablePiece {
 /// Whether the building on `tile` is one `player` may move. Houses, workshops, farms, mines, mills,
 /// public buildings and idle shipyards move; Kontors, markets, towers, castles, ruins and the pieces
 /// of roads, walls and fields do not.
+/// Which cities' buildings claim each tile of an island (width x height, row by row): a bit per
+/// city number, from the circles of their markets and Kontors, the towers of their owner and the
+/// neutral buildings' own tiles; without the land the editor gave (WorldIsland::claimed).
+[[nodiscard]] std::vector<CityMask> building_coverage(const World& world, const assets::BuildingTable& buildings,
+                                                      std::uint16_t island);
+
 [[nodiscard]] MovablePiece movable_at(const World& world, const assets::BuildingTable& buildings, PlayerId player,
                                       std::uint16_t island, TilePos tile);
 
