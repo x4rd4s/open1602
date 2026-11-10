@@ -82,7 +82,9 @@ share also counts for the build orders that wait for 4000, 5000 or 8000 gold. A 
 its other balance values (savegame `BALA` version 6).
 An improved computer's main city whose houses have risen to half the citizens of
 `citizens2_citizens` already moves on to the citizens' stage while it earns gold, with a quarter of
-that share in hand, without waiting for a luxury good in store or a colony first.
+that share in hand, without waiting for a luxury good in store or a colony first. While it earns
+gold, its home city grows its houses with its land at every stage, as long as its houses move up
+to the next class, and it builds them with a quarter of the original's 1000 gold in hand.
 
 ## Taxes
 

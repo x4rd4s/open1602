@@ -905,7 +905,11 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 found = need_market(p, n.n);
                 break;
             case StageNeed::Kind::Houses:
-                found = need_houses(p, grow ? houses_wanted(c, r, n.n) : n.n);
+                // Open1602: the home city of an improved computer that earns gold grows its houses
+                // with its land at once (houses_wanted): more inhabitants pay more taxes. Before, it
+                // did so only with nothing else left to do, and stood at the list's number for hours.
+                found = need_houses(
+                    p, grow || (rivals() && &c == home_city(p) && net_income(p) > 0) ? houses_wanted(c, r, n.n) : n.n);
                 break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, count(n.n), holds(n.flag));
@@ -1879,7 +1883,9 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         }
         return false;
     }
-    if (c->stock(m_buildings.food_ware()) <= kTon / 2 || player(p).money <= 1000) {
+    // Open1602: an improved computer builds houses with a quarter of the original's 1000 gold in
+    // hand (stage_gold), as it lives from its taxes.
+    if (c->stock(m_buildings.food_ware()) <= kTon / 2 || std::int64_t{player(p).money} <= stage_gold(1000)) {
         return false;
     }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
