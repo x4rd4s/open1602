@@ -2548,13 +2548,15 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         if (crop.slot == kSlotSugar && wine_island) {
             continue;
         }
+        // The extra fields go to colonies, at most two beyond the order each: in the home city they
+        // took the land of its houses, and their upkeep outran its taxes.
         std::uint32_t want = n;
-        const std::uint32_t lacking = rivals() ? critical_short(p.player, crop.good) : 0;
+        const std::uint32_t lacking = rivals() && c != home ? critical_short(p.player, crop.good) : 0;
         if (lacking != 0) {
             const assets::BuildingType* b = producer(crop.good, crop.field);
             const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;
             if (per != 0) {
-                want = std::max(want, r->slots[crop.slot].count + (lacking + per - 1) / per);
+                want = std::max(want, std::min(r->slots[crop.slot].count + (lacking + per - 1) / per, n + 2));
             }
         }
         if (r->slots[crop.slot].count >= want || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
