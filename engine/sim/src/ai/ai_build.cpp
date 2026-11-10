@@ -88,6 +88,9 @@ std::uint16_t Engine::slot_fail(AiPlayer& p, std::uint8_t slot) {
     if (s.attempts >= 2 && s.fail_level < 2) {
         ++s.fail_level;
         s.attempts = 0;
+        if (s.fail_level >= 2) {
+            log(p, "city %u/%u: no site for slot %u after repeated tries", r->island, r->city, unsigned{slot});
+        }
     }
     return s.fail_level >= 2 ? s.fail_level : 0;
 }
