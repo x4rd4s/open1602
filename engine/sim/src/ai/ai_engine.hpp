@@ -338,6 +338,8 @@ private:
     bool rim_goal(const Ship& ship, std::uint16_t island, std::int64_t& best, Target& goal) const;
     /// Improved computers: an idle ship sails to the nearest island nobody of theirs explored.
     void scout(AiPlayer& p);
+    /// Open1602: sends an improved computer's ship without a job on patrol round its home island.
+    void guard_idle_ship(AiPlayer& p, bool healthy);
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
@@ -431,6 +433,8 @@ private:
     /// Open1602: more food or cloth for a home city whose supply falls short (`growing`: with a
     /// quarter of food to spare); true when a producer was planned.
     bool supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing);
+    /// Open1602: whether a class living in the city lacks one of its goods (not food).
+    [[nodiscard]] bool goods_lacking(const City& c) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
     [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).

@@ -1691,6 +1691,22 @@ bool Engine::supplies_growth(const City& c) const {
     return true;
 }
 
+bool Engine::goods_lacking(const City& c) const {
+    // A good of a class that lives in the city (not food) under a ton in stock and short in supply.
+    const auto& classes = m_buildings.resident_classes();
+    for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
+        if (c.inhabitants[k] == 0) {
+            continue;
+        }
+        for (const assets::ResidentClass::Need& n : classes[k].needs) {
+            if (n.ware != m_buildings.food_ware() && c.stock(n.ware) < kTon && supply(c, n.ware) < demand(c, n.ware)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool Engine::supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing) {
     // Short of gold, only where its own supply covers less than four fifths of the need: the rest
     // waits for gold to spare and, for food, for the stock to run low (a new farm's yield shows only
@@ -2131,10 +2147,11 @@ bool Engine::roads_if_mason(AiPlayer& p) {
 }
 
 std::int64_t Engine::yard_savings(AiPlayer& p) {
-    // The gold of the small yard while an improved computer has none and its home city could build
-    // one (a weaving mill, as need_shipyard asks), else 0.
-    if (classic() || p.yard_valid || !p.home_valid) {
-        return 0;
+    // The gold of the small yard while an improved computer wants another ship, has no yard and its
+    // home city could build one (a weaving mill, as need_shipyard asks), else 0.
+    if (classic() || p.yard_valid || !p.home_valid ||
+        static_cast<std::int32_t>(own_ships(p).size()) >= p.fleet_target) {
+        return 0;  // only while it wants another ship
     }
     const CityPlan& r = plan_of(p, p.home_island, p.home_city);
     if (r.slots[kSlotShipyard].count != 0 || r.slots[kSlotShipyard].attempts > 3 ||
@@ -2334,6 +2351,12 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
     }
     const assets::BuildingType* b = by_id(def->building);
     if (b == nullptr || !unlocked(p, *b) || !affordable(p, *c, *b)) {
+        return false;
+    }
+    // Open1602: no costly public building (a church, a bath, a college) while the people already
+    // living in the city run out of one of their goods: the gold goes to the goods first, and a
+    // building that lifts houses to a class whose goods are missing only makes them fall back.
+    if (rivals() && b->build_cost.money >= kCostlyPublic && goods_lacking(*c)) {
         return false;
     }
     if (plan_building(p, def->task, *b, which, false)) {
