@@ -859,14 +859,16 @@ void Engine::report(AiPlayer& p) {
         log(p,
             "report goods %u/%u: tax %d, costs %d, food %u/%u (1/32 t a min), food makers %u/%u/%u, stock t: cloth %u "
             "alcohol %u tobacco %u spices %u cocoa %u clothes %u jewellery %u, content %u/%u/%u/%u/%u, "
-            "tax rate %u/%u/%u/%u/%u",
+            "tax rate %u/%u/%u/%u/%u, food ahead %d, supplies growth %d, goods lacking %d, yard savings %lld",
             r.island, r.city, tax_income(*c, m_buildings), cost, supply(*c, food), demand(*c, food),
             unsigned{r.slots[kSlotFisher].count}, unsigned{r.slots[kSlotButcher].count},
             unsigned{r.slots[kSlotBakery].count}, c->stock(ware::kCloth) / kTon, c->stock(ware::kAlcohol) / kTon,
             c->stock(ware::kTobaccoGoods) / kTon, c->stock(ware::kSpices) / kTon, c->stock(ware::kCocoa) / kTon,
             c->stock(ware::kClothes) / kTon, c->stock(ware::kJewellery) / kTon, at(c->satisfaction, 0),
             at(c->satisfaction, 1), at(c->satisfaction, 2), at(c->satisfaction, 3), at(c->satisfaction, 4),
-            at(c->tax_rate, 0), at(c->tax_rate, 1), at(c->tax_rate, 2), at(c->tax_rate, 3), at(c->tax_rate, 4));
+            at(c->tax_rate, 0), at(c->tax_rate, 1), at(c->tax_rate, 2), at(c->tax_rate, 3), at(c->tax_rate, 4),
+            food_ahead(*c) ? 1 : 0, supplies_growth(*c) ? 1 : 0, goods_lacking(*c) ? 1 : 0,
+            static_cast<long long>(yard_savings(p)));
     }
 }
 
