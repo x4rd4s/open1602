@@ -608,6 +608,8 @@ private:
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
     /// Improved computers: what an own city can give of `w` to another own city (0 for nothing).
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const;
+    /// Improved computers: what is left to buy of `w` at a partner's city `c` (0 for nothing).
+    [[nodiscard]] std::uint32_t partner_spare(AiPlayer& p, const City& c, std::uint8_t w);
     /// Improved computers: what one supply run brings of a ware, by the computer's ships.
     [[nodiscard]] std::uint32_t supply_load(AiPlayer& p);
     /// Improved computers: how many supply runs bring ware `w` to `to` at a time from city `src`,

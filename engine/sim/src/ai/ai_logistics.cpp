@@ -583,7 +583,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             const City::Trade* t = c.trade_of(w);
-            if (t == nullptr || !t->sell || c.stock(w) <= t->keep + 5 * kTon || t->sell_price >= 1000) {
+            if (t == nullptr || t->sell_price >= 1000 || partner_spare(p, c, w) == 0) {
                 continue;
             }
             const std::uint64_t cost = std::uint64_t{t->sell_price} * (600 + sail_seconds(p, at, city_point(c)));
@@ -876,6 +876,42 @@ std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t res
     return c.stock(w) > keep ? c.stock(w) - keep : 0;
 }
 
+std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
+    // Open1602: what an improved computer can still buy of a ware at a partner's Kontor: what it
+    // sells beyond what it keeps (and 5 t), less what the computer's own runs are already on their
+    // way to load there; natives only for as much as the goodwill there pays for. Bought on what
+    // the Kontor merely held, nearly two thirds of the runs came back empty.
+    const City::Trade* t = c.trade_of(w);
+    if (t == nullptr || !t->sell || c.stock(w) <= t->keep + 5 * kTon) {
+        return 0;
+    }
+    std::uint64_t spare = c.stock(w) - t->keep - 5 * kTon;
+    if (m_world.acts_as(c.owner, FactionBehaviour::Natives)) {
+        const std::uint32_t goodwill = p.player < c.goodwill.size() ? c.goodwill[p.player] : 0U;
+        const std::uint32_t per_ton = std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U);
+        spare = std::min<std::uint64_t>(spare, std::uint64_t{goodwill} / per_ton * kTon);
+    }
+    const Target at = Target::city_of(c.island, c.index);
+    std::uint64_t booked = 0;
+    for (const ShipNote& n : p.ships) {
+        const Ship* o = m_world.ship(n.id);
+        if (o == nullptr || !n.supply || !o->route.active) {
+            continue;
+        }
+        for (const RouteStop& stop : o->route.stops) {
+            if (!(stop.target == at)) {
+                continue;
+            }
+            for (const RouteEntry& e : stop.entries) {
+                if (e.ware == w && !e.unload) {
+                    booked += e.amount;
+                }
+            }
+        }
+    }
+    return spare > booked + 5 * kTon ? static_cast<std::uint32_t>(spare - booked) : 0;
+}
+
 std::uint32_t Engine::supply_load(AiPlayer& p) {
     // What a supply run brings of one ware: half the holds (a run takes two wares), by the
     // computer's ships on average, at least one hold.
@@ -1011,7 +1047,9 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 const auto half = static_cast<std::uint32_t>(
                     std::max<std::size_t>(1, usable_holds(s, *m_sim.m_figures) / 2) * kHoldCapacity);
                 amount = std::min(std::max(amount, own ? 50 * kTon : amount), half);
-                if (own) {
+                if (!own) {
+                    amount = std::min(amount, partner_spare(p, m_world.cities()[*src], w));
+                } else {
                     // no more than the city can spare (own_spare), so that it does not run dry
                     const auto& m = m_buildings.materials();
                     const std::uint32_t reserve = (w == m.tools || w == m.bricks || w == m.wood) ? 28 * kTon : 5 * kTon;
