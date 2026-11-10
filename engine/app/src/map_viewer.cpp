@@ -1713,6 +1713,12 @@ void MapViewer::render() {
                 });
             }
         }
+        if (m_editor) {
+            editor_object_ghost([&](std::uint16_t island, std::uint32_t x, std::uint32_t y) {
+                saved.push_back(Saved{island, x, y, m_state->world.island(island).map.top(x, y)});
+                checker(island, x, y);
+            });
+        }
         if (m_tool.mode() == BuildTool::Mode::Demolish) {
             // Only what the click or drag would really remove is hatched, over the buildings, so the
             // player sees what changes before letting go; in the original's yellow checkerboard.

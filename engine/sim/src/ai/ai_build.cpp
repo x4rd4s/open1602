@@ -12,6 +12,7 @@
 
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/houses.hpp"
+#include "o1602/sim/logistics.hpp"
 
 namespace o1602::sim::ai {
 
@@ -741,6 +742,17 @@ void Engine::task_fisher(AiPlayer& p) {
     slot_ok(p, kSlotMarket);
 }
 
+void Engine::join_yard(AiPlayer& p, std::int32_t x, std::int32_t y) {
+    if (classic()) {
+        return;
+    }
+    const auto yard = building_at(m_world, m_buildings, p.island, TilePos{x, y});
+    if (yard && yard->city == p.city) {
+        (void)join_roads(p, yard->origin.x, yard->origin.y, static_cast<std::int32_t>(yard->width),
+                         static_cast<std::int32_t>(yard->height));
+    }
+}
+
 void Engine::task_shipyard(AiPlayer& p) {
     if (!search_shipyard(p)) {
         return;
@@ -760,6 +772,9 @@ void Engine::task_shipyard(AiPlayer& p) {
     if (s.stub_x >= 0 && s.extra > 0) {
         road_line(p, s.stub_x, s.stub_y, s.extra, static_cast<std::uint8_t>(s.rotation), true);
     }
+    // Open1602: the stub can fall short (a road at its start, a deer or a soldier on its way);
+    // without a road the yard's pack donkey never fetches wood and cloth.
+    join_yard(p, s.best_x0, s.best_y0);
     r->slots[kSlotShipyard].count = b->id == id::kShipyardBig ? 2 : 1;
     p.present[kSlotShipyard] = true;
     p.yard_valid = true;
@@ -785,6 +800,7 @@ void Engine::task_shipyard_upgrade(AiPlayer& p) {
     p.yard_valid = false;
     for (const auto& o : std::array<std::array<std::int32_t, 2>, 4>{{{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}}) {
         if (build(p, {BuildItem{big->id, x + o[0], y + o[1], 0, 0}}, false) != 0) {
+            join_yard(p, x + o[0], y + o[1]);
             r->slots[kSlotShipyard].count = 2;
             p.yard_valid = true;
             p.yard_island = p.island;

@@ -1944,6 +1944,95 @@ bool Engine::mine_path(AiPlayer& p, std::uint8_t w, std::vector<BuildItem>& road
     return false;
 }
 
+bool Engine::join_path(AiPlayer& p, std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h,
+                       std::vector<BuildItem>& road) {
+    constexpr std::int32_t kJoinPath = 24;
+    road.clear();
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto width = static_cast<std::int32_t>(map.width());
+    const auto height = static_cast<std::int32_t>(map.height());
+    if (width <= 0 || height <= 0 || w <= 0 || h <= 0) {
+        return false;
+    }
+    const auto own_road = [&](std::int32_t tx, std::int32_t ty) {
+        const Tile t = tile(p.island, tx, ty);
+        return t.valid() && t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge);
+    };
+    // The tiles beside the building (not its corners), where a road reaches its door.
+    const auto beside = [&](std::int32_t tx, std::int32_t ty) {
+        const bool row = tx >= x && tx < x + w && (ty == y - 1 || ty == y + h);
+        const bool column = ty >= y && ty < y + h && (tx == x - 1 || tx == x + w);
+        return row || column;
+    };
+    for (std::int32_t i = 0; i < w; ++i) {
+        if (own_road(x + i, y - 1) || own_road(x + i, y + h)) {
+            return true;
+        }
+    }
+    for (std::int32_t j = 0; j < h; ++j) {
+        if (own_road(x - 1, y + j) || own_road(x + w, y + j)) {
+            return true;
+        }
+    }
+    std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
+    std::vector<std::int32_t> dist(prev.size(), 0);
+    std::vector<std::int32_t> queue;
+    for (std::int32_t ty = 0; ty < height; ++ty) {
+        for (std::int32_t tx = 0; tx < width; ++tx) {
+            if (own_road(tx, ty)) {
+                prev[static_cast<std::size_t>(ty * width + tx)] = -1;
+                queue.push_back(ty * width + tx);
+            }
+        }
+    }
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::int32_t i = queue[head];
+        if (dist[static_cast<std::size_t>(i)] >= kJoinPath) {
+            continue;
+        }
+        for (std::uint8_t dir = 0; dir < 4; ++dir) {
+            const std::int32_t nx = i % width + kStep[dir][0];
+            const std::int32_t ny = i / width + kStep[dir][1];
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+                continue;
+            }
+            const auto n = static_cast<std::size_t>(ny * width + nx);
+            const Tile t = tile(p.island, nx, ny);
+            if (prev[n] != -2 || !t.valid() || t.city != p.city ||
+                !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
+                continue;
+            }
+            prev[n] = i;
+            dist[n] = dist[static_cast<std::size_t>(i)] + 1;
+            if (beside(nx, ny)) {
+                for (auto k = static_cast<std::int32_t>(n); prev[static_cast<std::size_t>(k)] != -1;
+                     k = prev[static_cast<std::size_t>(k)]) {
+                    road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
+                }
+                std::reverse(road.begin(), road.end());
+                return true;
+            }
+            queue.push_back(ny * width + nx);
+        }
+    }
+    return false;
+}
+
+bool Engine::join_roads(AiPlayer& p, std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h) {
+    std::vector<BuildItem> road;
+    if (!join_path(p, x, y, w, h, road)) {
+        log(p, "no road reaches the building at %d,%d", x, y);
+        return false;
+    }
+    if (road.empty()) {
+        return true;
+    }
+    const std::size_t want = road.size();
+    const std::size_t placed = build(p, std::move(road), false);
+    log(p, "road of %zu tiles to the building at %d,%d: %zu placed", want, x, y, placed);
+    return placed == want;
+}
+
 bool Engine::search_mine(AiPlayer& p, std::uint8_t w) {
     // One road tile per call from the start of the runs; the first mountain reached
     // within seven tiles ends the search.

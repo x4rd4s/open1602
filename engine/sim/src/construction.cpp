@@ -2690,7 +2690,9 @@ MovablePiece movable_at(const World& world, const assets::BuildingTable& buildin
                t.prod_kind == prod::kMilitary || t.kind == kind::kHq || t.kind == kind::kTower ||
                t.kind == kind::kTowerBeach) {
         piece.refusal = MoveRefusal::Holds;
-    } else if (std::find(kMovable.begin(), kMovable.end(), t.kind) == kMovable.end()) {
+    } else if (std::find(kMovable.begin(), kMovable.end(), t.kind) == kMovable.end() &&
+               !(t.kind == kind::kGate && t.prod_kind == prod::kTriumph)) {
+        // A triumphal arch moves like a building; a city gate stays in its wall.
         piece.refusal = MoveRefusal::NoBuilding;
     } else if (std::any_of(world.disasters().begin(), world.disasters().end(),
                            [&](const Disaster& d) { return d.island == island && d.x == ox && d.y == oy; })) {

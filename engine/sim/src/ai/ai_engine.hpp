@@ -471,6 +471,16 @@ private:
     /// over the city's open ground from its roads or its Kontor to a beach tile with fish, up to
     /// kFisherPath tiles; the road along it goes to `road`, the site to the search.
     bool fisher_path(AiPlayer& p, const assets::BuildingType& hut, std::vector<BuildItem>& road);
+    /// Open1602: the road that joins a building of the city at x, y (w x h tiles) to the city's
+    /// roads, when none touches it yet: the shortest way over the city's open ground from any of
+    /// its roads to a tile beside the building, up to kJoinPath tiles, goes to `road`. False when
+    /// no such way exists; true with `road` empty when a road touches the building already.
+    bool join_path(AiPlayer& p, std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h,
+                   std::vector<BuildItem>& road);
+    /// Open1602: lays join_path's road for a building of the city; whether a road touches it then.
+    bool join_roads(AiPlayer& p, std::int32_t x, std::int32_t y, std::int32_t w, std::int32_t h);
+    /// Open1602: join_roads for the shipyard just built at x, y (not with the original's computers).
+    void join_yard(AiPlayer& p, std::int32_t x, std::int32_t y);
     [[nodiscard]] DepositAccess deposit_access(const AiPlayer& p, const assets::IslandHeader::Deposit& d,
                                                std::int32_t& free_x, std::int32_t& free_y);
     [[nodiscard]] std::int32_t market_distance(const AiPlayer& p, std::int32_t x, std::int32_t y);

@@ -487,6 +487,10 @@ private:
     /// The order that places the chosen building about the world tile (x, y) for the chosen owner,
     /// free; nothing on the open sea or without players.
     [[nodiscard]] std::optional<sim::BuildOrder> editor_object_order(std::int64_t x, std::int64_t y) const;
+    /// The building of the editor's page "Objects" under the mouse, drawn into the map in its turn
+    /// and look where a click puts it, checkered as the build menu shows one. Every tile changed in
+    /// the map goes to `keep` first, which puts it back after drawing.
+    void editor_object_ghost(const std::function<void(std::uint16_t island, std::uint32_t x, std::uint32_t y)>& keep);
     /// Places the chosen building about the world tile (x, y) into object_steps; `tell`: a note why
     /// not.
     bool editor_place_object(std::int64_t x, std::int64_t y, bool tell);

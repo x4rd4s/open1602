@@ -942,6 +942,14 @@ EditorModel MapViewer::editor_model() const {
             if (m.terrain_name.ends_with(own)) {
                 m.terrain_name.resize(m.terrain_name.size() - own.size());
             }
+            // Ground: how much of an island's fertility it leaves a field. The map keeps the picture,
+            // so a piece is worth what the first piece of that picture is.
+            if (b->kind == assets::kind::kGround) {
+                const assets::BuildingType* laid = m_buildings.by_sprite(b->gfx);
+                const std::uint32_t edge = (laid != nullptr ? laid : b)->edge_growth;
+                m.terrain_name =
+                    ui::tr("editor.terrain.fertility", {m.terrain_name, std::to_string((edge * 100U + 64U) / 128U)});
+            }
             m.terrain_width = b->size_x;
             m.terrain_height = b->size_y;
             m.terrain_turns = b->rotate > 0;
