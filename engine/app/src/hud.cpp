@@ -2252,7 +2252,8 @@ void Hud::draw(const sim::World& world, const assets::BuildingTable& buildings, 
                 }
             }
         } else if (m_info && m_mode == kModeInfo) {
-            m_info->refresh(figures, banners.get(colour));
+            // A spectator plays no colour: no coat of arms.
+            m_info->refresh(figures, world.player(m_local) != nullptr ? banners.get(colour) : nullptr);
             m_renderer->draw(m_info->panel().draw(m_renderer->fonts(s)), m_regions.side_panel.x, m_regions.side_panel.y,
                              s);
             if (const auto text = m_info->help(m_leiste)) {

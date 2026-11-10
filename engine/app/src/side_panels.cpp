@@ -513,6 +513,7 @@ InfoPanel::InfoPanel(assets::GadgetLayout info, const assets::TextTable* texts)
 void InfoPanel::set_points(std::int64_t points, bool rating) {
     m_panel.set_text(kInfoPoints, std::to_string(points));
     m_panel.set_disabled(kInfoRating, !rating);
+    m_rating = rating;
 }
 
 std::optional<Selection::Kind> InfoPanel::mouse(std::int32_t x, std::int32_t y, bool down) {
@@ -546,6 +547,9 @@ std::optional<std::string> InfoPanel::help(const std::vector<std::string>& leist
     std::size_t line = 0;
     switch (*id) {
         case 57028:
+            if (!m_rating) {
+                return ui::tr("info.rating_alone");  // why it is greyed
+            }
             line = 217;
             break;
         case 57031:
@@ -570,9 +574,13 @@ void InfoPanel::refresh(const sim::PlayerFigures& f, const render::Banner* banne
         m_panel.set_text(kInfoRows[i].first + 1, std::to_string(values[i]));
     }
     // The coat of arms in the player's colour, the balance icon green or red.
-    const render::BannerArt arms = render::BannerArt::arms_at(m_arms);
-    set_banner_graphic(m_panel, kInfoArms, arms, banner);
-    set_banner_graphic(m_panel, kInfoArmsShadow, arms, banner);
+    m_panel.set_visible(kInfoArms, banner != nullptr);
+    m_panel.set_visible(kInfoArmsShadow, banner != nullptr);
+    if (banner != nullptr) {
+        const render::BannerArt arms = render::BannerArt::arms_at(m_arms);
+        set_banner_graphic(m_panel, kInfoArms, arms, banner);
+        set_banner_graphic(m_panel, kInfoArmsShadow, arms, banner);
+    }
     m_panel.set_graphic(kInfoBalanceIcon, m_balance_icon + (f.balance < 0 ? 1 : 0), 0);
     m_panel.set_text(kInfoGoods, ui::tr("stats.open"));  // the language may have changed
 }

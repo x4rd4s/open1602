@@ -840,7 +840,9 @@ private:
     void layout_package_save(const EditorModel& model);
     void layout_campaign(const EditorModel& model);
     /// The height of a line of the check list in a dialog `width` design units wide.
-    [[nodiscard]] static std::int32_t check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept;
+    /// The height of a line of the check list: its text wrapped as it is drawn, with the font of
+    /// the last draw (before the first, about 8 design units a letter).
+    [[nodiscard]] std::int32_t check_line_h(const EditorCheckLine& line, std::int32_t width) const;
     /// The notice (or the note `note_key`, `short_key` where it does not fit whole) from `y`
     /// down and the button `back` labelled `back_key` at the panel's foot.
     void note_and_back(const EditorModel& model, std::int32_t y, const char* note_key, const char* short_key,
@@ -874,6 +876,7 @@ private:
     std::uint32_t m_size_width = 0;
     std::uint32_t m_size_height = 0;
     std::size_t m_first = 0;                    ///< the first file shown on the page "Open", the first line on "Check"
+    const ui::Font* m_font = nullptr;           ///< the form's font at the last draw, to wrap texts in the layout
     std::size_t m_page_rows = 1;                ///< lines of the check list on its page as laid out last
     std::size_t m_player = 0;                   ///< the slot the page "Players" shows
     std::size_t m_mission = 0;                  ///< the mission the page "Goals" shows

@@ -2760,14 +2760,23 @@ void EditorPanel::layout_test_as(const EditorModel& model) {
     f.button(kBack, Rect{m_x, bottom + kGap, m_w, kButtonH}, ui::tr("editor.back"));
 }
 
-std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t width) noexcept {
+std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t width) const {
     if (line.kind == EditorCheckLine::Kind::Heading) {
         return 2 * 20 + 2;
     }
-    // As many lines as the text needs, about 8 design units a letter; three at least.
-    const auto per_line = static_cast<std::size_t>(std::max(20, width / 8));
-    const auto lines = static_cast<std::int32_t>((line.text.size() + per_line - 1) / per_line);
-    return std::clamp(lines + 1, 3, 6) * 20;
+    // As many lines as the text needs, wrapped as the paragraph wraps it, and the same gap below
+    // every line of the list.
+    constexpr std::int32_t kCheckRow = 20;
+    constexpr std::int32_t kSpace = 10;
+    std::size_t lines = 0;
+    if (m_font != nullptr) {
+        const double room = std::max(0.0, (width - 2.0 * ui::kTextPadding) * m_font->design_scale());
+        lines = ui::wrap_text(*m_font, line.text, static_cast<std::uint32_t>(room)).size();
+    } else {
+        const auto per_line = static_cast<std::size_t>(std::max(20, width / 8));
+        lines = (line.text.size() + per_line - 1) / per_line;
+    }
+    return std::clamp<std::int32_t>(static_cast<std::int32_t>(lines), 1, 8) * kCheckRow + kSpace;
 }
 
 void EditorPanel::layout_check(const EditorModel& model) {
@@ -2827,6 +2836,7 @@ void EditorPanel::layout_check(const EditorModel& model) {
 
 std::vector<ui::DrawItem> EditorPanel::draw(const EditorModel& model,
                                             const std::array<const ui::Font*, ui::kFontSlots>& fonts) {
+    m_font = m_form.font(fonts);
     layout(model);
     return m_form.draw(fonts);
 }

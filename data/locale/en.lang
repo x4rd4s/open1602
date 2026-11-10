@@ -1016,6 +1016,7 @@ display.keys = Keys ...
 # line of the player status that opens it
 stats.open = Goods balance
 stats.open_help = Goods balance: what your cities produce, buy, use and sell (F2)
+info.rating_alone = The rating sheet is only available when playing alone: in a multiplayer game it would stop the game on one computer only.
 stats.title = Goods balance
 # {1}: how many islands the player has cities on
 stats.all_islands = All islands ({1})
