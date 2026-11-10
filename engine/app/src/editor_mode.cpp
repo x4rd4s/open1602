@@ -1150,6 +1150,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             editor_city_request(request);
             break;
         case Kind::ShipCargo:
+        case Kind::ShipRoute:
             editor_ship_request(request);
             break;
         case Kind::SetPlayer:
@@ -1317,8 +1318,8 @@ namespace {
 bool shows_pick(EditorPanel::Page page) {
     return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
            page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods ||
-           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::CityTrade ||
-           page == EditorPanel::Page::CityWare;
+           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::ShipRoute ||
+           page == EditorPanel::Page::CityTrade || page == EditorPanel::Page::CityWare;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.

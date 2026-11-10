@@ -641,15 +641,90 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
     for (const std::uint8_t ware : world.goods().trade_wares()) {
         ship.wares.push_back(EditorGood{ware, ware_name(ware), 0});
     }
+    // The route: its stops by the cities it can go to, their wares.
+    ship.cart = s->cart();
+    const std::vector<sim::Target> targets = editor_route_targets(*s);
+    ship.route_targets.push_back(ui::tr("editor.ship.route_none"));
+    for (const sim::Target& t : targets) {
+        const sim::City* c = world.city(t.island, t.city);
+        ship.route_targets.push_back(c != nullptr ? c->name : std::string());
+    }
+    const std::size_t stops = s->cart() ? sim::kCartStops : sim::TradeRoute::kStops;
+    const std::size_t entries = std::min(sim::usable_route_entries(*s, m_figures), sim::RouteStop::kEntries);
+    for (std::size_t i = 0; i < stops; ++i) {
+        const sim::RouteStop& from = s->route.stops[i];
+        EditorRouteStop stop;
+        const auto at = std::find(targets.begin(), targets.end(), from.target);
+        stop.target = at == targets.end() ? 0 : static_cast<std::size_t>(at - targets.begin()) + 1;
+        for (std::size_t e = 0; e < entries; ++e) {
+            const sim::RouteEntry& v = from.entries[e];
+            stop.entries.push_back(
+                EditorRouteEntry{v.ware, v.ware != 0 ? ware_name(v.ware) : std::string(), v.unload, v.amount});
+        }
+        ship.stops.push_back(std::move(stop));
+    }
+    ship.route_active = s->route.active;
     m.ship = std::move(ship);
+}
+
+std::vector<sim::Target> MapViewer::editor_route_targets(const sim::Ship& ship) const {
+    // A ship's: every city with a Kontor; a cart's: those of its island, as the game's route window.
+    const sim::World& world = m_editor->document.world();
+    std::optional<std::uint16_t> island;
+    if (ship.cart()) {
+        if (!world.contains(ship.x, ship.y) || world.cell(ship.x, ship.y).island == sim::World::kSea) {
+            return {};
+        }
+        island = world.cell(ship.x, ship.y).island;
+    }
+    std::vector<sim::Target> out;
+    for (const sim::City& c : world.cities()) {
+        if (c.warehouse_x && c.warehouse_y && (!island || c.island == *island)) {
+            out.push_back(sim::Target::city_of(c.island, c.index));
+        }
+    }
+    return out;
 }
 
 void MapViewer::editor_ship_request(const EditorRequest& request) {
     if (m_editor->pick.kind != EditorPick::Kind::Ship) {
         return;
     }
-    auto op = editor::set_ship_cargo(m_editor->document.world(), m_editor->pick.id, request.index, request.ware,
-                                     request.amount);
+    const sim::World& world = m_editor->document.world();
+    if (request.kind == EditorRequest::Kind::ShipRoute) {
+        const sim::Ship* s = world.ship(m_editor->pick.id);
+        if (s == nullptr) {
+            return;
+        }
+        using What = EditorRequest::Route::What;
+        const EditorRequest::Route& r = request.route;
+        sim::RouteEdit e;
+        e.stop = static_cast<std::uint8_t>(std::min<std::size_t>(r.stop, sim::TradeRoute::kStops - 1));
+        if (r.what == What::Active) {
+            e.op = r.on ? sim::RouteEdit::Op::Start : sim::RouteEdit::Op::Stop;
+        } else if (r.what == What::Target) {
+            const std::vector<sim::Target> targets = editor_route_targets(*s);
+            if (r.target == 0 || r.target > targets.size()) {
+                e.op = sim::RouteEdit::Op::ClearStop;
+            } else {
+                e.op = sim::RouteEdit::Op::SetStop;
+                e.target = targets[r.target - 1];
+            }
+        } else {
+            e.op = sim::RouteEdit::Op::SetEntry;
+            e.entry = static_cast<std::uint8_t>(std::min<std::size_t>(r.entry, sim::RouteStop::kEntries - 1));
+            e.value = sim::RouteEntry{r.value.ware, r.value.unload, r.value.ware != 0 ? r.value.amount : 0U};
+        }
+        auto op = editor::edit_route(world, m_buildings, m_figures, m_editor->pick.id, e);
+        if (!op) {
+            editor_notice(ui::tr("editor.ship.route_refused"), true, op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        m_editor->notice.clear();
+        return;
+    }
+    auto op = editor::set_ship_cargo(world, m_editor->pick.id, request.index, request.ware, request.amount);
     if (!op) {
         editor_notice(op.error().message, true, op.error().message);
         return;

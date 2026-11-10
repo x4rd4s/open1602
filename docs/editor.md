@@ -217,6 +217,16 @@ the next trade good, the right button the one before, and empty), and + and - fo
 10 t, with the right button by 1 t, up to the 50 t a hold takes. A ware chosen for an empty hold
 fills it. Each change is one step of undo.
 
+Beside it, **Route** gives the ship or trade cart a trade route as its route window in the game
+does: **Stop 1 of 8** (a cart: of 4) chooses the stop to change, **City** the city it goes to (a
+ship's any city with a Kontor, a cart's only those of its island; **No stop** empties it), and
+below, for each ware the stop handles (as many as the ship has holds, at most eight), the ware,
+whether the stop **loads** it until that much is on board or **unloads** up to that much, and the
+tons (+ and - by 10 t, with the right button by 1 t). **Runs from the start** switches the route on:
+the ship or cart sets off along it as soon as the game begins, from its first stop. Changed while
+on, the route begins again from its first stop; without any stop it is off. Switched off, the ship
+waits where it was placed. Each change is one step of undo.
+
 ## Players
 
 **Players** lists the slots of the humans and computers, one row each (the free trader, the pirates

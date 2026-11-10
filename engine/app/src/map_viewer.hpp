@@ -537,6 +537,9 @@ private:
     void editor_remove_object(render::TilePos tile);
     /// The pipette at the world tile (x, y).
     void editor_pipette(std::uint32_t x, std::uint32_t y);
+    /// The cities a stop of the route of `ship` can be in the editor, in the order of the world's
+    /// cities: a ship's each with a Kontor, a trade cart's those of its island.
+    [[nodiscard]] std::vector<sim::Target> editor_route_targets(const sim::Ship& ship) const;
     /// The city of the chosen owner on the island at the world tile (x, y), nothing on the sea or
     /// where the owner has none (the tool Territory paints its land).
     [[nodiscard]] std::optional<std::pair<std::uint16_t, std::uint8_t>> editor_claim_city(std::int64_t x,

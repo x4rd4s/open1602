@@ -13,6 +13,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/editor/operation.hpp"
+#include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
 
 namespace o1602::editor {
@@ -74,6 +75,17 @@ enum class UnitRefusal : std::uint8_t {
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world,
                                                                                std::uint32_t id, std::size_t slot,
                                                                                std::uint8_t ware, std::uint32_t amount);
+
+/// The trade route of ship or trade cart `id` changed as `edit` says (its `ship` is `id`, its
+/// `player` passed over), as the owner changes it in the game (sim::Fleet::edit_route): a stop's
+/// city (a ship's any city with a Kontor, a cart's those of its island), a ware a stop loads or
+/// unloads, the route switched on or off. A route switched on runs from the game's start; changed
+/// while on, it starts again from its first stop, and without stops it is off. Fails (NotFound)
+/// without the ship, (Unsupported) where the game refuses the change.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> edit_route(const sim::World& world,
+                                                                           const assets::BuildingTable& buildings,
+                                                                           const assets::FigureTable& figures,
+                                                                           std::uint32_t id, sim::RouteEdit edit);
 
 /// The ship or trade cart `id` taken away, with every order of others that names it. Fails (NotFound).
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id);

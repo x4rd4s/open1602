@@ -1695,6 +1695,57 @@ TEST_CASE("construction: the editor gives a city land without a building, and ta
     CHECK(island.world.islands()[0].claimed_city(26, 25) == 0);
 }
 
+TEST_CASE("construction: the editor gives a ship a trade route that runs from the start") {
+    Island island;
+    island.found();
+    const assets::FigureTable figures;
+    const std::uint32_t id = island.world.ships()[0].id;
+    using Op = sim::RouteEdit::Op;
+    const auto edit = [&](sim::RouteEdit e) {
+        auto op = editor::edit_route(island.world, island.buildings, figures, id, e);
+        if (op.ok()) {
+            (*op)->apply(island.world);
+        }
+        return op.ok();
+    };
+    const sim::Target city = sim::Target::city_of(0, 0);
+    // Nothing to start yet; a stop only at a city.
+    CHECK(!edit(sim::RouteEdit{sim::kNoPlayer, id, Op::Start}));
+    CHECK(!edit(sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 0, 0, sim::Target::position(30, 30)}));
+    CHECK(!edit(sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 4)}));
+    CHECK(!editor::edit_route(island.world, island.buildings, figures, 999, sim::RouteEdit{}).ok());
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 1, 0, city}));
+    sim::RouteEdit wood{sim::kNoPlayer, id, Op::SetEntry, 1, 0};
+    wood.value = sim::RouteEntry{island.buildings.materials().wood, true, 5 * 32};
+    REQUIRE(edit(wood));
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::Start}));
+    const sim::Ship* ship = island.world.ship(id);
+    CHECK(ship->route.active);
+    CHECK(ship->route.current == 1);  // the first stop that is set
+    CHECK(ship->target == city);
+    CHECK(ship->route.stops[1].entries[0].unload);
+    // The scenario keeps it, running.
+    {
+        auto bytes = sim::write_game(island.world, island.buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, island.buildings);
+        REQUIRE(loaded.ok());
+        const sim::Ship& kept = loaded->ships()[0];
+        CHECK(kept.route.active);
+        CHECK(kept.target == city);
+        CHECK(kept.route.stops[1].entries[0].amount == 5 * 32);
+    }
+    // Without stops it stops; switched off, the ship waits where it is.
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::ClearStop, 1}));
+    CHECK(!island.world.ship(id)->route.active);
+    CHECK(island.world.ship(id)->target.empty());
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 0, 0, city}));
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::Start}));
+    REQUIRE(edit(sim::RouteEdit{sim::kNoPlayer, id, Op::Stop}));
+    CHECK(!island.world.ship(id)->route.active);
+    CHECK(island.world.ship(id)->target.empty());
+}
+
 TEST_CASE("construction: the editor sets what a Kontor sells and buys, and a village trades its goods") {
     Island island;
     sim::BuildOrder order;
