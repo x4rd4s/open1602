@@ -202,8 +202,10 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
     }
     if (population(c, 1) >= 170) {
         if (player(p).money > 2000) {
-            want(ware::kOre, (r.slots[kSlotSmelter].count != 0 ? 15U : 10U) * kTon);
-            want(ware::kIron, (r.slots[kSlotToolsmith].count != 0 ? 15U : 10U) * kTon);
+            // Open1602: with its veins running low, twice as much in store before they are gone.
+            const std::uint32_t more = ore_running_out(p) ? 2U : 1U;
+            want(ware::kOre, more * (r.slots[kSlotSmelter].count != 0 ? 15U : 10U) * kTon);
+            want(ware::kIron, more * (r.slots[kSlotToolsmith].count != 0 ? 15U : 10U) * kTon);
         }
         want(ware::kSpices, lux(ware::kSpices, 10));
         want(ware::kTobaccoGoods, lux(ware::kTobaccoGoods, 10));

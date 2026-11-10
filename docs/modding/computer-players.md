@@ -510,6 +510,11 @@ as a stranger's would. When a rival declares war on a computer, it asks each of 
 hour joins that war with a war plan of its own, unless it fights one already, rests after a war of its own, is short of gold
 or is allied with the enemy too. Scripts see alliances in `game.relation` and `on_diplomacy`.
 
+**Ore running low.** Where veins run out, an improved computer that mines iron watches the ore
+left in the veins of its own islands (a big vein its deep mines dig for good counts as endless).
+Below 80 t it looks for a colony on an island with a free vein, as for its goals, and keeps twice
+as much ore and iron in store by buying, so that its iron works go on when its own vein is gone.
+
 **War economy.** Improved computers pay their army's upkeep as a human does: soldiers, units in
 their castles and aboard, and cannon towers (the original's computers pay nothing). They add a unit
 or a tower only while its upkeep stays within a budget: in peace half their civil income (taxes less

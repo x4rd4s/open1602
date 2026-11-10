@@ -341,6 +341,8 @@ private:
     [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t w) const;
     /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing.
     [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
+    /// Whether the ore veins of its own islands run low while it mines iron (improved computers).
+    [[nodiscard]] bool ore_running_out(const AiPlayer& p) const;
     void task_settle_area(AiPlayer& p);
     void task_settle_site(AiPlayer& p);
     void task_settle_land(AiPlayer& p);

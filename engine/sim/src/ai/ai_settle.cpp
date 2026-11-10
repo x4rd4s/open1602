@@ -22,8 +22,9 @@ constexpr std::int32_t kNeedStep = 50;
 constexpr std::uint64_t kLeftIslandMs = 2'700'000;  // improved computers: 45 min before they settle a left island again
 constexpr std::uint32_t kPirateRegionPasses = 6;    // passes a further nest keeps to a part without one
 constexpr std::uint8_t kLandRetries = 4;
-constexpr std::uint32_t kReach = 5;       // a ship within 5 tiles of a Kontor lies at it
-constexpr std::uint32_t kLandRange = 12;  // founding: the ship within 12 tiles of the site
+constexpr std::uint32_t kOreLowTons = 80;  // improved computers look for new ore below this much in their veins
+constexpr std::uint32_t kReach = 5;        // a ship within 5 tiles of a Kontor lies at it
+constexpr std::uint32_t kLandRange = 12;   // founding: the ship within 12 tiles of the site
 
 bool in_circle(std::int32_t dx, std::int32_t dy, std::uint32_t r) {
     static const std::vector<std::uint8_t> kNear = circle_half_widths(kReach);
@@ -1079,10 +1080,47 @@ std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
     if (p.strategy.goal == goal::kGold && !crop_available(p, ware::kGold)) {
         return ware::kGold;
     }
-    if (p.strategy.goal == goal::kMilitary && !crop_available(p, ware::kOre)) {
+    if ((p.strategy.goal == goal::kMilitary && !crop_available(p, ware::kOre)) || ore_running_out(p)) {
         return ware::kOre;
     }
     return 0;
+}
+
+bool Engine::ore_running_out(const AiPlayer& p) const {
+    // Open1602: an improved computer that mines iron ore sees its veins run low before they are
+    // gone, as a player does: the ore left in the veins of its own islands (a big vein that never
+    // runs out counts as endless) below kOreLowTons, while it has an iron mine. It then looks for a
+    // colony with a vein of its own (goal_crop), and buys ore and iron in the meantime.
+    if (!rivals() || p.pirates) {
+        return false;
+    }
+    bool mines = false;
+    for (const CityPlan& r : p.plans) {
+        mines = mines || r.slots[kSlotIronMine].count != 0;
+    }
+    if (!mines) {
+        return false;
+    }
+    const bool game_endless = (m_world.game_settings().flags & World::GameSettings::kEndlessVeins) != 0;
+    const bool endless = m_sim.rules().endless_veins(game_endless);
+    std::vector<std::uint16_t> islands;
+    std::uint64_t left = 0;
+    for (const City& c : m_world.cities()) {
+        if (c.owner != p.player || std::find(islands.begin(), islands.end(), c.island) != islands.end()) {
+            continue;
+        }
+        islands.push_back(c.island);
+        for (const auto& d : island_of(c.island).header.deposits) {
+            if (d.ware != ware::kOre || d.amount == 0) {
+                continue;
+            }
+            if (endless && d.kind != 1 && player(p).unlocked(infra::kLevel3F)) {
+                return false;  // a big vein its deep mines dig for good
+            }
+            left += d.amount;
+        }
+    }
+    return left < kOreLowTons * kTon;
 }
 
 std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
