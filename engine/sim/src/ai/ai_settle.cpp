@@ -1242,6 +1242,11 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
         return false;
     }
+    // Open1602: nor while its cities cost more than they bring in taxes; plantation colonies without
+    // inhabitants piled up costs on a home city that paid for them.
+    if (rivals() && n >= 1 && civil_income(p) <= 0) {
+        return false;
+    }
     if (p.settle.active && !p.settle.sailing && !classic() && !p.settle.failed) {
         // Open1602: the loaded ship looks for its island at every look of the city's order, not
         // only when the whole order is through (root); it lay loaded at the Kontor for minutes.
