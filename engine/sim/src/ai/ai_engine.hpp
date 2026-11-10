@@ -341,6 +341,8 @@ private:
     [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t w) const;
     /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing.
     [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
+    /// Whether the ore veins of its own islands run low while it mines iron (improved computers).
+    [[nodiscard]] bool ore_running_out(const AiPlayer& p) const;
     void task_settle_area(AiPlayer& p);
     void task_settle_site(AiPlayer& p);
     void task_settle_land(AiPlayer& p);
@@ -371,6 +373,10 @@ private:
     void production_switches(AiPlayer& p, City& c);
     /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
     void shed_producers(AiPlayer& p, City& c);
+    using WareSet = std::array<bool, 256>;
+    [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon) const;
+    /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
+    [[nodiscard]] bool saving_costs(const AiPlayer& p) const;
     void tax_rates(AiPlayer& p, City& c);
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.
@@ -441,7 +447,23 @@ private:
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;
+    /// Per minute: taxes less running costs, less the army's upkeep where it pays one.
     [[nodiscard]] std::int32_t net_income(const AiPlayer& p) const;
+    /// net_income with the trade balance (sales less purchases).
+    [[nodiscard]] std::int32_t earned_income(const AiPlayer& p) const;
+    /// Taxes less the running costs of the cities, without the army.
+    [[nodiscard]] std::int32_t civil_income(const AiPlayer& p) const;
+    /// The army's upkeep per minute (military_upkeep), 0 for the original's computers.
+    [[nodiscard]] std::int32_t military_cost(const AiPlayer& p) const;
+    /// The upkeep a minute the computer allows its army (war economy): a share of its civil
+    /// income in peace; at war or under threat also what its gold can carry for a while.
+    [[nodiscard]] std::int32_t army_budget(const AiPlayer& p) const;
+    /// army_budget while it arms for a war of its own.
+    [[nodiscard]] std::int32_t arming_budget(const AiPlayer& p) const;
+    /// What one more soldier would cost it a minute.
+    [[nodiscard]] std::int32_t unit_upkeep_estimate(const AiPlayer& p) const;
+    /// Whether a war it wages or fears allows a deficit for a while.
+    [[nodiscard]] bool war_economy(const AiPlayer& p) const;
     [[nodiscard]] bool incomes_ok(const AiPlayer& p, std::int32_t minimum) const;
     [[nodiscard]] std::int32_t land_rank(const AiPlayer& p) const;
     bool plan_building(AiPlayer& p, std::uint8_t task, const assets::BuildingType& b, std::uint8_t slot, bool force,
@@ -564,7 +586,7 @@ private:
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;
     [[nodiscard]] std::uint32_t free_holds(const Ship& s) const;
-    void queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
+    bool queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
     bool guard_post(AiPlayer& p, City& c, CityPlan& r, std::int32_t& x, std::int32_t& y, bool& at_yard);
     void guard(AiPlayer& p, City& c, std::int32_t x, std::int32_t y, std::uint32_t n, bool castle_island);
     bool market_tower(AiPlayer& p, City& c, std::int32_t mx, std::int32_t my);

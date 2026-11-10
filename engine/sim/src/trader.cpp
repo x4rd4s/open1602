@@ -196,6 +196,7 @@ void Fleet::trader_choose(Ship& ship) {
     };
     std::vector<Candidate> candidates;
     std::size_t kontors = 0;
+    bool only_last = false;  // the Kontor it came from is the only one
     for (std::size_t i = 0; i < m_world->cities().size(); ++i) {
         const City& c = m_world->cities()[i];
         if (!c.warehouse_x || !c.warehouse_y) {
@@ -210,14 +211,26 @@ void Fleet::trader_choose(Ship& ship) {
         }
         ++kontors;
         if (ship.previous == Target::city_of(c.island, c.index)) {
+            only_last = kontors == 1;
             continue;
         }
+        only_last = false;
         const WorldIsland& isl = m_world->islands()[c.island];
         const auto kx = static_cast<std::int32_t>(isl.x + *c.warehouse_x);
         const auto ky = static_cast<std::int32_t>(isl.y + *c.warehouse_y);
         candidates.push_back(Candidate{i, sea_distance(kx - ship.x, ky - ship.y)});
     }
     if (candidates.empty()) {
+        // Open1602 (Rules::trader_reach): at the only Kontor of the world he sails out to the map
+        // edge and comes back from there; the original's trader stays where he is for good, so that
+        // a single settler never sees him again after his first visit.
+        if (only_last && m_rules->trader_reach != TraderReach::Original) {
+            if (const std::optional<std::pair<std::int32_t, std::int32_t>> at = edge_water()) {
+                ship.target =
+                    Target::position(static_cast<std::uint32_t>(at->first), static_cast<std::uint32_t>(at->second));
+                ship.motion.failures = 0;
+            }
+        }
         return;
     }
     std::stable_sort(candidates.begin(), candidates.end(),
@@ -434,6 +447,23 @@ void Fleet::spawn_trader() {
         return;
     }
     // A random tile of the map edge; Open1602 makes sure it is water.
+    if (const std::optional<std::pair<std::int32_t, std::int32_t>> at = edge_water()) {
+        const auto [x, y] = *at;
+        Ship s;
+        s.name = next_ship_name();
+        s.place(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+        s.figure = figure::kTrader;
+        s.owner = trader;
+        s.health = type->ship.max_health;
+        s.cargo.resize(std::max<std::size_t>(1, type->ship.cargo_slots));
+        s.trader = true;
+        s.trader_goods.resize(m_world->goods().end());
+        m_world->add_ship(std::move(s));
+        m_events.push_back(ShipEvent{ShipEvent::Kind::TraderArrived, m_world->ships().back().id, trader});
+    }
+}
+
+std::optional<std::pair<std::int32_t, std::int32_t>> Fleet::edge_water() {
     Random& random = m_world->random(RandomStream::Ships);
     const auto w = static_cast<std::int32_t>(m_world->width());
     const auto h = static_cast<std::int32_t>(m_world->height());
@@ -459,22 +489,11 @@ void Fleet::spawn_trader() {
                 x = static_cast<std::int32_t>((r >> 2) % static_cast<std::uint32_t>(w));
                 break;
         }
-        if (!m_sea.sailable(x, y)) {
-            continue;
+        if (m_sea.sailable(x, y)) {
+            return std::pair{x, y};
         }
-        Ship s;
-        s.name = next_ship_name();
-        s.place(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
-        s.figure = figure::kTrader;
-        s.owner = trader;
-        s.health = type->ship.max_health;
-        s.cargo.resize(std::max<std::size_t>(1, type->ship.cargo_slots));
-        s.trader = true;
-        s.trader_goods.resize(m_world->goods().end());
-        m_world->add_ship(std::move(s));
-        m_events.push_back(ShipEvent{ShipEvent::Kind::TraderArrived, m_world->ships().back().id, trader});
-        return;
     }
+    return std::nullopt;
 }
 
 void Fleet::trader_tick(std::uint32_t dt_ms) {
@@ -518,8 +537,11 @@ void Fleet::trader_tick(std::uint32_t dt_ms) {
     // By default one trader for every three Kontors (none with fewer than two), more on a world
     // larger than usual for the players (trader_count), at most one new per pass.
     const Player* trader = m_world->player(m_world->first_of(FactionBehaviour::Trader));
-    const std::uint32_t wanted =
+    std::uint32_t wanted =
         trader != nullptr ? trader_count(*m_world, *m_rules, m_world->faction(*trader).ships.of(kontors)) : 0U;
+    if (trader != nullptr && kontors != 0 && m_rules->trader_reach != TraderReach::Original) {
+        wanted = std::max<std::uint32_t>(wanted, 1);  // Open1602: one Kontor is enough for a trader
+    }
     std::uint32_t traders = 0;
     for (const Ship& s : m_world->ships()) {
         traders += s.trader ? 1U : 0U;  // counted anew: a sunk trader is replaced (S-080)

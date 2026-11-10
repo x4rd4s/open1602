@@ -80,6 +80,12 @@ nowhere. Improved computers (not `classic_ai`) live from what they earn and move
 it, `rival_money_percent` (25 by default): a city that waits for 8001 gold moves on with 2000. The
 share also counts for the build orders that wait for 4000, 5000 or 8000 gold. A game keeps it with
 its other balance values (savegame `BALA` version 6).
+An improved computer's main city whose houses have risen to half the citizens of
+`citizens2_citizens` already moves on to the citizens' stage while it earns gold, with a quarter of
+that share in hand, without waiting for a luxury good in store or a colony first. While it earns
+gold with its trade (purchases count against it) and its food suffices, its home city grows its
+houses with its land at every stage, as long as its houses move up
+to the next class, and it builds them with a quarter of the original's 1000 gold in hand.
 
 ## Taxes
 
@@ -507,12 +513,41 @@ as a stranger's would. When a rival declares war on a computer, it asks each of 
 hour joins that war with a war plan of its own, unless it fights one already, rests after a war of its own, is short of gold
 or is allied with the enemy too. Scripts see alliances in `game.relation` and `on_diplomacy`.
 
+**Ore running low.** Where veins run out, an improved computer that mines iron watches the ore
+left in the veins of its own islands (a big vein its deep mines dig for good counts as endless).
+Below 80 t, or with no vein on its islands at all once a city is past the settlers, it looks for a
+colony on an island with a free vein, as for its goals, and keeps twice
+as much ore and iron in store by buying, so that its iron works go on when its own vein is gone.
+A mine site search that failed through and through is not taken up again by new roads.
+
+**War economy.** Improved computers pay their army's upkeep as a human does: soldiers, units in
+their castles and aboard, and cannon towers (the original's computers pay nothing). They add a unit
+or a tower only while its upkeep stays within a budget: in peace a third of what their cities
+earn with their trade (taxes less running costs, sales less purchases) and what their gold above
+1000 pays for twelve hours; with a stronger enemy nearby three quarters of it and besides what their gold above 1000
+pays for an hour and a half; in a war of their own three quarters and three hours of that gold;
+arming for one, six hours of it. Half the army their inhabitants call for they keep up as long as
+they have gold and their cities' income pays for it, to defend themselves; beyond that they keep a
+quarter of the budget to spare, and they train one unit at a time, and their sword smiths are never switched off for savings. A cannon
+tower of a build order costs upkeep too and is built only within the budget. Paying upkeep, they order one unit a look. A war plan starts only if that budget carries the soldiers it needs, and is
+declared only while its cities earn more than they cost. While a war of its own gets somewhere, or
+under threat, a computer accepts a deficit and gives up only at 2000 gold in debt; a war that
+failed a look ends in debt as before. An army beyond its budget only stops growing: disbanding
+costs gold, so a computer disbands only in debt (below), and only a soldier whose upkeep pays that
+cost back within half an hour.
+While it is at its army's budget arming or at war, or in debt, it switches off the producers of
+what none of its cities needs now (no inhabitants want it, nothing of its own works it into a
+wanted good, no building material, no weapons while it arms or fights) until it can afford them
+again.
+
 More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
-disbands soldiers beyond half the army its inhabitants allow, and switches off every producer with
-10 t of its ware in stock until the stock is down to 4 t.
-More than 5000 gold in debt with a falling purse, it tears down the producers of wares none of its
-cities needs (no inhabitants want them, nothing of its own works them into a wanted good, and no
-building material), a few per visit of a city: switched off they still cost. It also gives up the city that costs it most (its
+disbands soldiers beyond half the army its inhabitants allow (not at war or under threat), and
+switches off every producer with 10 t of its ware in stock until the stock is down to 4 t.
+More than 5000 gold in debt with a falling purse, it weighs switching off against tearing down:
+a producer whose ware the next class of one of its cities will want, or a weapon at war, only goes
+off; another is torn down where the idle costs it would go on costing and what the game refunds
+for it (the demolish refund rule) outweigh building it again, a few per visit of a city. More
+than 10,000 gold in debt, whatever no city needs now goes, whatever it refunds. It also gives up the city that costs it most (its
 running costs above its taxes), if that saves 50 gold a minute and a quarter of the deficit, a
 quarter of an hour after the last; never its home city or its largest, nor a city that makes what
 another of its cities lacks. While its cities do not earn

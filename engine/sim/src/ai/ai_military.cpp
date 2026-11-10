@@ -14,6 +14,7 @@
 
 #include "ai_engine.hpp"
 
+#include "o1602/sim/mission.hpp"
 #include "o1602/sim/ships.hpp"
 
 namespace o1602::sim::ai {
@@ -25,6 +26,7 @@ constexpr std::size_t kMaxPosts = 64;
 
 /// The pirate nest's offer comes again after more than 42 s (0x1A4 tenths, task 5).
 constexpr std::uint64_t kNestOfferMs = 42'000;
+constexpr std::uint32_t kDisbandPaybackMinutes = 30;  // a soldier is disbanded only if its upkeep pays the cost back
 
 /// The index in figure::kUnitFamilies of a unit's family, for a unit of a package that of the
 /// original's unit of its kind (Kind, as its hold shows it); 0 for other figures.
@@ -319,7 +321,7 @@ std::uint32_t Engine::free_holds(const Ship& s) const {
 // ---------------------------------------------------------------------------------------------
 // Recruiting and guards (every 6 s)
 
-void Engine::queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family) {
+bool Engine::queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family) {
     // Swordsmen and cavalry one at a time per castle, the others may stack.
     const CostBuilding* b = nullptr;
     const std::uint16_t island = p.castle_island.value_or(0);
@@ -329,7 +331,7 @@ void Engine::queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t fa
         }
     }
     if (b == nullptr) {
-        return;
+        return false;
     }
     // Open1602: a soldier of a package of the same kind is trained as often as the original's
     // (docs/modding/own-figures.md#soldiers); the original's computers know only theirs.
@@ -348,7 +350,7 @@ void Engine::queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t fa
     const std::uint32_t t = family_index(m_sim.m_figures, family);
     for (const CastleSlot& slot : b->slots) {
         if (slot.figure != 0 && family_index(m_sim.m_figures, slot.figure) == t && t < 2) {
-            return;
+            return false;
         }
     }
     CastleOrder order;
@@ -358,7 +360,7 @@ void Engine::queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t fa
     order.y = castle.y;
     order.op = CastleOrder::Op::Recruit;
     order.figure = static_cast<std::uint16_t>(family);
-    execute(order);
+    return execute(order).accepted;
 }
 
 bool Engine::guard_post(AiPlayer& p, City& c, CityPlan& r, std::int32_t& x, std::int32_t& y, bool& at_yard) {
@@ -494,22 +496,38 @@ void Engine::recruit(AiPlayer& p) {
         return;
     }
     // Open1602: an improved computer deep in debt with its gold still falling disbands a soldier
-    // every few seconds, as a player cuts the army's upkeep, down to half its inhabitants' army.
-    if (rivals() && player(p).money < -1000 && net_income(p) < 0) {
+    // every few seconds, as a player cuts the army's upkeep, down to half its inhabitants' army;
+    // not while a war or a threat is worth the debt. An army beyond its budget otherwise only
+    // stops growing: disbanding costs gold, and the budget moves with the goal.
+    const std::int32_t upkeep = rivals() ? military_cost(p) : 0;
+    const std::int32_t budget = upkeep != 0 ? army_budget(p) : 0;
+    if (rivals() && net_income(p) < 0 && player(p).money < -1000 && !war_economy(p)) {
         const auto counts = army_counts(p.player);
         const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
         const Balance& bal = m_world.balance();
         const std::uint32_t keep =
             bal.ai_inhabitants_per_unit != 0 ? total_population(p.player) / bal.ai_inhabitants_per_unit / 2 : 0;
+        // Disbanding costs gold (the third value of the Soldat: line): only a soldier whose upkeep
+        // pays that back within half an hour goes; one that costs nothing to keep stays.
+        const assets::FigureTable* f = m_sim.figures();
+        const auto pays_back = [&](const Soldier& s) {
+            const assets::FigureType* type = f != nullptr ? f->get(s.figure) : nullptr;
+            if (type == nullptr) {
+                return false;
+            }
+            const std::uint32_t keep_cost = f->unit_upkeep(type->kind);
+            return keep_cost != 0 && keep_cost * kDisbandPaybackMinutes >= f->unit_cost(type->kind);
+        };
         if (units > keep) {
             for (const Soldier& s : m_world.soldiers()) {
-                if (s.owner == p.player && !s.away() && !s.dying()) {
+                if (s.owner == p.player && !s.away() && !s.dying() && pays_back(s)) {
                     SoldierCommand cmd;
                     cmd.player = p.player;
                     cmd.soldier = s.id;
                     cmd.op = SoldierCommand::Op::Disband;
                     execute(cmd);
-                    log(p, "disbands a soldier in debt (%u left, gold %d)", units - 1, player(p).money);
+                    log(p, "disbands a soldier in debt (%u left, gold %d, upkeep %d of %d)", units - 1, player(p).money,
+                        upkeep, budget);
                     break;
                 }
             }
@@ -587,11 +605,39 @@ void Engine::recruit(AiPlayer& p) {
             }
         }
     }
+    // Open1602: an improved computer adds a unit or tower only while its war economy pays for it.
+    // Half the army its inhabitants call for is always kept up, to defend itself.
+    const Balance& mb = m_world.balance();
+    const std::uint32_t core =
+        mb.ai_inhabitants_per_unit != 0
+            ? static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * total_population(p.player) /
+                                         mb.ai_inhabitants_per_unit / 2)
+            : 0;
+    // The core only with gold in hand and cities that pay for it; beyond it the budget with a quarter
+    // to spare, as the income it is counted from moves. One unit in training at a time, so that a
+    // goal or war does not order a dozen within minutes before the income shows their cost.
+    const bool pays = rivals() && pays_upkeep(m_world, player(p));
+    bool training = false;
+    if (pays) {
+        for (const CostBuilding& b : m_world.cost_buildings()) {
+            if (b.kind != CostBuilding::Kind::Castle || b.island >= m_world.islands().size() ||
+                m_world.islands()[b.island].map.top(b.x, b.y).owner != p.player) {
+                continue;
+            }
+            for (const CastleSlot& slot : b.slots) {
+                training = training || (slot.figure != 0 && slot.training);
+            }
+        }
+    }
+    const std::int32_t next = upkeep + unit_upkeep_estimate(p);
+    const bool can_add =
+        !pays || (!training && ((weighted_army(p.player) < core && player(p).money > 0 && next <= civil_income(p)) ||
+                                std::int64_t{next} * 4 <= std::int64_t{army_budget(p)} * 3));
     // A tower beside the market (cannons from the city: 2 t in the home city, 1 t elsewhere).
     const bool home = p.home_valid && p.home_island == c->island && p.home_city == c->index;
     const std::uint32_t cannons_needed = home ? 0x41U : 0x20U;
     const assets::BuildingType* tower = by_id(id::kStoneTower);
-    if (!at_yard && tower != nullptr && c->stock(m_buildings.materials().cannons) >= cannons_needed &&
+    if (can_add && !at_yard && tower != nullptr && c->stock(m_buildings.materials().cannons) >= cannons_needed &&
         unlocked(p, *tower) && affordable(p, *c, *tower)) {
         const bool own_city = p.has_city && p.island == c->island && p.city == c->index;
         const bool saved = p.has_city;
@@ -617,19 +663,36 @@ void Engine::recruit(AiPlayer& p) {
     }
     p.castle_cursor = static_cast<std::uint8_t>((p.castle_cursor + 1) % 3);
     if (p.castle_island && *p.castle_island == c->island) {
-        if (p.castle_cursor < p.castles.size() && weighted_army(p.player) <= target) {
+        if (can_add && p.castle_cursor < p.castles.size() && weighted_army(p.player) <= target) {
             const CastleEntry& e = p.castles[p.castle_cursor];
+            // Open1602: a computer that pays upkeep orders one unit a look, so that the budget is
+            // checked for each; the original's order up to four at once.
+            const bool one = rivals() && pays_upkeep(m_world, player(p));
+            bool queued = false;
+            const auto order = [&](std::uint32_t family) {
+                if (!(one && queued)) {
+                    queued = queue_unit(p, e, family) || queued;
+                    if (queued && one) {
+                        log(p,
+                            "recruits unit family %u (upkeep %d + %d, budget %d, civil %d, trade %d, gold %d, "
+                            "goal %u, war %u, army %u core %u)",
+                            family, upkeep, unit_upkeep_estimate(p), army_budget(p), civil_income(p),
+                            trade_balance(player(p)), player(p).money, unsigned{p.strategy.goal},
+                            unsigned{p.strategy.war_target}, weighted_army(p.player), core);
+                    }
+                }
+            };
             if (r.slots[kSlotMuskets].count != 0 && c->stock(ware::kMuskets) > 31) {
-                queue_unit(p, e, figure::kUnitFamilies[2]);
+                order(figure::kUnitFamilies[2]);
             }
             if (r.slots[kSlotCannons].count != 0 && c->stock(ware::kCannons) > 127) {
-                queue_unit(p, e, figure::kUnitFamilies[3]);
+                order(figure::kUnitFamilies[3]);
             }
             if (r.slots[kSlotSwords].count != 0) {
-                queue_unit(p, e, figure::kUnitFamilies[1]);
+                order(figure::kUnitFamilies[1]);
                 if (r.slots[kSlotMuskets].count == 0 && r.slots[kSlotCannons].count == 0) {
-                    queue_unit(p, e, figure::kUnitFamilies[0]);
-                    queue_unit(p, e, figure::kUnitFamilies[1]);
+                    order(figure::kUnitFamilies[0]);
+                    order(figure::kUnitFamilies[1]);
                 }
             }
         }

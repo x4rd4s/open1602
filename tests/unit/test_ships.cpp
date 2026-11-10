@@ -12,6 +12,7 @@
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/diplomacy.hpp"
+#include "o1602/sim/mission.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/ships.hpp"
@@ -649,6 +650,7 @@ TEST_CASE("ships: the free trader buys cheap goods and comes back with tools") {
     trader.trader_goods.resize(25);
     trader.trader_goods[kTools] = sim::TraderGood{70, 0, 4 * kTon};
     const std::uint32_t id = trader.id;
+    sea.rules.trader_reach = sim::TraderReach::Original;  // Open1602 sends him away and back again
     sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
     const std::int32_t money = sea.world.players()[0].money;
     const auto events = run(fleet, sea.world, 30000);
@@ -660,6 +662,29 @@ TEST_CASE("ships: the free trader buys cheap goods and comes back with tools") {
     CHECK(city.goods[kTools] == 4 * kTon);
     CHECK(sea.world.players()[0].money == money + 10 * 10 - 4 * 120);
     CHECK(sea.world.players()[4].money == 0);  // his own money never changes
+}
+
+TEST_CASE("ships: at the only Kontor of the world the free trader sails out and comes back") {
+    Sea sea(true);
+    sim::City& city = *sea.world.city(0, 0);
+    city.goods[kWood] = 30 * kTon;
+    city.trade[kWood] = sim::City::Trade{true, false, 10, 0, 5 * kTon, 0};
+    sim::Ship& trader = sea.add(30, 25, 29, 4);
+    trader.trader = true;
+    trader.trader_goods.resize(25);
+    const std::uint32_t id = trader.id;
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    REQUIRE(sea.rules.trader_reach == sim::TraderReach::Scaled);
+    const auto first = run(fleet, sea.world, 30000);
+    REQUIRE(count(first, sim::ShipEvent::Kind::Traded) >= 1);
+    CHECK(city.goods[kWood] == 20 * kTon);
+    // After his visit he heads for the map edge, then comes back for more.
+    const sim::Ship& s = *sea.world.ship(id);
+    CHECK(s.target.kind == sim::Target::Kind::Position);
+    CHECK((s.target.x == 0 || s.target.y == 0 || s.target.x == 119 || s.target.y == 59));
+    run(fleet, sea.world, 900000);
+    CHECK(city.goods[kWood] < 20 * kTon);
+    CHECK(sea.world.ships().size() == 1);  // still the one trader, no second one for a single Kontor
 }
 
 TEST_CASE("ships: a trader that gives up or sinks is no longer on its way to the city (S-119)") {
@@ -995,6 +1020,9 @@ TEST_CASE("ships: with more than four players a trader without profit goes where
 
 TEST_CASE("ships: a shipyard builds a ship from wood and cloth and repairs one lying in reach") {
     Sea sea(true);
+    sim::World::GameSettings quiet = sea.world.game_settings();
+    quiet.flags |= sim::World::GameSettings::kNoTrader;  // no free trader for the single Kontor
+    sea.world.set_game_settings(quiet);
     // The small shipyard on the east coast of the island (tiles 3..5, 0..2).
     sim::WorldIsland& isl = sea.world.island(0);
     REQUIRE(isl.map.place(*sea.buildings.by_id(20104), 3, 0, 0, 0, 0, 0).ok());
@@ -1059,6 +1087,9 @@ TEST_CASE("ships: a shipyard builds a ship from wood and cloth and repairs one l
 
 TEST_CASE("ships: a shipyard builds a package's ship beside the original's of its type, a savegame keeps the order") {
     Sea sea(true);
+    sim::World::GameSettings quiet = sea.world.game_settings();
+    quiet.flags |= sim::World::GameSettings::kNoTrader;  // no free trader for the single Kontor
+    sea.world.set_game_settings(quiet);
     // A cog of a package beside the small trade ship (type 0), with more health; its wreck follows.
     assets::FigureType cog = *sea.figures.get(21);
     cog.ship.max_health = 60 * kTon;
@@ -1573,4 +1604,17 @@ TEST_CASE("ships: the goods exchange starts at the fullest hold, an empty ship a
     ship.cargo[holds] = sim::CargoSlot{kWood, 50 * kTon, 0};
     ship.cargo[1] = sim::CargoSlot{0, 60 * kTon, 0};
     CHECK(sim::fullest_hold(ship, sea.figures) == 2);
+}
+
+TEST_CASE("military upkeep: humans and the improved computers pay it, the original's computers do not") {
+    Sea sea;
+    const auto& players = sea.world.players();
+    CHECK(sim::pays_upkeep(sea.world, players[0]));   // human
+    CHECK(sim::pays_upkeep(sea.world, players[1]));   // improved computer
+    CHECK(!sim::pays_upkeep(sea.world, players[4]));  // the free trader
+    sim::OriginalBugs bugs = sea.world.original_bugs();
+    bugs.classic_ai = true;
+    sea.world.set_original_bugs(bugs);
+    CHECK(sim::pays_upkeep(sea.world, players[0]));
+    CHECK(!sim::pays_upkeep(sea.world, players[1]));  // as in the original
 }

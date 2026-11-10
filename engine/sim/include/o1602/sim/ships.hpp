@@ -584,6 +584,8 @@ private:
     [[nodiscard]] std::uint32_t trader_buy_amount(const Ship& ship, const City& city, std::uint8_t ware) const;
     [[nodiscard]] std::uint32_t trader_sell_amount(const Ship& ship, const City& city, std::uint8_t ware) const;
     void spawn_trader();
+    /// A random water tile of the map edge, where a free trader comes from.
+    std::optional<std::pair<std::int32_t, std::int32_t>> edge_water();
 
     // Shipyards (shipyards.cpp)
     void yards_tick(std::uint32_t dt_ms);

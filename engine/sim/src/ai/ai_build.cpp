@@ -88,6 +88,9 @@ std::uint16_t Engine::slot_fail(AiPlayer& p, std::uint8_t slot) {
     if (s.attempts >= 2 && s.fail_level < 2) {
         ++s.fail_level;
         s.attempts = 0;
+        if (s.fail_level >= 2) {
+            log(p, "city %u/%u: no site for slot %u after repeated tries", r->island, r->city, unsigned{slot});
+        }
     }
     return s.fail_level >= 2 ? s.fail_level : 0;
 }
@@ -189,8 +192,13 @@ std::int32_t Engine::road_three(AiPlayer& p, std::int32_t x, std::int32_t y, std
     placed += road_line(p, x, y, left, static_cast<std::uint8_t>((dir + 3U) & 3U), force);
     if (placed >= 7) {
         if (CityPlan* r = current_plan(p)) {
-            for (SlotState& s : r->slots) {
-                s.attempts = 0;
+            for (std::size_t i = 0; i < r->slots.size(); ++i) {
+                // Open1602: roads open no beach for a tower; a tower given up stays given up.
+                if (!classic() && (i == kSlotWoodTower || i == kSlotStoneTower || i == kSlotPirateTower ||
+                                   (i == kSlotIronMine && r->slots[i].fail_level >= 2))) {
+                    continue;  // nor a site at a vein whose search failed through and through
+                }
+                r->slots[i].attempts = 0;
             }
             r->flags &= ~city_flag::kMarket;
         }
@@ -1032,7 +1040,10 @@ void Engine::task_towers(AiPlayer& p) {
         r->tower_ring = 0;
         if (!classic()) {
             log(p, "city %u/%u: no site for a tower", r->island, r->city);
-            slot_fail(p, p.search.slot);
+            // Every ring was searched: another look finds nothing either, until land changes.
+            SlotState& s = r->slots[p.search.slot];
+            s.attempts = 2;
+            s.fail_level = 2;
         }
     }
 }
@@ -1168,6 +1179,8 @@ void Engine::task_survey(AiPlayer& p) {
     r->slots[kSlotKontor].count = static_cast<std::uint16_t>(kontor_level(*c));
     // Cleanup: exhausted mines; sheep and small weavers where cotton grows.
     for (const auto& [x, y] : finds.starved_mines) {
+        log(p, "city %u/%u: the vein of the mine at %d,%d ran out%s", r->island, r->city, x, y,
+            ore_running_out(p) ? ", ore runs low" : "");
         demolish_tile(p, x, y);
     }
     if (cotton_island && weberei_ok) {

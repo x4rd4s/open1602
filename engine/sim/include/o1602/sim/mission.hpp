@@ -148,8 +148,12 @@ void apply_package_scenario(World& world, const assets::PackageScenario& scenari
 [[nodiscard]] std::uint32_t city_workers(const World& world, const assets::BuildingTable& buildings, const City& city);
 
 /// Military upkeep per minute per player: soldiers, units in castles and on ships,
-/// cannon towers. Computer players pay none.
+/// cannon towers. Of the computers only the improved ones pay (pays_upkeep).
 [[nodiscard]] std::vector<std::uint32_t> military_upkeep(const World& world, const assets::FigureTable& figures);
+
+/// Whether a player pays military upkeep: a human; Open1602's improved computers too, as a human
+/// does (the original's computers, and with them those of OriginalBugs::classic_ai, pay none).
+[[nodiscard]] bool pays_upkeep(const World& world, const Player& player) noexcept;
 
 /// Trade balance per minute.
 [[nodiscard]] std::int32_t trade_balance(const Player& player) noexcept;
