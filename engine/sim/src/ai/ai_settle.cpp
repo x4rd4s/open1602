@@ -1250,16 +1250,23 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     return prepare_colony_ship(p, choose_colony_crop(p), food);
 }
 
+std::uint32_t Engine::colony_load(std::uint32_t tons) const {
+    // The original's 30 t of wood, tools and bricks (15 t of food) took a city hours to spare; two
+    // thirds found a Kontor, a market and the first farms all the same.
+    return classic() ? tons : tons * 2 / 3;
+}
+
 bool Engine::colony_load_in_stock(AiPlayer& p, bool food) {
-    // Half of every ware of the load in the city: an improved computer loads all of its stock
-    // (prepare_colony_ship), so the rest comes in while the ship sails home.
+    // The whole load in the city: an improved computer loads all of its stock (prepare_colony_ship)
+    // and sets out as soon as the ship is home.
     const City* c = current_city(p);
     if (c == nullptr) {
         return false;
     }
     const auto& m = m_buildings.materials();
-    return c->stock(m.wood) >= 15 * kTon && c->stock(m.tools) >= 15 * kTon &&
-           (food ? c->stock(m_buildings.food_ware()) >= 8 * kTon : c->stock(m.bricks) >= 15 * kTon);
+    const std::uint32_t full = colony_load(30) * kTon;
+    return c->stock(m.wood) >= full && c->stock(m.tools) >= full &&
+           (food ? c->stock(m_buildings.food_ware()) >= colony_load(15) * kTon : c->stock(m.bricks) >= full);
 }
 
 bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
@@ -1333,12 +1340,14 @@ bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
         }
         return false;
     };
-    bool ready = load(m.wood, 30 * kTon, 15 * kTon, 5 * kTon);
-    ready = load(m.tools, 30 * kTon, 18 * kTon, 5 * kTon) && ready;
+    // Open1602: an improved computer sets out with two thirds of the original's load (colony_load).
+    const std::uint32_t full = colony_load(30);
+    bool ready = load(m.wood, full * kTon, 15 * kTon, 5 * kTon);
+    ready = load(m.tools, full * kTon, 18 * kTon, 5 * kTon) && ready;
     if (food) {
-        ready = load(food_ware, 15 * kTon, 9 * kTon, 3 * kTon) && ready;
+        ready = load(food_ware, colony_load(15) * kTon, 9 * kTon, 3 * kTon) && ready;
     } else {
-        ready = load(m.bricks, 30 * kTon, 15 * kTon, 5 * kTon) && ready;
+        ready = load(m.bricks, full * kTon, 15 * kTon, 5 * kTon) && ready;
     }
     if (ready) {
         log(p, "colony ship %u loaded: wood %u tools %u bricks %u food %u", ship->id, ship->load(m.wood) / 32,

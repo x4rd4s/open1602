@@ -1684,6 +1684,10 @@ bool Engine::supplies_growth(const City& c) const {
 }
 
 bool Engine::supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing) {
+    // Only with gold to spare: a city that is short of food builds it in more_food anyway.
+    if (std::int64_t{player(p).money} < stage_gold(2000)) {
+        return false;
+    }
     // Food: while what comes in falls short of what its people eat (with a quarter more while it is
     // to grow) and the stock runs low; a new farm's yield shows only after a while.
     const std::uint8_t food = m_buildings.food_ware();
@@ -1692,10 +1696,13 @@ bool Engine::supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool gr
         return true;
     }
     // Cloth: one more sheep farm (cotton where it grows fully) while the cloth falls short and runs
-    // out and the wool is what is missing; the weaving follows the farms (processing).
+    // out, once the weaving caught up with the farms (processing: one for every two), so that the
+    // farms do not run ahead of a weaving whose yield has not shown yet.
     const std::uint32_t cloth = demand(c, ware::kCloth);
+    const std::uint32_t farms = std::uint32_t{r.slots[kSlotSheep].count} + r.slots[kSlotCotton].count;
+    const std::uint32_t weaving = std::uint32_t{r.slots[kSlotWebstube].count} + r.slots[kSlotWeberei].count;
     if (cloth != 0 && supply(c, ware::kCloth) < cloth && !food_lasts(c.stock(ware::kCloth), cloth) &&
-        c.stock(ware::kWool) < kFoodStock / 4 * kStockUnitsPerTon) {
+        farms < 2 * weaving + 2) {
         const std::size_t before = p.stack.size();
         (void)need(p, kSlotSheep, std::uint32_t{r.slots[kSlotSheep].count} + 1);
         if (p.stack.size() > before) {
