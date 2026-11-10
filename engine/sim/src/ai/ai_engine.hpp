@@ -456,6 +456,13 @@ private:
     /// Improved computers: settlers in the home city want a good whose crop none of the computer's
     /// islands grows, and it may found a colony for it.
     [[nodiscard]] bool colony_crop_missing(AiPlayer& p);
+    /// Open1602: what an improved rival's home city lacks of food (with a quarter to spare) or cloth
+    /// a minute that its island has no site left to make and its other cities do not make beyond
+    /// their own use, 1/32 t a minute; 0 otherwise.
+    [[nodiscard]] std::uint32_t home_shortfall(AiPlayer& p, std::uint8_t w);
+    /// Open1602: a colony of an improved rival builds food or sheep farms for its home city's
+    /// shortfall (home_shortfall).
+    [[nodiscard]] bool grow_for_home(AiPlayer& p, const City& c, const CityPlan& r);
     static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
     static constexpr std::int64_t kBuyReserveMinutes = 5;
     static constexpr std::uint32_t kSpareKeepMinutes = 10;

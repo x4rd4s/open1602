@@ -1178,7 +1178,11 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         // Open1602: the home city, its orders done, settles a further island for room to grow
         // (Rules::computer_cities). Only from the home city, where the ship loads.
-        if (&c == home_city(p) && wants_room(p) && want_colony(p, 0, false, true)) {
+        // So too, improved, when the home city lacks food or cloth its island has no room for and
+        // no colony makes.
+        const bool short_home = &c == home_city(p) && (home_shortfall(p, m_buildings.food_ware()) != 0 ||
+                                                       home_shortfall(p, ware::kCloth) != 0);
+        if (&c == home_city(p) && (wants_room(p) || short_home) && want_colony(p, 0, short_home, true)) {
             return;
         }
         nothing_to_do(p);
@@ -1188,6 +1192,10 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // and the pioneers follow their orders (the fisher before the houses); need_houses asks for
     // food there.
     if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
+        return;
+    }
+    // Open1602: a colony makes the food and cloth its home city has no room left to make.
+    if (r.stage != stage::kFounded && r.stage != stage::kPioneers && &c != home_city(p) && grow_for_home(p, c, r)) {
         return;
     }
     // Open1602: an improved computer whose people want a good none of its islands grows the crop
@@ -2276,6 +2284,74 @@ std::int64_t Engine::colony_savings(AiPlayer& p) {
     }
     // Only with a ship to sail: without one the gold lay idle (update_fleet_target orders one).
     return colony_crop_missing(p) && colony_ship_candidate(p) != 0 ? colony_money(p) : 0;
+}
+
+std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
+    if (!rivals() || p.pirates || p.cities < 1) {
+        return 0;
+    }
+    const City* home = home_city(p);
+    if (home == nullptr || population(*home) == 0) {
+        return 0;
+    }
+    const CityPlan& r = plan_of(p, home->island, home->index);
+    const auto blocked = [&](std::uint8_t slot) { return r.slots[slot].fail_level >= 2; };
+    std::uint64_t wanted = 0;
+    if (w == m_buildings.food_ware()) {
+        // The fishers alone feed no large city: the pastures and fields have no site left.
+        if (!blocked(kSlotCattle) || !blocked(kSlotGrain)) {
+            return 0;
+        }
+        wanted = std::uint64_t{demand(*home, w)} * 5 / 4;
+    } else if (w == ware::kCloth) {
+        if (!blocked(kSlotSheep) && !blocked(kSlotCotton)) {
+            return 0;
+        }
+        wanted = demand(*home, w);
+    } else {
+        return 0;
+    }
+    const std::uint64_t made = supply(*home, w);
+    if (made >= wanted) {
+        return 0;
+    }
+    std::uint64_t missing = wanted - made;
+    // What the other cities make beyond their own use comes by ship (home_supply_route).
+    for (const City& o : m_world.cities()) {
+        if (o.owner != p.player || &o == home) {
+            continue;
+        }
+        const std::uint32_t own = supply(o, w);
+        const std::uint32_t used = demand(o, w);
+        if (own > used) {
+            missing -= std::min<std::uint64_t>(missing, own - used);
+        }
+    }
+    return static_cast<std::uint32_t>(missing);
+}
+
+bool Engine::grow_for_home(AiPlayer& p, const City& c, const CityPlan& r) {
+    if (!rivals() || population(c) == 0) {
+        return false;
+    }
+    if (home_shortfall(p, m_buildings.food_ware()) != 0 && more_food(p, c, r, true)) {
+        log(p, "city %u/%u: food for the home city", r.island, r.city);
+        return true;
+    }
+    if (home_shortfall(p, ware::kCloth) != 0) {
+        // Farms only as far as the weaving keeps up (supply_ahead); processing() adds the weaving.
+        const std::uint32_t farms = std::uint32_t{r.slots[kSlotSheep].count} + r.slots[kSlotCotton].count;
+        const std::uint32_t weaving = std::uint32_t{r.slots[kSlotWebstube].count} + r.slots[kSlotWeberei].count;
+        if (farms < 2 * weaving + 2) {
+            const std::size_t before = p.stack.size();
+            (void)need(p, kSlotSheep, std::uint32_t{r.slots[kSlotSheep].count} + 1);
+            if (p.stack.size() > before) {
+                log(p, "city %u/%u: cloth for the home city", r.island, r.city);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 bool Engine::colony_crop_missing(AiPlayer& p) {
