@@ -1231,6 +1231,12 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     if (p.settle.ship != ship) {
+        // Open1602: an improved computer calls the ship home only once the city holds the load; the
+        // original called it at once, and a city short of tools or bricks kept it idle at the Kontor
+        // for good, away from every other job.
+        if (!classic() && !colony_load_in_stock(p, food)) {
+            return false;
+        }
         log(p, "colony (mode %u): ship %u goes home to load", mode, ship);
         // First call: the ship goes to the home city to load.
         p.settle.ship = ship;
@@ -1242,6 +1248,21 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return true;
     }
     return prepare_colony_ship(p, choose_colony_crop(p), food);
+}
+
+bool Engine::colony_load_in_stock(AiPlayer& p, bool food) {
+    // What prepare_colony_ship takes in one go: the load on top of what the city keeps.
+    const City* c = current_city(p);
+    if (c == nullptr) {
+        return false;
+    }
+    const auto& m = m_buildings.materials();
+    const auto has = [&](std::uint8_t w, std::uint32_t enough, std::uint32_t min_city, std::uint32_t amount) {
+        return c->stock(w) >= enough + min_city - amount;
+    };
+    return has(m.wood, 30 * kTon, 15 * kTon, 5 * kTon) && has(m.tools, 30 * kTon, 18 * kTon, 5 * kTon) &&
+           (food ? has(m_buildings.food_ware(), 15 * kTon, 9 * kTon, 3 * kTon)
+                 : has(m.bricks, 30 * kTon, 15 * kTon, 5 * kTon));
 }
 
 bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {

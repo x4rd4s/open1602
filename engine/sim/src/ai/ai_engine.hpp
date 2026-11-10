@@ -365,6 +365,8 @@ private:
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
+    /// Open1602: whether the current city holds a colony ship's load on top of what it keeps.
+    [[nodiscard]] bool colony_load_in_stock(AiPlayer& p, bool food);
     [[nodiscard]] std::uint32_t colony_ship_candidate(AiPlayer& p);
     void task_abandon(AiPlayer& p);
     void unload_at(City& c, Ship& ship, bool keep_basics, bool destroy);

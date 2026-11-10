@@ -13,6 +13,8 @@
 #include "annokit/core/file.hpp"
 
 #include "o1602/sim/ai.hpp"
+#include "o1602/sim/consumption.hpp"
+#include "o1602/sim/mission.hpp"
 
 namespace o1602::sim {
 
@@ -820,6 +822,7 @@ void Engine::report(AiPlayer& p) {
     log(p, "report: gold %d, civil %d, net %d, earned %d, stage %u, last need kind %d slot %d", player(p).money,
         civil_income(p), net_income(p), earned_income(p), unsigned{p.max_stage}, need < 0 ? -1 : need >> 8,
         need < 0 ? -1 : need & 0xFF);
+    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     for (const CityPlan& r : p.plans) {
         const City* c = city(r.island, r.city);
         if (c == nullptr || c->owner != p.player) {
@@ -843,6 +846,27 @@ void Engine::report(AiPlayer& p) {
             unsigned{hs.count}, unsigned{hs.attempts}, unsigned{hs.fail_level}, unsigned{ms.count},
             unsigned{ms.attempts}, unsigned{ms.fail_level}, (r.flags & city_flag::kMarket) != 0 ? 1 : 0,
             c->stock(m_buildings.food_ware()) / kTon, food_short(*c) ? 1 : 0);
+        // Where its gold comes from and goes, and what its people lack.
+        std::size_t index = 0;
+        while (index < m_world.cities().size() && &m_world.cities()[index] != c) {
+            ++index;
+        }
+        const std::int32_t cost = index < costs.size() ? costs[index] : 0;
+        const auto at = [](const std::vector<std::uint8_t>& v, std::size_t k) {
+            return k < v.size() ? unsigned{v[k]} : 0U;
+        };
+        const std::uint8_t food = m_buildings.food_ware();
+        log(p,
+            "report goods %u/%u: tax %d, costs %d, food %u/%u (1/32 t a min), food makers %u/%u/%u, stock t: cloth %u "
+            "alcohol %u tobacco %u spices %u cocoa %u clothes %u jewellery %u, content %u/%u/%u/%u/%u, "
+            "tax rate %u/%u/%u/%u/%u",
+            r.island, r.city, tax_income(*c, m_buildings), cost, supply(*c, food), demand(*c, food),
+            unsigned{r.slots[kSlotFisher].count}, unsigned{r.slots[kSlotButcher].count},
+            unsigned{r.slots[kSlotBakery].count}, c->stock(ware::kCloth) / kTon, c->stock(ware::kAlcohol) / kTon,
+            c->stock(ware::kTobaccoGoods) / kTon, c->stock(ware::kSpices) / kTon, c->stock(ware::kCocoa) / kTon,
+            c->stock(ware::kClothes) / kTon, c->stock(ware::kJewellery) / kTon, at(c->satisfaction, 0),
+            at(c->satisfaction, 1), at(c->satisfaction, 2), at(c->satisfaction, 3), at(c->satisfaction, 4),
+            at(c->tax_rate, 0), at(c->tax_rate, 1), at(c->tax_rate, 2), at(c->tax_rate, 3), at(c->tax_rate, 4));
     }
 }
 
