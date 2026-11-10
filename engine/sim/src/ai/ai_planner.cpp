@@ -933,6 +933,11 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 // building houses whose settlers then lacked cloth and alcohol.
                 const bool supplied = home_city_here ? supplies_growth(c) : true;
                 const bool home = earns && supplied;
+                // Nor its order's houses while a good it makes is used up and comes in short: their
+                // people would only fall back (the order filled up a city whose cloth was gone).
+                if (home_city_here && lacking_ware(c, true) != 0) {
+                    break;
+                }
                 found = need_houses(p, (grow && supplied) || home ? houses_wanted(c, r, n.n, home) : n.n);
             } break;
             case StageNeed::Kind::Public:
