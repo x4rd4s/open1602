@@ -124,6 +124,17 @@ void Fleet::pirates_step() {
         static_cast<std::uint32_t>(std::min_element(per_region.begin(), per_region.end()) - per_region.begin());
     if (ships < max * nests && m_pirate_armed && m_pirate_spawn_ms == 0 &&
         ((settings.flags & World::GameSettings::kPirateGoal) == 0 || !bases.empty())) {
+        const auto spawn = [&](std::int32_t x, std::int32_t y) {
+            Ship pirate = make_ship(next_ship_name(), static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                                    figure::kPirate, p, static_cast<std::uint8_t>(random.below(8)));
+            if (const assets::FigureType* t = m_figures->get(figure::kPirate)) {
+                pirate.cargo.resize(t->ship.cargo_slots);
+                pirate.health = t->ship.max_health;  // a loaded game would fill 0 to full (Fleet), the running one not
+            }
+            m_world->add_ship(std::move(pirate));
+            m_events.push_back(ShipEvent{ShipEvent::Kind::PirateAppeared, m_world->ships().back().id, p});
+        };
+        bool spawned = false;
         for (int tries = 0; tries < (nests > 1 ? 32 : 16); ++tries) {
             const std::uint32_t r = random.next();
             std::int32_t x = 0;
@@ -154,15 +165,19 @@ void Fleet::pirates_step() {
                     region) {
                 continue;
             }
-            Ship pirate = make_ship(next_ship_name(), static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
-                                    figure::kPirate, p, static_cast<std::uint8_t>(random.below(8)));
-            if (const assets::FigureType* t = m_figures->get(figure::kPirate)) {
-                pirate.cargo.resize(t->ship.cargo_slots);
-                pirate.health = t->ship.max_health;  // a loaded game would fill 0 to full (Fleet), the running one not
-            }
-            m_world->add_ship(std::move(pirate));
-            m_events.push_back(ShipEvent{ShipEvent::Kind::PirateAppeared, m_world->ships().back().id, p});
+            spawn(x, y);
+            spawned = true;
             break;
+        }
+        if (!spawned) {
+            // Open1602: a map whose edge is mostly land (the editor's land beyond the map): one of
+            // its tiles of water. A map whose edge is all water never comes here, so its draws
+            // stay the same.
+            const std::vector<std::pair<std::int32_t, std::int32_t>> water = sailable_edge();
+            if (!water.empty()) {
+                const auto& [x, y] = water[random.below(static_cast<std::uint32_t>(water.size()))];
+                spawn(x, y);
+            }
         }
         m_pirate_armed = false;
         m_pirate_spawn_ms = interval_ms;

@@ -389,8 +389,11 @@ annokit::core::Result<World> read_map(Reader& in, const assets::BuildingTable& b
     // of a mode byte and at least one byte each. A larger minimum would refuse 1x1 islands.
     const bool compact = version >= kCompactMap;
     const std::uint32_t islands = in.in().count(compact ? 49 : 54);
-    // In version 2 a few bytes can describe a large island: the islands together may not cover
-    // more than the world before any of them is allocated (add_island refuses overlapping land after).
+    // In version 2 a few bytes can describe a large island: the islands' rectangles together may not
+    // cover more than four times the world before any of them is allocated (add_island refuses
+    // overlapping land after). Their rectangles may overlap where one holds only sea: an island of
+    // the editor that runs on beyond the map's edges can span the whole world about the others.
+    constexpr std::uint64_t kAreaPerWorld = 4;
     std::uint64_t area = 0;
     for (std::uint32_t i = 0; i < islands && in.ok(); ++i) {
         assets::IslandHeader header;
@@ -405,7 +408,7 @@ annokit::core::Result<World> read_map(Reader& in, const assets::BuildingTable& b
         in.u32(h);
         // Version 1: two layers of 10 bytes per tile must be there before the island is allocated.
         area += std::uint64_t{w} * h;
-        if (!in.ok() || w == 0 || h == 0 || w > width || h > height || area > std::uint64_t{width} * height ||
+        if (!in.ok() || w == 0 || h == 0 || w > width || h > height || area > kAreaPerWorld * width * height ||
             (!compact && std::uint64_t{w} * h * 2 * 10 > in.in().remaining())) {
             return make_error(ErrorCode::InvalidFormat, "save: damaged island");
         }

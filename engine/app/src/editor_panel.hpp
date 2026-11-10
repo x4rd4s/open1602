@@ -74,6 +74,8 @@ struct EditorTerrain {
     std::uint8_t brush = 0;     ///< index into editor::kBrushSizes
     std::uint8_t shape = 1;     ///< editor::BrushShape of the shaping tools (Land, Water, Coast, Random)
     bool paste_water = false;   ///< Paste: the copy's water too (exactly), else only its land
+    /// Land: up to the world map's edge without a coast there (editor::TerrainStroke::set_open_edge)
+    bool open_edge = false;
     friend bool operator==(const EditorTerrain&, const EditorTerrain&) = default;
 };
 
@@ -83,9 +85,10 @@ struct EditorObjects {
     /// longer covers the last); Template: one of the player's saved templates (templates.hpp) about
     /// the mouse, for the owner, without costs; Ship, Unit: a ship on the water, a land unit on an island, for the
     /// owner; Resource: an ore or gold vein in a mountain, a treasure, deer in a forest; Remove:
-    /// takes the ship, unit, resource or building clicked away.
-    enum class Tool : std::uint8_t { Build, Template, Ship, Unit, Resource, Remove };
-    static constexpr std::size_t kTools = 6;
+    /// takes the ship, unit, resource or building clicked away; Territory: land painted to the
+    /// owner's city on the island without a building (the right button takes it back).
+    enum class Tool : std::uint8_t { Build, Template, Ship, Unit, Resource, Remove, Territory };
+    static constexpr std::size_t kTools = 7;
     Tool tool = Tool::Build;
     std::size_t group = 0;      ///< index into the build menu's categories that list buildings
     std::size_t piece = 0;      ///< index into the group's buildings
@@ -95,6 +98,7 @@ struct EditorObjects {
     std::size_t resource = 0;   ///< editor::Resource: veins, treasure, deer
     std::uint8_t rotation = 0;  ///< 0..3, a quarter clockwise each; ships and units face 2 * rotation
     std::size_t owner = 0;      ///< index into the world's players
+    std::size_t brush = 2;      ///< Territory: index into editor::kBrushSizes
     friend bool operator==(const EditorObjects&, const EditorObjects&) = default;
 };
 
@@ -128,10 +132,11 @@ enum class EditorTool : std::uint8_t {
     Ship,
     Unit,
     Resource,
+    Territory,  ///< land of a city without a building (the page "Objects")
     Remove,
     Marker,  ///< a named point or area for the scenario's scripts (the page "Markers")
 };
-inline constexpr std::size_t kEditorTools = 20;
+inline constexpr std::size_t kEditorTools = 21;
 
 /// What the editor's menu bar asks for (EditorChrome), the same as the keys do.
 enum class EditorCommand : std::uint8_t {
@@ -258,13 +263,33 @@ struct EditorCity {
     std::size_t max_buys = 0;
 };
 
-/// A ship's holds (the page "Cargo"): what each holds, and the wares it can be loaded with.
+/// A ware a stop of a trade route loads or unloads (the page "Route").
+struct EditorRouteEntry {
+    std::uint8_t ware = 0;     ///< 0: unused
+    std::string name;          ///< Windows-1252
+    bool unload = false;       ///< delivers up to `amount`; else loads until `amount` is on board
+    std::uint32_t amount = 0;  ///< 1/32 t
+};
+/// A stop of a trade route: its city and its wares.
+struct EditorRouteStop {
+    std::size_t target = 0;  ///< index into EditorShip::route_targets, 0: none
+    std::vector<EditorRouteEntry> entries;
+};
+
+/// A ship's holds (the page "Cargo") and its trade route (the page "Route"): what each hold holds,
+/// the wares it can be loaded with, the stops.
 struct EditorShip {
     std::string name;  ///< Windows-1252
     /// What a hold takes in 1/32 t (sim::hold_capacity).
     std::uint32_t room = 0;
     std::vector<EditorGood> holds;  ///< per hold: its ware (0 empty), name and amount
     std::vector<EditorGood> wares;  ///< the trade goods a hold can take, in the order panels list them
+    bool cart = false;              ///< a trade cart: its stops are the cities of its island
+    /// The cities a stop can be (a ship's: each with a Kontor; a cart's: those of its island),
+    /// by name; the first, "none", empties a stop.
+    std::vector<std::string> route_targets;
+    std::vector<EditorRouteStop> stops;  ///< as many as the route has (a cart's four)
+    bool route_active = false;           ///< the route runs from the game's start
 };
 
 /// A human's or computer's slot as the page "Players" shows it.
@@ -566,6 +591,8 @@ struct EditorRequest {
         CityTrade,
         CityTradeReset,  ///< the city's trade as its owner starts with it (a village's offer, else none)
         ShipCargo,       ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
+        /// The selected ship's route: `route` says what changes.
+        ShipRoute,
         /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is.
@@ -645,6 +672,18 @@ struct EditorRequest {
         std::optional<std::uint32_t> amount;  ///< 1/32 t
     };
     Trade trade{};
+    /// ShipRoute: the stop `stop` to EditorShip::route_targets[`target`] (Target), its entry
+    /// `entry` as `value` (Entry), or the route on or off (`on`, Active).
+    struct Route {
+        enum class What : std::uint8_t { Target, Entry, Active };
+        What what = What::Target;
+        std::size_t stop = 0;
+        std::size_t target = 0;
+        std::size_t entry = 0;
+        EditorRouteEntry value{};
+        bool on = false;
+    };
+    Route route{};
     std::size_t goal = 0;  ///< GoalStep
     bool held = false;     ///< SoundVolume
 };
@@ -679,6 +718,7 @@ public:
         CityTrade,  ///< the wares the city's Kontor sells and buys
         CityWare,   ///< the trade of one ware
         ShipCargo,
+        ShipRoute,  ///< the selected ship's or trade cart's route
         Players,
         PlayerName,
         Relations,
@@ -808,6 +848,7 @@ private:
     void layout_city_trade(const EditorModel& model);
     void layout_city_ware(const EditorModel& model);
     void layout_ship_cargo(const EditorModel& model);
+    void layout_ship_route(const EditorModel& model);
     void layout_players(const EditorModel& model);
     void layout_player_name(const EditorModel& model);
     void layout_relations(const EditorModel& model);
@@ -882,6 +923,7 @@ private:
     std::size_t m_mission = 0;                  ///< the mission the page "Goals" shows
     std::size_t m_scenario_row = 0;             ///< the row of the page "Scenario" being typed
     std::size_t m_ware = 0;                     ///< the row of EditorCity::trade the page "Ware" shows
+    std::size_t m_route_stop = 0;               ///< the stop the page "Route" shows
     std::size_t m_partner = 0;                  ///< the other slot the page "Relations" shows
     std::optional<std::size_t> m_shown_marker;  ///< the marker chosen when the page Markers was laid out last
     std::size_t m_first_column = 0;             ///< the first slot of the diplomacy table's columns

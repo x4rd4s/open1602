@@ -433,9 +433,16 @@ bool TerrainStroke::shape_tiles(std::uint16_t island, std::span<const ShapeTile>
     if (island >= m_world->islands().size() || tiles.empty()) {
         return false;
     }
-    const sim::IslandMap& map = m_world->islands()[island].map;
+    const sim::WorldIsland& isl = m_world->islands()[island];
+    const sim::IslandMap& map = isl.map;
     const auto w = static_cast<std::int64_t>(map.width());
     const auto h = static_cast<std::int64_t>(map.height());
+    // The island's sides that lie on the world map's edge: beyond them the map goes on as its
+    // edge is (set_open_edge).
+    const bool edge_left = isl.x == 0;
+    const bool edge_top = isl.y == 0;
+    const bool edge_right = std::int64_t{isl.x} + w >= std::int64_t{m_world->width()};
+    const bool edge_bottom = std::int64_t{isl.y} + h >= std::int64_t{m_world->height()};
     // The rectangle worked on: the tiles and a margin, whose outer ring keeps its kind so that
     // the coast beyond it stays as it is.
     constexpr std::int64_t kMargin = 4;
@@ -473,17 +480,24 @@ bool TerrainStroke::shape_tiles(std::uint16_t island, std::span<const ShapeTile>
             fixed[at(x, y)] = ring || refusal(island, x, y) != Refusal::Free ? 1 : 0;
         }
     }
-    // Land keeps a tile of water to the island's edge, for the surf.
+    // Land keeps a tile of water to the island's edge, for the surf; with set_open_edge not where
+    // that edge is the map's.
     const auto may_be = [&](std::int64_t x, std::int64_t y, bool l) {
         if (fixed[at(x, y)] != 0) {
             return false;
         }
-        return !l || (x > 0 && y > 0 && x < w - 1 && y < h - 1);
+        const bool open = m_open_edge;
+        return !l || ((x > 0 || (open && edge_left)) && (y > 0 || (open && edge_top)) &&
+                      (x < w - 1 || (open && edge_right)) && (y < h - 1 || (open && edge_bottom)));
     };
     const auto is_land = [&](std::int64_t x, std::int64_t y) -> bool {
-        if (x < 0 || y < 0 || x >= w || y >= h) {
+        // Beyond the world map's edge the tile at the edge goes on; beyond the island's edge
+        // elsewhere the open sea.
+        if ((x < 0 && !edge_left) || (y < 0 && !edge_top) || (x >= w && !edge_right) || (y >= h && !edge_bottom)) {
             return false;
         }
+        x = std::clamp<std::int64_t>(x, 0, w - 1);
+        y = std::clamp<std::int64_t>(y, 0, h - 1);
         if (x < x0 || y < y0 || x > x1 || y > y1) {
             return !water(*m_buildings, map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)));
         }

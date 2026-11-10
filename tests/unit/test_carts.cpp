@@ -713,3 +713,45 @@ TEST_CASE("carts: the editor places no cart without the cart in the figure table
     REQUIRE(figures.ok());
     CHECK(!editor::place_cart(land.world, land.buildings, *figures, 0, 12, 14, 0).ok());
 }
+
+TEST_CASE("carts: a route stop without a way warns the player after three rounds (Open1602)") {
+    Land land;
+    land.wall();
+    land.world.player(1)->gates_closed = true;
+    land.world.diplomacy().relation(0, 1).trade = sim::Treaty::Signed;
+    land.world.diplomacy().relation(1, 0).trade = sim::Treaty::Signed;
+    sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+    const std::uint32_t id = fleet.request_cart(sim::CartRequest{0, 0, 0, 20, 15});
+    REQUIRE(id != 0);
+    using Op = sim::RouteEdit::Op;
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 0)}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 1)}));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{0, id, Op::Start}));
+    const auto events = run(fleet, land.world, 120000);
+    CHECK(count(events, sim::ShipEvent::Kind::GaveUp) >= 3);
+    CHECK(count(events, sim::ShipEvent::Kind::RouteWarning) >= 1);
+    CHECK(land.world.ship(id)->x < 29);
+}
+
+TEST_CASE("carts: the editor refuses a route stop the cart finds no way to") {
+    Land land;
+    land.wall();
+    land.world.player(1)->gates_closed = true;
+    auto placed = editor::place_cart(land.world, land.buildings, land.figures, 0, 12, 14, 2);
+    REQUIRE(placed.ok());
+    (*placed)->apply(land.world);
+    const std::uint32_t id = land.world.ships().back().id;
+    using Op = sim::RouteEdit::Op;
+    CHECK(editor::edit_route(land.world, land.buildings, land.figures, id,
+                             sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 0)})
+              .ok());
+    const auto refused =
+        editor::edit_route(land.world, land.buildings, land.figures, id,
+                           sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 1)});
+    REQUIRE(!refused.ok());
+    CHECK(refused.error().code == annokit::core::ErrorCode::OutOfRange);
+    land.world.player(1)->gates_closed = false;
+    CHECK(editor::edit_route(land.world, land.buildings, land.figures, id,
+                             sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 1)})
+              .ok());
+}

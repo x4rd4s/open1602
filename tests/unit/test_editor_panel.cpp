@@ -1193,6 +1193,64 @@ TEST_CASE("editor panel: a ship's holds are loaded on the page Cargo") {
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }
 
+TEST_CASE("editor panel: a ship's trade route is set on the page Route") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 700);
+    EditorModel m = document();
+    m.selection = "Ship";
+    app::EditorShip ship;
+    ship.name = "Elise";
+    ship.room = 50 * 32;
+    ship.holds = {app::EditorGood{0, "", 0}, app::EditorGood{0, "", 0}};
+    ship.wares = {app::EditorGood{3, "Wood", 0}, app::EditorGood{5, "Cloth", 0}};
+    ship.route_targets = {"No stop", "Abemsberg", "Abmont"};
+    ship.stops.resize(8);
+    for (app::EditorRouteStop& s : ship.stops) {
+        s.entries.resize(2);
+    }
+    m.ship = ship;
+    CHECK(panel.show_selection());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!click(panel, m, "Route").has_value());
+    REQUIRE(panel.page() == EditorPanel::Page::ShipRoute);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Trade route of Elise"));
+    CHECK(says(panel, "Stop 1 of 8"));
+    // The second stop to the first city.
+    CHECK(!click(panel, m, "Stop 1 of 8").has_value());
+    (void)panel.draw(m, kNoFonts);
+    REQUIRE(says(panel, "Stop 2 of 8"));
+    auto r = click(panel, m, "No stop");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ShipRoute);
+    CHECK(r->route.what == EditorRequest::Route::What::Target);
+    CHECK(r->route.stop == 1);
+    CHECK(r->route.target == 1);
+    // With the city: a ware, loaded at first, a full hold.
+    m.ship->stops[1].target = 2;
+    (void)panel.draw(m, kNoFonts);
+    r = click(panel, m, "No ware");
+    REQUIRE(r.has_value());
+    CHECK(r->route.what == EditorRequest::Route::What::Entry);
+    CHECK(r->route.entry == 0);
+    CHECK(r->route.value.ware == 3);
+    CHECK(!r->route.value.unload);
+    CHECK(r->route.value.amount == 50U * 32U);
+    m.ship->stops[1].entries[0] = app::EditorRouteEntry{3, "Wood", false, 20U * 32U};
+    (void)panel.draw(m, kNoFonts);
+    r = click(panel, m, "Loads");
+    REQUIRE(r.has_value());
+    CHECK(r->route.value.unload);
+    // Switched on.
+    r = click(panel, m, "Runs from the start: no");
+    REQUIRE(r.has_value());
+    CHECK(r->route.what == EditorRequest::Route::What::Active);
+    CHECK(r->route.on);
+    CHECK(!click(panel, m, "Back to the selection").has_value());
+    CHECK(panel.page() == EditorPanel::Page::Selection);
+}
+
 TEST_CASE("editor panel: a city's Kontor sells and buys goods at prices of its own") {
     ui::set_language("en");
     EditorPanel panel;

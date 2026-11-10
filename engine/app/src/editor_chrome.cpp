@@ -21,7 +21,7 @@ constexpr Id kFirstMenu = 1;    ///< + the menu
 constexpr Id kFirstEntry = 20;  ///< + the entry of the open menu
 constexpr Id kFirstTool = 50;   ///< + EditorTool
 
-constexpr std::int32_t kToolButton = 32;  ///< a tool's button, square
+constexpr std::int32_t kToolButton = 30;  ///< a tool's button, square: all of them fit a window 768 high
 constexpr std::int32_t kToolGap = 2;
 constexpr std::int32_t kGroupGap = 8;
 constexpr std::int32_t kEntryH = 26;
@@ -50,6 +50,7 @@ constexpr std::array<EditorChrome::ToolEntry, kEditorTools> kTools = {{
     {EditorTool::Ship, "editor.tool.ship", false},
     {EditorTool::Unit, "editor.tool.unit", false},
     {EditorTool::Resource, "editor.tool.resource", false},
+    {EditorTool::Territory, "editor.tool.territory", false},
     {EditorTool::Remove, "editor.tool.remove", true},
     {EditorTool::Marker, "editor.tool.marker", false},
 }};
@@ -111,6 +112,9 @@ constexpr std::array<Icon, kEditorTools> kIcons = {{
     // Resource: a gem
     {"............", "...######...", "..#.#..#.#..", ".#..#..#..#.", "############", ".#...##...#.", "..#..##..#..",
      "...#.##.#...", "....####....", ".....##.....", "............", "............"},
+    // Territory: a border of posts about land
+    {"#.#.#.#.#.#.", "............", "#.........#.", "...####.....", "#.######..#.", "..#######...", "#.#########.",
+     "..#######...", "#..#####..#.", "............", "#.#.#.#.#.#.", "............"},
     // Remove: a cross
     {"##........##", "###......###", ".###....###.", "..###..###..", "...######...", "....####....", "....####....",
      "...######...", "..###..###..", ".###....###.", "###......###", "##........##"},

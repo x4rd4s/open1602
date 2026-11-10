@@ -832,10 +832,13 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
                             render::TilePos{x, y}});
     }
     for (const sim::Ship& s : world.ships()) {
-        if (holds(s.name)) {
+        // A ship or trade cart placed in the editor has no name of its own yet: by its number.
+        const std::string name = ship_name(s);
+        if (holds(name)) {
             const sim::Player* owner = world.player(s.owner);
             out.push_back(Found{
-                ui::tr("editor.find.ship", {s.name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
+                ui::tr(s.name.empty() ? "editor.find.unnamed" : (s.cart() ? "editor.find.cart" : "editor.find.ship"),
+                       {name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
                 EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
         }
     }
@@ -1150,6 +1153,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
             editor_city_request(request);
             break;
         case Kind::ShipCargo:
+        case Kind::ShipRoute:
             editor_ship_request(request);
             break;
         case Kind::SetPlayer:
@@ -1317,8 +1321,8 @@ namespace {
 bool shows_pick(EditorPanel::Page page) {
     return page == EditorPanel::Page::Selection || page == EditorPanel::Page::Fertility ||
            page == EditorPanel::Page::CityName || page == EditorPanel::Page::CityGoods ||
-           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::CityTrade ||
-           page == EditorPanel::Page::CityWare;
+           page == EditorPanel::Page::ShipCargo || page == EditorPanel::Page::ShipRoute ||
+           page == EditorPanel::Page::CityTrade || page == EditorPanel::Page::CityWare;
 }
 
 /// The note of why an island cannot be turned, copied or taken out; empty if it can.
@@ -2211,6 +2215,18 @@ void MapViewer::draw_editor_marks() {
                 }
                 outline(tile->x, tile->y, 1, 1,
                         ui::rgb_ink(fits ? assets::Rgba{90, 230, 90, 255} : assets::Rgba{230, 60, 60, 255}));
+            } else if (tool == EditorObjects::Tool::Territory) {
+                // The brush in its shape: white where it gives, red where it takes back, where the
+                // owner has a city on the island.
+                const std::uint32_t side =
+                    editor::kBrushSizes[std::min(m_editor->objects.brush, editor::kBrushSizes.size() - 1)];
+                const auto shape = static_cast<editor::BrushShape>(m_editor->terrain.shape % editor::kBrushShapes);
+                const bool taking = m_input->right_stroke();
+                const bool city = editor_claim_city(tile->x, tile->y).has_value();
+                rim(editor::brush_tiles(tile->x, tile->y, side, world.width(), world.height(), shape),
+                    ui::rgb_ink(!city    ? assets::Rgba{230, 60, 60, 255}
+                                : taking ? assets::Rgba{235, 120, 80, 255}
+                                         : assets::Rgba{250, 250, 250, 255}));
             } else if (tool == EditorObjects::Tool::Remove || b == nullptr) {
                 outline(tile->x, tile->y, 1, 1, ui::rgb_ink(assets::Rgba{250, 250, 250, 255}));
             } else if (editor_special_piece()) {
@@ -2465,6 +2481,12 @@ void MapViewer::editor_terrain_request(const EditorRequest& request) {
 }
 
 void MapViewer::editor_pipette(std::uint32_t x, std::uint32_t y) {
+    // A building: the page "Objects" takes it in hand, turned and for its owner, as it stands.
+    if (const auto picked = editor_object_at(x, y); picked && m_hud) {
+        m_hud->editor_tool(EditorTool::Build, &*picked);
+        editor_notice(ui::tr("editor.objects.picked"), false, "building picked");
+        return;
+    }
     const auto piece = editor::terrain_at(m_state->world, m_buildings, x, y);
     const assets::BuildingType* b = piece ? m_buildings.by_id(piece->id) : nullptr;
     const auto group = b != nullptr ? editor::terrain_group(m_buildings, *b) : std::nullopt;
@@ -2516,7 +2538,26 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
         return;
     }
     if (t.tool == EditorTerrain::Tool::Land || t.tool == EditorTerrain::Tool::Water) {
-        const auto brush = editor::brush_tiles(x, y, side, world.width(), world.height(), shape);
+        auto brush = editor::brush_tiles(x, y, side, world.width(), world.height(), shape);
+        if (t.tool == EditorTerrain::Tool::Land && t.open_edge) {
+            // Land that runs on beyond the map: a brush one tile short of the map's edge takes the
+            // edge too, so that no strip of beach and water one tile wide is left there.
+            const std::uint32_t W = world.width();
+            const std::uint32_t H = world.height();
+            std::vector<std::pair<std::uint32_t, std::uint32_t>> more;
+            for (const auto& [tx, ty] : brush) {
+                const std::uint32_t ex = tx == 1 ? 0 : (W > 2 && tx == W - 2 ? W - 1 : tx);
+                const std::uint32_t ey = ty == 1 ? 0 : (H > 2 && ty == H - 2 ? H - 1 : ty);
+                for (const auto& p : {std::pair{ex, ty}, std::pair{tx, ey}, std::pair{ex, ey}}) {
+                    if (p != std::pair{tx, ty}) {
+                        more.push_back(p);
+                    }
+                }
+            }
+            brush.insert(brush.end(), more.begin(), more.end());
+            std::sort(brush.begin(), brush.end());
+            brush.erase(std::unique(brush.begin(), brush.end()), brush.end());
+        }
         if (brush.empty()) {
             return;
         }
@@ -2580,6 +2621,7 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
         if (by_island.empty() && !kept_apart) {
             into.note(editor::TerrainStroke::Refusal::NoIsland);
         }
+        into.set_open_edge(t.tool == EditorTerrain::Tool::Land && t.open_edge);
         for (const auto& [island, tiles] : by_island) {
             (void)into.shape(island, tiles, t.tool == EditorTerrain::Tool::Land, tile_seed(m_editor->strokes, x, y));
         }
@@ -2882,6 +2924,12 @@ bool MapViewer::editor_stroke(std::optional<render::TilePos> tile, Stroke phase,
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (panel != nullptr && panel->page() == EditorPanel::Page::Objects && !m_editor->placing) {
         editor_end_stroke();
+        if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+            if (phase == Stroke::Begin) {
+                m_editor->claim_take = erase;  // the right button takes land back
+            }
+            return editor_objects_stroke(tile, phase);
+        }
         if (erase) {
             return false;  // the right button drags the map, it never builds
         }
