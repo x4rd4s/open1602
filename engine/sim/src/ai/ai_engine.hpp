@@ -451,6 +451,8 @@ private:
     /// Improved computers: the gold kept for a colony whose crop its people want and none of its
     /// islands grows, else 0.
     [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
+    /// Improved computers: its supply and gold carry a war it would start or join.
+    [[nodiscard]] bool war_supplied(AiPlayer& p);
     /// Improved computers: settlers in the home city want a good whose crop none of the computer's
     /// islands grows, and it may found a colony for it.
     [[nodiscard]] bool colony_crop_missing(AiPlayer& p);

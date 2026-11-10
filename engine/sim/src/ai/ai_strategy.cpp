@@ -46,6 +46,7 @@ constexpr std::uint64_t kRestructurePauseMs = 900'000;
 constexpr std::int32_t kArmyPeaceShare = 33;
 constexpr std::int32_t kArmyWarShare = 75;
 constexpr std::int64_t kWarReserve = 1000;
+constexpr std::int64_t kWarSupplyReserve = 5;      // improved computers: gold for a war, in kWarReserve
 constexpr std::int64_t kPeaceRunwayMinutes = 720;  // in peace twelve hours of its gold
 constexpr std::int64_t kThreatRunwayMinutes = 90;
 constexpr std::int64_t kWarRunwayMinutes = 180;
@@ -478,7 +479,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     st.war_arming = false;
     const bool willing =
         st.character == character::kConqueror || (st.character == character::kSettler && level >= 2) || level >= 3;
-    if (!willing || broke || p.max_stage < stage::kMain ||
+    if (!willing || broke || p.max_stage < stage::kMain || !war_supplied(p) ||
         (st.war_ended_ms != 0 && now_ms() - st.war_ended_ms < kWarRestMs) ||
         player(p).scenario.has(scenario_flag::kPassive)) {
         return;
@@ -524,6 +525,23 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
         threat_of(best));
     start_war(p, best);
+}
+
+bool Engine::war_supplied(AiPlayer& p) {
+    // Open1602: an improved computer starts or joins a war only while its own supply holds: its
+    // cities make the alcohol and cloth they use, its home city grows the food it eats, and it
+    // keeps five times its war reserve in gold. Of the computers that fell into debt on their own
+    // in long games, nearly half had started wars with their supply already failing.
+    if (!rivals()) {
+        return true;
+    }
+    const City* home = home_city(p);
+    if (home == nullptr) {
+        return false;
+    }
+    const std::uint8_t food = m_buildings.food_ware();
+    return critical_short(p.player, ware::kAlcohol) == 0 && critical_short(p.player, ware::kCloth) == 0 &&
+           supply(*home, food) >= demand(*home, food) && player(p).money >= kWarReserve * kWarSupplyReserve;
 }
 
 void Engine::start_war(AiPlayer& p, PlayerId target) {
@@ -653,7 +671,7 @@ void Engine::alliances(AiPlayer& p, std::uint64_t every_ms, bool broke) {
             // Its ally was attacked within the last half hour: it joins that war, unless it rests
             // after a war of its own (as before a war plan).
             if (st.war_target == kNoPlayer && !broke && !resting && !d.allied(p.player, x) &&
-                d.relation(p.player, x).peace != Treaty::None && declared_on(a, x, kHelpMs)) {
+                d.relation(p.player, x).peace != Treaty::None && declared_on(a, x, kHelpMs) && war_supplied(p)) {
                 log(p, "joins its ally %u in the war on player %u", a, x);
                 start_war(p, x);
             }
