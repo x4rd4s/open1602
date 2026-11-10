@@ -369,6 +369,8 @@ private:
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);
+    /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
+    void shed_producers(AiPlayer& p, City& c);
     void tax_rates(AiPlayer& p, City& c);
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.
@@ -613,6 +615,8 @@ private:
     void start_war(AiPlayer& p, PlayerId target);
     /// Alliances: offers, answers and ends them; asks allies for help and helps them.
     void alliances(AiPlayer& p, std::uint64_t every_ms, bool broke);
+    /// Deep in debt: gives up the city that loses most (not the home city).
+    void restructure(AiPlayer& p);
     /// For the log: the events a remembers of b.
     [[nodiscard]] std::string event_text(PlayerId a, PlayerId b) const;
     void end_war(AiPlayer& p, const char* why);

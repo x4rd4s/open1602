@@ -12,6 +12,8 @@
 
 #include "ai_engine.hpp"
 
+#include "o1602/sim/consumption.hpp"
+
 namespace o1602::sim::ai {
 
 namespace {
@@ -30,6 +32,11 @@ constexpr std::int32_t kAllianceEndMood = -10;
 constexpr std::uint32_t kMaxAllies = 2;
 constexpr std::uint64_t kHelpMs = 1'800'000;
 constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unless debt or a threat end it
+// Deeper in debt than kRestructureMoney, a city that saves kRestructureSaving a minute or more is
+// given up, a quarter of an hour after the last.
+constexpr std::int32_t kRestructureMoney = -5000;
+constexpr std::int32_t kRestructureSaving = 50;
+constexpr std::uint64_t kRestructurePauseMs = 900'000;
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -230,6 +237,7 @@ void Engine::plan_strategy(AiPlayer& p) {
     war_plan(p, broke);
     alliances(p, st.next_ms - now_ms(), broke);
     if (broke) {
+        restructure(p);
         g = goal::kEconomy;
     } else if (threat || st.war_target != kNoPlayer || st.war_arming) {
         g = goal::kMilitary;
@@ -249,6 +257,92 @@ void Engine::plan_strategy(AiPlayer& p) {
         st.goal_ms = now_ms();
     }
     st.goal = g;
+}
+
+void Engine::restructure(AiPlayer& p) {
+    // Open1602: an improved computer deep in debt and still losing gold gives up a city whose
+    // running costs are well above its taxes: its buildings cost whether anybody lives there or not,
+    // and a colony that cannot pay for itself drags the whole economy down for good. Never the home
+    // city or its largest one, nor a city that makes what another of its cities lacks; only one
+    // whose loss covers a good part of the deficit, and one at a time with a pause between, so that
+    // the last one shows in the income first.
+    if (!rivals() || p.pirates || player(p).money >= kRestructureMoney) {
+        return;
+    }
+    const std::int32_t deficit = -net_income(p);
+    if (deficit <= 0) {
+        return;
+    }
+    const std::uint64_t now = now_ms();
+    for (const auto& [island, at] : p.left_islands) {
+        if (at <= now && now - at < kRestructurePauseMs) {
+            return;
+        }
+    }
+    for (const CityPlan& r : p.plans) {
+        if ((r.flags & city_flag::kAbandon) != 0) {
+            return;  // one is being given up already
+        }
+    }
+    const City* home = home_city(p);
+    const City* largest = nullptr;
+    std::vector<const City*> own;
+    for (const City& c : m_world.cities()) {
+        if (c.owner != p.player) {
+            continue;
+        }
+        own.push_back(&c);
+        if (largest == nullptr || population(c) > population(*largest)) {
+            largest = &c;
+        }
+    }
+    // Whether city c makes a ware that another inhabited city of the computer wants and lacks.
+    const auto& classes = m_buildings.resident_classes();
+    const std::uint8_t food = m_buildings.food_ware();
+    const auto supplies = [&](const City& c) {
+        for (const City* o : own) {
+            if (o == &c || population(*o) == 0) {
+                continue;
+            }
+            std::vector<std::uint8_t> wares{food};
+            for (std::size_t k = 0; k < classes.size() && k < o->inhabitants.size(); ++k) {
+                if (o->inhabitants[k] != 0) {
+                    for (const assets::ResidentClass::Need& n : classes[k].needs) {
+                        wares.push_back(n.ware);
+                    }
+                }
+            }
+            for (const std::uint8_t w : wares) {
+                if (supply(*o, w) < demand(*o, w) && supply(c, w) > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
+    const std::int32_t enough = std::max(kRestructureSaving, deficit / 4);
+    CityPlan* worst = nullptr;
+    std::int32_t worst_net = 0;
+    for (CityPlan& r : p.plans) {
+        const City* c = m_world.city(r.island, r.city);
+        if (c == nullptr || c == home || c == largest || c->owner != p.player) {
+            continue;
+        }
+        const auto i = static_cast<std::size_t>(c - m_world.cities().data());
+        const std::int32_t net = tax_income(*c, m_buildings) - costs[i];
+        if (-net >= enough && net < worst_net && !supplies(*c)) {
+            worst = &r;
+            worst_net = net;
+        }
+    }
+    if (worst == nullptr) {
+        return;
+    }
+    worst->flags |= city_flag::kAbandon;
+    p.left_islands.emplace_back(worst->island, std::max<std::uint64_t>(now, 1));
+    log(p, "in debt (gold %d, income %d): gives up city %u/%u, which costs %d a minute", player(p).money, -deficit,
+        worst->island, worst->city, -worst_net);
 }
 
 std::uint32_t Engine::war_measure(PlayerId target) const {

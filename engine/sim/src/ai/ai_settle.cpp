@@ -1153,7 +1153,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     const std::uint32_t n = p.cities;
-    if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && player(p).money < 15001) {
+    // Open1602: an improved computer founds a further colony only while its cities earn more than
+    // they cost; its gold alone let it settle into debt.
+    if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
         return false;
     }
     if (p.settle.active || n >= city_limit()) {
