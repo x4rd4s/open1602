@@ -621,7 +621,8 @@ private:
                                                  std::uint32_t seconds);
     static constexpr std::uint32_t kMaxRunsPerWare = 4;
     static constexpr std::uint32_t kMaxSupplyShips = 8;
-    static constexpr std::uint32_t kSupplyCannons = 2;  ///< what a supply ship carries against pirates
+    static constexpr std::uint32_t kMinSupplyRun = 10 * kTon;  ///< the least a supply run loads
+    static constexpr std::uint32_t kSupplyCannons = 2;         ///< what a supply ship carries against pirates
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,

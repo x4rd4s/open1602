@@ -873,7 +873,9 @@ std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t res
         }
         keep = std::max<std::uint32_t>(reserve, 20 * kTon);
     }
-    return c.stock(w) > keep ? c.stock(w) - keep : 0;
+    // Less than kMinSupplyRun is not worth a run: ships sailed for a ton or four and crowded the
+    // narrow harbours of the cities they left.
+    return c.stock(w) >= keep + kMinSupplyRun ? c.stock(w) - keep : 0;
 }
 
 std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
@@ -911,7 +913,7 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
             }
         }
     }
-    return spare > booked + 5 * kTon ? static_cast<std::uint32_t>(spare - booked) : 0;
+    return spare >= booked + kMinSupplyRun ? static_cast<std::uint32_t>(spare - booked) : 0;
 }
 
 std::uint32_t Engine::supply_load(AiPlayer& p) {
