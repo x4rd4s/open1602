@@ -1555,27 +1555,27 @@ void EditorPanel::layout_ship_route(const EditorModel& model) {
     y += kButtonH + kGap;
     // Per entry: its ware (a click the next, a right click the one before); below it whether the
     // stop loads or unloads it, and its tons.
-    constexpr std::int32_t kRowH = 28;
+    constexpr std::int32_t kRouteRowH = 28;
     constexpr std::int32_t kStep = 28;
     constexpr std::int32_t kAmount = 64;
     const std::int32_t bottom = m_top + m_height - (kButtonH + kGap) - kGap;
-    for (std::size_t i = 0; i < std::min(stop.entries.size(), kRouteEntries) && y + 2 * kRowH <= bottom; ++i) {
+    for (std::size_t i = 0; i < std::min(stop.entries.size(), kRouteEntries) && y + 2 * kRouteRowH <= bottom; ++i) {
         const EditorRouteEntry& e = stop.entries[i];
         const auto id = static_cast<Id>(i);
         const bool set = stop.target != 0;
-        f.cycle_button(kFirstRouteWare + id, Rect{m_x, y, m_w, kRowH - 4},
+        f.cycle_button(kFirstRouteWare + id, Rect{m_x, y, m_w, kRouteRowH - 4},
                        e.ware != 0 ? e.name : ui::tr("editor.ship.route_no_ware"), set);
-        y += kRowH - 2;
+        y += kRouteRowH - 2;
         const std::int32_t mode_w = m_w - 2 * kStep - kAmount - 6;
-        f.cycle_button(kFirstRouteMode + id, Rect{m_x + 12, y, mode_w - 12, kRowH - 4},
+        f.cycle_button(kFirstRouteMode + id, Rect{m_x + 12, y, mode_w - 12, kRouteRowH - 4},
                        ui::tr(e.unload ? "editor.ship.route_unload" : "editor.ship.route_load"), set && e.ware != 0);
-        f.label(Rect{m_x + mode_w, y, kAmount, kRowH - 4}, ui::tr("editor.city.tons", {count(e.amount / 32)}),
+        f.label(Rect{m_x + mode_w, y, kAmount, kRouteRowH - 4}, ui::tr("editor.city.tons", {count(e.amount / 32)}),
                 Align::Right);
-        f.cycle_button(kFirstRouteLess + id, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kRowH - 4}, "-",
+        f.cycle_button(kFirstRouteLess + id, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kRouteRowH - 4}, "-",
                        set && e.ware != 0 && e.amount > 0);
-        f.cycle_button(kFirstRouteMore + id, Rect{m_x + m_w - kStep, y, kStep, kRowH - 4}, "+",
+        f.cycle_button(kFirstRouteMore + id, Rect{m_x + m_w - kStep, y, kStep, kRouteRowH - 4}, "+",
                        set && e.ware != 0 && e.amount < ship.room);
-        y += kRowH + 2;
+        y += kRouteRowH + 2;
     }
     y += 4;
     f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
