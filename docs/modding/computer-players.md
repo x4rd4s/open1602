@@ -461,6 +461,14 @@ Improved computers weigh the way at sea:
   it first, so that its colonies lie within reach of its ships. It founds one only with 3000 gold
   in hand, passes over an island it gave a city up on for 45 minutes, and a young colony (before
   its settlers) no longer makes the older city a second city.
+- **Colony crops.** An improved computer founds its next colony for the good its people use, make
+  too little of and run out of soonest, where none of its cities has an island for it yet (alcohol
+  from wine, else sugar; tobacco; spices; cocoa), after its goal's gold or ore. The original goes
+  for spices and tobacco before wine. In a city's fields it plants the crops in the same order,
+  alcohol and cloth (which all its cities together lack) first, with up to two fields beyond the
+  order for them.
+- **Kontor sites.** An improved computer tries a Kontor on every side of each beach tile, so that
+  its Kontors face any side of an island; before, almost all stood on two of the four sides.
 - **Land power.** A colony follows the goal: with gold as its goal a computer without gold looks
   for an island with a free gold vein, arming one without ore for an island with a free ore vein,
   once it has 10000 gold and earns 100 a minute; it puts the Kontor by the vein, so that a market
@@ -483,7 +491,11 @@ Improved computers weigh the way at sea:
 
 All computers fill their Kontor's trade list as in the original: they buy the wares their cities
 lack and offer what lies in store beyond what they keep, so that humans, the free trader and the
-other computers' ships trade with them. They offer each other a trade treaty, and an improved
+other computers' ships trade with them. An improved computer puts the consumer goods its people use and its city makes too little of
+on its buy list as soon as they use them, the one that runs out first ahead, before ore and iron
+take the Kontor's few buying places; the original's computers list alcohol last and only from 170
+settlers on. The free trader brings far less than a big city uses, so the colonies above matter
+more. They offer each other a trade treaty, and an improved
 computer's supply ship fetches from a partner's Kontor where it is cheapest by the way at sea
 (see below).
 
