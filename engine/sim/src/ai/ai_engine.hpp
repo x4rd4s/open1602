@@ -365,6 +365,10 @@ private:
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
+    /// Loads the colony ship in city `c`; true once it holds its whole load, the settlement then starts.
+    bool load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::uint8_t crop);
+    /// Open1602: goes on loading the colony ship at home, from the logistics look.
+    void continue_colony_load(AiPlayer& p);
     /// Open1602: whether the current city holds a colony ship's whole load.
     [[nodiscard]] bool colony_load_in_stock(AiPlayer& p, bool food);
     /// Open1602: whether the colony ship already holds part of its load.
@@ -427,6 +431,8 @@ private:
     /// Open1602: more food or cloth for a home city whose supply falls short (`growing`: with a
     /// quarter of food to spare); true when a producer was planned.
     bool supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing);
+    /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
+    [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.

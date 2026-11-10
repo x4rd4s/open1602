@@ -162,6 +162,7 @@ void Engine::logistics(AiPlayer& p) {
         return;
     }
     forget_ships(p);
+    continue_colony_load(p);
     colony_load_timeout(p);
     // Patrol stops passed since the last look.
     for (ShipNote& n : p.ships) {

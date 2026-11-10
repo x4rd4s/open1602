@@ -286,6 +286,7 @@ void io(A& a, Settlement& s) {
     a(s.regions);
     if (a.version() >= kStateWithColonyLoad) {
         a(s.load_ms);
+        a(s.load_food);
     }
 }
 

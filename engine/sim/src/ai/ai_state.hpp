@@ -39,7 +39,8 @@ inline constexpr std::uint32_t kStateWithStrategy = 10;
 /// Version 11: an improved computer's war plan (Strategy::war_target and the rest). Written only
 /// while or after a computer planned a war.
 inline constexpr std::uint32_t kStateWithWarPlan = 11;
-/// Version 12: when an improved computer called its colony ship home to load (Settlement::load_ms).
+/// Version 12: when an improved computer called its colony ship home to load and with what
+/// (Settlement::load_ms, load_food).
 /// Written only while a ship is being loaded.
 inline constexpr std::uint32_t kStateWithColonyLoad = 12;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
@@ -344,6 +345,7 @@ struct Settlement {
     std::vector<Region> regions;  ///< result of the area scan
     /// Open1602: game time an improved computer called `ship` home to load for a colony, 0 none.
     std::uint64_t load_ms = 0;
+    bool load_food = false;  ///< Open1602: the load holds food instead of bricks
 };
 
 /// A castle the computer recruits in.
