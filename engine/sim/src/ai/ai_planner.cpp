@@ -605,6 +605,31 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     const WareSet needed = saving ? needed_wares(p, false) : WareSet{};
     std::uint32_t saved = 0;
     std::uint32_t idled = 0;
+    // Open1602: the food of the city and what its producers work into food (cattle, grain, flour)
+    // keep running in debt; without it the people leave faster than any saving pays back.
+    WareSet feeds{};
+    if (rivals()) {
+        feeds[m_buildings.food_ware()] = true;
+        std::vector<const assets::BuildingType*> types;
+        for (const Production& pr : m_world.productions()) {
+            if (pr.used && pr.island == c.island && map.contains(pr.x, pr.y) && map.top(pr.x, pr.y).city == c.index &&
+                !map.top(pr.x, pr.y).empty()) {
+                if (const assets::BuildingType* b = m_buildings.by_sprite(map.top(pr.x, pr.y).sprite);
+                    b != nullptr && b->raw_ware != 0) {
+                    types.push_back(b);
+                }
+            }
+        }
+        for (bool more = true; more;) {
+            more = false;
+            for (const assets::BuildingType* b : types) {
+                if (feeds[b->ware] && !feeds[b->raw_ware]) {
+                    feeds[b->raw_ware] = true;
+                    more = true;
+                }
+            }
+        }
+    }
     for (std::size_t i = 0; i < m_world.productions().size(); ++i) {
         const Production& pr = m_world.productions()[i];
         if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
@@ -623,7 +648,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         bool enabled = pr.enabled;
         // Open1602: what its cities go short of (critical_short) keeps running in debt; the ships
         // carry the stock to where it is missing.
-        const bool short_of = rivals() && critical_short(p.player, b->ware) != 0;
+        const bool short_of = rivals() && b->ware != 0 && (feeds[b->ware] || goods_short(p.player, b->ware) != 0);
         const bool idle = saving && b->ware != 0 && !needed[b->ware];
         const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle;
         const auto set = [&](bool on) {
@@ -1736,6 +1761,14 @@ std::uint32_t Engine::critical_short(PlayerId owner, std::uint8_t w) const {
     if (w != ware::kAlcohol && w != ware::kCloth) {
         return 0;
     }
+    return goods_short(owner, w);
+}
+
+std::uint32_t Engine::goods_short(PlayerId owner, std::uint8_t w) const {
+    // Open1602: what all the owner's cities use of a ware beyond what they make (1/32 t a minute).
+    // Where it is short, the supply runs cannot bring enough however many ships sail: the
+    // computer makes more of it (luxury) instead. Measured afresh at each look, so that a colony
+    // that a rival takes or burns shows at once.
     std::uint64_t used = 0;
     std::uint64_t made = 0;
     for (const City& c : m_world.cities()) {
@@ -2560,7 +2593,10 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     if (rivals()) {
         wine_island = fertility(c->island, ware::kWineField) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
-            return critical_short(p.player, crop.good) != 0 ? 0 : 1 + stock_lasts(*home, crop.good) / 2;
+            if (critical_short(p.player, crop.good) != 0) {
+                return std::uint64_t{0};
+            }
+            return goods_short(p.player, crop.good) != 0 ? 1 : 2 + stock_lasts(*home, crop.good) / 2;
         });
     }
     for (const Crop& crop : order) {
@@ -2575,7 +2611,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         }
         // At most two beyond the order in a city, so that the fields do not take its houses' land.
         std::uint32_t want = n;
-        const std::uint32_t lacking = rivals() ? critical_short(p.player, crop.good) : 0;
+        const std::uint32_t lacking = rivals() ? goods_short(p.player, crop.good) : 0;
         if (lacking != 0) {
             const assets::BuildingType* b = producer(crop.good, crop.field);
             const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;

@@ -569,10 +569,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (c.owner == p.player) {
-                // A city whose people use more of it than it makes keeps a stock for itself.
-                const std::uint32_t keep =
-                    demand(c, w) > supply(c, w) ? std::max<std::uint32_t>(reserve, 20 * kTon) : reserve;
-                if (c.stock(w) > keep) {
+                if (own_spare(c, w, reserve) != 0) {
                     const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
@@ -864,10 +861,55 @@ std::vector<std::uint8_t> Engine::routed_wares(AiPlayer& p, std::uint32_t ship, 
     return routed;
 }
 
-std::uint32_t Engine::ships_per_ware(std::uint32_t seconds) {
-    // Open1602: one ship for a ware, one more for each ten minutes there and back, at most three,
-    // so that a far source still keeps the city supplied while one ship is under way.
-    return 1 + std::min<std::uint32_t>(2 * seconds, 1200) / 600;
+std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const {
+    // Open1602: what an improved computer's city can give of a ware to another of its cities. One
+    // where people live gives only what it makes beyond their use, keeping 20 t, so that a city
+    // the runs bring a ware to does not pass it on (it ran dry itself), and the home city does
+    // not ship away what it lacks. A city where nobody lives gives all beyond the reserve.
+    std::uint32_t keep = reserve;
+    if (population(c) != 0 && demand(c, w) != 0) {
+        if (supply(c, w) <= demand(c, w)) {
+            return 0;
+        }
+        keep = std::max<std::uint32_t>(reserve, 20 * kTon);
+    }
+    return c.stock(w) > keep ? c.stock(w) - keep : 0;
+}
+
+std::uint32_t Engine::supply_load(AiPlayer& p) {
+    // What a supply run brings of one ware: half the holds (a run takes two wares), by the
+    // computer's ships on average, at least one hold.
+    std::size_t holds = 0;
+    std::size_t ships = 0;
+    for (const Ship* s : own_ships(p)) {
+        holds += usable_holds(*s, *m_sim.m_figures);
+        ++ships;
+    }
+    const std::size_t half = ships != 0 ? holds / (2 * ships) : 1;
+    return static_cast<std::uint32_t>(std::max<std::size_t>(half, 1) * kHoldCapacity);
+}
+
+std::uint32_t Engine::supply_ships_for(AiPlayer& p, const City& to, std::uint8_t w, std::size_t src,
+                                       std::uint32_t seconds) {
+    // Open1602: as many runs at a time as it takes to bring what the city uses beyond what it
+    // makes while one run sails there and back: its shortfall a minute times the minutes of the
+    // round trip (a minute at each end for the loading), over what one run brings of the ware. From
+    // an own city no more than that city makes beyond its own use, so that the runs do not wait
+    // there for goods. At least one, at most kMaxRunsPerWare.
+    const City& from = m_world.cities()[src];
+    const std::uint32_t used = demand(to, w);
+    const std::uint32_t made = supply(to, w);
+    std::uint64_t rate = used > made ? used - made : 0;  // 1/32 t a minute
+    if (from.owner == p.player) {
+        const std::uint32_t there_used = demand(from, w);
+        const std::uint32_t there_made = supply(from, w);
+        rate = std::min<std::uint64_t>(rate, there_made > there_used ? there_made - there_used : 0);
+    }
+    const std::uint64_t round_s = 2 * std::uint64_t{seconds} + 120;
+    const std::uint64_t per_round = rate * round_s / 60;  // stock units over one round trip
+    const std::uint64_t load = supply_load(p);
+    const std::uint64_t runs = (per_round + load - 1) / load;
+    return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(runs, 1, kMaxRunsPerWare));
 }
 
 std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_t target) const {
@@ -889,8 +931,9 @@ std::uint64_t Engine::supply_need(AiPlayer& p, const City& c) {
         }
         std::uint16_t price = 0;
         const auto src = supply_source(p, c.island, w, &price, &c);
-        if (src && static_cast<std::uint32_t>(std::ranges::count(routed, w)) <
-                       ships_per_ware(sail_seconds(p, city_point(c), city_point(m_world.cities()[*src])))) {
+        if (src &&
+            static_cast<std::uint32_t>(std::ranges::count(routed, w)) <
+                supply_ships_for(p, c, w, *src, sail_seconds(p, city_point(c), city_point(m_world.cities()[*src])))) {
             return urgency;
         }
     }
@@ -957,7 +1000,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 // until the ship can be back, at most half the ship's holds.
                 seconds = sail_seconds(p, city_point(home), city_point(m_world.cities()[*src]));
                 keep = supply_buffer(target, 2 * seconds);
-                if (home.stock(w) >= keep || on_way >= ships_per_ware(seconds)) {
+                if (home.stock(w) >= keep || on_way >= supply_ships_for(p, home, w, *src, seconds)) {
                     continue;
                 }
             }
@@ -968,6 +1011,12 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 const auto half = static_cast<std::uint32_t>(
                     std::max<std::size_t>(1, usable_holds(s, *m_sim.m_figures) / 2) * kHoldCapacity);
                 amount = std::min(std::max(amount, own ? 50 * kTon : amount), half);
+                if (own) {
+                    // no more than the city can spare (own_spare), so that it does not run dry
+                    const auto& m = m_buildings.materials();
+                    const std::uint32_t reserve = (w == m.tools || w == m.bricks || w == m.wood) ? 28 * kTon : 5 * kTon;
+                    amount = std::min(amount, own_spare(m_world.cities()[*src], w, reserve));
+                }
             }
             return Pick{w, *src, amount, own, seconds};
         }
@@ -1087,7 +1136,7 @@ void Engine::update_fleet_target(AiPlayer& p) {
         if (const City* home = home_city(p); home != nullptr && player(p).money >= 0) {
             supply = supply_ships_wanted(p, *home);
         }
-        t = std::min(t + supply, 2 * std::max(n, 1) + 1);
+        t = std::min(t + supply, std::max(n, 1) + static_cast<std::int32_t>(kMaxSupplyShips));
     }
     if (p.present[kSlotCannons]) {
         std::vector<std::int32_t> cannons(m_world.players().size(), 0);
@@ -1177,9 +1226,10 @@ std::uint32_t Engine::supply_buffer(std::uint32_t target, std::uint32_t seconds)
 }
 
 std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
-    // A ship brings two wares; a ware whose round trip lasts ten minutes more takes a further half
-    // ship, so that the city does not run dry while it is under way. At most four.
-    std::uint64_t halves = 0;  // in 1/600 of a half ship
+    // A ship brings two wares. Open1602: an improved computer counts for each ware the runs it
+    // takes at a time (supply_ships_for: what the city lacks a minute against the way there and
+    // back), for a ware it lacks for good as well as for one low in store. At most kMaxSupplyShips.
+    std::uint64_t runs = 0;
     const auto count = [&](const City& to, bool all) {
         std::uint32_t target = 0;
         const std::vector<std::uint8_t> wares = supply_wares(p, to, &target);
@@ -1193,11 +1243,11 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
             if (!src) {
                 continue;
             }
-            const std::uint32_t round = 2 * sail_seconds(p, at, city_point(m_world.cities()[*src]));
-            if (to.stock(w) >= supply_buffer(target, round)) {
+            const std::uint32_t seconds = sail_seconds(p, at, city_point(m_world.cities()[*src]));
+            if (to.stock(w) >= supply_buffer(target, 2 * seconds) && demand(to, w) <= supply(to, w)) {
                 continue;
             }
-            halves += 600 + std::min<std::uint32_t>(round, 1800);
+            runs += supply_ships_for(p, to, w, *src, seconds);
         }
     };
     count(home, true);
@@ -1207,8 +1257,7 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
             count(c, false);
         }
     }
-    const std::uint64_t ships = (halves + 2 * 600 - 1) / (2 * 600);
-    return static_cast<std::int32_t>(std::min<std::uint64_t>(ships, 4));
+    return static_cast<std::int32_t>(std::min<std::uint64_t>((runs + 1) / 2, kMaxSupplyShips));
 }
 
 void Engine::order_ship(AiPlayer& p) {

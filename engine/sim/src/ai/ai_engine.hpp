@@ -442,6 +442,8 @@ private:
     /// Open1602: how much alcohol or cloth all of an owner's cities use beyond what they make,
     /// 1/32 t a minute; 0 for other goods.
     [[nodiscard]] std::uint32_t critical_short(PlayerId owner, std::uint8_t w) const;
+    /// What all of the owner's cities use of `w` beyond what they make, 1/32 t a minute.
+    [[nodiscard]] std::uint32_t goods_short(PlayerId owner, std::uint8_t w) const;
     /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
     [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
@@ -604,9 +606,16 @@ private:
     /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
     /// for the original's computers to any city.
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
-    /// Improved computers: how many supply ships may bring the same ware to a city whose source
-    /// lies `seconds` away.
-    [[nodiscard]] static std::uint32_t ships_per_ware(std::uint32_t seconds);
+    /// Improved computers: what an own city can give of `w` to another own city (0 for nothing).
+    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const;
+    /// Improved computers: what one supply run brings of a ware, by the computer's ships.
+    [[nodiscard]] std::uint32_t supply_load(AiPlayer& p);
+    /// Improved computers: how many supply runs bring ware `w` to `to` at a time from city `src`,
+    /// `seconds` away, so that the city does not run short while they sail.
+    [[nodiscard]] std::uint32_t supply_ships_for(AiPlayer& p, const City& to, std::uint8_t w, std::size_t src,
+                                                 std::uint32_t seconds);
+    static constexpr std::uint32_t kMaxRunsPerWare = 4;
+    static constexpr std::uint32_t kMaxSupplyShips = 8;
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,
