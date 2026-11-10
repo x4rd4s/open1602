@@ -1190,6 +1190,13 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
         return;
     }
+    // Open1602: an improved computer whose people want a good none of its islands grows the crop
+    // for asks for the colony at every look of its home city, once the gold for it is saved
+    // (colony_savings); the orders asked only at their steps, hours apart.
+    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) &&
+        want_colony(p, 3, false, false)) {
+        return;
+    }
     // Open1602: a farm without room for its fields moves (move_farm_later).
     if (r.move_x >= 0 && !classic() && relocate_farm(p, c, r)) {
         return;
@@ -2104,6 +2111,11 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         yard != 0 && std::int64_t{player(p).money} < yard + stage_gold(1000)) {
         return false;
     }
+    // Open1602: so too for a colony whose crop its home island does not grow (colony_savings).
+    if (const std::int64_t colony = colony_savings(p);
+        colony != 0 && std::int64_t{player(p).money} < colony + stage_gold(1000)) {
+        return false;
+    }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
     // A city that has no way to more food (no site for a fisher, its farms not yet open to it, as
     // in a town just founded) builds its houses all the same while its stock lasts, instead of
@@ -2241,6 +2253,37 @@ bool Engine::need_stone_roads(AiPlayer& p) {
 bool Engine::roads_if_mason(AiPlayer& p) {
     const CityPlan* r = current_plan(p);
     return r != nullptr && r->slots[kSlotStonemason].count != 0 && need_stone_roads(p);
+}
+
+std::int64_t Engine::colony_savings(AiPlayer& p) {
+    // The gold of a colony while an improved computer's home city has people who want a good whose
+    // crop none of its islands grows (alcohol: wine or sugar; tobacco, spices, cocoa) and it may
+    // found one, else 0. Without it, the houses took every coin and the colony came hours late.
+    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_limit() ||
+        player(p).scenario.has(scenario_flag::kNoColonies)) {
+        return 0;
+    }
+    const City* home = home_city(p);
+    if (home == nullptr) {
+        return 0;
+    }
+    struct Need {
+        std::uint8_t good;
+        std::array<std::uint8_t, 2> crops;
+    };
+    static constexpr std::array<Need, 4> kNeeds{{{ware::kAlcohol, {ware::kWineField, ware::kSugarField}},
+                                                 {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
+                                                 {ware::kSpices, {ware::kSpiceField, 0}},
+                                                 {ware::kCocoa, {ware::kCocoaField, 0}}}};
+    for (const Need& n : kNeeds) {
+        if (demand(*home, n.good) == 0) {
+            continue;
+        }
+        if (std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); })) {
+            return colony_money(p);
+        }
+    }
+    return 0;
 }
 
 std::int64_t Engine::yard_savings(AiPlayer& p) {

@@ -878,7 +878,12 @@ void Fleet::hit(std::uint32_t id, std::uint32_t damage, PlayerId attacker, bool 
     ship->health = health - damage;
     m_events.push_back(ShipEvent{ShipEvent::Kind::Attacked, ship->id, ship->owner, 0, attacker, 0, by_pirates ? 1 : 0});
     const Player* owner = m_world->player(ship->owner);
-    if (by_pirates && !ship->held && owner != nullptr && owner->role != PlayerRole::Human &&
+    // Open1602: an improved computer's ship with cannons fights back as a player's does
+    // (Rules::bugs.classic_ai off); only an unarmed one shows the white flag.
+    const bool fights_back = ship->cannons != 0 && owner != nullptr && owner->role == PlayerRole::Computer &&
+                             m_world->behaviour(*owner) == FactionBehaviour::Settlers && m_rules != nullptr &&
+                             !m_rules->bugs.classic_ai;
+    if (by_pirates && !ship->held && !fights_back && owner != nullptr && owner->role != PlayerRole::Human &&
         m_world->behaviour(*owner) != FactionBehaviour::Pirates) {
         // A computer's, the trader's or the natives' ship surrenders at once.
         ship->held = true;

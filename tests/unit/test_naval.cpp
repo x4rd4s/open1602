@@ -253,6 +253,21 @@ TEST_CASE("naval: a computer's ship hit by pirates surrenders; the pirates plund
     CHECK(!s.world.diplomacy().hostile(2, 1));
 }
 
+TEST_CASE("naval: an improved computer's armed ship fights pirates off; the original's surrenders") {
+    for (const bool classic : {false, true}) {
+        Sea s;
+        s.rules.bugs.classic_ai = classic;
+        s.start();
+        s.world.diplomacy().set_peace(s.world, 2, 1, sim::Treaty::None, 0);
+        s.add(10, 40, kWarship, 2, 8);
+        const std::uint32_t merchant = s.add(14, 40, kTrade, 1, 2);
+        s.world.ship(merchant)->cargo[0] = sim::CargoSlot{21, 20 * 32, 0};
+        s.run(10'000);
+        CHECK(s.count(sim::ShipEvent::Kind::WhiteFlag) == (classic ? 1 : 0));
+        CHECK(s.count(sim::ShipEvent::Kind::Plundered) == (classic ? 1 : 0));
+    }
+}
+
 TEST_CASE("naval: a warship sent against a tree of nobody shoots it down, without war") {
     Sea s(true);
     REQUIRE(s.world.island(0).map.place(*s.buildings.by_id(20106), 0, 4, 0, 0).ok());

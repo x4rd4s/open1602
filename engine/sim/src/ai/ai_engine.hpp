@@ -448,6 +448,9 @@ private:
     [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
     [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
+    /// Improved computers: the gold kept for a colony whose crop its people want and none of its
+    /// islands grows, else 0.
+    [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -618,6 +621,7 @@ private:
                                                  std::uint32_t seconds);
     static constexpr std::uint32_t kMaxRunsPerWare = 4;
     static constexpr std::uint32_t kMaxSupplyShips = 8;
+    static constexpr std::uint32_t kSupplyCannons = 2;  ///< what a supply ship carries against pirates
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,

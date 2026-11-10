@@ -891,14 +891,16 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
         const std::uint32_t per_ton = std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U);
         spare = std::min<std::uint64_t>(spare, std::uint64_t{goodwill} / per_ton * kTon);
     }
+    // Every ship's route that loads there, the computer's own and other buyers' (the trade routes
+    // sail in plain sight): bought on its own runs alone, every other purchase at a computer's
+    // Kontor still came back empty.
     const Target at = Target::city_of(c.island, c.index);
     std::uint64_t booked = 0;
-    for (const ShipNote& n : p.ships) {
-        const Ship* o = m_world.ship(n.id);
-        if (o == nullptr || !n.supply || !o->route.active) {
+    for (const Ship& o : m_world.ships()) {
+        if (!o.route.active || o.sinking) {
             continue;
         }
-        for (const RouteStop& stop : o->route.stops) {
+        for (const RouteStop& stop : o.route.stops) {
             if (!(stop.target == at)) {
                 continue;
             }
@@ -1063,6 +1065,21 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     const auto first = choose(0);
     if (!first) {
         return false;
+    }
+    // Open1602: an improved computer arms its supply ship at the home city with up to
+    // kSupplyCannons from the stock it can spare: armed, it fights pirates off instead of handing
+    // them its load (about one run in seventeen was plundered).
+    if (rivals()) {
+        if (City* own = home_city(p); own != nullptr && ship_at_city(s, *own)) {
+            const std::uint8_t guns = m_buildings.materials().cannons;
+            while (s.cannons < kSupplyCannons && own->stock(guns) > 4 * kTon) {
+                const std::uint32_t before = s.cannons;
+                arm_one(*own, s);
+                if (s.cannons == before) {
+                    break;
+                }
+            }
+        }
     }
     const auto second = choose(first->ware);
     struct Stop {
