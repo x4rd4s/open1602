@@ -267,7 +267,8 @@ public:
     /// every frame.
     void set_editor_chrome(EditorChromeModel model) { m_chrome_model = std::move(model); }
     /// A tool of the editor's tool bar chosen by its key, or a command of its menus: as clicked.
-    void editor_tool(EditorTool tool);
+    /// With `objects` (the pipette), a tool of the page "Objects" takes their building, turn and owner.
+    void editor_tool(EditorTool tool, const EditorObjects* objects = nullptr);
     void editor_command(EditorCommand command);
     /// The build menu shows a tool a key started (its title names it).
     void show_tool_in_build_menu(BuildPanel::Tool tool) {

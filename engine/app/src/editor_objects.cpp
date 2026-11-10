@@ -894,6 +894,57 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
     return order;
 }
 
+std::optional<EditorObjects> MapViewer::editor_object_at(std::uint32_t x, std::uint32_t y) const {
+    const sim::World& world = m_state->world;
+    if (!m_editor || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(x, y);
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    const auto at = sim::building_at(world, m_buildings, c.island,
+                                     {static_cast<std::int32_t>(c.local_x), static_cast<std::int32_t>(c.local_y)});
+    if (!at || at->type == nullptr) {
+        return std::nullopt;
+    }
+    // A house in another look is the house of its class; a field the field of its crop.
+    std::vector<std::uint32_t> ids{at->type->id};
+    if (at->type->prod_kind == assets::prod::kHouse) {
+        if (const assets::BuildingType* first = m_buildings.first_house(at->type->resident_class)) {
+            ids.push_back(first->id);
+        }
+    }
+    for (const assets::BuildingType* other :
+         {sim::ripe_record(m_buildings, *at->type), sim::growing_record(m_buildings, *at->type)}) {
+        if (other != nullptr) {
+            ids.push_back(other->id);
+        }
+    }
+    const auto groups = object_groups();
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+        const ui::BuildCategory& cat = editor_group(*groups[g], m_buildings);
+        for (const std::uint32_t id : ids) {
+            const auto index = cat.index_of(id);
+            if (!index) {
+                continue;
+            }
+            EditorObjects o = m_editor->objects;
+            o.tool = EditorObjects::Tool::Build;
+            o.group = g;
+            o.piece = *index;
+            const sim::MapCell& cell = world.islands()[c.island].map.top(c.local_x, c.local_y);
+            o.rotation = static_cast<std::uint8_t>(cell.rotation & 3U);
+            const auto owners = object_owners(world);
+            if (const auto it = std::find(owners.begin(), owners.end(), cell.owner); it != owners.end()) {
+                o.owner = static_cast<std::size_t>(it - owners.begin());
+            }
+            return o;
+        }
+    }
+    return std::nullopt;
+}
+
 void MapViewer::editor_object_ghost(
     const std::function<void(std::uint16_t island, std::uint32_t x, std::uint32_t y)>& keep) {
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;

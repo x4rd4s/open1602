@@ -2152,6 +2152,30 @@ std::pair<std::uint8_t, std::optional<std::uint16_t>> MapViewer::fertility_view_
 }
 
 void MapViewer::add_fertility_marks() {
+    if (m_editor) {
+        // The editor's view (Ctrl+B) stays in every tool: with a farm or field in hand, where its crop
+        // bears on the island under the mouse; else the ground of every island, what share of the
+        // island's fertility it leaves a field.
+        if (!m_show_fertility) {
+            return;
+        }
+        const sim::World& world = m_state->world;
+        const assets::BuildingType* piece = m_editor->objects.tool == EditorObjects::Tool::Build && m_hud != nullptr &&
+                                                    m_hud->editor_panel() != nullptr &&
+                                                    m_hud->editor_panel()->page() == EditorPanel::Page::Objects
+                                                ? editor_object_piece()
+                                                : nullptr;
+        const std::uint8_t crop = piece != nullptr ? fertility_crop(m_buildings, *piece) : std::uint8_t{0};
+        const auto spot = m_input->spot_at_mouse();
+        if (crop != 0 && spot) {
+            fertility_marks(world, m_buildings, m_local_player, spot->island, crop, m_tile_marks, true);
+            return;
+        }
+        for (std::uint16_t i = 0; i < world.islands().size(); ++i) {
+            ground_marks(world, m_buildings, i, m_tile_marks);
+        }
+        return;
+    }
     const auto [crop, selected_island] = fertility_view_crop();
     if (crop == 0) {
         return;
@@ -2168,6 +2192,11 @@ void MapViewer::add_fertility_marks() {
 
 void MapViewer::toggle_fertility() {
     m_show_fertility = !m_show_fertility;
+    if (m_editor) {
+        // The editor always has something to show: the ground.
+        notify(ui::tr(m_show_fertility ? "overlay.ground_on" : "overlay.ground_off"), "editor ground view");
+        return;
+    }
     if (m_show_fertility && fertility_view_crop().first == 0) {
         // Nothing to show: it stays off, so the next Ctrl+B with a farm or field turns it on.
         m_show_fertility = false;

@@ -29,7 +29,19 @@ inline constexpr assets::Rgba kInfertileTint{220, 40, 40, 110};
 /// ground and fields) and that belongs to `player` or to nobody: green where it bears, red where
 /// it does not. A drought is left out: what it withers grows again after it. Nothing on an island
 /// the player has neither explored nor settled on: its crops are still unknown to them.
+/// With `everyone` (the editor), every tile of every owner, explored or not.
 void fertility_marks(const sim::World& world, const assets::BuildingTable& buildings, sim::PlayerId player,
-                     std::uint16_t island, std::uint8_t crop, std::vector<render::TileMark>& out);
+                     std::uint16_t island, std::uint8_t crop, std::vector<render::TileMark>& out,
+                     bool everyone = false);
+
+/// The editor's view of the ground: what share of the island's fertility the ground of each land
+/// tile of `island` leaves a field (its Randwachs; under forest, fields and buildings the ground
+/// below them), from green (all) over yellow to red (a quarter). Beach, rock, rivers and water
+/// stay unmarked.
+void ground_marks(const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                  std::vector<render::TileMark>& out);
+
+/// The tint of ground that leaves a field `edge` / 128 of the island's fertility.
+[[nodiscard]] assets::Rgba ground_tint(std::uint32_t edge) noexcept;
 
 }  // namespace o1602::app

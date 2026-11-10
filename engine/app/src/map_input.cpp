@@ -158,6 +158,7 @@ bool MapInput::editor_key(ui::KeyAction action) noexcept {
         case KeyAction::PixelScaleDown:
         case KeyAction::ShowFps:
         case KeyAction::ShowCoordinates:
+        case KeyAction::ShowFertility:
         case KeyAction::Fullscreen:
         case KeyAction::Quit:
         case KeyAction::EditorUndo:

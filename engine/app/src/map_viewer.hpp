@@ -537,6 +537,10 @@ private:
     void editor_remove_object(render::TilePos tile);
     /// The pipette at the world tile (x, y).
     void editor_pipette(std::uint32_t x, std::uint32_t y);
+    /// The building at the world tile (x, y) as the page "Objects" would place it: its group and
+    /// piece (a house's look as its class's house), turn and owner; nothing where none of the
+    /// page's buildings stands.
+    [[nodiscard]] std::optional<EditorObjects> editor_object_at(std::uint32_t x, std::uint32_t y) const;
     /// The islands changed: what the viewer keeps of them is made anew (flags, minimap), and what
     /// the panel shows of an island that is gone goes.
     void editor_islands_changed();

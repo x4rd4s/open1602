@@ -2465,6 +2465,12 @@ void MapViewer::editor_terrain_request(const EditorRequest& request) {
 }
 
 void MapViewer::editor_pipette(std::uint32_t x, std::uint32_t y) {
+    // A building: the page "Objects" takes it in hand, turned and for its owner, as it stands.
+    if (const auto picked = editor_object_at(x, y); picked && m_hud) {
+        m_hud->editor_tool(EditorTool::Build, &*picked);
+        editor_notice(ui::tr("editor.objects.picked"), false, "building picked");
+        return;
+    }
     const auto piece = editor::terrain_at(m_state->world, m_buildings, x, y);
     const assets::BuildingType* b = piece ? m_buildings.by_id(piece->id) : nullptr;
     const auto group = b != nullptr ? editor::terrain_group(m_buildings, *b) : std::nullopt;

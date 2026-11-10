@@ -36,20 +36,20 @@ std::uint8_t fertility_crop(const assets::BuildingTable& buildings, const assets
 }
 
 void fertility_marks(const sim::World& world, const assets::BuildingTable& buildings, sim::PlayerId player,
-                     std::uint16_t island, std::uint8_t crop, std::vector<render::TileMark>& out) {
+                     std::uint16_t island, std::uint8_t crop, std::vector<render::TileMark>& out, bool everyone) {
     if (island >= world.islands().size() || !checked_crop(crop)) {
         return;
     }
     const sim::WorldIsland& isl = world.islands()[island];
     const sim::IslandMap& map = isl.map;
     // What grows where is learnt only by exploring the island with a ship, or by settling on it.
-    if (!isl.explored_by(player) && !holds_land(map, player)) {
+    if (!everyone && !isl.explored_by(player) && !holds_land(map, player)) {
         return;
     }
     for (std::uint32_t y = 0; y < map.height(); ++y) {
         for (std::uint32_t x = 0; x < map.width(); ++x) {
             const sim::MapCell& cell = map.top(x, y);
-            if (cell.empty() || (cell.owner != player && cell.owner != sim::kNoPlayer)) {
+            if (cell.empty() || (!everyone && cell.owner != player && cell.owner != sim::kNoPlayer)) {
                 continue;
             }
             const assets::BuildingType* b = buildings.by_sprite(cell.sprite);
@@ -66,6 +66,42 @@ void fertility_marks(const sim::World& world, const assets::BuildingTable& build
             out.push_back(render::TileMark{
                 island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y),
                 sim::tile_fertile_at(world, buildings, island, crop, tx, ty, 0) ? kFertileTint : kInfertileTint});
+        }
+    }
+}
+
+assets::Rgba ground_tint(std::uint32_t edge) noexcept {
+    // 100 % green, 75 % yellow-green, 50 % yellow, 40 % orange, 25 % and below red.
+    if (edge >= 128) {
+        return kFertileTint;
+    }
+    if (edge >= 96) {
+        return assets::Rgba{150, 210, 40, 110};
+    }
+    if (edge >= 64) {
+        return assets::Rgba{235, 210, 40, 110};
+    }
+    if (edge >= 48) {
+        return assets::Rgba{235, 130, 30, 110};
+    }
+    return kInfertileTint;
+}
+
+void ground_marks(const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island,
+                  std::vector<render::TileMark>& out) {
+    if (island >= world.islands().size()) {
+        return;
+    }
+    const sim::IslandMap& map = world.islands()[island].map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const sim::MapCell& ground = map.ground(x, y);
+            const assets::BuildingType* g = ground.empty() ? nullptr : buildings.by_sprite(ground.sprite);
+            if (g == nullptr || g->kind != assets::kind::kGround) {
+                continue;
+            }
+            out.push_back(render::TileMark{island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y),
+                                           ground_tint(g->edge_growth)});
         }
     }
 }

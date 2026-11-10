@@ -961,7 +961,7 @@ void Hud::place_editor_panel() {
                          static_cast<std::int32_t>(m_regions.side_panel.x / unit));
 }
 
-void Hud::editor_tool(EditorTool tool) {
+void Hud::editor_tool(EditorTool tool, const EditorObjects* objects) {
     if (!m_editor || m_editor->typing()) {
         return;
     }
@@ -969,6 +969,11 @@ void Hud::editor_tool(EditorTool tool) {
         (void)m_chrome->close_menu();
     }
     if (auto r = m_editor->choose_tool(tool, m_editor_model)) {
+        if (objects != nullptr && r->kind == EditorRequest::Kind::Objects) {
+            const EditorObjects::Tool chosen = r->objects.tool;
+            r->objects = *objects;
+            r->objects.tool = chosen;
+        }
         m_editor_requests.push_back(std::move(*r));
     }
 }
