@@ -925,8 +925,8 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 const bool earns =
                     rivals() && &c == home_city(p) && earned_income(p) > 0 && civil_income(p) > 0 && !food_short(c);
                 const bool home = earns && supplies_growth(c);
-                if (earns && !food_ahead(c) && houses_wanted(c, r, n.n, true) > r.slots[kSlotHouses].count &&
-                    more_food(p, c, r, true)) {
+                if (earns && !food_ahead(c) && c.stock(m_buildings.food_ware()) < 2 * kFoodStock * kStockUnitsPerTon &&
+                    houses_wanted(c, r, n.n, true) > r.slots[kSlotHouses].count && more_food(p, c, r, true)) {
                     found = true;
                     break;
                 }
