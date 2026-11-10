@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 11;
+inline constexpr std::uint32_t kStateVersion = 12;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -39,6 +39,10 @@ inline constexpr std::uint32_t kStateWithStrategy = 10;
 /// Version 11: an improved computer's war plan (Strategy::war_target and the rest). Written only
 /// while or after a computer planned a war.
 inline constexpr std::uint32_t kStateWithWarPlan = 11;
+/// Version 12: when an improved computer called its colony ship home to load and with what
+/// (Settlement::load_ms, load_food).
+/// Written only while a ship is being loaded.
+inline constexpr std::uint32_t kStateWithColonyLoad = 12;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -339,6 +343,9 @@ struct Settlement {
     std::uint8_t retries = 0;
     bool sailing = false;         ///< the ship sails to the site
     std::vector<Region> regions;  ///< result of the area scan
+    /// Open1602: game time an improved computer called `ship` home to load for a colony, 0 none.
+    std::uint64_t load_ms = 0;
+    bool load_food = false;  ///< Open1602: the load holds food instead of bricks
 };
 
 /// A castle the computer recruits in.

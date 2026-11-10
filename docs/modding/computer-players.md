@@ -35,6 +35,12 @@ its producers is built without its raw material.
 Mines, fisheries, hunters and farms of another size are not built for a package's good; the good
 then has to come by trade. Only the first raw material (`raw`) is followed, not the second (`raw2`).
 
+A workshop goes where it scores best: near a market or the Kontor and its raw material, away from
+the coast and the fields. The original takes only a site that scores above nothing, so in a full
+town or on a small island it may find none however much room there is. An improved computer takes
+any free site by a road in a market's reach for its smelter, toolsmith and sword smith, after every
+site that scores; houses and the other workshops keep the original's rule.
+
 ## How many
 
 A city wants as many producers of a good as its inhabitants use of it, together with what the
@@ -86,6 +92,24 @@ that share in hand, without waiting for a luxury good in store or a colony first
 gold with its trade (purchases count against it) and its food suffices, its home city grows its
 houses with its land at every stage, as long as its houses move up
 to the next class, and it builds them with a quarter of the original's 1000 gold in hand.
+
+The home city of an improved computer grows from 1000 tiles of free land on (others from 2000), and
+it keeps its supply in step with its houses:
+
+- **Growth.** It builds houses beyond its order only while its cities earn more than they cost
+  (with trade and without), its own food comes in with a quarter to spare, and every class living
+  in it is content (100 of 128). The same holds once its order is through. A settler without
+  cloth or a citizen without alcohol turns discontent, and the houses fall back to a class that
+  pays a fraction.
+- **Food and cloth.** While its own food falls short of what its people eat (by a quarter while it
+  is to grow) and the stock is under 40 t, it plans the food producer that pays best; while its
+  cloth falls short and runs out, another sheep farm (cotton where it grows fully), as long as the
+  weaving keeps up with the farms. Short of gold (under 500) it does so only where its own supply
+  covers less than four fifths.
+- **Costly public buildings.** A church, a bath or a college (1000 gold and more) waits while a
+  discontent class lacks one of its goods: the gold goes to the goods first.
+- **The first yard.** While it wants another ship and has none, its houses wait until the gold
+  covers the small yard and 250 more.
 
 ## Taxes
 
@@ -443,6 +467,14 @@ Improved computers weigh the way at sea:
   can take the mountain in. Such a colony may go to an island where a small rival (two cities at
   most) lives, as the original's computers never do, but not next to a partner, an ally or a rival
   stronger than itself; the rival takes it ill.
+- **Colony ships.** An improved computer calls its colony ship home only once the home city holds
+  the whole load, loads everything there at once, sets out with two thirds of the original's load
+  (20 t of wood, tools and bricks, or 10 t of food) or nine tenths of it, and unloads other goods
+  aboard first. A ship that has not been loaded after ten minutes goes back to work. The loaded
+  ship looks for its island at every look of the city's order.
+- **Ships without a job.** A ship of an improved computer that has nothing to do guards the home
+  island as a patrol (the supply takes it again at the end of a leg), and no new ship is ordered
+  while one lies idle.
 - **Hourly new start.** The original's computers start again every hour and walk every city
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.

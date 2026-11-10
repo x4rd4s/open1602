@@ -133,12 +133,37 @@ void Engine::arm_one(City& c, Ship& s) {
 
 // ---------------------------------------------------------------------------------------------
 
+void Engine::colony_load_timeout(AiPlayer& p) {
+    // Open1602: a colony ship called home to load whose city never gathers the wood, tools and
+    // bricks lay idle at the Kontor for good, kept from every other job. After kColonyLoadMs it goes
+    // back to work, and the next colony starts over later.
+    constexpr std::uint64_t kColonyLoadMs = 10ULL * 60 * 1000;
+    Settlement& s = p.settle;
+    if (s.load_ms == 0) {
+        return;
+    }
+    if (s.ship == 0 || s.active) {
+        s.load_ms = 0;
+        return;
+    }
+    if (now_ms() - s.load_ms < kColonyLoadMs) {
+        return;
+    }
+    log(p, "colony ship %u: no load after %llu min, back to work", s.ship,
+        static_cast<unsigned long long>((now_ms() - s.load_ms) / 60'000));
+    s.ship = 0;
+    s.load_ms = 0;
+    s.last_ms = now_ms();
+}
+
 void Engine::logistics(AiPlayer& p) {
     // A scenario can keep the computer's ships out of supply and patrols.
     if (p.pirates || player(p).scenario.has(scenario_flag::kNoFleet)) {
         return;
     }
     forget_ships(p);
+    continue_colony_load(p);
+    colony_load_timeout(p);
     // Patrol stops passed since the last look.
     for (ShipNote& n : p.ships) {
         const Ship* s = m_world.ship(n.id);
@@ -193,7 +218,11 @@ void Engine::logistics(AiPlayer& p) {
             }
         }
         update_fleet_target(p);
-        if (static_cast<std::int32_t>(own_ships(p).size()) < p.fleet_target && !buy_ship(p)) {
+        // Open1602: an improved computer orders no further ship while one of its own lies idle.
+        const bool spare = rivals() && std::ranges::any_of(own_ships(p), [&](const Ship* s) {
+                               return ship_idle(p, *s) && !s->for_sale;
+                           });
+        if (static_cast<std::int32_t>(own_ships(p).size()) < p.fleet_target && !spare && !buy_ship(p)) {
             order_ship(p);
         }
     }
@@ -213,6 +242,28 @@ void Engine::logistics(AiPlayer& p) {
                 break;
             }
             patrol_route(p, *s, c.island);
+        }
+    }
+    if (rivals()) {
+        guard_idle_ship(p, healthy);
+    }
+}
+
+void Engine::guard_idle_ship(AiPlayer& p, bool healthy) {
+    // Open1602: a ship left without a job (more ships than the supply takes, once the fleet target fell
+    // back) guards the home island instead of lying at the yard for a quarter of an hour; as a patrol
+    // the supply takes it again at the end of a leg. One a look.
+    const City* home = home_city(p);
+    if (home == nullptr) {
+        return;
+    }
+    for (Ship* s : own_ships(p)) {
+        const ShipNote& n = note(p, s->id);
+        if (ship_idle(p, *s) && n.cooldown == 0 && !s->for_sale && !carries_goods(*s) &&
+            (!healthy || health128(*s) > kHealthy)) {
+            log(p, "ship %u has no job: guards island %u", s->id, home->island);
+            patrol_route(p, *s, home->island);
+            return;
         }
     }
 }

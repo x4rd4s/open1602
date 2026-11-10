@@ -13,6 +13,8 @@
 #include "annokit/core/file.hpp"
 
 #include "o1602/sim/ai.hpp"
+#include "o1602/sim/consumption.hpp"
+#include "o1602/sim/mission.hpp"
 
 namespace o1602::sim {
 
@@ -52,9 +54,13 @@ CommandResult Engine::execute(const Command& command) {
     return m_sim.execute(command);
 }
 
-void Engine::log(const AiPlayer& p, const char* format, ...) const {
+bool Engine::logging() noexcept {
     static const bool enabled = annokit::core::environment_variable("O1602_AI_LOG").has_value();
-    if (!enabled) {
+    return enabled;
+}
+
+void Engine::log(const AiPlayer& p, const char* format, ...) const {
+    if (!logging()) {
         return;
     }
     std::fprintf(stderr, "[ai %u %llus] ", p.player, static_cast<unsigned long long>(now_ms() / 1000));
@@ -243,6 +249,9 @@ void Engine::tick(std::uint32_t dt_ms) {
         }
         if (rivals() && !p.pirates && p.has_plan && now_ms() >= p.strategy.next_ms) {
             plan_strategy(p);
+        }
+        if (logging() && p.has_plan) {
+            report(p);
         }
     }
 }
@@ -769,6 +778,101 @@ void Engine::choose_home(AiPlayer& p) {
     }
 }
 
+Engine::SiteTally& Engine::site_tally(const AiPlayer& p) {
+    if (m_site_tally.size() <= p.player) {
+        m_site_tally.resize(std::size_t{p.player} + 1);
+    }
+    return m_site_tally[p.player];
+}
+
+void Engine::tally_site(const AiPlayer& p, bool road, bool market, std::int32_t score) {
+    if (!logging()) {
+        return;
+    }
+    SiteTally& t = site_tally(p);
+    ++t.sites;
+    t.road += road ? 1 : 0;
+    t.market += market ? 1 : 0;
+    if (road && market) {
+        ++t.both;
+        t.best = std::max(t.best, score);
+    }
+}
+
+void Engine::log_no_site(const AiPlayer& p, std::uint32_t building) {
+    if (!logging()) {
+        return;
+    }
+    const SiteTally& t = site_tally(p);
+    log(p, "city %u/%u: no site for building %u: %d free sites, %d by a road, %d in market reach, %d both, best %d",
+        p.island, p.city, building, t.sites, t.road, t.market, t.both, t.both != 0 ? t.best : 0);
+}
+
+void Engine::report(AiPlayer& p) {
+    // Every half hour of game time, for the log: what each city has and why it may stand still.
+    constexpr std::uint64_t kReportMs = 30ULL * 60 * 1000;
+    if (m_report_ms.size() <= p.player) {
+        m_report_ms.resize(std::size_t{p.player} + 1, 0);
+    }
+    if (now_ms() < m_report_ms[p.player]) {
+        return;
+    }
+    m_report_ms[p.player] = now_ms() + kReportMs;
+    const std::int32_t need = p.player < m_last_need.size() ? m_last_need[p.player] : -1;
+    log(p, "report: gold %d, civil %d, net %d, earned %d, stage %u, last need kind %d slot %d", player(p).money,
+        civil_income(p), net_income(p), earned_income(p), unsigned{p.max_stage}, need < 0 ? -1 : need >> 8,
+        need < 0 ? -1 : need & 0xFF);
+    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
+    for (const CityPlan& r : p.plans) {
+        const City* c = city(r.island, r.city);
+        if (c == nullptr || c->owner != p.player) {
+            continue;
+        }
+        std::array<std::uint32_t, 5> classes{};
+        std::uint32_t houses = 0;
+        for (const House& h : m_world.houses()) {
+            if (h.island == c->island && h.city == c->index) {
+                ++houses;
+                ++classes[std::min<std::size_t>(h.resident_class, classes.size() - 1)];
+            }
+        }
+        const SlotState& hs = r.slots[kSlotHouses];
+        const SlotState& ms = r.slots[kSlotMarket];
+        log(p,
+            "report city %u/%u: stage %u, people %u, houses %u (%u/%u/%u/%u/%u), land %u, grown16 %u, wanted %u, "
+            "house slot %u/%u/%u, market %u/%u/%u flag %d, food %u t short %d",
+            r.island, r.city, unsigned{r.stage}, population(*c), houses, classes[0], classes[1], classes[2], classes[3],
+            classes[4], r.land, grown(r, 16), houses_wanted(*c, r, houses, rivals() && c == home_city(p)),
+            unsigned{hs.count}, unsigned{hs.attempts}, unsigned{hs.fail_level}, unsigned{ms.count},
+            unsigned{ms.attempts}, unsigned{ms.fail_level}, (r.flags & city_flag::kMarket) != 0 ? 1 : 0,
+            c->stock(m_buildings.food_ware()) / kTon, food_short(*c) ? 1 : 0);
+        // Where its gold comes from and goes, and what its people lack.
+        std::size_t index = 0;
+        while (index < m_world.cities().size() && &m_world.cities()[index] != c) {
+            ++index;
+        }
+        const std::int32_t cost = index < costs.size() ? costs[index] : 0;
+        const auto at = [](const std::vector<std::uint8_t>& v, std::size_t k) {
+            return k < v.size() ? unsigned{v[k]} : 0U;
+        };
+        const std::uint8_t food = m_buildings.food_ware();
+        log(p,
+            "report goods %u/%u: tax %d, costs %d, food %u/%u (1/32 t a min), food makers %u/%u/%u, stock t: cloth %u "
+            "alcohol %u tobacco %u spices %u cocoa %u clothes %u jewellery %u, content %u/%u/%u/%u/%u, "
+            "tax rate %u/%u/%u/%u/%u, food ahead %d, supplies growth %d (used up: ware %u), goods lacking %d, yard "
+            "savings %lld",
+            r.island, r.city, tax_income(*c, m_buildings), cost, supply(*c, food), demand(*c, food),
+            unsigned{r.slots[kSlotFisher].count}, unsigned{r.slots[kSlotButcher].count},
+            unsigned{r.slots[kSlotBakery].count}, c->stock(ware::kCloth) / kTon, c->stock(ware::kAlcohol) / kTon,
+            c->stock(ware::kTobaccoGoods) / kTon, c->stock(ware::kSpices) / kTon, c->stock(ware::kCocoa) / kTon,
+            c->stock(ware::kClothes) / kTon, c->stock(ware::kJewellery) / kTon, at(c->satisfaction, 0),
+            at(c->satisfaction, 1), at(c->satisfaction, 2), at(c->satisfaction, 3), at(c->satisfaction, 4),
+            at(c->tax_rate, 0), at(c->tax_rate, 1), at(c->tax_rate, 2), at(c->tax_rate, 3), at(c->tax_rate, 4),
+            food_ahead(*c) ? 1 : 0, supplies_growth(*c) ? 1 : 0, unsigned{lacking_ware(*c, true)},
+            goods_lacking(*c) ? 1 : 0, static_cast<long long>(yard_savings(p)));
+    }
+}
+
 }  // namespace ai
 
 // ---------------------------------------------------------------------------------------------
@@ -795,6 +899,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (p.settle.load_ms != 0) {
+            return static_cast<std::uint16_t>(ai::kStateWithColonyLoad);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.war_target != kNoPlayer || p.strategy.war_ended_ms != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithWarPlan);

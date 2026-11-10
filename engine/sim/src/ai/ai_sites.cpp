@@ -195,6 +195,22 @@ std::int32_t outside_zone(const TownZone* zone, std::int32_t margin, const Site&
     return zone_excess(*zone, c.x0, c.y0, c.x1, c.y1) > margin ? score + kZoneTier : score;
 }
 
+/// Open1602: an improved computer takes a site that scores nothing for the iron, its tools and
+/// its swords, after every site that does. The scores reward company (a market, the raw material)
+/// and punish the coast and the fields, so in a full town or on a small island every site left may
+/// score 0 or less; the original then never builds its toolsmith or sword smith, however much room
+/// there is. Houses and the other workshops keep to the sites that score: those taken anyway
+/// were bad ones, away from the supply, and cost more than they brought.
+constexpr std::int32_t kAnySiteBand = 1 << 20;
+
+std::int32_t any_site(std::int32_t score) {
+    return score > 0 ? score + kAnySiteBand : std::max(1, kAnySiteBand + score);
+}
+
+bool takes_any_site(std::uint8_t slot) {
+    return slot == kSlotSmelter || slot == kSlotToolsmith || slot == kSlotSwords;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
@@ -496,6 +512,9 @@ void Engine::start_search(AiPlayer& p, const assets::BuildingType& b, std::uint8
         s.remaining = g.length;
     }
     p.search = s;
+    if (logging()) {
+        site_tally(p) = SiteTally{};
+    }
 }
 
 bool Engine::advance_cursor(AiPlayer& p, std::int32_t limit) {
@@ -662,6 +681,7 @@ bool Engine::search_houses(AiPlayer& p) {
                 const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
                 score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
             }
+            tally_site(p, true, acc.market, score);
             if (acc.market && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -734,6 +754,10 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
             std::int32_t score = cannons ? acc.score : parity_penalty(acc.score, parity, 4);
             // Open1602: workshops at the edge of the town zone or outside, not on its house land.
             score = outside_zone(zone, -kZoneWorkshopDepth, c, score);
+            if (!classic() && takes_any_site(s.slot)) {
+                score = any_site(score);
+            }
+            tally_site(p, acc.road, acc.market, score);
             if (acc.market && acc.road && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;

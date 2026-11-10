@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -226,6 +227,9 @@ private:
     CommandResult execute(const Command& command);
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
+    [[nodiscard]] static bool logging() noexcept;
+    /// The computer log only: a report of each city every half hour of game time.
+    void report(AiPlayer& p);
 
     // ---- ai_world.cpp ----
     [[nodiscard]] Tile tile(std::uint16_t island, std::int32_t x, std::int32_t y) const;
@@ -334,6 +338,8 @@ private:
     bool rim_goal(const Ship& ship, std::uint16_t island, std::int64_t& best, Target& goal) const;
     /// Improved computers: an idle ship sails to the nearest island nobody of theirs explored.
     void scout(AiPlayer& p);
+    /// Open1602: sends an improved computer's ship without a job on patrol round its home island.
+    void guard_idle_ship(AiPlayer& p, bool healthy);
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
@@ -361,6 +367,16 @@ private:
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
+    /// Loads the colony ship in city `c`; true once it holds its whole load, the settlement then starts.
+    bool load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::uint8_t crop);
+    /// Open1602: goes on loading the colony ship at home, from the logistics look.
+    void continue_colony_load(AiPlayer& p);
+    /// Open1602: whether the current city holds a colony ship's whole load.
+    [[nodiscard]] bool colony_load_in_stock(AiPlayer& p, bool food);
+    /// Open1602: whether the colony ship already holds part of its load.
+    [[nodiscard]] bool colony_loading(AiPlayer& p);
+    /// The tons of a ware a colony ship sets out with, of the original's `tons`.
+    [[nodiscard]] std::uint32_t colony_load(std::uint32_t tons) const;
     [[nodiscard]] std::uint32_t colony_ship_candidate(AiPlayer& p);
     void task_abandon(AiPlayer& p);
     void unload_at(City& c, Ship& ship, bool keep_basics, bool destroy);
@@ -392,8 +408,10 @@ private:
     /// `any_stage`: for a colony too (its caps on fields and farms).
     [[nodiscard]] std::uint32_t grown(const CityPlan& r, std::uint32_t n, bool any_stage = false) const;
     /// Open1602: the houses of an order, `grown` only while at most an eighth of the city's houses
-    /// hold pioneers, so that a city grows tall before it grows wide.
-    [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const;
+    /// hold pioneers, so that a city grows tall before it grows wide. `home`: the home city of an
+    /// improved computer that earns, grown from kGrowLand tiles of land on.
+    [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n,
+                                              bool home = false) const;
     /// `grow`: with the numbers `grown` by the city's land (houses: `houses_wanted`).
     bool first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money, std::span<const StageNeed> needs,
                     bool grow = false);
@@ -406,7 +424,22 @@ private:
     [[nodiscard]] std::uint32_t processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const;
     /// Open1602: a food producer for a city that makes too little food (food_short), on its own
     /// island before anything else of its order: true if one was planned.
-    bool more_food(AiPlayer& p, const City& c, const CityPlan& r);
+    /// `ahead`: also for a city not yet short, which is to grow.
+    bool more_food(AiPlayer& p, const City& c, const CityPlan& r, bool ahead = false);
+    /// Open1602: whether a city's own food comes in with a quarter to spare.
+    [[nodiscard]] bool food_ahead(const City& c) const;
+    /// Open1602: food_ahead, and every class living in the city is content and has its goods.
+    [[nodiscard]] bool supplies_growth(const City& c) const;
+    /// Open1602: more food or cloth for a home city whose supply falls short (`growing`: with a
+    /// quarter of food to spare); true when a producer was planned.
+    bool supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing);
+    /// Open1602: whether a discontent class living in the city (any, with `content_too`) lacks one
+    /// of its goods (not food).
+    [[nodiscard]] bool goods_lacking(const City& c, bool content_too = false) const;
+    /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
+    [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
+    /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
+    [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -529,6 +562,8 @@ private:
 
     // ---- ai_logistics.cpp ----
     void logistics(AiPlayer& p);
+    /// Open1602: frees a colony ship that waited too long for its load.
+    void colony_load_timeout(AiPlayer& p);
     ShipNote& note(AiPlayer& p, std::uint32_t ship);
     void forget_ships(AiPlayer& p);
     [[nodiscard]] const assets::FigureType* ship_type(const Ship& s) const;
@@ -821,6 +856,22 @@ private:
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
     std::vector<CityScans> m_city_scans;
     bool m_in_tick = false;
+    /// The computer log only (not saved): what a player's last site search saw, and when its cities
+    /// were last reported.
+    struct SiteTally {
+        std::int32_t sites = 0;   ///< free sites looked at
+        std::int32_t road = 0;    ///< of them by a road
+        std::int32_t market = 0;  ///< in reach of a market or the Kontor
+        std::int32_t both = 0;
+        std::int32_t best = std::numeric_limits<std::int32_t>::min();  ///< best score of those with both
+    };
+    SiteTally& site_tally(const AiPlayer& p);
+    void tally_site(const AiPlayer& p, bool road, bool market, std::int32_t score);
+    void log_no_site(const AiPlayer& p, std::uint32_t building);
+    std::vector<SiteTally> m_site_tally;
+    std::vector<std::uint64_t> m_report_ms;
+    /// The computer log only: the stage order's entry a player's last look stopped at.
+    std::vector<std::int32_t> m_last_need;
 };
 
 /// Ring iterator: ring d (Chebyshev distance d + 1) around the
