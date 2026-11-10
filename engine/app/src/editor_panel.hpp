@@ -74,6 +74,8 @@ struct EditorTerrain {
     std::uint8_t brush = 0;     ///< index into editor::kBrushSizes
     std::uint8_t shape = 1;     ///< editor::BrushShape of the shaping tools (Land, Water, Coast, Random)
     bool paste_water = false;   ///< Paste: the copy's water too (exactly), else only its land
+    /// Land: up to the world map's edge without a coast there (editor::TerrainStroke::set_open_edge)
+    bool open_edge = false;
     friend bool operator==(const EditorTerrain&, const EditorTerrain&) = default;
 };
 

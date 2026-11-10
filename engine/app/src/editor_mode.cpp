@@ -2599,6 +2599,7 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
         if (by_island.empty() && !kept_apart) {
             into.note(editor::TerrainStroke::Refusal::NoIsland);
         }
+        into.set_open_edge(t.tool == EditorTerrain::Tool::Land && t.open_edge);
         for (const auto& [island, tiles] : by_island) {
             (void)into.shape(island, tiles, t.tool == EditorTerrain::Tool::Land, tile_seed(m_editor->strokes, x, y));
         }

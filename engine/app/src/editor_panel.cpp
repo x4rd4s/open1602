@@ -88,6 +88,7 @@ constexpr Id kTerrainBigger = 79;       ///< the brush a size bigger
 constexpr Id kTerrainShape = 173;       ///< the brush's shape
 constexpr Id kTerrainSlider = 174;      ///< the brush's size slid
 constexpr Id kTerrainPasteWater = 175;  ///< whether a paste lays the copy's water too
+constexpr Id kTerrainOpenEdge = 1120;   ///< Land: up to the map's edge without a coast, or not
 constexpr Id kCityTradePage = 188;
 constexpr Id kTradeSell = 176;   ///< the ware sold, or no longer
 constexpr Id kTradeBuy = 177;    ///< the ware bought, or no longer
@@ -1904,6 +1905,10 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
                       ui::tr(kBrushShapeTexts[t.shape % kBrushShapeTexts.size()]), brush);
             }
         }
+        if (t.tool == Tool::Land) {
+            value(kTerrainOpenEdge, "editor.terrain.map_edge",
+                  ui::tr(t.open_edge ? "editor.terrain.map_edge.open" : "editor.terrain.map_edge.coast"), true);
+        }
         if (pieces && !single) {
             note = ui::tr("editor.terrain.note.large", {count(model.terrain_width), count(model.terrain_height)});
         }
@@ -3300,6 +3305,7 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kTerrainBigger:
         case kTerrainShape:
         case kTerrainPasteWater:
+        case kTerrainOpenEdge:
         case kTerrainSlider: {
             EditorRequest r{EditorRequest::Kind::Terrain};
             EditorTerrain& t = r.terrain;
@@ -3322,6 +3328,8 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 t.brush = static_cast<std::uint8_t>(std::min<std::size_t>(t.brush + 1U, kTerrainBrushes.size() - 1));
             } else if (*id == kTerrainPasteWater) {
                 t.paste_water = !t.paste_water;
+            } else if (*id == kTerrainOpenEdge) {
+                t.open_edge = !t.open_edge;
             } else if (*id == kTerrainShape) {
                 t.shape = static_cast<std::uint8_t>(step(t.shape, kBrushShapeTexts.size(), forward));
             } else if (*id == kTerrainSlider) {

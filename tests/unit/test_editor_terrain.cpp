@@ -661,3 +661,35 @@ TEST_CASE("editor terrain: copy, turn, mirror and paste terrain; the coast clean
     CHECK(tidy.tidy_coast(1, spot, 4));
     CHECK(id_at(1, 14, 16) == kMeadow);
 }
+
+TEST_CASE("editor terrain: land runs on beyond the map's edge without a coast, where asked") {
+    const auto buildings = make_buildings();
+    sim::World world(500, 350);
+    REQUIRE(world.add_island(make_island(buildings, 20, 16, 0, 0, 30), &buildings).ok());
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> edge;
+    for (std::uint32_t y = 1; y <= 14; ++y) {
+        edge.emplace_back(0, y);
+    }
+    {
+        // As before: land keeps a tile of sea to the island's edge, the map's too.
+        editor::TerrainStroke stroke(world, buildings);
+        (void)stroke.shape(0, edge, true, 1);
+        CHECK(record_at(world, buildings, 0, 7) == kSea);
+        CHECK(stroke.first_refusal() == editor::TerrainStroke::Refusal::Edge);
+        stroke.cancel();
+    }
+    editor::TerrainStroke stroke(world, buildings);
+    stroke.set_open_edge(true);
+    CHECK(stroke.shape(0, edge, true, 2));
+    // The map's edge: meadow up to it, no beach; the land goes on beyond (its ends by the island's
+    // sea get their beach).
+    for (std::uint32_t y = 2; y <= 13; ++y) {
+        CHECK(record_at(world, buildings, 0, y) == kMeadow);
+        CHECK(record_at(world, buildings, 1, y) == kMeadow);
+    }
+    // The island's other edges are no map edge: there the sea stays.
+    const std::vector<std::pair<std::uint32_t, std::uint32_t>> east = {{19, 7}};
+    (void)stroke.shape(0, east, true, 3);
+    CHECK(record_at(world, buildings, 19, 7) == kSea);
+    CHECK(stroke.first_refusal() == editor::TerrainStroke::Refusal::Edge);
+}
