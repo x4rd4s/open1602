@@ -1666,9 +1666,9 @@ bool Engine::food_ahead(const City& c) const {
 bool Engine::supplies_growth(const City& c) const {
     // A stock alone fills new houses that starve once it is eaten: the home city grows beyond its
     // order only while its own food comes in with a quarter to spare and every class living in it
-    // is content (kContentForGrowth). A settler without cloth or a citizen without alcohol turns
-    // discontent, the houses fall back and pay a fraction; a good merely short in store, with the
-    // people still content, holds nothing up.
+    // is content (kContentForGrowth) with every good of theirs in store or coming in. A settler
+    // without cloth or a citizen without alcohol turns discontent, the houses fall back and pay a
+    // fraction; a good merely low in store, with the people content, holds nothing up.
     if (!food_ahead(c)) {
         return false;
     }
@@ -1677,15 +1677,18 @@ bool Engine::supplies_growth(const City& c) const {
             return false;
         }
     }
-    return true;
+    // Contentment follows a missing good only after a while: nor while one of their goods is used up
+    // and comes in short.
+    return !goods_lacking(c, true);
 }
 
-bool Engine::goods_lacking(const City& c) const {
-    // A class that lives in the city, discontent, with one of its goods (not food) under a ton in
-    // stock and short in supply.
+bool Engine::goods_lacking(const City& c, bool content_too) const {
+    // A class that lives in the city (discontent, unless `content_too`) with one of its goods (not
+    // food) under a ton in stock and short in supply.
     const auto& classes = m_buildings.resident_classes();
     for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
-        if (c.inhabitants[k] == 0 || (k < c.satisfaction.size() && c.satisfaction[k] >= kContentForGrowth)) {
+        if (c.inhabitants[k] == 0 ||
+            (!content_too && k < c.satisfaction.size() && c.satisfaction[k] >= kContentForGrowth)) {
             continue;
         }
         for (const assets::ResidentClass::Need& n : classes[k].needs) {

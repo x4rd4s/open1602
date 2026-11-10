@@ -428,13 +428,14 @@ private:
     bool more_food(AiPlayer& p, const City& c, const CityPlan& r, bool ahead = false);
     /// Open1602: whether a city's own food comes in with a quarter to spare.
     [[nodiscard]] bool food_ahead(const City& c) const;
-    /// Open1602: food_ahead, and every class living in the city is content.
+    /// Open1602: food_ahead, and every class living in the city is content and has its goods.
     [[nodiscard]] bool supplies_growth(const City& c) const;
     /// Open1602: more food or cloth for a home city whose supply falls short (`growing`: with a
     /// quarter of food to spare); true when a producer was planned.
     bool supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing);
-    /// Open1602: whether a discontent class living in the city lacks one of its goods (not food).
-    [[nodiscard]] bool goods_lacking(const City& c) const;
+    /// Open1602: whether a discontent class living in the city (any, with `content_too`) lacks one
+    /// of its goods (not food).
+    [[nodiscard]] bool goods_lacking(const City& c, bool content_too = false) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
     [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
