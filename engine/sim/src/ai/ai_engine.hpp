@@ -586,9 +586,25 @@ private:
     Ship* pick_patrol_ship(AiPlayer& p, bool healthy);
     std::uint32_t patrols(AiPlayer& p, std::uint16_t island);
     void patrol_route(AiPlayer& p, Ship& s, std::uint16_t island);
+    /// Where a ware for a city on `home_island` comes from. Improved computers weigh the way from
+    /// `to` (the home city when null).
     std::optional<std::size_t> supply_source(AiPlayer& p, std::uint16_t home_island, std::uint8_t ware,
-                                             std::uint16_t* price);
+                                             std::uint16_t* price, const City* to = nullptr);
     bool home_supply_route(AiPlayer& p, Ship& s, City& home);
+    /// Improved computers: how soon a city runs out of a ware a supply ship brings, the lower the
+    /// sooner (stock_lasts); building materials under half the kept stock count as out.
+    /// kNoUrgency for a ware it makes enough of or does not use.
+    [[nodiscard]] std::uint64_t supply_urgency(const City& c, std::uint8_t ware, std::uint32_t target) const;
+    /// Improved computers: the urgency of the most urgent ware `c` lacks that no supply ship brings
+    /// it yet and that it can get (kNoUrgency for none).
+    [[nodiscard]] std::uint64_t supply_need(AiPlayer& p, const City& c);
+    /// Improved computers: the own city the next supply run goes to: the one that runs out of a
+    /// ware soonest, the home city when none does.
+    City* supply_destination(AiPlayer& p, City& home);
+    /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
+    /// for the original's computers to any city.
+    [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
+    static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,
                                                          std::uint32_t* target) const;

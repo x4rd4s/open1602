@@ -621,8 +621,11 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         }
         const auto index = static_cast<std::uint32_t>(i);
         bool enabled = pr.enabled;
+        // Open1602: what its cities go short of (critical_short) keeps running in debt; the ships
+        // carry the stock to where it is missing.
+        const bool short_of = rivals() && critical_short(p.player, b->ware) != 0;
         const bool idle = saving && b->ware != 0 && !needed[b->ware];
-        const bool hold = (lean && c.stock(b->ware) >= 4 * kTon) || idle;
+        const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle;
         const auto set = [&](bool on) {
             if (on && hold) {
                 return;
@@ -650,8 +653,8 @@ void Engine::production_switches(AiPlayer& p, City& c) {
                 if (starved) {
                     set(false);
                 }
-            } else if (c.stock(b->raw_ware) > 4 * kTon) {
-                set(true);
+            } else if (c.stock(b->raw_ware) > (short_of ? kTon : 4 * kTon)) {
+                set(true);  // Open1602: for a good its cities go short of, with the first ton
             }
         };
         const auto capped = [&](std::uint32_t limit) {
@@ -680,7 +683,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         } else {
             raw();  // farms, pastures, mines, hunters, fishers and the workshops without a raw ware
         }
-        if (lean && enabled && c.stock(w) >= 10 * kTon) {
+        if (lean && !short_of && enabled && c.stock(w) >= 10 * kTon) {
             set(false);
             ++saved;
         } else if (idle && enabled) {

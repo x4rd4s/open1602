@@ -209,7 +209,10 @@ void Engine::logistics(AiPlayer& p) {
                 execute(withdraw);
             }
             if (!carries_goods_for(*s, *home) || s->route.active) {
-                home_supply_route(p, *s, *home);
+                City* to = rivals() ? supply_destination(p, *home) : home;
+                if (!home_supply_route(p, *s, *to) && to != home) {
+                    home_supply_route(p, *s, *home);
+                }
             } else if (ship_at_city(*s, *home)) {
                 unload_at(*home, *s, false, false);  // the original throws away what does not fit (S-097)
                 arm_one(*home, *s);
@@ -540,7 +543,7 @@ void Engine::patrol_route(AiPlayer& p, Ship& s, std::uint16_t island) {
 }
 
 std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home_island, std::uint8_t w,
-                                                 std::uint16_t* price) {
+                                                 std::uint16_t* price, const City* to) {
     // An own city on another island with goods to spare, else the cheapest Kontor
     // of a partner with a trade treaty.
     const auto& m = m_buildings.materials();
@@ -550,7 +553,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
         // Open1602: an improved computer weighs the way. Its nearest own city with goods to spare,
         // else the partner whose price, raised by the hours at sea, is lowest: ten minutes away
         // count as the price twice.
-        const City* home = home_city(p);
+        const City* home = to != nullptr ? to : home_city(p);
         if (home == nullptr) {
             return std::nullopt;
         }
@@ -566,7 +569,10 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (c.owner == p.player) {
-                if (c.stock(w) > reserve) {
+                // A city whose people use more of it than it makes keeps a stock for itself.
+                const std::uint32_t keep =
+                    demand(c, w) > supply(c, w) ? std::max<std::uint32_t>(reserve, 20 * kTon) : reserve;
+                if (c.stock(w) > keep) {
                     const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
@@ -646,14 +652,23 @@ std::vector<std::uint8_t> Engine::supply_wares(const AiPlayer& p, const City& ho
         wares.insert(wares.end(), {ware::kGold, ware::kJewellery});
         *target = 40 * kTon;
     }
+    // Open1602: an improved computer brings first what runs out soonest (supply_urgency), so that
+    // cloth or alcohol at the end of the list waits no longer behind building materials in store.
+    if (rivals()) {
+        const std::uint32_t keep = *target;
+        std::ranges::stable_sort(wares, {}, [&](std::uint8_t w) { return supply_urgency(home, w, keep); });
+    }
     return wares;
 }
 
 namespace {
 
-/// The wares a route unloads.
-void unloaded_wares(const TradeRoute& route, std::vector<std::uint8_t>& out) {
+/// The wares a route unloads (at `to` only, when given).
+void unloaded_wares(const TradeRoute& route, std::vector<std::uint8_t>& out, const Target* to = nullptr) {
     for (const RouteStop& stop : route.stops) {
+        if (to != nullptr && !(stop.target == *to)) {
+            continue;
+        }
         for (const RouteEntry& e : stop.entries) {
             if (e.ware != 0 && e.unload) {
                 out.push_back(e.ware);
@@ -829,23 +844,80 @@ void Engine::cart_supply(AiPlayer& p) {
     }
 }
 
-bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
-    // One or two wares the home city lacks, from where they are, one-way home.
-    std::uint32_t target = 0;
-    const std::vector<std::uint8_t> wares = supply_wares(p, home, &target);
-    // Wares other supply ships already bring, and the trade cart on the home island.
+std::vector<std::uint8_t> Engine::routed_wares(AiPlayer& p, std::uint32_t ship, const City& to) {
+    // Open1602: an improved computer's supply ships sail to several of its cities; a ware on the
+    // way to one of them is not on the way to another.
+    const Target at = Target::city_of(to.island, to.index);
+    const Target* only = rivals() ? &at : nullptr;
     std::vector<std::uint8_t> routed;
     for (const ShipNote& n : p.ships) {
         const Ship* o = m_world.ship(n.id);
-        if (o == nullptr || o->id == s.id || !n.supply || !o->route.active) {
+        if (o == nullptr || o->id == ship || !n.supply || !o->route.active) {
             continue;
         }
-        unloaded_wares(o->route, routed);
+        unloaded_wares(o->route, routed, only);
     }
-    if (const Ship* cart = trade_cart_of(m_world, p.player, home.island);
+    if (const Ship* cart = trade_cart_of(m_world, p.player, to.island);
         cart != nullptr && cart->route.active && !classic()) {
         unloaded_wares(cart->route, routed);
     }
+    return routed;
+}
+
+std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_t target) const {
+    const auto& m = m_buildings.materials();
+    if (w == m.tools || w == m.bricks || w == m.wood) {
+        return c.stock(w) < target / 2 ? 0 : kNoUrgency;
+    }
+    return stock_lasts(c, w);
+}
+
+std::uint64_t Engine::supply_need(AiPlayer& p, const City& c) {
+    std::uint32_t target = 0;
+    const std::vector<std::uint8_t> wares = supply_wares(p, c, &target);
+    const std::vector<std::uint8_t> routed = routed_wares(p, 0, c);
+    for (const std::uint8_t w : wares) {  // the most urgent first
+        const std::uint64_t urgency = supply_urgency(c, w, target);
+        if (urgency == kNoUrgency) {
+            break;
+        }
+        std::uint16_t price = 0;
+        if (std::ranges::find(routed, w) == routed.end() && supply_source(p, c.island, w, &price, &c)) {
+            return urgency;
+        }
+    }
+    return kNoUrgency;
+}
+
+City* Engine::supply_destination(AiPlayer& p, City& home) {
+    // Open1602: an improved computer supplies each of its cities where people live, not the home
+    // city alone: the next ship goes where a ware runs out soonest; the home city keeps its runs
+    // for the rest.
+    City* best = &home;
+    std::uint64_t best_need = supply_need(p, home);
+    for (const City& c : m_world.cities()) {
+        if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+            continue;
+        }
+        const std::uint64_t need = supply_need(p, c);
+        if (need < best_need) {
+            if (City* to = city(c.island, c.index); to != nullptr) {
+                best = to;
+                best_need = need;
+            }
+        }
+    }
+    return best;
+}
+
+bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
+    // One or two wares the home city lacks, from where they are, one-way home. An improved
+    // computer's runs go to any of its cities (supply_destination); `home` is that city.
+    std::uint32_t target = 0;
+    const std::vector<std::uint8_t> wares = supply_wares(p, home, &target);
+    // Wares other supply ships already bring, and the trade cart on the home island.
+    const std::vector<std::uint8_t> routed = routed_wares(p, s.id, home);
+    const bool own_home = &home == home_city(p);
     struct Pick {
         std::uint8_t ware = 0;
         std::size_t source = 0;
@@ -861,8 +933,11 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             if (classic() && home.stock(w) >= target) {
                 continue;
             }
+            if (!own_home && supply_urgency(home, w, target) == kNoUrgency) {
+                break;  // another city gets only what runs out there (the wares come most urgent first)
+            }
             std::uint16_t price = 0;
-            const auto src = supply_source(p, home.island, w, &price);
+            const auto src = supply_source(p, home.island, w, &price, &home);
             if (!src) {
                 continue;
             }
@@ -978,8 +1053,9 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     n.mission = 0;
     n.counter = 0;
     if (rivals()) {
-        log(p, "supply ship %u: ware %u (%u t) from city %u/%u, %u s away%s", s.id, first->ware, first->amount / kTon,
-            src1.island, src1.index, first->seconds, second ? ", and a second ware" : "");
+        log(p, "supply ship %u: ware %u (%u t) from city %u/%u to %u/%u, %u s away%s", s.id, first->ware,
+            first->amount / kTon, src1.island, src1.index, home.island, home.index, first->seconds,
+            second ? ", and a second ware" : "");
     }
     return true;
 }
@@ -1094,21 +1170,33 @@ std::uint32_t Engine::supply_buffer(std::uint32_t target, std::uint32_t seconds)
 std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
     // A ship brings two wares; a ware whose round trip lasts ten minutes more takes a further half
     // ship, so that the city does not run dry while it is under way. At most four.
-    std::uint32_t target = 0;
-    const std::vector<std::uint8_t> wares = supply_wares(p, home, &target);
-    const auto at = city_point(home);
     std::uint64_t halves = 0;  // in 1/600 of a half ship
-    for (const std::uint8_t w : wares) {
-        std::uint16_t price = 0;
-        const auto src = supply_source(p, home.island, w, &price);
-        if (!src) {
-            continue;
+    const auto count = [&](const City& to, bool all) {
+        std::uint32_t target = 0;
+        const std::vector<std::uint8_t> wares = supply_wares(p, to, &target);
+        const auto at = city_point(to);
+        for (const std::uint8_t w : wares) {
+            if (!all && supply_urgency(to, w, target) == kNoUrgency) {
+                break;
+            }
+            std::uint16_t price = 0;
+            const auto src = supply_source(p, to.island, w, &price, &to);
+            if (!src) {
+                continue;
+            }
+            const std::uint32_t round = 2 * sail_seconds(p, at, city_point(m_world.cities()[*src]));
+            if (to.stock(w) >= supply_buffer(target, round)) {
+                continue;
+            }
+            halves += 600 + std::min<std::uint32_t>(round, 1800);
         }
-        const std::uint32_t round = 2 * sail_seconds(p, at, city_point(m_world.cities()[*src]));
-        if (home.stock(w) >= supply_buffer(target, round)) {
-            continue;
+    };
+    count(home, true);
+    // Open1602: the other cities where people live, for what runs out there (supply_destination).
+    for (const City& c : m_world.cities()) {
+        if (c.owner == p.player && &c != &home && c.island != home.island && c.warehouse_x && population(c) != 0) {
+            count(c, false);
         }
-        halves += 600 + std::min<std::uint32_t>(round, 1800);
     }
     const std::uint64_t ships = (halves + 2 * 600 - 1) / (2 * 600);
     return static_cast<std::int32_t>(std::min<std::uint64_t>(ships, 4));
