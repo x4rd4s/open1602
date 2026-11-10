@@ -12,6 +12,7 @@
 #include "ai_tables.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
 
@@ -433,33 +434,41 @@ void Engine::set_material_lock(AiPlayer& p, City& c, bool on) {
     log(p, "city %u/%u: material %s", c.island, c.index, on ? "locked, goods are missing" : "free again");
 }
 
-void Engine::shed_producers(AiPlayer& p, City& c) {
-    // Open1602: an improved computer deep in debt and still losing gold tears down the producers of
-    // the city whose ware none of its cities needs: no inhabitants that want it, no building of its
-    // own that works it into something wanted, and no building material. A producer switched off
-    // still costs its idle running costs; once torn down it costs nothing. A few at a time.
-    if (!rivals() || p.pirates || player(p).money >= kShedMoney || net_income(p) >= 0) {
-        return;
-    }
-    std::array<bool, 256> needed{};
+Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon) const {
+    // The wares the computer needs: building material and food, what its inhabitants want and
+    // what its own buildings work into such a ware, down the chain, and the weapons while it arms
+    // or is at war. With `soon` also what the next class of each of its cities will want.
+    WareSet needed{};
     const auto& m = m_buildings.materials();
     for (const std::uint8_t w : {m.wood, m.tools, m.bricks, m_buildings.food_ware()}) {
         needed[w] = true;
     }
     const auto& classes = m_buildings.resident_classes();
-    std::vector<const assets::BuildingType*> made;  // the computer's producers, once per type
     for (const City& o : m_world.cities()) {
         if (o.owner != p.player) {
             continue;
         }
+        std::size_t top = 0;
         for (std::size_t k = 0; k < classes.size() && k < o.inhabitants.size(); ++k) {
             if (o.inhabitants[k] != 0) {
+                top = k + 1;
                 for (const assets::ResidentClass::Need& n : classes[k].needs) {
                     needed[n.ware] = true;
                 }
             }
         }
+        if (soon && top != 0 && top < classes.size()) {
+            for (const assets::ResidentClass::Need& n : classes[top].needs) {
+                needed[n.ware] = true;
+            }
+        }
     }
+    if (p.strategy.goal == goal::kMilitary || p.strategy.war_target != kNoPlayer) {
+        for (const std::uint8_t w : {ware::kSwords, ware::kMuskets, m.cannons}) {
+            needed[w] = true;
+        }
+    }
+    std::vector<const assets::BuildingType*> made;  // the computer's producers, once per type
     for (const Production& pr : m_world.productions()) {
         if (!pr.used || pr.island >= m_world.islands().size()) {
             continue;
@@ -475,7 +484,6 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
             made.push_back(b);
         }
     }
-    // What a needed ware is made of is needed too, down the chain.
     for (bool more = true; more;) {
         more = false;
         for (const assets::BuildingType* b : made) {
@@ -485,6 +493,35 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
             }
         }
     }
+    return needed;
+}
+
+bool Engine::saving_costs(const AiPlayer& p) const {
+    // Deep in debt with the gold still falling, or arming with an army that is at its budget.
+    if (!rivals() || p.pirates) {
+        return false;
+    }
+    if (player(p).money < kLeanMoney && net_income(p) < 0) {
+        return true;
+    }
+    const Strategy& st = p.strategy;
+    const std::int32_t upkeep = military_cost(p);
+    return (st.goal == goal::kMilitary || st.war_target != kNoPlayer) && upkeep != 0 &&
+           upkeep + unit_upkeep_estimate(p) > army_budget(p);
+}
+
+void Engine::shed_producers(AiPlayer& p, City& c) {
+    // Open1602: an improved computer deep in debt and still losing gold gets rid of the producers
+    // of the city whose ware none of its cities needs (needed_wares). It weighs switching off
+    // against tearing down as a player does: one whose ware it will want soon (the next class of a
+    // city, weapons at war) only goes off (production_switches); another is torn down where the
+    // idle costs it would still cost and what the game refunds outweigh building it again later
+    // (worth_demolishing, by the game's refund rule), else it stays switched off. A few at a time.
+    if (!rivals() || p.pirates || player(p).money >= kShedMoney || net_income(p) >= 0) {
+        return;
+    }
+    const WareSet soon = needed_wares(p, true);
+    const std::uint32_t refund = m_sim.rules().refund_share();
     const IslandMap& map = island_of(c.island).map;
     std::vector<std::pair<std::int32_t, std::int32_t>> shed;
     for (const Production& pr : m_world.productions()) {
@@ -499,9 +536,12 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
             continue;
         }
         const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
-        if (b == nullptr || b->ware == 0 || needed[b->ware] || b->prod_kind == prod::kMarket ||
+        if (b == nullptr || b->ware == 0 || soon[b->ware] || b->prod_kind == prod::kMarket ||
             b->prod_kind == prod::kKontor || b->prod_kind < prod::kWorkshop || b->prod_kind > prod::kFisher) {
             continue;
+        }
+        if (!worth_demolishing(b->idle_cost, build_value(b->build_cost), refund, true)) {
+            continue;  // cheaper to keep switched off
         }
         shed.emplace_back(pr.x, pr.y);
     }
@@ -527,7 +567,12 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     // Deep in debt an improved computer also saves the running costs of its stores: whatever has
     // 10 t of its ware in stock goes off and stays off until the stock is down to 4 t.
     const bool lean = rivals() && player(p).money < kLeanMoney && net_income(p) < 0;
+    // Saving for its army or in debt it also switches off what none of its cities needs now
+    // (needed_wares), until it can afford them again.
+    const bool saving = saving_costs(p);
+    const WareSet needed = saving ? needed_wares(p, false) : WareSet{};
     std::uint32_t saved = 0;
+    std::uint32_t idled = 0;
     for (std::size_t i = 0; i < m_world.productions().size(); ++i) {
         const Production& pr = m_world.productions()[i];
         if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
@@ -544,7 +589,8 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         }
         const auto index = static_cast<std::uint32_t>(i);
         bool enabled = pr.enabled;
-        const bool hold = lean && c.stock(b->ware) >= 4 * kTon;
+        const bool idle = saving && b->ware != 0 && !needed[b->ware];
+        const bool hold = (lean && c.stock(b->ware) >= 4 * kTon) || idle;
         const auto set = [&](bool on) {
             if (on && hold) {
                 return;
@@ -605,10 +651,17 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         if (lean && enabled && c.stock(w) >= 10 * kTon) {
             set(false);
             ++saved;
+        } else if (idle && enabled) {
+            set(false);
+            ++idled;
         }
     }
     if (saved != 0) {
         log(p, "city %u/%u: switches %u full producers off in debt", c.island, c.index, saved);
+    }
+    if (idled != 0) {
+        log(p, "city %u/%u: switches %u producers off nobody needs now (gold %d, income %d)", c.island, c.index, idled,
+            player(p).money, net_income(p));
     }
     for (const auto& [index, on] : changes) {
         const Production& pr = m_world.productions()[index];
@@ -652,7 +705,8 @@ void Engine::nothing_to_do(AiPlayer& p) {
     }
 }
 
-std::int32_t Engine::net_income(const AiPlayer& p) const {
+std::int32_t Engine::civil_income(const AiPlayer& p) const {
+    // Taxes less the running costs of all own cities, per minute.
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     std::int32_t sum = 0;
     for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
@@ -662,6 +716,41 @@ std::int32_t Engine::net_income(const AiPlayer& p) const {
         }
     }
     return sum;
+}
+
+std::int32_t Engine::military_cost(const AiPlayer& p) const {
+    // What its army costs a minute; nothing for the original's computers (pays_upkeep).
+    if (m_sim.figures() == nullptr) {
+        return 0;
+    }
+    const std::vector<std::uint32_t> upkeep = military_upkeep(m_world, *m_sim.figures());
+    return p.player < upkeep.size() ? static_cast<std::int32_t>(upkeep[p.player]) : 0;
+}
+
+std::int32_t Engine::unit_upkeep_estimate(const AiPlayer& p) const {
+    // What one more soldier costs a minute: the average of its army, else of the unit kinds.
+    const assets::FigureTable* f = m_sim.figures();
+    if (f == nullptr || !pays_upkeep(m_world, player(p))) {
+        return 0;
+    }
+    const auto counts = army_counts(p.player);
+    const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
+    if (units != 0) {
+        return std::max<std::int32_t>(1, military_cost(p) / static_cast<std::int32_t>(units));
+    }
+    std::uint32_t sum = 0;
+    std::uint32_t n = 0;
+    for (std::int32_t k = 0; k < 4; ++k) {
+        if (const std::uint32_t u = f->unit_upkeep(k); u != 0) {
+            sum += u;
+            ++n;
+        }
+    }
+    return n != 0 ? static_cast<std::int32_t>(sum / n) : 0;
+}
+
+std::int32_t Engine::net_income(const AiPlayer& p) const {
+    return civil_income(p) - military_cost(p);
 }
 
 bool Engine::incomes_ok(const AiPlayer& p, std::int32_t minimum) const {

@@ -469,13 +469,22 @@ std::vector<std::uint32_t> military_upkeep(const World& world, const assets::Fig
             upkeep[t.owner] += figures.tower_upkeep();
         }
     }
-    // Computer players pay nothing.
     for (std::size_t p = 0; p < upkeep.size(); ++p) {
-        if (world.players()[p].role != PlayerRole::Human) {
+        if (!pays_upkeep(world, world.players()[p])) {
             upkeep[p] = 0;
         }
     }
     return upkeep;
+}
+
+bool pays_upkeep(const World& world, const Player& player) noexcept {
+    if (player.role == PlayerRole::Human) {
+        return true;
+    }
+    // Open1602: an improved computer pays for its army as a human does, so that it arms only as
+    // far as its economy carries; the original's computers pay nothing.
+    return player.role == PlayerRole::Computer && !world.original_bugs().classic_ai &&
+           world.behaviour(player) == FactionBehaviour::Settlers;
 }
 
 std::int32_t trade_balance(const Player& player) noexcept {

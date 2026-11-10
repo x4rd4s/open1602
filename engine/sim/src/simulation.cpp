@@ -1211,7 +1211,7 @@ void Simulation::houses_step() {
 }
 
 void Simulation::upkeep_step() {
-    // Soldiers' upkeep of human players every 5 s: a twelfth of the upkeep per minute.
+    // Soldiers' upkeep of human players (and improved computers) every 5 s: a twelfth of the upkeep per minute.
     if (elapsed(m_upkeep_ms, kUpkeepPeriodMs)) {
         pay_upkeep();
     }
@@ -1329,9 +1329,9 @@ void Simulation::logistics_step() {
 void Simulation::pay_upkeep() {
     const std::vector<std::uint32_t> upkeep = military_upkeep(*m_world, *m_figures);
     for (std::size_t p = 0; p < upkeep.size(); ++p) {
-        // Computer players pay nothing, as in the original.
+        // The original's computers pay nothing (pays_upkeep).
         Player* player = m_world->player(static_cast<PlayerId>(p));
-        if (player != nullptr && player->role == PlayerRole::Human) {
+        if (player != nullptr && upkeep[p] != 0) {
             player->money = money_plus(player->money, -static_cast<std::int64_t>(upkeep[p] / 12));
         }
     }

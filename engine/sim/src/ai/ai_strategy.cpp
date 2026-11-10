@@ -13,6 +13,7 @@
 #include "ai_engine.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
 
@@ -37,6 +38,13 @@ constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unl
 constexpr std::int32_t kRestructureMoney = -5000;
 constexpr std::int32_t kRestructureSaving = 50;
 constexpr std::uint64_t kRestructurePauseMs = 900'000;
+// The war economy of an improved computer: in peace its army may cost half its civil income; at
+// war or under threat all of it, and besides what its gold above a small reserve pays for an hour.
+// At war it lets its gold fall to this debt before it gives up.
+constexpr std::int32_t kArmyPeaceShare = 50;
+constexpr std::int64_t kWarReserve = 1000;
+constexpr std::int64_t kWarRunwayMinutes = 60;
+constexpr std::int64_t kWarDebt = -2000;
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -232,8 +240,9 @@ void Engine::plan_strategy(AiPlayer& p) {
     for (const CityPlan& r : p.plans) {
         aristocrats_near = aristocrats_near || r.stage >= stage::kMerchants2;
     }
-    // In debt, or losing gold with little left.
-    const bool broke = money < 0 || (net_income(p) < 0 && money < 2000);
+    // In debt, or losing gold with little left. Open1602: a war that gets somewhere, or a threat,
+    // is worth a deficit for a while and a small debt (war_economy).
+    const bool broke = war_economy(p) ? money < kWarDebt : money < 0 || (net_income(p) < 0 && money < 2000);
     war_plan(p, broke);
     alliances(p, st.next_ms - now_ms(), broke);
     if (broke) {
@@ -345,6 +354,40 @@ void Engine::restructure(AiPlayer& p) {
         worst->island, worst->city, -worst_net);
 }
 
+bool Engine::war_economy(const AiPlayer& p) const {
+    // A war of its own that has not failed a look yet, or a stronger enemy nearby (the goal
+    // military without a war plan or arming for one).
+    if (!rivals() || p.pirates || military_cost(p) == 0) {
+        return false;
+    }
+    const Strategy& st = p.strategy;
+    if (st.war_target != kNoPlayer) {
+        return st.war_fails == 0;
+    }
+    return st.goal == goal::kMilitary && !st.war_arming;
+}
+
+std::int32_t Engine::army_budget(const AiPlayer& p) const {
+    const Strategy& st = p.strategy;
+    if (st.war_arming && st.war_target == kNoPlayer) {
+        return arming_budget(p);
+    }
+    const std::int64_t civil = std::max<std::int32_t>(0, civil_income(p));
+    if (st.war_target == kNoPlayer && st.goal != goal::kMilitary) {
+        return static_cast<std::int32_t>(civil * kArmyPeaceShare / 100);
+    }
+    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kWarRunwayMinutes;
+    return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
+}
+
+std::int32_t Engine::arming_budget(const AiPlayer& p) const {
+    // Arming for a war of its own: its civil income and half of what its gold carries, as the war
+    // is not won yet.
+    const std::int64_t civil = std::max<std::int32_t>(0, civil_income(p));
+    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kWarRunwayMinutes / 2;
+    return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
+}
+
 std::uint32_t Engine::war_measure(PlayerId target) const {
     // What a war takes from its target: its inhabitants, and a city counts as fifty more.
     return total_population(target) + 50U * own_city_count(target);
@@ -452,6 +495,13 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     const auto counts = army_counts(p.player);
     const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
     if (units < bal.ai_war_units || player(p).money < static_cast<std::int64_t>(bal.ai_war_money)) {
+        // Open1602: only if its economy carries the army it needs, with the gold it may spend on it.
+        if (pays_upkeep(m_world, player(p))) {
+            const std::int64_t per_unit = unit_upkeep_estimate(p);
+            if (per_unit * std::max<std::uint32_t>(units, bal.ai_war_units) > arming_budget(p)) {
+                return;
+            }
+        }
         st.war_arming = true;
         return;
     }

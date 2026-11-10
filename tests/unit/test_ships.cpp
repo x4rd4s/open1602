@@ -12,6 +12,7 @@
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/diplomacy.hpp"
+#include "o1602/sim/mission.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/sea_paths.hpp"
 #include "o1602/sim/ships.hpp"
@@ -1603,4 +1604,17 @@ TEST_CASE("ships: the goods exchange starts at the fullest hold, an empty ship a
     ship.cargo[holds] = sim::CargoSlot{kWood, 50 * kTon, 0};
     ship.cargo[1] = sim::CargoSlot{0, 60 * kTon, 0};
     CHECK(sim::fullest_hold(ship, sea.figures) == 2);
+}
+
+TEST_CASE("military upkeep: humans and the improved computers pay it, the original's computers do not") {
+    Sea sea;
+    const auto& players = sea.world.players();
+    CHECK(sim::pays_upkeep(sea.world, players[0]));   // human
+    CHECK(sim::pays_upkeep(sea.world, players[1]));   // improved computer
+    CHECK(!sim::pays_upkeep(sea.world, players[4]));  // the free trader
+    sim::OriginalBugs bugs = sea.world.original_bugs();
+    bugs.classic_ai = true;
+    sea.world.set_original_bugs(bugs);
+    CHECK(sim::pays_upkeep(sea.world, players[0]));
+    CHECK(!sim::pays_upkeep(sea.world, players[1]));  // as in the original
 }
