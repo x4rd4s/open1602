@@ -412,7 +412,12 @@ private:
     [[nodiscard]] std::uint32_t processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const;
     /// Open1602: a food producer for a city that makes too little food (food_short), on its own
     /// island before anything else of its order: true if one was planned.
-    bool more_food(AiPlayer& p, const City& c, const CityPlan& r);
+    /// `ahead`: also for a city not yet short, which is to grow.
+    bool more_food(AiPlayer& p, const City& c, const CityPlan& r, bool ahead = false);
+    /// Open1602: whether a city's own food comes in with a quarter to spare.
+    [[nodiscard]] bool food_ahead(const City& c) const;
+    /// Open1602: food_ahead, and the city's cloth comes in or lasts.
+    [[nodiscard]] bool supplies_growth(const City& c) const;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.

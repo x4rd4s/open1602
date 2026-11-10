@@ -917,15 +917,21 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
             case StageNeed::Kind::Market:
                 found = need_market(p, n.n);
                 break;
-            case StageNeed::Kind::Houses:
-                // Open1602: the home city of an improved computer that earns gold grows its houses
-                // with its land at once (houses_wanted): more inhabitants pay more taxes. Before, it
-                // did so only with nothing else left to do, and stood at the list's number for hours.
-                {
-                    const bool home = rivals() && &c == home_city(p) && earned_income(p) > 0 && !food_short(c);
-                    found = need_houses(p, grow || home ? houses_wanted(c, r, n.n, home) : n.n);
+            case StageNeed::Kind::Houses: {
+                // Open1602: the home city of an improved computer that earns gold, from its
+                // cities too, grows its houses with its land at once (houses_wanted): more
+                // inhabitants pay more taxes. Its food grows ahead of them, and it stops while
+                // its supply does not carry more.
+                const bool earns =
+                    rivals() && &c == home_city(p) && earned_income(p) > 0 && civil_income(p) > 0 && !food_short(c);
+                const bool home = earns && supplies_growth(c);
+                if (earns && !food_ahead(c) && houses_wanted(c, r, n.n, true) > r.slots[kSlotHouses].count &&
+                    more_food(p, c, r, true)) {
+                    found = true;
+                    break;
                 }
-                break;
+                found = need_houses(p, grow || home ? houses_wanted(c, r, n.n, home) : n.n);
+            } break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, count(n.n), holds(n.flag));
                 break;
@@ -1649,8 +1655,23 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
     return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? full / 2 : sum / n, 0xFFFFFFFFU));
 }
 
-bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
-    if (classic() || population(c) == 0 || !food_short(c)) {
+bool Engine::food_ahead(const City& c) const {
+    const std::uint8_t food = m_buildings.food_ware();
+    return std::uint64_t{supply(c, food)} * 4 >= std::uint64_t{demand(c, food)} * 5;
+}
+
+bool Engine::supplies_growth(const City& c) const {
+    // A stock alone fills new houses that starve once it is eaten: the home city grows beyond its
+    // order only while its own food comes in with a quarter to spare and its cloth comes in or lasts.
+    if (!food_ahead(c)) {
+        return false;
+    }
+    const std::uint32_t cloth = demand(c, ware::kCloth);
+    return cloth == 0 || supply(c, ware::kCloth) >= cloth || food_lasts(c.stock(ware::kCloth), cloth);
+}
+
+bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r, bool ahead) {
+    if (classic() || population(c) == 0 || (!ahead && !food_short(c))) {
         return false;
     }
     const std::vector<ComputerProducer>& changes = m_world.balance().computer_producers;
@@ -1722,7 +1743,8 @@ bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
         const std::size_t before = p.stack.size();
         (void)need(p, w.slot, std::uint32_t{r.slots[w.slot].count} + 1);
         if (p.stack.size() > before) {
-            log(p, "city %u/%u: short of food, slot %u (%llu/min for %llu gold)", r.island, r.city, w.slot,
+            log(p, "city %u/%u: %s, slot %u (%llu/min for %llu gold)", r.island, r.city,
+                ahead && !food_short(c) ? "food ahead of new houses" : "short of food", w.slot,
                 static_cast<unsigned long long>(w.food), static_cast<unsigned long long>(w.cost));
             // A way whose building failed already does not hold up the stage's list as well: the
             // city goes on with it while the food producer is tried again.
