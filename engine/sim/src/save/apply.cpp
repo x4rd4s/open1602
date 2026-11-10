@@ -274,6 +274,27 @@ annokit::core::Status apply_decoded(World& world, Decoded& d) {
                                                 island.header.number) != d.random_fertility->end();
         }
     }
+    if (d.claimed) {
+        for (const Decoded::ClaimedIsland& c : *d.claimed) {
+            for (std::size_t i = 0; i < world.islands().size(); ++i) {
+                WorldIsland& island = world.island(i);
+                if (island.header.number != c.number) {
+                    continue;
+                }
+                const std::uint32_t w = island.map.width();
+                const std::uint32_t h = island.map.height();
+                for (const Decoded::ClaimedTile& t : c.tiles) {
+                    if (t.x >= w || t.y >= h || t.city >= kCitySlotsPerIsland) {
+                        continue;  // a damaged file: the tile stays unclaimed
+                    }
+                    if (island.claimed.empty()) {
+                        island.claimed.assign(std::size_t{w} * h, MapCell::kNoCity);
+                    }
+                    island.claimed[std::size_t{t.y} * w + t.x] = t.city;
+                }
+            }
+        }
+    }
     if (d.blueprints) {
         world.blueprints() = std::move(d.blueprints->blueprints);
         world.blueprint_auto() = std::move(d.blueprints->autos);

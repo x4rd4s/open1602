@@ -446,24 +446,26 @@ void Fleet::spawn_trader() {
     if (trader == kNoPlayer || type == nullptr) {
         return;
     }
-    // A random tile of the map edge; Open1602 makes sure it is water.
-    if (const std::optional<std::pair<std::int32_t, std::int32_t>> at = edge_water()) {
-        const auto [x, y] = *at;
-        Ship s;
-        s.name = next_ship_name();
-        s.place(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
-        s.figure = figure::kTrader;
-        s.owner = trader;
-        s.health = type->ship.max_health;
-        s.cargo.resize(std::max<std::size_t>(1, type->ship.cargo_slots));
-        s.trader = true;
-        s.trader_goods.resize(m_world->goods().end());
-        m_world->add_ship(std::move(s));
-        m_events.push_back(ShipEvent{ShipEvent::Kind::TraderArrived, m_world->ships().back().id, trader});
+    const auto at = edge_water();
+    if (!at) {
+        return;
     }
+    const auto [x, y] = *at;
+    Ship s;
+    s.name = next_ship_name();
+    s.place(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    s.figure = figure::kTrader;
+    s.owner = trader;
+    s.health = type->ship.max_health;
+    s.cargo.resize(std::max<std::size_t>(1, type->ship.cargo_slots));
+    s.trader = true;
+    s.trader_goods.resize(m_world->goods().end());
+    m_world->add_ship(std::move(s));
+    m_events.push_back(ShipEvent{ShipEvent::Kind::TraderArrived, m_world->ships().back().id, trader});
 }
 
 std::optional<std::pair<std::int32_t, std::int32_t>> Fleet::edge_water() {
+    // A random tile of the map edge; Open1602 makes sure it is water.
     Random& random = m_world->random(RandomStream::Ships);
     const auto w = static_cast<std::int32_t>(m_world->width());
     const auto h = static_cast<std::int32_t>(m_world->height());
@@ -490,10 +492,40 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Fleet::edge_water() {
                 break;
         }
         if (m_sea.sailable(x, y)) {
-            return std::pair{x, y};
+            return std::pair<std::int32_t, std::int32_t>{x, y};
         }
     }
-    return std::nullopt;
+    // Open1602: a map whose edge is mostly land (the editor's land beyond the map); a map whose
+    // edge is all water never comes here, so its draws stay the same.
+    const std::vector<std::pair<std::int32_t, std::int32_t>> water = sailable_edge();
+    if (water.empty()) {
+        return std::nullopt;
+    }
+    return water[random.below(static_cast<std::uint32_t>(water.size()))];
+}
+
+std::vector<std::pair<std::int32_t, std::int32_t>> Fleet::sailable_edge() const {
+    const auto w = static_cast<std::int32_t>(m_world->width());
+    const auto h = static_cast<std::int32_t>(m_world->height());
+    std::vector<std::pair<std::int32_t, std::int32_t>> out;
+    const auto add = [&](std::int32_t x, std::int32_t y) {
+        if (m_sea.sailable(x, y)) {
+            out.emplace_back(x, y);
+        }
+    };
+    for (std::int32_t x = 0; x < w; ++x) {
+        add(x, 0);
+        if (h > 1) {
+            add(x, h - 1);
+        }
+    }
+    for (std::int32_t y = 1; y + 1 < h; ++y) {
+        add(0, y);
+        if (w > 1) {
+            add(w - 1, y);
+        }
+    }
+    return out;
 }
 
 void Fleet::trader_tick(std::uint32_t dt_ms) {

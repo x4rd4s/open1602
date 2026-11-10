@@ -453,6 +453,12 @@ void MapViewer::editor_object_model(EditorModel& m) const {
         const BuildTemplate* t = editor_template();
         m.object_name = t != nullptr ? t->name : std::string();
     }
+    if (tool == Tool::Territory) {
+        const std::size_t side = editor::kBrushSizes[std::min(m.objects.brush, editor::kBrushSizes.size() - 1)];
+        m.object_pieces = editor::kBrushSizes.size();
+        m.object_turns = false;
+        m.object_name = ui::tr("editor.objects.brush_size", {std::to_string(side)});
+    }
     if (tool == Tool::Resource) {
         m.object_pieces = editor::kResources;
         m.object_turns = false;
@@ -635,15 +641,92 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
     for (const std::uint8_t ware : world.goods().trade_wares()) {
         ship.wares.push_back(EditorGood{ware, ware_name(ware), 0});
     }
+    // The route: its stops by the cities it can go to, their wares.
+    ship.cart = s->cart();
+    const std::vector<sim::Target> targets = editor_route_targets(*s);
+    ship.route_targets.push_back(ui::tr("editor.ship.route_none"));
+    for (const sim::Target& t : targets) {
+        const sim::City* c = world.city(t.island, t.city);
+        ship.route_targets.push_back(c != nullptr ? c->name : std::string());
+    }
+    const std::size_t stops = s->cart() ? sim::kCartStops : sim::TradeRoute::kStops;
+    const std::size_t entries = std::min(sim::usable_route_entries(*s, m_figures), sim::RouteStop::kEntries);
+    for (std::size_t i = 0; i < stops; ++i) {
+        const sim::RouteStop& from = s->route.stops[i];
+        EditorRouteStop stop;
+        const auto at = std::find(targets.begin(), targets.end(), from.target);
+        stop.target = at == targets.end() ? 0 : static_cast<std::size_t>(at - targets.begin()) + 1;
+        for (std::size_t e = 0; e < entries; ++e) {
+            const sim::RouteEntry& v = from.entries[e];
+            stop.entries.push_back(
+                EditorRouteEntry{v.ware, v.ware != 0 ? ware_name(v.ware) : std::string(), v.unload, v.amount});
+        }
+        ship.stops.push_back(std::move(stop));
+    }
+    ship.route_active = s->route.active;
     m.ship = std::move(ship);
+}
+
+std::vector<sim::Target> MapViewer::editor_route_targets(const sim::Ship& ship) const {
+    // A ship's: every city with a Kontor; a cart's: those of its island, as the game's route window.
+    const sim::World& world = m_editor->document.world();
+    std::optional<std::uint16_t> island;
+    if (ship.cart()) {
+        if (!world.contains(ship.x, ship.y) || world.cell(ship.x, ship.y).island == sim::World::kSea) {
+            return {};
+        }
+        island = world.cell(ship.x, ship.y).island;
+    }
+    std::vector<sim::Target> out;
+    for (const sim::City& c : world.cities()) {
+        if (c.warehouse_x && c.warehouse_y && (!island || c.island == *island)) {
+            out.push_back(sim::Target::city_of(c.island, c.index));
+        }
+    }
+    return out;
 }
 
 void MapViewer::editor_ship_request(const EditorRequest& request) {
     if (m_editor->pick.kind != EditorPick::Kind::Ship) {
         return;
     }
-    auto op = editor::set_ship_cargo(m_editor->document.world(), m_editor->pick.id, request.index, request.ware,
-                                     request.amount);
+    const sim::World& world = m_editor->document.world();
+    if (request.kind == EditorRequest::Kind::ShipRoute) {
+        const sim::Ship* s = world.ship(m_editor->pick.id);
+        if (s == nullptr) {
+            return;
+        }
+        using What = EditorRequest::Route::What;
+        const EditorRequest::Route& r = request.route;
+        sim::RouteEdit e;
+        e.stop = static_cast<std::uint8_t>(std::min<std::size_t>(r.stop, sim::TradeRoute::kStops - 1));
+        if (r.what == What::Active) {
+            e.op = r.on ? sim::RouteEdit::Op::Start : sim::RouteEdit::Op::Stop;
+        } else if (r.what == What::Target) {
+            const std::vector<sim::Target> targets = editor_route_targets(*s);
+            if (r.target == 0 || r.target > targets.size()) {
+                e.op = sim::RouteEdit::Op::ClearStop;
+            } else {
+                e.op = sim::RouteEdit::Op::SetStop;
+                e.target = targets[r.target - 1];
+            }
+        } else {
+            e.op = sim::RouteEdit::Op::SetEntry;
+            e.entry = static_cast<std::uint8_t>(std::min<std::size_t>(r.entry, sim::RouteStop::kEntries - 1));
+            e.value = sim::RouteEntry{r.value.ware, r.value.unload, r.value.ware != 0 ? r.value.amount : 0U};
+        }
+        auto op = editor::edit_route(world, m_buildings, m_figures, m_editor->pick.id, e);
+        if (!op) {
+            const bool no_way = op.error().code == annokit::core::ErrorCode::OutOfRange;
+            editor_notice(ui::tr(no_way ? "editor.ship.route_no_way" : "editor.ship.route_refused"), true,
+                          op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        m_editor->notice.clear();
+        return;
+    }
+    auto op = editor::set_ship_cargo(world, m_editor->pick.id, request.index, request.ware, request.amount);
     if (!op) {
         editor_notice(op.error().message, true, op.error().message);
         return;
@@ -894,6 +977,57 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
     return order;
 }
 
+std::optional<EditorObjects> MapViewer::editor_object_at(std::uint32_t x, std::uint32_t y) const {
+    const sim::World& world = m_state->world;
+    if (!m_editor || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(x, y);
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    const auto at = sim::building_at(world, m_buildings, c.island,
+                                     {static_cast<std::int32_t>(c.local_x), static_cast<std::int32_t>(c.local_y)});
+    if (!at || at->type == nullptr) {
+        return std::nullopt;
+    }
+    // A house in another look is the house of its class; a field the field of its crop.
+    std::vector<std::uint32_t> ids{at->type->id};
+    if (at->type->prod_kind == assets::prod::kHouse) {
+        if (const assets::BuildingType* first = m_buildings.first_house(at->type->resident_class)) {
+            ids.push_back(first->id);
+        }
+    }
+    for (const assets::BuildingType* other :
+         {sim::ripe_record(m_buildings, *at->type), sim::growing_record(m_buildings, *at->type)}) {
+        if (other != nullptr) {
+            ids.push_back(other->id);
+        }
+    }
+    const auto groups = object_groups();
+    for (std::size_t g = 0; g < groups.size(); ++g) {
+        const ui::BuildCategory& cat = editor_group(*groups[g], m_buildings);
+        for (const std::uint32_t id : ids) {
+            const auto index = cat.index_of(id);
+            if (!index) {
+                continue;
+            }
+            EditorObjects o = m_editor->objects;
+            o.tool = EditorObjects::Tool::Build;
+            o.group = g;
+            o.piece = *index;
+            const sim::MapCell& cell = world.islands()[c.island].map.top(c.local_x, c.local_y);
+            o.rotation = static_cast<std::uint8_t>(cell.rotation & 3U);
+            const auto owners = object_owners(world);
+            if (const auto it = std::find(owners.begin(), owners.end(), cell.owner); it != owners.end()) {
+                o.owner = static_cast<std::size_t>(it - owners.begin());
+            }
+            return o;
+        }
+    }
+    return std::nullopt;
+}
+
 void MapViewer::editor_object_ghost(
     const std::function<void(std::uint16_t island, std::uint32_t x, std::uint32_t y)>& keep) {
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
@@ -996,6 +1130,12 @@ bool MapViewer::editor_objects_stroke(std::optional<render::TilePos> tile, Strok
                 editor_remove_object(*tile);
                 return true;
             }
+            if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+                m_editor->object_at = {tile->x, tile->y};
+                m_editor->object_drag = true;
+                editor_claim(tile->x, tile->y, true);
+                return true;
+            }
             if (m_editor->objects.tool == EditorObjects::Tool::Resource) {
                 editor_place_resource(*tile);
                 return true;
@@ -1020,6 +1160,17 @@ bool MapViewer::editor_objects_stroke(std::optional<render::TilePos> tile, Strok
         case Stroke::Continue: {
             if (!m_editor->object_drag || !tile || !m_editor->object_at) {
                 return m_editor->object_drag;
+            }
+            if (m_editor->objects.tool == EditorObjects::Tool::Territory) {
+                // The brush along the way, a tile at a time.
+                const auto [lx, ly] = *m_editor->object_at;
+                for (const auto& [px, py] : editor::line_tiles(lx, ly, tile->x, tile->y)) {
+                    if (px != lx || py != ly) {
+                        editor_claim(px, py, false);
+                    }
+                }
+                m_editor->object_at = {tile->x, tile->y};
+                return true;
             }
             const assets::BuildingType* b = editor_object_piece();
             if (b == nullptr) {
@@ -1275,11 +1426,15 @@ void MapViewer::editor_end_objects() {
     if (m_editor->object_steps.empty()) {
         return;
     }
-    editor_remember_object();
+    const bool territory = m_editor->objects.tool == EditorObjects::Tool::Territory;
+    if (!territory) {
+        editor_remember_object();  // a brush is no object to place again
+    }
     if (m_editor->object_steps.size() == 1) {
         m_editor->document.record(std::move(m_editor->object_steps.front()));
     } else {
-        m_editor->document.record(std::make_unique<editor::Steps>(std::move(m_editor->object_steps), "building_place"));
+        m_editor->document.record(std::make_unique<editor::Steps>(std::move(m_editor->object_steps),
+                                                                  territory ? "territory" : "building_place"));
     }
     m_editor->object_steps.clear();
     m_editor->notice.clear();
@@ -1319,6 +1474,57 @@ void MapViewer::editor_remember_object() {
     }
 }
 
+std::optional<std::pair<std::uint16_t, std::uint8_t>> MapViewer::editor_claim_city(std::int64_t x,
+                                                                                   std::int64_t y) const {
+    const sim::World& world = m_state->world;
+    const sim::PlayerId owner = editor_object_owner();
+    if (owner == sim::kNoPlayer || x < 0 || y < 0 || x >= world.width() || y >= world.height()) {
+        return std::nullopt;
+    }
+    const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    if (c.island == sim::World::kSea) {
+        return std::nullopt;
+    }
+    // A player has one city on an island (editor::refuse_second_city).
+    for (const sim::City& city : world.cities()) {
+        if (city.island == c.island && city.owner == owner) {
+            return std::pair<std::uint16_t, std::uint8_t>{c.island, city.index};
+        }
+    }
+    return std::nullopt;
+}
+
+void MapViewer::editor_claim(std::int64_t x, std::int64_t y, bool tell) {
+    sim::World& world = m_state->world;
+    const auto city = editor_claim_city(x, y);
+    if (!city) {
+        if (tell) {
+            editor_notice(ui::tr(object_owners(world).empty() ? "editor.objects.note.no_players"
+                                                              : "editor.objects.refused.territory"),
+                          true, "no city to give land to");
+        }
+        return;
+    }
+    const auto [island, index] = *city;
+    const std::uint32_t side = editor::kBrushSizes[std::min(m_editor->objects.brush, editor::kBrushSizes.size() - 1)];
+    const auto shape = static_cast<editor::BrushShape>(m_editor->terrain.shape % editor::kBrushShapes);
+    // The brush's tiles on this island, by the island's own coordinates.
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> tiles;
+    for (const auto& [wx, wy] : editor::brush_tiles(x, y, side, world.width(), world.height(), shape)) {
+        const sim::World::Cell& c = world.cell(wx, wy);
+        if (c.island == island) {
+            tiles.emplace_back(c.local_x, c.local_y);
+        }
+    }
+    auto op = editor::claim_land(world, m_buildings, island, index, tiles, m_editor->claim_take);
+    if (!op) {
+        return;  // nothing to give or take there: no note at every tile of a drag
+    }
+    (*op)->apply(world);
+    m_editor->object_steps.push_back(std::move(op).value());
+    m_editor->notice.clear();
+}
+
 std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) const {
     const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
     if (!m_editor || panel == nullptr || panel->page() != EditorPanel::Page::Objects || m_editor->placing ||
@@ -1350,6 +1556,12 @@ std::string MapViewer::editor_hover_refusal(std::int64_t x, std::int64_t y) cons
             return ui::tr("editor.objects.note.no_players");
         }
         return editor_figure_refusal(editor_figure_fits(x, y));
+    }
+    if (tool == Tool::Territory) {
+        if (object_owners(world).empty()) {
+            return ui::tr("editor.objects.note.no_players");
+        }
+        return editor_claim_city(x, y) ? std::string() : ui::tr("editor.objects.refused.territory");
     }
     if (tool == Tool::Resource) {
         const sim::World::Cell& c = world.cell(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));

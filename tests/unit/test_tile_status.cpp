@@ -125,12 +125,17 @@ TEST_CASE("tile status: an island of a package's climate names it and the crops 
     i.island.climate = 1;
     CHECK(app::tile_status(i.island, 3, 0, kMe, i.buildings, i.texts, climates) ==
           "Tundra - Geeignet für: Tabak: 50% - Zuckerrohr: 100% - Kakao: 50%");
-    // A climate of one crop.
+    // A climate of one crop; the sugar cane the island's own fertility gives it besides follows.
     std::vector<sim::Climate> one = climates;
     one[0].crops = 1U << (47 - 45);  // spices
-    CHECK(app::tile_status(i.island, 3, 0, kMe, i.buildings, i.texts, one) == "Tundra - Geeignet für: Gewürze: 50%");
+    CHECK(app::tile_status(i.island, 3, 0, kMe, i.buildings, i.texts, one) ==
+          "Tundra - Geeignet für: Gewürze: 50% - Zuckerrohr: 100%");
     // Without the climates the island shows the original's of its header.
     CHECK(i.at(3) == "Geeignet für: Tabak: 50% - Weintrauben: 50% - Zuckerrohr: 100%");
+    // A northern island the editor gave spices as well: they follow its climate's three.
+    i.island.climate = 0;
+    i.island.header.fertility |= 1U << (47 - 45);
+    CHECK(i.at(3) == "Geeignet für: Tabak: 50% - Weintrauben: 50% - Zuckerrohr: 100% - Gewürze: 100%");
 }
 
 TEST_CASE("tile status: an undiscovered island shows its terrain, not its buildings") {

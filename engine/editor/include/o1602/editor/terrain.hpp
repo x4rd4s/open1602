@@ -156,6 +156,11 @@ public:
     /// and nothing changed, if a coast would take a form without tiles (Refusal::Shape).
     bool paste(std::uint16_t island, std::int64_t x, std::int64_t y, const TerrainClip& clip, std::uint64_t seed,
                bool with_water = false);
+    /// Open1602: land may reach the world map's edge (where the island touches it), without beach
+    /// or surf there: the land runs on beyond the map, a continent of which the map shows the coast.
+    /// Off, land keeps a tile of water to the island's edge as before. Either way the coast takes
+    /// what lies beyond the map's edge as the tile at the edge: land at the edge runs on, water too.
+    void set_open_edge(bool on) noexcept { m_open_edge = on; }
     /// Keeps `refusal` as the first one met, unless one was met before (a tool that found nothing to paint).
     void note(Refusal refusal) noexcept;
     /// The first refusal met, for the tools' note (Free if none).
@@ -187,7 +192,8 @@ private:
     const assets::BuildingTable* m_buildings;
     TileEditBuilder m_builder;
     bool m_changed = false;
-    bool m_shaping = false;  ///< shape() lays the coast: any level on any other
+    bool m_shaping = false;    ///< shape() lays the coast: any level on any other
+    bool m_open_edge = false;  ///< set_open_edge()
     std::vector<TerrainEdit::Features> m_features;
     /// Island tiles with a ship or a land unit, by island (made when first asked).
     std::vector<std::optional<std::unordered_set<std::uint64_t>>> m_units;

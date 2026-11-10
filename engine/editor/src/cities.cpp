@@ -6,6 +6,8 @@
 #include <utility>
 
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/terrain.hpp"
+#include "o1602/sim/construction.hpp"
 #include "o1602/sim/logistics.hpp"
 
 namespace o1602::editor {
@@ -24,7 +26,114 @@ std::unique_ptr<Operation> edit(sim::World after, const char* name) {
     return std::make_unique<WorldEdit>(std::move(after), name);
 }
 
+/// Tiles given to a city or taken back (claim_land): each tile's claim and city before and after.
+class ClaimEdit final : public Operation {
+public:
+    struct Change {
+        std::uint16_t x = 0;
+        std::uint16_t y = 0;
+        std::uint8_t claimed_before = sim::MapCell::kNoCity;
+        std::uint8_t claimed_after = sim::MapCell::kNoCity;
+        std::uint8_t city_before = sim::MapCell::kNoCity;
+        std::uint8_t city_after = sim::MapCell::kNoCity;
+        sim::PlayerId owner_before = sim::kNoPlayer;
+        sim::PlayerId owner_after = sim::kNoPlayer;
+    };
+    ClaimEdit(std::uint16_t island, std::vector<Change> changes) noexcept
+        : m_island(island), m_changes(std::move(changes)) {}
+
+    void apply(sim::World& world) override { set(world, true); }
+    void revert(sim::World& world) override { set(world, false); }
+    [[nodiscard]] std::size_t memory() const noexcept override {
+        return sizeof(*this) + m_changes.capacity() * sizeof(Change);
+    }
+    [[nodiscard]] std::string_view kind() const noexcept override { return "territory"; }
+
+private:
+    void set(sim::World& world, bool after) {
+        sim::WorldIsland& isl = world.island(m_island);
+        const std::size_t size = std::size_t{isl.map.width()} * isl.map.height();
+        if (isl.claimed.size() != size) {
+            isl.claimed.assign(size, sim::MapCell::kNoCity);
+        }
+        for (const Change& c : m_changes) {
+            isl.claimed[std::size_t{c.y} * isl.map.width() + c.x] = after ? c.claimed_after : c.claimed_before;
+            isl.map.set_city(c.x, c.y, after ? c.city_after : c.city_before, after ? c.owner_after : c.owner_before);
+        }
+        // An island without any claim keeps none.
+        if (std::all_of(isl.claimed.begin(), isl.claimed.end(),
+                        [](std::uint8_t v) { return v == sim::MapCell::kNoCity; })) {
+            isl.claimed.clear();
+        }
+    }
+    std::uint16_t m_island;
+    std::vector<Change> m_changes;
+};
+
 }  // namespace
+
+annokit::core::Result<std::unique_ptr<Operation>> claim_land(
+    const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island, std::uint8_t city,
+    const std::vector<std::pair<std::uint32_t, std::uint32_t>>& tiles, bool take) {
+    const sim::City* c = world.city(island, city);
+    if (c == nullptr || city >= sim::kCitySlotsPerIsland) {
+        return no_city(island, city);
+    }
+    const sim::WorldIsland& isl = world.islands()[island];
+    const sim::IslandMap& map = isl.map;
+    const std::vector<sim::CityMask> covered =
+        take ? sim::building_coverage(world, buildings, island) : std::vector<sim::CityMask>{};
+    std::vector<ClaimEdit::Change> changes;
+    std::vector<bool> seen(std::size_t{map.width()} * map.height(), false);
+    for (const auto& [x, y] : tiles) {
+        if (x >= map.width() || y >= map.height()) {
+            continue;
+        }
+        const std::size_t i = std::size_t{y} * map.width() + x;
+        if (seen[i]) {
+            continue;
+        }
+        seen[i] = true;
+        const sim::MapCell& top = map.top(x, y);
+        const assets::BuildingType* b = top.empty() ? nullptr : buildings.by_sprite(top.sprite);
+        if (b == nullptr || terrain_level(*b) == 0) {
+            continue;  // never the sea or the surf
+        }
+        ClaimEdit::Change ch{static_cast<std::uint16_t>(x),
+                             static_cast<std::uint16_t>(y),
+                             isl.claimed_city(x, y),
+                             isl.claimed_city(x, y),
+                             top.city,
+                             top.city,
+                             top.owner,
+                             top.owner};
+        if (!take) {
+            if ((top.city != sim::MapCell::kNoCity && top.city != city) || ch.claimed_before == city) {
+                continue;  // another city's land, or given already
+            }
+            ch.claimed_after = city;
+            ch.city_after = city;
+            ch.owner_after = c->owner;
+        } else {
+            if (ch.claimed_before != city) {
+                continue;
+            }
+            ch.claimed_after = sim::MapCell::kNoCity;
+            // Still the city's where its buildings claim it, or where one of them stands.
+            const bool held = (covered[i] >> city & 1U) != 0;
+            const bool built = !is_terrain(buildings, *b) && b->kind != assets::kind::kRuin;
+            if (!held && !built) {
+                ch.city_after = sim::MapCell::kNoCity;
+                ch.owner_after = sim::kNoPlayer;
+            }
+        }
+        changes.push_back(ch);
+    }
+    if (changes.empty()) {
+        return make_error(ErrorCode::Unsupported, "no tile changes");
+    }
+    return std::unique_ptr<Operation>(std::make_unique<ClaimEdit>(island, std::move(changes)));
+}
 
 annokit::core::Result<std::unique_ptr<Operation>> rename_city(const sim::World& world, std::uint16_t island,
                                                               std::uint8_t city, std::string_view name) {

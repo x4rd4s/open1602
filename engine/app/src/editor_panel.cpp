@@ -88,6 +88,7 @@ constexpr Id kTerrainBigger = 79;       ///< the brush a size bigger
 constexpr Id kTerrainShape = 173;       ///< the brush's shape
 constexpr Id kTerrainSlider = 174;      ///< the brush's size slid
 constexpr Id kTerrainPasteWater = 175;  ///< whether a paste lays the copy's water too
+constexpr Id kTerrainOpenEdge = 1120;   ///< Land: up to the map's edge without a coast, or not
 constexpr Id kCityTradePage = 188;
 constexpr Id kTradeSell = 176;   ///< the ware sold, or no longer
 constexpr Id kTradeBuy = 177;    ///< the ware bought, or no longer
@@ -181,14 +182,23 @@ constexpr Id kSoundTest = 298;
 constexpr Id kRandomFertility = 299;  ///< the selected island's crops rolled at the start, or not
 /// A click on "-" or "+" beside a volume: a twentieth of the slider.
 constexpr std::uint32_t kVolumeStep = EditorModel::kVolumeRange / 20;
-constexpr Id kCheckLine = 800;         ///< + the line of the check list (a line that leads somewhere)
-constexpr Id kRecent = 190;            ///< + the object placed lately (the page "Objects")
-constexpr Id kShipCargoPage = 1000;    ///< the selected ship's holds
-constexpr Id kFirstHoldWare = 1010;    ///< + the hold on the page "Cargo": its ware
-constexpr Id kFirstHoldLess = 1030;    ///< + the hold: fewer tons
-constexpr Id kFirstHoldMore = 1050;    ///< + the hold: more tons
-constexpr std::size_t kHoldRows = 20;  ///< holds the page "Cargo" shows at most
-constexpr Id kPlayerTable = 300;       ///< + 8 * the row + the column of the players' table
+constexpr Id kCheckLine = 800;            ///< + the line of the check list (a line that leads somewhere)
+constexpr Id kRecent = 190;               ///< + the object placed lately (the page "Objects")
+constexpr Id kShipCargoPage = 1000;       ///< the selected ship's holds
+constexpr Id kFirstHoldWare = 1010;       ///< + the hold on the page "Cargo": its ware
+constexpr Id kFirstHoldLess = 1030;       ///< + the hold: fewer tons
+constexpr Id kFirstHoldMore = 1050;       ///< + the hold: more tons
+constexpr std::size_t kHoldRows = 20;     ///< holds the page "Cargo" shows at most
+constexpr Id kShipRoutePage = 1070;       ///< the selected ship's trade route
+constexpr Id kRouteActive = 1071;         ///< the route runs from the start, or not
+constexpr Id kRouteStop = 1072;           ///< the stop the page "Route" shows
+constexpr Id kRouteTarget = 1073;         ///< the stop's city
+constexpr Id kFirstRouteWare = 1080;      ///< + the entry of the stop: its ware
+constexpr Id kFirstRouteMode = 1090;      ///< + the entry: loads or unloads
+constexpr Id kFirstRouteLess = 1100;      ///< + the entry: fewer tons
+constexpr Id kFirstRouteMore = 1110;      ///< + the entry: more tons
+constexpr std::size_t kRouteEntries = 8;  ///< entries of a stop the page shows at most
+constexpr Id kPlayerTable = 300;          ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
@@ -254,14 +264,15 @@ constexpr std::array<const char*, 4> kTerrainRotationTexts = {"editor.terrain.ro
                                                               "editor.terrain.rotation.2", "editor.terrain.rotation.3"};
 
 constexpr std::array<const char*, EditorObjects::kTools> kObjectToolTitles = {
-    "editor.tool.build", "editor.tool.template", "editor.tool.ship",
-    "editor.tool.unit",  "editor.tool.resource", "editor.tool.remove"};
+    "editor.tool.build",    "editor.tool.template", "editor.tool.ship",     "editor.tool.unit",
+    "editor.tool.resource", "editor.tool.remove",   "editor.tool.territory"};
 constexpr std::array<const char*, EditorObjects::kTools> kObjectToolNotes = {
-    "editor.objects.note.build", "editor.objects.note.template", "editor.objects.note.ship",
-    "editor.objects.note.unit",  "editor.objects.note.resource", "editor.objects.note.remove"};
+    "editor.objects.note.build",    "editor.objects.note.template", "editor.objects.note.ship",
+    "editor.objects.note.unit",     "editor.objects.note.resource", "editor.objects.note.remove",
+    "editor.objects.note.territory"};
 constexpr std::array<const char*, EditorObjects::kTools> kObjectPieceLabels = {
-    "editor.objects.building", "editor.objects.template", "editor.objects.ship",
-    "editor.objects.unit",     "editor.objects.resource", "editor.objects.piece"};
+    "editor.objects.building", "editor.objects.template", "editor.objects.ship", "editor.objects.unit",
+    "editor.objects.resource", "editor.objects.piece",    "editor.objects.brush"};
 
 constexpr std::uint32_t kSizeStep = 50;
 constexpr std::uint32_t kFitMargin = 8;
@@ -567,13 +578,14 @@ constexpr std::array<std::pair<EditorTool, EditorTerrain::Tool>, 10> kTerrainToo
     {EditorTool::Paste, EditorTerrain::Tool::Paste},
 }};
 
-constexpr std::array<std::pair<EditorTool, EditorObjects::Tool>, 6> kObjectTools = {{
+constexpr std::array<std::pair<EditorTool, EditorObjects::Tool>, 7> kObjectTools = {{
     {EditorTool::Build, EditorObjects::Tool::Build},
     {EditorTool::Template, EditorObjects::Tool::Template},
     {EditorTool::Ship, EditorObjects::Tool::Ship},
     {EditorTool::Unit, EditorObjects::Tool::Unit},
     {EditorTool::Resource, EditorObjects::Tool::Resource},
     {EditorTool::Remove, EditorObjects::Tool::Remove},
+    {EditorTool::Territory, EditorObjects::Tool::Territory},
 }};
 
 }  // namespace
@@ -630,6 +642,7 @@ std::optional<EditorTool> EditorPanel::active_tool(const EditorModel& model) con
         case Page::CityTrade:
         case Page::CityWare:
         case Page::ShipCargo:
+        case Page::ShipRoute:
         case Page::Fertility:
             return EditorTool::Select;
         case Page::Markers:
@@ -820,6 +833,9 @@ void EditorPanel::layout_page(const EditorModel& model) {
             break;
         case Page::ShipCargo:
             layout_ship_cargo(model);
+            break;
+        case Page::ShipRoute:
+            layout_ship_route(model);
             break;
         case Page::Players:
             wide ? layout_players_table(model) : layout_players(model);
@@ -1211,8 +1227,11 @@ void EditorPanel::layout_selection(const EditorModel& model) {
             f.cycle_button(kCityOwner, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.owner", {model.city->owner}));
             y += kButtonH + kGap;
         } else if (model.ship) {
-            f.button(kShipCargoPage, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.ship.cargo"),
+            const std::int32_t half = (m_w - kGap) / 2;
+            f.button(kShipCargoPage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.ship.cargo"),
                      !model.ship->holds.empty() && !model.ship->wares.empty());
+            f.button(kShipRoutePage, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.ship.route"),
+                     model.ship->route_targets.size() > 1);
             y += kButtonH + kGap;
         }
     }
@@ -1498,6 +1517,65 @@ void EditorPanel::layout_ship_cargo(const EditorModel& model) {
         f.cycle_button(kFirstHoldMore + id, Rect{m_x + m_w - kStep, y, kStep, kHoldH - 4}, "+",
                        h.ware != 0 && h.amount < ship.room);
         y += kHoldH;
+    }
+    y += 4;
+    f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
+}
+
+void EditorPanel::layout_ship_route(const EditorModel& model) {
+    if (!model.ship || model.ship->stops.empty() || model.ship->route_targets.size() < 2) {
+        m_page = Page::Selection;  // the ship is gone (undone) or has nowhere to go
+        layout_selection(model);
+        return;
+    }
+    ui::Form& f = m_form;
+    const EditorShip& ship = *model.ship;
+    m_route_stop = std::min(m_route_stop, ship.stops.size() - 1);
+    const EditorRouteStop& stop = ship.stops[m_route_stop];
+    std::int32_t y = m_top + 6;
+    f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.ship.route_title", {ship.name}), Align::Left, Tone::Heading);
+    y += 28;
+    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, ui::tr(ship.cart ? "editor.ship.route_note_cart" : "editor.ship.route_note"),
+                Tone::Dim, 20);
+    y += 3 * 20 + 4;
+    const bool any =
+        std::any_of(ship.stops.begin(), ship.stops.end(), [](const EditorRouteStop& s) { return s.target != 0; });
+    f.cycle_button(kRouteActive, Rect{m_x, y, m_w, kButtonH},
+                   ui::tr(ship.route_active ? "editor.ship.route_on" : "editor.ship.route_off"), any);
+    y += kButtonH + kGap;
+    const auto target_name = [&](std::size_t t) {
+        return t < ship.route_targets.size() ? ship.route_targets[t] : ship.route_targets.front();
+    };
+    f.cycle_button(kRouteStop, Rect{m_x, y, m_w, kButtonH},
+                   ui::tr("editor.ship.route_stop", {count(m_route_stop + 1), count(ship.stops.size())}));
+    y += kButtonH + kGap;
+    f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.ship.route_city"));
+    y += 18;
+    f.cycle_button(kRouteTarget, Rect{m_x, y, m_w, kButtonH}, target_name(stop.target));
+    y += kButtonH + kGap;
+    // Per entry: its ware (a click the next, a right click the one before); below it whether the
+    // stop loads or unloads it, and its tons.
+    constexpr std::int32_t kRouteRowH = 28;
+    constexpr std::int32_t kStep = 28;
+    constexpr std::int32_t kAmount = 64;
+    const std::int32_t bottom = m_top + m_height - (kButtonH + kGap) - kGap;
+    for (std::size_t i = 0; i < std::min(stop.entries.size(), kRouteEntries) && y + 2 * kRouteRowH <= bottom; ++i) {
+        const EditorRouteEntry& e = stop.entries[i];
+        const auto id = static_cast<Id>(i);
+        const bool set = stop.target != 0;
+        f.cycle_button(kFirstRouteWare + id, Rect{m_x, y, m_w, kRouteRowH - 4},
+                       e.ware != 0 ? e.name : ui::tr("editor.ship.route_no_ware"), set);
+        y += kRouteRowH - 2;
+        const std::int32_t mode_w = m_w - 2 * kStep - kAmount - 6;
+        f.cycle_button(kFirstRouteMode + id, Rect{m_x + 12, y, mode_w - 12, kRouteRowH - 4},
+                       ui::tr(e.unload ? "editor.ship.route_unload" : "editor.ship.route_load"), set && e.ware != 0);
+        f.label(Rect{m_x + mode_w, y, kAmount, kRouteRowH - 4}, ui::tr("editor.city.tons", {count(e.amount / 32)}),
+                Align::Right);
+        f.cycle_button(kFirstRouteLess + id, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kRouteRowH - 4}, "-",
+                       set && e.ware != 0 && e.amount > 0);
+        f.cycle_button(kFirstRouteMore + id, Rect{m_x + m_w - kStep, y, kStep, kRouteRowH - 4}, "+",
+                       set && e.ware != 0 && e.amount < ship.room);
+        y += kRouteRowH + 2;
     }
     y += 4;
     f.button(kCitySelection, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.city.back"));
@@ -1827,6 +1905,10 @@ void EditorPanel::layout_terrain(const EditorModel& model) {
                       ui::tr(kBrushShapeTexts[t.shape % kBrushShapeTexts.size()]), brush);
             }
         }
+        if (t.tool == Tool::Land) {
+            value(kTerrainOpenEdge, "editor.terrain.map_edge",
+                  ui::tr(t.open_edge ? "editor.terrain.map_edge.open" : "editor.terrain.map_edge.coast"), true);
+        }
         if (pieces && !single) {
             note = ui::tr("editor.terrain.note.large", {count(model.terrain_width), count(model.terrain_height)});
         }
@@ -1860,12 +1942,15 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     // Ships and land units: the piece is their type, the rotation the way they face.
     const bool figure =
         o.tool == Tool::Template || o.tool == Tool::Ship || o.tool == Tool::Unit || o.tool == Tool::Resource;
+    // Territory: the piece is the brush's size, the owner the city's.
+    const bool territory = o.tool == Tool::Territory;
     // What is placed for an owner, turned.
     const bool owned = build || o.tool == Tool::Template || o.tool == Tool::Ship || o.tool == Tool::Unit;
     const std::size_t chosen = o.tool == Tool::Template   ? o.stamp
                                : o.tool == Tool::Ship     ? o.ship
                                : o.tool == Tool::Unit     ? o.unit
                                : o.tool == Tool::Resource ? o.resource
+                               : territory                ? o.brush
                                                           : o.piece;
     const auto value = [&](Id id, const std::string& label, std::string text, bool enabled) {
         f.label(Rect{m_x, y, m_w, 18}, label, Align::Left, enabled ? Tone::Normal : Tone::Dim);
@@ -1875,7 +1960,7 @@ void EditorPanel::layout_objects(const EditorModel& model) {
     };
     value(kObjectsGroup, ui::tr("editor.objects.group"), model.object_group, build && model.object_groups > 0);
     // A name is long: its number goes on the label above it.
-    const bool pieces = (build || figure) && model.object_pieces > 0;
+    const bool pieces = (build || figure || territory) && model.object_pieces > 0;
     std::string piece = ui::tr("editor.terrain.no_piece");
     const char* piece_label = kObjectPieceLabels[static_cast<std::size_t>(o.tool)];
     std::string label = ui::tr(piece_label, {"-", "-"});
@@ -1890,11 +1975,11 @@ void EditorPanel::layout_objects(const EditorModel& model) {
           model.object_ownerless    ? ui::tr("editor.objects.ownerless")
           : model.object_owners > 0 ? model.object_owner
                                     : ui::tr("editor.objects.no_owner"),
-          owned && model.object_owners > 0 && !model.object_ownerless);
+          (owned || territory) && model.object_owners > 0 && !model.object_ownerless);
     std::string note = ui::tr(kObjectToolNotes[static_cast<std::size_t>(o.tool)]);
     if (model.object_ownerless) {
         note = ui::tr("editor.objects.note.special");
-    } else if (owned && model.object_owners == 0) {
+    } else if ((owned || territory) && model.object_owners == 0) {
         note = ui::tr("editor.objects.note.no_players");
     } else if (build && model.object_neutral) {
         note = ui::tr("editor.objects.note.neutral");
@@ -3188,11 +3273,12 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 o.rotation = 0;
             } else if (*id == kObjectsPiece) {
                 using Tool = EditorObjects::Tool;
-                std::size_t& chosen = o.tool == Tool::Template   ? o.stamp
-                                      : o.tool == Tool::Ship     ? o.ship
-                                      : o.tool == Tool::Unit     ? o.unit
-                                      : o.tool == Tool::Resource ? o.resource
-                                                                 : o.piece;
+                std::size_t& chosen = o.tool == Tool::Template    ? o.stamp
+                                      : o.tool == Tool::Ship      ? o.ship
+                                      : o.tool == Tool::Unit      ? o.unit
+                                      : o.tool == Tool::Resource  ? o.resource
+                                      : o.tool == Tool::Territory ? o.brush
+                                                                  : o.piece;
                 chosen = model.object_pieces > 0 ? step(chosen, model.object_pieces, forward) : 0;
                 if (o.tool == Tool::Build) {
                     o.rotation = 0;
@@ -3219,6 +3305,7 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kTerrainBigger:
         case kTerrainShape:
         case kTerrainPasteWater:
+        case kTerrainOpenEdge:
         case kTerrainSlider: {
             EditorRequest r{EditorRequest::Kind::Terrain};
             EditorTerrain& t = r.terrain;
@@ -3241,6 +3328,8 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 t.brush = static_cast<std::uint8_t>(std::min<std::size_t>(t.brush + 1U, kTerrainBrushes.size() - 1));
             } else if (*id == kTerrainPasteWater) {
                 t.paste_water = !t.paste_water;
+            } else if (*id == kTerrainOpenEdge) {
+                t.open_edge = !t.open_edge;
             } else if (*id == kTerrainShape) {
                 t.shape = static_cast<std::uint8_t>(step(t.shape, kBrushShapeTexts.size(), forward));
             } else if (*id == kTerrainSlider) {
@@ -3508,6 +3597,32 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kShipCargoPage:
             m_page = Page::ShipCargo;
             return std::nullopt;
+        case kShipRoutePage:
+            m_page = Page::ShipRoute;
+            m_route_stop = 0;
+            return std::nullopt;
+        case kRouteStop:
+            if (model.ship && !model.ship->stops.empty()) {
+                m_route_stop = step(m_route_stop, model.ship->stops.size(), forward);
+            }
+            return std::nullopt;
+        case kRouteActive:
+        case kRouteTarget: {
+            if (!model.ship || model.ship->stops.empty() || model.ship->route_targets.empty()) {
+                return std::nullopt;
+            }
+            EditorRequest r{EditorRequest::Kind::ShipRoute};
+            r.route.stop = std::min(m_route_stop, model.ship->stops.size() - 1);
+            if (*id == kRouteActive) {
+                r.route.what = EditorRequest::Route::What::Active;
+                r.route.on = !model.ship->route_active;
+            } else {
+                r.route.what = EditorRequest::Route::What::Target;
+                r.route.target =
+                    step(model.ship->stops[r.route.stop].target, model.ship->route_targets.size(), forward);
+            }
+            return r;
+        }
         case kCitySelection:
             m_page = Page::Selection;
             m_form.set_focus(std::nullopt);
@@ -3658,6 +3773,44 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         // Down to whole tons, then by steps.
         r.amount = more ? std::min(model.city->room, (g.amount / step + 1) * step)
                         : (g.amount % step != 0 ? g.amount / step * step : g.amount - std::min(g.amount, step));
+        return r;
+    }
+    if (*id >= kFirstRouteWare && *id < kFirstRouteMore + static_cast<Id>(kRouteEntries) && model.ship &&
+        !model.ship->stops.empty()) {
+        const EditorShip& ship = *model.ship;
+        const std::size_t s = std::min(m_route_stop, ship.stops.size() - 1);
+        const auto part = (*id - kFirstRouteWare) / 10;  // ware, mode, fewer, more
+        const auto i = static_cast<std::size_t>((*id - kFirstRouteWare) % 10);
+        if (i >= ship.stops[s].entries.size() || i >= kRouteEntries) {
+            return std::nullopt;
+        }
+        EditorRequest r{EditorRequest::Kind::ShipRoute};
+        r.route.what = EditorRequest::Route::What::Entry;
+        r.route.stop = s;
+        r.route.entry = i;
+        EditorRouteEntry& v = r.route.value;
+        v = ship.stops[s].entries[i];
+        if (part == 0) {
+            // None, then the wares in their order and back to none; a new ware takes a full hold.
+            const auto at = std::find_if(ship.wares.begin(), ship.wares.end(),
+                                         [&](const EditorGood& g) { return g.ware == v.ware; });
+            const std::size_t n = ship.wares.size() + 1;
+            const std::size_t now = at == ship.wares.end() ? 0 : static_cast<std::size_t>(at - ship.wares.begin()) + 1;
+            const std::size_t next = step(now, n, forward);
+            v.ware = next == 0 ? 0 : ship.wares[next - 1].ware;
+            v.amount = next == 0 ? 0 : (v.amount > 0 ? v.amount : ship.room);
+            if (next == 0) {
+                v.unload = false;
+            }
+        } else if (part == 1) {
+            v.unload = !v.unload;
+        } else {
+            // Left 10 t, right 1 t, within a hold's room.
+            const std::uint32_t unit = forward ? 10 * 32 : 32;
+            v.amount = part == 3
+                           ? std::min(ship.room, (v.amount / unit + 1) * unit)
+                           : (v.amount % unit != 0 ? v.amount / unit * unit : v.amount - std::min(v.amount, unit));
+        }
         return r;
     }
     if (*id >= kFirstHoldWare && *id < kFirstHoldMore + static_cast<Id>(kHoldRows) && model.ship) {

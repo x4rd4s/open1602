@@ -141,13 +141,23 @@ std::vector<std::pair<std::uint8_t, std::uint32_t>> island_crops(const sim::Worl
         for (const std::uint8_t ware : island.header.climate == sim::climate::kSouth ? kSouth : kNorth) {
             add(ware);
         }
-        return crops;
+    } else {
+        // A package's climate: the crops it grows, the north's first, in the same order.
+        const std::uint32_t own = sim::climate_crops(climates, island);
+        for (const auto& wares : {kNorth, kSouth}) {
+            for (const std::uint8_t ware : wares) {
+                if ((own >> (ware - sim::ware::kCornField) & 1U) != 0) {
+                    add(ware);
+                }
+            }
+        }
     }
-    // A package's climate: the crops it grows, the north's first, in the same order.
-    const std::uint32_t own = sim::climate_crops(climates, island);
+    // Open1602: then every other crop the island grows (one the editor gave it besides its
+    // climate's), so that the line shows all; an island without one reads as in the original.
     for (const auto& wares : {kNorth, kSouth}) {
         for (const std::uint8_t ware : wares) {
-            if ((own >> (ware - sim::ware::kCornField) & 1U) != 0) {
+            const bool listed = std::any_of(crops.begin(), crops.end(), [&](const auto& c) { return c.first == ware; });
+            if (!listed && sim::island_fertility(climates, island, ware) != 0) {
                 add(ware);
             }
         }

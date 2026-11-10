@@ -537,6 +537,20 @@ private:
     void editor_remove_object(render::TilePos tile);
     /// The pipette at the world tile (x, y).
     void editor_pipette(std::uint32_t x, std::uint32_t y);
+    /// The cities a stop of the route of `ship` can be in the editor, in the order of the world's
+    /// cities: a ship's each with a Kontor, a trade cart's those of its island.
+    [[nodiscard]] std::vector<sim::Target> editor_route_targets(const sim::Ship& ship) const;
+    /// The city of the chosen owner on the island at the world tile (x, y), nothing on the sea or
+    /// where the owner has none (the tool Territory paints its land).
+    [[nodiscard]] std::optional<std::pair<std::uint16_t, std::uint8_t>> editor_claim_city(std::int64_t x,
+                                                                                          std::int64_t y) const;
+    /// The tool Territory's brush about the world tile (x, y): land given to the city there, or taken
+    /// back (claim_take), into object_steps; `tell`: a note why nothing.
+    void editor_claim(std::int64_t x, std::int64_t y, bool tell);
+    /// The building at the world tile (x, y) as the page "Objects" would place it: its group and
+    /// piece (a house's look as its class's house), turn and owner; nothing where none of the
+    /// page's buildings stands.
+    [[nodiscard]] std::optional<EditorObjects> editor_object_at(std::uint32_t x, std::uint32_t y) const;
     /// The islands changed: what the viewer keeps of them is made anew (flags, minimap), and what
     /// the panel shows of an island that is gone goes.
     void editor_islands_changed();
@@ -924,6 +938,7 @@ private:
         std::vector<std::unique_ptr<editor::Operation>> object_steps{};
         std::optional<std::pair<std::int64_t, std::int64_t>> object_at{};
         bool object_drag = false;
+        bool claim_take = false;  ///< the tool Territory's stroke takes land back (the right button)
         /// Where the drag began: with Shift held the drag places along a straight row from there.
         std::optional<std::pair<std::int64_t, std::int64_t>> object_from{};
         std::vector<EditorRecent> recent_objects{};  ///< the objects placed lately, the last first

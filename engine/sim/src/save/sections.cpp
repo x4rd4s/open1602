@@ -169,6 +169,10 @@ constexpr std::uint32_t kPlannedIslands = tag("PLAN");
 /// The islands whose crops a game rolls when it starts (WorldIsland::random_fertility), by number,
 /// only written when there are any. Optional: without it the islands keep the crops they have.
 constexpr std::uint32_t kRandomFertility = tag("RFRT");
+/// The land the editor gave cities without a building that claims it (WorldIsland::claimed), by
+/// island number and tile, only written when there is any. Optional: without it the land falls back
+/// to what the cities' buildings claim once their territory is checked again.
+constexpr std::uint32_t kClaimedLand = tag("CLMD");
 /// The packages' climates (Balance::climates) and the islands that have one (WorldIsland::climate),
 /// only written when there are any. Required: crops would grow otherwise.
 constexpr std::uint32_t kClimates = tag("CLIM");
@@ -260,6 +264,7 @@ constexpr std::array kKnownSections = {kRules,
                                        kEditorState,
                                        kPlannedIslands,
                                        kRandomFertility,
+                                       kClaimedLand,
                                        kClimates,
                                        kComputerProducers,
                                        kComputerSlots};
@@ -1061,6 +1066,37 @@ void encode_sections(annokit::core::ByteWriter& out, const World& world, const a
             out, kRandomFertility, [&](Writer& o) { o.list(numbers, 2, [&](std::uint16_t n) { o.u16(n); }); },
             Need::Optional);
     }
+    {
+        std::vector<Decoded::ClaimedIsland> claimed;
+        for (const WorldIsland& i : world.islands()) {
+            Decoded::ClaimedIsland entry{static_cast<std::uint16_t>(i.header.number), {}};
+            const std::uint32_t w = i.map.width();
+            for (std::size_t k = 0; w != 0 && k < i.claimed.size(); ++k) {
+                if (i.claimed[k] != MapCell::kNoCity) {
+                    entry.tiles.push_back(Decoded::ClaimedTile{static_cast<std::uint16_t>(k % w),
+                                                               static_cast<std::uint16_t>(k / w), i.claimed[k]});
+                }
+            }
+            if (!entry.tiles.empty()) {
+                claimed.push_back(std::move(entry));
+            }
+        }
+        if (!claimed.empty()) {
+            section(
+                out, kClaimedLand,
+                [&](Writer& o) {
+                    o.list(claimed, 6, [&](const Decoded::ClaimedIsland& c) {
+                        o.u16(c.number);
+                        o.list(c.tiles, 5, [&](const Decoded::ClaimedTile& t) {
+                            o.u16(t.x);
+                            o.u16(t.y);
+                            o.u8(t.city);
+                        });
+                    });
+                },
+                Need::Optional);
+        }
+    }
     const auto has_groups = [](const UnitGroups& g) {
         return std::any_of(g.begin(), g.end(), [](const auto& members) { return !members.empty(); });
     };
@@ -1755,6 +1791,19 @@ annokit::core::Status apply_sections(World& world, const assets::BuildingTable& 
                 PlannedIslands planned;
                 read_planned_islands(in, planned);
                 d.planned_islands = std::move(planned);
+                break;
+            }
+            case kClaimedLand: {
+                std::vector<Decoded::ClaimedIsland> claimed;
+                in.list(claimed, 6, [&](Decoded::ClaimedIsland& c) {
+                    in.u16(c.number);
+                    in.list(c.tiles, 5, [&](Decoded::ClaimedTile& t) {
+                        in.u16(t.x);
+                        in.u16(t.y);
+                        in.u8(t.city);
+                    });
+                });
+                d.claimed = std::move(claimed);
                 break;
             }
             case kRandomFertility: {

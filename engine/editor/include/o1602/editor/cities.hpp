@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "annokit/core/result.hpp"
 
@@ -65,5 +67,16 @@ inline constexpr std::size_t kMaxCityName = 40;
                                                                                   std::uint16_t island,
                                                                                   std::uint8_t city,
                                                                                   sim::PlayerId owner);
+
+/// Land given to the city `city` of island `island` without a building that claims it, or taken
+/// back (`take`): the editor's tool "Territory". `tiles` are tiles of the island. Given: each tile
+/// that is land and free or the city's already becomes the city's and stays so while the city stands
+/// (sim::WorldIsland::claimed); another city's land is passed over. Taken: each tile the editor
+/// gave the city is given up; it stays the city's where a market, Kontor or tower of its owner covers
+/// it or a building of the city stands on it. Fails (NotFound) without the city, (Unsupported) when
+/// no tile changes.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> claim_land(
+    const sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island, std::uint8_t city,
+    const std::vector<std::pair<std::uint32_t, std::uint32_t>>& tiles, bool take);
 
 }  // namespace o1602::editor

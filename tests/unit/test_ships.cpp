@@ -1618,3 +1618,26 @@ TEST_CASE("military upkeep: humans and the improved computers pay it, the origin
     CHECK(sim::pays_upkeep(sea.world, players[0]));
     CHECK(!sim::pays_upkeep(sea.world, players[1]));  // as in the original
 }
+
+TEST_CASE("ships: on a map whose edge is land but for a bay the trader comes in through the bay") {
+    Sea sea;
+    // Land over the whole map (a continent running off it) but a bay of 3 x 4 tiles at the top.
+    sim::IslandMap map(120, 60);
+    for (std::int32_t y = 0; y < 60; ++y) {
+        for (std::int32_t x = 0; x < 120; ++x) {
+            const bool bay = x >= 70 && x <= 72 && y <= 3;
+            REQUIRE(map.place(*sea.buildings.by_id(bay ? 20102 : 20101), x, y, 0, 0).ok());
+        }
+    }
+    REQUIRE(sea.world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 0, 0}).ok());
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    const auto edge = fleet.sailable_edge();
+    REQUIRE(edge.size() == 3);
+    for (int i = 0; i < 5; ++i) {
+        const auto at = fleet.edge_water();
+        REQUIRE(at.has_value());
+        CHECK(at->second == 0);
+        CHECK(at->first >= 70);
+        CHECK(at->first <= 72);
+    }
+}

@@ -126,6 +126,7 @@ enum class KeyAction : std::uint16_t {
     EditorToolShip,
     EditorToolUnit,
     EditorToolResource,
+    EditorToolTerritory,
     EditorToolRemove,
     EditorToolMarker,
 };

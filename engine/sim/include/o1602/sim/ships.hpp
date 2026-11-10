@@ -418,6 +418,12 @@ public:
     /// FigureTable::ship_type_of) appears on sailable world tile (x, y), new and empty, as a yard
     /// launches it. Its id; nothing for another figure or a tile ships cannot sail on.
     std::optional<std::uint32_t> add_ship(PlayerId owner, std::uint32_t figure, std::int32_t x, std::int32_t y);
+    /// A tile of water at the map's edge where the trader comes from: 16 random tries as before,
+    /// then (Open1602, a map whose edge is mostly land) one of sailable_edge(). Nothing if the
+    /// edge has no water.
+    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> edge_water();
+    /// Every tile of the map's edge a ship can sail on, along the top, bottom, left and right.
+    [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> sailable_edge() const;
     /// Starts exploring the island the ship stands in (ExploreState::Possible only).
     bool explore(const ExploreOrder& order);
     /// A new trade cart (carts.cpp); its id, or 0 when the request is refused.
@@ -584,8 +590,6 @@ private:
     [[nodiscard]] std::uint32_t trader_buy_amount(const Ship& ship, const City& city, std::uint8_t ware) const;
     [[nodiscard]] std::uint32_t trader_sell_amount(const Ship& ship, const City& city, std::uint8_t ware) const;
     void spawn_trader();
-    /// A random water tile of the map edge, where a free trader comes from.
-    std::optional<std::pair<std::int32_t, std::int32_t>> edge_water();
 
     // Shipyards (shipyards.cpp)
     void yards_tick(std::uint32_t dt_ms);

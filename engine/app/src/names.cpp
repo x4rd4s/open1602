@@ -74,7 +74,10 @@ std::string city_name(const sim::City& city) {
 }
 
 std::string ship_name(const sim::Ship& ship) {
-    return ship.name.empty() ? ui::tr("ship.default", {std::to_string(ship.id)}) : ship.name;
+    if (!ship.name.empty()) {
+        return ship.name;
+    }
+    return ui::tr(ship.cart() ? "cart.default" : "ship.default", {std::to_string(ship.id)});
 }
 
 }  // namespace o1602::app

@@ -272,6 +272,60 @@ annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::Worl
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_cargo"));
 }
 
+annokit::core::Result<std::unique_ptr<Operation>> edit_route(const sim::World& world,
+                                                             const assets::BuildingTable& buildings,
+                                                             const assets::FigureTable& figures, std::uint32_t id,
+                                                             sim::RouteEdit edit) {
+    if (world.ship(id) == nullptr) {
+        return make_error(ErrorCode::NotFound, "no such ship");
+    }
+    edit.ship = id;
+    edit.player = sim::kNoPlayer;  // the editor's hand, not a player's
+    if (edit.op == sim::RouteEdit::Op::SetStop && edit.target.kind != sim::Target::Kind::City && !edit.target.empty()) {
+        return make_error(ErrorCode::Unsupported, "a route of the editor stops at cities");
+    }
+    sim::World after = world;
+    const sim::Rules rules = scenario_rules(world).value_or(sim::Rules{});
+    sim::Fleet fleet(after, buildings, figures, rules);
+    sim::Ship& ship = *after.ship(id);
+    if (edit.op == sim::RouteEdit::Op::SetStop && ship.cart() &&
+        !fleet.cart_way(ship.owner, static_cast<std::uint32_t>(ship.x), static_cast<std::uint32_t>(ship.y),
+                        edit.target)) {
+        return make_error(ErrorCode::OutOfRange, "the cart finds no way to that city");
+    }
+    // A route begins at its first stop.
+    const auto first_stop = [&ship] {
+        ship.route.current = 0;
+        while (ship.route.current + 1U < sim::TradeRoute::kStops &&
+               ship.route.stops[ship.route.current].target.empty()) {
+            ++ship.route.current;
+        }
+    };
+    const bool start = edit.op == sim::RouteEdit::Op::Start;
+    if (start) {
+        first_stop();
+    }
+    if (!fleet.edit_route(edit)) {
+        return make_error(ErrorCode::Unsupported, "the route refuses the change");
+    }
+    // A running route begins again from its first stop with what it carries now, as at the start.
+    if (ship.route.active && !start) {
+        if (!ship.route.has_stops()) {
+            ship.route.active = false;
+            ship.target = {};
+        } else {
+            first_stop();
+            (void)fleet.edit_route(sim::RouteEdit{sim::kNoPlayer, id, sim::RouteEdit::Op::Start});
+        }
+    }
+    if (edit.op == sim::RouteEdit::Op::Stop) {
+        ship.target = {};  // a ship placed in the editor waits where it is
+    }
+    ship.route.problem = false;
+    ship.route.problem_rounds = 0;
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_route"));
+}
+
 annokit::core::Result<std::unique_ptr<Operation>> remove_ship(const sim::World& world, std::uint32_t id) {
     if (world.ship(id) == nullptr) {
         return make_error(ErrorCode::NotFound, "no such ship");
