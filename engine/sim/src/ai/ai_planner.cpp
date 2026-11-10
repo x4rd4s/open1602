@@ -678,7 +678,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
                 if (starved) {
                     set(false);
                 }
-            } else if (c.stock(b->raw_ware) > (short_of ? kTon : 4 * kTon)) {
+            } else if (c.stock(b->raw_ware) > static_cast<std::uint32_t>(short_of ? kTon : 4 * kTon)) {
                 set(true);  // Open1602: for a good its cities go short of, with the first ton
             }
         };
