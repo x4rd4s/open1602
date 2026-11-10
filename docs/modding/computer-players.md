@@ -512,15 +512,19 @@ or is allied with the enemy too. Scripts see alliances in `game.relation` and `o
 
 **Ore running low.** Where veins run out, an improved computer that mines iron watches the ore
 left in the veins of its own islands (a big vein its deep mines dig for good counts as endless).
-Below 80 t it looks for a colony on an island with a free vein, as for its goals, and keeps twice
+Below 80 t, or with no vein on its islands at all once a city is past the settlers, it looks for a
+colony on an island with a free vein, as for its goals, and keeps twice
 as much ore and iron in store by buying, so that its iron works go on when its own vein is gone.
+A mine site search that failed through and through is not taken up again by new roads.
 
 **War economy.** Improved computers pay their army's upkeep as a human does: soldiers, units in
 their castles and aboard, and cannon towers (the original's computers pay nothing). They add a unit
-or a tower only while its upkeep stays within a budget: in peace half their civil income (taxes less
-running costs); with a stronger enemy nearby all of it and besides what their gold above 1000 pays
-for an hour and a half; in a war of their own all of it and three hours of that gold; arming for
-one, six hours of it. A war plan starts only if that budget carries the soldiers it needs, and is
+or a tower only while its upkeep stays within a budget: in peace a third of what their cities
+earn with their trade (taxes less running costs, sales less purchases) and what their gold above
+1000 pays for twelve hours; with a stronger enemy nearby three quarters of it and besides what their gold above 1000
+pays for an hour and a half; in a war of their own three quarters and three hours of that gold;
+arming for one, six hours of it. Half the army their inhabitants call for they keep up whatever
+it costs, to defend themselves. Paying upkeep, they order one unit a look. A war plan starts only if that budget carries the soldiers it needs, and is
 declared only while its cities earn more than they cost. While a war of its own gets somewhere, or
 under threat, a computer accepts a deficit and gives up only at 2000 gold in debt; a war that
 failed a look ends in debt as before. An army beyond its budget only stops growing: disbanding

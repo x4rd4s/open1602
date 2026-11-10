@@ -584,7 +584,7 @@ private:
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;
     [[nodiscard]] std::uint32_t free_holds(const Ship& s) const;
-    void queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
+    bool queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
     bool guard_post(AiPlayer& p, City& c, CityPlan& r, std::int32_t& x, std::int32_t& y, bool& at_yard);
     void guard(AiPlayer& p, City& c, std::int32_t x, std::int32_t y, std::uint32_t n, bool castle_island);
     bool market_tower(AiPlayer& p, City& c, std::int32_t mx, std::int32_t my);

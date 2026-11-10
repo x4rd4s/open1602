@@ -191,8 +191,9 @@ std::int32_t Engine::road_three(AiPlayer& p, std::int32_t x, std::int32_t y, std
         if (CityPlan* r = current_plan(p)) {
             for (std::size_t i = 0; i < r->slots.size(); ++i) {
                 // Open1602: roads open no beach for a tower; a tower given up stays given up.
-                if (!classic() && (i == kSlotWoodTower || i == kSlotStoneTower || i == kSlotPirateTower)) {
-                    continue;
+                if (!classic() && (i == kSlotWoodTower || i == kSlotStoneTower || i == kSlotPirateTower ||
+                                   (i == kSlotIronMine && r->slots[i].fail_level >= 2))) {
+                    continue;  // nor a site at a vein whose search failed through and through
                 }
                 r->slots[i].attempts = 0;
             }
@@ -1175,6 +1176,8 @@ void Engine::task_survey(AiPlayer& p) {
     r->slots[kSlotKontor].count = static_cast<std::uint16_t>(kontor_level(*c));
     // Cleanup: exhausted mines; sheep and small weavers where cotton grows.
     for (const auto& [x, y] : finds.starved_mines) {
+        log(p, "city %u/%u: the vein of the mine at %d,%d ran out%s", r->island, r->city, x, y,
+            ore_running_out(p) ? ", ore runs low" : "");
         demolish_tile(p, x, y);
     }
     if (cotton_island && weberei_ok) {

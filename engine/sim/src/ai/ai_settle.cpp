@@ -1089,7 +1089,8 @@ std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
 bool Engine::ore_running_out(const AiPlayer& p) const {
     // Open1602: an improved computer that mines iron ore sees its veins run low before they are
     // gone, as a player does: the ore left in the veins of its own islands (a big vein that never
-    // runs out counts as endless) below kOreLowTons, while it has an iron mine. It then looks for a
+    // runs out counts as endless) below kOreLowTons, while it has an iron mine, or no vein at all
+    // once its city is past the settlers. It then looks for a
     // colony with a vein of its own (goal_crop), and buys ore and iron in the meantime.
     if (!rivals() || p.pirates) {
         return false;
@@ -1099,7 +1100,9 @@ bool Engine::ore_running_out(const AiPlayer& p) const {
         mines = mines || r.slots[kSlotIronMine].count != 0;
     }
     if (!mines) {
-        return false;
+        // Without a mine of its own: a city past the settlers with no vein on its islands needs one
+        // for its tools and iron.
+        return p.max_stage >= stage::kCitizens && !crop_available(p, ware::kOre);
     }
     const bool game_endless = (m_world.game_settings().flags & World::GameSettings::kEndlessVeins) != 0;
     const bool endless = m_sim.rules().endless_veins(game_endless);

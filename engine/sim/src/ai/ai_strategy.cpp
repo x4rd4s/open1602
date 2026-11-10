@@ -38,12 +38,15 @@ constexpr std::uint64_t kGoalHoldMs = 600'000;  // a goal holds ten minutes, unl
 constexpr std::int32_t kRestructureMoney = -5000;
 constexpr std::int32_t kRestructureSaving = 50;
 constexpr std::uint64_t kRestructurePauseMs = 900'000;
-// The war economy of an improved computer: in peace its army may cost half its civil income; at
-// war or under threat all of it, and besides a share of its gold above a small reserve: what it
+// The war economy of an improved computer: in peace its army may cost a third of what its cities
+// earn with their trade (taxes less running costs, sales less purchases); at war, arming or under
+// threat three quarters of it, and besides a share of its gold above a small reserve: what it
 // pays for an hour and a half under threat, three hours in a war of its own, six while it arms.
 // At war it lets its gold fall to this debt before it gives up.
-constexpr std::int32_t kArmyPeaceShare = 50;
+constexpr std::int32_t kArmyPeaceShare = 33;
+constexpr std::int32_t kArmyWarShare = 75;
 constexpr std::int64_t kWarReserve = 1000;
+constexpr std::int64_t kPeaceRunwayMinutes = 720;  // in peace twelve hours of its gold
 constexpr std::int64_t kThreatRunwayMinutes = 90;
 constexpr std::int64_t kWarRunwayMinutes = 180;
 constexpr std::int64_t kArmingRunwayMinutes = 360;
@@ -375,10 +378,13 @@ std::int32_t Engine::army_budget(const AiPlayer& p) const {
     if (st.war_arming && st.war_target == kNoPlayer) {
         return arming_budget(p);
     }
-    const std::int64_t civil = std::max<std::int32_t>(0, civil_income(p));
+    const std::int64_t earned = std::max<std::int64_t>(0, std::int64_t{civil_income(p)} + trade_balance(player(p)));
     if (st.war_target == kNoPlayer && st.goal != goal::kMilitary) {
-        return static_cast<std::int32_t>(civil * kArmyPeaceShare / 100);
+        const std::int64_t saved = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kPeaceRunwayMinutes;
+        return static_cast<std::int32_t>(
+            std::min<std::int64_t>(earned * kArmyPeaceShare / 100 + saved, std::numeric_limits<std::int32_t>::max()));
     }
+    const std::int64_t civil = earned * kArmyWarShare / 100;
     const std::int64_t minutes = st.war_target != kNoPlayer ? kWarRunwayMinutes : kThreatRunwayMinutes;
     const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / minutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
@@ -387,7 +393,8 @@ std::int32_t Engine::army_budget(const AiPlayer& p) const {
 std::int32_t Engine::arming_budget(const AiPlayer& p) const {
     // Arming for a war of its own: its civil income and a small share of its gold, as the war is
     // not won yet.
-    const std::int64_t civil = std::max<std::int32_t>(0, civil_income(p));
+    const std::int64_t earned = std::max<std::int64_t>(0, std::int64_t{civil_income(p)} + trade_balance(player(p)));
+    const std::int64_t civil = earned * kArmyWarShare / 100;
     const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kArmingRunwayMinutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
 }
