@@ -2092,6 +2092,16 @@ bool Engine::claim_fields(AiPlayer& p, std::uint8_t slot) {
         return false;
     }
     log(p, "fields: open land at %d,%d for slot %u", x, y, unsigned{slot});
+    City* c = current_city(p);
+    const assets::BuildingType* market = by_id(id::kMarket);
+    if (c != nullptr && market != nullptr && affordable(p, *c, *market) && claim_by_path(p, x, y)) {
+        // The farm searches its sites anew in the land the market brought in.
+        if (CityPlan* r = current_plan(p)) {
+            r->slots[slot].attempts = 0;
+            r->slots[slot].fail_level = 0;
+        }
+        return true;
+    }
     return claim_land(p, slot, x, y);
 }
 

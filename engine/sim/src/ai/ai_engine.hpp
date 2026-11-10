@@ -586,6 +586,8 @@ private:
     /// near the city's markets (kFieldLandTiles at least); false without one.
     [[nodiscard]] bool field_land(const AiPlayer& p, std::int32_t& x, std::int32_t& y) const;
     /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
+    /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
+    bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
     bool claim_fields(AiPlayer& p, std::uint8_t slot);
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
     [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,

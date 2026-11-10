@@ -173,6 +173,9 @@ inline constexpr std::int32_t kOpenLandRange = 6;
 /// kFieldLandStep tiles.
 inline constexpr std::int32_t kFieldLandTiles = 60;
 inline constexpr std::int32_t kFieldLandStep = 3;
+/// The longest road an improved computer lays over its open ground to a market that claims land for
+/// its farms (Engine::claim_by_path).
+inline constexpr std::int32_t kClaimPath = 40;
 /// The slots of the farms and plantations, whose fields want open land.
 inline constexpr std::array<std::uint8_t, 9> kFieldSlots{kSlotGrain,  kSlotCotton,  kSlotWine,  kSlotSpices, kSlotCocoa,
                                                          kSlotCattle, kSlotTobacco, kSlotSheep, kSlotSugar};
