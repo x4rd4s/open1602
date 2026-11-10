@@ -1688,7 +1688,9 @@ bool Engine::more_food(AiPlayer& p, const City& c, const CityPlan& r) {
         if (p.stack.size() > before) {
             log(p, "city %u/%u: short of food, slot %u (%llu/min for %llu gold)", r.island, r.city, w.slot,
                 static_cast<unsigned long long>(w.food), static_cast<unsigned long long>(w.cost));
-            return true;
+            // A way whose building failed already does not hold up the stage's list as well: the
+            // city goes on with it while the food producer is tried again.
+            return r.slots[w.slot].fail_level == 0;
         }
     }
     return false;
