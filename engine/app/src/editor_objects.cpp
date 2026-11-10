@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "build_tool.hpp"
 #include "catchment_view.hpp"
 #include "map_input.hpp"
 #include "map_viewer.hpp"
@@ -41,6 +42,9 @@
 namespace o1602::app {
 
 namespace {
+
+/// The seed of the looks of the houses the editor places (building_look).
+constexpr std::uint32_t kEditorLookSeed = 1602;
 
 /// The button number of the natives' and pirates' group (no button of the build menu has it).
 constexpr std::int32_t kLandscapeGroup = 31099;
@@ -77,6 +81,74 @@ std::vector<const ui::BuildCategory*> object_groups() {
     }
     groups.push_back(&landscape_group());
     return groups;
+}
+
+/// `c` as the editor lists it: the group of the house also has the houses of the higher classes
+/// (settlers to aristocrats), which a game reaches only by its houses rising. Kept until the houses
+/// of the game data change (a package's classes).
+const ui::BuildCategory& editor_group(const ui::BuildCategory& c, const assets::BuildingTable& buildings) {
+    if (!c.index_of(assets::id::kHouse)) {
+        return c;
+    }
+    std::vector<std::uint32_t> houses;
+    for (std::size_t k = 1; k < assets::kResidentClasses; ++k) {
+        const assets::BuildingType* h = buildings.first_house(k);
+        if (h != nullptr && h->id != assets::id::kHouse &&
+            std::find(houses.begin(), houses.end(), h->id) == houses.end()) {
+            houses.push_back(h->id);
+        }
+    }
+    static std::vector<std::uint32_t> cached_houses;
+    static std::int32_t cached_button = 0;
+    static ui::BuildCategory cached;
+    static std::size_t cached_size = 0;
+    if (cached_houses != houses || cached_button != c.button || cached_size != c.size()) {
+        cached = c;
+        for (auto& row : cached.rows) {
+            const auto at = std::find_if(row.begin(), row.end(),
+                                         [](const ui::BuildButton& b) { return b.id == assets::id::kHouse; });
+            if (at != row.end()) {
+                const ui::BuildButton house = *at;
+                std::vector<ui::BuildButton> more;
+                for (const std::uint32_t id : houses) {
+                    more.push_back(ui::BuildButton{id, house.icon, -1, {}, house.picture});
+                }
+                row.insert(at + 1, more.begin(), more.end());
+                break;
+            }
+        }
+        cached_houses = std::move(houses);
+        cached_button = c.button;
+        cached_size = c.size();
+    }
+    return cached;
+}
+
+/// The name of one of the natives' or pirates' buildings by what it is, where the original's list
+/// calls most of them the same ("native hut"); empty for one it does not tell apart.
+std::string landscape_name(const assets::BuildingType& b) {
+    // The natives' buildings come first in the list, five of each of their two looks.
+    constexpr std::ptrdiff_t kNativeLook = 5;
+    const auto at = std::find(assets::id::kLandscape.begin(), assets::id::kLandscape.end(), b.id);
+    const std::ptrdiff_t index = at - assets::id::kLandscape.begin();
+    if (at == assets::id::kLandscape.end() || index >= 2 * kNativeLook) {
+        return {};
+    }
+    const char* key = nullptr;
+    if (b.kind == assets::kind::kHq) {
+        key = "editor.objects.native.chief";
+    } else if (b.prod_kind == assets::prod::kMilitary) {
+        key = "editor.objects.native.warriors";
+    } else if (b.prod_kind == assets::prod::kFarm && b.ware == assets::ware::kTobaccoGoods) {
+        key = "editor.objects.native.tobacco";
+    } else if (b.prod_kind == assets::prod::kFarm && b.ware == assets::ware::kSpices) {
+        key = "editor.objects.native.spices";
+    } else if (b.prod_kind == assets::prod::kPirateHouse) {
+        key = "editor.objects.native.hut";
+    } else {
+        return {};
+    }
+    return ui::tr("editor.objects.native.look", {ui::tr(key), index < kNativeLook ? "1" : "2"});
 }
 
 /// The number of groups of the tool "Build": the build menu's, the natives' and pirates', and last
@@ -330,7 +402,7 @@ const assets::BuildingType* MapViewer::editor_object_piece() const {
     if (groups.empty()) {
         return nullptr;
     }
-    const ui::BuildCategory& c = *groups[m_editor->objects.group % groups.size()];
+    const ui::BuildCategory& c = editor_group(*groups[m_editor->objects.group % groups.size()], m_buildings);
     const auto id = c.at(std::min(m_editor->objects.piece, c.size() - 1));
     return id ? m_buildings.by_id(*id) : nullptr;
 }
@@ -349,12 +421,18 @@ void MapViewer::editor_object_model(EditorModel& m) const {
             m.object_name = special_name(p, m_buildings);
         }
     } else if (!groups.empty()) {
-        const ui::BuildCategory& c = *groups[m_editor->objects.group % groups.size()];
+        const ui::BuildCategory& c = editor_group(*groups[m_editor->objects.group % groups.size()], m_buildings);
         m.object_pieces = c.size();
         const std::size_t index = std::min(m_editor->objects.piece, c.size() - 1);
         const std::vector<std::string> none;
         const assets::TextTable* texts = m_hud ? m_hud->texts() : nullptr;
         std::string name = texts != nullptr ? c.name(index, texts->section(c.names)) : c.name(index, none);
+        if (const assets::BuildingType* shown = m_buildings.by_id(c.at(index).value_or(0));
+            shown != nullptr && c.button == kLandscapeGroup) {
+            if (std::string own = landscape_name(*shown); !own.empty()) {
+                name = std::move(own);
+            }
+        }
         if (name.empty()) {
             const assets::BuildingType* b = m_buildings.by_id(c.at(index).value_or(0));
             name = b != nullptr ? editor_building_name(*b, m_buildings, texts)
@@ -783,9 +861,10 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
         std::uint32_t w = 0;
         std::uint32_t h = 0;
         sim::rotated_size(*b, rotation, w, h);
-        return sim::BuildItem{b->id, static_cast<std::int32_t>(c.local_x) - static_cast<std::int32_t>((w - 1) / 2) + dx,
-                              static_cast<std::int32_t>(c.local_y) - static_cast<std::int32_t>((h - 1) / 2) + dy,
-                              rotation, 0};
+        const std::int32_t ix = static_cast<std::int32_t>(c.local_x) - static_cast<std::int32_t>((w - 1) / 2) + dx;
+        const std::int32_t iy = static_cast<std::int32_t>(c.local_y) - static_cast<std::int32_t>((h - 1) / 2) + dy;
+        // A house in one of its looks, as the build menu lays it; the same tile keeps its look.
+        return sim::BuildItem{building_look(m_buildings, *b, kEditorLookSeed, c.island, ix, iy), ix, iy, rotation, 0};
     };
     order.items.push_back(item(m_editor->objects.rotation, 0, 0));
     // A building that needs a coast, river or rock face where it stands exactly (a Kontor, a
@@ -813,6 +892,50 @@ std::optional<sim::BuildOrder> MapViewer::editor_object_order(std::int64_t x, st
         }
     }
     return order;
+}
+
+void MapViewer::editor_object_ghost(
+    const std::function<void(std::uint16_t island, std::uint32_t x, std::uint32_t y)>& keep) {
+    const EditorPanel* panel = m_hud ? m_hud->editor_panel() : nullptr;
+    if (!m_editor || panel == nullptr || panel->page() != EditorPanel::Page::Objects || m_editor->placing ||
+        m_editor->preview_plan || m_editor->objects.tool != EditorObjects::Tool::Build ||
+        special_group(m_editor->objects.group) ||
+        m_hud->covers(static_cast<std::int32_t>(m_input->mouse_x()), static_cast<std::int32_t>(m_input->mouse_y()))) {
+        return;
+    }
+    const auto tile = m_input->tile_at_mouse();
+    const auto order = tile ? editor_object_order(tile->x, tile->y) : std::nullopt;
+    if (!order) {
+        return;
+    }
+    sim::World& world = m_state->world;
+    sim::BuildPlan plan = sim::plan_build(world, m_buildings, *order);
+    (void)editor::refuse_second_city(world, *order, plan);
+    sim::IslandMap& map = world.island(order->island).map;
+    for (const sim::PlannedBuild& item : plan.items) {
+        if (!item.ok() || item.type == nullptr) {
+            continue;
+        }
+        std::uint32_t w = 1;
+        std::uint32_t h = 1;
+        sim::rotated_size(*item.type, item.rotation, w, h);
+        if (!map.contains(item.x, item.y) ||
+            !map.contains(item.x + static_cast<std::int32_t>(w) - 1, item.y + static_cast<std::int32_t>(h) - 1)) {
+            continue;
+        }
+        for (std::uint32_t j = 0; j < h; ++j) {
+            for (std::uint32_t i = 0; i < w; ++i) {
+                keep(order->island, static_cast<std::uint32_t>(item.x) + i, static_cast<std::uint32_t>(item.y) + j);
+            }
+        }
+        const sim::MapCell at = map.top(static_cast<std::uint32_t>(item.x), static_cast<std::uint32_t>(item.y));
+        // A field is shown grown, a seedling would hardly be seen.
+        const assets::BuildingType* shown = item.type;
+        if (const assets::BuildingType* ripe = sim::ripe_record(m_buildings, *item.type)) {
+            shown = ripe;
+        }
+        (void)map.build(*shown, item.x, item.y, item.rotation, 0, at.owner, at.city);
+    }
 }
 
 bool MapViewer::editor_place_object(std::int64_t x, std::int64_t y, bool tell) {

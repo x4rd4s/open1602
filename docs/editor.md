@@ -91,7 +91,7 @@ takes back.
 The terrain tools of the tool bar paint the islands' terrain from a palette of the game's own: ground,
 forest, rock and ore mountains, slopes, rivers, beach, surf and sea. The column shows the tool's name
 and only the settings it uses. **Kind** picks a group of the palette, **Piece** goes through its pieces
-(a right click goes back) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
+(a right click goes back; a ground piece names the share of the island's fertility it leaves a field, from 25 to 100 percent, as the game data gives it) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
 from 1 to 17 tiles: with the buttons - and +, the slider between them, the keys + and -, or Ctrl and
 the mouse wheel. **Shape** makes the brush round, square or a diamond (Land, Water, Tidy coast, Random
 fill and the brush of a one-tile piece). A white dotted outline on the map shows the tiles the tool
@@ -136,7 +136,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 | Setting | What it does |
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Template**: a left click builds one of the templates saved in games (the copy tool's pieces, kept in the folder "templates" of the user's data folder) about the mouse, for the owner; what does not fit is left out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island, or a trade cart on a road beside its owner's Kontor or market. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
-| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the chieftain's hut, the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
+| Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the natives' huts named by what they are: chief's, warriors', tobacco growers', spice growers' and dwelling huts, each in the natives' two looks; the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
 | Building, Template, Ship, Unit, Resource | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) the natives' spearman, placed for the natives only, and the trade cart; a big or small iron vein, gold, a treasure or deer. |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
 | Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader; for a trade cart only the humans and computers. For buildings, templates and units the last is "Neutral": buildings for nobody on free land, without a Kontor, which soldiers take ([the neutral buildings](modding/factions.md#the-neutral-buildings)); the map gets their player when it is first chosen. |
@@ -152,7 +152,10 @@ A building is placed as the game builds it, only without gold, goods, unlocked l
 (castle, cathedral, monuments): it needs its ground, the owner's land (a Kontor at the coast founds a
 city and claims its land), a coast, river or rock face where the game asks for one. A building on a
 buried treasure leaves it in the ground. The outline under the mouse is green where the building can
-stand and red where not; a Kontor, shipyard, mill or mine finds the coast, river or rock face near
+stand and red where not, and where it can stand the building itself shows there, turned and checkered
+as the build menu shows one. Houses come in each of their looks at random, as the build menu lays
+them, and the group of the house also has the houses of the higher classes (settlers to
+aristocrats); a Kontor, shipyard, mill or mine finds the coast, river or rock face near
 the mouse and turns to it. A refused click says why. A Kontor goes only once its city has nothing
 else, and its piers go with it.
 

@@ -29,6 +29,12 @@
 
 namespace o1602::app {
 
+/// The look of `b` built at a tile: one of its RandAnz pictures for trees and the player's houses
+/// (as the build menu draws one), else `b` itself. The same seed and tile always give the same look.
+[[nodiscard]] std::uint32_t building_look(const assets::BuildingTable& buildings, const assets::BuildingType& b,
+                                          std::uint32_t seed, std::uint16_t island, std::int32_t x,
+                                          std::int32_t y) noexcept;
+
 class BuildTool {
 public:
     enum class Mode : std::uint8_t { Off, Build, Demolish, Copy, Move };
