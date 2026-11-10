@@ -505,6 +505,11 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         st.war_arming = true;
         return;
     }
+    // Open1602: only with an economy that carries the army at war: cities that earn more than they
+    // cost, and the army's upkeep within what the war may cost.
+    if (pays_upkeep(m_world, player(p)) && (civil_income(p) < 0 || military_cost(p) > arming_budget(p))) {
+        return;
+    }
     log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
         threat_of(best));
     start_war(p, best);

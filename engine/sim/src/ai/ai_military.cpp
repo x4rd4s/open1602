@@ -26,6 +26,7 @@ constexpr std::size_t kMaxPosts = 64;
 
 /// The pirate nest's offer comes again after more than 42 s (0x1A4 tenths, task 5).
 constexpr std::uint64_t kNestOfferMs = 42'000;
+constexpr std::uint32_t kDisbandPaybackMinutes = 30;  // a soldier is disbanded only if its upkeep pays the cost back
 
 /// The index in figure::kUnitFamilies of a unit's family, for a unit of a package that of the
 /// original's unit of its kind (Kind, as its hold shows it); 0 for other figures.
@@ -506,9 +507,20 @@ void Engine::recruit(AiPlayer& p) {
         const Balance& bal = m_world.balance();
         const std::uint32_t keep =
             bal.ai_inhabitants_per_unit != 0 ? total_population(p.player) / bal.ai_inhabitants_per_unit / 2 : 0;
+        // Disbanding costs gold (the third value of the Soldat: line): only a soldier whose upkeep
+        // pays that back within half an hour goes; one that costs nothing to keep stays.
+        const assets::FigureTable* f = m_sim.figures();
+        const auto pays_back = [&](const Soldier& s) {
+            const assets::FigureType* type = f != nullptr ? f->get(s.figure) : nullptr;
+            if (type == nullptr) {
+                return false;
+            }
+            const std::uint32_t keep_cost = f->unit_upkeep(type->kind);
+            return keep_cost != 0 && keep_cost * kDisbandPaybackMinutes >= f->unit_cost(type->kind);
+        };
         if (units > keep) {
             for (const Soldier& s : m_world.soldiers()) {
-                if (s.owner == p.player && !s.away() && !s.dying()) {
+                if (s.owner == p.player && !s.away() && !s.dying() && pays_back(s)) {
                     SoldierCommand cmd;
                     cmd.player = p.player;
                     cmd.soldier = s.id;

@@ -512,10 +512,12 @@ their castles and aboard, and cannon towers (the original's computers pay nothin
 or a tower only while its upkeep stays within a budget: in peace half their civil income (taxes less
 running costs); arming for a war of their own, all of it and besides what their gold above 1000
 pays for two hours; at war or with a stronger enemy nearby, all of it and what their gold pays for
-an hour. A war plan starts only if that budget carries the soldiers it needs. While a war of its
+an hour. A war plan starts only if that budget carries the soldiers it needs, and is declared only
+while its cities earn more than they cost. While a war of its
 own gets somewhere, or under threat, a computer accepts a deficit and gives up only at 2000 gold
 in debt; a war that failed a look ends in debt as before. In peace, with an army that costs a
-quarter beyond its budget while its gold falls, it disbands soldiers one by one.
+quarter beyond its budget while its gold falls, it disbands soldiers one by one. As disbanding
+costs gold, only a soldier whose upkeep pays that back within half an hour goes.
 While it saves for its army that way, or is in debt, it switches off the producers of what none
 of its cities needs now (no inhabitants want it, nothing of its own works it into a wanted good,
 no building material, no weapons while it arms or fights) until it can afford them again.
