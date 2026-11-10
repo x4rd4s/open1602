@@ -171,6 +171,9 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
         if (counts && counted >= max_entries) {
             return;
         }
+        if (std::any_of(wanted.begin(), wanted.end(), [&](const Want& x) { return x.ware == w; })) {
+            return;  // already wanted, by an improved computer's need
+        }
         if (c.stock(w) < target) {
             wanted.push_back({w, target + target / 4});
             counted += counts ? 1U : 0U;
@@ -200,6 +203,27 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
     }
     if (population(c) >= 25) {
         want(ware::kCloth, std::max(8 * demand(c, ware::kCloth), std::uint32_t{10 * kTon}));
+    }
+    if (rivals()) {
+        // Open1602: an improved computer buys the goods its people use and it makes too little of
+        // as soon as they use them, the one that runs out first ahead, before ore and iron take the
+        // Kontor's few buying places: alcohol came last and its settlers went without for hours.
+        struct Lack {
+            std::uint8_t ware;
+            std::uint64_t lasts;  ///< stock * 256 / demand
+        };
+        std::vector<Lack> lacks;
+        for (const std::uint8_t w :
+             {ware::kAlcohol, ware::kTobaccoGoods, ware::kSpices, ware::kCocoa, ware::kClothes}) {
+            const std::uint32_t used = demand(c, w);
+            if (used != 0 && supply(c, w) < used) {
+                lacks.push_back({w, std::uint64_t{c.stock(w)} * 256 / used});
+            }
+        }
+        std::stable_sort(lacks.begin(), lacks.end(), [](const Lack& a, const Lack& b) { return a.lasts < b.lasts; });
+        for (const Lack& l : lacks) {
+            want(l.ware, lux(l.ware, 10));
+        }
     }
     if (population(c, 1) >= 170) {
         if (player(p).money > 2000) {
