@@ -654,6 +654,14 @@ void Engine::recruit(AiPlayer& p) {
             const auto order = [&](std::uint32_t family) {
                 if (!(one && queued)) {
                     queued = queue_unit(p, e, family) || queued;
+                    if (queued && one) {
+                        log(p,
+                            "recruits unit family %u (upkeep %d + %d, budget %d, civil %d, trade %d, gold %d, "
+                            "goal %u, war %u, army %u core %u)",
+                            family, upkeep, unit_upkeep_estimate(p), army_budget(p), civil_income(p),
+                            trade_balance(player(p)), player(p).money, unsigned{p.strategy.goal},
+                            unsigned{p.strategy.war_target}, weighted_army(p.player), core);
+                    }
                 }
             };
             if (r.slots[kSlotMuskets].count != 0 && c->stock(ware::kMuskets) > 31) {
