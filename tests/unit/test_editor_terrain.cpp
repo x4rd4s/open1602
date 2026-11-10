@@ -15,6 +15,7 @@
 #include "o1602/editor/document.hpp"
 #include "o1602/editor/islands.hpp"
 #include "o1602/editor/terrain.hpp"
+#include "o1602/sim/save_game.hpp"
 #include "o1602/sim/validate.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -692,4 +693,33 @@ TEST_CASE("editor terrain: land runs on beyond the map's edge without a coast, w
     (void)stroke.shape(0, east, true, 3);
     CHECK(record_at(world, buildings, 19, 7) == kSea);
     CHECK(stroke.first_refusal() == editor::TerrainStroke::Refusal::Edge);
+}
+
+TEST_CASE("editor terrain: a land that spans the whole map about other islands is saved and loaded") {
+    const auto buildings = make_buildings();
+    sim::World world(120, 80);
+    // A continent along three edges of the map; its rectangle is the whole map.
+    sim::IslandMap map(120, 80);
+    for (std::uint32_t y = 0; y < 80; ++y) {
+        for (std::uint32_t x = 0; x < 120; ++x) {
+            const bool land = x < 10 || y < 6 || y >= 74;
+            REQUIRE(map.place(*buildings.by_id(land ? kMeadow : kSea), static_cast<std::int32_t>(x),
+                              static_cast<std::int32_t>(y), 0, 0)
+                        .ok());
+        }
+    }
+    map.capture_ground();
+    assets::IslandHeader header;
+    header.width = 120;
+    header.height = 80;
+    REQUIRE(world.add_island(sim::WorldIsland{header, std::move(map), 0, 0}, &buildings).ok());
+    // Islands in its sea, together larger than what the continent leaves open.
+    REQUIRE(world.add_island(make_island(buildings, 60, 40, 1, 20, 10), &buildings).ok());
+    REQUIRE(world.add_island(make_island(buildings, 30, 30, 2, 85, 40), &buildings).ok());
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->islands().size() == 3);
+    CHECK(loaded->islands()[0].map.width() == 120);
 }

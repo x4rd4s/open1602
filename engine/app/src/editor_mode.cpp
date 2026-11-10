@@ -832,10 +832,12 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
                             render::TilePos{x, y}});
     }
     for (const sim::Ship& s : world.ships()) {
-        if (holds(s.name)) {
+        // A ship or trade cart placed in the editor has no name of its own yet: by its number.
+        const std::string name = ship_name(s);
+        if (holds(name)) {
             const sim::Player* owner = world.player(s.owner);
             out.push_back(Found{
-                ui::tr("editor.find.ship", {s.name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
+                ui::tr("editor.find.ship", {name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
                 EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
         }
     }
@@ -2535,7 +2537,26 @@ void MapViewer::editor_paint(editor::TerrainStroke& stroke, std::int64_t x, std:
         return;
     }
     if (t.tool == EditorTerrain::Tool::Land || t.tool == EditorTerrain::Tool::Water) {
-        const auto brush = editor::brush_tiles(x, y, side, world.width(), world.height(), shape);
+        auto brush = editor::brush_tiles(x, y, side, world.width(), world.height(), shape);
+        if (t.tool == EditorTerrain::Tool::Land && t.open_edge) {
+            // Land that runs on beyond the map: a brush one tile short of the map's edge takes the
+            // edge too, so that no strip of beach and water one tile wide is left there.
+            const std::uint32_t W = world.width();
+            const std::uint32_t H = world.height();
+            std::vector<std::pair<std::uint32_t, std::uint32_t>> more;
+            for (const auto& [tx, ty] : brush) {
+                const std::uint32_t ex = tx == 1 ? 0 : (W > 2 && tx == W - 2 ? W - 1 : tx);
+                const std::uint32_t ey = ty == 1 ? 0 : (H > 2 && ty == H - 2 ? H - 1 : ty);
+                for (const auto& p : {std::pair{ex, ty}, std::pair{tx, ey}, std::pair{ex, ey}}) {
+                    if (p != std::pair{tx, ty}) {
+                        more.push_back(p);
+                    }
+                }
+            }
+            brush.insert(brush.end(), more.begin(), more.end());
+            std::sort(brush.begin(), brush.end());
+            brush.erase(std::unique(brush.begin(), brush.end()), brush.end());
+        }
         if (brush.empty()) {
             return;
         }

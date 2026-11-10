@@ -1056,10 +1056,12 @@ void MapViewer::update(std::uint32_t delta_ms) {
     }
     if (m_editor) {
         // The editor's world is shown, never run (ADR 0013): no tick, no figures moving, no autosave.
-        // The animations of the pictures (water, flags) go on, at 1x.
+        // The animations of the pictures (water, flags) go on, at 1x. The trade carts stand where
+        // they were placed (they are land figures, not drawn with the ships).
         m_clock.advance(delta_ms, 1);
         m_tick_fraction = 1.0;
         m_ship_trail.set_fraction(m_tick_fraction);
+        m_carts.update(m_state->world, m_buildings, m_figures, m_ship_trail, 0);
         return;
     }
     // The pause of the video ended another way (F3, another player): the video goes too.
