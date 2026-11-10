@@ -457,7 +457,7 @@ private:
     /// islands grows, and it may found a colony for it.
     [[nodiscard]] bool colony_crop_missing(AiPlayer& p);
     static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
-    static constexpr std::int64_t kBuyReserveMinutes = 10;
+    static constexpr std::int64_t kBuyReserveMinutes = 5;
     static constexpr std::uint32_t kSpareKeepMinutes = 10;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
@@ -619,7 +619,7 @@ private:
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
     /// Improved computers: what an own city can give of `w` to another own city (0 for nothing).
     /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
-    /// purchases); 0 for the others.
+    /// purchases beyond its sales); 0 for the others.
     [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const;
     /// Improved computers: what is left to buy of `w` at a partner's city `c` (0 for nothing).

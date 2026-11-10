@@ -281,22 +281,26 @@ bool Engine::affordable(const AiPlayer& p, const City& c, const assets::Building
     const auto& m = m_buildings.materials();
     const auto& cost = b.build_cost;
     // Open1602: an improved rival leaves the gold for the goods it buys (buy_reserve), but for a
-    // producer, which may be the one to make them.
+    // producer, which may be the one to make them, and a house, which brings the taxes.
     const bool producer = b.ware != 0 && b.prod_kind != prod::kMarket && b.prod_kind != prod::kKontor;
-    const std::int64_t keep = producer ? 0 : buy_reserve(p);
+    const std::int64_t keep = producer || b.prod_kind == prod::kHouse ? 0 : buy_reserve(p);
     return std::int64_t{player(p).money} >= cost.money + keep && c.stock(m.wood) >= cost.wood &&
            c.stock(m.bricks) >= cost.bricks && c.stock(m.tools) >= cost.tools && c.stock(m.cannons) >= cost.cannons;
 }
 
 std::int64_t Engine::buy_reserve(const AiPlayer& p) const {
-    // Open1602: the gold an improved rival keeps for the goods it buys at other Kontors, the
-    // purchases of kBuyReserveMinutes. Its public buildings, yard and ships took the gold down to a
-    // few coins; then it could buy no more cloth and tobacco, its merchants left within half an
-    // hour, and its taxes fell below its costs for good.
-    if (!rivals() || p.pirates) {
+    // Open1602: the gold an improved rival keeps for the goods it buys at other Kontors, what it
+    // buys beyond what it sells in kBuyReserveMinutes. Its public buildings, yard and ships took the
+    // gold down to a few coins; then it could buy no more cloth and tobacco, its merchants left
+    // within half an hour, and its taxes fell below its costs for good. Ten minutes of the gross
+    // purchases held back too much: a sixth fewer inhabitants, and some sat on their gold.
+    // Only from kColonySaveFrom inhabitants on: a young town that bought its first goods kept back
+    // the gold of everything else and stayed a village.
+    if (!rivals() || p.pirates || total_population(p.player) < kColonySaveFrom) {
         return 0;
     }
-    return kBuyReserveMinutes * std::max<std::int64_t>(0, player(p).purchases / 480);
+    const Player& pl = player(p);
+    return kBuyReserveMinutes * std::max<std::int64_t>(0, (pl.purchases - pl.sales) / 480);
 }
 
 const assets::BuildingType* Engine::producer(std::uint8_t w, std::uint8_t raw) const {
