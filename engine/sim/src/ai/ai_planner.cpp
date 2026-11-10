@@ -2277,8 +2277,9 @@ bool Engine::colony_crop_missing(AiPlayer& p) {
         return false;
     }
     const City* home = home_city(p);
-    // Only once settlers live there: pioneers saving for it stood still for up to two hours.
-    if (home == nullptr || population(*home, 1) == 0) {
+    // Only once settlers live there and the city has grown to kColonySaveFrom: saving from the
+    // first settler held the houses that bring the gold, and the town stood still for two hours.
+    if (home == nullptr || population(*home, 1) == 0 || population(*home) < kColonySaveFrom) {
         return false;
     }
     struct Need {

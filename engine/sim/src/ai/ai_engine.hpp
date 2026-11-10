@@ -456,6 +456,7 @@ private:
     /// Improved computers: settlers in the home city want a good whose crop none of the computer's
     /// islands grows, and it may found a colony for it.
     [[nodiscard]] bool colony_crop_missing(AiPlayer& p);
+    static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
