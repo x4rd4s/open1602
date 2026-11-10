@@ -2766,7 +2766,7 @@ std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t
     }
     // As many lines as the text needs, wrapped as the paragraph wraps it, and the same gap below
     // every line of the list.
-    constexpr std::int32_t kLine = 20;
+    constexpr std::int32_t kCheckRow = 20;
     constexpr std::int32_t kSpace = 10;
     std::size_t lines = 0;
     if (m_font != nullptr) {
@@ -2776,7 +2776,7 @@ std::int32_t EditorPanel::check_line_h(const EditorCheckLine& line, std::int32_t
         const auto per_line = static_cast<std::size_t>(std::max(20, width / 8));
         lines = (line.text.size() + per_line - 1) / per_line;
     }
-    return std::clamp<std::int32_t>(static_cast<std::int32_t>(lines), 1, 8) * kLine + kSpace;
+    return std::clamp<std::int32_t>(static_cast<std::int32_t>(lines), 1, 8) * kCheckRow + kSpace;
 }
 
 void EditorPanel::layout_check(const EditorModel& model) {
