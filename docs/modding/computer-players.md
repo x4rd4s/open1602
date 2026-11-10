@@ -480,6 +480,12 @@ Improved computers weigh the way at sea:
   (20 t of wood, tools and bricks, or 10 t of food) or nine tenths of it, and unloads other goods
   aboard first. A ship that has not been loaded after ten minutes goes back to work. The loaded
   ship looks for its island at every look of the city's order.
+- **Big shipyard.** The original's computers tear their small yard down and put the big one in
+  its place; where it did not fit or the gold fell short, they were left without a yard for good.
+  An improved computer builds the big yard on a site of its own. Where demolishing gives something
+  back (the game's refund setting), it counts the small yard's refund in the big one's price and
+  tears the small one down first, once the big one's site is found; without a refund it tears it
+  down only once the big one stands.
 - **Ships without a job.** A ship of an improved computer that has nothing to do guards the home
   island as a patrol (the supply takes it again at the end of a leg), and no new ship is ordered
   while one lies idle.
