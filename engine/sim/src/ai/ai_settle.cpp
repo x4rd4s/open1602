@@ -1038,6 +1038,31 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     if (const std::uint8_t g = goal_crop(p); g != 0 && g != skip) {
         return g;
     }
+    // Open1602: and then a crop for what its home city's people use, make too little of and run
+    // out of soonest, alcohol from wine or sugar: settlers without it fell back and the city into
+    // debt, while the original went for spices and tobacco first.
+    if (const City* home = rivals() ? home_city(p) : nullptr) {
+        struct Need {
+            std::uint8_t good;
+            std::array<std::uint8_t, 2> crops;
+        };
+        std::array<Need, 4> needs{{{ware::kAlcohol, {ware::kWineField, ware::kSugarField}},
+                                   {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
+                                   {ware::kSpices, {ware::kSpiceField, 0}},
+                                   {ware::kCocoa, {ware::kCocoaField, 0}}}};
+        std::ranges::stable_sort(needs, {}, [&](const Need& n) { return stock_lasts(*home, n.good); });
+        for (const Need& n : needs) {
+            if (stock_lasts(*home, n.good) == std::numeric_limits<std::uint64_t>::max() ||
+                std::ranges::any_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); })) {
+                continue;
+            }
+            for (const std::uint8_t crop : n.crops) {
+                if (crop != 0 && crop != skip) {
+                    return crop;
+                }
+            }
+        }
+    }
     for (const std::uint8_t crop : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCocoaField,
                                     ware::kCottonField, ware::kSugarField}) {
         if (crop != skip && !crop_available(p, crop)) {

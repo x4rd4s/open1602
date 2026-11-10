@@ -436,6 +436,9 @@ private:
     /// Open1602: whether a discontent class living in the city (any, with `content_too`) lacks one
     /// of its goods (not food).
     [[nodiscard]] bool goods_lacking(const City& c, bool content_too = false) const;
+    /// Open1602: how long a good's stock lasts its people (stock * 256 / demand), the most for one
+    /// they do not use or that the city makes enough of.
+    [[nodiscard]] std::uint64_t stock_lasts(const City& c, std::uint8_t w) const;
     /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
     [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.

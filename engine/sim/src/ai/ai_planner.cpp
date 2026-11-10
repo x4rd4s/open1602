@@ -1715,6 +1715,15 @@ bool Engine::goods_lacking(const City& c, bool content_too) const {
     return lacking_ware(c, content_too) != 0;
 }
 
+std::uint64_t Engine::stock_lasts(const City& c, std::uint8_t w) const {
+    // A good its people do not use, or that the city makes enough of, lasts for good.
+    const std::uint32_t used = demand(c, w);
+    if (used == 0 || supply(c, w) >= used) {
+        return std::numeric_limits<std::uint64_t>::max();
+    }
+    return std::uint64_t{c.stock(w)} * 256 / used;
+}
+
 std::uint8_t Engine::lacking_ware(const City& c, bool content_too) const {
     // A class that lives in the city (discontent, unless `content_too`) with one of its goods (not
     // food) under a ton in stock and short in supply. With `content_too` only goods the city makes
@@ -2499,7 +2508,12 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         {kSlotSugar, ware::kSugarField, ware::kAlcohol,
          upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
     }};
-    for (const Crop& crop : crops) {
+    // Open1602: an improved computer plants first what its home city's people run out of soonest.
+    std::array<Crop, 6> order = crops;
+    if (rivals()) {
+        std::ranges::stable_sort(order, {}, [&](const Crop& crop) { return stock_lasts(*home, crop.good); });
+    }
+    for (const Crop& crop : order) {
         if (!crop.eligible || fertility(c->island, crop.field) != 128) {
             continue;
         }
