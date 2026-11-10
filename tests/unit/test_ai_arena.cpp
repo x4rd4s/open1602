@@ -572,7 +572,7 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
         // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
         // their ships saw.
-        test::check_golden("arena after an hour", s.state_hash(), 0x353e44bc57d515b7ULL);
+        test::check_golden("arena after an hour", s.state_hash(), 0x8d28e7633d5bf90bULL);
     }
 }
 

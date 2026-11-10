@@ -1251,18 +1251,15 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
 }
 
 bool Engine::colony_load_in_stock(AiPlayer& p, bool food) {
-    // What prepare_colony_ship takes in one go: the load on top of what the city keeps.
+    // Half of every ware of the load in the city: an improved computer loads all of its stock
+    // (prepare_colony_ship), so the rest comes in while the ship sails home.
     const City* c = current_city(p);
     if (c == nullptr) {
         return false;
     }
     const auto& m = m_buildings.materials();
-    const auto has = [&](std::uint8_t w, std::uint32_t enough, std::uint32_t min_city, std::uint32_t amount) {
-        return c->stock(w) >= enough + min_city - amount;
-    };
-    return has(m.wood, 30 * kTon, 15 * kTon, 5 * kTon) && has(m.tools, 30 * kTon, 18 * kTon, 5 * kTon) &&
-           (food ? has(m_buildings.food_ware(), 15 * kTon, 9 * kTon, 3 * kTon)
-                 : has(m.bricks, 30 * kTon, 15 * kTon, 5 * kTon));
+    return c->stock(m.wood) >= 15 * kTon && c->stock(m.tools) >= 15 * kTon &&
+           (food ? c->stock(m_buildings.food_ware()) >= 8 * kTon : c->stock(m.bricks) >= 15 * kTon);
 }
 
 bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
@@ -1322,13 +1319,16 @@ bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
         if (ship->load(w) >= enough) {
             return true;
         }
-        if (c->stock(w) >= min_city) {
+        // Open1602: an improved computer loads what the city has; the original leaves it min_city, so
+        // a city short of tools kept its ship waiting at the Kontor.
+        const std::uint32_t stock = c->stock(w);
+        if (stock >= min_city || (!classic() && stock != 0)) {
             CargoTransfer t;
             t.player = p.player;
             t.ship = ship->id;
             t.ware = w;
             t.to_ship = true;
-            t.amount = amount;
+            t.amount = classic() ? amount : std::min(amount, std::min(stock, enough - ship->load(w)));
             execute(t);
         }
         return false;

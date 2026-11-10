@@ -418,8 +418,11 @@ private:
     bool more_food(AiPlayer& p, const City& c, const CityPlan& r, bool ahead = false);
     /// Open1602: whether a city's own food comes in with a quarter to spare.
     [[nodiscard]] bool food_ahead(const City& c) const;
-    /// Open1602: food_ahead, and the city's cloth comes in or lasts.
+    /// Open1602: food_ahead, and the goods of its pioneers and settlers come in or last.
     [[nodiscard]] bool supplies_growth(const City& c) const;
+    /// Open1602: more food or cloth for a home city whose supply falls short (`growing`: with a
+    /// quarter of food to spare); true when a producer was planned.
+    bool supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
