@@ -369,6 +369,8 @@ private:
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);
+    /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
+    void shed_producers(AiPlayer& p, City& c);
     void tax_rates(AiPlayer& p, City& c);
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.

@@ -22,6 +22,8 @@ constexpr std::size_t kLockFromClass = 2;   // the merchants
 constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
 constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
+constexpr std::int64_t kShedMoney = -5000;  // ... and below this tear down producers nobody needs,
+constexpr std::size_t kShedPerVisit = 4;    // ... a few per visit of the city
 
 }  // namespace
 
@@ -95,6 +97,7 @@ void Engine::refresh_city(AiPlayer& p) {
         buy_settings(p, *c, *r);
         sell_settings(p, *c, *r);
         production_switches(p, *c);
+        shed_producers(p, *c);
         tax_rates(p, *c);
         material_lock(p, *c);
     }
@@ -428,6 +431,88 @@ void Engine::set_material_lock(AiPlayer& p, City& c, bool on) {
     o.on = on;
     execute(o);
     log(p, "city %u/%u: material %s", c.island, c.index, on ? "locked, goods are missing" : "free again");
+}
+
+void Engine::shed_producers(AiPlayer& p, City& c) {
+    // Open1602: an improved computer deep in debt and still losing gold tears down the producers of
+    // the city whose ware none of its cities needs: no inhabitants that want it, no building of its
+    // own that works it into something wanted, and no building material. A producer switched off
+    // still costs its idle running costs; once torn down it costs nothing. A few at a time.
+    if (!rivals() || p.pirates || player(p).money >= kShedMoney || net_income(p) >= 0) {
+        return;
+    }
+    std::array<bool, 256> needed{};
+    const auto& m = m_buildings.materials();
+    for (const std::uint8_t w : {m.wood, m.tools, m.bricks, m_buildings.food_ware()}) {
+        needed[w] = true;
+    }
+    const auto& classes = m_buildings.resident_classes();
+    std::vector<const assets::BuildingType*> made;  // the computer's producers, once per type
+    for (const City& o : m_world.cities()) {
+        if (o.owner != p.player) {
+            continue;
+        }
+        for (std::size_t k = 0; k < classes.size() && k < o.inhabitants.size(); ++k) {
+            if (o.inhabitants[k] != 0) {
+                for (const assets::ResidentClass::Need& n : classes[k].needs) {
+                    needed[n.ware] = true;
+                }
+            }
+        }
+    }
+    for (const Production& pr : m_world.productions()) {
+        if (!pr.used || pr.island >= m_world.islands().size()) {
+            continue;
+        }
+        const IslandMap& map = island_of(pr.island).map;
+        if (!map.contains(pr.x, pr.y) || map.top(pr.x, pr.y).empty()) {
+            continue;
+        }
+        const City* o = m_world.city(pr.island, map.top(pr.x, pr.y).city);
+        const assets::BuildingType* b = m_buildings.by_sprite(map.top(pr.x, pr.y).sprite);
+        if (o != nullptr && o->owner == p.player && b != nullptr && b->raw_ware != 0 &&
+            std::find(made.begin(), made.end(), b) == made.end()) {
+            made.push_back(b);
+        }
+    }
+    // What a needed ware is made of is needed too, down the chain.
+    for (bool more = true; more;) {
+        more = false;
+        for (const assets::BuildingType* b : made) {
+            if (needed[b->ware] && !needed[b->raw_ware]) {
+                needed[b->raw_ware] = true;
+                more = true;
+            }
+        }
+    }
+    const IslandMap& map = island_of(c.island).map;
+    std::vector<std::pair<std::int32_t, std::int32_t>> shed;
+    for (const Production& pr : m_world.productions()) {
+        if (shed.size() >= kShedPerVisit) {
+            break;
+        }
+        if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
+            continue;
+        }
+        const MapCell& cell = map.top(pr.x, pr.y);
+        if (cell.city != c.index || cell.empty()) {
+            continue;
+        }
+        const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
+        if (b == nullptr || b->ware == 0 || needed[b->ware] || b->prod_kind == prod::kMarket ||
+            b->prod_kind == prod::kKontor || b->prod_kind < prod::kWorkshop || b->prod_kind > prod::kFisher) {
+            continue;
+        }
+        shed.emplace_back(pr.x, pr.y);
+    }
+    std::size_t done = 0;
+    for (const auto& [x, y] : shed) {
+        done += demolish_tile(p, x, y) != 0 ? 1U : 0U;
+    }
+    if (done != 0) {
+        log(p, "city %u/%u: tears down %zu producers nobody needs in debt (gold %d)", c.island, c.index, done,
+            player(p).money);
+    }
 }
 
 void Engine::production_switches(AiPlayer& p, City& c) {
