@@ -836,9 +836,9 @@ std::vector<MapViewer::Found> MapViewer::editor_find(const std::string& text) co
         const std::string name = ship_name(s);
         if (holds(name)) {
             const sim::Player* owner = world.player(s.owner);
-            out.push_back(Found{
-                ui::tr(s.cart() ? "editor.find.cart" : "editor.find.ship", {name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
-                EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
+            out.push_back(Found{ui::tr(s.cart() ? "editor.find.cart" : "editor.find.ship",
+                                       {name, owner != nullptr ? editor_player_label(*owner) : std::string("-")}),
+                                EditorPick{EditorPick::Kind::Ship, 0, s.x, s.y, s.id}, render::TilePos{s.x, s.y}});
         }
     }
     return out;
