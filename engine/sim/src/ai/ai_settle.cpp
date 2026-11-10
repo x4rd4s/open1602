@@ -627,12 +627,17 @@ void Engine::task_settle_site(AiPlayer& p) {
     const std::int32_t by0 = std::max(region.y0 - 1, 0);
     const std::int32_t bx1 = std::min(region.x1 + 1, w - 1);
     const std::int32_t by1 = std::min(region.y1 + 1, h - 1);
+    // Open1602: the window used to hold only Kontors whose top left corner lies up to two tiles left
+    // of and above the beach tile; improved computers also try those beside it on every side, so
+    // that their Kontors may face any side of the island.
+    const std::int32_t before = classic() ? 2 : static_cast<std::int32_t>(std::max(kontor->size_x, kontor->size_y));
+    const std::int32_t after = classic() ? 0 : 1;
     for (const auto& [x, y] : area_scan(island).beach) {
         if (x < bx0 || x > bx1 || y < by0 || y > by1) {
             continue;
         }
-        for (std::int32_t oy = y - 2; oy <= y; ++oy) {
-            for (std::int32_t ox = x - 2; ox <= x; ++ox) {
+        for (std::int32_t oy = y - before; oy <= y + after; ++oy) {
+            for (std::int32_t ox = x - before; ox <= x + after; ++ox) {
                 if (!isl.map.contains(ox, oy) || tried[std::size_t(oy) * std::size_t(w) + std::size_t(ox)] != 0) {
                     continue;
                 }
