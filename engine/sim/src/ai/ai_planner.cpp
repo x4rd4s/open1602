@@ -466,8 +466,11 @@ Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon) const {
             }
         }
     }
+    // Swords always, for the army it keeps to defend itself; the rest of the weapons while it arms
+    // or is at war.
+    needed[ware::kSwords] = true;
     if (p.strategy.goal == goal::kMilitary || p.strategy.war_target != kNoPlayer) {
-        for (const std::uint8_t w : {ware::kSwords, ware::kMuskets, m.cannons}) {
+        for (const std::uint8_t w : {ware::kMuskets, m.cannons}) {
             needed[w] = true;
         }
     }
@@ -758,6 +761,14 @@ std::int32_t Engine::net_income(const AiPlayer& p) const {
     return civil_income(p) - military_cost(p);
 }
 
+std::int32_t Engine::earned_income(const AiPlayer& p) const {
+    // What the computer's gold does a minute with its trade: its purchases of goods for the
+    // inhabitants count against it.
+    return static_cast<std::int32_t>(std::clamp<std::int64_t>(std::int64_t{net_income(p)} + trade_balance(player(p)),
+                                                              std::numeric_limits<std::int32_t>::min(),
+                                                              std::numeric_limits<std::int32_t>::max()));
+}
+
 bool Engine::incomes_ok(const AiPlayer& p, std::int32_t minimum) const {
     // Every inhabited city of the computer earns at least `minimum` per minute.
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
@@ -908,8 +919,10 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 // Open1602: the home city of an improved computer that earns gold grows its houses
                 // with its land at once (houses_wanted): more inhabitants pay more taxes. Before, it
                 // did so only with nothing else left to do, and stood at the list's number for hours.
-                found = need_houses(
-                    p, grow || (rivals() && &c == home_city(p) && net_income(p) > 0) ? houses_wanted(c, r, n.n) : n.n);
+                found =
+                    need_houses(p, grow || (rivals() && &c == home_city(p) && earned_income(p) > 0 && !food_short(c))
+                                       ? houses_wanted(c, r, n.n)
+                                       : n.n);
                 break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, count(n.n), holds(n.flag));
@@ -2089,6 +2102,11 @@ bool Engine::need_tower(AiPlayer& p, std::uint8_t type, std::uint32_t n) {
     }
     const assets::BuildingType* b = by_id(building);
     if (b == nullptr || !unlocked(p, *b) || (!p.pirates && !affordable(p, *c, *b))) {
+        return false;
+    }
+    // Open1602: a cannon tower costs upkeep like a soldier; only within the army's budget.
+    if (!p.pirates && rivals() && pays_upkeep(m_world, player(p)) && m_sim.figures() != nullptr &&
+        military_cost(p) + static_cast<std::int32_t>(m_sim.figures()->tower_upkeep()) > army_budget(p)) {
         return false;
     }
     if (!push(p, kTowers, false)) {

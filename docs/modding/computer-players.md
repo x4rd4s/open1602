@@ -83,7 +83,8 @@ its other balance values (savegame `BALA` version 6).
 An improved computer's main city whose houses have risen to half the citizens of
 `citizens2_citizens` already moves on to the citizens' stage while it earns gold, with a quarter of
 that share in hand, without waiting for a luxury good in store or a colony first. While it earns
-gold, its home city grows its houses with its land at every stage, as long as its houses move up
+gold with its trade (purchases count against it) and its food suffices, its home city grows its
+houses with its land at every stage, as long as its houses move up
 to the next class, and it builds them with a quarter of the original's 1000 gold in hand.
 
 ## Taxes
@@ -526,7 +527,8 @@ earn with their trade (taxes less running costs, sales less purchases) and what 
 1000 pays for twelve hours; with a stronger enemy nearby three quarters of it and besides what their gold above 1000
 pays for an hour and a half; in a war of their own three quarters and three hours of that gold;
 arming for one, six hours of it. Half the army their inhabitants call for they keep up whatever
-it costs, to defend themselves. Paying upkeep, they order one unit a look. A war plan starts only if that budget carries the soldiers it needs, and is
+it costs, to defend themselves, and their sword smiths are never switched off for savings. A cannon
+tower of a build order costs upkeep too and is built only within the budget. Paying upkeep, they order one unit a look. A war plan starts only if that budget carries the soldiers it needs, and is
 declared only while its cities earn more than they cost. While a war of its own gets somewhere, or
 under threat, a computer accepts a deficit and gives up only at 2000 gold in debt; a war that
 failed a look ends in debt as before. An army beyond its budget only stops growing: disbanding

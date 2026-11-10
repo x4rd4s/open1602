@@ -449,6 +449,8 @@ private:
                                                 std::uint32_t level) const;
     /// Per minute: taxes less running costs, less the army's upkeep where it pays one.
     [[nodiscard]] std::int32_t net_income(const AiPlayer& p) const;
+    /// net_income with the trade balance (sales less purchases).
+    [[nodiscard]] std::int32_t earned_income(const AiPlayer& p) const;
     /// Taxes less the running costs of the cities, without the army.
     [[nodiscard]] std::int32_t civil_income(const AiPlayer& p) const;
     /// The army's upkeep per minute (military_upkeep), 0 for the original's computers.
