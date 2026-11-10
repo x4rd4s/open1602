@@ -396,8 +396,10 @@ private:
     /// `any_stage`: for a colony too (its caps on fields and farms).
     [[nodiscard]] std::uint32_t grown(const CityPlan& r, std::uint32_t n, bool any_stage = false) const;
     /// Open1602: the houses of an order, `grown` only while at most an eighth of the city's houses
-    /// hold pioneers, so that a city grows tall before it grows wide.
-    [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const;
+    /// hold pioneers, so that a city grows tall before it grows wide. `home`: the home city of an
+    /// improved computer that earns, grown from kGrowLand tiles of land on.
+    [[nodiscard]] std::uint32_t houses_wanted(const City& c, const CityPlan& r, std::uint32_t n,
+                                              bool home = false) const;
     /// `grow`: with the numbers `grown` by the city's land (houses: `houses_wanted`).
     bool first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int32_t money, std::span<const StageNeed> needs,
                     bool grow = false);

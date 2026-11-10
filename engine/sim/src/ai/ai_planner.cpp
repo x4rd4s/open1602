@@ -856,8 +856,10 @@ std::uint32_t Engine::grown(const CityPlan& r, std::uint32_t n, bool any_stage) 
     return grown_count(r.land, n, any_stage || m_grow_from == 0 ? kGrowFrom : m_grow_from);
 }
 
-std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint32_t n) const {
-    const std::uint32_t wanted = grown(r, n);
+std::uint32_t Engine::houses_wanted(const City& c, const CityPlan& r, std::uint32_t n, bool home) const {
+    // The home city grows from kGrowLand tiles on rather than kGrowFrom: most home islands give
+    // their main city between 1000 and 2000 tiles, and it stood at the order's number of houses.
+    const std::uint32_t wanted = home ? std::max(grown(r, n), grown_count(r.land, n, kGrowLand)) : grown(r, n);
     if (wanted <= n) {
         return n;
     }
@@ -919,10 +921,10 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 // Open1602: the home city of an improved computer that earns gold grows its houses
                 // with its land at once (houses_wanted): more inhabitants pay more taxes. Before, it
                 // did so only with nothing else left to do, and stood at the list's number for hours.
-                found =
-                    need_houses(p, grow || (rivals() && &c == home_city(p) && earned_income(p) > 0 && !food_short(c))
-                                       ? houses_wanted(c, r, n.n)
-                                       : n.n);
+                {
+                    const bool home = rivals() && &c == home_city(p) && earned_income(p) > 0 && !food_short(c);
+                    found = need_houses(p, grow || home ? houses_wanted(c, r, n.n, home) : n.n);
+                }
                 break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, count(n.n), holds(n.flag));

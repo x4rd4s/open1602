@@ -839,10 +839,10 @@ void Engine::report(AiPlayer& p) {
             "report city %u/%u: stage %u, people %u, houses %u (%u/%u/%u/%u/%u), land %u, grown16 %u, wanted %u, "
             "house slot %u/%u/%u, market %u/%u/%u flag %d, food %u t short %d",
             r.island, r.city, unsigned{r.stage}, population(*c), houses, classes[0], classes[1], classes[2], classes[3],
-            classes[4], r.land, grown(r, 16), houses_wanted(*c, r, houses), unsigned{hs.count}, unsigned{hs.attempts},
-            unsigned{hs.fail_level}, unsigned{ms.count}, unsigned{ms.attempts}, unsigned{ms.fail_level},
-            (r.flags & city_flag::kMarket) != 0 ? 1 : 0, c->stock(m_buildings.food_ware()) / kTon,
-            food_short(*c) ? 1 : 0);
+            classes[4], r.land, grown(r, 16), houses_wanted(*c, r, houses, rivals() && c == home_city(p)),
+            unsigned{hs.count}, unsigned{hs.attempts}, unsigned{hs.fail_level}, unsigned{ms.count},
+            unsigned{ms.attempts}, unsigned{ms.fail_level}, (r.flags & city_flag::kMarket) != 0 ? 1 : 0,
+            c->stock(m_buildings.food_ware()) / kTon, food_short(*c) ? 1 : 0);
     }
 }
 
