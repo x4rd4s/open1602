@@ -582,6 +582,9 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
+    /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
+    [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
+                                         std::int32_t r) const;
     bool farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                    std::int32_t y1);
     [[nodiscard]] assets::ServiceBits house_services(std::uint16_t island, std::int32_t x, std::int32_t y) const;

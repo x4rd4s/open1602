@@ -165,6 +165,12 @@ inline constexpr std::uint32_t kFoodMinutes = 15;
 /// Open1602: an improved rival's home grows beyond its order with three quarters of its food its
 /// own while the stock feeds its inhabitants for kFoodAheadMinutes minutes (supplies_growth).
 inline constexpr std::uint32_t kFoodAheadMinutes = 30;
+/// Open1602: how far about a road's end an improved computer counts the open land its new roads
+/// lead to (Engine::task_roads).
+inline constexpr std::int32_t kOpenLandRange = 6;
+/// The slots of the farms and plantations, whose fields want open land.
+inline constexpr std::array<std::uint8_t, 9> kFieldSlots{kSlotGrain,  kSlotCotton,  kSlotWine,  kSlotSpices, kSlotCocoa,
+                                                         kSlotCattle, kSlotTobacco, kSlotSheep, kSlotSugar};
 /// Open1602: gold from which a public building counts as costly (a church, a bath, a college): an
 /// improved computer builds it only while its people have their goods (Engine::goods_lacking).
 inline constexpr std::int64_t kCostlyPublic = 1000;

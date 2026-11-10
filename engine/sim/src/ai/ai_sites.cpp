@@ -923,7 +923,10 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                           if (t.ware == ware::kGrain && d == 0) {
                               acc.score -= 64;
                           }
-                          if (raw_producer(t.ware) && d < 5) {
+                          // Open1602: an improved computer keeps its farms apart only where their
+                          // fields would overlap (three rings); five left no site in a grown town
+                          // with a thousand free tiles, and its people starved.
+                          if (raw_producer(t.ware) && d < (improved ? 3 : 5)) {
                               acc.score -= 32 << (5 - d);
                           }
                       });
@@ -1671,6 +1674,20 @@ std::int32_t Engine::free_run(std::uint16_t island, std::uint8_t own, std::int32
         break;
     }
     return n < 2 ? 0 : n;
+}
+
+std::int32_t Engine::open_land(std::uint16_t island, std::uint8_t own, std::int32_t x, std::int32_t y,
+                               std::int32_t r) const {
+    std::int32_t n = 0;
+    for (std::int32_t ty = y - r; ty <= y + r; ++ty) {
+        for (std::int32_t tx = x - r; tx <= x + r; ++tx) {
+            const Tile t = tile(island, tx, ty);
+            if (t.valid() && (t.city == own || t.city == MapCell::kNoCity) && plantable(t)) {
+                ++n;
+            }
+        }
+    }
+    return n;
 }
 
 Acc Engine::fisher_site(AiPlayer& p, std::int32_t cx, std::int32_t cy) {
