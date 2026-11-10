@@ -1227,12 +1227,14 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     const std::uint32_t ship = colony_ship_candidate(p);
     if (ship == 0) {
         p.settle.ship = 0;
+        p.settle.load_ms = 0;
         return false;
     }
     if (p.settle.ship != ship) {
         log(p, "colony (mode %u): ship %u goes home to load", mode, ship);
         // First call: the ship goes to the home city to load.
         p.settle.ship = ship;
+        p.settle.load_ms = classic() ? 0 : std::max<std::uint64_t>(now_ms(), 1);
         Ship* s = m_world.ship(ship);
         if (const City* home = home_city(p); home != nullptr && s != nullptr) {
             send_to_city(p, *s, *home);
@@ -1324,6 +1326,7 @@ bool Engine::prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food) {
         s.floor = 300;
         s.crop = crop;
         s.active = true;
+        s.load_ms = 0;
     }
     return true;
 }

@@ -284,6 +284,9 @@ void io(A& a, Settlement& s) {
     a(s.retries);
     a(s.sailing);
     a(s.regions);
+    if (a.version() >= kStateWithColonyLoad) {
+        a(s.load_ms);
+    }
 }
 
 template <class A>

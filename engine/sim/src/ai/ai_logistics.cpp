@@ -133,12 +133,36 @@ void Engine::arm_one(City& c, Ship& s) {
 
 // ---------------------------------------------------------------------------------------------
 
+void Engine::colony_load_timeout(AiPlayer& p) {
+    // Open1602: a colony ship called home to load whose city never gathers the wood, tools and
+    // bricks lay idle at the Kontor for good, kept from every other job. After kColonyLoadMs it goes
+    // back to work, and the next colony starts over later.
+    constexpr std::uint64_t kColonyLoadMs = 10ULL * 60 * 1000;
+    Settlement& s = p.settle;
+    if (s.load_ms == 0) {
+        return;
+    }
+    if (s.ship == 0 || s.active) {
+        s.load_ms = 0;
+        return;
+    }
+    if (now_ms() - s.load_ms < kColonyLoadMs) {
+        return;
+    }
+    log(p, "colony ship %u: no load after %llu min, back to work", s.ship,
+        static_cast<unsigned long long>((now_ms() - s.load_ms) / 60'000));
+    s.ship = 0;
+    s.load_ms = 0;
+    s.last_ms = now_ms();
+}
+
 void Engine::logistics(AiPlayer& p) {
     // A scenario can keep the computer's ships out of supply and patrols.
     if (p.pirates || player(p).scenario.has(scenario_flag::kNoFleet)) {
         return;
     }
     forget_ships(p);
+    colony_load_timeout(p);
     // Patrol stops passed since the last look.
     for (ShipNote& n : p.ships) {
         const Ship* s = m_world.ship(n.id);

@@ -540,6 +540,8 @@ private:
 
     // ---- ai_logistics.cpp ----
     void logistics(AiPlayer& p);
+    /// Open1602: frees a colony ship that waited too long for its load.
+    void colony_load_timeout(AiPlayer& p);
     ShipNote& note(AiPlayer& p, std::uint32_t ship);
     void forget_ships(AiPlayer& p);
     [[nodiscard]] const assets::FigureType* ship_type(const Ship& s) const;
