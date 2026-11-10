@@ -171,6 +171,9 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
         if (counts && counted >= max_entries) {
             return;
         }
+        if (std::any_of(wanted.begin(), wanted.end(), [&](const Want& x) { return x.ware == w; })) {
+            return;  // already wanted, by an improved computer's need
+        }
         if (c.stock(w) < target) {
             wanted.push_back({w, target + target / 4});
             counted += counts ? 1U : 0U;
@@ -200,6 +203,27 @@ void Engine::buy_settings(AiPlayer& p, City& c, CityPlan& r) {
     }
     if (population(c) >= 25) {
         want(ware::kCloth, std::max(8 * demand(c, ware::kCloth), std::uint32_t{10 * kTon}));
+    }
+    if (rivals()) {
+        // Open1602: an improved computer buys the goods its people use and it makes too little of
+        // as soon as they use them, the one that runs out first ahead, before ore and iron take the
+        // Kontor's few buying places: alcohol came last and its settlers went without for hours.
+        struct Lack {
+            std::uint8_t ware;
+            std::uint64_t lasts;  ///< stock * 256 / demand
+        };
+        std::vector<Lack> lacks;
+        for (const std::uint8_t w :
+             {ware::kAlcohol, ware::kTobaccoGoods, ware::kSpices, ware::kCocoa, ware::kClothes}) {
+            const std::uint32_t used = demand(c, w);
+            if (used != 0 && supply(c, w) < used) {
+                lacks.push_back({w, std::uint64_t{c.stock(w)} * 256 / used});
+            }
+        }
+        std::stable_sort(lacks.begin(), lacks.end(), [](const Lack& a, const Lack& b) { return a.lasts < b.lasts; });
+        for (const Lack& l : lacks) {
+            want(l.ware, lux(l.ware, 10));
+        }
     }
     if (population(c, 1) >= 170) {
         if (player(p).money > 2000) {
@@ -1684,11 +1708,40 @@ bool Engine::supplies_growth(const City& c) const {
     }
     // Contentment follows a missing good only after a while: nor while one of their goods that the
     // city makes is used up and comes in short.
-    return !goods_lacking(c, true);
+    if (goods_lacking(c, true)) {
+        return false;
+    }
+    return true;
 }
 
 bool Engine::goods_lacking(const City& c, bool content_too) const {
     return lacking_ware(c, content_too) != 0;
+}
+
+std::uint64_t Engine::stock_lasts(const City& c, std::uint8_t w) const {
+    // A good its people do not use, or that the city makes enough of, lasts for good.
+    const std::uint32_t used = demand(c, w);
+    if (used == 0 || supply(c, w) >= used) {
+        return std::numeric_limits<std::uint64_t>::max();
+    }
+    return std::uint64_t{c.stock(w)} * 256 / used;
+}
+
+std::uint32_t Engine::critical_short(PlayerId owner, std::uint8_t w) const {
+    // Open1602: alcohol and cloth, what all the owner's cities use beyond what they make (1/32 t a
+    // minute); the ships carry it between them. Food each city grows for itself (more_food).
+    if (w != ware::kAlcohol && w != ware::kCloth) {
+        return 0;
+    }
+    std::uint64_t used = 0;
+    std::uint64_t made = 0;
+    for (const City& c : m_world.cities()) {
+        if (c.owner == owner) {
+            used += demand(c, w);
+            made += supply(c, w);
+        }
+    }
+    return used > made ? static_cast<std::uint32_t>(std::min<std::uint64_t>(used - made, 0xFFFFFFFFU)) : 0;
 }
 
 std::uint8_t Engine::lacking_ware(const City& c, bool content_too) const {
@@ -2475,7 +2528,17 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         {kSlotSugar, ware::kSugarField, ware::kAlcohol,
          upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
     }};
-    for (const Crop& crop : crops) {
+    // Open1602: an improved computer plants first what its people go without (critical_short),
+    // then what its home city's people run out of soonest; for a critical good as many fields as
+    // make up what its cities lack, beyond the order's number.
+    std::array<Crop, 6> order = crops;
+    if (rivals()) {
+        wine_island = fertility(c->island, ware::kWineField) == 128;
+        std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
+            return critical_short(p.player, crop.good) != 0 ? 0 : 1 + stock_lasts(*home, crop.good) / 2;
+        });
+    }
+    for (const Crop& crop : order) {
         if (!crop.eligible || fertility(c->island, crop.field) != 128) {
             continue;
         }
@@ -2485,10 +2548,20 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         if (crop.slot == kSlotSugar && wine_island) {
             continue;
         }
-        if (r->slots[crop.slot].count >= n || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
+        // At most two beyond the order in a city, so that the fields do not take its houses' land.
+        std::uint32_t want = n;
+        const std::uint32_t lacking = rivals() ? critical_short(p.player, crop.good) : 0;
+        if (lacking != 0) {
+            const assets::BuildingType* b = producer(crop.good, crop.field);
+            const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;
+            if (per != 0) {
+                want = std::max(want, std::min(r->slots[crop.slot].count + (lacking + per - 1) / per, n + 2));
+            }
+        }
+        if (r->slots[crop.slot].count >= want || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
             continue;
         }
-        if (need(p, crop.slot, n)) {
+        if (need(p, crop.slot, want)) {
             return true;
         }
         if (exclusive && crop.slot != kSlotSugar) {

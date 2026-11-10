@@ -776,6 +776,9 @@ void Engine::task_shipyard(AiPlayer& p) {
         return;
     }
     if (s.best <= 0 || build(p, {BuildItem{b->id, s.best_x0, s.best_y0, 0, 0}}, false) == 0) {
+        log(p, "city %u/%u: %s for building %u (try %u)", r->island, r->city,
+            s.best <= 0 ? "no shipyard site" : "shipyard not built", unsigned{b->id},
+            unsigned{r->slots[kSlotShipyard].attempts} + 1);
         slot_fail(p, kSlotShipyard);
         return;
     }
