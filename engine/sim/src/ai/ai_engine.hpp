@@ -582,6 +582,11 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
+    /// Open1602: the place of the island with the most unclaimed land fields could take about it,
+    /// near the city's markets (kFieldLandTiles at least); false without one.
+    [[nodiscard]] bool field_land(const AiPlayer& p, std::int32_t& x, std::int32_t& y) const;
+    /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
+    bool claim_fields(AiPlayer& p, std::uint8_t slot);
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
     [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                          std::int32_t r) const;

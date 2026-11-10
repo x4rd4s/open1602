@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "ai_engine.hpp"
+#include "ai_tables.hpp"
 
 #include "o1602/sim/houses.hpp"
 
@@ -1688,6 +1689,63 @@ std::int32_t Engine::open_land(std::uint16_t island, std::uint8_t own, std::int3
         }
     }
     return n;
+}
+
+bool Engine::field_land(const AiPlayer& p, std::int32_t& best_x, std::int32_t& best_y) const {
+    if (p.island >= m_world.islands().size()) {
+        return false;
+    }
+    const IslandMap& map = m_world.islands()[p.island].map;
+    // The middles of the city's markets and its Kontor.
+    std::vector<std::pair<std::int32_t, std::int32_t>> markets;
+    for (std::uint32_t ty = 0; ty < map.height(); ++ty) {
+        for (std::uint32_t tx = 0; tx < map.width(); ++tx) {
+            if (map.top(tx, ty).city != p.city) {
+                continue;
+            }
+            const Tile t = tile(p.island, static_cast<std::int32_t>(tx), static_cast<std::int32_t>(ty));
+            if (t.origin && market_or_kontor(t) && !t.type->destroyed) {
+                markets.emplace_back(static_cast<std::int32_t>(tx) + static_cast<std::int32_t>(t.type->size_x) / 2,
+                                     static_cast<std::int32_t>(ty) + static_cast<std::int32_t>(t.type->size_y) / 2);
+            }
+        }
+    }
+    if (markets.empty()) {
+        return false;
+    }
+    std::int32_t best = 0;
+    for (std::int32_t y = 0; y < static_cast<std::int32_t>(map.height()); y += kFieldLandStep) {
+        for (std::int32_t x = 0; x < static_cast<std::int32_t>(map.width()); x += kFieldLandStep) {
+            const Tile t = tile(p.island, x, y);
+            if (!t.valid() || t.city != MapCell::kNoCity || !plantable(t)) {
+                continue;
+            }
+            std::int32_t open = 0;
+            for (std::int32_t ty = y - kOpenLandRange; ty <= y + kOpenLandRange; ++ty) {
+                for (std::int32_t tx = x - kOpenLandRange; tx <= x + kOpenLandRange; ++tx) {
+                    const Tile o = tile(p.island, tx, ty);
+                    open += o.valid() && o.city == MapCell::kNoCity && plantable(o) ? 1 : 0;
+                }
+            }
+            if (open < kFieldLandTiles) {
+                continue;
+            }
+            std::int32_t near = std::numeric_limits<std::int32_t>::max();
+            for (const auto& [mx, my] : markets) {
+                const std::int32_t ax = std::abs(mx - x);
+                const std::int32_t ay = std::abs(my - y);
+                near = std::min(near, std::max(ax, ay) + std::min(ax, ay) / 2);
+            }
+            // Open land counts, and so does staying near: a market reaches some twenty tiles.
+            const std::int32_t score = 4 * open - 8 * near;
+            if (score > best) {
+                best = score;
+                best_x = x;
+                best_y = y;
+            }
+        }
+    }
+    return best > 0;
 }
 
 Acc Engine::fisher_site(AiPlayer& p, std::int32_t cx, std::int32_t cy) {

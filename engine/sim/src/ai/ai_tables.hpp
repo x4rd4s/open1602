@@ -168,6 +168,11 @@ inline constexpr std::uint32_t kFoodAheadMinutes = 30;
 /// Open1602: how far about a road's end an improved computer counts the open land its new roads
 /// lead to (Engine::task_roads).
 inline constexpr std::int32_t kOpenLandRange = 6;
+/// Open1602: unclaimed land an improved computer claims for its farms (Engine::field_land): at
+/// least kFieldLandTiles tiles fields can take within kOpenLandRange of a place, looked at every
+/// kFieldLandStep tiles.
+inline constexpr std::int32_t kFieldLandTiles = 60;
+inline constexpr std::int32_t kFieldLandStep = 3;
 /// The slots of the farms and plantations, whose fields want open land.
 inline constexpr std::array<std::uint8_t, 9> kFieldSlots{kSlotGrain,  kSlotCotton,  kSlotWine,  kSlotSpices, kSlotCocoa,
                                                          kSlotCattle, kSlotTobacco, kSlotSheep, kSlotSugar};

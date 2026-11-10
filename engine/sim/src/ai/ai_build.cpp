@@ -456,6 +456,10 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
     }
     if (slot_fail(p, s.slot) == 0) {
         push(p, kRoads, true);
+    } else if (!classic() && !p.pirates && std::ranges::find(kFieldSlots, s.slot) != kFieldSlots.end()) {
+        // Open1602: with no site left in its land, an improved computer claims open land of the
+        // island for its farms with a market (claim_fields).
+        (void)claim_fields(p, s.slot);
     }
 }
 
@@ -636,6 +640,13 @@ void Engine::task_claim_land(AiPlayer& p) {
                             false) != 0) {
         slot_built(p, kSlotMarket);
         log(p, "claim market at %d,%d towards %d,%d", s.best_x0, s.best_y0, s.target_x, s.target_y);
+        // A farm's slot searches its sites anew in the land the market brought in.
+        if (std::ranges::find(kFieldSlots, s.slot) != kFieldSlots.end()) {
+            if (CityPlan* r = current_plan(p)) {
+                r->slots[s.slot].attempts = 0;
+                r->slots[s.slot].fail_level = 0;
+            }
+        }
         return;
     }
     // No site on the way: the deposit is given up until land changes (land_freed) or the hourly
