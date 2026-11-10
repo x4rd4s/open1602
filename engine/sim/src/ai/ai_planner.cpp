@@ -1665,37 +1665,27 @@ bool Engine::food_ahead(const City& c) const {
 
 bool Engine::supplies_growth(const City& c) const {
     // A stock alone fills new houses that starve once it is eaten: the home city grows beyond its
-    // order only while its own food comes in with a quarter to spare and every good its pioneers and
-    // settlers want (cloth, and what a package adds) comes in or lasts kFoodMinutes. A settler without
-    // cloth turns discontent, and the houses fall back to pioneers paying a fifth.
+    // order only while its own food comes in with a quarter to spare and every class living in it
+    // is content (kContentForGrowth). A settler without cloth or a citizen without alcohol turns
+    // discontent, the houses fall back and pay a fraction; a good merely short in store, with the
+    // people still content, holds nothing up.
     if (!food_ahead(c)) {
         return false;
     }
-    // The same for the goods of every higher class that lives in the city: citizens without alcohol,
-    // tobacco or spices fall back to settlers as well.
-    const auto& classes = m_buildings.resident_classes();
-    for (std::size_t k = 0; k < classes.size(); ++k) {
-        if (k >= 2 && (k >= c.inhabitants.size() || c.inhabitants[k] == 0)) {
-            continue;
-        }
-        for (const assets::ResidentClass::Need& n : classes[k].needs) {
-            if (n.ware == m_buildings.food_ware()) {
-                continue;
-            }
-            const std::uint32_t d = demand(c, n.ware);
-            if (d != 0 && supply(c, n.ware) < d && !food_lasts(c.stock(n.ware), d)) {
-                return false;
-            }
+    for (std::size_t k = 0; k < c.inhabitants.size() && k < c.satisfaction.size(); ++k) {
+        if (c.inhabitants[k] != 0 && c.satisfaction[k] < kContentForGrowth) {
+            return false;
         }
     }
     return true;
 }
 
 bool Engine::goods_lacking(const City& c) const {
-    // A good of a class that lives in the city (not food) under a ton in stock and short in supply.
+    // A class that lives in the city, discontent, with one of its goods (not food) under a ton in
+    // stock and short in supply.
     const auto& classes = m_buildings.resident_classes();
     for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
-        if (c.inhabitants[k] == 0) {
+        if (c.inhabitants[k] == 0 || (k < c.satisfaction.size() && c.satisfaction[k] >= kContentForGrowth)) {
             continue;
         }
         for (const assets::ResidentClass::Need& n : classes[k].needs) {

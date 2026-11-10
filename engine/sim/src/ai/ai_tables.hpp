@@ -165,6 +165,9 @@ inline constexpr std::uint32_t kFoodMinutes = 15;
 /// Open1602: gold from which a public building counts as costly (a church, a bath, a college): an
 /// improved computer builds it only while its people have their goods (Engine::goods_lacking).
 inline constexpr std::int64_t kCostlyPublic = 1000;
+/// Open1602: the contentment (128 = content) every class of the home city must have for it to grow
+/// beyond its order, and below which a class that lacks a good holds costly public buildings back.
+inline constexpr std::uint8_t kContentForGrowth = 100;
 /// Open1602: a city whose houses wait for wood builds woodcutters up to one for every four houses,
 /// at most kMostWoodcutters that way.
 inline constexpr std::uint32_t kMostWoodcutters = 4;
