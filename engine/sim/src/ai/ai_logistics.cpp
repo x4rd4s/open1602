@@ -864,6 +864,12 @@ std::vector<std::uint8_t> Engine::routed_wares(AiPlayer& p, std::uint32_t ship, 
     return routed;
 }
 
+std::uint32_t Engine::ships_per_ware(std::uint32_t seconds) {
+    // Open1602: one ship for a ware, one more for each ten minutes there and back, at most three,
+    // so that a far source still keeps the city supplied while one ship is under way.
+    return 1 + std::min<std::uint32_t>(2 * seconds, 1200) / 600;
+}
+
 std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_t target) const {
     const auto& m = m_buildings.materials();
     if (w == m.tools || w == m.bricks || w == m.wood) {
@@ -882,7 +888,9 @@ std::uint64_t Engine::supply_need(AiPlayer& p, const City& c) {
             break;
         }
         std::uint16_t price = 0;
-        if (std::ranges::find(routed, w) == routed.end() && supply_source(p, c.island, w, &price, &c)) {
+        const auto src = supply_source(p, c.island, w, &price, &c);
+        if (src && static_cast<std::uint32_t>(std::ranges::count(routed, w)) <
+                       ships_per_ware(sail_seconds(p, city_point(c), city_point(m_world.cities()[*src])))) {
             return urgency;
         }
     }
@@ -927,7 +935,8 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     };
     const auto choose = [&](std::uint8_t exclude) -> std::optional<Pick> {
         for (const std::uint8_t w : wares) {
-            if (w == exclude || std::find(routed.begin(), routed.end(), w) != routed.end()) {
+            const auto on_way = static_cast<std::uint32_t>(std::ranges::count(routed, w));
+            if (w == exclude || (on_way != 0 && classic())) {
                 continue;
             }
             if (classic() && home.stock(w) >= target) {
@@ -948,7 +957,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 // until the ship can be back, at most half the ship's holds.
                 seconds = sail_seconds(p, city_point(home), city_point(m_world.cities()[*src]));
                 keep = supply_buffer(target, 2 * seconds);
-                if (home.stock(w) >= keep) {
+                if (home.stock(w) >= keep || on_way >= ships_per_ware(seconds)) {
                     continue;
                 }
             }

@@ -604,6 +604,9 @@ private:
     /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
     /// for the original's computers to any city.
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
+    /// Improved computers: how many supply ships may bring the same ware to a city whose source
+    /// lies `seconds` away.
+    [[nodiscard]] static std::uint32_t ships_per_ware(std::uint32_t seconds);
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,
