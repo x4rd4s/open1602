@@ -195,6 +195,19 @@ std::int32_t outside_zone(const TownZone* zone, std::int32_t margin, const Site&
     return zone_excess(*zone, c.x0, c.y0, c.x1, c.y1) > margin ? score + kZoneTier : score;
 }
 
+/// Open1602: an improved computer also takes a site that scores nothing, after every site that
+/// does. The scores reward company (houses, a market, the raw material) and punish the coast and
+/// the fields, so in a full town or on a small island every site left may score 0 or less; the
+/// original then finds no site for a house or a workshop at all, however much room there is.
+constexpr std::int32_t kAnySiteBand = 1 << 20;
+
+std::int32_t any_site(bool classic, std::int32_t score) {
+    if (classic) {
+        return score;
+    }
+    return score > 0 ? score + kAnySiteBand : std::max(1, kAnySiteBand + score);
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
@@ -665,6 +678,7 @@ bool Engine::search_houses(AiPlayer& p) {
                 const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
                 score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
             }
+            score = any_site(classic(), score);
             tally_site(p, true, acc.market, score);
             if (acc.market && score > s.best) {
                 s.best = score;
@@ -737,7 +751,7 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
             std::int32_t score = cannons ? acc.score : parity_penalty(acc.score, parity, 4);
             // Open1602: workshops at the edge of the town zone or outside, not on its house land.
-            score = outside_zone(zone, -kZoneWorkshopDepth, c, score);
+            score = any_site(classic(), outside_zone(zone, -kZoneWorkshopDepth, c, score));
             tally_site(p, acc.road, acc.market, score);
             if (acc.market && acc.road && score > s.best) {
                 s.best = score;
