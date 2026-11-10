@@ -1199,6 +1199,13 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
         return false;
     }
+    if (p.settle.active && !p.settle.sailing && !classic() && !p.settle.failed) {
+        // Open1602: the loaded ship looks for its island at every look of the city's order, not
+        // only when the whole order is through (root); it lay loaded at the Kontor for minutes.
+        const std::size_t before = p.stack.size();
+        pick_island(p);
+        return p.stack.size() > before;
+    }
     if (p.settle.active || n >= city_limit()) {
         return false;
     }
@@ -1230,6 +1237,12 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         p.settle.load_ms = 0;
         return false;
     }
+    if (!classic() && p.settle.ship == ship && !colony_load_in_stock(p, food) && !colony_loading(p)) {
+        // Called from another city's order, which does not hold the load: the ship goes back to work.
+        p.settle.ship = 0;
+        p.settle.load_ms = 0;
+        return false;
+    }
     if (p.settle.ship != ship) {
         // Open1602: an improved computer calls the ship home only once the city holds the load; the
         // original called it at once, and a city short of tools or bricks kept it idle at the Kontor
@@ -1248,6 +1261,16 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return true;
     }
     return prepare_colony_ship(p, choose_colony_crop(p), food);
+}
+
+bool Engine::colony_loading(AiPlayer& p) {
+    // Whether the colony ship already holds part of its load.
+    const Ship* ship = settle_ship(p);
+    if (ship == nullptr) {
+        return false;
+    }
+    const auto& m = m_buildings.materials();
+    return ship->load(m.wood) != 0 || ship->load(m.tools) != 0 || ship->load(m.bricks) != 0;
 }
 
 std::uint32_t Engine::colony_load(std::uint32_t tons) const {

@@ -367,6 +367,8 @@ private:
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
     /// Open1602: whether the current city holds a colony ship's whole load.
     [[nodiscard]] bool colony_load_in_stock(AiPlayer& p, bool food);
+    /// Open1602: whether the colony ship already holds part of its load.
+    [[nodiscard]] bool colony_loading(AiPlayer& p);
     /// The tons of a ware a colony ship sets out with, of the original's `tons`.
     [[nodiscard]] std::uint32_t colony_load(std::uint32_t tons) const;
     [[nodiscard]] std::uint32_t colony_ship_candidate(AiPlayer& p);
