@@ -288,6 +288,11 @@ annokit::core::Result<std::unique_ptr<Operation>> edit_route(const sim::World& w
     const sim::Rules rules = scenario_rules(world).value_or(sim::Rules{});
     sim::Fleet fleet(after, buildings, figures, rules);
     sim::Ship& ship = *after.ship(id);
+    if (edit.op == sim::RouteEdit::Op::SetStop && ship.cart() &&
+        !fleet.cart_way(ship.owner, static_cast<std::uint32_t>(ship.x), static_cast<std::uint32_t>(ship.y),
+                        edit.target)) {
+        return make_error(ErrorCode::OutOfRange, "the cart finds no way to that city");
+    }
     // A route begins at its first stop.
     const auto first_stop = [&ship] {
         ship.route.current = 0;

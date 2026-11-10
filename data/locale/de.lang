@@ -379,6 +379,7 @@ city.cart_more = {1} (Umschalt+Klick: ein weiterer fahrender Händler)
 unit.trade_cart = Fahrender Händler
 # The name frame of a trade cart's window
 cart.name_help = Name des fahrenden Händlers
+cart.default = Händler {1}
 castle.release = {1} (Umschalt+Klick: alle fertigen Einheiten, aufgestellt um den Zielpunkt)
 
 # Players five to twelve of a new world, named after their colours
@@ -1245,6 +1246,7 @@ editor.find.island = Insel {1}
 editor.find.city = Stadt {1}
 editor.find.ship = Schiff {1} ({2})
 editor.find.cart = Händler {1} ({2})
+editor.find.unnamed = {1} ({2})
 editor.recover.ask = „{1}“ wurde nicht gespeichert.\nÄnderungen wiederherstellen?
 editor.recover.new_map = die neue Karte
 editor.recover.done = Wiederhergestellt. Noch nicht gespeichert.
@@ -1433,6 +1435,7 @@ editor.ship.route_no_ware = Keine Ware
 editor.ship.route_load = Lädt
 editor.ship.route_unload = Entlädt
 editor.ship.route_refused = Das nimmt die Route nicht an.
+editor.ship.route_no_way = Der Händler findet keinen Weg zu dieser Stadt. Fehlt eine Straße oder Brücke?
 editor.ship.cargo_title = Ladung von {1}
 editor.ship.room = Jeder Laderaum fasst bis zu {1} t. Die Ware: Klick die nächste, Rechtsklick die vorige. Tonnen: Klick 10 t, Rechtsklick 1 t.
 editor.ship.empty = Leer

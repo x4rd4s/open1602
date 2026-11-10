@@ -717,7 +717,9 @@ void MapViewer::editor_ship_request(const EditorRequest& request) {
         }
         auto op = editor::edit_route(world, m_buildings, m_figures, m_editor->pick.id, e);
         if (!op) {
-            editor_notice(ui::tr("editor.ship.route_refused"), true, op.error().message);
+            const bool no_way = op.error().code == annokit::core::ErrorCode::OutOfRange;
+            editor_notice(ui::tr(no_way ? "editor.ship.route_no_way" : "editor.ship.route_refused"), true,
+                          op.error().message);
             return;
         }
         m_editor->document.perform(std::move(op).value());

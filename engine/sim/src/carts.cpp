@@ -391,6 +391,9 @@ void Fleet::decide_cart(Ship& ship) {
             if (m.failures > kCartMaxFailures) {
                 m_events.push_back(ShipEvent{ShipEvent::Kind::GaveUp, ship.id, ship.owner});
                 if (ship.route.active) {
+                    // Open1602: a stop without a way counts as a refused transfer, so three such
+                    // rounds warn the player and the route list shows it red.
+                    ship.route.problem = true;
                     route_next_stop(ship);
                 } else {
                     finish_order(ship);

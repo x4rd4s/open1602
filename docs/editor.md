@@ -219,13 +219,16 @@ fills it. Each change is one step of undo.
 
 Beside it, **Route** gives the ship or trade cart a trade route as its route window in the game
 does: **Stop 1 of 8** (a cart: of 4) chooses the stop to change, **City** the city it goes to (a
-ship's any city with a Kontor, a cart's only those of its island; **No stop** empties it), and
+ship's any city with a Kontor, a cart's only those of its island, its own or a foreign one it may
+trade with, and only one it finds a way to; **No stop** empties it), and
 below, for each ware the stop handles (as many as the ship has holds, at most eight), the ware,
 whether the stop **loads** it until that much is on board or **unloads** up to that much, and the
 tons (+ and - by 10 t, with the right button by 1 t). **Runs from the start** switches the route on:
 the ship or cart sets off along it as soon as the game begins, from its first stop. Changed while
 on, the route begins again from its first stop; without any stop it is off. Switched off, the ship
 waits where it was placed. Each change is one step of undo.
+In the game, a cart that finds no way to a stop of its route goes on to the next one; three rounds
+like that warn its player as refused transfers do (Open1602).
 
 ## Players
 
