@@ -1361,7 +1361,9 @@ bool Engine::load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::
         unload_at(c, ship, true, false);
     }
     const auto load = [&](std::uint8_t w, std::uint32_t enough, std::uint32_t min_city, std::uint32_t amount) {
-        if (ship.load(w) >= enough) {
+        // Open1602: an improved computer sets out with nine tenths too; the last ton of food was
+        // eaten in town as fast as it came in, and the ship waited for it.
+        if (ship.load(w) >= (classic() ? enough : enough - enough / 10)) {
             return true;
         }
         // Open1602: an improved computer loads what the city has; the original leaves it min_city, so
@@ -1373,7 +1375,7 @@ bool Engine::load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::
             t.ship = ship.id;
             t.ware = w;
             t.to_ship = true;
-            t.amount = classic() ? amount : std::min(amount, std::min(stock, enough - ship.load(w)));
+            t.amount = classic() ? amount : std::min(stock, enough - ship.load(w));  // all at once
             execute(t);
         }
         return false;

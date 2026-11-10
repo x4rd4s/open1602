@@ -929,11 +929,11 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                     found = true;
                     break;
                 }
-                // With ten minutes of its civil income in hand: a city that spent every coin had nothing
-                // to bridge the first shortage with.
-                const bool home =
-                    earns && std::int64_t{money} >= 10 * std::int64_t{civil_income(p)} && supplies_growth(c);
-                found = need_houses(p, grow || home ? houses_wanted(c, r, n.n, home) : n.n);
+                // The same supply holds the home city once its order is through (`grow`): it went on
+                // building houses whose settlers then lacked cloth and alcohol.
+                const bool supplied = home_city_here ? supplies_growth(c) : true;
+                const bool home = earns && supplied;
+                found = need_houses(p, (grow && supplied) || home ? houses_wanted(c, r, n.n, home) : n.n);
             } break;
             case StageNeed::Kind::Public:
                 found = need_public(p, n.slot, count(n.n), holds(n.flag));
