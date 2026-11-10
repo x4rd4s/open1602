@@ -1355,6 +1355,11 @@ bool Engine::load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::
     Settlement& s = p.settle;
     const auto& m = m_buildings.materials();
     const std::uint8_t food_ware = m_buildings.food_ware();
+    if (!classic()) {
+        // Open1602: other goods aboard go into the warehouse first; a ship whose holds were full of
+        // them took no wood or tools and lay at the Kontor.
+        unload_at(c, ship, true, false);
+    }
     const auto load = [&](std::uint8_t w, std::uint32_t enough, std::uint32_t min_city, std::uint32_t amount) {
         if (ship.load(w) >= enough) {
             return true;
@@ -1405,12 +1410,19 @@ void Engine::continue_colony_load(AiPlayer& p) {
         return;
     }
     if (!ship_at_city(*ship, *home)) {
+        log(p, "colony ship %u: not at home yet (at %u,%u, target %d, route %d)", ship->id, unsigned{ship->x},
+            unsigned{ship->y}, ship->target.empty() ? 0 : 1, ship->route.active ? 1 : 0);
         if (ship->target.empty()) {
             send_to_city(p, *ship, *home);
         }
         return;
     }
-    load_colony_ship(p, *home, *ship, s.load_food, choose_colony_crop(p));
+    if (!load_colony_ship(p, *home, *ship, s.load_food, choose_colony_crop(p))) {
+        const auto& m = m_buildings.materials();
+        log(p, "colony ship %u: loading, aboard wood %u tools %u bricks %u food %u, holds %zu", ship->id,
+            ship->load(m.wood) / kTon, ship->load(m.tools) / kTon, ship->load(m.bricks) / kTon,
+            ship->load(m_buildings.food_ware()) / kTon, ship->cargo.size());
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
