@@ -1033,29 +1033,26 @@ bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
 
 std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     const std::uint8_t skip = p.settle.previous_crop;
-    // Open1602: an improved computer looks for the crop of what its people use, make too little of
-    // and run out of soonest first, alcohol from wine or sugar and cloth from cotton ahead
-    // (critical_short), where none of its cities has an island for it yet: settlers without alcohol
-    // fell back and the city into debt, while the original went for spices and tobacco first. Then
-    // what its goal needs: gold for its aristocrats, ore to arm.
-    const City* home = rivals() ? home_city(p) : nullptr;
-    struct Need {
-        std::uint8_t good;
-        std::array<std::uint8_t, 2> crops;
-    };
-    std::array<Need, 5> needs{{{ware::kAlcohol, {ware::kWineField, ware::kSugarField}},
-                               {ware::kCloth, {ware::kCottonField, 0}},
-                               {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
-                               {ware::kSpices, {ware::kSpiceField, 0}},
-                               {ware::kCocoa, {ware::kCocoaField, 0}}}};
-    const auto lacks = [&](const Need& n) {
-        return critical_short(p.player, n.good) != 0 ? 0 : 1 + stock_lasts(*home, n.good) / 2;
-    };
-    const auto crop_for = [&](bool critical) -> std::uint8_t {
+    // Open1602: an improved computer looks for what its goal needs first: gold for its
+    // aristocrats, ore to arm.
+    if (const std::uint8_t g = goal_crop(p); g != 0 && g != skip) {
+        return g;
+    }
+    // Open1602: and then a crop for what its home city's people use, make too little of and run
+    // out of soonest, alcohol from wine or sugar: settlers without it fell back and the city into
+    // debt, while the original went for spices and tobacco first.
+    if (const City* home = rivals() ? home_city(p) : nullptr) {
+        struct Need {
+            std::uint8_t good;
+            std::array<std::uint8_t, 2> crops;
+        };
+        std::array<Need, 4> needs{{{ware::kAlcohol, {ware::kWineField, ware::kSugarField}},
+                                   {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
+                                   {ware::kSpices, {ware::kSpiceField, 0}},
+                                   {ware::kCocoa, {ware::kCocoaField, 0}}}};
+        std::ranges::stable_sort(needs, {}, [&](const Need& n) { return stock_lasts(*home, n.good); });
         for (const Need& n : needs) {
-            const bool is_critical = critical_short(p.player, n.good) != 0;
-            if (is_critical != critical ||
-                (!critical && stock_lasts(*home, n.good) == std::numeric_limits<std::uint64_t>::max()) ||
+            if (stock_lasts(*home, n.good) == std::numeric_limits<std::uint64_t>::max() ||
                 std::ranges::any_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); })) {
                 continue;
             }
@@ -1064,21 +1061,6 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
                     return crop;
                 }
             }
-        }
-        return 0;
-    };
-    if (home != nullptr) {
-        std::ranges::stable_sort(needs, {}, lacks);
-        if (const std::uint8_t crop = crop_for(true); crop != 0) {
-            return crop;
-        }
-    }
-    if (const std::uint8_t g = goal_crop(p); g != 0 && g != skip) {
-        return g;
-    }
-    if (home != nullptr) {
-        if (const std::uint8_t crop = crop_for(false); crop != 0) {
-            return crop;
         }
     }
     for (const std::uint8_t crop : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCocoaField,
