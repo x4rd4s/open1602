@@ -17,7 +17,8 @@ namespace o1602::sim::ai {
 
 namespace {
 
-constexpr std::uint64_t kColonyCooldownMs = 60'000;  // 60 s between settlement events
+constexpr std::uint64_t kColonyCooldownMs = 60'000;      // 60 s between settlement events
+constexpr std::uint64_t kColonySpacingMs = 20 * 60'000;  // improved computers: between two foundings
 constexpr std::int32_t kNeedStep = 50;
 constexpr std::uint64_t kLeftIslandMs = 2'700'000;  // improved computers: 45 min before they settle a left island again
 constexpr std::uint32_t kPirateRegionPasses = 6;    // passes a further nest keeps to a part without one
@@ -1219,8 +1220,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     // Open1602: an improved computer founds a colony only with the gold to build it up; founded
-    // with its last gold, the colony stood empty and was given up.
-    if (!classic() && player(p).money < colony_money(p)) {
+    // with its last gold, the colony stood empty and was given up. A rival also keeps its gold for
+    // the goods it buys (buy_reserve).
+    if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
         return false;
     }
     const std::uint32_t n = p.cities;
@@ -1237,6 +1239,12 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return p.stack.size() > before;
     }
     if (p.settle.active || n >= city_limit()) {
+        return false;
+    }
+    // Open1602: an improved computer founds one colony after the other: the next only once the
+    // last one's costs show in its income (kColonySpacingMs). Three founded within forty minutes
+    // spent the gold of a lone home city, whose income then could not carry them.
+    if (rivals() && n >= 2 && now_ms() - p.settle.last_ms < kColonySpacingMs) {
         return false;
     }
     std::vector<std::uint8_t> wanted{ware::kWineField};

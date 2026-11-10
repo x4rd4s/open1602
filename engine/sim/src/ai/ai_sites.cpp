@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "ai_engine.hpp"
+#include "ai_tables.hpp"
 
 #include "o1602/sim/houses.hpp"
 
@@ -923,7 +924,10 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                           if (t.ware == ware::kGrain && d == 0) {
                               acc.score -= 64;
                           }
-                          if (raw_producer(t.ware) && d < 5) {
+                          // Open1602: an improved computer keeps its farms apart only where their
+                          // fields would overlap (three rings); five left no site in a grown town
+                          // with a thousand free tiles, and its people starved.
+                          if (raw_producer(t.ware) && d < (improved ? 3 : 5)) {
                               acc.score -= 32 << (5 - d);
                           }
                       });
@@ -1673,6 +1677,77 @@ std::int32_t Engine::free_run(std::uint16_t island, std::uint8_t own, std::int32
     return n < 2 ? 0 : n;
 }
 
+std::int32_t Engine::open_land(std::uint16_t island, std::uint8_t own, std::int32_t x, std::int32_t y,
+                               std::int32_t r) const {
+    std::int32_t n = 0;
+    for (std::int32_t ty = y - r; ty <= y + r; ++ty) {
+        for (std::int32_t tx = x - r; tx <= x + r; ++tx) {
+            const Tile t = tile(island, tx, ty);
+            if (t.valid() && (t.city == own || t.city == MapCell::kNoCity) && plantable(t)) {
+                ++n;
+            }
+        }
+    }
+    return n;
+}
+
+bool Engine::field_land(const AiPlayer& p, std::int32_t& best_x, std::int32_t& best_y) const {
+    if (p.island >= m_world.islands().size()) {
+        return false;
+    }
+    const IslandMap& map = m_world.islands()[p.island].map;
+    // The middles of the city's markets and its Kontor.
+    std::vector<std::pair<std::int32_t, std::int32_t>> markets;
+    for (std::uint32_t ty = 0; ty < map.height(); ++ty) {
+        for (std::uint32_t tx = 0; tx < map.width(); ++tx) {
+            if (map.top(tx, ty).city != p.city) {
+                continue;
+            }
+            const Tile t = tile(p.island, static_cast<std::int32_t>(tx), static_cast<std::int32_t>(ty));
+            if (t.origin && market_or_kontor(t) && !t.type->destroyed) {
+                markets.emplace_back(static_cast<std::int32_t>(tx) + static_cast<std::int32_t>(t.type->size_x) / 2,
+                                     static_cast<std::int32_t>(ty) + static_cast<std::int32_t>(t.type->size_y) / 2);
+            }
+        }
+    }
+    if (markets.empty()) {
+        return false;
+    }
+    std::int32_t best = 0;
+    for (std::int32_t y = 0; y < static_cast<std::int32_t>(map.height()); y += kFieldLandStep) {
+        for (std::int32_t x = 0; x < static_cast<std::int32_t>(map.width()); x += kFieldLandStep) {
+            const Tile t = tile(p.island, x, y);
+            if (!t.valid() || t.city != MapCell::kNoCity || !plantable(t)) {
+                continue;
+            }
+            std::int32_t open = 0;
+            for (std::int32_t ty = y - kOpenLandRange; ty <= y + kOpenLandRange; ++ty) {
+                for (std::int32_t tx = x - kOpenLandRange; tx <= x + kOpenLandRange; ++tx) {
+                    const Tile o = tile(p.island, tx, ty);
+                    open += o.valid() && o.city == MapCell::kNoCity && plantable(o) ? 1 : 0;
+                }
+            }
+            if (open < kFieldLandTiles) {
+                continue;
+            }
+            std::int32_t near = std::numeric_limits<std::int32_t>::max();
+            for (const auto& [mx, my] : markets) {
+                const std::int32_t ax = std::abs(mx - x);
+                const std::int32_t ay = std::abs(my - y);
+                near = std::min(near, std::max(ax, ay) + std::min(ax, ay) / 2);
+            }
+            // Open land counts, and so does staying near: a market reaches some twenty tiles.
+            const std::int32_t score = 4 * open - 8 * near;
+            if (score > best) {
+                best = score;
+                best_x = x;
+                best_y = y;
+            }
+        }
+    }
+    return best > 0;
+}
+
 Acc Engine::fisher_site(AiPlayer& p, std::int32_t cx, std::int32_t cy) {
     // The fish a hut on (cx, cy) reaches, a market or Kontor near, and no other hut close by.
     Acc acc;
@@ -1895,6 +1970,111 @@ bool Engine::search_shipyard(AiPlayer& p) {
             return false;
         }
     }
+}
+
+bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t target_y) {
+    // Open1602: a market at the edge of the city's land towards (target_x, target_y), with a road
+    // to it over the city's open ground from any of its roads (up to kClaimPath tiles). The search
+    // along the road runs found no site for it in nine of ten tries: the runs end in the built-up
+    // town, away from the open land.
+    const assets::BuildingType* b = by_id(id::kMarket);
+    if (b == nullptr || p.island >= m_world.islands().size()) {
+        return false;
+    }
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto width = static_cast<std::int32_t>(map.width());
+    const auto height = static_cast<std::int32_t>(map.height());
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+    const std::int32_t start = market_distance(p, target_x, target_y);
+    std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
+    std::vector<std::int32_t> dist(prev.size(), 0);
+    std::vector<std::int32_t> queue;
+    for (std::int32_t y = 0; y < height; ++y) {
+        for (std::int32_t x = 0; x < width; ++x) {
+            const Tile t = tile(p.island, x, y);
+            if (t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
+                prev[static_cast<std::size_t>(y * width + x)] = -1;
+                queue.push_back(y * width + x);
+            }
+        }
+    }
+    const auto on_path = [&](std::int32_t end, std::int32_t x0, std::int32_t y0, std::int32_t w, std::int32_t h) {
+        for (std::int32_t k = end; k >= 0; k = prev[static_cast<std::size_t>(k)]) {
+            const std::int32_t kx = k % width;
+            const std::int32_t ky = k / width;
+            if (kx >= x0 && kx < x0 + w && ky >= y0 && ky < y0 + h) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::int32_t best = start - kClaimStep;
+    std::int32_t best_end = -1;
+    std::array<std::int32_t, 4> site{};
+    const auto bw = static_cast<std::int32_t>(b->size_x);
+    const auto bh = static_cast<std::int32_t>(b->size_y);
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::int32_t i = queue[head];
+        const std::int32_t x = i % width;
+        const std::int32_t y = i / width;
+        // Market sites beside this tile, both ways round.
+        for (const auto& [w, h] : {std::pair{bw, bh}, std::pair{bh, bw}}) {
+            for (const auto& [x0, y0] : {std::pair{x + 1, y - h / 2}, std::pair{x - w, y - h / 2},
+                                         std::pair{x - w / 2, y + 1}, std::pair{x - w / 2, y - h}}) {
+                const std::int32_t d = tile_distance(x0 + w / 2 - target_x, y0 + h / 2 - target_y);
+                if (d >= best || !can_place(p, *b, x0, y0, w, h) || on_path(i, x0, y0, w, h)) {
+                    continue;
+                }
+                best = d;
+                best_end = i;
+                site = {x0, y0, w, h};
+            }
+        }
+        if (dist[static_cast<std::size_t>(i)] >= kClaimPath) {
+            continue;
+        }
+        for (std::uint8_t dir = 0; dir < 4; ++dir) {
+            const std::int32_t nx = x + kStep[dir][0];
+            const std::int32_t ny = y + kStep[dir][1];
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+                continue;
+            }
+            const auto n = static_cast<std::size_t>(ny * width + nx);
+            const Tile t = tile(p.island, nx, ny);
+            if (prev[n] != -2 || !t.valid() || t.city != p.city ||
+                !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
+                continue;
+            }
+            prev[n] = i;
+            dist[n] = dist[static_cast<std::size_t>(i)] + 1;
+            queue.push_back(ny * width + nx);
+        }
+    }
+    if (best_end < 0) {
+        return false;
+    }
+    std::vector<BuildItem> road;
+    for (std::int32_t k = best_end; prev[static_cast<std::size_t>(k)] != -1; k = prev[static_cast<std::size_t>(k)]) {
+        road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
+    }
+    std::reverse(road.begin(), road.end());
+    const std::size_t want = road.size();
+    if (want != 0 && build(p, std::move(road), false) != want) {
+        log(p, "fields: road to the market site at %d,%d not built", site[0], site[1]);
+        return false;
+    }
+    const std::uint8_t rotation = site[2] == bw ? 0 : 1;
+    if (build(p, {BuildItem{b->id, site[0], site[1], rotation, 0}}, false) == 0) {
+        log(p, "fields: market at %d,%d not built", site[0], site[1]);
+        return false;
+    }
+    slot_built(p, kSlotMarket);
+    log(p, "fields: market at %d,%d with %zu road tiles, %d from the open land at %d,%d (was %d)", site[0], site[1],
+        want, best, target_x, target_y, start);
+    push(p, kLayout, true);
+    return true;
 }
 
 bool Engine::mine_path(AiPlayer& p, std::uint8_t w, std::vector<BuildItem>& road) {

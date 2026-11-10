@@ -605,6 +605,31 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     const WareSet needed = saving ? needed_wares(p, false) : WareSet{};
     std::uint32_t saved = 0;
     std::uint32_t idled = 0;
+    // Open1602: the food of the city and what its producers work into food (cattle, grain, flour)
+    // keep running in debt; without it the people leave faster than any saving pays back.
+    WareSet feeds{};
+    if (rivals()) {
+        feeds[m_buildings.food_ware()] = true;
+        std::vector<const assets::BuildingType*> types;
+        for (const Production& pr : m_world.productions()) {
+            if (pr.used && pr.island == c.island && map.contains(pr.x, pr.y) && map.top(pr.x, pr.y).city == c.index &&
+                !map.top(pr.x, pr.y).empty()) {
+                if (const assets::BuildingType* b = m_buildings.by_sprite(map.top(pr.x, pr.y).sprite);
+                    b != nullptr && b->raw_ware != 0) {
+                    types.push_back(b);
+                }
+            }
+        }
+        for (bool more = true; more;) {
+            more = false;
+            for (const assets::BuildingType* b : types) {
+                if (feeds[b->ware] && !feeds[b->raw_ware]) {
+                    feeds[b->raw_ware] = true;
+                    more = true;
+                }
+            }
+        }
+    }
     for (std::size_t i = 0; i < m_world.productions().size(); ++i) {
         const Production& pr = m_world.productions()[i];
         if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
@@ -621,8 +646,11 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         }
         const auto index = static_cast<std::uint32_t>(i);
         bool enabled = pr.enabled;
+        // Open1602: what its cities go short of (critical_short) keeps running in debt; the ships
+        // carry the stock to where it is missing.
+        const bool short_of = rivals() && b->ware != 0 && (feeds[b->ware] || goods_short(p.player, b->ware) != 0);
         const bool idle = saving && b->ware != 0 && !needed[b->ware];
-        const bool hold = (lean && c.stock(b->ware) >= 4 * kTon) || idle;
+        const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle;
         const auto set = [&](bool on) {
             if (on && hold) {
                 return;
@@ -650,8 +678,8 @@ void Engine::production_switches(AiPlayer& p, City& c) {
                 if (starved) {
                     set(false);
                 }
-            } else if (c.stock(b->raw_ware) > 4 * kTon) {
-                set(true);
+            } else if (c.stock(b->raw_ware) > static_cast<std::uint32_t>(short_of ? kTon : 4 * kTon)) {
+                set(true);  // Open1602: for a good its cities go short of, with the first ton
             }
         };
         const auto capped = [&](std::uint32_t limit) {
@@ -680,7 +708,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         } else {
             raw();  // farms, pastures, mines, hunters, fishers and the workshops without a raw ware
         }
-        if (lean && enabled && c.stock(w) >= 10 * kTon) {
+        if (lean && !short_of && enabled && c.stock(w) >= 10 * kTon) {
             set(false);
             ++saved;
         } else if (idle && enabled) {
@@ -1150,7 +1178,11 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         // Open1602: the home city, its orders done, settles a further island for room to grow
         // (Rules::computer_cities). Only from the home city, where the ship loads.
-        if (&c == home_city(p) && wants_room(p) && want_colony(p, 0, false, true)) {
+        // So too, improved, when the home city lacks food or cloth its island has no room for and
+        // no colony makes.
+        const bool short_home = &c == home_city(p) && (home_shortfall(p, m_buildings.food_ware()) != 0 ||
+                                                       home_shortfall(p, ware::kCloth) != 0);
+        if (&c == home_city(p) && (wants_room(p) || short_home) && want_colony(p, 0, short_home, true)) {
             return;
         }
         nothing_to_do(p);
@@ -1160,6 +1192,17 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // and the pioneers follow their orders (the fisher before the houses); need_houses asks for
     // food there.
     if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
+        return;
+    }
+    // Open1602: a colony makes the food and cloth its home city has no room left to make.
+    if (r.stage != stage::kFounded && r.stage != stage::kPioneers && &c != home_city(p) && grow_for_home(p, c, r)) {
+        return;
+    }
+    // Open1602: an improved computer whose people want a good none of its islands grows the crop
+    // for asks for the colony at every look of its home city, once the gold for it is saved
+    // (colony_savings); the orders asked only at their steps, hours apart.
+    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) + buy_reserve(p) &&
+        want_colony(p, 3, false, false)) {
         return;
     }
     // Open1602: a farm without room for its fields moves (move_farm_later).
@@ -1698,7 +1741,13 @@ bool Engine::supplies_growth(const City& c) const {
     // is content (kContentForGrowth) with every good of theirs in store or coming in. A settler
     // without cloth or a citizen without alcohol turns discontent, the houses fall back and pay a
     // fraction; a good merely low in store, with the people content, holds nothing up.
-    if (!food_ahead(c)) {
+    // Open1602: for an improved rival, so too while its own food covers three quarters and the
+    // stock feeds them for kFoodAheadMinutes: a home island with no room left for farms got the
+    // rest by ship and sat for hours on 20,000 gold and more, its houses never built.
+    const std::uint8_t food = m_buildings.food_ware();
+    const bool stocked = rivals() && std::uint64_t{supply(c, food)} * 4 >= std::uint64_t{demand(c, food)} * 3 &&
+                         std::uint64_t{c.stock(food)} >= std::uint64_t{demand(c, food)} * kFoodAheadMinutes;
+    if (!food_ahead(c) && !stocked) {
         return false;
     }
     for (std::size_t k = 0; k < c.inhabitants.size() && k < c.satisfaction.size(); ++k) {
@@ -1733,6 +1782,14 @@ std::uint32_t Engine::critical_short(PlayerId owner, std::uint8_t w) const {
     if (w != ware::kAlcohol && w != ware::kCloth) {
         return 0;
     }
+    return goods_short(owner, w);
+}
+
+std::uint32_t Engine::goods_short(PlayerId owner, std::uint8_t w) const {
+    // Open1602: what all the owner's cities use of a ware beyond what they make (1/32 t a minute).
+    // Where it is short, the supply runs cannot bring enough however many ships sail: the
+    // computer makes more of it (luxury) instead. Measured afresh at each look, so that a colony
+    // that a rival takes or burns shows at once.
     std::uint64_t used = 0;
     std::uint64_t made = 0;
     for (const City& c : m_world.cities()) {
@@ -2024,6 +2081,30 @@ bool Engine::claim_land(AiPlayer& p, std::uint8_t slot, std::int32_t x, std::int
     return true;
 }
 
+bool Engine::claim_fields(AiPlayer& p, std::uint8_t slot) {
+    // Open1602: open land of the island for a farm whose slot found no site in the city's land:
+    // the place with the most unclaimed land fields can take about it, nearest to the city's
+    // markets, which a market then brings in (claim_land). Islands with a thousand free tiles and
+    // more were left to the forest while the city starved.
+    std::int32_t x = -1;
+    std::int32_t y = -1;
+    if (!field_land(p, x, y)) {
+        return false;
+    }
+    log(p, "fields: open land at %d,%d for slot %u", x, y, unsigned{slot});
+    City* c = current_city(p);
+    const assets::BuildingType* market = by_id(id::kMarket);
+    if (c != nullptr && market != nullptr && affordable(p, *c, *market) && claim_by_path(p, x, y)) {
+        // The farm searches its sites anew in the land the market brought in.
+        if (CityPlan* r = current_plan(p)) {
+            r->slots[slot].attempts = 0;
+            r->slots[slot].fail_level = 0;
+        }
+        return true;
+    }
+    return claim_land(p, slot, x, y);
+}
+
 bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
     // Houses while affordable, with half a ton of food and more than 1000 gold.
     City* c = current_city(p);
@@ -2066,6 +2147,11 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
     // every coin above 250, and some never had a yard after hours.
     if (const std::int64_t yard = yard_savings(p);
         yard != 0 && std::int64_t{player(p).money} < yard + stage_gold(1000)) {
+        return false;
+    }
+    // Open1602: so too for a colony whose crop its home island does not grow (colony_savings).
+    if (const std::int64_t colony = colony_savings(p);
+        colony != 0 && std::int64_t{player(p).money} < colony + stage_gold(1000)) {
         return false;
     }
     // Open1602: no new inhabitants a city cannot feed; its food producers come first (more_food).
@@ -2205,6 +2291,116 @@ bool Engine::need_stone_roads(AiPlayer& p) {
 bool Engine::roads_if_mason(AiPlayer& p) {
     const CityPlan* r = current_plan(p);
     return r != nullptr && r->slots[kSlotStonemason].count != 0 && need_stone_roads(p);
+}
+
+std::int64_t Engine::colony_savings(AiPlayer& p) {
+    // The gold of a colony while an improved computer wants one for a crop none of its islands
+    // grows (colony_crop_missing), else 0. Without it, the houses took every coin and the colony
+    // came hours late.
+    if (!rivals() || p.pirates || p.settle.failed || player(p).scenario.has(scenario_flag::kNoColonies)) {
+        return 0;
+    }
+    // A settlement under way keeps the gold until the Kontor stands: spent meanwhile, the ship
+    // arrived to find too little to found the city.
+    // So too while its ship goes home to load: the gold fell from 3600 to 130 in those minutes.
+    if (p.settle.active || p.settle.ship != 0) {
+        return colony_money(p);
+    }
+    // Only with a ship to sail: without one the gold lay idle (update_fleet_target orders one).
+    return colony_crop_missing(p) && colony_ship_candidate(p) != 0 ? colony_money(p) : 0;
+}
+
+std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
+    if (!rivals() || p.pirates || p.cities < 1) {
+        return 0;
+    }
+    const City* home = home_city(p);
+    if (home == nullptr || population(*home) == 0) {
+        return 0;
+    }
+    const CityPlan& r = plan_of(p, home->island, home->index);
+    const auto blocked = [&](std::uint8_t slot) { return r.slots[slot].fail_level >= 2; };
+    std::uint64_t wanted = 0;
+    if (w == m_buildings.food_ware()) {
+        // The fishers alone feed no large city: the pastures and fields have no site left.
+        if (!blocked(kSlotCattle) || !blocked(kSlotGrain)) {
+            return 0;
+        }
+        wanted = std::uint64_t{demand(*home, w)} * 5 / 4;
+    } else if (w == ware::kCloth) {
+        if (!blocked(kSlotSheep) && !blocked(kSlotCotton)) {
+            return 0;
+        }
+        wanted = demand(*home, w);
+    } else {
+        return 0;
+    }
+    const std::uint64_t made = supply(*home, w);
+    if (made >= wanted) {
+        return 0;
+    }
+    std::uint64_t missing = wanted - made;
+    // What the other cities make beyond their own use comes by ship (home_supply_route).
+    for (const City& o : m_world.cities()) {
+        if (o.owner != p.player || &o == home) {
+            continue;
+        }
+        const std::uint32_t own = supply(o, w);
+        const std::uint32_t used = demand(o, w);
+        if (own > used) {
+            missing -= std::min<std::uint64_t>(missing, own - used);
+        }
+    }
+    return static_cast<std::uint32_t>(missing);
+}
+
+bool Engine::grow_for_home(AiPlayer& p, const City& c, const CityPlan& r) {
+    if (!rivals() || population(c) == 0) {
+        return false;
+    }
+    if (home_shortfall(p, m_buildings.food_ware()) != 0 && more_food(p, c, r, true)) {
+        log(p, "city %u/%u: food for the home city", r.island, r.city);
+        return true;
+    }
+    if (home_shortfall(p, ware::kCloth) != 0) {
+        // Farms only as far as the weaving keeps up (supply_ahead); processing() adds the weaving.
+        const std::uint32_t farms = std::uint32_t{r.slots[kSlotSheep].count} + r.slots[kSlotCotton].count;
+        const std::uint32_t weaving = std::uint32_t{r.slots[kSlotWebstube].count} + r.slots[kSlotWeberei].count;
+        if (farms < 2 * weaving + 2) {
+            const std::size_t before = p.stack.size();
+            (void)need(p, kSlotSheep, std::uint32_t{r.slots[kSlotSheep].count} + 1);
+            if (p.stack.size() > before) {
+                log(p, "city %u/%u: cloth for the home city", r.island, r.city);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Engine::colony_crop_missing(AiPlayer& p) {
+    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_limit() ||
+        player(p).scenario.has(scenario_flag::kNoColonies)) {
+        return false;
+    }
+    const City* home = home_city(p);
+    // Only once settlers live there and the city has grown to kColonySaveFrom: saving from the
+    // first settler held the houses that bring the gold, and the town stood still for two hours.
+    if (home == nullptr || population(*home, 1) == 0 || population(*home) < kColonySaveFrom) {
+        return false;
+    }
+    struct Need {
+        std::uint8_t good;
+        std::array<std::uint8_t, 2> crops;
+    };
+    static constexpr std::array<Need, 4> kNeeds{{{ware::kAlcohol, {ware::kWineField, ware::kSugarField}},
+                                                 {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
+                                                 {ware::kSpices, {ware::kSpiceField, 0}},
+                                                 {ware::kCocoa, {ware::kCocoaField, 0}}}};
+    return std::ranges::any_of(kNeeds, [&](const Need& n) {
+        return demand(*home, n.good) != 0 &&
+               std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); });
+    });
 }
 
 std::int64_t Engine::yard_savings(AiPlayer& p) {
@@ -2557,7 +2753,10 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     if (rivals()) {
         wine_island = fertility(c->island, ware::kWineField) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
-            return critical_short(p.player, crop.good) != 0 ? 0 : 1 + stock_lasts(*home, crop.good) / 2;
+            if (critical_short(p.player, crop.good) != 0) {
+                return std::uint64_t{0};
+            }
+            return goods_short(p.player, crop.good) != 0 ? 1 : 2 + stock_lasts(*home, crop.good) / 2;
         });
     }
     for (const Crop& crop : order) {
@@ -2572,7 +2771,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         }
         // At most two beyond the order in a city, so that the fields do not take its houses' land.
         std::uint32_t want = n;
-        const std::uint32_t lacking = rivals() ? critical_short(p.player, crop.good) : 0;
+        const std::uint32_t lacking = rivals() ? goods_short(p.player, crop.good) : 0;
         if (lacking != 0) {
             const assets::BuildingType* b = producer(crop.good, crop.field);
             const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;

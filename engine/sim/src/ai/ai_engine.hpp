@@ -442,10 +442,30 @@ private:
     /// Open1602: how much alcohol or cloth all of an owner's cities use beyond what they make,
     /// 1/32 t a minute; 0 for other goods.
     [[nodiscard]] std::uint32_t critical_short(PlayerId owner, std::uint8_t w) const;
+    /// What all of the owner's cities use of `w` beyond what they make, 1/32 t a minute.
+    [[nodiscard]] std::uint32_t goods_short(PlayerId owner, std::uint8_t w) const;
     /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
     [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
     [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
+    /// Improved computers: the gold kept for a colony whose crop its people want and none of its
+    /// islands grows, else 0.
+    [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
+    /// Improved computers: its supply and gold carry a war it would start or join.
+    [[nodiscard]] bool war_supplied(AiPlayer& p);
+    /// Improved computers: settlers in the home city want a good whose crop none of the computer's
+    /// islands grows, and it may found a colony for it.
+    [[nodiscard]] bool colony_crop_missing(AiPlayer& p);
+    /// Open1602: what an improved rival's home city lacks of food (with a quarter to spare) or cloth
+    /// a minute that its island has no site left to make and its other cities do not make beyond
+    /// their own use, 1/32 t a minute; 0 otherwise.
+    [[nodiscard]] std::uint32_t home_shortfall(AiPlayer& p, std::uint8_t w);
+    /// Open1602: a colony of an improved rival builds food or sheep farms for its home city's
+    /// shortfall (home_shortfall).
+    [[nodiscard]] bool grow_for_home(AiPlayer& p, const City& c, const CityPlan& r);
+    static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
+    static constexpr std::int64_t kBuyReserveMinutes = 5;
+    static constexpr std::uint32_t kSpareKeepMinutes = 10;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -562,6 +582,16 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
+    /// Open1602: the place of the island with the most unclaimed land fields could take about it,
+    /// near the city's markets (kFieldLandTiles at least); false without one.
+    [[nodiscard]] bool field_land(const AiPlayer& p, std::int32_t& x, std::int32_t& y) const;
+    /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
+    /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
+    bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
+    bool claim_fields(AiPlayer& p, std::uint8_t slot);
+    /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
+    [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
+                                         std::int32_t r) const;
     bool farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                    std::int32_t y1);
     [[nodiscard]] assets::ServiceBits house_services(std::uint16_t island, std::int32_t x, std::int32_t y) const;
@@ -586,9 +616,41 @@ private:
     Ship* pick_patrol_ship(AiPlayer& p, bool healthy);
     std::uint32_t patrols(AiPlayer& p, std::uint16_t island);
     void patrol_route(AiPlayer& p, Ship& s, std::uint16_t island);
+    /// Where a ware for a city on `home_island` comes from. Improved computers weigh the way from
+    /// `to` (the home city when null).
     std::optional<std::size_t> supply_source(AiPlayer& p, std::uint16_t home_island, std::uint8_t ware,
-                                             std::uint16_t* price);
+                                             std::uint16_t* price, const City* to = nullptr);
     bool home_supply_route(AiPlayer& p, Ship& s, City& home);
+    /// Improved computers: how soon a city runs out of a ware a supply ship brings, the lower the
+    /// sooner (stock_lasts); building materials under half the kept stock count as out.
+    /// kNoUrgency for a ware it makes enough of or does not use.
+    [[nodiscard]] std::uint64_t supply_urgency(const City& c, std::uint8_t ware, std::uint32_t target) const;
+    /// Improved computers: the urgency of the most urgent ware `c` lacks that no supply ship brings
+    /// it yet and that it can get (kNoUrgency for none).
+    [[nodiscard]] std::uint64_t supply_need(AiPlayer& p, const City& c);
+    /// Improved computers: the own city the next supply run goes to: the one that runs out of a
+    /// ware soonest, the home city when none does.
+    City* supply_destination(AiPlayer& p, City& home);
+    /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
+    /// for the original's computers to any city.
+    [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
+    /// Improved computers: what an own city can give of `w` to another own city (0 for nothing).
+    /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
+    /// purchases beyond its sales); 0 for the others.
+    [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
+    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const;
+    /// Improved computers: what is left to buy of `w` at a partner's city `c` (0 for nothing).
+    [[nodiscard]] std::uint32_t partner_spare(AiPlayer& p, const City& c, std::uint8_t w);
+    /// Improved computers: what one supply run brings of a ware, by the computer's ships.
+    [[nodiscard]] std::uint32_t supply_load(AiPlayer& p);
+    /// Improved computers: how many supply runs bring ware `w` to `to` at a time from city `src`,
+    /// `seconds` away, so that the city does not run short while they sail.
+    [[nodiscard]] std::uint32_t supply_ships_for(AiPlayer& p, const City& to, std::uint8_t w, std::size_t src,
+                                                 std::uint32_t seconds);
+    static constexpr std::uint32_t kMaxRunsPerWare = 4;
+    static constexpr std::uint32_t kMaxSupplyShips = 8;
+    static constexpr std::uint32_t kMinSupplyRun = 10 * kTon;  ///< the least a supply run loads
+    static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
     /// The wares a supply run brings to `home`, and how much of each it keeps (`target`).
     [[nodiscard]] std::vector<std::uint8_t> supply_wares(const AiPlayer& p, const City& home,
                                                          std::uint32_t* target) const;

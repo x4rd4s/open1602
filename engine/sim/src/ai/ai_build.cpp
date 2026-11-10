@@ -456,6 +456,10 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
     }
     if (slot_fail(p, s.slot) == 0) {
         push(p, kRoads, true);
+    } else if (!classic() && !p.pirates && std::ranges::find(kFieldSlots, s.slot) != kFieldSlots.end()) {
+        // Open1602: with no site left in its land, an improved computer claims open land of the
+        // island for its farms with a market (claim_fields).
+        (void)claim_fields(p, s.slot);
     }
 }
 
@@ -636,6 +640,13 @@ void Engine::task_claim_land(AiPlayer& p) {
                             false) != 0) {
         slot_built(p, kSlotMarket);
         log(p, "claim market at %d,%d towards %d,%d", s.best_x0, s.best_y0, s.target_x, s.target_y);
+        // A farm's slot searches its sites anew in the land the market brought in.
+        if (std::ranges::find(kFieldSlots, s.slot) != kFieldSlots.end()) {
+            if (CityPlan* r = current_plan(p)) {
+                r->slots[s.slot].attempts = 0;
+                r->slots[s.slot].fail_level = 0;
+            }
+        }
         return;
     }
     // No site on the way: the deposit is given up until land changes (land_freed) or the hourly
@@ -1108,6 +1119,14 @@ void Engine::task_roads(AiPlayer& p) {
     }
     // Open1602: roads of the town style's length, so that towns have blocks of different sizes.
     const std::int32_t block = classic() ? 7 : town_style_of(p).block;
+    bool fields = false;
+    if (const CityPlan* r = current_plan(p); r != nullptr && !classic() && !p.pirates) {
+        const SlotState& houses = r->slots[kSlotHouses];
+        fields =
+            houses.attempts == 0 && houses.fail_level == 0 && std::ranges::any_of(kFieldSlots, [&](std::uint8_t k) {
+                return r->slots[k].attempts != 0 || r->slots[k].fail_level != 0;
+            });
+    }
     std::int32_t best = -1;
     std::size_t best_index = 0;
     std::int32_t bx = 0;
@@ -1133,7 +1152,16 @@ void Engine::task_roads(AiPlayer& p) {
         }
         const std::int32_t right = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 1U) & 3U));
         const std::int32_t left = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 3U) & 3U));
-        const std::int32_t score = (left + right) / 2 + 2 * back;
+        std::int32_t score = (left + right) / 2 + 2 * back;
+        // Open1602: an improved computer whose farms find no site while its houses do leads its
+        // roads out where the land is open, a block ahead of the run's end. The runs alone counted
+        // the roads they followed, so new roads went into the built-up core, and the farms found no
+        // site on islands with a thousand free tiles.
+        if (fields) {
+            const std::int32_t ahead = std::min(back, block) / 2;
+            score +=
+                open_land(p.island, p.city, sx + kStep[out][0] * ahead, sy + kStep[out][1] * ahead, kOpenLandRange);
+        }
         if (score > best) {
             best = score;
             best_index = i;

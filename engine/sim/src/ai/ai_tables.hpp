@@ -162,6 +162,23 @@ inline constexpr std::uint32_t kFoodMargin = 2;
 /// A city short of food with no way to more food (no site for a fisher, its farms not yet open to
 /// it) builds houses all the same while its stock feeds its inhabitants for kFoodMinutes minutes.
 inline constexpr std::uint32_t kFoodMinutes = 15;
+/// Open1602: an improved rival's home grows beyond its order with three quarters of its food its
+/// own while the stock feeds its inhabitants for kFoodAheadMinutes minutes (supplies_growth).
+inline constexpr std::uint32_t kFoodAheadMinutes = 30;
+/// Open1602: how far about a road's end an improved computer counts the open land its new roads
+/// lead to (Engine::task_roads).
+inline constexpr std::int32_t kOpenLandRange = 6;
+/// Open1602: unclaimed land an improved computer claims for its farms (Engine::field_land): at
+/// least kFieldLandTiles tiles fields can take within kOpenLandRange of a place, looked at every
+/// kFieldLandStep tiles.
+inline constexpr std::int32_t kFieldLandTiles = 60;
+inline constexpr std::int32_t kFieldLandStep = 3;
+/// The longest road an improved computer lays over its open ground to a market that claims land for
+/// its farms (Engine::claim_by_path).
+inline constexpr std::int32_t kClaimPath = 40;
+/// The slots of the farms and plantations, whose fields want open land.
+inline constexpr std::array<std::uint8_t, 9> kFieldSlots{kSlotGrain,  kSlotCotton,  kSlotWine,  kSlotSpices, kSlotCocoa,
+                                                         kSlotCattle, kSlotTobacco, kSlotSheep, kSlotSugar};
 /// Open1602: gold from which a public building counts as costly (a church, a bath, a college): an
 /// improved computer builds it only while its people have their goods (Engine::goods_lacking).
 inline constexpr std::int64_t kCostlyPublic = 1000;
