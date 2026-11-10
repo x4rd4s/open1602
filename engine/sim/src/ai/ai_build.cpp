@@ -788,6 +788,16 @@ void Engine::task_shipyard(AiPlayer& p) {
     // Open1602: the stub can fall short (a road at its start, a deer or a soldier on its way);
     // without a road the yard's pack donkey never fetches wood and cloth.
     join_yard(p, s.best_x0, s.best_y0);
+    // The small yard an improved computer's big one replaces goes once the big one stands.
+    if (!classic() && b->id == id::kShipyardBig && p.yard_valid && p.yard_island == p.island &&
+        (p.yard_x != s.best_x0 || p.yard_y != s.best_y0)) {
+        const auto old = building_at(m_world, m_buildings, p.island, TilePos{p.yard_x, p.yard_y});
+        if (old && old->city == p.city && old->type != nullptr && old->type->id == id::kShipyardSmall) {
+            log(p, "city %u/%u: big yard at %d,%d replaces the small one at %d,%d", r->island, r->city, s.best_x0,
+                s.best_y0, int{p.yard_x}, int{p.yard_y});
+            demolish_tile(p, p.yard_x, p.yard_y);
+        }
+    }
     r->slots[kSlotShipyard].count = b->id == id::kShipyardBig ? 2 : 1;
     p.present[kSlotShipyard] = true;
     p.yard_valid = true;

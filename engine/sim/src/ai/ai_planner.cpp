@@ -2262,7 +2262,10 @@ bool Engine::need_shipyard(AiPlayer& p) {
         return true;
     }
     if (s.count == 1 && big != nullptr && unlocked(p, *big) && affordable(p, *c, *big)) {
-        if (plan_building(p, kShipyardUpgrade, *big, kSlotShipyard, false)) {
+        // Open1602: an improved computer builds the big yard on a site of its own and tears the small
+        // one down only once the big one stands; the original's upgrade tore the small one down
+        // first, and where the big one then did not fit, the computer was left without a yard.
+        if (plan_building(p, classic() ? kShipyardUpgrade : kShipyard, *big, kSlotShipyard, false)) {
             reserve(p, *big);
         }
         return true;
