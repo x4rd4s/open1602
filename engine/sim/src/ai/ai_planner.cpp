@@ -2261,10 +2261,29 @@ bool Engine::need_shipyard(AiPlayer& p) {
         }
         return true;
     }
-    if (s.count == 1 && big != nullptr && unlocked(p, *big) && affordable(p, *c, *big)) {
-        // Open1602: an improved computer builds the big yard on a site of its own and tears the small
-        // one down only once the big one stands; the original's upgrade tore the small one down
-        // first, and where the big one then did not fit, the computer was left without a yard.
+    // Open1602: an improved computer builds the big yard on a site of its own and counts what
+    // demolishing the small one gives back (Rules::demolish_refund); the original's upgrade tore the
+    // small one down first, and where the big one then did not fit or the gold fell short, the
+    // computer was left without a yard.
+    const auto affordable_big = [&] {
+        if (affordable(p, *c, *big)) {
+            return true;
+        }
+        const std::uint32_t share = m_sim.rules().refund_share();
+        if (classic() || share == 0 || small == nullptr) {
+            return false;
+        }
+        const auto& m = m_buildings.materials();
+        const auto& want = big->build_cost;
+        const auto& back = small->build_cost;
+        const auto has = [&](std::int64_t have, std::int64_t returned, std::int64_t cost) {
+            return have + returned * share / 100 >= cost;
+        };
+        return has(player(p).money, back.money, want.money) && has(c->stock(m.wood), back.wood, want.wood) &&
+               has(c->stock(m.bricks), back.bricks, want.bricks) && has(c->stock(m.tools), back.tools, want.tools) &&
+               has(c->stock(m.cannons), back.cannons, want.cannons);
+    };
+    if (s.count == 1 && big != nullptr && unlocked(p, *big) && affordable_big()) {
         if (plan_building(p, classic() ? kShipyardUpgrade : kShipyard, *big, kSlotShipyard, false)) {
             reserve(p, *big);
         }
