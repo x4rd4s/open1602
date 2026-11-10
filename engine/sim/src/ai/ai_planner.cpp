@@ -1708,7 +1708,26 @@ bool Engine::supplies_growth(const City& c) const {
     }
     // Contentment follows a missing good only after a while: nor while one of their goods that the
     // city makes is used up and comes in short.
-    return !goods_lacking(c, true);
+    if (goods_lacking(c, true)) {
+        return false;
+    }
+    // Nor while the owner's cities make less than four fifths of the alcohol and cloth they use: the
+    // trader brought a tenth of what a big city drinks, and its houses fell back once the stock was
+    // gone. The rest comes from the trader and the stock.
+    for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
+        std::uint64_t used = 0;
+        std::uint64_t made = 0;
+        for (const City& o : m_world.cities()) {
+            if (o.owner == c.owner) {
+                used += demand(o, w);
+                made += supply(o, w);
+            }
+        }
+        if (made * 5 < used * 4) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Engine::goods_lacking(const City& c, bool content_too) const {
@@ -1722,6 +1741,23 @@ std::uint64_t Engine::stock_lasts(const City& c, std::uint8_t w) const {
         return std::numeric_limits<std::uint64_t>::max();
     }
     return std::uint64_t{c.stock(w)} * 256 / used;
+}
+
+std::uint32_t Engine::critical_short(PlayerId owner, std::uint8_t w) const {
+    // Open1602: alcohol and cloth, what all the owner's cities use beyond what they make (1/32 t a
+    // minute); the ships carry it between them. Food each city grows for itself (more_food).
+    if (w != ware::kAlcohol && w != ware::kCloth) {
+        return 0;
+    }
+    std::uint64_t used = 0;
+    std::uint64_t made = 0;
+    for (const City& c : m_world.cities()) {
+        if (c.owner == owner) {
+            used += demand(c, w);
+            made += supply(c, w);
+        }
+    }
+    return used > made ? static_cast<std::uint32_t>(std::min<std::uint64_t>(used - made, 0xFFFFFFFFU)) : 0;
 }
 
 std::uint8_t Engine::lacking_ware(const City& c, bool content_too) const {
@@ -2462,11 +2498,20 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         return false;
     }
     std::int64_t budget = net_income(p);
+    // Open1602: short of gold, an improved computer still plants for the alcohol or cloth its
+    // people go without (critical_short), as long as it has 1000 gold: without them its houses fell
+    // back, its taxes with them, and the debt grew all the faster.
+    bool funded = true;
     if (budget < std::int64_t{p.cities} * 25) {
         if (player(p).money < 7000) {
-            return false;
+            if (!rivals() || player(p).money < 1000) {
+                return false;
+            }
+            funded = false;
+            budget = 0;
+        } else {
+            budget = player(p).money / 100;
         }
-        budget = player(p).money / 100;
     }
     const std::uint32_t cap = home->capacity / 2;
     const auto upkeep = [&](std::uint8_t w, std::uint8_t raw) -> std::int64_t {
@@ -2474,14 +2519,14 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         return b != nullptr ? b->running_cost : 0;
     };
     // 1. Iron
-    if (p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
+    if (funded && p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
         static constexpr std::array<std::uint32_t, 4> kMines{1, 2, 2, 3};
         if (need_iron_mine(p, kMines[std::min<std::uint32_t>(difficulty(), 3)])) {
             return true;
         }
     }
     // 2. Gold
-    if (p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
+    if (funded && p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
         const auto gold = need_def(slots(), kSlotGoldMine, m_world.balance().computer_producers);
         const assets::BuildingType* mine = gold ? by_id(gold->fixed) : nullptr;
         if (mine != nullptr && mine->running_cost < budget && need_gold_mine(p)) {
@@ -2508,10 +2553,15 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         {kSlotSugar, ware::kSugarField, ware::kAlcohol,
          upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
     }};
-    // Open1602: an improved computer plants first what its home city's people run out of soonest.
+    // Open1602: an improved computer plants first what its people go without (critical_short),
+    // then what its home city's people run out of soonest; for a critical good as many fields as
+    // make up what its cities lack, beyond the order's number.
     std::array<Crop, 6> order = crops;
     if (rivals()) {
-        std::ranges::stable_sort(order, {}, [&](const Crop& crop) { return stock_lasts(*home, crop.good); });
+        wine_island = fertility(c->island, ware::kWineField) == 128;
+        std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
+            return critical_short(p.player, crop.good) != 0 ? 0 : 1 + stock_lasts(*home, crop.good) / 2;
+        });
     }
     for (const Crop& crop : order) {
         if (!crop.eligible || fertility(c->island, crop.field) != 128) {
@@ -2523,10 +2573,21 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         if (crop.slot == kSlotSugar && wine_island) {
             continue;
         }
-        if (r->slots[crop.slot].count >= n || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
+        std::uint32_t want = n;
+        const std::uint32_t lacking = rivals() ? critical_short(p.player, crop.good) : 0;
+        if (lacking != 0) {
+            const assets::BuildingType* b = producer(crop.good, crop.field);
+            const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;
+            if (per != 0) {
+                want = std::max(want, r->slots[crop.slot].count + (lacking + per - 1) / per);
+            }
+        } else if (!funded) {
             continue;
         }
-        if (need(p, crop.slot, n)) {
+        if (r->slots[crop.slot].count >= want || home->stock(crop.good) >= cap || (funded && crop.upkeep >= budget)) {
+            continue;
+        }
+        if (need(p, crop.slot, want)) {
             return true;
         }
         if (exclusive && crop.slot != kSlotSugar) {
