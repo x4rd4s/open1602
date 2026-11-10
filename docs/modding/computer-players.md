@@ -80,6 +80,9 @@ nowhere. Improved computers (not `classic_ai`) live from what they earn and move
 it, `rival_money_percent` (25 by default): a city that waits for 8001 gold moves on with 2000. The
 share also counts for the build orders that wait for 4000, 5000 or 8000 gold. A game keeps it with
 its other balance values (savegame `BALA` version 6).
+An improved computer's main city whose houses have risen to half the citizens of
+`citizens2_citizens` already moves on to the citizens' stage while it earns gold, with a quarter of
+that share in hand, without waiting for a luxury good in store or a colony first.
 
 ## Taxes
 

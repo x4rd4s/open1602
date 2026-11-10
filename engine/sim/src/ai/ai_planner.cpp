@@ -1244,8 +1244,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMain2: {
-            if (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
-                (luxury_in_stock(p, c, r, 2) > at.ai_citizens_luxury || kontor_level(c) > at.ai_citizens_kontor)) {
+            // Open1602: an improved computer whose houses rose to citizens already, with an income,
+            // moves on with them: before, the stage could trail the houses by hours, waiting for gold
+            // or a luxury good in store while its lists built nothing new.
+            const bool risen = rivals() && population(c, 2) >= at.ai_citizens2_citizens / 2 && net_income(p) > 0 &&
+                               std::int64_t{money} >= stage_gold(at.ai_citizens_money) / 4;
+            if (risen ||
+                (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
+                 (luxury_in_stock(p, c, r, 2) > at.ai_citizens_luxury || kontor_level(c) > at.ai_citizens_kontor))) {
                 set_stage(p, r, stage::kCitizens);
                 return;
             }
