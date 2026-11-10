@@ -436,6 +436,8 @@ private:
     /// Open1602: whether a discontent class living in the city (any, with `content_too`) lacks one
     /// of its goods (not food).
     [[nodiscard]] bool goods_lacking(const City& c, bool content_too = false) const;
+    /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
+    [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
     [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).

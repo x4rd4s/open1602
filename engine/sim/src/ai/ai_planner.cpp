@@ -1677,14 +1677,20 @@ bool Engine::supplies_growth(const City& c) const {
             return false;
         }
     }
-    // Contentment follows a missing good only after a while: nor while one of their goods is used up
-    // and comes in short.
+    // Contentment follows a missing good only after a while: nor while one of their goods that the
+    // city makes is used up and comes in short.
     return !goods_lacking(c, true);
 }
 
 bool Engine::goods_lacking(const City& c, bool content_too) const {
+    return lacking_ware(c, content_too) != 0;
+}
+
+std::uint8_t Engine::lacking_ware(const City& c, bool content_too) const {
     // A class that lives in the city (discontent, unless `content_too`) with one of its goods (not
-    // food) under a ton in stock and short in supply.
+    // food) under a ton in stock and short in supply. With `content_too` only goods the city makes
+    // itself count: one it has no producer for yet lacks from the start and shows in the
+    // contentment; one it makes but too little of is used up before the people turn discontent.
     const auto& classes = m_buildings.resident_classes();
     for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
         if (c.inhabitants[k] == 0 ||
@@ -1692,12 +1698,16 @@ bool Engine::goods_lacking(const City& c, bool content_too) const {
             continue;
         }
         for (const assets::ResidentClass::Need& n : classes[k].needs) {
-            if (n.ware != m_buildings.food_ware() && c.stock(n.ware) < kTon && supply(c, n.ware) < demand(c, n.ware)) {
-                return true;
+            if (n.ware == m_buildings.food_ware() || c.stock(n.ware) >= kTon) {
+                continue;
+            }
+            const std::uint32_t made = supply(c, n.ware);
+            if (made < demand(c, n.ware) && (!content_too || made > 0)) {
+                return n.ware;
             }
         }
     }
-    return false;
+    return 0;
 }
 
 bool Engine::supply_ahead(AiPlayer& p, const City& c, const CityPlan& r, bool growing) {
