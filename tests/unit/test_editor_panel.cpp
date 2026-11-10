@@ -412,16 +412,16 @@ TEST_CASE("editor panel: the overlays go on and off, the check list goes through
     m.check.push_back(Line{"For saving", Line::Kind::Heading});
     m.check.push_back(Line{"All right.", Line::Kind::Fine});
     m.check.push_back(Line{"The original's limits (not asked for)", Line::Kind::Heading});
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 15; ++i) {
         m.check.push_back(Line{"Island " + std::to_string(i + 1) + " has 3 ore deposits", Line::Kind::Note,
                                Line::Target::Island, static_cast<std::size_t>(i)});
     }
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "All right."));
-    CHECK(!says(panel, "Island 10 has"));
+    CHECK(!says(panel, "Island 15 has"));
     CHECK(!click(panel, m, "More").has_value());
     (void)panel.draw(m, kNoFonts);
-    CHECK(says(panel, "Island 10 has"));
+    CHECK(says(panel, "Island 15 has"));
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         CHECK(w.rect.y + w.rect.h <= 760);
     }
@@ -433,10 +433,10 @@ TEST_CASE("editor panel: the overlays go on and off, the check list goes through
     CHECK(!click(panel, m, "More").has_value());
     (void)panel.draw(m, kNoFonts);
     // A line that leads somewhere: the island on the map, the mission in the goals dialog.
-    r = click(panel, m, "Island 10 has 3 ore deposits");
+    r = click(panel, m, "Island 15 has 3 ore deposits");
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::ShowIsland);
-    CHECK(r->index == 9);
+    CHECK(r->index == 14);
     m.check.push_back(Line{"Mission 2 has no goal", Line::Kind::Warning, Line::Target::Goals, 1});
     (void)panel.draw(m, kNoFonts);
     CHECK(!click(panel, m, "Mission 2 has no goal").has_value());

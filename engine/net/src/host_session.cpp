@@ -555,7 +555,9 @@ void HostSession::hello(Peer& peer, const Hello& m) {
     // A person kicked in this session has no claim to their slot any more.
     const std::uint64_t claim =
         std::find(m_kicked.begin(), m_kicked.end(), peer.owner) != m_kicked.end() ? 0 : peer.owner;
-    if (seat == sim::kNoPlayer) {
+    // Asked only to watch: no slot, if the game lets computers watch.
+    const bool watch = m.watch && m_config.spectators && seat == sim::kNoPlayer;
+    if (seat == sim::kNoPlayer && !watch) {
         // Back into the slot this person played (the game keeps who it was), also after a restart
         // of the program or a change of host, and also when newcomers may no longer join.
         seat = seat_of_owner(claim);
@@ -563,7 +565,7 @@ void HostSession::hello(Peer& peer, const Hello& m) {
             forget_token(seat);  // whoever had it in the meantime cannot come back with the old token
         }
     }
-    if (seat == sim::kNoPlayer && m.returning && m_config.spectators) {
+    if (watch || (seat == sim::kNoPlayer && m.returning && m_config.spectators)) {
         // After the host changed, without its slot (it watched, or someone took the slot): it
         // watches, rather than taking a slot it did not have.
     } else if (seat == sim::kNoPlayer) {

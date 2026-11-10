@@ -479,10 +479,14 @@ std::vector<GoalProblem> goal_problems(const sim::World& world) {
                 holders.push_back(s);
             }
         }
+        const bool empty = (m.goals & ~goal::kComputers) == 0;
+        if (holders.empty() && empty) {
+            continue;  // an unused slot, as the original's maps and new maps keep them: nothing to warn of
+        }
         if (holders.empty()) {
             out.push_back({Kind::NobodyHolds, mi});
         }
-        if ((m.goals & ~goal::kComputers) == 0) {
+        if (empty) {
             out.push_back({Kind::NoGoals, mi});
             continue;  // without goals its loss conditions do nothing either
         }

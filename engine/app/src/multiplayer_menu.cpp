@@ -90,6 +90,8 @@ constexpr std::size_t kChatLines = 12;
 constexpr Rect kChatBox{48, 0, 604, 28};  ///< a row of the lobby's chat (x and width)
 // Connecting
 constexpr Id kCancel = 70;
+constexpr Id kWatchGame = 71;     ///< the game chosen in the list, only to watch
+constexpr Id kConnectWatch = 72;  ///< the address typed in, only to watch
 // The game's settings, on the create screen and in the lobby
 constexpr Id kSettings = 80;
 
@@ -563,12 +565,14 @@ void MultiplayerMenu::layout_browse(const MultiplayerModel& model) {
     f.field(kAddress, Rect{712, 150, 260, 32}, m_address);
     f.label(Rect{708, 186, 268, 24}, tr(MpText::Password), Align::Left, Tone::Dim);
     f.field(kJoinPassword, Rect{712, 212, 260, 32}, m_join_password, true);
-    f.button(kConnect, Rect{712, 262, 260, 40}, tr(MpText::Connect), parse_address(m_address).has_value());
+    f.button(kConnect, Rect{712, 262, 128, 40}, tr(MpText::Connect), parse_address(m_address).has_value());
+    f.button(kConnectWatch, Rect{844, 262, 128, 40}, tr(MpText::Watch), parse_address(m_address).has_value());
     f.button(kCreate, Rect{700, 340, 284, 56}, tr(MpText::CreateGame), true, true);
     f.paragraph(Rect{700, 410, 284, 120}, tr(MpText::HostHint, std::to_string(net::kDefaultPort)), Tone::Dim);
 
     f.button(kBack, Rect{40, kBottomY, 180, 44}, tr(MpText::Back));
     f.button(kRefresh, Rect{596, kBottomY, 180, 44}, tr(MpText::Refresh));
+    f.button(kWatchGame, Rect{392, kBottomY, 180, 44}, tr(MpText::Watch), m_selected.has_value());
     f.button(kJoin, Rect{804, kBottomY, 180, 44}, tr(MpText::Join), m_selected.has_value());
 }
 
@@ -1053,7 +1057,7 @@ void MultiplayerMenu::layout_connecting() {
 
 // --- Clicks and keys ---
 
-std::optional<MultiplayerEvent> MultiplayerMenu::join_event(const std::string& address) const {
+std::optional<MultiplayerEvent> MultiplayerMenu::join_event(const std::string& address, bool watch) const {
     const auto parsed = parse_address(address);
     if (!parsed) {
         return std::nullopt;
@@ -1063,6 +1067,7 @@ std::optional<MultiplayerEvent> MultiplayerMenu::join_event(const std::string& a
     e.address = parsed->first;
     e.port = parsed->second;
     e.password = m_join_password;
+    e.watch = watch;
     return e;
 }
 
@@ -1085,12 +1090,12 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
                 event(MultiplayerEvent::Kind::Close);
             } else if (id == kRefresh) {
                 event(MultiplayerEvent::Kind::Search);
-            } else if (id == kConnect) {
-                if (auto e = join_event(m_address)) {
+            } else if (id == kConnect || id == kConnectWatch) {
+                if (auto e = join_event(m_address, id == kConnectWatch)) {
                     out.push_back(std::move(*e));
                 }
-            } else if (id == kJoin && m_selected) {
-                if (auto e = join_event(*m_selected)) {
+            } else if ((id == kJoin || id == kWatchGame) && m_selected) {
+                if (auto e = join_event(*m_selected, id == kWatchGame)) {
                     out.push_back(std::move(*e));
                 }
             } else if (id == kCreate) {

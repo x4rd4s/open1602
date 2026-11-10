@@ -577,8 +577,9 @@ private:
     annokit::core::Status start_hosted_game();
     /// Joins the host at `address`; with `fetch_packages` it asks the host for the packages of the
     /// game this computer lacks, which the person agreed to download (docs/modding/packages.md).
+    /// With `watch` it asks for no slot, only to watch (if the game lets computers watch).
     annokit::core::Status join_game(const std::string& address, std::uint16_t port, const std::string& password,
-                                    bool fetch_packages = false);
+                                    bool fetch_packages = false, bool watch = false);
     /// The host has packages of its game this computer lacks and would send them: asks the person,
     /// the answer joins again with them or goes back to the search (m_fetch_offer).
     void offer_packages(std::span<const assets::ContentPackage> packages, std::uint64_t bytes, std::string refusal);
@@ -823,6 +824,7 @@ private:
         std::uint16_t port = net::kDefaultPort;
         std::string password;
         std::string refusal;  ///< the host's refusal, shown if the person says no
+        bool watch = false;   ///< only to watch, as asked first
     };
     std::optional<FetchOffer> m_fetch_offer;
     /// A game loaded alone that waits for the person to choose their player (player_choice).
@@ -836,6 +838,7 @@ private:
     };
     std::optional<PendingLoad> m_pending_load;
     std::string m_join_password;       ///< of the game joined last, for joining it again with its packages
+    bool m_join_watch = false;         ///< the game joined last only to watch, the same way again
     bool m_fetching_packages = false;  ///< the game joined last was asked for its packages
     bool m_migrating = false;          ///< following a successor, its game not here yet
     std::string m_successor_name;      ///< the one followed

@@ -4040,6 +4040,11 @@ void MapViewer::apply_menu() {
     if (m_hud && m_hud->end_screen_active()) {
         if (const auto choice = m_hud->take_end_choice()) {
             m_hud->close_end_screen(*choice);
+            // A test game of the editor's map ends back in the editor, as its quit key does.
+            if (*choice != EndScreen::Choice::Resume && m_test_play && m_test_play->running) {
+                editor_end_test_play();
+                return;
+            }
             // To the menus: out of a multiplayer game too, as "Ende" in the settings does.
             if (*choice != EndScreen::Choice::Resume && m_session) {
                 end_session();
