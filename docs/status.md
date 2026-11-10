@@ -1,10 +1,9 @@
 # Implementation status
 
-Status: 2026-11-04 (latest steps: packages bring languages and the interface's art, Ctrl+Shift+R reads
-them again in a running game; flags of packages as PNG; packages replace the original's buildings,
-figures, ships, coats of arms, music, sounds and message voices; videos of packages in WebM; ship route search two and a half
-times faster; the editor saves scenarios into packages, with markers, a script and factions per
-slot). This page is the overview
+Status: 2026-11-10 (latest steps: the improved computer opponents play by the players' rules and pay for their army,
+with a character per game, trade, peace and alliances among all players, wars against any rival and
+colonies for gold and ore; Linux ARM64 packages; the game-independent modules come from annokit).
+This page is the overview
 and the single place for the status of the project. The details are in the linked documents, each in
 its "Open" section. It is updated with every completed step.
 
@@ -27,19 +26,19 @@ Symbols: ✅ done · 🟡 partly · ⬜ open · ❓ behaviour of the original no
   ADR 0010; feedback also in the terminal.
 - **Multiplayer** works in lockstep through the host over the network, with Open1602's own menu,
   a lobby and a search for games on the local network ([ADR 0011](architecture/0011-multiplayer-lockstep.md)).
-- **The large open blocks** are the editor and host migration beyond the local network; the items of
-  mod support are done ([open-work.md](modding/open-work.md#summary)).
+- **Open** are host migration beyond the local network, replays and a few ideas (section 2.2); the
+  editor and the items of mod support are done ([open-work.md](modding/open-work.md#summary)).
 - **Compared with the running original** on 2026-10-20:
   the differences found and what is still open about them are in section 1.4.
 - **Milestones** (defined in [00-plan.md](00-plan.md#6-milestones)): M0 ✅ · M1 ✅ (every field of the
   island header and the scenario chunks known; fonts, layouts, sound and videos done) · M2 ✅ · M3 ✅ · M4 ✅
   (simulation, ships, trade, savegames, sound, the side panel with the selection windows, menus and
-  settings) · M5 🟡 (military, pirates, world generator stage 1, AI, missions with victory and defeat,
+  settings) · M5 ✅ (military, pirates, world generator stage 1, AI with the improved computer opponents, missions with victory and defeat,
   points, end screen, high score lists, campaign progress, the scenarios' switches of the computers and
   their attitude done) · M6 🟡 (lockstep, desync detection with resync,
   reconnecting, lobby, LAN search, Open1602's own multiplayer menu, 4 to 12 players, host migration; open: see
-  Multiplayer in 1.2) · M7 🟡 (freely assignable keys, mouse-wheel zoom, pixel scaling, screenshot,
-  bug fixes, any window size and full screen, free zoom and the interface's size done; open: editor) · M8 ✅ (packages with
+  Multiplayer in 1.2) · M7 ✅ (freely assignable keys, mouse-wheel zoom, pixel scaling, screenshot,
+  bug fixes, any window size and full screen, free zoom, the interface's size and the editor done) · M8 ✅ (packages with
   manifest and zip archives, values, buildings, figures, goods, classes and levels of their own,
   graphics and sound of their own and in place of the original's, videos in WebM (AV1 and Opus), Lua
   scripts, scenarios and campaigns, also saved from the editor, factions, computer players from data
@@ -225,7 +224,7 @@ are recorded in the ADRs.
 
 | Point | Status |
 |---|---|
-| Tests | 1512 test cases on 2026-11-04 (counted with `grep -c '^TEST_CASE'`; ctest runs them as the tests `unit` and `data`): 1432 in the 127 files of `tests/unit/`, which need no original data, and 80 in the 13 files of `tests/data/`, which skip without `ANNO1602_DIR` (one of them needs no data). Sea and land routes, world generator, new games, AI (founding, diplomacy, determinism), multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) and the recorded bytes of every savegame section have their own. The SDL layer (`engine/platform`, `render_sdl`) has its own executable `o1602_sdl_tests` (40 cases), built with the game and run headless in the game's CI jobs (dummy drivers, software renderer). Without their own unit tests: the parts of the game executable outside `o1602::menus` (`engine/app`); `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). A CI job measures the line and branch coverage of `engine/` by the tests without data (gcovr report as an artifact). How to run them: [tests/README.md](../tests/README.md) |
+| Tests | 1607 test cases on 2026-11-10 (counted with `grep -c '^TEST_CASE'`; ctest runs them as the tests `unit` and `data`): 1526 in the 128 files of `tests/unit/`, which need no original data, and 81 in the 13 files of `tests/data/`, which skip without `ANNO1602_DIR` (one of them needs no data). Sea and land routes, world generator, new games, AI (founding, diplomacy, determinism), multiplayer and a fuzz test over the own savegame (`O1602_FUZZ_ITERATIONS` for longer runs) and the recorded bytes of every savegame section have their own. The SDL layer (`engine/platform`, `render_sdl`) has its own executable `o1602_sdl_tests` (40 cases), built with the game and run headless in the game's CI jobs (dummy drivers, software renderer). Without their own unit tests: the parts of the game executable outside `o1602::menus` (`engine/app`); `o1602-tool` has ctest smoke tests on synthetic files, and CI starts the game without data (also under ASan/UBSan). A CI job measures the line and branch coverage of `engine/` by the tests without data (gcovr report as an artifact). How to run them: [tests/README.md](../tests/README.md) |
 | Builds | presets `debug`, `release`, `asan`, `tsan`, `ci`, `coverage` and `vcpkg` (`release` and `vcpkg` build the game, the others with `-DO1602_BUILD_GAME=ON`; `release` and `vcpkg` put the game and `o1602-tool` into `bin/`, the others into `build/<preset>/bin/`, on macOS the game as `Open1602.app`), locally under Linux without warnings; CI for Linux (GCC, Clang, ASan, TSan, coverage), Windows (MSVC 2026, Visual Studio 2026), macOS 15 and the game with SDL3 on all three. the game has run on Windows (the maintainer with the English installation, a player with release v0.1.1); macOS has never run on a real machine |
 | Player commands | complete for the simulation (since 2026-10-18 also the town window and ship window); the selection windows trigger them; white flag, scuttling, patrol, command chains and group commands with offset have been added |
 | Local player | the first human in a single player game; in multiplayer the slot taken in the lobby |

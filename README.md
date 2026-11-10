@@ -4,12 +4,33 @@
 The goal is a faithful game on modern systems (Linux, Windows, macOS), with the original's bugs fixed,
 stable multiplayer and room for new features, quality-of-life improvements and mods.
 
-> **Status (October 2026):** The simulation of the original is largely complete (construction, economy,
-> population, disasters, ships and trade, military, diplomacy, pirates, computer opponents, new endless
-> game, savegames in the original format). The game starts in the original's main menu and is played with
-> its side panel; multiplayer runs in lockstep over the network with a lobby. The editor, parts of the
-> interface and the modding foundations are still missing. What is done, open and unclear:
-> [docs/status.md](docs/status.md).
+> **Status (November 2026, version 0.9):** The whole game of the original is playable: construction,
+> economy, population, disasters, ships and trade, military, diplomacy, pirates, natives, computer
+> opponents, scenarios and campaigns, the endless game and savegames in the original format. On top of
+> that Open1602 brings a map and scenario editor, worlds of islands of their own shape up to
+> 4000 x 4000 tiles, multiplayer for up to twelve players with a lobby, chat and spectators, content
+> packages for mods, and improved computer opponents that play by the players' rules. What is done,
+> open and unclear: [docs/status.md](docs/status.md).
+
+## Features
+
+- **The original game** from your own installation (GOG or History Edition), with its menus, side panel,
+  scenarios, campaigns and savegames; the original's behaviour stays available in the start dialog's
+  page "Original settings".
+- **Improved computer opponents** (the default; "As in the original" keeps the original's): no gifts,
+  the same view of the map and the same units as a player, a character per game (trader, conqueror or
+  settler), trade, peace and alliances among all players, wars against any rival that end when they stop
+  paying off, and colonies chosen for gold and ore
+  ([docs/modding/computer-players.md](docs/modding/computer-players.md)).
+- **Multiplayer** in lockstep over the network for up to twelve players: games on the local network
+  found by themselves, joining by address, reconnecting, spectators and chat
+  ([ADR 0011](docs/architecture/0011-multiplayer-lockstep.md)).
+- **Editor** for maps and scenarios in the game's window, with test play ([docs/editor.md](docs/editor.md)).
+- **Worlds of their own:** islands of their own shape, larger maps, many settings for the island world.
+- **Comfort:** any window size and full screen, free zoom, freely assignable keys (F1), trade routes
+  with eight stops, blueprints and moving buildings, autosave, extra settings for events and rules.
+- **Mods:** content packages with values, buildings, figures, goods, graphics, sound, videos, languages,
+  Lua scripts, scenarios and campaigns ([docs/modding/README.md](docs/modding/README.md)).
 
 ## Download
 
@@ -189,6 +210,7 @@ open1602 --scenario "Szenes/Das Atoll.szs"         # a scenario of the installat
 open1602 --new-game 1 --name Merlin                # a new endless game, difficulty 0 (easy) .. 3 (hard)
 open1602 --savegame NAME                           # a savegame of the original by its name
 open1602 --load path/to/game.o1602                 # a savegame of Open1602
+open1602 --editor                                  # the map and scenario editor (docs/editor.md)
 ```
 
 An option the game does not know, for example `--help`, prints every option and the default keys

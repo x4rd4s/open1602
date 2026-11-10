@@ -110,7 +110,7 @@ later does not change a running game.
 ## Open items
 
 Each item names the ADR 0007 section it comes from and, where there is one, the finding of the
-code review of October 2026 ([PR #109](https://github.com/x4rd4s/open1602/pull/109)).
+code review of October 2026.
 
 ### 1. Package manifest (ADR 0007 section 2) – done
 
