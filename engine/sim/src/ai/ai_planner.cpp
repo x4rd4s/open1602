@@ -22,9 +22,10 @@ constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
 constexpr std::size_t kLockFromClass = 2;   // the merchants
 constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
-constexpr std::int64_t kLeanMoney = -1000;  // improved computers below this cut running costs
-constexpr std::int64_t kShedMoney = -5000;  // ... and below this tear down producers nobody needs,
-constexpr std::size_t kShedPerVisit = 4;    // ... a few per visit of the city
+constexpr std::int64_t kLeanMoney = -1000;      // improved computers below this cut running costs
+constexpr std::int64_t kShedMoney = -5000;      // ... and below this tear down producers nobody needs,
+constexpr std::size_t kShedPerVisit = 4;        // ... a few per visit of the city
+constexpr std::int64_t kShedFarMoney = -10000;  // ... and below this whatever they refund
 
 }  // namespace
 
@@ -522,7 +523,9 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     if (!rivals() || p.pirates || player(p).money >= kShedMoney || net_income(p) >= 0) {
         return;
     }
-    const WareSet soon = needed_wares(p, true);
+    // Far in debt nothing is kept for later: what no city needs now goes, whatever it refunds.
+    const bool far = player(p).money < kShedFarMoney;
+    const WareSet soon = needed_wares(p, !far);
     const std::uint32_t refund = m_sim.rules().refund_share();
     const IslandMap& map = island_of(c.island).map;
     std::vector<std::pair<std::int32_t, std::int32_t>> shed;
@@ -542,7 +545,7 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
             b->prod_kind == prod::kKontor || b->prod_kind < prod::kWorkshop || b->prod_kind > prod::kFisher) {
             continue;
         }
-        if (!worth_demolishing(b->idle_cost, build_value(b->build_cost), refund, true)) {
+        if (!far && !worth_demolishing(b->idle_cost, build_value(b->build_cost), refund, true)) {
             continue;  // cheaper to keep switched off
         }
         shed.emplace_back(pr.x, pr.y);

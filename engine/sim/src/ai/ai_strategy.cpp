@@ -39,11 +39,14 @@ constexpr std::int32_t kRestructureMoney = -5000;
 constexpr std::int32_t kRestructureSaving = 50;
 constexpr std::uint64_t kRestructurePauseMs = 900'000;
 // The war economy of an improved computer: in peace its army may cost half its civil income; at
-// war or under threat all of it, and besides what its gold above a small reserve pays for an hour.
+// war or under threat all of it, and besides a share of its gold above a small reserve: what it
+// pays for an hour and a half under threat, three hours in a war of its own, six while it arms.
 // At war it lets its gold fall to this debt before it gives up.
 constexpr std::int32_t kArmyPeaceShare = 50;
 constexpr std::int64_t kWarReserve = 1000;
-constexpr std::int64_t kWarRunwayMinutes = 60;
+constexpr std::int64_t kThreatRunwayMinutes = 90;
+constexpr std::int64_t kWarRunwayMinutes = 180;
+constexpr std::int64_t kArmingRunwayMinutes = 360;
 constexpr std::int64_t kWarDebt = -2000;
 
 const char* goal_name(std::uint8_t g) {
@@ -376,15 +379,16 @@ std::int32_t Engine::army_budget(const AiPlayer& p) const {
     if (st.war_target == kNoPlayer && st.goal != goal::kMilitary) {
         return static_cast<std::int32_t>(civil * kArmyPeaceShare / 100);
     }
-    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kWarRunwayMinutes;
+    const std::int64_t minutes = st.war_target != kNoPlayer ? kWarRunwayMinutes : kThreatRunwayMinutes;
+    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / minutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
 }
 
 std::int32_t Engine::arming_budget(const AiPlayer& p) const {
-    // Arming for a war of its own: its civil income and half of what its gold carries, as the war
-    // is not won yet.
+    // Arming for a war of its own: its civil income and a small share of its gold, as the war is
+    // not won yet.
     const std::int64_t civil = std::max<std::int32_t>(0, civil_income(p));
-    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kWarRunwayMinutes / 2;
+    const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / kArmingRunwayMinutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
 }
 

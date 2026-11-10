@@ -518,17 +518,18 @@ as much ore and iron in store by buying, so that its iron works go on when its o
 **War economy.** Improved computers pay their army's upkeep as a human does: soldiers, units in
 their castles and aboard, and cannon towers (the original's computers pay nothing). They add a unit
 or a tower only while its upkeep stays within a budget: in peace half their civil income (taxes less
-running costs); arming for a war of their own, all of it and besides what their gold above 1000
-pays for two hours; at war or with a stronger enemy nearby, all of it and what their gold pays for
-an hour. A war plan starts only if that budget carries the soldiers it needs, and is declared only
-while its cities earn more than they cost. While a war of its
-own gets somewhere, or under threat, a computer accepts a deficit and gives up only at 2000 gold
-in debt; a war that failed a look ends in debt as before. In peace, with an army that costs a
-quarter beyond its budget while its gold falls, it disbands soldiers one by one. As disbanding
-costs gold, only a soldier whose upkeep pays that back within half an hour goes.
-While it saves for its army that way, or is in debt, it switches off the producers of what none
-of its cities needs now (no inhabitants want it, nothing of its own works it into a wanted good,
-no building material, no weapons while it arms or fights) until it can afford them again.
+running costs); with a stronger enemy nearby all of it and besides what their gold above 1000 pays
+for an hour and a half; in a war of their own all of it and three hours of that gold; arming for
+one, six hours of it. A war plan starts only if that budget carries the soldiers it needs, and is
+declared only while its cities earn more than they cost. While a war of its own gets somewhere, or
+under threat, a computer accepts a deficit and gives up only at 2000 gold in debt; a war that
+failed a look ends in debt as before. An army beyond its budget only stops growing: disbanding
+costs gold, so a computer disbands only in debt (below), and only a soldier whose upkeep pays that
+cost back within half an hour.
+While it is at its army's budget arming or at war, or in debt, it switches off the producers of
+what none of its cities needs now (no inhabitants want it, nothing of its own works it into a
+wanted good, no building material, no weapons while it arms or fights) until it can afford them
+again.
 
 More than 1000 gold in debt with a falling purse, an improved computer cuts its running costs: it
 disbands soldiers beyond half the army its inhabitants allow (not at war or under threat), and
@@ -536,7 +537,8 @@ switches off every producer with 10 t of its ware in stock until the stock is do
 More than 5000 gold in debt with a falling purse, it weighs switching off against tearing down:
 a producer whose ware the next class of one of its cities will want, or a weapon at war, only goes
 off; another is torn down where the idle costs it would go on costing and what the game refunds
-for it (the demolish refund rule) outweigh building it again, a few per visit of a city. It also gives up the city that costs it most (its
+for it (the demolish refund rule) outweigh building it again, a few per visit of a city. More
+than 10,000 gold in debt, whatever no city needs now goes, whatever it refunds. It also gives up the city that costs it most (its
 running costs above its taxes), if that saves 50 gold a minute and a quarter of the deficit, a
 quarter of an hour after the last; never its home city or its largest, nor a city that makes what
 another of its cities lacks. While its cities do not earn

@@ -497,11 +497,11 @@ void Engine::recruit(AiPlayer& p) {
     }
     // Open1602: an improved computer deep in debt with its gold still falling disbands a soldier
     // every few seconds, as a player cuts the army's upkeep, down to half its inhabitants' army;
-    // also in peace with an army that costs well beyond its budget while it loses gold.
+    // not while a war or a threat is worth the debt. An army beyond its budget otherwise only
+    // stops growing: disbanding costs gold, and the budget moves with the goal.
     const std::int32_t upkeep = rivals() ? military_cost(p) : 0;
     const std::int32_t budget = upkeep != 0 ? army_budget(p) : 0;
-    const bool over = upkeep != 0 && !war_economy(p) && upkeep > budget + budget / 4;
-    if (rivals() && net_income(p) < 0 && ((player(p).money < -1000 && !war_economy(p)) || over)) {
+    if (rivals() && net_income(p) < 0 && player(p).money < -1000 && !war_economy(p)) {
         const auto counts = army_counts(p.player);
         const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
         const Balance& bal = m_world.balance();
