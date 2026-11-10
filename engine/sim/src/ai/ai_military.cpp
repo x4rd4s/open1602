@@ -613,8 +613,26 @@ void Engine::recruit(AiPlayer& p) {
             ? static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * total_population(p.player) /
                                          mb.ai_inhabitants_per_unit / 2)
             : 0;
-    const bool can_add = !rivals() || !pays_upkeep(m_world, player(p)) || weighted_army(p.player) < core ||
-                         upkeep + unit_upkeep_estimate(p) <= army_budget(p);
+    // The core only with gold in hand and cities that pay for it; beyond it the budget with a quarter
+    // to spare, as the income it is counted from moves. One unit in training at a time, so that a
+    // goal or war does not order a dozen within minutes before the income shows their cost.
+    const bool pays = rivals() && pays_upkeep(m_world, player(p));
+    bool training = false;
+    if (pays) {
+        for (const CostBuilding& b : m_world.cost_buildings()) {
+            if (b.kind != CostBuilding::Kind::Castle || b.island >= m_world.islands().size() ||
+                m_world.islands()[b.island].map.top(b.x, b.y).owner != p.player) {
+                continue;
+            }
+            for (const CastleSlot& slot : b.slots) {
+                training = training || (slot.figure != 0 && slot.training);
+            }
+        }
+    }
+    const std::int32_t next = upkeep + unit_upkeep_estimate(p);
+    const bool can_add =
+        !pays || (!training && ((weighted_army(p.player) < core && player(p).money > 0 && next <= civil_income(p)) ||
+                                std::int64_t{next} * 4 <= std::int64_t{army_budget(p)} * 3));
     // A tower beside the market (cannons from the city: 2 t in the home city, 1 t elsewhere).
     const bool home = p.home_valid && p.home_island == c->island && p.home_city == c->index;
     const std::uint32_t cannons_needed = home ? 0x41U : 0x20U;

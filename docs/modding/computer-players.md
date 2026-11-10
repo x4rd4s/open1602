@@ -526,8 +526,9 @@ or a tower only while its upkeep stays within a budget: in peace a third of what
 earn with their trade (taxes less running costs, sales less purchases) and what their gold above
 1000 pays for twelve hours; with a stronger enemy nearby three quarters of it and besides what their gold above 1000
 pays for an hour and a half; in a war of their own three quarters and three hours of that gold;
-arming for one, six hours of it. Half the army their inhabitants call for they keep up whatever
-it costs, to defend themselves, and their sword smiths are never switched off for savings. A cannon
+arming for one, six hours of it. Half the army their inhabitants call for they keep up as long as
+they have gold and their cities' income pays for it, to defend themselves; beyond that they keep a
+quarter of the budget to spare, and they train one unit at a time, and their sword smiths are never switched off for savings. A cannon
 tower of a build order costs upkeep too and is built only within the budget. Paying upkeep, they order one unit a look. A war plan starts only if that budget carries the soldiers it needs, and is
 declared only while its cities earn more than they cost. While a war of its own gets somewhere, or
 under threat, a computer accepts a deficit and gives up only at 2000 gold in debt; a war that
