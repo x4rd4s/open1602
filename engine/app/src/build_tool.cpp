@@ -70,6 +70,11 @@ std::uint32_t variant_at(const assets::BuildingTable& buildings, const assets::B
 
 }  // namespace
 
+std::uint32_t building_look(const assets::BuildingTable& buildings, const assets::BuildingType& b, std::uint32_t seed,
+                            std::uint16_t island, std::int32_t x, std::int32_t y) noexcept {
+    return variant_at(buildings, b, seed, island, x, y);
+}
+
 BuildTool::BuildTool(const assets::BuildingTable& buildings) : m_buildings(&buildings) {
     for (const assets::BuildingType& b : buildings.types()) {
         const auto& c = b.build_cost;

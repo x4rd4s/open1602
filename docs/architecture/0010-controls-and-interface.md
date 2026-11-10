@@ -112,8 +112,8 @@ The fourth entry is the move tool (as later Anno games; the game setting "Moving
 click picks up one of the player's buildings, which then hangs at the mouse by its middle, turns
 with the building keys and goes where the next click puts it, within its city and also over its
 own old place. It keeps its level, inhabitants, stock and production; free by default, or paid as
-a new building with the demolish refund for the old place. Kontors, markets, towers, castles, a
-shipyard at work and burning or plague-struck buildings stay; the status line says why. A right
+a new building with the demolish refund for the old place. Kontors, markets, towers, castles, city
+gates, a shipyard at work and burning or plague-struck buildings stay (a triumphal arch moves); the status line says why. A right
 click puts the building in hand back.
 
 The fifth entry, in a row above the tools, opens the templates (as later Anno games): pieces the
