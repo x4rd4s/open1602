@@ -1274,9 +1274,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     }
     bool all = true;
     for (const std::uint8_t crop : wanted) {
-        // Open1602: an improved computer's alcohol comes from sugar as well as from wine.
-        all = all && (crop_available(p, crop) ||
-                      (rivals() && crop == ware::kWineField && crop_available(p, ware::kSugarField)));
+        all = all && crop_available(p, crop);
     }
     if (all && !force && !wants_room(p)) {
         return false;
