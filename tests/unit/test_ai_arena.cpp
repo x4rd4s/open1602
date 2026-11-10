@@ -571,8 +571,8 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // leaves half the way searches of a tick to units with a way to go; up to 16 cities on an island
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
         // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
-        // their ships saw.
-        test::check_golden("arena after an hour", s.state_hash(), 0x5d0f9deed6e9307cULL);
+        // their ships saw; saving for a colony whose crop none of their islands grows.
+        test::check_golden("arena after an hour", s.state_hash(), 0x6a5349c08a00701eULL);
     }
 }
 
