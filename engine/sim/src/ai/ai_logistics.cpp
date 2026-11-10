@@ -863,15 +863,17 @@ std::vector<std::uint8_t> Engine::routed_wares(AiPlayer& p, std::uint32_t ship, 
 
 std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const {
     // Open1602: what an improved computer's city can give of a ware to another of its cities. One
-    // where people live gives only what it makes beyond their use, keeping 20 t, so that a city
-    // the runs bring a ware to does not pass it on (it ran dry itself), and the home city does
-    // not ship away what it lacks. A city where nobody lives gives all beyond the reserve.
+    // where people live gives only what it makes beyond their use, keeping 20 t and what they use
+    // in kSpareKeepMinutes, so that a city the runs bring a ware to does not pass it on (it ran dry
+    // itself), and the home city does not ship away what it lacks: a home that gave its alcohol to
+    // a new colony down to 18 t ran out of it within the hour. A city where nobody lives gives all
+    // beyond the reserve.
     std::uint32_t keep = reserve;
     if (population(c) != 0 && demand(c, w) != 0) {
         if (supply(c, w) <= demand(c, w)) {
             return 0;
         }
-        keep = std::max<std::uint32_t>(reserve, 20 * kTon);
+        keep = std::max<std::uint32_t>({reserve, 20 * kTon, kSpareKeepMinutes * demand(c, w)});
     }
     // Less than kMinSupplyRun is not worth a run: ships sailed for a ton or four and crowded the
     // narrow harbours of the cities they left.
@@ -1374,8 +1376,9 @@ void Engine::order_ship(AiPlayer& p) {
             m_sim.m_figures->get(package_ship != 0 ? package_ship : figure::ship_figure(type));
         const std::int64_t price = f != nullptr ? f->ship.price : 0;
         // Open1602: an improved computer pays for a ship only with the price in hand; the original's
-        // orders with half of it and may run into debt.
-        const std::int64_t needed = classic() ? price / 2 : price;
+        // orders with half of it and may run into debt. An improved rival's order also leaves its gold for the goods it
+        // buys (buy_reserve).
+        const std::int64_t needed = classic() ? price / 2 : price + buy_reserve(p);
         if (std::int64_t{player(p).money} > needed) {
             ShipyardOrder order;
             order.player = p.player;

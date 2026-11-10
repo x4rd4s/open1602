@@ -1220,8 +1220,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     // Open1602: an improved computer founds a colony only with the gold to build it up; founded
-    // with its last gold, the colony stood empty and was given up.
-    if (!classic() && player(p).money < colony_money(p)) {
+    // with its last gold, the colony stood empty and was given up. A rival also keeps its gold for
+    // the goods it buys (buy_reserve).
+    if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
         return false;
     }
     const std::uint32_t n = p.cities;

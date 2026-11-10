@@ -1193,7 +1193,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // Open1602: an improved computer whose people want a good none of its islands grows the crop
     // for asks for the colony at every look of its home city, once the gold for it is saved
     // (colony_savings); the orders asked only at their steps, hours apart.
-    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) &&
+    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) + buy_reserve(p) &&
         want_colony(p, 3, false, false)) {
         return;
     }
@@ -2264,7 +2264,8 @@ std::int64_t Engine::colony_savings(AiPlayer& p) {
     }
     // A settlement under way keeps the gold until the Kontor stands: spent meanwhile, the ship
     // arrived to find too little to found the city.
-    if (p.settle.active) {
+    // So too while its ship goes home to load: the gold fell from 3600 to 130 in those minutes.
+    if (p.settle.active || p.settle.ship != 0) {
         return colony_money(p);
     }
     // Only with a ship to sail: without one the gold lay idle (update_fleet_target orders one).
