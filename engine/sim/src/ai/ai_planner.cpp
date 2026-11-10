@@ -1733,7 +1733,13 @@ bool Engine::supplies_growth(const City& c) const {
     // is content (kContentForGrowth) with every good of theirs in store or coming in. A settler
     // without cloth or a citizen without alcohol turns discontent, the houses fall back and pay a
     // fraction; a good merely low in store, with the people content, holds nothing up.
-    if (!food_ahead(c)) {
+    // Open1602: for an improved rival, so too while its own food covers three quarters and the
+    // stock feeds them for kFoodAheadMinutes: a home island with no room left for farms got the
+    // rest by ship and sat for hours on 20,000 gold and more, its houses never built.
+    const std::uint8_t food = m_buildings.food_ware();
+    const bool stocked = rivals() && std::uint64_t{supply(c, food)} * 4 >= std::uint64_t{demand(c, food)} * 3 &&
+                         std::uint64_t{c.stock(food)} >= std::uint64_t{demand(c, food)} * kFoodAheadMinutes;
+    if (!food_ahead(c) && !stocked) {
         return false;
     }
     for (std::size_t k = 0; k < c.inhabitants.size() && k < c.satisfaction.size(); ++k) {

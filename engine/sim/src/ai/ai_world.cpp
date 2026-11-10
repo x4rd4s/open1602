@@ -281,9 +281,12 @@ bool Engine::affordable(const AiPlayer& p, const City& c, const assets::Building
     const auto& m = m_buildings.materials();
     const auto& cost = b.build_cost;
     // Open1602: an improved rival leaves the gold for the goods it buys (buy_reserve), but for a
-    // producer, which may be the one to make them, and a house, which brings the taxes.
-    const bool producer = b.ware != 0 && b.prod_kind != prod::kMarket && b.prod_kind != prod::kKontor;
-    const std::int64_t keep = producer || b.prod_kind == prod::kHouse ? 0 : buy_reserve(p);
+    // producer, which may be the one to make them, a house, which brings the taxes, and a market or
+    // Kontor, which the houses and the goods need: held back, the markets alone stood still for 2000
+    // computer minutes in a test of ten worlds.
+    const bool exempt =
+        b.ware != 0 || b.prod_kind == prod::kHouse || b.prod_kind == prod::kMarket || b.prod_kind == prod::kKontor;
+    const std::int64_t keep = exempt ? 0 : buy_reserve(p);
     return std::int64_t{player(p).money} >= cost.money + keep && c.stock(m.wood) >= cost.wood &&
            c.stock(m.bricks) >= cost.bricks && c.stock(m.tools) >= cost.tools && c.stock(m.cannons) >= cost.cannons;
 }
