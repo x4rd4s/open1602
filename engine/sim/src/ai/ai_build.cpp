@@ -497,6 +497,7 @@ void Engine::task_workshop(AiPlayer& p) {
         }
         return;
     }
+    log_no_site(p, b->id);
     if (slot_fail(p, s.slot) == 0 && task != kStonemason) {
         push(p, kRoads, true);
     }
@@ -554,6 +555,7 @@ void Engine::task_houses(AiPlayer& p) {
         }
         return;
     }
+    log_no_site(p, s.building);
     if (slot_fail(p, kSlotHouses) == 0) {
         push(p, kRoads, true);
     }

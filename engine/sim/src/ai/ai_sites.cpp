@@ -496,6 +496,9 @@ void Engine::start_search(AiPlayer& p, const assets::BuildingType& b, std::uint8
         s.remaining = g.length;
     }
     p.search = s;
+    if (logging()) {
+        site_tally(p) = SiteTally{};
+    }
 }
 
 bool Engine::advance_cursor(AiPlayer& p, std::int32_t limit) {
@@ -662,6 +665,7 @@ bool Engine::search_houses(AiPlayer& p) {
                 const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
                 score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
             }
+            tally_site(p, true, acc.market, score);
             if (acc.market && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -734,6 +738,7 @@ bool Engine::search_workshop(AiPlayer& p, bool cannons) {
             std::int32_t score = cannons ? acc.score : parity_penalty(acc.score, parity, 4);
             // Open1602: workshops at the edge of the town zone or outside, not on its house land.
             score = outside_zone(zone, -kZoneWorkshopDepth, c, score);
+            tally_site(p, acc.road, acc.market, score);
             if (acc.market && acc.road && score > s.best) {
                 s.best = score;
                 s.best_x0 = c.x0;

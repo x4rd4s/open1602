@@ -970,6 +970,12 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                 break;  // first_crops only: nothing a stage builds
         }
         if (found) {
+            if (logging()) {
+                if (m_last_need.size() <= p.player) {
+                    m_last_need.resize(std::size_t{p.player} + 1, -1);
+                }
+                m_last_need[p.player] = static_cast<std::int32_t>(n.kind) << 8 | n.slot;
+            }
             return true;
         }
     }

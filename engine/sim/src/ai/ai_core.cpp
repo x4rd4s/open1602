@@ -52,9 +52,13 @@ CommandResult Engine::execute(const Command& command) {
     return m_sim.execute(command);
 }
 
-void Engine::log(const AiPlayer& p, const char* format, ...) const {
+bool Engine::logging() noexcept {
     static const bool enabled = annokit::core::environment_variable("O1602_AI_LOG").has_value();
-    if (!enabled) {
+    return enabled;
+}
+
+void Engine::log(const AiPlayer& p, const char* format, ...) const {
+    if (!logging()) {
         return;
     }
     std::fprintf(stderr, "[ai %u %llus] ", p.player, static_cast<unsigned long long>(now_ms() / 1000));
@@ -243,6 +247,9 @@ void Engine::tick(std::uint32_t dt_ms) {
         }
         if (rivals() && !p.pirates && p.has_plan && now_ms() >= p.strategy.next_ms) {
             plan_strategy(p);
+        }
+        if (logging() && p.has_plan) {
+            report(p);
         }
     }
 }
@@ -766,6 +773,76 @@ void Engine::choose_home(AiPlayer& p) {
         p.home_island = cities[*home].island;
         p.home_city = cities[*home].index;
         p.city_cursor = static_cast<std::uint32_t>(*home == 0 ? cities.size() - 1 : *home - 1);
+    }
+}
+
+Engine::SiteTally& Engine::site_tally(const AiPlayer& p) {
+    if (m_site_tally.size() <= p.player) {
+        m_site_tally.resize(std::size_t{p.player} + 1);
+    }
+    return m_site_tally[p.player];
+}
+
+void Engine::tally_site(const AiPlayer& p, bool road, bool market, std::int32_t score) {
+    if (!logging()) {
+        return;
+    }
+    SiteTally& t = site_tally(p);
+    ++t.sites;
+    t.road += road ? 1 : 0;
+    t.market += market ? 1 : 0;
+    if (road && market) {
+        ++t.both;
+        t.best = std::max(t.best, score);
+    }
+}
+
+void Engine::log_no_site(const AiPlayer& p, std::uint32_t building) {
+    if (!logging()) {
+        return;
+    }
+    const SiteTally& t = site_tally(p);
+    log(p, "city %u/%u: no site for building %u: %d free sites, %d by a road, %d in market reach, %d both, best %d",
+        p.island, p.city, building, t.sites, t.road, t.market, t.both, t.both != 0 ? t.best : 0);
+}
+
+void Engine::report(AiPlayer& p) {
+    // Every half hour of game time, for the log: what each city has and why it may stand still.
+    constexpr std::uint64_t kReportMs = 30ULL * 60 * 1000;
+    if (m_report_ms.size() <= p.player) {
+        m_report_ms.resize(std::size_t{p.player} + 1, 0);
+    }
+    if (now_ms() < m_report_ms[p.player]) {
+        return;
+    }
+    m_report_ms[p.player] = now_ms() + kReportMs;
+    const std::int32_t need = p.player < m_last_need.size() ? m_last_need[p.player] : -1;
+    log(p, "report: gold %d, civil %d, net %d, earned %d, stage %u, last need kind %d slot %d", player(p).money,
+        civil_income(p), net_income(p), earned_income(p), unsigned{p.max_stage}, need < 0 ? -1 : need >> 8,
+        need < 0 ? -1 : need & 0xFF);
+    for (const CityPlan& r : p.plans) {
+        const City* c = city(r.island, r.city);
+        if (c == nullptr || c->owner != p.player) {
+            continue;
+        }
+        std::array<std::uint32_t, 5> classes{};
+        std::uint32_t houses = 0;
+        for (const House& h : m_world.houses()) {
+            if (h.island == c->island && h.city == c->index) {
+                ++houses;
+                ++classes[std::min<std::size_t>(h.resident_class, classes.size() - 1)];
+            }
+        }
+        const SlotState& hs = r.slots[kSlotHouses];
+        const SlotState& ms = r.slots[kSlotMarket];
+        log(p,
+            "report city %u/%u: stage %u, people %u, houses %u (%u/%u/%u/%u/%u), land %u, grown16 %u, wanted %u, "
+            "house slot %u/%u/%u, market %u/%u/%u flag %d, food %u t short %d",
+            r.island, r.city, unsigned{r.stage}, population(*c), houses, classes[0], classes[1], classes[2], classes[3],
+            classes[4], r.land, grown(r, 16), houses_wanted(*c, r, houses), unsigned{hs.count}, unsigned{hs.attempts},
+            unsigned{hs.fail_level}, unsigned{ms.count}, unsigned{ms.attempts}, unsigned{ms.fail_level},
+            (r.flags & city_flag::kMarket) != 0 ? 1 : 0, c->stock(m_buildings.food_ware()) / kTon,
+            food_short(*c) ? 1 : 0);
     }
 }
 

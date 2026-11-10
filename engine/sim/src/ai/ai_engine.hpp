@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -226,6 +227,9 @@ private:
     CommandResult execute(const Command& command);
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
+    [[nodiscard]] static bool logging() noexcept;
+    /// The computer log only: a report of each city every half hour of game time.
+    void report(AiPlayer& p);
 
     // ---- ai_world.cpp ----
     [[nodiscard]] Tile tile(std::uint16_t island, std::int32_t x, std::int32_t y) const;
@@ -821,6 +825,22 @@ private:
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
     std::vector<CityScans> m_city_scans;
     bool m_in_tick = false;
+    /// The computer log only (not saved): what a player's last site search saw, and when its cities
+    /// were last reported.
+    struct SiteTally {
+        std::int32_t sites = 0;   ///< free sites looked at
+        std::int32_t road = 0;    ///< of them by a road
+        std::int32_t market = 0;  ///< in reach of a market or the Kontor
+        std::int32_t both = 0;
+        std::int32_t best = std::numeric_limits<std::int32_t>::min();  ///< best score of those with both
+    };
+    SiteTally& site_tally(const AiPlayer& p);
+    void tally_site(const AiPlayer& p, bool road, bool market, std::int32_t score);
+    void log_no_site(const AiPlayer& p, std::uint32_t building);
+    std::vector<SiteTally> m_site_tally;
+    std::vector<std::uint64_t> m_report_ms;
+    /// The computer log only: the stage order's entry a player's last look stopped at.
+    std::vector<std::int32_t> m_last_need;
 };
 
 /// Ring iterator: ring d (Chebyshev distance d + 1) around the
