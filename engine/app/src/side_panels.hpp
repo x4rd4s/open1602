@@ -143,7 +143,8 @@ public:
     /// "Punkte" (57027, the score's total) and whether "Bewertung" can be pressed.
     void set_points(std::int64_t points, bool rating);
     [[nodiscard]] std::optional<std::string> help(const std::vector<std::string>& leiste) const;
-    /// The figures of the local player, its coat of arms in `banner`'s colour.
+    /// The figures of the local player, its coat of arms in `banner`'s colour (none for a
+    /// spectator, who plays no colour: then the panel shows no coat of arms).
     void refresh(const sim::PlayerFigures& figures, const render::Banner* banner);
     [[nodiscard]] const ui::Panel& panel() const noexcept { return m_panel; }
 
@@ -154,6 +155,7 @@ private:
     std::int32_t m_balance_icon = 0;  ///< sprite of the balance icon (green; red is the next)
     bool m_rating_clicked = false;
     bool m_goods_clicked = false;
+    bool m_rating = true;  ///< "Bewertung" can be pressed
 };
 
 }  // namespace o1602::app
