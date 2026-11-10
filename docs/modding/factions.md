@@ -36,7 +36,7 @@ Each number grows with what the game has: `base`, and one more for each `per` of
 | Field | Counted | Default | Meaning |
 |---|---|---|---|
 | `nests` (pirates) | human and computer players | `per = 4`, `min = 1` | how many nests the pirates aim for, each with the original's ships; only with the setting "Pirate nests: one for every four players" (the original has one) |
-| `ships` (free trader) | Kontors in the world | `per = 3`, `from = 2` | how many trader ships sail (the original's one for every three Kontors, none with fewer than two) |
+| `ships` (free trader) | Kontors in the world | `per = 3`, `from = 2` | how many trader ships sail (the original's one for every three Kontors, none with fewer than two; under the nearby destinations of `trader_reach` at least one as soon as there is a Kontor) |
 | `reach_players` (free trader) | – | `4` | with more human and computer players than this the trader keeps to as many Kontors as a game of this many would have (setting "Trader's reach"); 0 never |
 
 A field a faction's behaviour does not use (the settlers' `nests`) does nothing.
