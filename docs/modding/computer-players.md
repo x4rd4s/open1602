@@ -452,15 +452,34 @@ Improved computers weigh the way at sea:
 - **Stock and loads.** The home city keeps more of a ware the further away it comes from (a round
   trip of ten minutes doubles the stock it keeps, at most four times as much), and the ship brings
   what lasts until it is back, up to half its holds per ware.
-- **Fleet.** One ship guards each city; on top come as many ships as the supply takes: a ship per
-  two wares the home city lacks, half a ship more per ten minutes of a ware's round trip, at most
-  four, and in all at most two per city and one more; none while it is in debt. The target falls
+- **Which city, which ware.** A supply ship serves the own city with people whose goods run out
+  soonest, the home city first among equals; another city gets only what it runs out of. Of the
+  wares it brings the one that runs out first. A good the people use (food and its chain, cloth,
+  alcohol and the other goods it lacks) keeps being made while the computer is in debt.
+- **Ships per route.** Where a ware's source lies far away, several ships run for it: as many as
+  the shortfall a minute times the round trip (with two minutes at the Kontors) takes, counted in
+  half holds, at most four per ware. A source counts only for what it can spare: an own city with
+  people only what it makes beyond its own use, keeping 20 t and ten minutes of what it uses; a
+  partner only what it sells beyond what it keeps and 5 t, less what the computer's ships are
+  already on their way to load there; natives only as far as the goodwill pays. No ship sails for
+  less than 10 t. When the source makes too little, no further ship sails; the shortfall shows as
+  a lacking good, and the city builds the producer instead.
+- **Colonies for a crowded home.** When the home island has no site left for pastures and fields
+  (or sheep farms) and the home city makes too little food (a quarter to spare) or cloth, the
+  colonies build food producers or sheep farms for the rest, beyond their own use, and the supply
+  ships bring it home. Without a colony that can, the home city founds one.
+- **Fleet.** One ship guards each city; on top come as many ships as the supply takes: half the
+  supply runs its cities need (above), at most eight, and in all at most eight more than its
+  cities; none while it is in debt. The target falls
   only after ten minutes of lower needs. A ship is ordered at the yard once the gold covers its
   price (the original's computers order with half of it), or bought as before.
 - **Colonies.** The island search of a computer with a home city looks at the islands nearest to
   it first, so that its colonies lie within reach of its ships. It founds one only with 3000 gold
   in hand, passes over an island it gave a city up on for 45 minutes, and a young colony (before
-  its settlers) no longer makes the older city a second city.
+  its settlers) no longer makes the older city a second city. A rival founds one colony after
+  the other, twenty minutes apart. Once its home city has 300 inhabitants and its people use a
+  good none of its islands grows the crop for, it saves the colony's gold (its houses wait), from
+  then until the Kontor stands, also while the ship goes home to load.
 - **Colony crops.** An improved computer founds its next colony for the good its people use, make
   too little of and run out of soonest, where none of its cities has an island for it yet (alcohol
   from wine, else sugar; tobacco; spices; cocoa), after its goal's gold or ore. The original goes
@@ -492,6 +511,22 @@ Improved computers weigh the way at sea:
 - **Hourly new start.** The original's computers start again every hour and walk every city
   through the founding stages anew; improved ones keep each city's stage and forget only their
   failed site searches.
+
+- **Pirates.** An improved computer's armed ship fights a pirate off as a human's does, while it
+  has at least half its health and no pirate ship within twelve tiles has more cannons; else it
+  surrenders its cargo as the original's computers do.
+
+## Land for farms
+
+The original's computers search a farm's site only beside their roads and keep it five rings away
+from any other farm or plantation; in a grown town that leaves no site however much free land the
+city or its island has. Improved computers keep their farms apart only within three rings, where
+their fields would overlap. When the houses still find sites but a farm or plantation does not,
+the next road the city builds leads where the land ahead is open instead of along the town. When
+a farm finds no site at all, the computer looks for the place of its island with the most
+unclaimed land that fields can take (60 tiles within six of it at least), near its markets, and
+builds a market at the edge of its land towards it, with a road there over its own ground (up to
+40 tiles); failing that, a market along its roads that comes nearer. The farm then searches anew.
 
 ## Trade and treaties
 
@@ -602,6 +637,13 @@ running costs above its taxes), if that saves 50 gold a minute and a quarter of 
 quarter of an hour after the last; never its home city or its largest, nor a city that makes what
 another of its cities lacks. While its cities do not earn
 50 gold a minute each, it founds no further colony, whatever gold it has.
+
+An improved rival also keeps gold for the goods it buys: five minutes of what it buys beyond what
+it sells, once it has 300 inhabitants. Only producers, houses, markets and Kontors are built from
+that gold; public buildings, towers, yards, ships and colonies wait. Without it, the gold went into
+churches, baths and the big yard down to a few coins, the computer could buy no more cloth and
+tobacco, and its merchants left within half an hour. It starts or joins a war only while none of
+its cities lacks alcohol or cloth, its home city makes the food it eats, and it has 5000 gold.
 
 In debt, an improved computer locks the building material of a city (the city window's switch)
 while the city has less than 1 t of food, or of a good its merchants or higher classes want and
