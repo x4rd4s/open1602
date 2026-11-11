@@ -1263,17 +1263,26 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
         return false;
     }
-    // Nor while it would lose gold with one more colony (what it earns now less what one of its
-    // colonies costs beyond its taxes, colony_deficit), unless its gold carries that loss for
-    // kColonyLossMinutes beyond the founding: three colonies in two hours took a computer from
-    // 24,000 gold into a debt it never left, and two founded with 140,000 gold in hand put
-    // another in debt within the hour.
+    // Nor while it would lose gold with one more colony, as its statistics show it (overview):
+    // the worse of its net gold a minute now and an hour ahead at the trend of the last hour,
+    // less what one of its colonies costs beyond its taxes (colony_deficit), must keep a tenth of
+    // its taxes; what it falls short its gold must carry for kColonyLossMinutes beyond the
+    // founding. Three colonies in two hours took a computer from 24,000 gold into a debt it never
+    // left; five plantations and mines, founded on a margin of 500 a minute, into one of 79,000.
     // Weighed before the ship is called home only: its loss changes with every look, and a ship
     // called for a founding that was then refused lay idle at the Kontor.
     if (rivals() && p.cities >= 2 && p.settle.ship == 0) {
-        const std::int64_t after = std::int64_t{earned_income(p)} - colony_deficit(p);
-        if (player(p).money < std::int64_t{colony_money(p)} + buy_reserve(p) +
-                                  std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -after)) {
+        const Overview o = overview(p);
+        const std::int64_t deficit = colony_deficit(p);
+        const std::int64_t after = o.all.net_safe(kForecastMinutes) - deficit;
+        const std::int64_t margin = std::max<std::int64_t>(0, o.all.now.taxes / 10);
+        const std::int64_t needed = std::int64_t{colony_money(p)} + buy_reserve(p) +
+                                    std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, margin - after);
+        if (player(p).money < needed) {
+            log(p, "no colony: net %lld now, %lld in an hour, a colony costs %lld, gold %lld of %lld",
+                static_cast<long long>(o.all.now.net()), static_cast<long long>(o.all.net_ahead(kForecastMinutes)),
+                static_cast<long long>(deficit), static_cast<long long>(player(p).money),
+                static_cast<long long>(needed));
             return false;
         }
     }

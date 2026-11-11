@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "ai_chains.hpp"
+#include "ai_overview.hpp"
 #include "ai_state.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -671,6 +672,13 @@ private:
     /// taxes, on average over those that cost more than they pay, uninhabited ones included
     /// (want_colony).
     [[nodiscard]] std::int64_t colony_deficit(const AiPlayer& p) const;
+    /// Improved computers: their cities as the statistics windows show them, for each island and
+    /// all of them (ai_overview.hpp).
+    [[nodiscard]] Overview overview(const AiPlayer& p) const;
+    /// One good of the computer's cities (of one island, or all) as the window "Warenbilanz"
+    /// shows it.
+    [[nodiscard]] WareView ware_view(const AiPlayer& p, std::uint8_t ware,
+                                     std::optional<std::uint16_t> island = std::nullopt) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
     /// Whether `c` is the computer's home city.
     [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {
