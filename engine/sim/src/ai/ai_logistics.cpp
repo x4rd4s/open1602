@@ -342,8 +342,37 @@ bool Engine::yard_service(AiPlayer& p) {
     if (yard == nullptr) {
         return false;
     }
+    // Open1602: an improved computer releases a ship whose repair has had no material for
+    // kYardStalled cycles while neither the yard nor the city's Kontor holds any, and starts no
+    // repair at such a yard until it does: its only ship lay at the yard for fourteen hours, and
+    // its cities went without supply runs.
+    constexpr std::uint8_t kYardStalled = 15;
+    const auto material = [&] {
+        const City* c = city(yard->island, island_of(yard->island).map.top(yard->x, yard->y).city);
+        const auto has = [&](std::uint32_t in_yard, std::uint8_t w) {
+            return w == 0 || in_yard != 0 || (c != nullptr && c->stock(w) != 0);
+        };
+        return has(yard->wood, t.type->raw_ware) && has(yard->cloth, t.type->raw2_ware);
+    };
+    const bool repairs = !rivals() || yard->idle_cycles < kYardStalled || material();
     if (yard->repair_ship != 0 && m_world.ship(yard->repair_ship) != nullptr) {
-        return true;
+        if (!rivals() || yard->idle_cycles < kYardStalled || repairs) {
+            return true;
+        }
+        ShipyardOrder release;
+        release.player = p.player;
+        release.island = p.yard_island;
+        release.x = p.yard_x;
+        release.y = p.yard_y;
+        release.op = ShipyardOrder::Op::Repair;
+        release.on = false;
+        release.ship = yard->repair_ship;
+        execute(release);
+        log(p, "ship %u: no material at the yard, repair stopped", release.ship);
+        return false;
+    }
+    if (!repairs) {
+        return false;
     }
     for (Ship* s : own_ships(p)) {
         if (!ship_idle(p, *s) ||
@@ -587,7 +616,12 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (c.owner == p.player) {
-                if (own_spare(c, w, reserve, is_home(p, c)) != 0) {
+                // Not from a city that uses more of it than it makes for one that makes more than it
+                // uses, nor from one a ship brings it to: jewellery and clothes went back and forth
+                // between two cities a minute apart, eight runs each way within two hours.
+                const bool takes = supply(c, w) <= demand(c, w) && supply(*home, w) > demand(*home, w);
+                if (!takes && std::ranges::count(routed_wares(p, 0, c), w) == 0 &&
+                    own_spare(c, w, reserve, is_home(p, c)) != 0) {
                     const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
