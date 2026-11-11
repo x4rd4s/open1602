@@ -389,6 +389,7 @@ private:
     void production_switches(AiPlayer& p, City& c);
     /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
     void shed_producers(AiPlayer& p, City& c);
+    void shed_public(AiPlayer& p, City& c);
     using WareSet = std::array<bool, 256>;
     [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon) const;
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.

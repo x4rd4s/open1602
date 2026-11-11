@@ -101,6 +101,7 @@ void Engine::refresh_city(AiPlayer& p) {
         sell_settings(p, *c, *r);
         production_switches(p, *c);
         shed_producers(p, *c);
+        shed_public(p, *c);
         tax_rates(p, *c);
         material_lock(p, *c);
     }
@@ -589,6 +590,56 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     if (done != 0) {
         log(p, "city %u/%u: tears down %zu producers nobody needs in debt (gold %d)", c.island, c.index, done,
             player(p).money);
+    }
+}
+
+void Engine::shed_public(AiPlayer& p, City& c) {
+    // Open1602: an improved computer far in debt and still losing gold tears down a public
+    // building that lets houses rise into a class (gate_class) when nobody of that class or above
+    // lives in the city any more: a church and a bath house for merchants who had left kept
+    // costing 835 gold a minute against 424 of taxes. One a visit.
+    if (!rivals() || p.pirates || player(p).money >= kShedFarMoney || net_income(p) >= 0 || c.island != p.island) {
+        return;
+    }
+    const auto lives_from = [&](std::size_t k) {
+        for (std::size_t i = k; i < c.inhabitants.size(); ++i) {
+            if (c.inhabitants[i] != 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::vector<std::uint32_t> unused;
+    for (const ComputerSlot& def : slots()) {
+        if (def.kind != ComputerSlot::Kind::Public) {
+            continue;
+        }
+        if (const std::size_t g = gate_class(def); g != 0 && !lives_from(g)) {
+            unused.push_back(def.building);
+        }
+    }
+    if (unused.empty()) {
+        return;
+    }
+    const IslandMap& map = island_of(c.island).map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const auto tx = static_cast<std::int32_t>(x);
+            const auto ty = static_cast<std::int32_t>(y);
+            const MapCell& cell = map.top(tx, ty);
+            if (cell.empty() || cell.city != c.index || cell.owner != p.player) {
+                continue;
+            }
+            const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
+            if (b == nullptr || std::ranges::find(unused, b->id) == unused.end()) {
+                continue;
+            }
+            if (demolish_tile(p, tx, ty) != 0) {
+                log(p, "city %u/%u: tears down a public building nobody uses in debt (gold %d)", c.island, c.index,
+                    player(p).money);
+                return;
+            }
+        }
     }
 }
 
@@ -2466,8 +2517,10 @@ std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
     const auto blocked = [&](std::uint8_t slot) { return r.slots[slot].fail_level >= 2; };
     std::uint64_t wanted = 0;
     if (w == m_buildings.food_ware()) {
-        // The fishers alone feed no large city: the pastures and fields have no site left.
-        if (!blocked(kSlotCattle) || !blocked(kSlotGrain)) {
+        // The fishers alone feed no large city: the pastures or the fields have no site left. Once
+        // one of them has none, not only both: waited for both, the colonies grew the home city's
+        // food three hours after its first pasture found no site, and its merchants starved.
+        if (!blocked(kSlotCattle) && !blocked(kSlotGrain)) {
             return 0;
         }
         wanted = std::uint64_t{demand(*home, w)} * 5 / 4;
