@@ -1110,6 +1110,7 @@ namespace {
 constexpr std::int32_t kGoalColonyMoney = 10'000;
 constexpr std::int32_t kGoalColonyIncome = 100;
 constexpr std::int64_t kRichColonyMoney = 20'000;
+constexpr std::uint32_t kColonyLossMinutes = 30;  // improved computers: the loss a founding's gold carries
 }  // namespace
 
 std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
@@ -1172,6 +1173,12 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
     if (Ship* s = settle_ship(p)) {
         return s->id;
     }
+    // Open1602: an improved computer does not send its only ship to found a city while one of its
+    // cities runs out of food (food_runs_out): the founding took the ship for twenty minutes, and a
+    // colony of 450 people starved meanwhile.
+    if (rivals() && !p.pirates && own_ships(p).size() < 2 && food_runs_out(p)) {
+        return 0;
+    }
     std::uint32_t best = 0;
     std::uint32_t best_cannons = 25;
     for (Ship* s : own_ships(p)) {
@@ -1233,6 +1240,15 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     // with its last gold, the colony stood empty and was given up. A rival also keeps its gold for
     // the goods it buys (buy_reserve).
     if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
+        return false;
+    }
+    // Nor while it loses gold, unless its gold carries the loss for kColonyLossMinutes beyond the
+    // founding: three colonies in two hours took a computer from 24,000 gold into a debt it never
+    // left.
+    if (rivals() && p.cities >= 2 &&
+        player(p).money <
+            std::int64_t{colony_money(p)} + buy_reserve(p) +
+                std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -std::int64_t{earned_income(p)})) {
         return false;
     }
     const std::uint32_t n = p.cities;

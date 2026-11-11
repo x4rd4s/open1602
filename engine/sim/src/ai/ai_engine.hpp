@@ -340,6 +340,8 @@ private:
     void scout(AiPlayer& p);
     /// Open1602: sends an improved computer's ship without a job on patrol round its home island.
     void guard_idle_ship(AiPlayer& p, bool healthy);
+    /// Whether a pirate ship lies near `s` (an improved computer's held ship waits for it).
+    [[nodiscard]] bool pirate_near(const Ship& s) const;
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
@@ -389,6 +391,7 @@ private:
     void production_switches(AiPlayer& p, City& c);
     /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
     void shed_producers(AiPlayer& p, City& c);
+    void shed_public(AiPlayer& p, City& c);
     using WareSet = std::array<bool, 256>;
     [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon) const;
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
@@ -478,8 +481,11 @@ private:
     [[nodiscard]] std::uint32_t goods_ahead(PlayerId owner, std::uint8_t w) const;
     /// Whether the goods of class `k` are made and in store for the houses to rise into it.
     [[nodiscard]] bool ascent_ready(AiPlayer& p, const City& c, std::size_t k);
-    /// Whether a good of class `k` has no own source: none made and little in store.
-    [[nodiscard]] bool source_missing(AiPlayer& p, const City& c, std::size_t k);
+    /// A good of class `k` without an own source: none made and little in store (0 for none).
+    [[nodiscard]] std::uint8_t source_missing(AiPlayer& p, const City& c, std::size_t k);
+    /// Improved computers: a workshop for `w` in the current city where it has the workshop's raw
+    /// material in store and none yet; whether one was planned.
+    bool workshop_for(AiPlayer& p, const City& c, std::uint8_t w);
     /// The lowest class that needs the public building of slot `def` (0: none from the citizens on).
     [[nodiscard]] std::size_t gate_class(const ComputerSlot& def) const;
     static constexpr std::uint32_t kAscentStockMinutes = 5;
@@ -643,11 +649,14 @@ private:
     /// kNoUrgency for a ware it makes enough of or does not use.
     [[nodiscard]] std::uint64_t supply_urgency(const City& c, std::uint8_t ware, std::uint32_t target) const;
     /// Improved computers: the urgency of the most urgent ware `c` lacks that no supply ship brings
-    /// it yet and that it can get (kNoUrgency for none).
-    [[nodiscard]] std::uint64_t supply_need(AiPlayer& p, const City& c);
+    /// it yet and that it can get (kNoUrgency for none); of `only` alone when given.
+    [[nodiscard]] std::uint64_t supply_need(AiPlayer& p, const City& c, std::uint8_t only = 0);
     /// Improved computers: the own city the next supply run goes to: the one that runs out of a
     /// ware soonest, the home city when none does.
     City* supply_destination(AiPlayer& p, City& home);
+    /// Improved computers: whether one of the computer's cities runs out of food within
+    /// kHomeFirstMinutes and a ship could bring it some (supply_need).
+    [[nodiscard]] bool food_runs_out(AiPlayer& p);
     /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
     /// for the original's computers to any city.
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);

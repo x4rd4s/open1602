@@ -675,6 +675,29 @@ lasts less than ten minutes there, before any colony. A building of 750 gold or 
 buildings, the big yard) and a ship order also leave five minutes of what the gold loses while the
 taxes and sales do not cover the costs and purchases.
 
+An improved computer's home city is the one the original would choose (the last with ten citizens,
+unless a later one has more free land), but only among its cities where 50 people live, once it has
+one; a city reaching a new stage does not take it over. By the original's rule a new colony with
+much free land became the home while nobody lived there yet, and the capital's food went there.
+Its colonies grow the home city's food as soon as its pastures or its fields have no room left, not
+only once both have none. A supply run goes first to a city whose food runs out within ten minutes
+while the home city's own food lasts; food counts as running out while the city makes less than a
+quarter beyond what it eats, and a food run brings ten minutes of what the city eats (at most half
+its Kontor) straight there, without a second ware from elsewhere. Its only ship does not leave to
+found a city while a city runs out of food. A city gives a ware to another of its cities only when
+it does not use more of it than it makes while the other makes more, and no ship brings it the same
+ware: the goods went back and forth between two cities a minute apart. A further colony waits until
+its gold carries what it loses a minute for half an hour beyond the founding. A good of a class
+whose gate is held that the city can work from its store (the tailor's clothes from cloth) gets its
+workshop before a colony is sought.
+
+More than 10,000 gold in debt with a falling purse, it also tears down, in its home island's city, a
+public building that lets houses rise into a class when nobody of that class or above lives there
+any more, one a visit. A repair that has had no material for fifteen of the yard's cycles while
+neither the yard nor the city holds any is stopped, and no repair starts there until it does. A
+ship on a route that surrendered to the pirates sails on once they plundered it or none lies within
+24 tiles: the white flag stays up until a ship's next job, and a ship on a route gets none.
+
 ## What they get from nowhere
 
 Only the original's computers (`classic_ai`, computer opponents "as in the original") get anything

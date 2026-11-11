@@ -756,12 +756,19 @@ void Engine::take_original_jobs(AiPlayer& p) {
 void Engine::choose_home(AiPlayer& p) {
     // The last city with at least 10 inhabitants of class 2 or higher, unless a later one has more
     // free land.
+    // Open1602: an improved computer counts only cities where kHomePeople live, while it has one:
+    // a new colony with much free land became the home while nobody lived there yet, the home
+    // city's food runs went to the empty Kontor, 1381 t in one game, and the capital starved.
+    constexpr std::uint32_t kHomePeople = 50;
     const auto& cities = m_world.cities();
+    const bool peopled = rivals() && !p.pirates && std::ranges::any_of(cities, [&](const City& c) {
+                             return c.owner == p.player && population(c) >= kHomePeople;
+                         });
     std::uint32_t best = 0;
     std::optional<std::size_t> home;
     for (std::size_t i = 0; i < cities.size(); ++i) {
         const City& c = cities[i];
-        if (c.owner != p.player) {
+        if (c.owner != p.player || (peopled && population(c) < kHomePeople)) {
             continue;
         }
         const CityPlan& r = plan_of(p, c.island, c.index);

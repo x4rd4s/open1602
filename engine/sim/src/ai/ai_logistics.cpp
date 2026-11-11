@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <utility>
 
 #include "ai_engine.hpp"
 
@@ -190,6 +191,19 @@ void Engine::logistics(AiPlayer& p) {
         if (s != nullptr && n.supply && !s->route.active && !ship_moving(*s)) {
             n.supply = false;
         }
+        // Open1602: an improved computer's ship on a route that struck its white flag sails on once
+        // the pirates plundered it or none lies within kPirateNear tiles. The flag stays up until
+        // the ship gets its next job, and a ship on a route gets none: a supply ship lay at its
+        // own Kontor under the white flag for four hours, its route active and its hold empty.
+        if (s != nullptr && rivals() && s->held && s->route.active && !s->sinking &&
+            (s->plundered || !pirate_near(*s))) {
+            RouteEdit go;
+            go.player = p.player;
+            go.ship = s->id;
+            go.op = RouteEdit::Op::Start;
+            execute(go);
+            log(p, "ship %u: strikes the white flag and sails on", s->id);
+        }
     }
     bool healthy = false;
     City* home = home_city(p);
@@ -250,6 +264,15 @@ void Engine::logistics(AiPlayer& p) {
     if (rivals()) {
         guard_idle_ship(p, healthy);
     }
+}
+
+bool Engine::pirate_near(const Ship& s) const {
+    constexpr std::int32_t kPirateNear = 24;  // tiles
+    return std::ranges::any_of(m_world.ships(), [&](const Ship& o) {
+        return !o.sinking && m_world.acts_as(o.owner, FactionBehaviour::Pirates) &&
+               std::abs(std::int32_t{o.x} - std::int32_t{s.x}) <= kPirateNear &&
+               std::abs(std::int32_t{o.y} - std::int32_t{s.y}) <= kPirateNear;
+    });
 }
 
 void Engine::guard_idle_ship(AiPlayer& p, bool healthy) {
@@ -341,8 +364,37 @@ bool Engine::yard_service(AiPlayer& p) {
     if (yard == nullptr) {
         return false;
     }
+    // Open1602: an improved computer releases a ship whose repair has had no material for
+    // kYardStalled cycles while neither the yard nor the city's Kontor holds any, and starts no
+    // repair at such a yard until it does: its only ship lay at the yard for fourteen hours, and
+    // its cities went without supply runs.
+    constexpr std::uint8_t kYardStalled = 15;
+    const auto material = [&] {
+        const City* c = city(yard->island, island_of(yard->island).map.top(yard->x, yard->y).city);
+        const auto has = [&](std::uint32_t in_yard, std::uint8_t w) {
+            return w == 0 || in_yard != 0 || (c != nullptr && c->stock(w) != 0);
+        };
+        return has(yard->wood, t.type->raw_ware) && has(yard->cloth, t.type->raw2_ware);
+    };
+    const bool repairs = !rivals() || yard->idle_cycles < kYardStalled || material();
     if (yard->repair_ship != 0 && m_world.ship(yard->repair_ship) != nullptr) {
-        return true;
+        if (!rivals() || yard->idle_cycles < kYardStalled || repairs) {
+            return true;
+        }
+        ShipyardOrder release;
+        release.player = p.player;
+        release.island = p.yard_island;
+        release.x = p.yard_x;
+        release.y = p.yard_y;
+        release.op = ShipyardOrder::Op::Repair;
+        release.on = false;
+        release.ship = yard->repair_ship;
+        execute(release);
+        log(p, "ship %u: no material at the yard, repair stopped", release.ship);
+        return false;
+    }
+    if (!repairs) {
+        return false;
     }
     for (Ship* s : own_ships(p)) {
         if (!ship_idle(p, *s) ||
@@ -586,7 +638,12 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (c.owner == p.player) {
-                if (own_spare(c, w, reserve, is_home(p, c)) != 0) {
+                // Not from a city that uses more of it than it makes for one that makes more than it
+                // uses, nor from one a ship brings it to: jewellery and clothes went back and forth
+                // between two cities a minute apart, eight runs each way within two hours.
+                const bool takes = supply(c, w) <= demand(c, w) && supply(*home, w) > demand(*home, w);
+                if (!takes && std::ranges::count(routed_wares(p, 0, c), w) == 0 &&
+                    own_spare(c, w, reserve, is_home(p, c)) != 0) {
                     const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
@@ -670,9 +727,16 @@ std::vector<std::uint8_t> Engine::supply_wares(const AiPlayer& p, const City& ho
     }
     // Open1602: an improved computer brings first what runs out soonest (supply_urgency), so that
     // cloth or alcohol at the end of the list waits no longer behind building materials in store.
+    // Food that runs out within kHomeFirstMinutes comes before all: a run for 10 t of tobacco goods
+    // took the only ship thirteen minutes away while the city's food ran out.
     if (rivals()) {
         const std::uint32_t keep = *target;
-        std::ranges::stable_sort(wares, {}, [&](std::uint8_t w) { return supply_urgency(home, w, keep); });
+        const std::uint8_t food = m_buildings.food_ware();
+        std::ranges::stable_sort(wares, {}, [&](std::uint8_t w) {
+            const std::uint64_t urgency = supply_urgency(home, w, keep);
+            const bool hungry = w == food && urgency < std::uint64_t{kHomeFirstMinutes} * 256;
+            return std::pair{hungry ? 0 : 1, urgency};
+        });
     }
     return wares;
 }
@@ -994,14 +1058,25 @@ std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_
             return std::uint64_t{c.stock(w)} * 256 / ahead;
         }
     }
+    // Food made only just as fast as it is eaten counts too: the farms' rate is what they make at
+    // best, and a colony that made 220 against 207 ran dry within the hour.
+    if (rivals() && w == m_buildings.food_ware()) {
+        if (const std::uint32_t used = demand(c, w);
+            used != 0 && 4 * std::uint64_t{supply(c, w)} < 5 * std::uint64_t{used}) {
+            return std::uint64_t{c.stock(w)} * 256 / used;
+        }
+    }
     return stock_lasts(c, w);
 }
 
-std::uint64_t Engine::supply_need(AiPlayer& p, const City& c) {
+std::uint64_t Engine::supply_need(AiPlayer& p, const City& c, std::uint8_t only) {
     std::uint32_t target = 0;
     const std::vector<std::uint8_t> wares = supply_wares(p, c, &target);
     const std::vector<std::uint8_t> routed = routed_wares(p, 0, c);
     for (const std::uint8_t w : wares) {  // the most urgent first
+        if (only != 0 && w != only) {
+            continue;
+        }
         const std::uint64_t urgency = supply_urgency(c, w, target);
         if (urgency == kNoUrgency) {
             break;
@@ -1024,8 +1099,32 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     // there: the home city pays for the others, and a run of alcohol that went to a new colony
     // while the home city had none took its merchants with it.
     City* best = &home;
+    // Food first: while the home city's own food lasts, a city whose food runs out within
+    // kHomeFirstMinutes gets the run before any good the home city waits for. A colony whose fields
+    // had no room left starved with 220 t of food in the home city's Kontor, while the computer's
+    // only ship brought cocoa to the home city run after run.
+    const std::uint8_t food = m_buildings.food_ware();
+    const std::uint64_t first = std::uint64_t{kHomeFirstMinutes} * 256;
+    if (supply_need(p, home, food) >= first) {
+        City* hungry = nullptr;
+        std::uint64_t hungry_need = first;
+        for (const City& c : m_world.cities()) {
+            if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+                continue;
+            }
+            if (const std::uint64_t need = supply_need(p, c, food); need < hungry_need) {
+                if (City* to = city(c.island, c.index); to != nullptr) {
+                    hungry = to;
+                    hungry_need = need;
+                }
+            }
+        }
+        if (hungry != nullptr) {
+            return hungry;
+        }
+    }
     std::uint64_t best_need = supply_need(p, home);
-    if (best_need < std::uint64_t{kHomeFirstMinutes} * 256) {
+    if (best_need < first) {
         return best;
     }
     for (const City& c : m_world.cities()) {
@@ -1041,6 +1140,16 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
         }
     }
     return best;
+}
+
+bool Engine::food_runs_out(AiPlayer& p) {
+    for (const City& c : m_world.cities()) {
+        if (c.owner == p.player && c.warehouse_x && population(c) != 0 &&
+            supply_need(p, c, m_buildings.food_ware()) < std::uint64_t{kHomeFirstMinutes} * 256) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
@@ -1082,6 +1191,13 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 // until the ship can be back, at most half the ship's holds.
                 seconds = sail_seconds(p, city_point(home), city_point(m_world.cities()[*src]));
                 keep = supply_buffer(target, 2 * seconds);
+                // Food for kHomeFirstMinutes of what the city eats, up to half its Kontor: 40 t
+                // lasted a colony of 450 people four minutes.
+                if (w == m_buildings.food_ware()) {
+                    const std::uint64_t eaten = std::uint64_t{kHomeFirstMinutes} * demand(home, w);
+                    keep = std::max<std::uint32_t>(
+                        keep, static_cast<std::uint32_t>(std::min<std::uint64_t>(eaten, home.capacity / 2)));
+                }
                 if (home.stock(w) >= keep || on_way >= supply_ships_for(p, home, w, *src, seconds)) {
                     continue;
                 }
@@ -1111,7 +1227,13 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     if (!first) {
         return false;
     }
-    const auto second = choose(first->ware);
+    auto second = choose(first->ware);
+    // Food the city runs out of soon waits for no second ware from elsewhere: the ship sails home
+    // with it straight from where it loads.
+    if (second && rivals() && first->ware == m_buildings.food_ware() && second->source != first->source &&
+        supply_urgency(home, first->ware, target) < std::uint64_t{kHomeFirstMinutes} * 256) {
+        second.reset();
+    }
     struct Stop {
         Target target;
         std::array<RouteEntry, 3> entries{};

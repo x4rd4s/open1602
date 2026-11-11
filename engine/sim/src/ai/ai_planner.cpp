@@ -101,6 +101,7 @@ void Engine::refresh_city(AiPlayer& p) {
         sell_settings(p, *c, *r);
         production_switches(p, *c);
         shed_producers(p, *c);
+        shed_public(p, *c);
         tax_rates(p, *c);
         material_lock(p, *c);
     }
@@ -592,6 +593,56 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     }
 }
 
+void Engine::shed_public(AiPlayer& p, City& c) {
+    // Open1602: an improved computer far in debt and still losing gold tears down a public
+    // building that lets houses rise into a class (gate_class) when nobody of that class or above
+    // lives in the city any more: a church and a bath house for merchants who had left kept
+    // costing 835 gold a minute against 424 of taxes. One a visit.
+    if (!rivals() || p.pirates || player(p).money >= kShedFarMoney || net_income(p) >= 0 || c.island != p.island) {
+        return;
+    }
+    const auto lives_from = [&](std::size_t k) {
+        for (std::size_t i = k; i < c.inhabitants.size(); ++i) {
+            if (c.inhabitants[i] != 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::vector<std::uint32_t> unused;
+    for (const ComputerSlot& def : slots()) {
+        if (def.kind != ComputerSlot::Kind::Public) {
+            continue;
+        }
+        if (const std::size_t g = gate_class(def); g != 0 && !lives_from(g)) {
+            unused.push_back(def.building);
+        }
+    }
+    if (unused.empty()) {
+        return;
+    }
+    const IslandMap& map = island_of(c.island).map;
+    for (std::uint32_t y = 0; y < map.height(); ++y) {
+        for (std::uint32_t x = 0; x < map.width(); ++x) {
+            const auto tx = static_cast<std::int32_t>(x);
+            const auto ty = static_cast<std::int32_t>(y);
+            const MapCell& cell = map.top(x, y);
+            if (cell.empty() || cell.city != c.index || cell.owner != p.player) {
+                continue;
+            }
+            const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
+            if (b == nullptr || std::ranges::find(unused, b->id) == unused.end()) {
+                continue;
+            }
+            if (demolish_tile(p, tx, ty) != 0) {
+                log(p, "city %u/%u: tears down a public building nobody uses in debt (gold %d)", c.island, c.index,
+                    player(p).money);
+                return;
+            }
+        }
+    }
+}
+
 void Engine::production_switches(AiPlayer& p, City& c) {
     // Every producer of the current city, by the ware it makes. Each check looks at the
     // building's switch first: one that is on can only go off, one that is off only on.
@@ -749,7 +800,9 @@ void Engine::set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s) {
     r.stage_ms = now_ms();
     if (s > p.max_stage) {
         p.max_stage = s;
-        if (s > stage::kPioneers) {
+        // Open1602: an improved computer keeps its home (choose_home) when another city reaches a
+        // new stage: the home went back and forth between two cities, and the runs with it.
+        if (s > stage::kPioneers && !(rivals() && !p.pirates && home_city(p) != nullptr)) {
             p.home_valid = true;
             p.home_island = r.island;
             p.home_city = r.city;
@@ -1907,12 +1960,12 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
     return true;
 }
 
-bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
+std::uint8_t Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
     // A good of class k (not food) that none of the computer's cities makes and the city has under
     // 10 t of.
     const auto& classes = m_buildings.resident_classes();
     if (k >= classes.size()) {
-        return false;
+        return 0;
     }
     for (const assets::ResidentClass::Need& n : classes[k].needs) {
         const std::uint8_t w = n.ware;
@@ -1924,6 +1977,29 @@ bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
         // Bought only, it counts as missing too: partners' Kontors ran empty, and a city that rose on
         // their spices lost its merchants within the hour.
         if (!made) {
+            return w;
+        }
+    }
+    return 0;
+}
+
+bool Engine::workshop_for(AiPlayer& p, const City& c, std::uint8_t w) {
+    // Open1602: the tailor came only with the aristocrats' own stage, so the clothes they want were
+    // never made before and their theatre never built: four rich computers waited at the merchants
+    // for ten hours with the cloth in store.
+    const CityPlan* r = current_plan(p);
+    if (r == nullptr) {
+        return false;
+    }
+    for (const ComputerSlot& k : slots()) {
+        if (k.kind != ComputerSlot::Kind::Producer || k.ware != w || k.raw == 0 || k.field != 0 || k.deposit != 0 ||
+            r->slots[k.number].count != 0 || c.stock(k.raw) < 10 * kTon) {
+            continue;
+        }
+        const std::size_t before = p.stack.size();
+        (void)need(p, k.number, 1);
+        if (p.stack.size() > before) {
+            log(p, "city %u/%u: a workshop for ware %u", c.island, c.index, unsigned{w});
             return true;
         }
     }
@@ -2466,8 +2542,10 @@ std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
     const auto blocked = [&](std::uint8_t slot) { return r.slots[slot].fail_level >= 2; };
     std::uint64_t wanted = 0;
     if (w == m_buildings.food_ware()) {
-        // The fishers alone feed no large city: the pastures and fields have no site left.
-        if (!blocked(kSlotCattle) || !blocked(kSlotGrain)) {
+        // The fishers alone feed no large city: the pastures or the fields have no site left. Once
+        // one of them has none, not only both: waited for both, the colonies grew the home city's
+        // food three hours after its first pasture found no site, and its merchants starved.
+        if (!blocked(kSlotCattle) && !blocked(kSlotGrain)) {
             return 0;
         }
         wanted = std::uint64_t{demand(*home, w)} * 5 / 4;
@@ -2790,8 +2868,10 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
             // A good of that class that none of its cities makes and no partner sells it gets from
             // a colony: else the city waited at the settlers for the whole game, with the tobacco
             // its citizens would want never made, and fifty thousand gold in hand.
-            return source_missing(p, *c, g) &&
-                   want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
+            // A good it can work from what it has in store gets its workshop first (workshop_for).
+            const std::uint8_t w = source_missing(p, *c, g);
+            return w != 0 && (workshop_for(p, *c, w) ||
+                              want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false));
         }
     }
     if (plan_building(p, def->task, *b, which, false)) {
