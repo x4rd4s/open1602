@@ -1241,7 +1241,8 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     // Not when it asks for one (`force`) with kRichColonyMoney in hand: a city that waited for a
     // good of its next class (need_public) sat on 45,000 gold for hours.
     const bool rich = rivals() && force && player(p).money >= kRichColonyMoney;
-    if (n >= 2 && !rich && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
+    if (n >= 2 && !rich && net_income(p) <= static_cast<std::int32_t>(50 * n) &&
+        (rivals() || player(p).money < 15001)) {
         return false;
     }
     if (p.settle.active && !p.settle.sailing && !classic() && !p.settle.failed) {

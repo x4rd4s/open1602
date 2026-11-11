@@ -1881,7 +1881,8 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
             continue;
         }
         const std::uint64_t cap = c.capacity / 4;
-        const std::uint64_t store = std::min<std::uint64_t>(std::max<std::uint64_t>(10 * kTon, kAscentStockMinutes * use), cap);
+        const std::uint64_t store =
+            std::min<std::uint64_t>(std::max<std::uint64_t>(10 * kTon, kAscentStockMinutes * use), cap);
         if (c.stock(w) < store) {
             return false;
         }
@@ -1916,9 +1917,8 @@ bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
         if (w == m_buildings.food_ware() || c.stock(w) >= 10 * kTon) {
             continue;
         }
-        const bool made = std::ranges::any_of(m_world.cities(), [&](const City& o) {
-            return o.owner == p.player && supply(o, w) != 0;
-        });
+        const bool made = std::ranges::any_of(m_world.cities(),
+                                              [&](const City& o) { return o.owner == p.player && supply(o, w) != 0; });
         std::uint16_t price = 0;
         if (!made && !supply_source(p, c.island, w, &price, &c)) {
             return true;
@@ -2787,7 +2787,8 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
             // A good of that class that none of its cities makes and no partner sells it gets from
             // a colony: else the city waited at the settlers for the whole game, with the tobacco
             // its citizens would want never made, and fifty thousand gold in hand.
-            return source_missing(p, *c, g) && want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
+            return source_missing(p, *c, g) &&
+                   want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
         }
     }
     if (plan_building(p, def->task, *b, which, false)) {
