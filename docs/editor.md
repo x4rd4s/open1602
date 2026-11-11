@@ -191,7 +191,7 @@ Resources lie where a new game puts them, and nobody knows them at first:
 
 | Resource | Where it goes |
 |---|---|
-| Iron ore, big vein | 240 t in a big ore mountain, which the deep mine digs. |
+| Iron ore, big vein | 240 t in any ore mountain. The ore mine digs it down to 120 t, only a deep mine (big mountain) digs the rest. |
 | Iron ore, small vein | 80 t in any ore mountain. |
 | Gold | 50 t in any ore mountain. |
 | Treasure | 1000 gold under a tile of open ground; whoever builds on it finds it. |

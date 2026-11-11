@@ -57,9 +57,8 @@ ResourceRefusal resource_fits(const sim::World& world, const assets::BuildingTab
             if (!mountain) {
                 return ResourceRefusal::NoMountain;
             }
-            if (resource == Resource::BigOre && mountain->type->ore_mountain != 0) {
-                return ResourceRefusal::SmallMount;
-            }
+            // As in the original, any vein goes into any ore mountain: a big vein in a small mountain
+            // is dug by the ore mine down to 120 t (Logistics), the rest only by a deep mine.
             const bool taken = std::any_of(
                 isl.header.deposits.begin(), isl.header.deposits.end(),
                 [&](const Deposit& d) { return is_vein(d) && d.x == mountain->origin.x && d.y == mountain->origin.y; });
@@ -179,8 +178,6 @@ const char* refusal_name(ResourceRefusal refusal) noexcept {
             return "not on an island";
         case ResourceRefusal::NoMountain:
             return "no ore mountain";
-        case ResourceRefusal::SmallMount:
-            return "a big vein needs a big mountain";
         case ResourceRefusal::NoGround:
             return "no open ground";
         case ResourceRefusal::NoForest:
