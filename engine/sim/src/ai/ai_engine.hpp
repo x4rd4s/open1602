@@ -265,6 +265,9 @@ private:
     /// Open1602: what the producers of `ware` in a city make, 1/32 t per minute, as their
     /// statistics show (half their full rate for one that has run for less than a minute).
     [[nodiscard]] std::uint32_t supply(const City& c, std::uint8_t ware) const;
+    /// Open1602: whether a city's producers make less food than its people eat with kFoodMargin,
+    /// whatever is in store.
+    [[nodiscard]] bool food_behind(const City& c) const;
     /// Open1602: whether a city makes too little food for more inhabitants: with less than
     /// kFoodStock in stock, its own producers make less than its inhabitants eat and a margin.
     [[nodiscard]] bool food_short(const City& c) const;
@@ -664,6 +667,9 @@ private:
     /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
     /// purchases beyond its sales); 0 for the others.
     [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
+    /// Improved computers: what one of their cities beyond the home city costs a minute beyond its
+    /// taxes, on average over those that cost more than they pay (want_colony).
+    [[nodiscard]] std::int64_t colony_deficit(const AiPlayer& p) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
     /// Whether `c` is the computer's home city.
     [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {

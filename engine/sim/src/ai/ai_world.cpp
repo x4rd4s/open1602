@@ -155,6 +155,11 @@ bool Engine::food_short(const City& c) const {
     return short_of_food(c.stock(food), supply(c, food), demand(c, food));
 }
 
+bool Engine::food_behind(const City& c) const {
+    const std::uint8_t food = m_buildings.food_ware();
+    return std::uint64_t{supply(c, food)} * 16 < std::uint64_t{demand(c, food)} * (16 + kFoodMargin);
+}
+
 bool Engine::stock_full(const City& c, std::uint8_t ware) const {
     return ware != 0 && full_stock(c.stock(ware), c.capacity);
 }
