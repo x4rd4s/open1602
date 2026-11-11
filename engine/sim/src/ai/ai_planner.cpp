@@ -19,9 +19,10 @@ namespace o1602::sim::ai {
 
 namespace {
 
-constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
-constexpr std::size_t kLockFromClass = 2;   // the citizens
-constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
+constexpr std::uint64_t kRefreshMs = 5100;       // a refresh every 5.1 s
+constexpr std::size_t kLockFromClass = 2;        // the citizens
+constexpr std::uint32_t kHouseFoodPercent = 85;  // improved computers: need_houses
+constexpr std::int64_t kLockMoney = 0;           // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
 constexpr std::int64_t kLeanMoney = -1000;      // improved computers below this cut running costs
 constexpr std::int64_t kShedMoney = -5000;      // ... and below this tear down producers nobody needs,
@@ -2335,6 +2336,24 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
     SlotState& s = r->slots[kSlotHouses];
     if (s.count >= n || s.attempts >= 2) {
         return false;
+    }
+    // Open1602: an improved computer builds no further house in a city past the pioneers that makes
+    // less than kHouseFoodPercent of the food its people eat, the home city counting what its other
+    // cities make beyond their own use: its ships carried the growth for a while, and then a home
+    // city of 2200 that made 60 % of its food starved for five hours.
+    if (rivals() && r->stage != stage::kFounded && r->stage != stage::kPioneers) {
+        const std::uint8_t food = m_buildings.food_ware();
+        std::uint64_t made = supply(*c, food);
+        if (c == home_city(p)) {
+            for (const City& o : m_world.cities()) {
+                if (o.owner == p.player && &o != c && supply(o, food) > demand(o, food)) {
+                    made += supply(o, food) - demand(o, food);
+                }
+            }
+        }
+        if (100 * made < std::uint64_t{kHouseFoodPercent} * demand(*c, food)) {
+            return false;
+        }
     }
     const assets::BuildingType* b = by_id(id::kHouse);
     if (b == nullptr || !unlocked(p, *b)) {
