@@ -1904,6 +1904,29 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
     return true;
 }
 
+bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
+    // A good of class k (not food) that none of the computer's cities makes, that the city has
+    // under 10 t of, and that no partner sells (supply_source).
+    const auto& classes = m_buildings.resident_classes();
+    if (k >= classes.size()) {
+        return false;
+    }
+    for (const assets::ResidentClass::Need& n : classes[k].needs) {
+        const std::uint8_t w = n.ware;
+        if (w == m_buildings.food_ware() || c.stock(w) >= 10 * kTon) {
+            continue;
+        }
+        const bool made = std::ranges::any_of(m_world.cities(), [&](const City& o) {
+            return o.owner == p.player && supply(o, w) != 0;
+        });
+        std::uint16_t price = 0;
+        if (!made && !supply_source(p, c.island, w, &price, &c)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::size_t Engine::gate_class(const ComputerSlot& def) const {
     // The lowest class from the citizens on whose houses cannot do without the building: all the
     // other public buildings and the market do not serve it.
@@ -2761,7 +2784,10 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
     // and running costs, and then lift houses whose people leave again.
     if (rivals()) {
         if (const std::size_t g = gate_class(*def); g != 0 && !ascent_ready(p, *c, g)) {
-            return false;
+            // A good of that class that none of its cities makes and no partner sells it gets from
+            // a colony: else the city waited at the settlers for the whole game, with the tobacco
+            // its citizens would want never made, and fifty thousand gold in hand.
+            return source_missing(p, *c, g) && want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
         }
     }
     if (plan_building(p, def->task, *b, which, false)) {

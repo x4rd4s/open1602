@@ -478,6 +478,8 @@ private:
     [[nodiscard]] std::uint32_t goods_ahead(PlayerId owner, std::uint8_t w) const;
     /// Whether the goods of class `k` are made and in store for the houses to rise into it.
     [[nodiscard]] bool ascent_ready(AiPlayer& p, const City& c, std::size_t k);
+    /// Whether a good of class `k` has no source at all: none made, little in store, none for sale.
+    [[nodiscard]] bool source_missing(AiPlayer& p, const City& c, std::size_t k);
     /// The lowest class that needs the public building of slot `def` (0: none from the citizens on).
     [[nodiscard]] std::size_t gate_class(const ComputerSlot& def) const;
     static constexpr std::uint32_t kAscentStockMinutes = 5;
