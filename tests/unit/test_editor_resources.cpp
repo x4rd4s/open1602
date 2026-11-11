@@ -65,7 +65,7 @@ TEST_CASE("editor resources: veins go into ore mountains, at their origin, one e
         return editor::resource_fits(island.world, island.buildings, 0, t, r);
     };
     CHECK(fits({3, 3}, Resource::BigOre) == ResourceRefusal::None);
-    CHECK(fits({11, 3}, Resource::BigOre) == ResourceRefusal::SmallMount);
+    CHECK(fits({11, 3}, Resource::BigOre) == ResourceRefusal::None);  // any vein in any mountain
     CHECK(fits({11, 3}, Resource::Gold) == ResourceRefusal::None);
     CHECK(fits({15, 15}, Resource::SmallOre) == ResourceRefusal::NoMountain);
     CHECK(fits({25, 3}, Resource::SmallOre) == ResourceRefusal::NoIsland);
@@ -99,6 +99,19 @@ TEST_CASE("editor resources: veins go into ore mountains, at their origin, one e
     (*gone)->revert(island.world);
     CHECK(island.world.islands()[0].header.deposits.size() == 2);
     CHECK(!editor::remove_resource(island.world, island.buildings, 0, {15, 15}).ok());
+}
+
+TEST_CASE("editor resources: a big vein goes into a small mountain too, as in the original") {
+    Island island;
+    auto vein = editor::place_resource(island.world, island.buildings, 0, {11, 3}, editor::Resource::BigOre);
+    REQUIRE(vein.ok());
+    (*vein)->apply(island.world);
+    const auto& deposits = island.world.islands()[0].header.deposits;
+    REQUIRE(deposits.size() == 1);
+    CHECK(deposits[0].x == 10);  // the small mountain's origin
+    CHECK(deposits[0].y == 2);
+    CHECK(deposits[0].kind == 0);
+    CHECK(deposits[0].amount == editor::kBigOreAmount);
 }
 
 TEST_CASE("editor resources: treasures under open ground, deer in a forest, at most 8") {
