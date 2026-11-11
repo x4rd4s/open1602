@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <utility>
 
 #include "ai_engine.hpp"
 
@@ -670,9 +671,16 @@ std::vector<std::uint8_t> Engine::supply_wares(const AiPlayer& p, const City& ho
     }
     // Open1602: an improved computer brings first what runs out soonest (supply_urgency), so that
     // cloth or alcohol at the end of the list waits no longer behind building materials in store.
+    // Food that runs out within kHomeFirstMinutes comes before all: a run for 10 t of tobacco goods
+    // took the only ship thirteen minutes away while the city's food ran out.
     if (rivals()) {
         const std::uint32_t keep = *target;
-        std::ranges::stable_sort(wares, {}, [&](std::uint8_t w) { return supply_urgency(home, w, keep); });
+        const std::uint8_t food = m_buildings.food_ware();
+        std::ranges::stable_sort(wares, {}, [&](std::uint8_t w) {
+            const std::uint64_t urgency = supply_urgency(home, w, keep);
+            const bool hungry = w == food && urgency < std::uint64_t{kHomeFirstMinutes} * 256;
+            return std::pair{hungry ? 0 : 1, urgency};
+        });
     }
     return wares;
 }
@@ -1163,7 +1171,13 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     if (!first) {
         return false;
     }
-    const auto second = choose(first->ware);
+    auto second = choose(first->ware);
+    // Food the city runs out of soon waits for no second ware from elsewhere: the ship sails home
+    // with it straight from where it loads.
+    if (second && rivals() && first->ware == m_buildings.food_ware() && second->source != first->source &&
+        supply_urgency(home, first->ware, target) < std::uint64_t{kHomeFirstMinutes} * 256) {
+        second.reset();
+    }
     struct Stop {
         Target target;
         std::array<RouteEntry, 3> entries{};

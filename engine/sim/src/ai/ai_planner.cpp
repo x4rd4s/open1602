@@ -626,7 +626,7 @@ void Engine::shed_public(AiPlayer& p, City& c) {
         for (std::uint32_t x = 0; x < map.width(); ++x) {
             const auto tx = static_cast<std::int32_t>(x);
             const auto ty = static_cast<std::int32_t>(y);
-            const MapCell& cell = map.top(tx, ty);
+            const MapCell& cell = map.top(x, y);
             if (cell.empty() || cell.city != c.index || cell.owner != p.player) {
                 continue;
             }
@@ -800,8 +800,8 @@ void Engine::set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s) {
     r.stage_ms = now_ms();
     if (s > p.max_stage) {
         p.max_stage = s;
-        // Open1602: an improved computer keeps the city where most of its people live
-        // (choose_home_by_people), not the one that reached a new stage first.
+        // Open1602: an improved computer keeps its home (choose_home) when another city reaches a
+        // new stage: the home went back and forth between two cities, and the runs with it.
         if (s > stage::kPioneers && !(rivals() && !p.pirates && home_city(p) != nullptr)) {
             p.home_valid = true;
             p.home_island = r.island;

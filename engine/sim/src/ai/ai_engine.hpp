@@ -223,9 +223,6 @@ private:
     bool city_valid(AiPlayer& p, bool clear);
     void check_city_loss(AiPlayer& p);
     void choose_home(AiPlayer& p);
-    /// Improved computers: the home is the city with the most people (citizens on weigh four
-    /// times), kept until another weighs a quarter more; false while no city has 50 people.
-    bool choose_home_by_people(AiPlayer& p);
     void take_original_jobs(AiPlayer& p);
     CommandResult execute(const Command& command);
     /// Debug trace to stderr when O1602_AI_LOG is set.
