@@ -433,6 +433,23 @@ Ship* Engine::pick_logistics_ship(AiPlayer& p, bool healthy) {
             best_counter = n.counter;
         }
     }
+    if (best != nullptr || !rivals()) {
+        return best;
+    }
+    // Open1602: an improved computer whose ships all patrol takes the one with the fewest cannons
+    // under way: a patrol never lies at the end of a leg long enough, so a computer that had set
+    // every ship to guard its island sent no supply run for six hours while its colony held
+    // 99 t of the tobacco its home city waited for.
+    for (Ship* s : own_ships(p)) {
+        const ShipNote& n = note(p, s->id);
+        if (!n.patrol || !s->route.active || (healthy && health128(*s) <= kHealthy)) {
+            continue;
+        }
+        if (s->cannons < best_cannons) {
+            best = s;
+            best_cannons = s->cannons;
+        }
+    }
     return best;
 }
 
@@ -874,9 +891,16 @@ std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t res
     std::uint32_t keep = reserve;
     if (population(c) != 0 && demand(c, w) != 0) {
         if (supply(c, w) <= demand(c, w)) {
-            return 0;
+            // A colony that makes less than it uses still gives what lasts it beyond
+            // kSpareKeepMinutes: it held its alcohol in store while the home city, which pays for
+            // it, ran dry (2323 runs found no source so).
+            if (home) {
+                return 0;
+            }
+            keep = std::max<std::uint32_t>({reserve, 20 * kTon, kSpareKeepMinutes * demand(c, w)});
+        } else {
+            keep = std::max<std::uint32_t>({reserve, 20 * kTon, home ? kSpareKeepMinutes * demand(c, w) : 0U});
         }
-        keep = std::max<std::uint32_t>({reserve, 20 * kTon, home ? kSpareKeepMinutes * demand(c, w) : 0U});
     }
     // Less than kMinSupplyRun is not worth a run: ships sailed for a ton or four and crowded the
     // narrow harbours of the cities they left.
@@ -1395,7 +1419,11 @@ void Engine::order_ship(AiPlayer& p) {
         // Open1602: an improved computer pays for a ship only with the price in hand; the original's
         // orders with half of it and may run into debt. An improved rival's order also leaves its gold for the goods it
         // buys (buy_reserve).
-        const std::int64_t needed = classic() ? price / 2 : price + buy_reserve(p);
+        // Also the gold the costs eat in kCostlyMinutes while they exceed the income: three ships
+        // ordered within half an hour took a computer to −16,706 gold.
+        const std::int64_t drain =
+            rivals() && !p.pirates ? kCostlyMinutes * std::max<std::int64_t>(0, -std::int64_t{earned_income(p)}) : 0;
+        const std::int64_t needed = classic() ? price / 2 : price + buy_reserve(p) + drain;
         if (std::int64_t{player(p).money} > needed) {
             ShipyardOrder order;
             order.player = p.player;
