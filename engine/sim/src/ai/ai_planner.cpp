@@ -1896,8 +1896,10 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         }
         if (4 * made < 3 * used) {
             std::uint16_t price = 0;
+            // A good it makes none of needs twice the store (partners stopped selling, and their
+            // runs came back empty) and is asked of a colony too (source_missing).
             if (!supply_source(p, c.island, w, &price, &c) ||
-                (k > kLockFromClass && c.stock(w) < std::min<std::uint64_t>(2 * store, cap))) {
+                ((k > kLockFromClass || made == 0) && c.stock(w) < std::min<std::uint64_t>(2 * store, cap))) {
                 return false;
             }
         }
@@ -1906,8 +1908,8 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
 }
 
 bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
-    // A good of class k (not food) that none of the computer's cities makes, that the city has
-    // under 10 t of, and that no partner sells (supply_source).
+    // A good of class k (not food) that none of the computer's cities makes and the city has under
+    // 10 t of.
     const auto& classes = m_buildings.resident_classes();
     if (k >= classes.size()) {
         return false;
@@ -1919,8 +1921,9 @@ bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
         }
         const bool made = std::ranges::any_of(m_world.cities(),
                                               [&](const City& o) { return o.owner == p.player && supply(o, w) != 0; });
-        std::uint16_t price = 0;
-        if (!made && !supply_source(p, c.island, w, &price, &c)) {
+        // Bought only, it counts as missing too: partners' Kontors ran empty, and a city that rose on
+        // their spices lost its merchants within the hour.
+        if (!made) {
             return true;
         }
     }
