@@ -265,8 +265,8 @@ private:
     /// Open1602: what the producers of `ware` in a city make, 1/32 t per minute, as their
     /// statistics show (half their full rate for one that has run for less than a minute).
     [[nodiscard]] std::uint32_t supply(const City& c, std::uint8_t ware) const;
-    /// Open1602: whether a city's producers make less food than its people eat with kFoodMargin,
-    /// whatever is in store.
+    /// Open1602: whether a city's producers make less food than its people eat and its stock lasts
+    /// less than kFoodAheadMinutes at that shortfall, whatever its ships may yet bring.
     [[nodiscard]] bool food_behind(const City& c) const;
     /// Open1602: whether a city makes too little food for more inhabitants: with less than
     /// kFoodStock in stock, its own producers make less than its inhabitants eat and a margin.
