@@ -1266,7 +1266,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     // kColonyLossMinutes beyond the founding: three colonies in two hours took a computer from
     // 24,000 gold into a debt it never left, and two founded with 140,000 gold in hand put
     // another in debt within the hour.
-    if (rivals() && p.cities >= 2) {
+    // Weighed before the ship is called home only: its loss changes with every look, and a ship
+    // called for a founding that was then refused lay idle at the Kontor.
+    if (rivals() && p.cities >= 2 && p.settle.ship == 0) {
         const std::int64_t after = std::int64_t{earned_income(p)} - colony_deficit(p);
         if (player(p).money < std::int64_t{colony_money(p)} + buy_reserve(p) +
                                   std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -after)) {
