@@ -191,6 +191,19 @@ void Engine::logistics(AiPlayer& p) {
         if (s != nullptr && n.supply && !s->route.active && !ship_moving(*s)) {
             n.supply = false;
         }
+        // Open1602: an improved computer's ship on a route that struck its white flag sails on once
+        // the pirates plundered it or none lies within kPirateNear tiles. The flag stays up until
+        // the ship gets its next job, and a ship on a route gets none: a supply ship lay at its
+        // own Kontor under the white flag for four hours, its route active and its hold empty.
+        if (s != nullptr && rivals() && s->held && s->route.active && !s->sinking &&
+            (s->plundered || !pirate_near(*s))) {
+            RouteEdit go;
+            go.player = p.player;
+            go.ship = s->id;
+            go.op = RouteEdit::Op::Start;
+            execute(go);
+            log(p, "ship %u: strikes the white flag and sails on", s->id);
+        }
     }
     bool healthy = false;
     City* home = home_city(p);
@@ -251,6 +264,15 @@ void Engine::logistics(AiPlayer& p) {
     if (rivals()) {
         guard_idle_ship(p, healthy);
     }
+}
+
+bool Engine::pirate_near(const Ship& s) const {
+    constexpr std::int32_t kPirateNear = 24;  // tiles
+    return std::ranges::any_of(m_world.ships(), [&](const Ship& o) {
+        return !o.sinking && m_world.acts_as(o.owner, FactionBehaviour::Pirates) &&
+               std::abs(std::int32_t{o.x} - std::int32_t{s.x}) <= kPirateNear &&
+               std::abs(std::int32_t{o.y} - std::int32_t{s.y}) <= kPirateNear;
+    });
 }
 
 void Engine::guard_idle_ship(AiPlayer& p, bool healthy) {

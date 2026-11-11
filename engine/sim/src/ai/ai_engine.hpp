@@ -340,6 +340,8 @@ private:
     void scout(AiPlayer& p);
     /// Open1602: sends an improved computer's ship without a job on patrol round its home island.
     void guard_idle_ship(AiPlayer& p, bool healthy);
+    /// Whether a pirate ship lies near `s` (an improved computer's held ship waits for it).
+    [[nodiscard]] bool pirate_near(const Ship& s) const;
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
