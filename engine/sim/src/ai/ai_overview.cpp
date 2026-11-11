@@ -4,6 +4,7 @@
 #include "ai_overview.hpp"
 
 #include <algorithm>
+#include <utility>
 
 #include "ai_engine.hpp"
 
@@ -67,10 +68,10 @@ const Overview& Engine::overview(const AiPlayer& p) const {
     // changes. A game loaded in between builds the same overview again.
     const std::uint64_t t = now_ms();
     const std::uint64_t minute = t == 0 ? 0 : (t - 1) / kGoodsMinuteMs + 1;
-    std::uint64_t cities = 1469598103934665603ULL;  // FNV-1a over the indices of its cities
+    std::vector<std::uint32_t> cities;
     for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
         if (m_world.cities()[i].owner == p.player) {
-            cities = (cities ^ (i + 1)) * 1099511628211ULL;
+            cities.push_back(static_cast<std::uint32_t>(i));
         }
     }
     if (m_overviews.size() <= p.player) {
@@ -80,7 +81,7 @@ const Overview& Engine::overview(const AiPlayer& p) const {
     if (!cache.valid || cache.minute != minute || cache.cities != cities) {
         cache.valid = true;
         cache.minute = minute;
-        cache.cities = cities;
+        cache.cities = std::move(cities);
         cache.view = build_overview(p);
     }
     // The army's upkeep is the player's and counts as it is now.

@@ -903,7 +903,7 @@ private:
     struct OverviewCache {
         bool valid = false;
         std::uint64_t minute = 0;
-        std::uint64_t cities = 0;  ///< a hash of the indices of the computer's cities
+        std::vector<std::uint32_t> cities;  ///< the indices of the computer's cities
         Overview view;
     };
     mutable std::vector<OverviewCache> m_overviews;
