@@ -646,9 +646,30 @@ tobacco, and its merchants left within half an hour. It starts or joins a war on
 its cities lacks alcohol or cloth, its home city makes the food it eats, and it has 5000 gold.
 
 In debt, an improved computer locks the building material of a city (the city window's switch)
-while the city has less than 1 t of food, or of a good its merchants or higher classes want and
+while the city has less than 1 t of food, or of a good its citizens or higher classes want and
 it does not make enough of itself: houses that rise without their goods only lose their people again. The lock holds until the goods are
 back or the gold is above 3000.
+
+An improved rival plans the rise of its classes ahead. For each class whose class below lives in a
+city it counts what the class would use more once half the class below has risen, and grows its
+luxury fields for that, keeps that much in its Kontor instead of selling it and brings it with its
+supply runs. The public building that lets houses rise into a class from the citizens on (the
+tavern for the citizens, the bath house and the church for the merchants, the theatre and the
+college for the aristocrats) waits until that class is ready: the city's food is not short, and of
+each good of the class the computer's cities make three quarters of what they will use after the
+rise, or a partner sells it, and the city has five minutes of its use after the rise in store (at
+least 10 t, at most a quarter of its Kontor; from the merchants on twice that for a bought good). A
+good that none of its cities makes and no partner sells it gets from a colony founded for that
+crop, with 20,000 gold also while its cities earn little. The rise from pioneers to settlers does
+not wait: the settlers' goods are planned once the first settlers live there. Without this, houses
+rose to citizens where no alcohol or tobacco was made or sold, and five hundred citizens left
+within the hour.
+
+Its colonies give what they make beyond their own use and 20 t to the other cities; only the home
+city keeps ten minutes of its own use. A supply ship goes to the home city while one of its goods
+lasts less than ten minutes there, before any colony. A building of 750 gold or more (public
+buildings, the big yard) also leaves five minutes of what the gold loses while the taxes and sales
+do not cover the costs and purchases.
 
 ## What they get from nowhere
 
