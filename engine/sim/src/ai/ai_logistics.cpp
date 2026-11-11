@@ -637,11 +637,13 @@ std::vector<std::uint8_t> Engine::supply_wares(const AiPlayer& p, const City& ho
     std::vector<std::uint8_t> wares{m_buildings.food_ware(), m_buildings.materials().tools,
                                     m_buildings.materials().bricks, m_buildings.materials().wood, ware::kCloth};
     *target = 10 * kTon;
-    if (demand(home, ware::kSpices) > 0 || p.max_stage > 30) {
+    // Open1602: an improved rival also the goods its houses will want once they rise (demand_ahead).
+    const auto wanted = [&](std::uint8_t w) { return (rivals() ? demand_ahead(home, w) : demand(home, w)) > 0; };
+    if (wanted(ware::kSpices) || wanted(ware::kTobaccoGoods) || p.max_stage > 30) {
         wares.insert(wares.end(), {ware::kTobaccoGoods, ware::kSpices, ware::kAlcohol, ware::kOre, ware::kIron});
         *target = 20 * kTon;
     }
-    if (demand(home, ware::kCocoa) > 0 || p.max_stage > 39) {
+    if (wanted(ware::kCocoa) || p.max_stage > 39) {
         wares.insert(wares.end(), {ware::kCocoa, ware::kClothes});
         *target = 30 * kTon;
     }
@@ -959,6 +961,14 @@ std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_
     const auto& m = m_buildings.materials();
     if (w == m.tools || w == m.bricks || w == m.wood) {
         return c.stock(w) < target / 2 ? 0 : kNoUrgency;
+    }
+    // Open1602: an improved rival also brings what its houses will use once they rise (demand_ahead),
+    // to have it in store before (ascent_ready).
+    if (rivals() && demand(c, w) == 0) {
+        const std::uint32_t ahead = demand_ahead(c, w);
+        if (ahead != 0 && supply(c, w) < ahead) {
+            return std::uint64_t{c.stock(w)} * 256 / ahead;
+        }
     }
     return stock_lasts(c, w);
 }
