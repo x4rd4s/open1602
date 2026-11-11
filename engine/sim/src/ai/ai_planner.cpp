@@ -12,6 +12,7 @@
 #include "ai_tables.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
@@ -19,7 +20,7 @@ namespace o1602::sim::ai {
 namespace {
 
 constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
-constexpr std::size_t kLockFromClass = 2;   // the merchants
+constexpr std::size_t kLockFromClass = 2;   // the citizens
 constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
 constexpr std::int64_t kLeanMoney = -1000;      // improved computers below this cut running costs
@@ -304,7 +305,11 @@ void Engine::sell_settings(AiPlayer& p, City& c, CityPlan& r) {
             counted += counts ? 1U : 0U;
         }
     };
-    const auto by_demand = [&](std::uint8_t w) { return std::max(15 * demand(c, w), std::uint32_t{17 * kTon}); };
+    // Open1602: an improved rival keeps also what its houses will use once they rise (demand_ahead),
+    // the store ascent_ready waits for.
+    const auto by_demand = [&](std::uint8_t w) {
+        return std::max(15 * (rivals() ? demand_ahead(c, w) : demand(c, w)), std::uint32_t{17 * kTon});
+    };
     const std::uint32_t civ = civ_level(p);
     struct Lux {
         std::uint8_t ware;
@@ -422,7 +427,7 @@ void Engine::material_lock(AiPlayer& p, City& c) {
     }
     // Houses that rise without the goods of their class only lose their people again, and with
     // them the taxes that pay for the city. So the material stays locked while the city has no
-    // food left, or none of a good that its classes from the merchants on want and that it does
+    // food left, or none of a good that its classes from the citizens on want and that it does
     // not make enough of itself. Only in debt: a computer with gold in
     // hand lets its city grow and builds or buys what is missing. A lock holds until the gold is back above 3000.
     if (player(p).money >= (c.material_lock ? kUnlockMoney : kLockMoney)) {
@@ -1801,6 +1806,142 @@ std::uint32_t Engine::goods_short(PlayerId owner, std::uint8_t w) const {
     return used > made ? static_cast<std::uint32_t>(std::min<std::uint64_t>(used - made, 0xFFFFFFFFU)) : 0;
 }
 
+std::uint32_t Engine::ascent_extra(const City& c, std::size_t k, std::uint8_t w) const {
+    // Open1602: half the people of class k - 1 risen into class k use what class k wants of the
+    // good beyond what they used before.
+    const auto& classes = m_buildings.resident_classes();
+    if (k == 0 || k >= classes.size() || k - 1 >= c.inhabitants.size() || c.inhabitants[k - 1] == 0) {
+        return 0;
+    }
+    const auto amount = [&](std::size_t of) {
+        std::uint64_t a = 0;
+        for (const assets::ResidentClass::Need& n : classes[of].needs) {
+            a += n.ware == w ? n.amount : 0U;
+        }
+        return a;
+    };
+    const std::uint64_t up = amount(k);
+    const std::uint64_t before = amount(k - 1);
+    if (up <= before) {
+        return 0;
+    }
+    const std::uint64_t risers = c.inhabitants[k - 1] / 2;
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>((risers * (up - before) * 6) >> 8, 0xFFFFFFFFU));
+}
+
+std::uint32_t Engine::demand_ahead(const City& c, std::uint8_t w) const {
+    // What the city uses now and what the next rise of each class adds (ascent_extra), where the
+    // class below lives in the city.
+    std::uint64_t sum = demand(c, w);
+    const std::size_t n = m_buildings.resident_classes().size();
+    for (std::size_t k = 1; k < n; ++k) {
+        sum += ascent_extra(c, k, w);
+    }
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(sum, 0xFFFFFFFFU));
+}
+
+std::uint32_t Engine::goods_ahead(PlayerId owner, std::uint8_t w) const {
+    // Open1602: goods_short with the rise of the classes to come (demand_ahead): an improved
+    // rival makes its goods before its houses rise, not once its new citizens go without.
+    std::uint64_t used = 0;
+    std::uint64_t made = 0;
+    for (const City& c : m_world.cities()) {
+        if (c.owner == owner) {
+            used += demand_ahead(c, w);
+            made += supply(c, w);
+        }
+    }
+    return used > made ? static_cast<std::uint32_t>(std::min<std::uint64_t>(used - made, 0xFFFFFFFFU)) : 0;
+}
+
+bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
+    // Open1602: an improved rival lets its houses rise into class k only once that class's goods
+    // are ready: its cities make at least kAscentMadeShare of what they will use after the rise
+    // (demand_ahead), or a partner sells the good, and the city has kAscentStockMinutes of its use
+    // after the rise in store (at least 10 t, at most a quarter of its Kontor); from the merchants
+    // on a bought good twice that. Its food is not short. Risen without their goods, five hundred
+    // citizens left again within the hour, and their taxes with them; asked for a quarter of an
+    // hour in store of every good and food beyond its use, most home cities waited at the settlers
+    // for the whole game.
+    const auto& classes = m_buildings.resident_classes();
+    if (k >= classes.size()) {
+        return true;
+    }
+    const std::uint8_t food = m_buildings.food_ware();
+    if (food_short(c)) {
+        return false;
+    }
+    for (const assets::ResidentClass::Need& n : classes[k].needs) {
+        const std::uint8_t w = n.ware;
+        if (w == food) {
+            continue;
+        }
+        const std::uint64_t use = std::uint64_t{demand(c, w)} + ascent_extra(c, k, w);
+        if (use == 0) {
+            continue;
+        }
+        const std::uint64_t cap = c.capacity / 4;
+        const std::uint64_t store =
+            std::min<std::uint64_t>(std::max<std::uint64_t>(10 * kTon, kAscentStockMinutes * use), cap);
+        if (c.stock(w) < store) {
+            return false;
+        }
+        std::uint64_t used = 0;
+        std::uint64_t made = 0;
+        for (const City& o : m_world.cities()) {
+            if (o.owner == p.player) {
+                used += demand_ahead(o, w);
+                made += supply(o, w);
+            }
+        }
+        if (4 * made < 3 * used) {
+            std::uint16_t price = 0;
+            if (!supply_source(p, c.island, w, &price, &c) ||
+                (k > kLockFromClass && c.stock(w) < std::min<std::uint64_t>(2 * store, cap))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
+    // A good of class k (not food) that none of the computer's cities makes, that the city has
+    // under 10 t of, and that no partner sells (supply_source).
+    const auto& classes = m_buildings.resident_classes();
+    if (k >= classes.size()) {
+        return false;
+    }
+    for (const assets::ResidentClass::Need& n : classes[k].needs) {
+        const std::uint8_t w = n.ware;
+        if (w == m_buildings.food_ware() || c.stock(w) >= 10 * kTon) {
+            continue;
+        }
+        const bool made = std::ranges::any_of(m_world.cities(),
+                                              [&](const City& o) { return o.owner == p.player && supply(o, w) != 0; });
+        std::uint16_t price = 0;
+        if (!made && !supply_source(p, c.island, w, &price, &c)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::size_t Engine::gate_class(const ComputerSlot& def) const {
+    // The lowest class from the citizens on whose houses cannot do without the building: all the
+    // other public buildings and the market do not serve it.
+    House h;
+    h.market = true;
+    h.services = static_cast<assets::ServiceBits>(~def.service);
+    const std::size_t n = m_buildings.resident_classes().size();
+    for (std::size_t k = kLockFromClass; k < n; ++k) {
+        if (!has_services(h, m_buildings, static_cast<std::uint8_t>(k))) {
+            return k;
+        }
+    }
+    return 0;
+}
+
 std::uint8_t Engine::lacking_ware(const City& c, bool content_too) const {
     // A class that lives in the city (discontent, unless `content_too`) with one of its goods (not
     // food) under a ton in stock and short in supply. With `content_too` only goods the city makes
@@ -2398,7 +2539,7 @@ bool Engine::colony_crop_missing(AiPlayer& p) {
                                                  {ware::kSpices, {ware::kSpiceField, 0}},
                                                  {ware::kCocoa, {ware::kCocoaField, 0}}}};
     return std::ranges::any_of(kNeeds, [&](const Need& n) {
-        return demand(*home, n.good) != 0 &&
+        return demand_ahead(*home, n.good) != 0 &&
                std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); });
     });
 }
@@ -2638,6 +2779,18 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
     if (rivals() && b->build_cost.money >= kCostlyPublic && goods_lacking(*c)) {
         return false;
     }
+    // Open1602: nor one that lets houses rise into a class (a tavern, a theatre) before that
+    // class's goods are made and in store (ascent_ready): until then it would only cost its gold
+    // and running costs, and then lift houses whose people leave again.
+    if (rivals()) {
+        if (const std::size_t g = gate_class(*def); g != 0 && !ascent_ready(p, *c, g)) {
+            // A good of that class that none of its cities makes and no partner sells it gets from
+            // a colony: else the city waited at the settlers for the whole game, with the tobacco
+            // its citizens would want never made, and fifty thousand gold in hand.
+            return source_missing(p, *c, g) &&
+                   want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
+        }
+    }
     if (plan_building(p, def->task, *b, which, false)) {
         reserve(p, *b);
     }
@@ -2756,7 +2909,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             if (critical_short(p.player, crop.good) != 0) {
                 return std::uint64_t{0};
             }
-            return goods_short(p.player, crop.good) != 0 ? 1 : 2 + stock_lasts(*home, crop.good) / 2;
+            return goods_ahead(p.player, crop.good) != 0 ? 1 : 2 + stock_lasts(*home, crop.good) / 2;
         });
     }
     for (const Crop& crop : order) {
@@ -2771,7 +2924,8 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         }
         // At most two beyond the order in a city, so that the fields do not take its houses' land.
         std::uint32_t want = n;
-        const std::uint32_t lacking = rivals() ? goods_short(p.player, crop.good) : 0;
+        // What its cities will lack once their houses rise (goods_ahead): the goods are made before.
+        const std::uint32_t lacking = rivals() ? goods_ahead(p.player, crop.good) : 0;
         if (lacking != 0) {
             const assets::BuildingType* b = producer(crop.good, crop.field);
             const std::uint32_t per = b != nullptr ? std::max<std::uint32_t>(made_per_minute(*c, *b), 1) : 0;

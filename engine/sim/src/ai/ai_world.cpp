@@ -286,7 +286,14 @@ bool Engine::affordable(const AiPlayer& p, const City& c, const assets::Building
     // computer minutes in a test of ten worlds.
     const bool exempt =
         b.ware != 0 || b.prod_kind == prod::kHouse || b.prod_kind == prod::kMarket || b.prod_kind == prod::kKontor;
-    const std::int64_t keep = exempt ? 0 : buy_reserve(p);
+    std::int64_t keep = exempt ? 0 : buy_reserve(p);
+    // A costly one (public buildings, the big yard) also leaves what the gold loses in
+    // kCostlyMinutes where the taxes and sales do not cover the costs and purchases: built down to
+    // the last coin, the next minutes put the computer in debt, it shut its producers down and its
+    // merchants left.
+    if (!exempt && rivals() && !p.pirates && cost.money >= kCostlyBuild) {
+        keep += kCostlyMinutes * std::max<std::int64_t>(0, -std::int64_t{earned_income(p)});
+    }
     return std::int64_t{player(p).money} >= cost.money + keep && c.stock(m.wood) >= cost.wood &&
            c.stock(m.bricks) >= cost.bricks && c.stock(m.tools) >= cost.tools && c.stock(m.cannons) >= cost.cannons;
 }
