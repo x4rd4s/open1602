@@ -1249,7 +1249,12 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // Open1602: a city that cannot feed its inhabitants builds food producers first. A founded city
     // and the pioneers follow their orders (the fisher before the houses); need_houses asks for
     // food there.
-    if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r)) {
+    // Improved: also while the city's own producers make less than it eats and its stock would last
+    // less than kFoodAheadMinutes at that shortfall, whatever its ships may yet bring: the runs
+    // carried a home city of 2200 for hours while its fields and pastures, with land and gold for
+    // more, stayed as they were, until it starved. Not merely below the margin: the growing cities
+    // then built food at every look and their stages stood still (no shipyard in three hours).
+    if (r.stage != stage::kFounded && r.stage != stage::kPioneers && more_food(p, c, r, rivals() && food_behind(c))) {
         return;
     }
     // Open1602: a colony makes the food and cloth its home city has no room left to make.

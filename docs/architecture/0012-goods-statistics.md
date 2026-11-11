@@ -46,7 +46,11 @@ before a good the people need runs out.
    - They are part of the state hash, so a multiplayer game compares them like everything else. A
      computer that joins or resyncs gets them with the savegame
      ([ADR 0011](0011-multiplayer-lockstep.md)).
-   - The gameplay does not depend on them. The early warning only puts a message on the screen.
+   - The players' gameplay does not depend on them; the early warning only puts a message on the
+     screen. Improved computers' cities keep the figures by minute too (`CityHistory`), for an
+     overview of their own cities as a player reads the windows (`engine/sim/src/ai/ai_overview.hpp`);
+     the original's computers' and the natives' do not. The overview is built from closed minutes
+     only, so a game loaded mid-minute reads the same.
    - Adding the section changed the hash of the AI's golden test (`test_ai.cpp`). Without `GLDG`, the
      hash is the old one.
 4. **Only one's own cities.** `sim::GoodsScope` sums a player's cities, all of them or one island's.

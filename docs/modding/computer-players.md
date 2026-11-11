@@ -686,8 +686,7 @@ quarter beyond what it eats, and a food run brings ten minutes of what the city 
 its Kontor) straight there, without a second ware from elsewhere. Its only ship does not leave to
 found a city while a city runs out of food. A city gives a ware to another of its cities only when
 it does not use more of it than it makes while the other makes more, and no ship brings it the same
-ware: the goods went back and forth between two cities a minute apart. A further colony waits until
-its gold carries what it loses a minute for half an hour beyond the founding. A good of a class
+ware: the goods went back and forth between two cities a minute apart. A good of a class
 whose gate is held that the city can work from its store (the tailor's clothes from cloth) gets its
 workshop before a colony is sought.
 
@@ -697,6 +696,17 @@ any more, one a visit. A repair that has had no material for fifteen of the yard
 neither the yard nor the city holds any is stopped, and no repair starts there until it does. A
 ship on a route that surrendered to the pirates sails on once they plundered it or none lies within
 24 tiles: the white flag stays up until a ship's next job, and a ship on a route gets none.
+
+A city past the pioneers looks for more food while its own producers make less than it eats and its
+stock would run dry within half an hour at that shortfall, whatever its ships may yet bring; where
+no pasture site has room for 19 fields, a second search takes one with 12. A further colony waits
+until its gold carries for an hour what it would lose a minute with one more colony: what it earns
+now less what one of its colonies costs beyond its taxes, uninhabited plantations and mines
+counted; this is weighed before the ship is called home, not after. The 12 fields and the hour are
+interim and stay in the code: a shared budget of the computer's plans is to replace them. For it
+improved computers' cities keep the figures of the statistics windows as a player's do, and the
+computer can read them as an overview of its own cities (goods, producers, inhabitants, finances,
+per island and in all); no decision reads it yet.
 
 ## What they get from nowhere
 

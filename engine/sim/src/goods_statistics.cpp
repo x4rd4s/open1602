@@ -52,17 +52,23 @@ void warn_of_shortages(City& city, const std::vector<std::uint8_t>& consumer_goo
 
 void close_goods_minute(World& world, const assets::BuildingTable& buildings, std::vector<CityEvent>* events) {
     const std::vector<std::uint8_t> goods = consumer_goods(buildings);
-    std::optional<std::vector<std::int32_t>> costs;  // only once a human player's city needs them
+    std::optional<std::vector<std::int32_t>> costs;  // only once a city needs them
     std::optional<std::vector<std::uint32_t>> workers;
+    // Improved computers (not classic_ai) read their cities' figures as a player reads the
+    // windows (the AI's overview); the original's computers and the natives keep none.
+    const bool computers = !world.original_bugs().classic_ai;
     for (std::size_t i = 0; i < world.cities().size(); ++i) {
         const City& c = world.cities()[i];
         City& city = *world.city(c.island, c.index);
         city.ledger.close_minute(city.goods);
         const Player* owner = world.player(city.owner);
-        if (owner == nullptr || owner->role != PlayerRole::Human) {
-            continue;  // nobody ever sees the figures of computer players and natives
+        const bool human = owner != nullptr && owner->role == PlayerRole::Human;
+        if (!human && !(computers && owner != nullptr && owner->role == PlayerRole::Computer)) {
+            continue;
         }
-        warn_of_shortages(city, goods, events);
+        if (human) {
+            warn_of_shortages(city, goods, events);
+        }
         if (!costs) {
             costs = running_costs(world, buildings);
             workers = city_workers(world, buildings);

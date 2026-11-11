@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "ai_chains.hpp"
+#include "ai_overview.hpp"
 #include "ai_state.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -265,6 +266,9 @@ private:
     /// Open1602: what the producers of `ware` in a city make, 1/32 t per minute, as their
     /// statistics show (half their full rate for one that has run for less than a minute).
     [[nodiscard]] std::uint32_t supply(const City& c, std::uint8_t ware) const;
+    /// Open1602: whether a city's producers make less food than its people eat and its stock lasts
+    /// less than kFoodAheadMinutes at that shortfall, whatever its ships may yet bring.
+    [[nodiscard]] bool food_behind(const City& c) const;
     /// Open1602: whether a city makes too little food for more inhabitants: with less than
     /// kFoodStock in stock, its own producers make less than its inhabitants eat and a margin.
     [[nodiscard]] bool food_short(const City& c) const;
@@ -664,6 +668,19 @@ private:
     /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
     /// purchases beyond its sales); 0 for the others.
     [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
+    /// Improved computers: what one of their cities beyond the home city costs a minute beyond its
+    /// taxes, on average over those that cost more than they pay, uninhabited ones included
+    /// (want_colony).
+    [[nodiscard]] std::int64_t colony_deficit(const AiPlayer& p) const;
+    /// Improved computers: their cities as the statistics windows show them, for each island and
+    /// all of them (ai_overview.hpp). Taken from the cities' last closed minutes, so it is built
+    /// once a game minute (and when the computer's cities change) and read from m_overviews.
+    [[nodiscard]] const Overview& overview(const AiPlayer& p) const;
+    [[nodiscard]] Overview build_overview(const AiPlayer& p) const;
+    /// One good of the computer's cities (of one island, or all) over the last `minutes` as the
+    /// window "Warenbilanz" shows it.
+    [[nodiscard]] WareView ware_view(const AiPlayer& p, std::uint8_t ware, std::uint32_t minutes,
+                                     std::optional<std::uint16_t> island = std::nullopt) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
     /// Whether `c` is the computer's home city.
     [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {
@@ -881,6 +898,15 @@ private:
     };
     [[nodiscard]] const Census* census() const;
     mutable Census m_census;
+    /// overview() by player: built from the cities' closed minutes only, for the minutes closed
+    /// before `minute` and the cities in `cities`, so a saved game rebuilds the same one.
+    struct OverviewCache {
+        bool valid = false;
+        std::uint64_t minute = 0;
+        std::vector<std::uint32_t> cities;  ///< the indices of the computer's cities
+        Overview view;
+    };
+    mutable std::vector<OverviewCache> m_overviews;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.
     std::uint32_t m_grow_from = 0;  ///< 0: kGrowFrom
     /// The order and plan of can_place(), reused so that a site test allocates nothing.

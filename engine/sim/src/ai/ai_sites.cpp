@@ -29,6 +29,8 @@ constexpr std::int32_t kRings = 16;
 constexpr std::int32_t kSearchPositions = 32;
 /// Open1602: the trees next to a woodcutter enough where no place has the usual 10 (search_farm).
 constexpr std::int32_t kSparseWoodTrees = 4;
+/// Open1602: the fields about a pasture enough where the city lacks food and no place has 19.
+constexpr std::int32_t kSparseFarmFields = 12;
 /// Open1602, town_zone(): houses beyond those there are that the zone has room for, and its
 /// smallest and largest radius.
 constexpr std::int32_t kZoneSpareHouses = 12;
@@ -838,10 +840,16 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
     // trees planted about it (task_farm) feed; the original's computer built none and ran out of wood.
     const bool sparse = woodcutter && s.phase == 1;
     const bool improved = !woodcutter && !classic();
+    // Open1602: so too an improved rival's pasture where the city makes less food than it eats: a
+    // second round takes a place with kSparseFarmFields fields. Its towns' leftover land had no
+    // place with the usual 19 along the roads, and their people starved with gold in hand.
+    const City* here = city(p.island, p.city);
+    const bool hungry = rivals() && !woodcutter && s.slot == kSlotCattle && here != nullptr && food_behind(*here);
+    const bool sparse_farm = hungry && s.phase == 1;
     const TownZone* zone = improved && town_zone(p).valid ? &town_zone(p) : nullptr;
     const std::int32_t margin = improved ? town_style_of(p).field_margin : 0;
     const auto finished = [&] {
-        if (woodcutter && s.best == 0 && s.phase == 0 && !classic()) {
+        if ((woodcutter || hungry) && s.best == 0 && s.phase == 0 && !classic()) {
             start_search(p, *b, s.slot, false);
             p.search.phase = 1;
             return false;
@@ -937,7 +945,8 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
                 const std::int32_t score =
                     outside_zone(zone, margin, c, away_from_town(parity_penalty(acc.score, parity, 4), acc.extra));
-                const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10) : acc.count >= 19;
+                const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10)
+                                               : acc.count >= (sparse_farm ? kSparseFarmFields : 19);
                 if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
                     s.best_x0 = c.x0;

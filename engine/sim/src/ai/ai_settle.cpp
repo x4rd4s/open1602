@@ -1110,8 +1110,29 @@ namespace {
 constexpr std::int32_t kGoalColonyMoney = 10'000;
 constexpr std::int32_t kGoalColonyIncome = 100;
 constexpr std::int64_t kRichColonyMoney = 20'000;
-constexpr std::uint32_t kColonyLossMinutes = 30;  // improved computers: the loss a founding's gold carries
+constexpr std::uint32_t kColonyLossMinutes = 60;  // improved computers: the loss a founding's gold carries
 }  // namespace
+
+std::int64_t Engine::colony_deficit(const AiPlayer& p) const {
+    // What one of the computer's cities beyond the home city costs a minute beyond its taxes, on
+    // average over those that cost more than they pay; 0 without such a city. Its uninhabited
+    // colonies too: plantations and mines pay no taxes and cost 200 to 1400 gold a minute each,
+    // and five of them founded on a margin of 500 a minute took a computer into a debt of 79,000.
+    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
+    std::int64_t sum = 0;
+    std::int64_t n = 0;
+    for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
+        const City& c = m_world.cities()[i];
+        if (c.owner != p.player || is_home(p, c)) {
+            continue;
+        }
+        if (const std::int64_t d = std::int64_t{costs[i]} - tax_income(c, m_buildings); d > 0) {
+            sum += d;
+            ++n;
+        }
+    }
+    return n != 0 ? sum / n : 0;
+}
 
 std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
     // What the goal of an improved computer asks a colony for: gold or ore it has none of, once
@@ -1242,14 +1263,19 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
         return false;
     }
-    // Nor while it loses gold, unless its gold carries the loss for kColonyLossMinutes beyond the
-    // founding: three colonies in two hours took a computer from 24,000 gold into a debt it never
-    // left.
-    if (rivals() && p.cities >= 2 &&
-        player(p).money <
-            std::int64_t{colony_money(p)} + buy_reserve(p) +
-                std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -std::int64_t{earned_income(p)})) {
-        return false;
+    // Nor while it would lose gold with one more colony (what it earns now less what one of its
+    // colonies costs beyond its taxes, colony_deficit), unless its gold carries that loss for
+    // kColonyLossMinutes beyond the founding: three colonies in two hours took a computer from
+    // 24,000 gold into a debt it never left, and two founded with 140,000 gold in hand put
+    // another in debt within the hour.
+    // Weighed before the ship is called home only: its loss changes with every look, and a ship
+    // called for a founding that was then refused lay idle at the Kontor.
+    if (rivals() && p.cities >= 2 && p.settle.ship == 0) {
+        const std::int64_t after = std::int64_t{earned_income(p)} - colony_deficit(p);
+        if (player(p).money < std::int64_t{colony_money(p)} + buy_reserve(p) +
+                                  std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -after)) {
+            return false;
+        }
     }
     const std::uint32_t n = p.cities;
     // Open1602: an improved computer founds a further colony only while its cities earn more than
