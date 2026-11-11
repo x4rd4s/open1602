@@ -466,6 +466,11 @@ private:
     static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
     static constexpr std::int64_t kBuyReserveMinutes = 5;
     static constexpr std::uint32_t kSpareKeepMinutes = 10;
+    static constexpr std::uint32_t kHomeFirstMinutes = 10;  ///< supply_destination
+    static constexpr std::int64_t kCostlyBuild = 750;       ///< gold; affordable keeps kCostlyMinutes too
+    static constexpr std::int64_t kCostlyMinutes = 5;
+    /// Open1602: whether a class of an improved rival's city lacks a good it cannot get (material_lock).
+    [[nodiscard]] bool unsupplied_class(AiPlayer& p, const City& c);
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -638,7 +643,11 @@ private:
     /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
     /// purchases beyond its sales); 0 for the others.
     [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
-    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve) const;
+    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
+    /// Whether `c` is the computer's home city.
+    [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {
+        return p.home_valid && c.owner == p.player && c.island == p.home_island && c.index == p.home_city;
+    }
     /// Improved computers: what is left to buy of `w` at a partner's city `c` (0 for nothing).
     [[nodiscard]] std::uint32_t partner_spare(AiPlayer& p, const City& c, std::uint8_t w);
     /// Improved computers: what one supply run brings of a ware, by the computer's ships.
