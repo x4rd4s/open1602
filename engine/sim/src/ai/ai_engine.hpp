@@ -677,9 +677,9 @@ private:
     /// once a game minute (and when the computer's cities change) and read from m_overviews.
     [[nodiscard]] const Overview& overview(const AiPlayer& p) const;
     [[nodiscard]] Overview build_overview(const AiPlayer& p) const;
-    /// One good of the computer's cities (of one island, or all) as the window "Warenbilanz"
-    /// shows it.
-    [[nodiscard]] WareView ware_view(const AiPlayer& p, std::uint8_t ware,
+    /// One good of the computer's cities (of one island, or all) over the last `minutes` as the
+    /// window "Warenbilanz" shows it.
+    [[nodiscard]] WareView ware_view(const AiPlayer& p, std::uint8_t ware, std::uint32_t minutes,
                                      std::optional<std::uint16_t> island = std::nullopt) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
     /// Whether `c` is the computer's home city.
@@ -907,8 +907,6 @@ private:
         Overview view;
     };
     mutable std::vector<OverviewCache> m_overviews;
-    /// The figures of the last refused founding logged by player (want_colony logs a change only).
-    mutable std::vector<std::uint64_t> m_colony_logged;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.
     std::uint32_t m_grow_from = 0;  ///< 0: kGrowFrom
     /// The order and plan of can_place(), reused so that a site test allocates nothing.

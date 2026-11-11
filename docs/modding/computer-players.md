@@ -697,18 +697,16 @@ neither the yard nor the city holds any is stopped, and no repair starts there u
 ship on a route that surrendered to the pirates sails on once they plundered it or none lies within
 24 tiles: the white flag stays up until a ship's next job, and a ship on a route gets none.
 
-Improved computers read their own cities as a player reads the statistics windows: the goods
-balance, stocks, producers, inhabitants by class and the finances of each island and of all their
-cities, from the last closed minute, with the change over the last hour. They see nothing of other
-players' cities this way. A city past the pioneers looks for more food while its own producers make
-less than it eats and its stock would run dry within half an hour at that shortfall, whatever its
-ships may yet bring; where no pasture site has room for 19 fields, a second search takes one with
-12. A further colony waits while the worse of its net gold a minute now and an hour ahead, less
-what one of its colonies costs beyond its taxes (uninhabited plantations and mines too), keeps less
-than a tenth of its taxes, until its gold carries the shortfall for an hour; this is weighed before
-the ship is called home, not after. These figures (12 fields, the tenth, the hour, the 15, 45 and
-60 minutes of the overview) are interim and stay in the code: a shared budget of the computer's
-plans is to replace them.
+A city past the pioneers looks for more food while its own producers make less than it eats and its
+stock would run dry within half an hour at that shortfall, whatever its ships may yet bring; where
+no pasture site has room for 19 fields, a second search takes one with 12. A further colony waits
+until its gold carries for an hour what it would lose a minute with one more colony: what it earns
+now less what one of its colonies costs beyond its taxes, uninhabited plantations and mines
+counted; this is weighed before the ship is called home, not after. The 12 fields and the hour are
+interim and stay in the code: a shared budget of the computer's plans is to replace them. For it
+improved computers' cities keep the figures of the statistics windows as a player's do, and the
+computer can read them as an overview of its own cities (goods, producers, inhabitants, finances,
+per island and in all); no decision reads it yet.
 
 ## What they get from nowhere
 

@@ -47,10 +47,10 @@ before a good the people need runs out.
      computer that joins or resyncs gets them with the savegame
      ([ADR 0011](0011-multiplayer-lockstep.md)).
    - The players' gameplay does not depend on them; the early warning only puts a message on the
-     screen. Improved computers read their own cities' figures as a player reads the windows (the
-     AI's overview, `engine/sim/src/ai/ai_overview.hpp`): their cities keep the figures by minute
-     too (`CityHistory`), the original's computers' and the natives' do not. The overview is built
-     from closed minutes only, so a game loaded mid-minute decides the same.
+     screen. Improved computers' cities keep the figures by minute too (`CityHistory`), for an
+     overview of their own cities as a player reads the windows (`engine/sim/src/ai/ai_overview.hpp`);
+     the original's computers' and the natives' do not. The overview is built from closed minutes
+     only, so a game loaded mid-minute reads the same.
    - Adding the section changed the hash of the AI's golden test (`test_ai.cpp`). Without `GLDG`, the
      hash is the old one.
 4. **Only one's own cities.** `sim::GoodsScope` sums a player's cities, all of them or one island's.

@@ -77,7 +77,6 @@ void Engine::log(const AiPlayer& p, const char* format, ...) const {
 void Engine::reset() {
     m_state.players.clear();
     m_overviews.clear();
-    m_colony_logged.clear();
     for (std::size_t i = 0; i < m_world.players().size(); ++i) {
         const Player& pl = m_world.players()[i];
         if ((pl.role != PlayerRole::Computer && m_world.behaviour(pl) != FactionBehaviour::Pirates) ||

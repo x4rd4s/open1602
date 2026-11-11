@@ -13,19 +13,6 @@
 
 namespace o1602::sim::ai {
 
-std::int64_t AreaView::net_ahead(std::uint32_t minutes) const noexcept {
-    // `before` is about kForecastMinutes old: its change to now goes on at the same pace.
-    if (history < kTrendMinutes) {
-        return now.net();
-    }
-    const std::int64_t change = now.net() - before.net();
-    return now.net() + change * std::int64_t{minutes} / std::int64_t{kForecastMinutes};
-}
-
-std::int64_t AreaView::net_safe(std::uint32_t minutes) const noexcept {
-    return std::min(now.net(), net_ahead(minutes));
-}
-
 std::optional<std::uint32_t> WareView::lasts() const noexcept {
     if (balance >= 0) {
         return std::nullopt;
@@ -86,25 +73,21 @@ const Overview& Engine::overview(const AiPlayer& p) const {
     }
     // The army's upkeep is the player's and counts as it is now.
     cache.view.all.now.military = military_cost(p);
-    cache.view.all.before.military = cache.view.all.now.military;
     return cache.view;
 }
 
 Overview Engine::build_overview(const AiPlayer& p) const {
     Overview o;
-    // Now: the last closed minute. An hour ago: the oldest quarter of the last hour, once every city
-    // of the area has kTrendMinutes of history (a young colony's would weigh as if it had none).
+    // Each city's last closed minute, added up.
     const auto area = [&](std::optional<std::uint16_t> island) {
         AreaView a;
         a.island = island;
-        std::uint32_t shortest = UINT32_MAX;
         for (const City& c : m_world.cities()) {
             if (c.owner != p.player || (island && c.island != *island)) {
                 continue;
             }
             ++a.cities;
             const std::vector<CitySample> last = c.history.last_minutes();
-            shortest = std::min(shortest, static_cast<std::uint32_t>(last.size()));
             if (last.empty()) {
                 continue;  // founded within the minute
             }
@@ -118,22 +101,6 @@ Overview Engine::build_overview(const AiPlayer& p) const {
             a.inhabitants += people;
             a.peopled += people != 0 ? 1U : 0U;
             add(a.now, s);
-            if (last.size() >= kTrendMinutes) {
-                Finances old;
-                const std::size_t n = last.size() - kTrendMinutes + 1;  // the oldest minutes
-                for (std::size_t k = 0; k < n; ++k) {
-                    add(old, last[k]);
-                }
-                const auto div = static_cast<std::int64_t>(n);
-                a.before.taxes += old.taxes / div;
-                a.before.costs += old.costs / div;
-                a.before.sales += old.sales / div;
-                a.before.purchases += old.purchases / div;
-            }
-        }
-        a.history = a.cities != 0 && shortest != UINT32_MAX ? shortest : 0;
-        if (a.history < kTrendMinutes) {
-            a.before = a.now;
         }
         return a;
     };
@@ -144,11 +111,12 @@ Overview Engine::build_overview(const AiPlayer& p) const {
     return o;
 }
 
-WareView Engine::ware_view(const AiPlayer& p, std::uint8_t ware, std::optional<std::uint16_t> island) const {
+WareView Engine::ware_view(const AiPlayer& p, std::uint8_t ware, std::uint32_t minutes,
+                           std::optional<std::uint16_t> island) const {
     WareView v;
     GoodsScope scope{p.player, island};
     v.stock = goods_stock(m_world, scope, ware);
-    const FlowTotals t = goods_totals(m_world, scope, ware, kViewMinutes);
+    const FlowTotals t = goods_totals(m_world, scope, ware, minutes);
     v.minutes = t.minutes;
     if (t.minutes != 0) {
         const std::uint64_t m = t.minutes;

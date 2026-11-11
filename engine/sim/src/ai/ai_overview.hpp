@@ -2,8 +2,8 @@
 //
 // Improved computers: what a player reads in the statistics windows of their own cities (the
 // goods balance, the stocks, the producers, the inhabitants and the finances), for one island or
-// for all of them, and where those figures lead within the next hour at the trend they show.
-// Only the computer's own cities: nothing a player could not see of their own.
+// for all of them. Only the computer's own cities: nothing a player could not see of their own.
+// Read by no decision yet: the ground for a shared budget of the computer's plans.
 #pragma once
 
 #include <array>
@@ -14,13 +14,6 @@
 #include "o1602/sim/goods_ledger.hpp"
 
 namespace o1602::sim::ai {
-
-/// Minutes the goods balance is read over (the window's short view).
-inline constexpr std::uint32_t kViewMinutes = 15;
-/// Minutes a decision looks ahead.
-inline constexpr std::uint32_t kForecastMinutes = 60;
-/// Minutes of history from which the finances show a trend (an hour's oldest quarter).
-inline constexpr std::uint32_t kTrendMinutes = 45;
 
 /// Gold a minute, as the cities' windows show it (the tab "Finanzen"), and the army's upkeep.
 struct Finances {
@@ -39,15 +32,7 @@ struct AreaView {
     std::uint32_t peopled = 0;  ///< cities with inhabitants
     std::uint32_t inhabitants = 0;
     std::array<std::uint32_t, kCityClasses> classes{};
-    Finances now;
-    /// The average minute of the oldest quarter of the last hour; `now` while the cities have less
-    /// than kTrendMinutes of history.
-    Finances before;
-    std::uint32_t history = 0;  ///< minutes of history behind `before`
-    /// The net gold a minute `minutes` ahead, at the change over the last hour.
-    [[nodiscard]] std::int64_t net_ahead(std::uint32_t minutes) const noexcept;
-    /// The worse of the net now and `minutes` ahead: what a decision may count on.
-    [[nodiscard]] std::int64_t net_safe(std::uint32_t minutes) const noexcept;
+    Finances now;  ///< the last closed minute
 };
 
 /// One good of some cities: its stock, its balance and its producers.
