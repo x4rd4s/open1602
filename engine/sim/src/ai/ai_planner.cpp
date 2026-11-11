@@ -2539,7 +2539,7 @@ bool Engine::colony_crop_missing(AiPlayer& p) {
                                                  {ware::kSpices, {ware::kSpiceField, 0}},
                                                  {ware::kCocoa, {ware::kCocoaField, 0}}}};
     return std::ranges::any_of(kNeeds, [&](const Need& n) {
-        return demand(*home, n.good) != 0 &&
+        return demand_ahead(*home, n.good) != 0 &&
                std::ranges::none_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); });
     });
 }

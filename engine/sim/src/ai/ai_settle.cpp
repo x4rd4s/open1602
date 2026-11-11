@@ -1056,9 +1056,18 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
                                    {ware::kTobaccoGoods, {ware::kTobaccoField, 0}},
                                    {ware::kSpices, {ware::kSpiceField, 0}},
                                    {ware::kCocoa, {ware::kCocoaField, 0}}}};
-        std::ranges::stable_sort(needs, {}, [&](const Need& n) { return stock_lasts(*home, n.good); });
+        // What the houses will use once they rise counts too (demand_ahead): a colony founded for
+        // the next class's tobacco grew sugar instead, and the city's tavern never opened.
+        const auto lasts = [&](std::uint8_t w) -> std::uint64_t {
+            const std::uint32_t used = demand_ahead(*home, w);
+            if (used == 0 || supply(*home, w) >= used) {
+                return std::numeric_limits<std::uint64_t>::max();
+            }
+            return std::uint64_t{home->stock(w)} * 256 / used;
+        };
+        std::ranges::stable_sort(needs, {}, [&](const Need& n) { return lasts(n.good); });
         for (const Need& n : needs) {
-            if (stock_lasts(*home, n.good) == std::numeric_limits<std::uint64_t>::max() ||
+            if (lasts(n.good) == std::numeric_limits<std::uint64_t>::max() ||
                 std::ranges::any_of(n.crops, [&](std::uint8_t crop) { return crop != 0 && crop_available(p, crop); })) {
                 continue;
             }
@@ -1100,6 +1109,7 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
 namespace {
 constexpr std::int32_t kGoalColonyMoney = 10'000;
 constexpr std::int32_t kGoalColonyIncome = 100;
+constexpr std::int64_t kRichColonyMoney = 20'000;
 }  // namespace
 
 std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
@@ -1228,7 +1238,10 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     const std::uint32_t n = p.cities;
     // Open1602: an improved computer founds a further colony only while its cities earn more than
     // they cost; its gold alone let it settle into debt.
-    if (n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
+    // Not when it asks for one (`force`) with kRichColonyMoney in hand: a city that waited for a
+    // good of its next class (need_public) sat on 45,000 gold for hours.
+    const bool rich = rivals() && force && player(p).money >= kRichColonyMoney;
+    if (n >= 2 && !rich && net_income(p) <= static_cast<std::int32_t>(50 * n) && (rivals() || player(p).money < 15001)) {
         return false;
     }
     if (p.settle.active && !p.settle.sailing && !classic() && !p.settle.failed) {
