@@ -800,7 +800,9 @@ void Engine::set_stage(AiPlayer& p, CityPlan& r, std::uint8_t s) {
     r.stage_ms = now_ms();
     if (s > p.max_stage) {
         p.max_stage = s;
-        if (s > stage::kPioneers) {
+        // Open1602: an improved computer keeps the city where most of its people live
+        // (choose_home_by_people), not the one that reached a new stage first.
+        if (s > stage::kPioneers && !(rivals() && !p.pirates && home_city(p) != nullptr)) {
             p.home_valid = true;
             p.home_island = r.island;
             p.home_city = r.city;
@@ -1958,12 +1960,12 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
     return true;
 }
 
-bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
+std::uint8_t Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
     // A good of class k (not food) that none of the computer's cities makes and the city has under
     // 10 t of.
     const auto& classes = m_buildings.resident_classes();
     if (k >= classes.size()) {
-        return false;
+        return 0;
     }
     for (const assets::ResidentClass::Need& n : classes[k].needs) {
         const std::uint8_t w = n.ware;
@@ -1975,6 +1977,29 @@ bool Engine::source_missing(AiPlayer& p, const City& c, std::size_t k) {
         // Bought only, it counts as missing too: partners' Kontors ran empty, and a city that rose on
         // their spices lost its merchants within the hour.
         if (!made) {
+            return w;
+        }
+    }
+    return 0;
+}
+
+bool Engine::workshop_for(AiPlayer& p, const City& c, std::uint8_t w) {
+    // Open1602: the tailor came only with the aristocrats' own stage, so the clothes they want were
+    // never made before and their theatre never built: four rich computers waited at the merchants
+    // for ten hours with the cloth in store.
+    const CityPlan* r = current_plan(p);
+    if (r == nullptr) {
+        return false;
+    }
+    for (const ComputerSlot& k : slots()) {
+        if (k.kind != ComputerSlot::Kind::Producer || k.ware != w || k.raw == 0 || k.field != 0 || k.deposit != 0 ||
+            r->slots[k.number].count != 0 || c.stock(k.raw) < 10 * kTon) {
+            continue;
+        }
+        const std::size_t before = p.stack.size();
+        (void)need(p, k.number, 1);
+        if (p.stack.size() > before) {
+            log(p, "city %u/%u: a workshop for ware %u", c.island, c.index, unsigned{w});
             return true;
         }
     }
@@ -2843,8 +2868,10 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
             // A good of that class that none of its cities makes and no partner sells it gets from
             // a colony: else the city waited at the settlers for the whole game, with the tobacco
             // its citizens would want never made, and fifty thousand gold in hand.
-            return source_missing(p, *c, g) &&
-                   want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false);
+            // A good it can work from what it has in store gets its workshop first (workshop_for).
+            const std::uint8_t w = source_missing(p, *c, g);
+            return w != 0 && (workshop_for(p, *c, w) ||
+                              want_colony(p, static_cast<std::uint8_t>(std::min<std::size_t>(g, 4)), true, false));
         }
     }
     if (plan_building(p, def->task, *b, which, false)) {

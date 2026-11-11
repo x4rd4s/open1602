@@ -1172,6 +1172,12 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
     if (Ship* s = settle_ship(p)) {
         return s->id;
     }
+    // Open1602: an improved computer does not send its only ship to found a city while one of its
+    // cities runs out of food (food_runs_out): the founding took the ship for twenty minutes, and a
+    // colony of 450 people starved meanwhile.
+    if (rivals() && !p.pirates && own_ships(p).size() < 2 && food_runs_out(p)) {
+        return 0;
+    }
     std::uint32_t best = 0;
     std::uint32_t best_cannons = 25;
     for (Ship* s : own_ships(p)) {

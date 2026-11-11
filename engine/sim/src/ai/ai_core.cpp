@@ -757,6 +757,9 @@ void Engine::choose_home(AiPlayer& p) {
     // The last city with at least 10 inhabitants of class 2 or higher, unless a later one has more
     // free land.
     const auto& cities = m_world.cities();
+    if (rivals() && !p.pirates && choose_home_by_people(p)) {
+        return;
+    }
     std::uint32_t best = 0;
     std::optional<std::size_t> home;
     for (std::size_t i = 0; i < cities.size(); ++i) {
@@ -776,6 +779,50 @@ void Engine::choose_home(AiPlayer& p) {
         p.home_city = cities[*home].index;
         p.city_cursor = static_cast<std::uint32_t>(*home == 0 ? cities.size() - 1 : *home - 1);
     }
+}
+
+bool Engine::choose_home_by_people(AiPlayer& p) {
+    // Open1602: an improved computer's home is the city where most of its people live, those from
+    // the citizens on counting four times; another city takes over only once it weighs a quarter
+    // more. By the original's rule a new colony with much free land became the home while nobody
+    // lived there yet: the home city's food runs went to the empty Kontor, 1381 t in one game, and
+    // the capital's shortfall was never seen. While no city has kHomePeople yet, the original's rule.
+    constexpr std::uint32_t kHomePeople = 50;
+    const auto& cities = m_world.cities();
+    const auto weight = [&](const City& c) {
+        return std::uint64_t{population(c)} + 3 * std::uint64_t{population(c, 2)};
+    };
+    std::optional<std::size_t> best;
+    std::uint64_t most = 0;
+    std::optional<std::size_t> now;
+    for (std::size_t i = 0; i < cities.size(); ++i) {
+        const City& c = cities[i];
+        if (c.owner != p.player) {
+            continue;
+        }
+        if (is_home(p, c)) {
+            now = i;
+        }
+        if (const std::uint64_t w = weight(c); population(c) >= kHomePeople && w > most) {
+            best = i;
+            most = w;
+        }
+    }
+    if (!best) {
+        return false;
+    }
+    std::size_t home = *best;
+    if (now) {
+        const std::uint64_t held = weight(cities[*now]);
+        if (held != 0 && 4 * most <= 5 * held) {
+            home = *now;
+        }
+    }
+    p.home_valid = true;
+    p.home_island = cities[home].island;
+    p.home_city = cities[home].index;
+    p.city_cursor = static_cast<std::uint32_t>(home == 0 ? cities.size() - 1 : home - 1);
+    return true;
 }
 
 Engine::SiteTally& Engine::site_tally(const AiPlayer& p) {

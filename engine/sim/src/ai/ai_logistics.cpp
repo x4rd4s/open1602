@@ -994,14 +994,25 @@ std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_
             return std::uint64_t{c.stock(w)} * 256 / ahead;
         }
     }
+    // Food made only just as fast as it is eaten counts too: the farms' rate is what they make at
+    // best, and a colony that made 220 against 207 ran dry within the hour.
+    if (rivals() && w == m_buildings.food_ware()) {
+        if (const std::uint32_t used = demand(c, w);
+            used != 0 && 4 * std::uint64_t{supply(c, w)} < 5 * std::uint64_t{used}) {
+            return std::uint64_t{c.stock(w)} * 256 / used;
+        }
+    }
     return stock_lasts(c, w);
 }
 
-std::uint64_t Engine::supply_need(AiPlayer& p, const City& c) {
+std::uint64_t Engine::supply_need(AiPlayer& p, const City& c, std::uint8_t only) {
     std::uint32_t target = 0;
     const std::vector<std::uint8_t> wares = supply_wares(p, c, &target);
     const std::vector<std::uint8_t> routed = routed_wares(p, 0, c);
     for (const std::uint8_t w : wares) {  // the most urgent first
+        if (only != 0 && w != only) {
+            continue;
+        }
         const std::uint64_t urgency = supply_urgency(c, w, target);
         if (urgency == kNoUrgency) {
             break;
@@ -1024,8 +1035,32 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     // there: the home city pays for the others, and a run of alcohol that went to a new colony
     // while the home city had none took its merchants with it.
     City* best = &home;
+    // Food first: while the home city's own food lasts, a city whose food runs out within
+    // kHomeFirstMinutes gets the run before any good the home city waits for. A colony whose fields
+    // had no room left starved with 220 t of food in the home city's Kontor, while the computer's
+    // only ship brought cocoa to the home city run after run.
+    const std::uint8_t food = m_buildings.food_ware();
+    const std::uint64_t first = std::uint64_t{kHomeFirstMinutes} * 256;
+    if (supply_need(p, home, food) >= first) {
+        City* hungry = nullptr;
+        std::uint64_t hungry_need = first;
+        for (const City& c : m_world.cities()) {
+            if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+                continue;
+            }
+            if (const std::uint64_t need = supply_need(p, c, food); need < hungry_need) {
+                if (City* to = city(c.island, c.index); to != nullptr) {
+                    hungry = to;
+                    hungry_need = need;
+                }
+            }
+        }
+        if (hungry != nullptr) {
+            return hungry;
+        }
+    }
     std::uint64_t best_need = supply_need(p, home);
-    if (best_need < std::uint64_t{kHomeFirstMinutes} * 256) {
+    if (best_need < first) {
         return best;
     }
     for (const City& c : m_world.cities()) {
@@ -1041,6 +1076,16 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
         }
     }
     return best;
+}
+
+bool Engine::food_runs_out(AiPlayer& p) {
+    for (const City& c : m_world.cities()) {
+        if (c.owner == p.player && c.warehouse_x && population(c) != 0 &&
+            supply_need(p, c, m_buildings.food_ware()) < std::uint64_t{kHomeFirstMinutes} * 256) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
@@ -1082,6 +1127,13 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 // until the ship can be back, at most half the ship's holds.
                 seconds = sail_seconds(p, city_point(home), city_point(m_world.cities()[*src]));
                 keep = supply_buffer(target, 2 * seconds);
+                // Food for kHomeFirstMinutes of what the city eats, up to half its Kontor: 40 t
+                // lasted a colony of 450 people four minutes.
+                if (w == m_buildings.food_ware()) {
+                    const std::uint64_t eaten = std::uint64_t{kHomeFirstMinutes} * demand(home, w);
+                    keep = std::max<std::uint32_t>(
+                        keep, static_cast<std::uint32_t>(std::min<std::uint64_t>(eaten, home.capacity / 2)));
+                }
                 if (home.stock(w) >= keep || on_way >= supply_ships_for(p, home, w, *src, seconds)) {
                     continue;
                 }
