@@ -668,7 +668,8 @@ private:
     /// purchases beyond its sales); 0 for the others.
     [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
     /// Improved computers: what one of their cities beyond the home city costs a minute beyond its
-    /// taxes, on average over those that cost more than they pay (want_colony).
+    /// taxes, on average over those that cost more than they pay, uninhabited ones included
+    /// (want_colony).
     [[nodiscard]] std::int64_t colony_deficit(const AiPlayer& p) const;
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
     /// Whether `c` is the computer's home city.

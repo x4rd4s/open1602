@@ -1115,13 +1115,15 @@ constexpr std::uint32_t kColonyLossMinutes = 60;  // improved computers: the los
 
 std::int64_t Engine::colony_deficit(const AiPlayer& p) const {
     // What one of the computer's cities beyond the home city costs a minute beyond its taxes, on
-    // average over those that cost more than they pay; 0 without such a city.
+    // average over those that cost more than they pay; 0 without such a city. Its uninhabited
+    // colonies too: plantations and mines pay no taxes and cost 200 to 1400 gold a minute each,
+    // and five of them founded on a margin of 500 a minute took a computer into a debt of 79,000.
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     std::int64_t sum = 0;
     std::int64_t n = 0;
     for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
         const City& c = m_world.cities()[i];
-        if (c.owner != p.player || is_home(p, c) || population(c) == 0) {
+        if (c.owner != p.player || is_home(p, c)) {
             continue;
         }
         if (const std::int64_t d = std::int64_t{costs[i]} - tax_income(c, m_buildings); d > 0) {
