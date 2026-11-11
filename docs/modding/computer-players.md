@@ -686,8 +686,7 @@ quarter beyond what it eats, and a food run brings ten minutes of what the city 
 its Kontor) straight there, without a second ware from elsewhere. Its only ship does not leave to
 found a city while a city runs out of food. A city gives a ware to another of its cities only when
 it does not use more of it than it makes while the other makes more, and no ship brings it the same
-ware: the goods went back and forth between two cities a minute apart. A further colony waits until
-its gold carries what it loses a minute for half an hour beyond the founding. A good of a class
+ware: the goods went back and forth between two cities a minute apart. A good of a class
 whose gate is held that the city can work from its store (the tailor's clothes from cloth) gets its
 workshop before a colony is sought.
 
@@ -697,6 +696,19 @@ any more, one a visit. A repair that has had no material for fifteen of the yard
 neither the yard nor the city holds any is stopped, and no repair starts there until it does. A
 ship on a route that surrendered to the pirates sails on once they plundered it or none lies within
 24 tiles: the white flag stays up until a ship's next job, and a ship on a route gets none.
+
+Improved computers read their own cities as a player reads the statistics windows: the goods
+balance, stocks, producers, inhabitants by class and the finances of each island and of all their
+cities, from the last closed minute, with the change over the last hour. They see nothing of other
+players' cities this way. A city past the pioneers looks for more food while its own producers make
+less than it eats and its stock would run dry within half an hour at that shortfall, whatever its
+ships may yet bring; where no pasture site has room for 19 fields, a second search takes one with
+12. A further colony waits while the worse of its net gold a minute now and an hour ahead, less
+what one of its colonies costs beyond its taxes (uninhabited plantations and mines too), keeps less
+than a tenth of its taxes, until its gold carries the shortfall for an hour; this is weighed before
+the ship is called home, not after. These figures (12 fields, the tenth, the hour, the 15, 45 and
+60 minutes of the overview) are interim and stay in the code: a shared budget of the computer's
+plans is to replace them.
 
 ## What they get from nowhere
 

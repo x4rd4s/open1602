@@ -1272,17 +1272,25 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     // Weighed before the ship is called home only: its loss changes with every look, and a ship
     // called for a founding that was then refused lay idle at the Kontor.
     if (rivals() && p.cities >= 2 && p.settle.ship == 0) {
-        const Overview o = overview(p);
+        const Overview& o = overview(p);
         const std::int64_t deficit = colony_deficit(p);
         const std::int64_t after = o.all.net_safe(kForecastMinutes) - deficit;
         const std::int64_t margin = std::max<std::int64_t>(0, o.all.now.taxes / 10);
         const std::int64_t needed = std::int64_t{colony_money(p)} + buy_reserve(p) +
                                     std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, margin - after);
         if (player(p).money < needed) {
-            log(p, "no colony: net %lld now, %lld in an hour, a colony costs %lld, gold %lld of %lld",
-                static_cast<long long>(o.all.now.net()), static_cast<long long>(o.all.net_ahead(kForecastMinutes)),
-                static_cast<long long>(deficit), static_cast<long long>(player(p).money),
-                static_cast<long long>(needed));
+            // Logged when the figures change, not at every look (millions of lines in a test).
+            const auto key = static_cast<std::uint64_t>(needed) ^ (static_cast<std::uint64_t>(deficit) << 32U);
+            if (m_colony_logged.size() <= p.player) {
+                m_colony_logged.resize(std::size_t{p.player} + 1, 0);
+            }
+            if (m_colony_logged[p.player] != key) {
+                m_colony_logged[p.player] = key;
+                log(p, "no colony: net %lld now, %lld in an hour, a colony costs %lld, gold %lld of %lld",
+                    static_cast<long long>(o.all.now.net()), static_cast<long long>(o.all.net_ahead(kForecastMinutes)),
+                    static_cast<long long>(deficit), static_cast<long long>(player(p).money),
+                    static_cast<long long>(needed));
+            }
             return false;
         }
     }

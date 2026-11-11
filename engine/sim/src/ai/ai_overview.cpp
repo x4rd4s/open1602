@@ -60,33 +60,63 @@ void add(Finances& f, const CitySample& s) {
 
 }  // namespace
 
-Overview Engine::overview(const AiPlayer& p) const {
+const Overview& Engine::overview(const AiPlayer& p) const {
+    // The figures come from the cities' last closed minutes (the statistics step closes a minute
+    // after the computers' step of its tick), so they stay the same from one close to the next: built
+    // once for them and for the computer's cities of the moment, read from the cache until either
+    // changes. A game loaded in between builds the same overview again.
+    const std::uint64_t t = now_ms();
+    const std::uint64_t minute = t == 0 ? 0 : (t - 1) / kGoodsMinuteMs + 1;
+    std::uint64_t cities = 1469598103934665603ULL;  // FNV-1a over the indices of its cities
+    for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
+        if (m_world.cities()[i].owner == p.player) {
+            cities = (cities ^ (i + 1)) * 1099511628211ULL;
+        }
+    }
+    if (m_overviews.size() <= p.player) {
+        m_overviews.resize(std::size_t{p.player} + 1);
+    }
+    OverviewCache& cache = m_overviews[p.player];
+    if (!cache.valid || cache.minute != minute || cache.cities != cities) {
+        cache.valid = true;
+        cache.minute = minute;
+        cache.cities = cities;
+        cache.view = build_overview(p);
+    }
+    // The army's upkeep is the player's and counts as it is now.
+    cache.view.all.now.military = military_cost(p);
+    cache.view.all.before.military = cache.view.all.now.military;
+    return cache.view;
+}
+
+Overview Engine::build_overview(const AiPlayer& p) const {
     Overview o;
-    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
-    // The history's samples of an hour ago: the oldest quarter of its last hour, once every city
-    // of the area has kTrendMinutes of it (a young colony's history would weigh as if it had none).
+    // Now: the last closed minute. An hour ago: the oldest quarter of the last hour, once every city
+    // of the area has kTrendMinutes of history (a young colony's would weigh as if it had none).
     const auto area = [&](std::optional<std::uint16_t> island) {
         AreaView a;
         a.island = island;
         std::uint32_t shortest = UINT32_MAX;
-        for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
-            const City& c = m_world.cities()[i];
+        for (const City& c : m_world.cities()) {
             if (c.owner != p.player || (island && c.island != *island)) {
                 continue;
             }
             ++a.cities;
-            const std::uint32_t people = population(c);
-            a.inhabitants += people;
-            a.peopled += people != 0 ? 1U : 0U;
-            for (std::size_t k = 0; k < c.inhabitants.size() && k < a.classes.size(); ++k) {
-                a.classes[k] += c.inhabitants[k];
-            }
-            a.now.taxes += tax_income(c, m_buildings);
-            a.now.costs += i < costs.size() ? costs[i] : 0;
-            a.now.sales += c.sales / 480;
-            a.now.purchases += c.purchases / 480;
             const std::vector<CitySample> last = c.history.last_minutes();
             shortest = std::min(shortest, static_cast<std::uint32_t>(last.size()));
+            if (last.empty()) {
+                continue;  // founded within the minute
+            }
+            const CitySample& s = last.back();
+            std::uint32_t people = 0;
+            for (std::size_t k = 0; k < a.classes.size(); ++k) {
+                const auto n = static_cast<std::uint32_t>(std::max(0, s.of_class(k)));
+                a.classes[k] += n;
+                people += n;
+            }
+            a.inhabitants += people;
+            a.peopled += people != 0 ? 1U : 0U;
+            add(a.now, s);
             if (last.size() >= kTrendMinutes) {
                 Finances old;
                 const std::size_t n = last.size() - kTrendMinutes + 1;  // the oldest minutes
@@ -107,9 +137,6 @@ Overview Engine::overview(const AiPlayer& p) const {
         return a;
     };
     o.all = area(std::nullopt);
-    // The army is the player's, not an island's; its trend is not kept (it counts as it is).
-    o.all.now.military = military_cost(p);
-    o.all.before.military = o.all.now.military;
     for (const std::uint16_t island : goods_islands(m_world, p.player)) {
         o.islands.push_back(area(island));
     }
