@@ -666,10 +666,14 @@ rose to citizens where no alcohol or tobacco was made or sold, and five hundred 
 within the hour.
 
 Its colonies give what they make beyond their own use and 20 t to the other cities; only the home
-city keeps ten minutes of its own use. A supply ship goes to the home city while one of its goods
+city keeps ten minutes of its own use. A colony that makes less than it uses still gives what it
+holds beyond ten minutes of its use. A good the computer only buys needs twice the store before a
+class may rise, and the held gate asks for a colony that grows it: partners' Kontors ran empty, and
+the class fell back. When all its ships patrol, the supply takes one under way, the one with the
+fewest cannons: a patrol never waits at the end of a leg long enough to be taken there. A supply ship goes to the home city while one of its goods
 lasts less than ten minutes there, before any colony. A building of 750 gold or more (public
-buildings, the big yard) also leaves five minutes of what the gold loses while the taxes and sales
-do not cover the costs and purchases.
+buildings, the big yard) and a ship order also leave five minutes of what the gold loses while the
+taxes and sales do not cover the costs and purchases.
 
 ## What they get from nowhere
 
