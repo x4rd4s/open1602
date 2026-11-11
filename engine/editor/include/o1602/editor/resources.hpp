@@ -19,7 +19,7 @@ namespace o1602::editor {
 
 /// What the editor puts on an island.
 enum class Resource : std::uint8_t {
-    BigOre,    ///< a big iron vein (240 t), only in a big ore mountain
+    BigOre,    ///< a big iron vein (240 t), in any ore mountain
     SmallOre,  ///< a small iron vein (80 t), in any ore mountain
     Gold,      ///< a gold vein (50 t), in any ore mountain
     Treasure,  ///< a buried treasure (1000 gold) under open ground
@@ -38,7 +38,6 @@ enum class ResourceRefusal : std::uint8_t {
     None,
     NoIsland,    ///< not on an island
     NoMountain,  ///< a vein outside an ore mountain
-    SmallMount,  ///< a big vein in a small mountain
     NoGround,    ///< a treasure not under open ground
     NoForest,    ///< deer not in a forest
     Taken,       ///< the mountain has its vein, the tile its treasure or deer already
