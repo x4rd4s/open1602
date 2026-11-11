@@ -480,7 +480,7 @@ private:
     [[nodiscard]] bool ascent_ready(AiPlayer& p, const City& c, std::size_t k);
     /// The lowest class that needs the public building of slot `def` (0: none from the citizens on).
     [[nodiscard]] std::size_t gate_class(const ComputerSlot& def) const;
-    static constexpr std::uint32_t kAscentStockMinutes = 15;
+    static constexpr std::uint32_t kAscentStockMinutes = 5;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.

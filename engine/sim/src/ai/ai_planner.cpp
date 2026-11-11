@@ -1856,16 +1856,19 @@ std::uint32_t Engine::goods_ahead(PlayerId owner, std::uint8_t w) const {
 
 bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
     // Open1602: an improved rival lets its houses rise into class k only once that class's goods
-    // are ready: each made by its cities for what they use after the rise (goods_ahead), or bought
-    // from a partner with twice the store, and kAscentStockMinutes of what the city will use in
-    // store (at most half its Kontor); food grown for its people. Risen without them, five hundred
-    // citizens left again within the hour, and their taxes with them.
+    // are ready: its cities make at least kAscentMadeShare of what they will use after the rise
+    // (demand_ahead), or a partner sells the good, and the city has kAscentStockMinutes of its use
+    // after the rise in store (at least 10 t, at most a quarter of its Kontor); from the merchants
+    // on a bought good twice that. Its food is not short. Risen without their goods, five hundred
+    // citizens left again within the hour, and their taxes with them; asked for a quarter of an
+    // hour in store of every good and food beyond its use, most home cities waited at the settlers
+    // for the whole game.
     const auto& classes = m_buildings.resident_classes();
     if (k >= classes.size()) {
         return true;
     }
     const std::uint8_t food = m_buildings.food_ware();
-    if (food_short(c) || (supply(c, food) < demand(c, food) && stock_lasts(c, food) < 2ULL * kAscentStockMinutes * 256)) {
+    if (food_short(c)) {
         return false;
     }
     for (const assets::ResidentClass::Need& n : classes[k].needs) {
@@ -1877,14 +1880,23 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         if (use == 0) {
             continue;
         }
-        const std::uint64_t cap = c.capacity / 2;
-        const std::uint64_t store = std::min<std::uint64_t>(std::max<std::uint64_t>(20 * kTon, kAscentStockMinutes * use), cap);
+        const std::uint64_t cap = c.capacity / 4;
+        const std::uint64_t store = std::min<std::uint64_t>(std::max<std::uint64_t>(10 * kTon, kAscentStockMinutes * use), cap);
         if (c.stock(w) < store) {
             return false;
         }
-        if (goods_ahead(p.player, w) != 0) {
+        std::uint64_t used = 0;
+        std::uint64_t made = 0;
+        for (const City& o : m_world.cities()) {
+            if (o.owner == p.player) {
+                used += demand_ahead(o, w);
+                made += supply(o, w);
+            }
+        }
+        if (4 * made < 3 * used) {
             std::uint16_t price = 0;
-            if (!supply_source(p, c.island, w, &price, &c) || c.stock(w) < std::min<std::uint64_t>(2 * store, cap)) {
+            if (!supply_source(p, c.island, w, &price, &c) ||
+                (k > kLockFromClass && c.stock(w) < std::min<std::uint64_t>(2 * store, cap))) {
                 return false;
             }
         }
