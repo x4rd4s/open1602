@@ -273,6 +273,8 @@ annokit::core::Status MapViewer::enter_editor(sim::World world, const std::files
         return annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
                                          "no editor while a multiplayer game runs");
     }
+    // Towers whose building is gone (older maps, the original's scenarios) would hold their island.
+    (void)editor::forget_fallen_towers(world, m_buildings);
     std::unique_ptr<GameState> next;
     try {
         next = make_state(std::move(world), m_options.rules, true);

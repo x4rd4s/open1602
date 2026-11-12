@@ -48,10 +48,16 @@ bool refuse_second_city(const sim::World& world, const sim::BuildOrder& order, s
 
 /// Takes the building covering `tile` of island `island` away, as its owner demolishes it: the
 /// ground comes back, land it held is checked again. A Kontor goes only once its city has no other
-/// building. Fails (NotFound) without a building there and (Unsupported) where it cannot go.
+/// building; a building outside every city (a pier, a tower whose city is gone, a special object)
+/// goes at once. Fails (NotFound) without a building there and (Unsupported) where it cannot go.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_building(const sim::World& world,
                                                                                 const assets::BuildingTable& buildings,
                                                                                 std::uint16_t island,
                                                                                 sim::TilePos tile);
+
+/// Forgets the towers of the world whose building is gone (no tower stands where they name), as the
+/// game does on its next look: maps from older versions and the original's scenarios may keep
+/// them, and they would hold their island as if in use. Returns how many went.
+std::size_t forget_fallen_towers(sim::World& world, const assets::BuildingTable& buildings);
 
 }  // namespace o1602::editor
