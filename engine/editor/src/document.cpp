@@ -2,6 +2,7 @@
 #include "o1602/editor/document.hpp"
 
 #include "o1602/assets/chunk_file.hpp"
+#include "o1602/editor/objects.hpp"
 #include "o1602/editor/operations.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/scenario_data.hpp"
@@ -55,6 +56,7 @@ annokit::core::Result<Document> Document::open(std::span<const std::uint8_t> byt
     if (!world) {
         return world.error();
     }
+    (void)forget_fallen_towers(*world, buildings);
     return Document(std::move(world).value());
 }
 

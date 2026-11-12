@@ -8,8 +8,11 @@
 
 #include "o1602/editor/islands.hpp"
 #include "o1602/editor/special_objects.hpp"
+#include "o1602/sim/island_map.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/ships.hpp"
+#include "o1602/sim/soldier.hpp"
+#include "o1602/sim/world.hpp"
 
 namespace o1602::editor {
 
@@ -37,6 +40,37 @@ bool clear_to_ground(sim::IslandMap& map, const sim::BuildingAt& at) {
         }
     }
     return cleared;
+}
+
+/// Forgets what the game keeps about the building at `at` once the editor cleared its tiles: its
+/// house, production, cost, damage and tower entries.
+void forget_building(sim::World& world, std::uint16_t island, const sim::BuildingAt& at) {
+    const auto x = static_cast<std::uint16_t>(at.origin.x);
+    const auto y = static_cast<std::uint16_t>(at.origin.y);
+    if (world.house(island, x, y) != nullptr) {
+        world.remove_house(island, x, y);
+    }
+    (void)world.remove_production(island, x, y);
+    const auto here = [&](const auto& e) { return e.island == island && e.x == x && e.y == y; };
+    std::erase_if(world.cost_buildings(), here);
+    std::erase_if(world.building_damage(), here);
+    std::erase_if(world.towers(), here);
+}
+
+/// Whether tower `t` names no standing tower: the building at its tile is gone or another.
+bool fallen(const sim::World& world, const assets::BuildingTable& buildings, const sim::Tower& t) {
+    if (t.island >= world.islands().size()) {
+        return true;
+    }
+    const auto b = sim::building_at(world, buildings, t.island, {t.x, t.y});
+    return !b || b->type->prod_kind != assets::prod::kTower || b->origin.x != t.x || b->origin.y != t.y;
+}
+
+/// Forgets the towers of `island` whose building is gone: the game drops them on its next look
+/// (Military::update_towers), the editor at once, so that they do not hold the island.
+void forget_fallen_towers(sim::World& world, const assets::BuildingTable& buildings, std::uint16_t island) {
+    std::erase_if(world.towers(),
+                  [&](const sim::Tower& t) { return t.island == island && fallen(world, buildings, t); });
 }
 
 }  // namespace
@@ -127,13 +161,18 @@ annokit::core::Result<std::unique_ptr<Operation>> remove_building(const sim::Wor
         map.top(static_cast<std::uint32_t>(at->origin.x), static_cast<std::uint32_t>(at->origin.y));
     const std::int32_t k = at->type->kind;
     if ((at->city == sim::MapCell::kNoCity || world.city(island, at->city) == nullptr) &&
-        (k == assets::kind::kPier || is_special(buildings, *at->type))) {
-        // A pier or ruin outside every city (left by a Kontor taken away in an older map), or a
-        // special object (a wild field, an unused building): the ground under it comes back.
+        (k == assets::kind::kPier || is_special(buildings, *at->type) ||
+         sim::territory_building(buildings, *at->type))) {
+        // A pier or ruin outside every city (left by a Kontor taken away in an older map), a
+        // building whose city is gone (a tower of the original's scenarios that stayed when its
+        // city went), or a special object (a wild field, an unused building): the ground under
+        // it comes back.
         sim::World after = world;
         if (!clear_to_ground(after.island(island).map, *at)) {
             return make_error(ErrorCode::Unsupported, "the building cannot be taken away");
         }
+        forget_building(after, island, *at);
+        forget_fallen_towers(after, buildings, island);
         // A growing field grows no more.
         std::erase_if(after.growth().entries, [&](const sim::GrowthEntry& e) {
             return e.island == island && e.x >= at->origin.x && e.y >= at->origin.y &&
@@ -187,7 +226,12 @@ annokit::core::Result<std::unique_ptr<Operation>> remove_building(const sim::Wor
             }
         }
     }
+    forget_fallen_towers(after, buildings, island);
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "building_remove"));
+}
+
+std::size_t forget_fallen_towers(sim::World& world, const assets::BuildingTable& buildings) {
+    return std::erase_if(world.towers(), [&](const sim::Tower& t) { return fallen(world, buildings, t); });
 }
 
 }  // namespace o1602::editor

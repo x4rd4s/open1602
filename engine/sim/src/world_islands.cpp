@@ -50,6 +50,21 @@ const char* use_text(World::IslandUse use) {
     return "";
 }
 
+/// Whether the building of tower `t` still stands on `map`: its tile shows more than its ground.
+bool tower_stands(const IslandMap& map, const Tower& t) {
+    if (!map.contains(t.x, t.y)) {
+        return false;
+    }
+    const MapCell& top = map.top(t.x, t.y);
+    const MapCell& ground = map.ground(t.x, t.y);
+    return top.sprite != ground.sprite || top.rotation != ground.rotation;
+}
+
+/// Forgets the towers listed for island `index`: called once island_use() found none standing there.
+void forget_towers(std::vector<Tower>& towers, std::size_t index) {
+    std::erase_if(towers, [index](const Tower& t) { return t.island == index; });
+}
+
 }  // namespace
 
 World::IslandUse World::island_use(std::size_t index) const {
@@ -68,11 +83,18 @@ World::IslandUse World::island_use(std::size_t index) const {
         })) {
         return IslandUse::Buildings;
     }
-    if (on(m_soldiers) || on(m_towers)) {
+    if (on(m_soldiers)) {
         return IslandUse::Units;
     }
     if (index < m_islands.size()) {
         const IslandMap& map = m_islands[index].map;
+        // A tower's guns count while its building stands; one left in the list after its building
+        // went (older maps, the original's scenarios) holds nothing and goes with the next change.
+        for (const Tower& t : m_towers) {
+            if (t.island == index && tower_stands(map, t)) {
+                return IslandUse::Buildings;
+            }
+        }
         for (std::uint32_t y = 0; y < map.height(); ++y) {
             for (std::uint32_t x = 0; x < map.width(); ++x) {
                 if (map.top(x, y).city != MapCell::kNoCity) {
@@ -207,6 +229,7 @@ annokit::core::Status World::rotate_island(std::size_t index, const assets::Buil
     if (const IslandUse use = island_use(index); use != IslandUse::None) {
         return make_error(ErrorCode::Unsupported, std::string("the island cannot turn: ") + use_text(use));
     }
+    forget_towers(m_towers, index);
     const WorldIsland& old = m_islands[index];
     const IslandMap& from = old.map;
     const std::uint32_t w = from.width();
@@ -322,6 +345,7 @@ annokit::core::Status World::grow_island(std::size_t index, std::uint32_t left, 
     if (const IslandUse use = island_use(index); use != IslandUse::None) {
         return make_error(ErrorCode::Unsupported, std::string("the island cannot grow: ") + use_text(use));
     }
+    forget_towers(m_towers, index);
     const WorldIsland& old = m_islands[index];
     const std::uint32_t w = old.map.width();
     const std::uint32_t h = old.map.height();
@@ -425,6 +449,8 @@ annokit::core::Status World::merge_islands(std::size_t keep, std::size_t other, 
         }
     }
     World after = *this;  // on failure nothing changes
+    forget_towers(after.m_towers, keep);
+    forget_towers(after.m_towers, other);
     const WorldIsland& k0 = after.m_islands[keep];
     const WorldIsland& o0 = after.m_islands[other];
     const std::uint32_t ux0 = std::min(k0.x, o0.x);
@@ -585,6 +611,7 @@ annokit::core::Status World::remove_island(std::size_t index, const assets::Buil
     if (const IslandUse use = island_use(index); use != IslandUse::None) {
         return make_error(ErrorCode::Unsupported, std::string("the island cannot be taken out: ") + use_text(use));
     }
+    forget_towers(m_towers, index);
     const auto i = static_cast<std::uint16_t>(index);
     // Names an island after the one taken out: one place forward.
     const auto shift = [i](std::uint16_t& island) {

@@ -16,6 +16,7 @@
 #include "o1602/assets/cod_parser.hpp"
 #include "o1602/editor/document.hpp"
 #include "o1602/editor/islands.hpp"
+#include "o1602/editor/objects.hpp"
 #include "o1602/sim/validate.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -25,7 +26,8 @@ namespace {
 
 constexpr std::uint32_t kGround = 20101;
 constexpr std::uint32_t kSea = 21201;
-constexpr std::uint32_t kHall = 20701;  // 3 x 2 tiles
+constexpr std::uint32_t kHall = 20701;   // 3 x 2 tiles
+constexpr std::uint32_t kTower = 20305;  // a watchtower, 1 x 1
 
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
@@ -34,6 +36,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
         "  @Nummer: 1\n  Id: 21201\n  Kind: 19\n  Gfx: 1\n  Size: 1, 1\n"
         "  @Nummer: 2\n  Id: 20701\n  Kind: 14\n  Gfx: 10\n  Size: 3, 2\n"
+        "  @Nummer: 3\n  Id: 20305\n  Kind: 6\n  Gfx: 20\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 16\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -572,4 +576,57 @@ TEST_CASE("editor islands: a new island takes no number a placeholder has") {
     REQUIRE(next.has_value());
     CHECK(*next != *free);
     CHECK(std::find(numbers.begin(), numbers.end(), *next) == numbers.end());
+}
+
+TEST_CASE("editor islands: towers whose building is gone hold no island, nor do towers left without a city") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings);
+    world.set_players({sim::Player{sim::PlayerRole::Human, 0, 0, "Merlin"}});
+    sim::IslandMap& map = world.island(0).map;
+    // A tower left standing for nobody (its city gone), and one listed where a hall stands now.
+    REQUIRE(map.place(*buildings.by_id(kTower), 2, 2, 0, 0, 0).ok());
+    REQUIRE(map.place(*buildings.by_id(kHall), 5, 3, 0, 0, 0).ok());
+    for (const auto& [x, y] : {std::pair{2, 2}, std::pair{5, 3}, std::pair{7, 6}}) {
+        sim::Tower t;
+        t.island = 0;
+        t.x = static_cast<std::uint16_t>(x);
+        t.y = static_cast<std::uint16_t>(y);
+        t.owner = 0;
+        world.towers().push_back(t);
+    }
+    CHECK(world.island_use(0) == sim::World::IslandUse::Buildings);
+
+    // The editor forgets the towers that name no tower when it opens a map.
+    CHECK(editor::forget_fallen_towers(world, buildings) == 2);
+    REQUIRE(world.towers().size() == 1);
+    CHECK(world.island_use(0) == sim::World::IslandUse::Buildings);  // the tower still stands
+
+    // The tower outside every city goes with its entry; then the island goes too.
+    auto gone = editor::remove_building(world, buildings, 0, {2, 2});
+    REQUIRE(gone.ok());
+    (*gone)->apply(world);
+    CHECK(world.towers().empty());
+    const sim::IslandMap& cleared = world.islands()[0].map;
+    CHECK(same_tile(cleared.top(2, 2), cleared.ground(2, 2)));
+    CHECK(world.island_use(0) == sim::World::IslandUse::None);
+    auto op = editor::remove_island(world, 0, buildings);
+    REQUIRE(op.ok());
+    (*op)->apply(world);
+    CHECK(world.islands().size() == 1);
+    CHECK(sim::validate(world).ok());
+}
+
+TEST_CASE("editor islands: a tower listed on an island that is taken out goes with it") {
+    const auto buildings = make_buildings();
+    sim::World world = make_world(buildings);
+    sim::Tower stale;  // its building long gone: it holds nothing
+    stale.island = 0;
+    stale.x = 3;
+    stale.y = 3;
+    world.towers().push_back(stale);
+    CHECK(world.island_use(0) == sim::World::IslandUse::None);
+    auto op = editor::remove_island(world, 0, buildings);
+    REQUIRE(op.ok());
+    (*op)->apply(world);
+    CHECK(world.towers().empty());  // not handed to the island that moved into its place
 }
