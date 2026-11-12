@@ -1087,8 +1087,12 @@ std::uint32_t Engine::target_stock(AiPlayer& p, const City& c, std::uint8_t w, s
 }
 
 std::int64_t Engine::supply_slack(AiPlayer& p, const City& c, std::uint8_t w, std::uint32_t target) {
+    // The home city keeps its building materials up to supply_buffer, as before G2a: what it builds
+    // (a yard, a church) waits for them there. Under half the kept stock they count as out, else
+    // they come after every ware that runs out sooner.
+    const bool home_material = building_material(w) && is_home(p, c);
     const std::uint64_t lasts = supply_urgency(c, w, target);
-    if (lasts == kNoUrgency) {
+    if (lasts == kNoUrgency && !home_material) {
         return kNoSlack;
     }
     std::uint16_t price = 0;
@@ -1097,6 +1101,9 @@ std::int64_t Engine::supply_slack(AiPlayer& p, const City& c, std::uint8_t w, st
         return kNoSlack;
     }
     const std::uint32_t seconds = sail_seconds(p, city_point(c), city_point(m_world.cities()[*src]));
+    if (lasts == kNoUrgency) {
+        return c.stock(w) < supply_buffer(target, 2 * seconds) ? -1 : kNoSlack;
+    }
     return Supply::slack(lasts, resupply_minutes(seconds));
 }
 

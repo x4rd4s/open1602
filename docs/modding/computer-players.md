@@ -457,8 +457,10 @@ Improved computers weigh the way at sea:
   cover the horizon yet goes by its producers' rates. A run is due when the cover is shorter than
   a ship from the best source takes to be back: there and back and a minute at each end. Food has
   no rule of its own: it is due like any other ware when it runs out first. Building materials
-  are brought while the stock is under half of what the city keeps (10 t to 40 t by its stage),
-  the further the source the more (a round trip of ten minutes doubles it, at most four times).
+  are brought to a colony while the stock is under half of what the city keeps (10 t to 40 t by
+  its stage), to the home city while it holds less than it keeps, the further the source the more
+  (a round trip of ten minutes doubles it, at most four times): what the home city builds, a yard
+  or a church, waits for them there.
 - **Stock and loads.** A run fills the city up to what it uses beyond what it makes until the next
   run can be back, and one run's load more (half the holds of the computer's ships on average),
   never beyond its Kontor: filled only to the level a run is due at, every run arrived at that
