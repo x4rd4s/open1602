@@ -903,7 +903,11 @@ bool Engine::becomes_colony(const AiPlayer& p, const City* founded, std::uint32_
             large = large || population(o) >= at.ai_colony_large_city;
         }
     }
-    return land < at.ai_colony_below_land || buildings > at.ai_colony_buildings || big_cities > 1 || large;
+    // Open1602: an improved rival settles a colony with land enough for a main city (kGrowFrom)
+    // however many cities it has; the original made every city after its second a colony
+    // without houses, whose land lay empty.
+    const bool room = rivals() && !p.pirates && land >= kGrowFrom;
+    return land < at.ai_colony_below_land || (!room && (buildings > at.ai_colony_buildings || big_cities > 1 || large));
 }
 
 std::int32_t Engine::land_rank(const AiPlayer& p) const {
