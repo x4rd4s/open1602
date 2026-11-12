@@ -730,8 +730,9 @@ private:
     static constexpr std::int64_t kNoSlack = std::numeric_limits<std::int64_t>::max();
     /// Improved computers: the slack of the ware a city needs a run of soonest that no supply ship
     /// brings it yet in the runs it takes (supply_ships_for); of `only` alone when given. Below 0: a
-    /// run is due; kNoSlack for none.
-    [[nodiscard]] std::int64_t supply_due(AiPlayer& p, const City& c, std::uint8_t only = 0);
+    /// run is due; kNoSlack for none. With a free ship (`idle`) also a ware not due yet that is a
+    /// run's worth below what a run fills up to (target_stock).
+    [[nodiscard]] std::int64_t supply_due(AiPlayer& p, const City& c, std::uint8_t only = 0, bool idle = false);
     /// Whether `c` is the computer's home city.
     [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {
         return p.home_valid && c.owner == p.player && c.island == p.home_island && c.index == p.home_city;

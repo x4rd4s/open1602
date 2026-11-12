@@ -455,7 +455,9 @@ Improved computers weigh the way at sea:
   over the budget's horizon (its people, workshops and buildings against what it produced), and
   what its houses will use once they rise is counted too; a young colony whose statistics do not
   cover the horizon yet goes by its producers' rates. A run is due when the cover is shorter than
-  a ship from the best source takes to be back: there and back and a minute at each end. Food has
+  a ship from the best source takes to be back: there and back and a minute at each end. A free
+  ship does not wait for that: it brings a ware that is at least a run's worth (10 t) below what a
+  run fills up to, the one due soonest first, since sailing early costs nothing more. Food has
   no rule of its own: it is due like any other ware when it runs out first. Building materials
   are brought to a colony while the stock is under half of what the city keeps (10 t to 40 t by
   its stage), to the home city while it holds less than it keeps, the further the source the more

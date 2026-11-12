@@ -1123,7 +1123,7 @@ std::vector<std::uint8_t> Engine::wares_by_slack(AiPlayer& p, const City& c) {
     return wares;
 }
 
-std::int64_t Engine::supply_due(AiPlayer& p, const City& c, std::uint8_t only) {
+std::int64_t Engine::supply_due(AiPlayer& p, const City& c, std::uint8_t only, bool idle) {
     const std::vector<std::uint8_t> routed = routed_wares(p, 0, c);
     std::int64_t best = kNoSlack;
     std::uint32_t target = 0;
@@ -1132,14 +1132,21 @@ std::int64_t Engine::supply_due(AiPlayer& p, const City& c, std::uint8_t only) {
             continue;
         }
         const std::int64_t slack = supply_slack(p, c, w, target);
-        if (slack >= 0 || slack >= best) {
+        if (slack == kNoSlack || (slack >= 0 && !idle) || slack >= best) {
             continue;
         }
         std::uint16_t price = 0;
         const auto src = supply_source(p, c.island, w, &price, &c);
-        if (src &&
-            static_cast<std::uint32_t>(std::ranges::count(routed, w)) <
-                supply_ships_for(p, c, w, *src, sail_seconds(p, city_point(c), city_point(m_world.cities()[*src])))) {
+        if (!src) {
+            continue;
+        }
+        const std::uint32_t seconds = sail_seconds(p, city_point(c), city_point(m_world.cities()[*src]));
+        // A free ship brings a ware below what a run fills up to before it is due: sailing early costs
+        // nothing more, and a ship idle until the last moment left no time for delays.
+        if (slack >= 0 && c.stock(w) + kMinSupplyRun > target_stock(p, c, w, seconds, target)) {
+            continue;
+        }
+        if (static_cast<std::uint32_t>(std::ranges::count(routed, w)) < supply_ships_for(p, c, w, *src, seconds)) {
             best = slack;
         }
     }
@@ -1152,13 +1159,14 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     // best source takes to bring more (supply_due), food or any other; the home city when none needs
     // one yet. A colony whose fields had no room left starved with 220 t of food in the home city's
     // Kontor, while the computer's only ship brought cocoa to the home city run after run.
+    // The ship is free: a ware below what a run fills up to counts before it is due (supply_due).
     City* best = &home;
-    std::int64_t best_due = supply_due(p, home);
+    std::int64_t best_due = supply_due(p, home, 0, true);
     for (const City& c : m_world.cities()) {
         if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
             continue;
         }
-        if (const std::int64_t due = supply_due(p, c); due < best_due) {
+        if (const std::int64_t due = supply_due(p, c, 0, true); due < best_due) {
             if (City* to = city(c.island, c.index); to != nullptr) {
                 best = to;
                 best_due = due;
@@ -1199,8 +1207,9 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             if (w == exclude) {
                 continue;
             }
-            if (supply_slack(p, home, w, target) >= 0) {
-                break;  // the wares come due soonest first
+            const std::int64_t slack = supply_slack(p, home, w, target);
+            if (slack == kNoSlack) {
+                break;  // the wares come due soonest first; the rest never runs out or has no source
             }
             std::uint16_t price = 0;
             const auto src = supply_source(p, home.island, w, &price, &home);
@@ -1212,6 +1221,10 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             const auto on_way = static_cast<std::uint32_t>(std::ranges::count(routed, w));
             const std::uint32_t keep = target_stock(p, home, w, seconds, target);
             if (home.stock(w) >= keep || on_way >= supply_ships_for(p, home, w, *src, seconds)) {
+                continue;
+            }
+            // Before it is due a ware comes only for a run's worth (kMinSupplyRun): the ship is free.
+            if (slack >= 0 && home.stock(w) + kMinSupplyRun > keep) {
                 continue;
             }
             const bool own = from.owner == p.player;
