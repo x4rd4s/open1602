@@ -149,7 +149,8 @@ std::int64_t Engine::reserved(const AiPlayer& p) const {
     if (!rivals() || p.pirates) {
         return 0;
     }
-    return p.settle.active || p.settle.ship != 0 ? std::int64_t{colony_money(p)} : 0;
+    // G4b: and from when the colony is planned (colony_plan).
+    return p.settle.active || p.settle.ship != 0 || p.settle.plan_crop != 0 ? std::int64_t{colony_money(p)} : 0;
 }
 
 bool Engine::can_commit(const AiPlayer& p, const Commitment& c, Spend what) const {

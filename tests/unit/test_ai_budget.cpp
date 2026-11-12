@@ -94,4 +94,22 @@ TEST_CASE("ai budget: the low point is checked where the plan begins to pay, not
     CHECK(!b.allows(colony));
 }
 
+TEST_CASE("ai budget: the colony plan takes the passing candidate of the highest rank") {
+    const auto c = [](std::uint8_t crop, bool passes, std::int64_t rank) {
+        ColonyCandidate k;
+        k.crop = crop;
+        k.passes = passes;
+        k.rank = rank;
+        return k;
+    };
+    // The higher rank wins, wherever it stands in the original's order.
+    CHECK(pick_colony({c(47, true, 100), c(50, true, 300), c(46, true, 200)}) == std::optional<std::size_t>{1});
+    // On equal ranks the original's order decides.
+    CHECK(pick_colony({c(47, true, 300), c(50, true, 300)}) == std::optional<std::size_t>{0});
+    // A candidate the budget does not carry is never taken, however high it ranks.
+    CHECK(pick_colony({c(47, false, 900), c(50, true, -50)}) == std::optional<std::size_t>{1});
+    CHECK(!pick_colony({c(47, false, 900)}).has_value());
+    CHECK(!pick_colony({}).has_value());
+}
+
 }  // namespace o1602::sim::ai
