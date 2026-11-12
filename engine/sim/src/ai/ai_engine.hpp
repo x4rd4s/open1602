@@ -471,8 +471,6 @@ private:
     /// shortfall (home_shortfall).
     [[nodiscard]] bool grow_for_home(AiPlayer& p, const City& c, const CityPlan& r);
     static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
-    static constexpr std::uint32_t kSpareKeepMinutes = 10;
-    static constexpr std::uint32_t kHomeFirstMinutes = 10;  ///< supply_destination
     /// Open1602: what class `k` of the city would use more of `w` once half the class below rose
     /// into it, 1/32 t a minute (an improved rival plans its goods ahead of the rise).
     [[nodiscard]] std::uint32_t ascent_extra(const City& c, std::size_t k, std::uint8_t w) const;
@@ -489,7 +487,6 @@ private:
     bool workshop_for(AiPlayer& p, const City& c, std::uint8_t w);
     /// The lowest class that needs the public building of slot `def` (0: none from the citizens on).
     [[nodiscard]] std::size_t gate_class(const ComputerSlot& def) const;
-    static constexpr std::uint32_t kAscentStockMinutes = 5;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
@@ -645,18 +642,15 @@ private:
     std::optional<std::size_t> supply_source(AiPlayer& p, std::uint16_t home_island, std::uint8_t ware,
                                              std::uint16_t* price, const City* to = nullptr);
     bool home_supply_route(AiPlayer& p, Ship& s, City& home);
-    /// Improved computers: how soon a city runs out of a ware a supply ship brings, the lower the
-    /// sooner (stock_lasts); building materials under half the kept stock count as out.
+    /// Improved computers: how soon a city runs out of a ware a supply ship brings, 1/256 minute
+    /// (cover); building materials under half the kept stock `target` count as out.
     /// kNoUrgency for a ware it makes enough of or does not use.
     [[nodiscard]] std::uint64_t supply_urgency(const City& c, std::uint8_t ware, std::uint32_t target) const;
-    /// Improved computers: the urgency of the most urgent ware `c` lacks that no supply ship brings
-    /// it yet and that it can get (kNoUrgency for none); of `only` alone when given.
-    [[nodiscard]] std::uint64_t supply_need(AiPlayer& p, const City& c, std::uint8_t only = 0);
     /// Improved computers: the own city the next supply run goes to: the one that runs out of a
     /// ware soonest, the home city when none does.
     City* supply_destination(AiPlayer& p, City& home);
-    /// Improved computers: whether one of the computer's cities runs out of food within
-    /// kHomeFirstMinutes and a ship could bring it some (supply_need).
+    /// Improved computers: whether one of the computer's cities runs out of food before a ship from
+    /// its best source could bring more (supply_due).
     [[nodiscard]] bool food_runs_out(AiPlayer& p);
     /// The wares the computer's other supply ships (not `ship`) and the trade cart bring to `to`;
     /// for the original's computers to any city.
@@ -698,7 +692,46 @@ private:
     /// window "Warenbilanz" shows it.
     [[nodiscard]] WareView ware_view(const AiPlayer& p, std::uint8_t ware, std::uint32_t minutes,
                                      std::optional<std::uint16_t> island = std::nullopt) const;
-    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home) const;
+    /// `seconds`: the way to the city it gives to; an improved rival keeps what it uses beyond what it
+    /// makes until a ship could be back (resupply_minutes).
+    [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home,
+                                          std::uint32_t seconds = 0) const;
+    /// Improved computers: what a city uses of `w` a minute, its people's use after the rises to come
+    /// (demand_ahead) or, once its statistics cover the budget's horizon, what they show it used up
+    /// by its people, workshops and buildings, whichever is more (1/32 t).
+    [[nodiscard]] std::uint32_t use_rate(const City& c, std::uint8_t w) const;
+    /// Improved computers: what a city makes of `w` a minute, as its statistics show it once they
+    /// cover the horizon, before that by its producers' rates (1/32 t).
+    [[nodiscard]] std::uint32_t made_rate(const City& c, std::uint8_t w) const;
+    /// Improved computers: how long a city's stock of `w` lasts, 1/256 minute (use_rate beyond
+    /// made_rate); kNoUrgency for a ware it makes enough of or does not use.
+    [[nodiscard]] std::uint64_t cover(const City& c, std::uint8_t w) const;
+    /// Improved computers: the minutes until a ship from a source `seconds` away is back with a ware:
+    /// there and back, and a minute at each end for the loading.
+    [[nodiscard]] static std::uint32_t resupply_minutes(std::uint32_t seconds);
+    /// Improved computers: the stock of `w` a run from a source `seconds` away fills a city up to:
+    /// what it uses beyond what it makes until the next run can be back, and what one run brings;
+    /// no more than its Kontor holds.
+    /// Building materials: supply_buffer of `target`.
+    [[nodiscard]] std::uint32_t target_stock(AiPlayer& p, const City& c, std::uint8_t w, std::uint32_t seconds,
+                                             std::uint32_t target);
+    /// Whether `w` is one of the building materials (tools, bricks, wood).
+    [[nodiscard]] bool building_material(std::uint8_t w) const {
+        const auto& m = m_buildings.materials();
+        return w == m.tools || w == m.bricks || w == m.wood;
+    }
+    /// Improved computers: how much sooner a city runs out of `w` than its best source can bring it,
+    /// 1/256 minute (cover less resupply_minutes; below 0: a run is due); kNoSlack for a ware it
+    /// makes enough of or cannot get.
+    /// `target`: what supply_wares keeps of building materials.
+    [[nodiscard]] std::int64_t supply_slack(AiPlayer& p, const City& c, std::uint8_t w, std::uint32_t target);
+    /// Improved computers: the wares a supply ship brings `c`, the one due soonest first (supply_slack).
+    [[nodiscard]] std::vector<std::uint8_t> wares_by_slack(AiPlayer& p, const City& c);
+    static constexpr std::int64_t kNoSlack = std::numeric_limits<std::int64_t>::max();
+    /// Improved computers: the slack of the ware a city needs a run of soonest that no supply ship
+    /// brings it yet in the runs it takes (supply_ships_for); of `only` alone when given. Below 0: a
+    /// run is due; kNoSlack for none.
+    [[nodiscard]] std::int64_t supply_due(AiPlayer& p, const City& c, std::uint8_t only = 0);
     /// Whether `c` is the computer's home city.
     [[nodiscard]] bool is_home(const AiPlayer& p, const City& c) const {
         return p.home_valid && c.owner == p.player && c.island == p.home_island && c.index == p.home_city;
@@ -728,8 +761,8 @@ private:
     /// estimate from the distance and the speed of its first ship.
     [[nodiscard]] std::uint32_t sail_seconds(const AiPlayer& p, std::pair<std::int32_t, std::int32_t> from,
                                              std::pair<std::int32_t, std::int32_t> to);
-    /// Improved computers: the stock a city keeps of a ware that a ship brings `seconds` away: the
-    /// further, the more, so that it lasts until the ship is back.
+    /// Improved computers: the stock a city keeps of a building material that a ship brings
+    /// `seconds` away: the further, the more, so that it lasts until the ship is back.
     [[nodiscard]] static std::uint32_t supply_buffer(std::uint32_t target, std::uint32_t seconds);
     /// Improved computers: the ships the home city's supply takes, by the wares it lacks and how
     /// far they come from.

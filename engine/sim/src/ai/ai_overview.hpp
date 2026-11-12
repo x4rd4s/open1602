@@ -105,4 +105,35 @@ struct Budget {
     [[nodiscard]] Refusal refusal(const Commitment& c) const noexcept;
 };
 
+/// What a computer's supply runs go by (ai_logistics.cpp), for one ware in one city. Rates are 1/32 t
+/// a minute, stocks 1/32 t, cover 1/256 minute.
+struct Supply {
+    static constexpr std::uint64_t kNever = UINT64_MAX;
+    /// The minutes until a ship from a source `seconds` away is back with a ware: there and back,
+    /// and a minute at each end for the loading.
+    [[nodiscard]] static constexpr std::uint32_t resupply_minutes(std::uint32_t seconds) noexcept {
+        return static_cast<std::uint32_t>((2 * std::uint64_t{seconds} + 120 + 59) / 60);
+    }
+    /// How long a stock lasts at what the city uses beyond what it makes; kNever when it makes
+    /// enough or uses none.
+    [[nodiscard]] static constexpr std::uint64_t cover(std::uint32_t stock, std::uint32_t used,
+                                                       std::uint32_t made) noexcept {
+        return used == 0 || made >= used ? kNever : std::uint64_t{stock} * 256 / (used - made);
+    }
+    /// The stock a run fills a city up to: what it uses beyond what it makes until the next run can
+    /// be back, and what one run brings (`load`), so that a run does not arrive at the level the next
+    /// one is due at; never beyond what its Kontor holds.
+    [[nodiscard]] static constexpr std::uint32_t target(std::uint32_t used, std::uint32_t made, std::uint32_t minutes,
+                                                        std::uint32_t load, std::uint32_t capacity) noexcept {
+        const std::uint64_t net = used > made ? used - made : 0;
+        const std::uint64_t want = net * minutes + load;
+        return static_cast<std::uint32_t>(want < capacity ? want : capacity);
+    }
+    /// How much sooner the stock runs out than a run takes, 1/256 minute: below 0 a run is due.
+    [[nodiscard]] static constexpr std::int64_t slack(std::uint64_t cover, std::uint32_t minutes) noexcept {
+        const std::uint64_t c = cover < (std::uint64_t{1} << 62) ? cover : (std::uint64_t{1} << 62);
+        return static_cast<std::int64_t>(c) - static_cast<std::int64_t>(std::uint64_t{minutes} * 256);
+    }
+};
+
 }  // namespace o1602::sim::ai

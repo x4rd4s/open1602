@@ -450,17 +450,29 @@ Improved computers weigh the way at sea:
 - **Sources.** A supply ship fetches from the nearest own city with goods to spare; else from the
   partner with a trade treaty whose price, raised by the time at sea, is lowest (ten minutes away
   count as the price twice).
-- **Stock and loads.** The home city keeps more of a ware the further away it comes from (a round
-  trip of ten minutes doubles the stock it keeps, at most four times as much), and the ship brings
-  what lasts until it is back, up to half its holds per ware.
-- **Which city, which ware.** A supply ship serves the own city with people whose goods run out
-  soonest, the home city first among equals; another city gets only what it runs out of. Of the
-  wares it brings the one that runs out first. A good the people use (food and its chain, cloth,
-  alcohol and the other goods it lacks) keeps being made while the computer is in debt.
+- **When a run is due.** For each ware a city counts how long its stock lasts (its cover): the
+  stock over what the city uses beyond what it makes. Both rates come from the city's statistics
+  over the budget's horizon (its people, workshops and buildings against what it produced), and
+  what its houses will use once they rise is counted too; a young colony whose statistics do not
+  cover the horizon yet goes by its producers' rates. A run is due when the cover is shorter than
+  a ship from the best source takes to be back: there and back and a minute at each end. Food has
+  no rule of its own: it is due like any other ware when it runs out first. Building materials
+  are brought while the stock is under half of what the city keeps (10 t to 40 t by its stage),
+  the further the source the more (a round trip of ten minutes doubles it, at most four times).
+- **Stock and loads.** A run fills the city up to what it uses beyond what it makes until the next
+  run can be back, and one run's load more (half the holds of the computer's ships on average),
+  never beyond its Kontor: filled only to the level a run is due at, every run arrived at that
+  level and the next was due at once. A ship takes at most half its holds per ware.
+- **Which city, which ware.** A supply ship serves the own city with people where a ware falls due
+  soonest against the way its best source takes; the home city when none is due. Of the wares it
+  brings the one due soonest first; a second ware from another source only while the first lasts
+  the longer way by both sources. A good the people use (food and its chain, cloth, alcohol and
+  the other goods it lacks) keeps being made while the computer is in debt.
 - **Ships per route.** Where a ware's source lies far away, several ships run for it: as many as
   the shortfall a minute times the round trip (with two minutes at the Kontors) takes, counted in
-  half holds, at most four per ware. A source counts only for what it can spare: an own city with
-  people only what it makes beyond its own use, keeping 20 t and ten minutes of what it uses; a
+  half holds, at most four per ware. A source counts only for what it can spare: an own city what it
+  holds beyond its reserve (28 t of building materials, else 5 t) and beyond what it uses more than
+  it makes until a ship could be back; a home city that makes less than it uses gives none; a
   partner only what it sells beyond what it keeps and 5 t, less what the computer's ships are
   already on their way to load there; natives only as far as the goodwill pays. No ship sails for
   less than 10 t. When the source makes too little, no further ship sails; the shortfall shows as
@@ -470,7 +482,8 @@ Improved computers weigh the way at sea:
   colonies build food producers or sheep farms for the rest, beyond their own use, and the supply
   ships bring it home. Without a colony that can, the home city founds one.
 - **Fleet.** One ship guards each city; on top come as many ships as the supply takes: half the
-  supply runs its cities need (above), at most eight, and in all at most eight more than its
+  supply runs its cities need (above) for every ware whose cover is shorter than the budget's
+  horizon, so that the fleet grows before the runs fall due, at most eight, and in all at most eight more than its
   cities; none while it is in debt. The target falls
   only after ten minutes of lower needs. A ship is ordered at the yard once the gold covers its
   price (the original's computers order with half of it), or bought as before.
@@ -683,34 +696,29 @@ city it counts what the class would use more once half the class below has risen
 luxury fields for that, keeps that much in its Kontor instead of selling it and brings it with its
 supply runs. The public building that lets houses rise into a class from the citizens on (the
 tavern for the citizens, the bath house and the church for the merchants, the theatre and the
-college for the aristocrats) waits until that class is ready: the city's food is not short, and of
-each good of the class the computer's cities make three quarters of what they will use after the
-rise, or a partner sells it, and the city has five minutes of its use after the rise in store (at
-least 10 t, at most a quarter of its Kontor; from the merchants on twice that for a bought good). A
-good that none of its cities makes and no partner sells it gets from a colony founded for that
+college for the aristocrats) waits until that class is ready: the city's food is not short, and
+each good of the class that the city will use more of after the rise than it makes has a source,
+and the city has in store what it uses beyond what it makes until a ship from that source could be
+back. A good whose way is so long that this does not fit into its Kontor is no source for the
+rise. A good that none of its cities makes and no partner sells it gets from a colony founded for that
 crop when its budget carries it. The rise from pioneers to settlers does
 not wait: the settlers' goods are planned once the first settlers live there. Without this, houses
 rose to citizens where no alcohol or tobacco was made or sold, and five hundred citizens left
 within the hour.
 
-Its colonies give what they make beyond their own use and 20 t to the other cities; only the home
-city keeps ten minutes of its own use. A colony that makes less than it uses still gives what it
-holds beyond ten minutes of its use. A good the computer only buys needs twice the store before a
-class may rise, and the held gate asks for a colony that grows it: partners' Kontors ran empty, and
-the class fell back. When all its ships patrol, the supply takes one under way, the one with the
-fewest cannons: a patrol never waits at the end of a leg long enough to be taken there. A supply ship goes to the home city while one of its goods
-lasts less than ten minutes there, before any colony.
+A colony that makes less than it uses still gives what it holds beyond what lasts it until a ship
+could be back: it held its alcohol in store while the home city ran dry. A held gate for a good the
+computer only buys asks for a colony that grows it: partners' Kontors ran empty, and the class fell
+back. When all its ships patrol, the supply takes one under way, the one with the
+fewest cannons: a patrol never waits at the end of a leg long enough to be taken there.
 
 An improved computer's home city is the one the original would choose (the last with ten citizens,
 unless a later one has more free land), but only among its cities where 50 people live, once it has
 one; a city reaching a new stage does not take it over. By the original's rule a new colony with
 much free land became the home while nobody lived there yet, and the capital's food went there.
 Its colonies grow the home city's food as soon as its pastures or its fields have no room left, not
-only once both have none. A supply run goes first to a city whose food runs out within ten minutes
-while the home city's own food lasts; food counts as running out while the city makes less than a
-quarter beyond what it eats, and a food run brings ten minutes of what the city eats (at most half
-its Kontor) straight there, without a second ware from elsewhere. Its only ship does not leave to
-found a city while a city runs out of food. A city gives a ware to another of its cities only when
+only once both have none. Its only ship does not leave to found a city while a city's food runs
+out before a ship from its best source could bring more. A city gives a ware to another of its cities only when
 it does not use more of it than it makes while the other makes more, and no ship brings it the same
 ware: the goods went back and forth between two cities a minute apart. A good of a class
 whose gate is held that the city can work from its store (the tailor's clothes from cloth) gets its

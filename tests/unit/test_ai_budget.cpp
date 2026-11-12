@@ -94,4 +94,41 @@ TEST_CASE("ai budget: the low point is checked where the plan begins to pay, not
     CHECK(!b.allows(colony));
 }
 
+// The improved computers' supply runs (ai_overview.hpp Supply, ai_logistics.cpp): a ware is due when
+// its stock runs out before a ship from its best source could be back, and a run fills it up to that
+// and what one run brings.
+
+TEST_CASE("ai supply: a run takes the way there and back and a minute at each end") {
+    CHECK(Supply::resupply_minutes(0) == 2);
+    CHECK(Supply::resupply_minutes(60) == 4);
+    // 2 * 100 + 120 seconds are five minutes and a third: the ship is back in the sixth.
+    CHECK(Supply::resupply_minutes(100) == 6);
+}
+
+TEST_CASE("ai supply: a stock lasts by what the city uses beyond what it makes") {
+    constexpr std::uint32_t kT = 32;
+    // 40 t at 4 t used and 2 t made a minute last 20 minutes.
+    CHECK(Supply::cover(40 * kT, 4 * kT, 2 * kT) == 20 * 256);
+    // A city that makes as much as it uses, or uses none, never runs out.
+    CHECK(Supply::cover(0, 4 * kT, 4 * kT) == Supply::kNever);
+    CHECK(Supply::cover(0, 0, 0) == Supply::kNever);
+    CHECK(Supply::cover(0, 4 * kT, 0) == 0);
+}
+
+TEST_CASE("ai supply: a run fills up to what lasts until the next can be back, and one load more") {
+    constexpr std::uint32_t kT = 32;
+    // 2 t short a minute, ten minutes for a run, 20 t a load: 40 t.
+    CHECK(Supply::target(4 * kT, 2 * kT, 10, 20 * kT, 200 * kT) == 40 * kT);
+    // A city that makes enough is filled by one load only.
+    CHECK(Supply::target(2 * kT, 4 * kT, 10, 20 * kT, 200 * kT) == 20 * kT);
+    // Never beyond the Kontor.
+    CHECK(Supply::target(20 * kT, 0, 30, 20 * kT, 100 * kT) == 100 * kT);
+}
+
+TEST_CASE("ai supply: a run is due when the stock lasts less than the run takes") {
+    CHECK(Supply::slack(10 * 256, 6) == 4 * 256);
+    CHECK(Supply::slack(5 * 256, 6) == -256);
+    CHECK(Supply::slack(Supply::kNever, 6) > 0);
+}
+
 }  // namespace o1602::sim::ai
