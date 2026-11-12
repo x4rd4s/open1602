@@ -1338,21 +1338,19 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
     if (s.plan_crop != 0) {
         b.reserved -= colony_money(p);
     }
-    std::optional<std::uint8_t> best;
-    std::int64_t best_rank = 0;
+    std::vector<ColonyCandidate> weighed;
     bool plan_holds = false;
     for (const std::uint8_t crop : crops) {
-        const std::uint8_t as = crop == kAnyCrop ? std::uint8_t{0} : crop;
-        if (b.refusal(colony_commitment(p, as)) != Refusal::None) {
-            continue;
-        }
-        plan_holds = plan_holds || crop == s.plan_crop;
-        const std::int64_t rank = colony_rank(p, crop);
-        if (!best || rank > best_rank) {
-            best = crop;
-            best_rank = rank;
-        }
+        ColonyCandidate c;
+        c.crop = crop;
+        c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
+        c.rank = c.passes ? colony_rank(p, crop) : 0;
+        plan_holds = plan_holds || (c.passes && crop == s.plan_crop);
+        weighed.push_back(c);
     }
+    const std::optional<std::size_t> pick = pick_colony(weighed);
+    const std::optional<std::uint8_t> best = pick ? std::optional<std::uint8_t>{weighed[*pick].crop} : std::nullopt;
+    const std::int64_t best_rank = pick ? weighed[*pick].rank : 0;
     if (!best || (!asked && !plan_holds)) {
         clear();
         return;
