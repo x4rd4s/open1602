@@ -460,6 +460,10 @@ private:
     /// The selected ship's holds for the page "Cargo".
     void editor_ship_model(EditorModel& m) const;
     void editor_ship_request(const EditorRequest& request);
+    void editor_unit_model(EditorModel& m) const;
+    void editor_unit_request(const EditorRequest& request);
+    /// The selected unit's patrol to world tile `tile` (the map's click after "Patrol").
+    void editor_set_patrol(const render::TilePos& tile);
     /// The humans' and computers' slots on the page "Players".
     void editor_players_model(EditorModel& m) const;
     /// A slot changed, added or taken away (EditorRequest SetPlayer, AddPlayer, RemovePlayer).
@@ -910,6 +914,8 @@ private:
             EditorPanel::Page page = EditorPanel::Page::Islands;  ///< leaving it puts the island back
         };
         std::optional<Placing> placing{};
+        /// The land unit whose patrol the map's next click sets (the page "Selection").
+        std::optional<std::uint32_t> patrol_for{};
         EditorTerrain terrain{};  ///< the terrain tools' settings
         /// A stroke of the brush being drawn, where it laid last and the last piece of several
         /// tiles laid (its world tile).

@@ -198,6 +198,8 @@ constexpr Id kFirstRouteMode = 1090;      ///< + the entry: loads or unloads
 constexpr Id kFirstRouteLess = 1100;      ///< + the entry: fewer tons
 constexpr Id kFirstRouteMore = 1110;      ///< + the entry: more tons
 constexpr std::size_t kRouteEntries = 8;  ///< entries of a stop the page shows at most
+constexpr Id kUnitPatrol = 1130;          ///< the selected unit's patrol: where to, on the map
+constexpr Id kUnitPatrolOff = 1131;       ///< the selected unit's patrol ended
 constexpr Id kPlayerTable = 300;          ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
@@ -1202,7 +1204,9 @@ void EditorPanel::layout_selection(const EditorModel& model) {
         f.paragraph(Rect{m_x, y, m_w, 2 * kLine}, model.selection, Tone::Normal, kLine);
         y += 2 * kLine + 4;
         // Room for the buttons below: back, and an island's three rows, a city's three or a ship's one.
-        const std::int32_t rows = model.island || model.placeholder || model.city ? 4 : model.ship ? 2 : 1;
+        const std::int32_t rows = model.island || model.placeholder || model.city ? 4
+                                  : model.ship || model.unit                      ? 2
+                                                                                  : 1;
         const std::int32_t bottom = m_top + m_height - rows * (kButtonH + kGap) - kGap;
         for (const EditorProperty& p : model.properties) {
             if (y + kLine > bottom) {
@@ -1232,6 +1236,13 @@ void EditorPanel::layout_selection(const EditorModel& model) {
                      !model.ship->holds.empty() && !model.ship->wares.empty());
             f.button(kShipRoutePage, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.ship.route"),
                      model.ship->route_targets.size() > 1);
+            y += kButtonH + kGap;
+        } else if (model.unit) {
+            const std::int32_t half = (m_w - kGap) / 2;
+            f.button(kUnitPatrol, Rect{m_x, y, half, kButtonH}, ui::tr("editor.unit.patrol"), true,
+                     model.unit->picking);
+            f.button(kUnitPatrolOff, Rect{m_x + half + kGap, y, half, kButtonH}, ui::tr("editor.unit.patrol_off"),
+                     model.unit->patrol);
             y += kButtonH + kGap;
         }
     }
@@ -3597,6 +3608,16 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kShipCargoPage:
             m_page = Page::ShipCargo;
             return std::nullopt;
+        case kUnitPatrol:
+            if (!model.unit) {
+                return std::nullopt;
+            }
+            return EditorRequest{EditorRequest::Kind::UnitPatrol};
+        case kUnitPatrolOff:
+            if (!model.unit || !model.unit->patrol) {
+                return std::nullopt;
+            }
+            return EditorRequest{EditorRequest::Kind::UnitPatrolOff};
         case kShipRoutePage:
             m_page = Page::ShipRoute;
             m_route_stop = 0;

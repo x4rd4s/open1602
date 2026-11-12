@@ -292,6 +292,12 @@ struct EditorShip {
     bool route_active = false;           ///< the route runs from the game's start
 };
 
+/// A land unit selected (the page "Selection"): its patrol.
+struct EditorUnit {
+    bool patrol = false;   ///< it patrols from the game's start
+    bool picking = false;  ///< the map's next click sets where its patrol goes
+};
+
 /// A human's or computer's slot as the page "Players" shows it.
 struct EditorPlayer {
     std::uint8_t slot = 0;  ///< sim::PlayerId
@@ -505,6 +511,8 @@ struct EditorModel {
     std::optional<EditorCity> city;
     /// The ship selected (the page "Selection"), its holds.
     std::optional<EditorShip> ship;
+    /// The land unit selected (the page "Selection"), its patrol.
+    std::optional<EditorUnit> unit;
     /// The humans' and computers' slots (the page "Players"), in the order of the slots; whether
     /// another can be added and the last taken away.
     std::vector<EditorPlayer> player_slots;
@@ -593,6 +601,8 @@ struct EditorRequest {
         ShipCargo,       ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
         /// The selected ship's route: `route` says what changes.
         ShipRoute,
+        UnitPatrol,     ///< the map's next click sets where the selected unit patrols to
+        UnitPatrolOff,  ///< the selected unit patrols no more
         /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is.

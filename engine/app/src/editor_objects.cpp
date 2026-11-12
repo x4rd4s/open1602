@@ -667,6 +667,54 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
     m.ship = std::move(ship);
 }
 
+void MapViewer::editor_unit_model(EditorModel& m) const {
+    if (m_editor->pick.kind != EditorPick::Kind::Soldier) {
+        return;
+    }
+    const sim::Soldier* s = m_editor->document.world().soldier(m_editor->pick.id);
+    if (s == nullptr) {
+        return;
+    }
+    EditorUnit unit;
+    unit.patrol = s->patrol.active;
+    unit.picking = m_editor->patrol_for == s->id;
+    m.unit = unit;
+}
+
+void MapViewer::editor_unit_request(const EditorRequest& request) {
+    if (m_editor->pick.kind != EditorPick::Kind::Soldier ||
+        m_editor->document.world().soldier(m_editor->pick.id) == nullptr) {
+        return;
+    }
+    if (request.kind == EditorRequest::Kind::UnitPatrol) {
+        if (m_editor->patrol_for) {
+            m_editor->patrol_for.reset();  // the button again: no patrol set after all
+            m_editor->notice.clear();
+            return;
+        }
+        m_editor->placing.reset();
+        m_editor->patrol_for = m_editor->pick.id;
+        editor_notice(ui::tr("editor.unit.patrol_pick"), false, "choosing where a unit patrols to");
+        return;
+    }
+    m_editor->patrol_for.reset();
+    if (editor_perform(editor::stop_patrol(m_editor->document.world(), m_editor->pick.id))) {
+        editor_notice(ui::tr("editor.unit.patrol_ended"), false, "patrol ended");
+    }
+}
+
+void MapViewer::editor_set_patrol(const render::TilePos& tile) {
+    const std::uint32_t id = *m_editor->patrol_for;
+    m_editor->patrol_for.reset();
+    auto op = editor::set_patrol(m_editor->document.world(), m_buildings, id, tile.x, tile.y);
+    if (!op) {
+        editor_notice(ui::tr("editor.unit.patrol_refused"), true, op.error().message);
+        return;
+    }
+    m_editor->document.perform(std::move(op).value());
+    editor_notice(ui::tr("editor.unit.patrol_set"), false, "patrol set");
+}
+
 std::vector<sim::Target> MapViewer::editor_route_targets(const sim::Ship& ship) const {
     // A ship's: every city with a Kontor; a cart's: those of its island, as the game's route window.
     const sim::World& world = m_editor->document.world();
