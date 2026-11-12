@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "o1602/editor/islands.hpp"
 #include "o1602/editor/scenario_rules.hpp"
@@ -106,6 +107,66 @@ UnitRefusal ship_fits(const sim::World& world, const assets::BuildingTable& buil
     return UnitRefusal::None;
 }
 
+namespace {
+
+/// Whether a soldier walks on world tile (x, y) as the game's land paths see it.
+bool walks_on(const sim::LandMap& land, std::int32_t x, std::int32_t y) {
+    return land.tile(x, y, 0, nullptr) == sim::LandMap::Cell::Walk;
+}
+
+/// Whether a soldier on world tile (x, y) can step off it: one of the four tiles beside it is
+/// ground it walks on. A step across a corner needs both tiles beside it free, as in the game.
+bool can_leave(const sim::LandMap& land, std::int32_t x, std::int32_t y) {
+    return walks_on(land, x + 1, y) || walks_on(land, x - 1, y) || walks_on(land, x, y + 1) || walks_on(land, x, y - 1);
+}
+
+/// Whether a soldier finds a way from world tile `from` to `to` on the island they lie on, by the
+/// game's rules: tiles it walks on, no corner cut past a tile it does not.
+bool way_between(const sim::World& world, const sim::LandMap& land, std::uint32_t fx, std::uint32_t fy,
+                 std::uint32_t tx, std::uint32_t ty) {
+    const std::uint16_t index = world.cell(fx, fy).island;
+    if (index == sim::World::kSea || index >= world.islands().size() || world.cell(tx, ty).island != index) {
+        return false;
+    }
+    const sim::WorldIsland& island = world.islands()[index];
+    const std::int32_t x0 = static_cast<std::int32_t>(island.x);
+    const std::int32_t y0 = static_cast<std::int32_t>(island.y);
+    const std::int32_t w = static_cast<std::int32_t>(island.map.width());
+    const std::int32_t h = static_cast<std::int32_t>(island.map.height());
+    const auto at = [&](std::int32_t x, std::int32_t y) {
+        return static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x - x0);
+    };
+    const auto inside = [&](std::int32_t x, std::int32_t y) { return x >= x0 && y >= y0 && x < x0 + w && y < y0 + h; };
+    std::vector<bool> seen(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), false);
+    std::vector<std::pair<std::int32_t, std::int32_t>> open;
+    open.emplace_back(static_cast<std::int32_t>(fx), static_cast<std::int32_t>(fy));
+    seen[at(open.back().first, open.back().second)] = true;
+    while (!open.empty()) {
+        const auto [x, y] = open.back();
+        open.pop_back();
+        if (x == static_cast<std::int32_t>(tx) && y == static_cast<std::int32_t>(ty)) {
+            return true;
+        }
+        for (std::int32_t dy = -1; dy <= 1; ++dy) {
+            for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                const std::int32_t nx = x + dx;
+                const std::int32_t ny = y + dy;
+                if ((dx == 0 && dy == 0) || !inside(nx, ny) || seen[at(nx, ny)] || !walks_on(land, nx, ny)) {
+                    continue;
+                }
+                if (dx != 0 && dy != 0 && (!walks_on(land, nx, y) || !walks_on(land, x, ny))) {
+                    continue;  // no corner cut
+                }
+                seen[at(nx, ny)] = true;
+                open.emplace_back(nx, ny);
+            }
+        }
+    }
+    return false;
+}
+
+}  // namespace
+
 UnitRefusal unit_fits(const sim::World& world, const assets::BuildingTable& buildings, std::int64_t x, std::int64_t y) {
     if (!on_map(world, x, y)) {
         return UnitRefusal::Outside;
@@ -117,6 +178,9 @@ UnitRefusal unit_fits(const sim::World& world, const assets::BuildingTable& buil
     const assets::BuildingType* ground = land.building(ix, iy);
     if (land.island_at(ix, iy) == sim::World::kSea || (ground != nullptr && !sim::soldiers_walk_on(*ground))) {
         return UnitRefusal::NoGround;
+    }
+    if (!can_leave(land, ix, iy)) {
+        return UnitRefusal::ShutIn;  // it could never move
     }
     for (const sim::Soldier& s : world.soldiers()) {
         if (s.pos_x / sim::kPosUnit == ix && s.pos_y / sim::kPosUnit == iy) {
@@ -354,8 +418,10 @@ annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& w
         return make_error(ErrorCode::NotFound, "no such unit");
     }
     UnitRefusal refused = unit_fits(world, buildings, x, y);
-    if (refused == UnitRefusal::Taken) {
-        refused = UnitRefusal::None;  // another unit standing there now does not keep this one away
+    if (refused == UnitRefusal::Taken || refused == UnitRefusal::ShutIn) {
+        // Another unit standing there now does not keep this one away; whether it gets there at
+        // all the way below tells.
+        refused = UnitRefusal::None;
     }
     if (refused != UnitRefusal::None) {
         return make_error(ErrorCode::InvalidFormat, refusal_name(refused));
@@ -369,6 +435,11 @@ annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& w
     }
     if (sx == ux && sy == uy) {
         return make_error(ErrorCode::InvalidFormat, "where the unit stands");
+    }
+    sim::LandMap land;
+    land.rebuild(world, buildings);
+    if (!way_between(world, land, sx, sy, ux, uy)) {
+        return make_error(ErrorCode::Unsupported, "no way there");
     }
     sim::World after = world;
     sim::Soldier& s = *after.soldier(id);
@@ -424,6 +495,8 @@ const char* refusal_name(UnitRefusal refusal) noexcept {
             return "no Kontor or market of its owner within reach";
         case UnitRefusal::CartLimit:
             return "no further cart for its owner on the island";
+        case UnitRefusal::ShutIn:
+            return "no way off the tile";
     }
     return "unknown";
 }
