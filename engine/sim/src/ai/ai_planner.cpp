@@ -1947,7 +1947,9 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         }
         const std::uint32_t seconds = sail_seconds(p, city_point(c), city_point(m_world.cities()[*src]));
         const std::uint64_t store = Supply::rise_stock(use, added, made, resupply_minutes(seconds));
-        if (store > c.capacity || c.stock(w) < store) {
+        // What the computer's ships already have on board for the city counts: a city whose runs are
+        // flowing need not wait for a full store. Not what they are yet to load: it may not come.
+        if (store > c.capacity || std::uint64_t{c.stock(w)} + inbound(p, 0, c, w, true) < store) {
             return false;
         }
     }

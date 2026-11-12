@@ -457,7 +457,9 @@ Improved computers weigh the way at sea:
   cover the horizon yet goes by its producers' rates. A run is due when the cover is shorter than
   a ship from the best source takes to be back: there and back and a minute at each end. A free
   ship does not wait for that: it brings a ware that is at least a run's worth (10 t) below what a
-  run fills up to, the one due soonest first, since sailing early costs nothing more. Food has
+  run fills up to, the one due soonest first, since sailing early costs nothing more. What the
+  computer's other ships are bringing the city counts to its stock: a ware they fill up already
+  gets no further run. Food has
   no rule of its own: it is due like any other ware when it runs out first. Building materials
   are brought to a colony while the stock is under half of what the city keeps (10 t to 40 t by
   its stage), to the home city while it holds less than it keeps, the further the source the more
@@ -475,8 +477,9 @@ Improved computers weigh the way at sea:
 - **Ships per route.** Where a ware's source lies far away, several ships run for it: as many as
   the shortfall a minute times the round trip (with two minutes at the Kontors) takes, counted in
   half holds, at most four per ware. A source counts only for what it can spare: an own city what it
-  holds beyond its reserve (28 t of building materials, else 5 t) and beyond what it uses more than
-  it makes until a ship could be back; a home city that makes less than it uses gives none; a
+  holds beyond its reserve (28 t of building materials, else 5 t) and, where it uses more than it
+  makes itself, beyond what a run would fill it up to: a colony that gave its food away while its
+  own deficit grew starved; a home city that makes less than it uses gives none; a
   partner only what it sells beyond what it keeps and 5 t, less what the computer's ships are
   already on their way to load there; natives only as far as the goodwill pays. No ship sails for
   less than 10 t. When the source makes too little, no further ship sails; the shortfall shows as
@@ -704,8 +707,8 @@ tavern for the citizens, the bath house and the church for the merchants, the th
 college for the aristocrats) waits until that class is ready: the city's food is not short, and
 each good of the class that the city will use more of after the rise than it makes has a source,
 and the city has in store what it uses beyond what it makes until a ship from that source could be
-back. A good whose way is so long that this does not fit into its Kontor is no source for the
-rise. A good that none of its cities makes and no partner sells it gets from a colony founded for that
+back; what the computer's ships have on board for it counts, what they are yet to load does not.
+A good whose way is so long that this does not fit into its Kontor is no source for the rise. A good that none of its cities makes and no partner sells it gets from a colony founded for that
 crop when its budget carries it. The rise from pioneers to settlers does
 not wait: the settlers' goods are planned once the first settlers live there. Without this, houses
 rose to citizens where no alcohol or tobacco was made or sold, and five hundred citizens left
