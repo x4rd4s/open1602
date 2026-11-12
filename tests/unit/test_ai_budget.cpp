@@ -94,4 +94,64 @@ TEST_CASE("ai budget: the low point is checked where the plan begins to pay, not
     CHECK(!b.allows(colony));
 }
 
+// The improved computers' supply runs (ai_overview.hpp Supply, ai_logistics.cpp): a ware is due when
+// its stock runs out before a ship from its best source could be back, and a run fills it up to that
+// and what one run brings.
+
+TEST_CASE("ai supply: a run takes the way there and back and a minute at each end") {
+    CHECK(Supply::resupply_minutes(0) == 2);
+    CHECK(Supply::resupply_minutes(60) == 4);
+    // 2 * 100 + 120 seconds are five minutes and a third: the ship is back in the sixth.
+    CHECK(Supply::resupply_minutes(100) == 6);
+}
+
+TEST_CASE("ai supply: a stock lasts by what the city uses beyond what it makes") {
+    constexpr std::uint32_t kT = 32;
+    // 40 t at 4 t used and 2 t made a minute last 20 minutes.
+    CHECK(Supply::cover(40 * kT, 4 * kT, 2 * kT) == 20 * 256);
+    // A city that makes as much as it uses, or uses none, never runs out.
+    CHECK(Supply::cover(0, 4 * kT, 4 * kT) == Supply::kNever);
+    CHECK(Supply::cover(0, 0, 0) == Supply::kNever);
+    CHECK(Supply::cover(0, 4 * kT, 0) == 0);
+}
+
+TEST_CASE("ai supply: a run fills up to what lasts until the next can be back, and one load more") {
+    constexpr std::uint32_t kT = 32;
+    // 2 t short a minute, ten minutes for a run, 20 t a load: 40 t.
+    CHECK(Supply::target(4 * kT, 2 * kT, 10, 20 * kT, 200 * kT) == 40 * kT);
+    // A city that makes enough is filled by one load only.
+    CHECK(Supply::target(2 * kT, 4 * kT, 10, 20 * kT, 200 * kT) == 20 * kT);
+    // Never beyond the Kontor.
+    CHECK(Supply::target(20 * kT, 0, 30, 20 * kT, 100 * kT) == 100 * kT);
+}
+
+TEST_CASE("ai supply: a run is due when the stock lasts less than the run takes") {
+    CHECK(Supply::slack(10 * 256, 6) == 4 * 256);
+    CHECK(Supply::slack(5 * 256, 6) == -256);
+    CHECK(Supply::slack(Supply::kNever, 6) > 0);
+}
+
+TEST_CASE("ai supply: a class nobody can rise into yet needs no source for its goods") {
+    constexpr std::uint32_t kT = 32;
+    // Nobody lives in the class below, nobody uses the good: the gate stays open without a source.
+    CHECK(!Supply::rise_needs_source(0, 0, 0));
+    CHECK(Supply::rise_stock(0, 0, 0, 10) == 0);
+    // Half the class below rising adds 2 t a minute the city does not make: a source is needed, and
+    // ten minutes of it in store.
+    CHECK(Supply::rise_needs_source(0, 2 * kT, 0));
+    CHECK(Supply::rise_stock(0, 2 * kT, 0, 10) == 20 * kT);
+    // A city that makes enough for its people after the rise needs none.
+    CHECK(!Supply::rise_needs_source(1 * kT, 2 * kT, 3 * kT));
+}
+
+TEST_CASE("ai supply: a city short of a ware itself gives only while it runs out no sooner than the taker") {
+    constexpr std::uint32_t kT = 32;
+    // Both 2 t short a minute, 100 t against 20 t: 40 t evens them out at 60 t each.
+    CHECK(Supply::share(100 * kT, 2 * kT, 20 * kT, 2 * kT, 10) == 40 * kT);
+    // A giver that runs out sooner than the taker gives nothing: the starving colony keeps its food.
+    CHECK(Supply::share(20 * kT, 4 * kT, 100 * kT, 1 * kT, 10) == 0);
+    // A taker that makes enough: the giver keeps what lasts it until a run is back.
+    CHECK(Supply::share(100 * kT, 2 * kT, 0, 0, 10) == 80 * kT);
+}
+
 }  // namespace o1602::sim::ai

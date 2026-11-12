@@ -1914,13 +1914,11 @@ std::uint32_t Engine::goods_ahead(PlayerId owner, std::uint8_t w) const {
 
 bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
     // Open1602: an improved rival lets its houses rise into class k only once that class's goods
-    // are ready: its cities make at least kAscentMadeShare of what they will use after the rise
-    // (demand_ahead), or a partner sells the good, and the city has kAscentStockMinutes of its use
-    // after the rise in store (at least 10 t, at most a quarter of its Kontor); from the merchants
-    // on a bought good twice that. Its food is not short. Risen without their goods, five hundred
-    // citizens left again within the hour, and their taxes with them; asked for a quarter of an
-    // hour in store of every good and food beyond its use, most home cities waited at the settlers
-    // for the whole game.
+    // are ready: for each good the city makes less of than it will use after the rise
+    // (demand_ahead), it can get it and has in store what it uses beyond what it makes until a ship
+    // from its best source could be back (resupply_minutes). A good whose way is so long that this
+    // does not fit into its Kontor is no source for the rise. Its food is not short. Risen without
+    // their goods, five hundred citizens left again within the hour, and their taxes with them.
     const auto& classes = m_buildings.resident_classes();
     if (k >= classes.size()) {
         return true;
@@ -1934,32 +1932,25 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         if (w == food) {
             continue;
         }
-        const std::uint64_t use = std::uint64_t{demand(c, w)} + ascent_extra(c, k, w);
-        if (use == 0) {
+        // What the city will use after this rise: its people's use now and what the risers add
+        // (Supply::rise_needs_source).
+        const std::uint32_t use = demand(c, w);
+        const std::uint32_t added = ascent_extra(c, k, w);
+        const std::uint32_t made = made_rate(c, w);
+        if (!Supply::rise_needs_source(use, added, made)) {
             continue;
         }
-        const std::uint64_t cap = c.capacity / 4;
-        const std::uint64_t store =
-            std::min<std::uint64_t>(std::max<std::uint64_t>(10 * kTon, kAscentStockMinutes * use), cap);
-        if (c.stock(w) < store) {
+        std::uint16_t price = 0;
+        const auto src = supply_source(p, c.island, w, &price, &c);
+        if (!src) {
             return false;
         }
-        std::uint64_t used = 0;
-        std::uint64_t made = 0;
-        for (const City& o : m_world.cities()) {
-            if (o.owner == p.player) {
-                used += demand_ahead(o, w);
-                made += supply(o, w);
-            }
-        }
-        if (4 * made < 3 * used) {
-            std::uint16_t price = 0;
-            // A good it makes none of needs twice the store (partners stopped selling, and their
-            // runs came back empty) and is asked of a colony too (source_missing).
-            if (!supply_source(p, c.island, w, &price, &c) ||
-                ((k > kLockFromClass || made == 0) && c.stock(w) < std::min<std::uint64_t>(2 * store, cap))) {
-                return false;
-            }
+        const std::uint32_t seconds = sail_seconds(p, city_point(c), city_point(m_world.cities()[*src]));
+        const std::uint64_t store = Supply::rise_stock(use, added, made, resupply_minutes(seconds));
+        // What the computer's ships already have on board for the city counts: a city whose runs are
+        // flowing need not wait for a full store. Not what they are yet to load: it may not come.
+        if (store > c.capacity || std::uint64_t{c.stock(w)} + inbound(p, 0, c, w, true) < store) {
+            return false;
         }
     }
     return true;

@@ -105,4 +105,66 @@ struct Budget {
     [[nodiscard]] Refusal refusal(const Commitment& c) const noexcept;
 };
 
+/// What a computer's supply runs go by (ai_logistics.cpp), for one ware in one city. Rates are 1/32 t
+/// a minute, stocks 1/32 t, cover 1/256 minute.
+struct Supply {
+    static constexpr std::uint64_t kNever = UINT64_MAX;
+    /// The minutes until a ship from a source `seconds` away is back with a ware: there and back,
+    /// and a minute at each end for the loading.
+    [[nodiscard]] static constexpr std::uint32_t resupply_minutes(std::uint32_t seconds) noexcept {
+        return static_cast<std::uint32_t>((2 * std::uint64_t{seconds} + 120 + 59) / 60);
+    }
+    /// How long a stock lasts at what the city uses beyond what it makes; kNever when it makes
+    /// enough or uses none.
+    [[nodiscard]] static constexpr std::uint64_t cover(std::uint32_t stock, std::uint32_t used,
+                                                       std::uint32_t made) noexcept {
+        return used == 0 || made >= used ? kNever : std::uint64_t{stock} * 256 / (used - made);
+    }
+    /// The stock a run fills a city up to: what it uses beyond what it makes until the next run can
+    /// be back, and what one run brings (`load`), so that a run does not arrive at the level the next
+    /// one is due at; never beyond what its Kontor holds.
+    [[nodiscard]] static constexpr std::uint32_t target(std::uint32_t used, std::uint32_t made, std::uint32_t minutes,
+                                                        std::uint32_t load, std::uint32_t capacity) noexcept {
+        const std::uint64_t net = used > made ? used - made : 0;
+        const std::uint64_t want = net * minutes + load;
+        return static_cast<std::uint32_t>(want < capacity ? want : capacity);
+    }
+    /// What a city short of a ware itself (`given`, `given_net` a minute beyond what it makes) can
+    /// give another (`taken`, `taken_net`) so that afterwards it runs out no sooner than the other
+    /// against a run of `minutes`: whoever would run out sooner gets the goods. 0 when it would.
+    [[nodiscard]] static constexpr std::uint64_t share(std::uint32_t given, std::uint32_t given_net,
+                                                       std::uint32_t taken, std::uint32_t taken_net,
+                                                       std::uint32_t minutes) noexcept {
+        // (given - x) / given_net - minutes >= (taken + x) / taken_net - minutes, solved for x;
+        // a taker that makes enough keeps the giver at what lasts it until a run is back.
+        const std::int64_t g = given;
+        const std::int64_t gn = given_net;
+        const std::int64_t t = taken;
+        const std::int64_t tn = taken_net;
+        const std::int64_t m = minutes;
+        const std::int64_t x = tn == 0 ? g - gn * m : (tn * (g - gn * m) - gn * (t - tn * m)) / (gn + tn);
+        return x > 0 ? static_cast<std::uint64_t>(x) : 0;
+    }
+    /// Whether a rise into a class needs a source for one of its goods: the city's use now (`use`)
+    /// and what this rise adds (`added`, 0 while nobody lives in the class below) exceed what it makes.
+    /// The next rises of the other classes do not count: asked a source for them, the gate of a
+    /// class nobody could rise into yet stayed shut for the whole game.
+    [[nodiscard]] static constexpr bool rise_needs_source(std::uint32_t use, std::uint32_t added,
+                                                          std::uint32_t made) noexcept {
+        return std::uint64_t{use} + added > made;
+    }
+    /// The stock of such a good the city holds before the rise: what it will use beyond what it makes
+    /// until a ship from its source (`minutes` away there and back) could bring more.
+    [[nodiscard]] static constexpr std::uint64_t rise_stock(std::uint32_t use, std::uint32_t added, std::uint32_t made,
+                                                            std::uint32_t minutes) noexcept {
+        const std::uint64_t after = std::uint64_t{use} + added;
+        return after > made ? (after - made) * minutes : 0;
+    }
+    /// How much sooner the stock runs out than a run takes, 1/256 minute: below 0 a run is due.
+    [[nodiscard]] static constexpr std::int64_t slack(std::uint64_t cover, std::uint32_t minutes) noexcept {
+        const std::uint64_t c = cover < (std::uint64_t{1} << 62) ? cover : (std::uint64_t{1} << 62);
+        return static_cast<std::int64_t>(c) - static_cast<std::int64_t>(std::uint64_t{minutes} * 256);
+    }
+};
+
 }  // namespace o1602::sim::ai
