@@ -1932,8 +1932,10 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         if (w == food) {
             continue;
         }
-        const std::uint64_t use =
-            std::max<std::uint64_t>(use_rate(c, w), std::uint64_t{demand(c, w)} + ascent_extra(c, k, w));
+        // What the city will use after this rise: its people's use now and what the risers add. Not
+        // demand_ahead, which counts every class's next rise: with nobody in the class below, the
+        // rise adds nothing, and asking a source for it held the gate shut for the whole game.
+        const std::uint64_t use = std::uint64_t{demand(c, w)} + ascent_extra(c, k, w);
         const std::uint64_t made = made_rate(c, w);
         if (use <= made) {
             continue;
