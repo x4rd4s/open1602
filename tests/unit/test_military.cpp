@@ -17,6 +17,7 @@
 #include "o1602/assets/cod.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/assets/own_figures.hpp"
+#include "o1602/editor/units.hpp"
 #include "o1602/script/game_scripts.hpp"
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/construction.hpp"
@@ -464,6 +465,28 @@ TEST_CASE("military: patrols walk between two points") {
     }
     CHECK(max_x == 50);
     CHECK(min_x_after < 50);
+}
+
+TEST_CASE("military: a patrol set in the editor runs from the game's start") {
+    Field f;
+    const std::uint32_t id = f.add(kSword, 0, 40, 30).id;  // world tile (20, 15)
+    auto patrol = editor::set_patrol(f.world, f.buildings, id, 25, 15);
+    REQUIRE(patrol.ok());
+    (*patrol)->apply(f.world);
+    f.start();
+    std::int32_t max_x = 0;
+    std::int32_t min_x_after = 100;
+    for (int i = 0; i < 40; ++i) {
+        f.run(500);
+        const sim::Soldier* s = f.world.soldier(id);
+        REQUIRE(s != nullptr);
+        max_x = std::max(max_x, s->cell_x());
+        if (max_x == 50) {
+            min_x_after = std::min(min_x_after, s->cell_x());
+        }
+    }
+    CHECK(max_x == 50);
+    CHECK(min_x_after < 50);  // and back
 }
 
 TEST_CASE("military: a castle trains units with weapons and sends them out") {

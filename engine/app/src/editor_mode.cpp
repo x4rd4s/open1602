@@ -970,6 +970,7 @@ EditorModel MapViewer::editor_model() const {
     }
     editor_city_model(m);
     editor_ship_model(m);
+    editor_unit_model(m);
     editor_players_model(m);
     editor_rules_model(m);
     editor_goals_model(m);
@@ -1157,6 +1158,10 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::ShipCargo:
         case Kind::ShipRoute:
             editor_ship_request(request);
+            break;
+        case Kind::UnitPatrol:
+        case Kind::UnitPatrolOff:
+            editor_unit_request(request);
             break;
         case Kind::SetPlayer:
         case Kind::AddPlayer:
@@ -1604,6 +1609,10 @@ std::pair<std::int64_t, std::int64_t> MapViewer::editor_place_origin(const rende
 }
 
 bool MapViewer::editor_place(const render::TilePos& tile) {
+    if (m_editor && m_editor->patrol_for && !m_editor->preview_plan) {
+        editor_set_patrol(tile);
+        return true;
+    }
     if (!m_editor || !m_editor->placing || m_editor->preview_plan) {
         return false;
     }
@@ -1691,6 +1700,11 @@ bool MapViewer::editor_place(const render::TilePos& tile) {
 bool MapViewer::editor_cancel_place() {
     if (!m_editor) {
         return false;
+    }
+    if (m_editor->patrol_for) {
+        m_editor->patrol_for.reset();
+        m_editor->notice.clear();
+        return true;
     }
     if (!m_editor->placing) {
         // Nothing being placed: an object in hand (the page "Objects") is put away, the tool
@@ -1827,6 +1841,10 @@ void MapViewer::editor_properties(EditorModel& m) const {
             add("editor.prop.owner", owner_name(world, soldier->owner));
             add("editor.prop.position", tiles(static_cast<std::uint32_t>(std::max(0, soldier->pos_x / 4096)),
                                               static_cast<std::uint32_t>(std::max(0, soldier->pos_y / 4096))));
+            if (soldier->patrol.active) {
+                const sim::Target& to = soldier->patrol.points[1];
+                add("editor.prop.patrol", ui::tr("editor.prop.patrol_to", {number(to.x / 2), number(to.y / 2)}));
+            }
             return;
         }
     }
@@ -2320,6 +2338,14 @@ void MapViewer::draw_editor_marks() {
             case Kind::Soldier:
                 if (const sim::Soldier* soldier = world.soldier(pick.id)) {
                     text_at(soldier->pos_x / 4096.0, soldier->pos_y / 4096.0, mark);
+                    // Where its patrol goes to and back.
+                    if (soldier->patrol.active) {
+                        for (const sim::Target& p : soldier->patrol.points) {
+                            if (p.kind == sim::Target::Kind::Spot) {
+                                text_at(p.x / 2.0 + 0.25, p.y / 2.0 + 0.25, ui::tr("editor.objects.mark.patrol"));
+                            }
+                        }
+                    }
                 }
                 break;
         }
@@ -2342,6 +2368,11 @@ void MapViewer::apply_editor() {
     // The page of the selection left (Escape, Back, another page): nothing is picked any more.
     if (m_hud->editor_panel() != nullptr && !shows_pick(m_hud->editor_panel()->page())) {
         m_editor->pick = EditorPick{};
+    }
+    // The unit whose patrol the next click sets no longer selected: no click sets it.
+    if (m_editor->patrol_for &&
+        (m_editor->pick.kind != EditorPick::Kind::Soldier || m_editor->pick.id != *m_editor->patrol_for)) {
+        m_editor->patrol_for.reset();
     }
     // The page an island is placed from left: it goes back.
     if (m_editor->placing &&

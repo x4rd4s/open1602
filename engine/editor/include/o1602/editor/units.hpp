@@ -92,6 +92,17 @@ enum class UnitRefusal : std::uint8_t {
 /// The land unit `id` taken away, with every order of others that names it. Fails (NotFound).
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& world, std::uint32_t id);
 
+/// Land unit `id` patrols from where it stands to world tile (x, y) and back, from the game's start,
+/// as the game's patrol order sends it (its two waypoints, back and forth). The tile must be ground
+/// a unit walks on, of the island the unit stands on. Fails (NotFound) without the unit,
+/// (InvalidFormat) with the refusal's name where the tile does not do.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& world,
+                                                                           const assets::BuildingTable& buildings,
+                                                                           std::uint32_t id, std::int64_t x,
+                                                                           std::int64_t y);
+/// Land unit `id` patrols no more: it stands where it is. Fails (NotFound) without the unit or its patrol.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> stop_patrol(const sim::World& world, std::uint32_t id);
+
 /// The name of a refusal for messages and logs.
 [[nodiscard]] const char* refusal_name(UnitRefusal refusal) noexcept;
 

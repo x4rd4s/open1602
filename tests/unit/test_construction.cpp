@@ -1966,6 +1966,41 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
     CHECK(soldier.pos_x / sim::kPosUnit == 20);
     CHECK(editor::unit_fits(island.world, island.buildings, 20, 20) == UnitRefusal::Taken);
 
+    // A patrol from where it stands to a tile of its island and back, from the start; not to the
+    // sea, a tree or its own tile; ended again.
+    CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id, 3, 3).ok());
+    CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id, 31, 16).ok());
+    CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id, 20, 20).ok());
+    CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id + 100, 24, 20).ok());
+    CHECK(!editor::stop_patrol(island.world, soldier.id).ok());  // none yet
+    {
+        auto patrol = editor::set_patrol(island.world, island.buildings, soldier.id, 24, 20);
+        REQUIRE(patrol.ok());
+        (*patrol)->apply(island.world);
+        const sim::Soldier& s = *island.world.soldier(soldier.id);
+        CHECK(s.patrol.active);
+        CHECK(!s.patrol.one_way);
+        CHECK(s.patrol.points[0] ==
+              sim::Target::spot(static_cast<std::uint32_t>(s.cell_x()), static_cast<std::uint32_t>(s.cell_y())));
+        CHECK(s.patrol.points[1] == sim::Target::tile_spot(24, 20));
+        CHECK(s.target == s.patrol.points[0]);
+        // The scenario keeps it.
+        auto bytes = sim::write_game(island.world, island.buildings);
+        REQUIRE(bytes.ok());
+        auto loaded = sim::read_game(*bytes, island.buildings);
+        REQUIRE(loaded.ok());
+        REQUIRE(loaded->soldier(soldier.id) != nullptr);
+        CHECK(loaded->soldier(soldier.id)->patrol == s.patrol);
+        auto ended = editor::stop_patrol(island.world, soldier.id);
+        REQUIRE(ended.ok());
+        (*ended)->apply(island.world);
+        CHECK(!island.world.soldier(soldier.id)->patrol.active);
+        CHECK(island.world.soldier(soldier.id)->target.empty());
+        (*ended)->revert(island.world);
+        CHECK(island.world.soldier(soldier.id)->patrol.active);
+        (*ended)->apply(island.world);
+    }
+
     // Its holds loaded: a trade ware up to a hold's room, emptied with 0 t.
     {
         const std::uint32_t id = island.world.ships().back().id;

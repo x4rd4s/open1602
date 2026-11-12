@@ -346,6 +346,62 @@ annokit::core::Result<std::unique_ptr<Operation>> remove_unit(const sim::World& 
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_remove"));
 }
 
+annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& world,
+                                                             const assets::BuildingTable& buildings, std::uint32_t id,
+                                                             std::int64_t x, std::int64_t y) {
+    const sim::Soldier* soldier = world.soldier(id);
+    if (soldier == nullptr) {
+        return make_error(ErrorCode::NotFound, "no such unit");
+    }
+    UnitRefusal refused = unit_fits(world, buildings, x, y);
+    if (refused == UnitRefusal::Taken) {
+        refused = UnitRefusal::None;  // another unit standing there now does not keep this one away
+    }
+    if (refused != UnitRefusal::None) {
+        return make_error(ErrorCode::InvalidFormat, refusal_name(refused));
+    }
+    const auto ux = static_cast<std::uint32_t>(x);
+    const auto uy = static_cast<std::uint32_t>(y);
+    const auto sx = static_cast<std::uint32_t>(std::max(0, soldier->pos_x / sim::kPosUnit));
+    const auto sy = static_cast<std::uint32_t>(std::max(0, soldier->pos_y / sim::kPosUnit));
+    if (world.cell(ux, uy).island != world.cell(sx, sy).island) {
+        return make_error(ErrorCode::InvalidFormat, "another island");
+    }
+    if (sx == ux && sy == uy) {
+        return make_error(ErrorCode::InvalidFormat, "where the unit stands");
+    }
+    sim::World after = world;
+    sim::Soldier& s = *after.soldier(id);
+    // As the game's patrol order: where it stands and the tile, from the first.
+    s.patrol.points[0] =
+        sim::Target::spot(static_cast<std::uint32_t>(s.cell_x()), static_cast<std::uint32_t>(s.cell_y()));
+    s.patrol.points[1] = sim::Target::tile_spot(ux, uy);
+    s.patrol.active = true;
+    s.patrol.one_way = false;
+    s.patrol.index = 0;
+    s.target = s.patrol.points[0];
+    s.queue.clear();
+    s.hold = false;
+    s.attack_move = false;
+    s.motion.path.clear();
+    s.motion.path_index = 0;
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_patrol"));
+}
+
+annokit::core::Result<std::unique_ptr<Operation>> stop_patrol(const sim::World& world, std::uint32_t id) {
+    const sim::Soldier* soldier = world.soldier(id);
+    if (soldier == nullptr || !soldier->patrol.active) {
+        return make_error(ErrorCode::NotFound, "no such unit on patrol");
+    }
+    sim::World after = world;
+    sim::Soldier& s = *after.soldier(id);
+    s.patrol = sim::Patrol{};
+    s.target = {};
+    s.motion.path.clear();
+    s.motion.path_index = 0;
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_patrol_off"));
+}
+
 const char* refusal_name(UnitRefusal refusal) noexcept {
     switch (refusal) {
         case UnitRefusal::None:
