@@ -1355,7 +1355,12 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         clear();
         return;
     }
+    const bool load = colony_load_in_stock(p, false) || colony_load_in_stock(p, true);
     if (!asked) {
+        if (s.plan_ship != 0 && !load) {
+            log(p, "colony plan: ship %u released (no load)", s.plan_ship);
+            s.plan_ship = 0;
+        }
         return;  // the plan holds; a new one is made when an order asks
     }
     if (*best != s.plan_crop) {
@@ -1372,8 +1377,12 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         s.plan_crop = *best;
         s.plan_ms = step;
     }
-    // A ship is kept for it at once, so that the supply runs do not take it.
-    if (s.plan_ship == 0) {
+    // A ship is kept for it once the home city holds the load, so that the supply runs do not take
+    // it while it is called home; before, kept from the plan on, it lay idle for most of an hour.
+    if (s.plan_ship != 0 && !load) {
+        log(p, "colony plan: ship %u released (no load)", s.plan_ship);
+        s.plan_ship = 0;
+    } else if (s.plan_ship == 0 && load) {
         if (const std::uint32_t ship = colony_ship_candidate(p); ship != 0) {
             s.plan_ship = ship;
             log(p, "colony plan: ship %u kept", ship);
