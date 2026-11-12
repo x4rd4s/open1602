@@ -1016,13 +1016,15 @@ std::uint32_t Engine::supply_ships_for(AiPlayer& p, const City& to, std::uint8_t
     // round trip (a minute at each end for the loading), over what one run brings of the ware. From
     // an own city no more than that city makes beyond its own use, so that the runs do not wait
     // there for goods. At least one, at most kMaxRunsPerWare.
+    // The rates as the cities' statistics show them (use_rate, made_rate): by its farms' best rates a
+    // colony short of 4 t of food a minute got one run at a time.
     const City& from = m_world.cities()[src];
-    const std::uint32_t used = demand(to, w);
-    const std::uint32_t made = supply(to, w);
+    const std::uint32_t used = use_rate(to, w);
+    const std::uint32_t made = made_rate(to, w);
     std::uint64_t rate = used > made ? used - made : 0;  // 1/32 t a minute
     if (from.owner == p.player) {
-        const std::uint32_t there_used = demand(from, w);
-        const std::uint32_t there_made = supply(from, w);
+        const std::uint32_t there_used = use_rate(from, w);
+        const std::uint32_t there_made = made_rate(from, w);
         rate = std::min<std::uint64_t>(rate, there_made > there_used ? there_made - there_used : 0);
     }
     const std::uint64_t round_s = 2 * std::uint64_t{seconds} + 120;
