@@ -482,8 +482,9 @@ Improved computers weigh the way at sea:
   colonies build food producers or sheep farms for the rest, beyond their own use, and the supply
   ships bring it home. Without a colony that can, the home city founds one.
 - **Fleet.** One ship guards each city; on top come as many ships as the supply takes: half the
-  supply runs its cities need (above) for every ware whose cover is shorter than the budget's
-  horizon, so that the fleet grows before the runs fall due, at most eight, and in all at most eight more than its
+  supply runs its cities need (above) for every ware a city uses more of than it makes, whatever
+  it holds at the moment, and for building materials while the home city holds less than it
+  keeps, at most eight, and in all at most eight more than its
   cities; none while it is in debt. The target falls
   only after ten minutes of lower needs. A ship is ordered at the yard once the gold covers its
   price (the original's computers order with half of it), or bought as before.

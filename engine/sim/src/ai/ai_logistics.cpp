@@ -1475,16 +1475,18 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
     // A ship brings two wares. Open1602: an improved computer counts for each ware the runs it
     // takes at a time (supply_ships_for: what the city lacks a minute against the way there and
     // back), for a ware it lacks for good as well as for one low in store. At most kMaxSupplyShips.
-    // A ware counts while its stock lasts less than the budget's horizon: the fleet grows before the
-    // runs fall due, not after.
+    // A ware counts while the city uses more of it than it makes, whatever it holds now: the runs
+    // it takes follow from that rate (supply_ships_for), not from the stock of the moment.
     std::uint64_t runs = 0;
-    const std::uint64_t horizon = std::uint64_t{m_world.balance().ai_budget_horizon_minutes} * 256;
-    const auto count = [&](const City& to, bool) {
+    // Building materials count for the home city while it holds less than it keeps of them
+    // (supply_buffer), for another city while it runs out (supply_urgency).
+    const auto count = [&](const City& to, bool home_city) {
         std::uint32_t target = 0;
         const std::vector<std::uint8_t> wares = supply_wares(p, to, &target);
         const auto at = city_point(to);
         for (const std::uint8_t w : wares) {
-            if (supply_urgency(to, w, target) >= horizon) {
+            const bool material = building_material(w);
+            if ((!material || !home_city) && supply_urgency(to, w, target) == kNoUrgency) {
                 continue;
             }
             std::uint16_t price = 0;
@@ -1493,6 +1495,9 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
                 continue;
             }
             const std::uint32_t seconds = sail_seconds(p, at, city_point(m_world.cities()[*src]));
+            if (material && home_city && to.stock(w) >= supply_buffer(target, 2 * seconds)) {
+                continue;
+            }
             runs += supply_ships_for(p, to, w, *src, seconds);
         }
     };
