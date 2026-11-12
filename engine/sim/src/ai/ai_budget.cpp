@@ -145,11 +145,13 @@ std::int64_t Engine::young_colonies_gap(const AiPlayer& p) const {
 
 std::int64_t Engine::reserved(const AiPlayer& p) const {
     // A founding under way keeps the colony's gold until its Kontor stands (colony_savings): the
-    // ship that is called home to load or sails with the load.
+    // ship that is called home to load or sails with the load. The first yard, while the computer
+    // wants another ship, keeps its gold too (yard_savings): only its houses waited for it, and its
+    // other buildings took the gold the yard waited for for the rest of the game.
     if (!rivals() || p.pirates) {
         return 0;
     }
-    return p.settle.active || p.settle.ship != 0 ? std::int64_t{colony_money(p)} : 0;
+    return (p.settle.active || p.settle.ship != 0 ? std::int64_t{colony_money(p)} : 0) + yard_savings(p);
 }
 
 bool Engine::can_commit(const AiPlayer& p, const Commitment& c, Spend what) const {

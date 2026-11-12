@@ -108,6 +108,14 @@ const Engine::Census* Engine::census() const {
     return &c;
 }
 
+std::size_t Engine::own_ship_count(const AiPlayer& p) const {
+    if (const Census* c = census(); c != nullptr && p.player < c->players) {
+        return c->own_ships[p.player].size();
+    }
+    return static_cast<std::size_t>(std::ranges::count_if(
+        m_world.ships(), [&](const Ship& s) { return s.owner == p.player && !s.sinking && !s.trader && !s.cart(); }));
+}
+
 std::vector<Ship*> Engine::own_ships(const AiPlayer& p) {
     std::vector<Ship*> out;
     if (const Census* c = census(); c != nullptr && p.player < c->players) {

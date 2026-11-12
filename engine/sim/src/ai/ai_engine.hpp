@@ -366,6 +366,8 @@ private:
     void free_colony_cargo(AiPlayer& p, Ship& ship, bool computer);
     [[nodiscard]] Ship* settle_ship(AiPlayer& p);
     [[nodiscard]] std::vector<Ship*> own_ships(const AiPlayer& p);
+    /// How many own_ships there are.
+    [[nodiscard]] std::size_t own_ship_count(const AiPlayer& p) const;
     bool want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food);
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
@@ -454,7 +456,7 @@ private:
     /// Open1602: the good goods_lacking finds, 0 none; with `content_too` only goods the city makes.
     [[nodiscard]] std::uint8_t lacking_ware(const City& c, bool content_too) const;
     /// Open1602: the gold an improved computer keeps for its first yard, 0 none.
-    [[nodiscard]] std::int64_t yard_savings(AiPlayer& p);
+    [[nodiscard]] std::int64_t yard_savings(const AiPlayer& p) const;
     /// Improved computers: the gold kept for a colony whose crop its people want and none of its
     /// islands grows, else 0.
     [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);

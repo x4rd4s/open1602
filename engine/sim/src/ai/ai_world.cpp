@@ -303,7 +303,8 @@ bool Engine::affordable(const AiPlayer& p, const City& c, const assets::Building
         // sees only the yard's upkeep, not what its ships bring, and small towns that lost a few coins
         // a minute never built one.
         if (b.id == id::kShipyardSmall && !p.yard_valid) {
-            return goods && std::int64_t{player(p).money} - reserved(p) >= cost.money;
+            // What is kept for it (yard_savings) is its own gold.
+            return goods && std::int64_t{player(p).money} - (reserved(p) - yard_savings(p)) >= cost.money;
         }
         Commitment plan;
         plan.cost = cost.money;

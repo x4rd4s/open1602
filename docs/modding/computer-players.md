@@ -678,7 +678,9 @@ weighed: they bring the taxes or the goods, and held back the markets alone stoo
 computer minutes in a test of ten worlds; their gold leaves all the same, and the next plan sees
 it gone. For now its first yard, the small one, needs only its price in hand
 beside what a founding keeps: the budget does not yet weigh what ships bring, and small towns that
-lost a few coins a minute never built one. Before the budget, fixed amounts held the gold: five minutes of the purchases beyond the
+lost a few coins a minute never built one. While the computer wants another ship and its home city
+could build that yard, the yard's gold is kept aside like a founding's, so that its other
+buildings do not take it: only its houses waited for it, and the yard never came. Before the budget, fixed amounts held the gold: five minutes of the purchases beyond the
 sales, five minutes of the loss for a building of 750 gold or more and a ship, an hour of the loss
 with one more colony, 20,000 gold for a colony while the cities earned little, 10,000 gold and 100
 a minute for a gold or ore colony. Without any, the gold went into churches, baths and the big yard

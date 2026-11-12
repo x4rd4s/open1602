@@ -2619,14 +2619,18 @@ bool Engine::colony_crop_missing(AiPlayer& p) {
     });
 }
 
-std::int64_t Engine::yard_savings(AiPlayer& p) {
+std::int64_t Engine::yard_savings(const AiPlayer& p) const {
     // The gold of the small yard while an improved computer wants another ship, has no yard and its
     // home city could build one (a weaving mill, as need_shipyard asks), else 0.
-    if (classic() || p.yard_valid || !p.home_valid ||
-        static_cast<std::int32_t>(own_ships(p).size()) >= p.fleet_target) {
+    if (classic() || p.yard_valid || !p.home_valid || static_cast<std::int32_t>(own_ship_count(p)) >= p.fleet_target) {
         return 0;  // only while it wants another ship
     }
-    const CityPlan& r = plan_of(p, p.home_island, p.home_city);
+    const auto plan = std::ranges::find_if(
+        p.plans, [&](const CityPlan& c) { return c.island == p.home_island && c.city == p.home_city; });
+    if (plan == p.plans.end()) {
+        return 0;
+    }
+    const CityPlan& r = *plan;
     if (r.slots[kSlotShipyard].count != 0 || r.slots[kSlotShipyard].attempts > 3 ||
         (r.slots[kSlotWebstube].count == 0 && r.slots[kSlotWeberei].count == 0)) {
         return 0;
