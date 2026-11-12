@@ -248,6 +248,11 @@ four. "4, as in the original" keeps the original's way.
   on to the main city's orders. The original makes the city with less land a second city that grows
   goods for the other, which on large islands far apart left the first city short of food while its
   land lay empty. A colony's pastures are no longer built for a home city with that much land.
+- *A colony with room is settled.* An improved rival's city founded with more than 2000 tiles of
+  free land gets houses however many cities the computer has. The original makes every city it
+  founds beside two cities with people (or beside one of 1200) a colony without houses, for good,
+  so that from its third city on its colonies only grew goods and their land lay empty. A city with
+  less land stays such a colony, as in the original.
 - *Pulling down what the city has no use for.* The maintenance sweep pulls down a producer that is
   switched off or out of raw material when the city has no use for it: a workshop more than one
   above what the producers of its raw material keep busy (above) while none of that is in store, or
