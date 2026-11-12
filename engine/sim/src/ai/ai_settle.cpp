@@ -1106,24 +1106,21 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     return 0;
 }
 
-namespace {
-constexpr std::int32_t kGoalColonyMoney = 10'000;
-constexpr std::int32_t kGoalColonyIncome = 100;
-constexpr std::int64_t kRichColonyMoney = 20'000;
-constexpr std::uint32_t kColonyLossMinutes = 60;  // improved computers: the loss a founding's gold carries
-}  // namespace
+namespace {}  // namespace
 
 std::int64_t Engine::colony_deficit(const AiPlayer& p) const {
     // What one of the computer's cities beyond the home city costs a minute beyond its taxes, on
     // average over those that cost more than they pay; 0 without such a city. Its uninhabited
     // colonies too: plantations and mines pay no taxes and cost 200 to 1400 gold a minute each,
     // and five of them founded on a margin of 500 a minute took a computer into a debt of 79,000.
+    // A young colony (young_colony) is left out: with its Kontor alone it cost little, and each
+    // founding made the next one look cheaper.
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     std::int64_t sum = 0;
     std::int64_t n = 0;
     for (std::size_t i = 0; i < m_world.cities().size(); ++i) {
         const City& c = m_world.cities()[i];
-        if (c.owner != p.player || is_home(p, c)) {
+        if (c.owner != p.player || is_home(p, c) || (rivals() && young_colony(c))) {
             continue;
         }
         if (const std::int64_t d = std::int64_t{costs[i]} - tax_income(c, m_buildings); d > 0) {
@@ -1136,8 +1133,8 @@ std::int64_t Engine::colony_deficit(const AiPlayer& p) const {
 
 std::uint8_t Engine::goal_crop(const AiPlayer& p) const {
     // What the goal of an improved computer asks a colony for: gold or ore it has none of, once
-    // it earns well and has the gold to spare (a colony for a mine pays off late).
-    if (!rivals() || p.pirates || player(p).money < kGoalColonyMoney || net_income(p) < kGoalColonyIncome) {
+    // its budget carries a colony that brings nothing within the horizon (a mine pays off late).
+    if (!rivals() || p.pirates || !can_commit(p, colony_commitment(p, 0), Spend::GoalColony)) {
         return 0;
     }
     if (p.strategy.goal == goal::kGold && !crop_available(p, ware::kGold)) {
@@ -1245,6 +1242,10 @@ bool Engine::wants_room(const AiPlayer& p) const {
     if (p.settle.ship != 0) {
         return true;  // the ship is being loaded: go on whatever the gold does meanwhile
     }
+    // An improved rival settles for room once its budget carries a colony that opens no class.
+    if (rivals()) {
+        return can_commit(p, colony_commitment(p, 0), Spend::RoomColony);
+    }
     const auto n = static_cast<std::int32_t>(p.cities);
     return player(p).money >= kRoomMoney && net_income(p) >= kRoomIncome * n;
 }
@@ -1258,33 +1259,25 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         return false;
     }
     // Open1602: an improved computer founds a colony only with the gold to build it up; founded
-    // with its last gold, the colony stood empty and was given up. A rival also keeps its gold for
-    // the goods it buys (buy_reserve).
-    if (!classic() && player(p).money < colony_money(p) + buy_reserve(p)) {
-        return false;
-    }
-    // Nor while it would lose gold with one more colony (what it earns now less what one of its
-    // colonies costs beyond its taxes, colony_deficit), unless its gold carries that loss for
-    // kColonyLossMinutes beyond the founding: three colonies in two hours took a computer from
-    // 24,000 gold into a debt it never left, and two founded with 140,000 gold in hand put
-    // another in debt within the hour.
-    // Weighed before the ship is called home only: its loss changes with every look, and a ship
-    // called for a founding that was then refused lay idle at the Kontor.
-    if (rivals() && p.cities >= 2 && p.settle.ship == 0) {
-        const std::int64_t after = std::int64_t{earned_income(p)} - colony_deficit(p);
-        if (player(p).money < std::int64_t{colony_money(p)} + buy_reserve(p) +
-                                  std::int64_t{kColonyLossMinutes} * std::max<std::int64_t>(0, -after)) {
+    // with its last gold, the colony stood empty and was given up. An improved rival founds one
+    // from its budget (gold_budget): the colony's gold now, what one of its colonies costs beyond
+    // its taxes (colony_deficit) from now on and what the crop's good opens in the home city
+    // (gate_value) once the colony delivers. Weighed before the ship is called home only: from
+    // then on the budget keeps the colony's gold (reserved), and a ship called for a founding
+    // that was then refused lay idle at the Kontor. Three colonies in two hours took a computer
+    // from 24,000 gold into a debt it never left; a city that waited for a good of its next class
+    // sat on 45,000 gold for hours.
+    if (rivals() && !p.pirates && p.settle.ship == 0 && !p.settle.active) {
+        if (!can_commit(p, colony_commitment(p, choose_colony_crop(p)), Spend::Colony)) {
             return false;
         }
+    } else if (!classic() && player(p).money < colony_money(p)) {
+        return false;
     }
     const std::uint32_t n = p.cities;
-    // Open1602: an improved computer founds a further colony only while its cities earn more than
-    // they cost; its gold alone let it settle into debt.
-    // Not when it asks for one (`force`) with kRichColonyMoney in hand: a city that waited for a
-    // good of its next class (need_public) sat on 45,000 gold for hours.
-    const bool rich = rivals() && force && player(p).money >= kRichColonyMoney;
-    if (n >= 2 && !rich && net_income(p) <= static_cast<std::int32_t>(50 * n) &&
-        (rivals() || player(p).money < 15001)) {
+    // The original's computers found a further colony only while their cities earn more than they
+    // cost, or with 15,001 gold in hand.
+    if (classic() && n >= 2 && net_income(p) <= static_cast<std::int32_t>(50 * n) && player(p).money < 15001) {
         return false;
     }
     if (p.settle.active && !p.settle.sailing && !classic() && !p.settle.failed) {

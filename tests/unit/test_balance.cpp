@@ -754,3 +754,25 @@ TEST_CASE("balance: the improved computers' war plans are [computer_strategy], s
     CHECK(balance.ai_war_units == 0);
     CHECK(sim::balance_version(balance) == sim::kBalanceWithWar);
 }
+
+TEST_CASE("balance: the improved computers' budget is [computer_budget], saved in BALA version 9") {
+    sim::Balance balance;
+    CHECK(balance.ai_budget_horizon_minutes == 30);
+    CHECK(balance.ai_budget_cushion_minutes == 5);
+    std::vector<std::string> warnings;
+    sim::apply_balance_file(balance, "eager", "[computer_budget]\nhorizon_minutes = 60\ncushion_minutes = 0\n",
+                            warnings);
+    CHECK(warnings.empty());
+    CHECK(balance.ai_budget_horizon_minutes == 60);
+    CHECK(balance.ai_budget_cushion_minutes == 0);
+    CHECK(sim::balance_version(balance) == sim::kBalanceWithBudget);
+
+    const auto buildings = make_buildings();
+    sim::World world(60, 40);
+    world.set_balance(balance);
+    auto bytes = sim::write_game(world, buildings);
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, buildings);
+    REQUIRE(loaded.ok());
+    CHECK(loaded->balance() == balance);
+}

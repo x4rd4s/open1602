@@ -471,11 +471,8 @@ private:
     /// shortfall (home_shortfall).
     [[nodiscard]] bool grow_for_home(AiPlayer& p, const City& c, const CityPlan& r);
     static constexpr std::uint32_t kColonySaveFrom = 300;  ///< inhabitants of the home city
-    static constexpr std::int64_t kBuyReserveMinutes = 5;
     static constexpr std::uint32_t kSpareKeepMinutes = 10;
     static constexpr std::uint32_t kHomeFirstMinutes = 10;  ///< supply_destination
-    static constexpr std::int64_t kCostlyBuild = 750;       ///< gold; affordable keeps kCostlyMinutes too
-    static constexpr std::int64_t kCostlyMinutes = 5;
     /// Open1602: what class `k` of the city would use more of `w` once half the class below rose
     /// into it, 1/32 t a minute (an improved rival plans its goods ahead of the rise).
     [[nodiscard]] std::uint32_t ascent_extra(const City& c, std::size_t k, std::uint8_t w) const;
@@ -665,9 +662,29 @@ private:
     /// for the original's computers to any city.
     [[nodiscard]] std::vector<std::uint8_t> routed_wares(AiPlayer& p, std::uint32_t ship, const City& to);
     /// Improved computers: what an own city can give of `w` to another own city (0 for nothing).
-    /// Open1602: the gold an improved rival keeps for the goods it buys (kBuyReserveMinutes of its
-    /// purchases beyond its sales); 0 for the others.
-    [[nodiscard]] std::int64_t buy_reserve(const AiPlayer& p) const;
+    /// Improved computers: the budget every plan of theirs that costs gold goes by (ai_budget.cpp):
+    /// their gold, what plans under way set aside (reserved), what it does a minute and the cushion.
+    [[nodiscard]] Budget gold_budget(const AiPlayer& p) const;
+    /// What the computer pays out a minute: running costs, upkeep and the inhabitants' goods bought.
+    [[nodiscard]] std::int64_t outflow(const AiPlayer& p) const;
+    /// The taxes it can count on: those of its cities whose inhabitants have their food.
+    [[nodiscard]] std::int64_t reliable_income(const AiPlayer& p) const;
+    /// Whether a city's statistics do not yet cover the budget's horizon.
+    [[nodiscard]] bool young_colony(const City& c) const;
+    /// What the young colonies will cost a minute beyond what they cost now.
+    [[nodiscard]] std::int64_t young_colonies_gap(const AiPlayer& p) const;
+    /// The gold a plan under way keeps: a founding's while its ship loads or sails; 0 for the
+    /// original's computers and the pirates.
+    [[nodiscard]] std::int64_t reserved(const AiPlayer& p) const;
+    /// Whether the budget allows the plan (Budget::allows); a refusal is logged as `what`.
+    [[nodiscard]] bool can_commit(const AiPlayer& p, const Commitment& c, Spend what) const;
+    /// What `amount` (1/32 t) of `w` costs bought, at the price the computer's cities paid lately.
+    [[nodiscard]] std::int64_t price_paid(const AiPlayer& p, std::uint8_t w, std::uint64_t amount) const;
+    /// What the home city gains a minute once it has `good`: the taxes of the inhabitants it lets
+    /// rise, less the other goods they then buy.
+    [[nodiscard]] std::int64_t gate_value(const AiPlayer& p, std::uint8_t good) const;
+    /// A colony for `crop` as a plan of the budget (0: for room or ore, it opens no class).
+    [[nodiscard]] Commitment colony_commitment(const AiPlayer& p, std::uint8_t crop) const;
     /// Improved computers: what one of their cities beyond the home city costs a minute beyond its
     /// taxes, on average over those that cost more than they pay, uninhabited ones included
     /// (want_colony).
@@ -907,6 +924,18 @@ private:
         Overview view;
     };
     mutable std::vector<OverviewCache> m_overviews;
+    /// gold_budget's flows per player, worked out once per game time step: the running costs and the
+    /// goods bought are summed over every city and minute.
+    struct BudgetCache {
+        bool valid = false;
+        std::uint64_t ms = 0;
+        std::int64_t net = 0;
+        std::int64_t outflow = 0;
+        std::int64_t reliable = 0;
+    };
+    mutable std::vector<BudgetCache> m_budgets;
+    /// The game minute of the last refusal logged, per player and kind of plan (only the log).
+    mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.
     std::uint32_t m_grow_from = 0;  ///< 0: kGrowFrom
     /// The order and plan of can_place(), reused so that a site test allocates nothing.

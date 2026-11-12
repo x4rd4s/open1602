@@ -210,7 +210,8 @@ scaled (`computer_cities`, Open1602's default) the limit is the world's islands 
 smallest size for each human and computer player who plays, at least four and at most 6, 8, 10 or 12
 by the difficulty (easy to hard). Beyond the crops, a computer settles a further island for room to
 grow once one of its cities reached the citizens, it has 20 000 gold and earns at least 100 gold a
-minute per city more than it pays, its home city's orders are done, and ten minutes have passed since
+minute per city more than it pays (an improved computer: once its budget carries a colony that
+brings nothing, see the budget below), its home city's orders are done, and ten minutes have passed since
 its last settlement (or failed search). Its fleet grows with its cities up to that limit instead of
 four. "4, as in the original" keeps the original's way.
 
@@ -490,7 +491,7 @@ Improved computers weigh the way at sea:
   its Kontors face any side of an island; before, almost all stood on two of the four sides.
 - **Land power.** A colony follows the goal: with gold as its goal a computer without gold looks
   for an island with a free gold vein, arming one without ore for an island with a free ore vein,
-  once it has 10000 gold and earns 100 a minute; it puts the Kontor by the vein, so that a market
+  once its budget carries a colony that brings nothing within its horizon; it puts the Kontor by the vein, so that a market
   can take the mountain in. Such a colony may go to an island where a small rival (two cities at
   most) lives, as the original's computers never do, but not next to a partner, an ally or a rival
   stronger than itself; the rival takes it ill.
@@ -635,14 +636,41 @@ for it (the demolish refund rule) outweigh building it again, a few per visit of
 than 10,000 gold in debt, whatever no city needs now goes, whatever it refunds. It also gives up the city that costs it most (its
 running costs above its taxes), if that saves 50 gold a minute and a quarter of the deficit, a
 quarter of an hour after the last; never its home city or its largest, nor a city that makes what
-another of its cities lacks. While its cities do not earn
-50 gold a minute each, it founds no further colony, whatever gold it has.
+another of its cities lacks.
 
-An improved rival also keeps gold for the goods it buys: five minutes of what it buys beyond what
-it sells, once it has 300 inhabitants. Only producers, houses, markets and Kontors are built from
-that gold; public buildings, towers, yards, ships and colonies wait. Without it, the gold went into
-churches, baths and the big yard down to a few coins, the computer could buy no more cloth and
-tobacco, and its merchants left within half an hour. It starts or joins a war only while none of
+**The budget.** An improved rival spends its gold from one budget, reckoned from what its own statistics windows
+show. A plan that costs gold, a building other than a house, producer, market or Kontor, a ship, a
+colony, is made only while its gold stays at the cushion or above with the plan: now, after paying
+for it; when the plan begins to bring something; and at the horizon (`horizon_minutes`, 30). Ahead,
+the gold changes a minute by what the computer earns with everything it buys and sells (taxes and
+sales less running costs, its army's upkeep and every purchase), less the plan's running costs, and
+from when it delivers, plus what it brings. The cushion is `cushion_minutes` (5) of what it pays out
+without the trade it could do without (running costs, upkeep and the goods its inhabitants use that
+it buys) beyond the taxes it can count on, those of its cities whose inhabitants have their food: a
+growing city whose taxes pay its outflow keeps none. Five minutes of the whole outflow grew ahead
+of the gold of growing cities and held back chapels, colonies and ships for hours; in a test of 27
+games the computers had 30 % fewer inhabitants. A colony whose statistics cover fewer minutes than
+the horizon counts with the upkeep of the computer's grown colonies, not with its first costs: it
+reaches its upkeep 30 to 60 minutes after the founding, and seen at its Kontor's running costs, the
+next colony followed minutes later. A founding under way keeps the colony's gold aside from when its ship is called home until
+the Kontor stands; nothing else spends it. A colony costs its gold, and a minute what one of the
+computer's colonies costs beyond its taxes (at least a Kontor's running costs); a colony for a crop
+whose good a class of the home city waits for brings, from half the horizon on (an interim guess for when it delivers), the taxes of the
+half of the class below that rises, less what those risen inhabitants' other new goods cost bought
+where the computer's cities do not make them. Houses, producers, markets and Kontors are not
+weighed: they bring the taxes or the goods, and held back the markets alone stood still for 2000
+computer minutes in a test of ten worlds; their gold leaves all the same, and the next plan sees
+it gone. For now its first yard, the small one, needs only its price in hand
+beside what a founding keeps: the budget does not yet weigh what ships bring, and small towns that
+lost a few coins a minute never built one. Before the budget, fixed amounts held the gold: five minutes of the purchases beyond the
+sales, five minutes of the loss for a building of 750 gold or more and a ship, an hour of the loss
+with one more colony, 20,000 gold for a colony while the cities earned little, 10,000 gold and 100
+a minute for a gold or ore colony. Without any, the gold went into churches, baths and the big yard
+down to a few coins, the computer could buy no more cloth and tobacco, and its merchants left within
+half an hour. The budget is the computer's own; the army's shares and the debt measures below are
+not yet part of it.
+
+An improved rival starts or joins a war only while none of
 its cities lacks alcohol or cloth, its home city makes the food it eats, and it has 5000 gold.
 
 In debt, an improved computer locks the building material of a city (the city window's switch)
@@ -660,7 +688,7 @@ each good of the class the computer's cities make three quarters of what they wi
 rise, or a partner sells it, and the city has five minutes of its use after the rise in store (at
 least 10 t, at most a quarter of its Kontor; from the merchants on twice that for a bought good). A
 good that none of its cities makes and no partner sells it gets from a colony founded for that
-crop, with 20,000 gold also while its cities earn little. The rise from pioneers to settlers does
+crop when its budget carries it. The rise from pioneers to settlers does
 not wait: the settlers' goods are planned once the first settlers live there. Without this, houses
 rose to citizens where no alcohol or tobacco was made or sold, and five hundred citizens left
 within the hour.
@@ -671,9 +699,7 @@ holds beyond ten minutes of its use. A good the computer only buys needs twice t
 class may rise, and the held gate asks for a colony that grows it: partners' Kontors ran empty, and
 the class fell back. When all its ships patrol, the supply takes one under way, the one with the
 fewest cannons: a patrol never waits at the end of a leg long enough to be taken there. A supply ship goes to the home city while one of its goods
-lasts less than ten minutes there, before any colony. A building of 750 gold or more (public
-buildings, the big yard) and a ship order also leave five minutes of what the gold loses while the
-taxes and sales do not cover the costs and purchases.
+lasts less than ten minutes there, before any colony.
 
 An improved computer's home city is the one the original would choose (the last with ten citizens,
 unless a later one has more free land), but only among its cities where 50 people live, once it has
@@ -699,14 +725,12 @@ ship on a route that surrendered to the pirates sails on once they plundered it 
 
 A city past the pioneers looks for more food while its own producers make less than it eats and its
 stock would run dry within half an hour at that shortfall, whatever its ships may yet bring; where
-no pasture site has room for 19 fields, a second search takes one with 12. A further colony waits
-until its gold carries for an hour what it would lose a minute with one more colony: what it earns
-now less what one of its colonies costs beyond its taxes, uninhabited plantations and mines
-counted; this is weighed before the ship is called home, not after. The 12 fields and the hour are
-interim and stay in the code: a shared budget of the computer's plans is to replace them. For it
-improved computers' cities keep the figures of the statistics windows as a player's do, and the
-computer can read them as an overview of its own cities (goods, producers, inhabitants, finances,
-per island and in all); no decision reads it yet.
+no pasture site has room for 19 fields, a second search takes one with 12. A further colony goes by
+the budget (above), counting its uninhabited plantations and mines; this is weighed before
+the ship is called home, not after. The 12 fields are interim and stay in the code. Improved
+computers' cities keep the figures of the statistics windows as a player's do, and the computer can
+read them as an overview of its own cities (goods, producers, inhabitants, finances, per island and
+in all).
 
 ## What they get from nowhere
 

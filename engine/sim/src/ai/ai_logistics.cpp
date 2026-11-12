@@ -1539,14 +1539,13 @@ void Engine::order_ship(AiPlayer& p) {
             m_sim.m_figures->get(package_ship != 0 ? package_ship : figure::ship_figure(type));
         const std::int64_t price = f != nullptr ? f->ship.price : 0;
         // Open1602: an improved computer pays for a ship only with the price in hand; the original's
-        // orders with half of it and may run into debt. An improved rival's order also leaves its gold for the goods it
-        // buys (buy_reserve).
-        // Also the gold the costs eat in kCostlyMinutes while they exceed the income: three ships
-        // ordered within half an hour took a computer to −16,706 gold.
-        const std::int64_t drain =
-            rivals() && !p.pirates ? kCostlyMinutes * std::max<std::int64_t>(0, -std::int64_t{earned_income(p)}) : 0;
-        const std::int64_t needed = classic() ? price / 2 : price + buy_reserve(p) + drain;
-        if (std::int64_t{player(p).money} > needed) {
+        // orders with half of it and may run into debt. An improved rival orders it from its budget
+        // (gold_budget): three ships ordered within half an hour took a computer to −16,706 gold.
+        Commitment plan;
+        plan.cost = price;
+        const bool budget = !rivals() || p.pirates || can_commit(p, plan, Spend::Ship);
+        const std::int64_t needed = classic() ? price / 2 : price;
+        if (budget && std::int64_t{player(p).money} > needed) {
             ShipyardOrder order;
             order.player = p.player;
             order.island = p.yard_island;

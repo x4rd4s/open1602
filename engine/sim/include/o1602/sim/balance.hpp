@@ -180,6 +180,11 @@ struct Balance {
     std::uint32_t ai_human_threat_percent = 15;  ///< humans count as stronger by this much per level above the second
     std::uint32_t ai_war_units = 6;              ///< a war is declared with an army of so many soldiers ...
     std::uint32_t ai_war_money = 1500;           ///< ... and so much gold in hand
+    /// The improved computers' budget ([computer_budget], version kBalanceWithBudget): a plan that
+    /// costs gold is made only while the gold, less what is set aside, stays above the cushion now
+    /// and over the horizon.
+    std::uint32_t ai_budget_horizon_minutes = 30;  ///< how far ahead a computer reckons its gold
+    std::uint32_t ai_budget_cushion_minutes = 5;   ///< minutes of its costs, upkeep and goods bought it keeps
     /// Changed values of buildings, sorted by id and field, each at most once.
     std::vector<BuildingValue> buildings;
     /// Changed values of figures, sorted by number and field, each at most once.
@@ -222,9 +227,11 @@ inline constexpr std::uint16_t kBalanceWithRivalEconomy = 6;
 inline constexpr std::uint16_t kBalanceWithStrategy = 7;
 /// The version of the section BALA with the improved computers' war plans.
 inline constexpr std::uint16_t kBalanceWithWar = 8;
+/// The version of the section BALA with the improved computers' budget.
+inline constexpr std::uint16_t kBalanceWithBudget = 9;
 
 /// Every value, in the order of the section BALA.
-inline constexpr std::array<BalanceField, 80> kBalanceFields = {{
+inline constexpr std::array<BalanceField, 82> kBalanceFields = {{
     {"trader", "max_held", &Balance::trader_max_held, 1, 200},
     {"trader", "max_buy", &Balance::trader_max_buy, 1, 200},
     {"trader", "restock_seconds", &Balance::trader_restock_s, 1, 3600},
@@ -309,6 +316,8 @@ inline constexpr std::array<BalanceField, 80> kBalanceFields = {{
     {"computer_strategy", "human_threat_percent", &Balance::ai_human_threat_percent, 0, 1000, kBalanceWithStrategy},
     {"computer_strategy", "war_units", &Balance::ai_war_units, 0, 1000, kBalanceWithWar},
     {"computer_strategy", "war_money", &Balance::ai_war_money, 0, 10'000'000, kBalanceWithWar},
+    {"computer_budget", "horizon_minutes", &Balance::ai_budget_horizon_minutes, 1, 1440, kBalanceWithBudget},
+    {"computer_budget", "cushion_minutes", &Balance::ai_budget_cushion_minutes, 0, 1440, kBalanceWithBudget},
 }};
 
 /// The version of the section BALA that `balance` needs: the first that holds every value that is
