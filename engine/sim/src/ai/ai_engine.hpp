@@ -367,6 +367,28 @@ private:
     [[nodiscard]] Ship* settle_ship(AiPlayer& p);
     [[nodiscard]] std::vector<Ship*> own_ships(const AiPlayer& p);
     bool want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food);
+    /// Open1602 (G4b): an improved rival's one colony decision a step. Of the crops the original's
+    /// order of motives offers (colony_candidates), those its budget carries (colony_commitment, as
+    /// before), the one that ranks highest by colony_rank (Settlement::plan_crop); the plan keeps
+    /// its gold and a ship (plan_ship).
+    void colony_plan(AiPlayer& p, bool asked);
+    /// G4b: the buildings of the chain a colony for `crop` builds, with their counts.
+    struct Chain {
+        std::vector<std::pair<const assets::BuildingType*, std::uint32_t>> parts;
+    };
+    [[nodiscard]] Chain colony_chain(const AiPlayer& p, std::uint8_t crop) const;
+    /// G4b: the running costs a minute of that chain.
+    [[nodiscard]] std::int64_t chain_upkeep(const AiPlayer& p, std::uint8_t crop) const;
+    /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
+    [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
+    /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
+    /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
+    /// home city's houses rise into. Ranks only; it refuses nothing.
+    [[nodiscard]] std::int64_t colony_rank(const AiPlayer& p, std::uint8_t crop);
+    /// Whether a city founded (`founded`, nullptr before the founding) with `land` free tiles and
+    /// `buildings` becomes a colony without houses (stage kColony).
+    [[nodiscard]] bool becomes_colony(const AiPlayer& p, const City* founded, std::uint32_t land,
+                                      std::uint32_t buildings) const;
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
@@ -934,6 +956,8 @@ private:
         std::int64_t reliable = 0;
     };
     mutable std::vector<BudgetCache> m_budgets;
+    /// The step colony_plan last ran in, per player.
+    std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.

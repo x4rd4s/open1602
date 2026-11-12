@@ -96,7 +96,7 @@ bool Engine::ship_idle(AiPlayer& p, const Ship& s) {
     // a plundered ship gets its next job, and the job strikes the flag.
     const ShipNote& n = note(p, s.id);
     return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.explore_steps == 0 &&
-           s.id != p.settle.ship;
+           s.id != p.settle.ship && s.id != p.settle.plan_ship;
 }
 
 void Engine::send_to_city(AiPlayer& p, Ship& s, const City& c) {
@@ -233,6 +233,10 @@ void Engine::logistics(AiPlayer& p) {
             } else {
                 send_to_city(p, *s, *home);
             }
+        }
+        // G4b: the plan of a colony holds while its budget carries it and its crop is still wanted.
+        if (rivals() && !p.pirates) {
+            colony_plan(p, false);
         }
         update_fleet_target(p);
         // Open1602: an improved computer orders no further ship while one of its own lies idle.

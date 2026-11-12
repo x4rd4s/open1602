@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 12;
+inline constexpr std::uint32_t kStateVersion = 13;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -43,6 +43,9 @@ inline constexpr std::uint32_t kStateWithWarPlan = 11;
 /// (Settlement::load_ms, load_food).
 /// Written only while a ship is being loaded.
 inline constexpr std::uint32_t kStateWithColonyLoad = 12;
+/// Version 13: an improved computer's colony plan (Settlement::plan_crop, plan_ms, plan_ship).
+/// Written only while it has one.
+inline constexpr std::uint32_t kStateWithColonyPlan = 13;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -346,7 +349,15 @@ struct Settlement {
     /// Open1602: game time an improved computer called `ship` home to load for a colony, 0 none.
     std::uint64_t load_ms = 0;
     bool load_food = false;  ///< Open1602: the load holds food instead of bricks
+    /// Open1602 (G4b): the crop of the colony an improved computer plans (colony_plan), 0 none;
+    /// kAnyCrop for one that grows food or cloth for its home city.
+    std::uint8_t plan_crop = 0;
+    std::uint64_t plan_ms = 0;    ///< game time the plan was made
+    std::uint32_t plan_ship = 0;  ///< the ship kept for it (no supply runs), 0 none yet
 };
+
+/// Settlement::plan_crop of a colony for food or cloth its home island has no room for.
+inline constexpr std::uint8_t kAnyCrop = 0xFF;
 
 /// A castle the computer recruits in.
 struct CastleEntry {

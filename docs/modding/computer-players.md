@@ -481,6 +481,17 @@ Improved computers weigh the way at sea:
   the other, twenty minutes apart. Once its home city has 300 inhabitants and its people use a
   good none of its islands grows the crop for, it saves the colony's gold (its houses wait), from
   then until the Kontor stands, also while the ship goes home to load.
+- **One colony decision.** An improved rival decides on its next colony once a step, whichever of
+  its orders asks for one, among the crops the original's order of motives offers (its goal's gold
+  or ore, the good its people run out of soonest, the crops none of its islands grows, then the
+  workshops it lacks) and that its budget carries. Of those it takes the one that ranks highest: the
+  taxes of the city the colony becomes (as many houses as the free land of the nearest island it
+  knows for the crop holds beside the fields, as densely as its home city's houses stand, full of
+  the highest class whose goods it will have; none for a city founded as a colony without houses),
+  less the running costs of the crop's chain, plus the houses of the home city that rise with the
+  good. The rank refuses nothing. The plan keeps its gold and a ship that no supply run takes from
+  then on; another crop takes its place only while no ship is kept for it, and the plan ends when
+  its crop is no longer wanted or its budget no longer carries it.
 - **Colony crops.** An improved computer founds its next colony for the good its people use, make
   too little of and run out of soonest, where none of its cities has an island for it yet (alcohol
   from wine, else sugar; tobacco; spices; cocoa), after its goal's gold or ore. The original goes
