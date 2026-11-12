@@ -144,4 +144,14 @@ TEST_CASE("ai supply: a class nobody can rise into yet needs no source for its g
     CHECK(!Supply::rise_needs_source(1 * kT, 2 * kT, 3 * kT));
 }
 
+TEST_CASE("ai supply: a city short of a ware itself gives only while it runs out no sooner than the taker") {
+    constexpr std::uint32_t kT = 32;
+    // Both 2 t short a minute, 100 t against 20 t: 40 t evens them out at 60 t each.
+    CHECK(Supply::share(100 * kT, 2 * kT, 20 * kT, 2 * kT, 10) == 40 * kT);
+    // A giver that runs out sooner than the taker gives nothing: the starving colony keeps its food.
+    CHECK(Supply::share(20 * kT, 4 * kT, 100 * kT, 1 * kT, 10) == 0);
+    // A taker that makes enough: the giver keeps what lasts it until a run is back.
+    CHECK(Supply::share(100 * kT, 2 * kT, 0, 0, 10) == 80 * kT);
+}
+
 }  // namespace o1602::sim::ai

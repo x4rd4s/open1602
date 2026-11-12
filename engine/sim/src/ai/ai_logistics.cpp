@@ -644,7 +644,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 const bool takes = supply(c, w) <= demand(c, w) && supply(*home, w) > demand(*home, w);
                 const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                 if (!takes && std::ranges::count(routed_wares(p, 0, c), w) == 0 &&
-                    own_spare(c, w, reserve, is_home(p, c), sec, supply_load(p)) != 0) {
+                    own_spare(c, w, reserve, is_home(p, c), *home, sec) != 0) {
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
                         nearest_s = sec;
@@ -980,28 +980,30 @@ std::uint32_t Engine::inbound(AiPlayer& p, std::uint32_t ship, const City& to, s
     return static_cast<std::uint32_t>(std::min<std::uint64_t>(sum, 0xFFFFFFFFU));
 }
 
-std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home, std::uint32_t seconds,
-                                std::uint32_t load) const {
+std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home, const City& to,
+                                std::uint32_t seconds) const {
     // Open1602: what an improved computer's city can give of a ware to another of its cities (only
-    // improved computers move goods between their cities): what it has beyond the reserve and
-    // beyond what it uses more than it makes until a ship could be back with more
-    // (resupply_minutes). A home city that makes less than it uses gives none: the home city pays
-    // for the others. A colony that makes less still gives what lasts it beyond that: it held its
-    // alcohol in store while the home city, which pays for it, ran dry.
+    // improved computers move goods between their cities): what it has beyond the reserve. A home
+    // city that makes less than it uses gives none: the home city pays for the others. Another city
+    // that makes less than it uses gives only while it runs out no sooner than the city it gives to
+    // (Supply::share): a colony that gave its food away while its own deficit grew starved, and one
+    // that kept all it made while the home city ran dry held its alcohol in store.
     const std::uint32_t used = population(c) != 0 ? use_rate(c, w) : 0;
     const std::uint32_t made = made_rate(c, w);
     if (home && used != 0 && made <= used) {
         return 0;
     }
-    // A city short of the ware itself keeps what a run would fill it up to (target_stock): one that
-    // gave its food away while its own deficit grew starved.
-    const std::uint64_t keep =
-        used > made
-            ? std::max<std::uint64_t>(reserve, Supply::target(used, made, resupply_minutes(seconds), load, 0xFFFFFFFFU))
-            : reserve;
+    std::uint64_t spare = c.stock(w) > reserve ? c.stock(w) - reserve : 0;
+    if (used > made) {
+        const std::uint32_t taken_used = population(to) != 0 ? use_rate(to, w) : 0;
+        const std::uint32_t taken_made = made_rate(to, w);
+        spare = std::min(
+            spare, Supply::share(c.stock(w), used - made, to.stock(w),
+                                 taken_used > taken_made ? taken_used - taken_made : 0, resupply_minutes(seconds)));
+    }
     // Less than kMinSupplyRun is not worth a run: ships sailed for a ton or four and crowded the
     // narrow harbours of the cities they left.
-    return c.stock(w) >= keep + kMinSupplyRun ? static_cast<std::uint32_t>(c.stock(w) - keep) : 0;
+    return spare >= kMinSupplyRun ? static_cast<std::uint32_t>(spare) : 0;
 }
 
 std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
@@ -1286,7 +1288,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             } else {
                 // no more than the city can spare (own_spare), so that it does not run dry
                 const std::uint32_t reserve = building_material(w) ? 28 * kTon : 5 * kTon;
-                amount = std::min(amount, own_spare(from, w, reserve, is_home(p, from), seconds, supply_load(p)));
+                amount = std::min(amount, own_spare(from, w, reserve, is_home(p, from), home, seconds));
             }
             if (amount == 0) {
                 continue;

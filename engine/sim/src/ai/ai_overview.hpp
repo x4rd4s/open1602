@@ -129,6 +129,22 @@ struct Supply {
         const std::uint64_t want = net * minutes + load;
         return static_cast<std::uint32_t>(want < capacity ? want : capacity);
     }
+    /// What a city short of a ware itself (`given`, `given_net` a minute beyond what it makes) can
+    /// give another (`taken`, `taken_net`) so that afterwards it runs out no sooner than the other
+    /// against a run of `minutes`: whoever would run out sooner gets the goods. 0 when it would.
+    [[nodiscard]] static constexpr std::uint64_t share(std::uint32_t given, std::uint32_t given_net,
+                                                       std::uint32_t taken, std::uint32_t taken_net,
+                                                       std::uint32_t minutes) noexcept {
+        // (given - x) / given_net - minutes >= (taken + x) / taken_net - minutes, solved for x;
+        // a taker that makes enough keeps the giver at what lasts it until a run is back.
+        const std::int64_t g = given;
+        const std::int64_t gn = given_net;
+        const std::int64_t t = taken;
+        const std::int64_t tn = taken_net;
+        const std::int64_t m = minutes;
+        const std::int64_t x = tn == 0 ? g - gn * m : (tn * (g - gn * m) - gn * (t - tn * m)) / (gn + tn);
+        return x > 0 ? static_cast<std::uint64_t>(x) : 0;
+    }
     /// Whether a rise into a class needs a source for one of its goods: the city's use now (`use`)
     /// and what this rise adds (`added`, 0 while nobody lives in the class below) exceed what it makes.
     /// The next rises of the other classes do not count: asked a source for them, the gate of a

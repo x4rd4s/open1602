@@ -477,9 +477,10 @@ Improved computers weigh the way at sea:
 - **Ships per route.** Where a ware's source lies far away, several ships run for it: as many as
   the shortfall a minute times the round trip (with two minutes at the Kontors) takes, counted in
   half holds, at most four per ware. A source counts only for what it can spare: an own city what it
-  holds beyond its reserve (28 t of building materials, else 5 t) and, where it uses more than it
-  makes itself, beyond what a run would fill it up to: a colony that gave its food away while its
-  own deficit grew starved; a home city that makes less than it uses gives none; a
+  holds beyond its reserve (28 t of building materials, else 5 t); where it uses more than it
+  makes itself, only so much that afterwards it runs out no sooner than the city it gives to
+  (whoever would run out sooner gets the goods): a colony that gave its food away while its own
+  deficit grew starved, and one that kept all it made held its alcohol while the home city ran dry; a home city that makes less than it uses gives none; a
   partner only what it sells beyond what it keeps and 5 t, less what the computer's ships are
   already on their way to load there; natives only as far as the goodwill pays. No ship sails for
   less than 10 t. When the source makes too little, no further ship sails; the shortfall shows as

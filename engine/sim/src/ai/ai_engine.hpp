@@ -694,10 +694,10 @@ private:
                                      std::optional<std::uint16_t> island = std::nullopt) const;
     /// `seconds`: the way to the city it gives to; an improved rival keeps what it uses beyond what it
     /// makes until a ship could be back (resupply_minutes).
-    /// `load`: what one run brings (supply_load); a city short of `w` itself keeps what a run would
-    /// fill it up to.
+    /// `to`: the city it gives to, `seconds` away; a city short of `w` itself gives only while it runs
+    /// out no sooner than `to` (Supply::share).
     [[nodiscard]] std::uint32_t own_spare(const City& c, std::uint8_t w, std::uint32_t reserve, bool home,
-                                          std::uint32_t seconds, std::uint32_t load) const;
+                                          const City& to, std::uint32_t seconds) const;
     /// Improved computers: what the other supply ships (not `ship`) and the trade cart bring of `w` to
     /// `to`: on board, or what their routes load before they did (only on board when `loaded`).
     [[nodiscard]] std::uint32_t inbound(AiPlayer& p, std::uint32_t ship, const City& to, std::uint8_t w, bool loaded);
