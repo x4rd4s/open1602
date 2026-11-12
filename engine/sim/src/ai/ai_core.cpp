@@ -77,6 +77,7 @@ void Engine::log(const AiPlayer& p, const char* format, ...) const {
 void Engine::reset() {
     m_state.players.clear();
     m_overviews.clear();
+    m_budgets.clear();
     for (std::size_t i = 0; i < m_world.players().size(); ++i) {
         const Player& pl = m_world.players()[i];
         if ((pl.role != PlayerRole::Computer && m_world.behaviour(pl) != FactionBehaviour::Pirates) ||
@@ -171,6 +172,7 @@ void Engine::tick(std::uint32_t dt_ms) {
     }
     const auto dt = static_cast<std::int32_t>(dt_ms);
     m_census.valid = false;
+    m_budgets.clear();  // gold_budget's flows are worked out anew in each step
     m_in_tick = true;
     struct Leave {
         Engine& e;

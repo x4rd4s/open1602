@@ -67,6 +67,8 @@ are needed; the needs of the inhabitants and the prices of the wares are still o
 | `computer_strategy` | `pressure_percent` | 150 | 100–1000 | a near rival that much weaker (in percent of its strength) is pressed: armed against, offered no peace; 25 less for a conqueror, 50 more for a trader, 10 less per level |
 | `computer_strategy` | `human_threat_percent` | 15 | 0–1000 | from the third level on, a human's strength counts this much more per level |
 | `computer_strategy` | `war_units`, `war_money` | 6, 1500 | 0–1000, 0–10000000 | a computer that arms for a war declares it with an army of so many soldiers and so much gold in hand (BALA version 8) |
+| `computer_budget` | `horizon_minutes` | 30 | 1–1440 | an improved computer reckons its gold this many minutes ahead before a plan that costs gold: a building other than a house, producer, market or Kontor, a ship, a colony (BALA version 9) |
+| `computer_budget` | `cushion_minutes` | 5 | 0–1440 | ... and keeps this many minutes of what it pays out at all times beyond the taxes of its cities that have their food: running costs, its army's upkeep and the goods its inhabitants use that it buys |
 
 The `computers` values are the original's cheats: what the computer players get from nowhere, on
 every difficulty ([computer-players.md](computer-players.md#what-they-get-from-nowhere)). Values of

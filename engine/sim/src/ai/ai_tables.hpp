@@ -149,7 +149,8 @@ inline constexpr std::uint32_t kOriginalCityLimit = 4;
 inline constexpr std::array<std::uint32_t, 4> kCityLimitMost{6, 8, 10, 12};
 /// Scaled, a computer founds a city for room to grow (wants_room) once one of its cities reached
 /// the citizens, with kRoomMoney gold and kRoomIncome gold a minute per city above what it pays,
-/// kRoomPauseMs after its last settlement event.
+/// kRoomPauseMs after its last settlement event; an improved computer once its budget carries the
+/// colony (gold_budget) instead of the gold and income.
 inline constexpr std::int32_t kRoomMoney = 20'000;
 inline constexpr std::int32_t kRoomIncome = 100;
 inline constexpr std::uint64_t kRoomPauseMs = 600'000;

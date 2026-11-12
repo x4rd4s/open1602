@@ -1264,7 +1264,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // Open1602: an improved computer whose people want a good none of its islands grows the crop
     // for asks for the colony at every look of its home city, once the gold for it is saved
     // (colony_savings); the orders asked only at their steps, hours apart.
-    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) + buy_reserve(p) &&
+    if (&c == home_city(p) && colony_savings(p) != 0 && player(p).money >= colony_money(p) &&
         want_colony(p, 3, false, false)) {
         return;
     }

@@ -1086,6 +1086,28 @@ TEST_CASE("save format: closed city gates come back (version 3 of PSTA)") {
     }
 }
 
+TEST_CASE("save format: a young city's closed minutes come back, so the computers' budget sees it young") {
+    // Improved computers keep a colony's expected costs in their budget while its statistics cover
+    // fewer minutes than the horizon (ai_budget.cpp, young_colony): the count must survive a save.
+    const auto buildings = make_buildings();
+    for (const std::uint32_t minutes : {1U, 29U, 30U}) {
+        sim::World world = make_world(buildings, false);
+        REQUIRE(!world.cities().empty());
+        sim::City& city = *world.city(world.cities()[0].island, world.cities()[0].index);
+        for (std::uint32_t m = 0; m < minutes; ++m) {
+            city.book(14, sim::GoodsFlow::Bought, 32);
+            city.ledger.close_minute(city.goods);
+        }
+        auto loaded = sim::read_game(save(world, buildings), buildings, nullptr);
+        REQUIRE(loaded.ok());
+        const sim::City* back = loaded->city(city.island, city.index);
+        REQUIRE(back != nullptr);
+        CHECK(back->ledger.minutes_closed() == minutes);
+        const std::uint32_t horizon = world.balance().ai_budget_horizon_minutes;
+        CHECK((back->ledger.minutes_closed() < horizon) == (city.ledger.minutes_closed() < horizon));
+    }
+}
+
 TEST_CASE("save format: the goods statistics of the cities come back (GLDG)") {
     const auto buildings = make_buildings();
     sim::World world = make_world(buildings, false);
