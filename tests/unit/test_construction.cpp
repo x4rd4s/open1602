@@ -1974,12 +1974,12 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
     CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id + 100, 24, 20).ok());
     CHECK(!editor::stop_patrol(island.world, soldier.id).ok());  // none yet
     {
-        // A clearing of one tile in the forest (world 32, 17): no unit goes there, it could never
-        // leave, and no patrol leads there, the unit would find no way in.
+        // A clearing of one tile in the forest (world 32, 17): a unit may stand there, but no
+        // patrol leads there, the unit would find no way in.
         sim::World walled = island.world;
         REQUIRE(walled.island(0).map.place(*island.buildings.by_id(kGround), 22, 7, 0, 0).ok());
-        CHECK(editor::unit_fits(walled, island.buildings, 32, 17) == UnitRefusal::ShutIn);
-        CHECK(!editor::place_unit(walled, island.buildings, *figures, 0, 1, 32, 17, 0).ok());
+        CHECK(editor::unit_fits(walled, island.buildings, 32, 17) == UnitRefusal::None);
+        CHECK(editor::place_unit(walled, island.buildings, *figures, 0, 1, 32, 17, 0).ok());
         auto no_way = editor::set_patrol(walled, island.buildings, soldier.id, 32, 17);
         REQUIRE(!no_way.ok());
         CHECK(no_way.error().code == annokit::core::ErrorCode::Unsupported);

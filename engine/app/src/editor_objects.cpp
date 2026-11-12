@@ -1364,8 +1364,6 @@ std::string MapViewer::editor_figure_refusal(editor::UnitRefusal refused, const 
             return ui::tr("editor.objects.refused.cart_market");
         case R::CartLimit:
             return ui::tr("editor.objects.refused.cart_limit");
-        case R::ShutIn:
-            return ui::tr("editor.objects.refused.shut_in");
         case R::NoOwner:
             if (editor_cart()) {
                 return ui::tr("editor.objects.refused.cart_owner");

@@ -1879,7 +1879,6 @@ editor.objects.refused.cart_near = A trade cart stands there already.
 editor.objects.refused.cart_road = A trade cart needs a road or ground it can drive on.
 editor.objects.refused.cart_market = A trade cart starts beside a Kontor or market of its owner.
 editor.objects.refused.cart_limit = The owner already has as many trade carts on this island as the game gives it.
-editor.objects.refused.shut_in = The unit would be shut in there: no ground it walks on beside it.
 editor.objects.refused.cart_owner = Only players and computers have trade carts.
 editor.objects.refused.resource.0 = Resources lie only on islands.
 editor.objects.refused.resource.1 = A vein goes into an ore mountain.

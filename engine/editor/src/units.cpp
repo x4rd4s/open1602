@@ -114,12 +114,6 @@ bool walks_on(const sim::LandMap& land, std::int32_t x, std::int32_t y) {
     return land.tile(x, y, 0, nullptr) == sim::LandMap::Cell::Walk;
 }
 
-/// Whether a soldier on world tile (x, y) can step off it: one of the four tiles beside it is
-/// ground it walks on. A step across a corner needs both tiles beside it free, as in the game.
-bool can_leave(const sim::LandMap& land, std::int32_t x, std::int32_t y) {
-    return walks_on(land, x + 1, y) || walks_on(land, x - 1, y) || walks_on(land, x, y + 1) || walks_on(land, x, y - 1);
-}
-
 /// Whether a soldier finds a way from world tile `from` to `to` on the island they lie on, by the
 /// game's rules: tiles it walks on, no corner cut past a tile it does not.
 bool way_between(const sim::World& world, const sim::LandMap& land, std::uint32_t fx, std::uint32_t fy,
@@ -178,9 +172,6 @@ UnitRefusal unit_fits(const sim::World& world, const assets::BuildingTable& buil
     const assets::BuildingType* ground = land.building(ix, iy);
     if (land.island_at(ix, iy) == sim::World::kSea || (ground != nullptr && !sim::soldiers_walk_on(*ground))) {
         return UnitRefusal::NoGround;
-    }
-    if (!can_leave(land, ix, iy)) {
-        return UnitRefusal::ShutIn;  // it could never move
     }
     for (const sim::Soldier& s : world.soldiers()) {
         if (s.pos_x / sim::kPosUnit == ix && s.pos_y / sim::kPosUnit == iy) {
@@ -418,7 +409,7 @@ annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& w
         return make_error(ErrorCode::NotFound, "no such unit");
     }
     UnitRefusal refused = unit_fits(world, buildings, x, y);
-    if (refused == UnitRefusal::Taken || refused == UnitRefusal::ShutIn) {
+    if (refused == UnitRefusal::Taken) {
         // Another unit standing there now does not keep this one away; whether it gets there at
         // all the way below tells.
         refused = UnitRefusal::None;
@@ -495,8 +486,6 @@ const char* refusal_name(UnitRefusal refusal) noexcept {
             return "no Kontor or market of its owner within reach";
         case UnitRefusal::CartLimit:
             return "no further cart for its owner on the island";
-        case UnitRefusal::ShutIn:
-            return "no way off the tile";
     }
     return "unknown";
 }

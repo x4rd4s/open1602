@@ -30,7 +30,6 @@ enum class UnitRefusal : std::uint8_t {
     NoRoad,     ///< a trade cart off the ground carts drive on
     NoMarket,   ///< a trade cart out of reach of a Kontor or market of its owner
     CartLimit,  ///< a trade cart more than its owner may have on the island
-    ShutIn,     ///< a land unit on ground with no way off it (no neighbour it walks on)
 };
 
 /// Whether a ship can go on world tile (x, y): water ships sail on, no other ship within a tile.

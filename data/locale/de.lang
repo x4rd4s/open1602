@@ -1809,7 +1809,6 @@ editor.objects.refused.cart_near = Dort steht schon ein Handelskarren.
 editor.objects.refused.cart_road = Ein Handelskarren braucht einen Weg oder Boden, auf dem er fahren kann.
 editor.objects.refused.cart_market = Ein Handelskarren beginnt neben einem Kontor oder Markt seines Besitzers.
 editor.objects.refused.cart_limit = Der Besitzer hat auf dieser Insel schon so viele Handelskarren, wie das Spiel ihm gibt.
-editor.objects.refused.shut_in = Dort wäre die Einheit eingeschlossen: Daneben ist kein Boden, den sie betreten kann.
 editor.objects.refused.cart_owner = Handelskarren haben nur Spieler und Computer.
 editor.objects.refused.resource.0 = Vorkommen gibt es nur auf Inseln.
 editor.objects.refused.resource.1 = Eine Ader gehört in einen Erzberg.
