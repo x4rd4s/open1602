@@ -461,6 +461,9 @@ private:
     void editor_ship_model(EditorModel& m) const;
     void editor_ship_request(const EditorRequest& request);
     void editor_unit_model(EditorModel& m) const;
+    /// The name of land unit figure `figure` as the game shows it (a package's own name, else the
+    /// game's text of its kind); empty if it has none.
+    [[nodiscard]] std::string editor_unit_name(std::uint16_t figure) const;
     void editor_unit_request(const EditorRequest& request);
     /// The selected unit's patrol to world tile `tile` (the map's click after "Patrol").
     void editor_set_patrol(const render::TilePos& tile);

@@ -1837,7 +1837,13 @@ void MapViewer::editor_properties(EditorModel& m) const {
             if (soldier == nullptr) {
                 return;
             }
-            m.selection = ui::tr("editor.prop.unit");
+            if (soldier->figure == assets::figure::kSpearman) {
+                m.selection = ui::tr("editor.objects.unit.spearman");
+            } else if (std::string name = editor_unit_name(soldier->figure); !name.empty()) {
+                m.selection = std::move(name);
+            } else {
+                m.selection = ui::tr("editor.prop.unit");
+            }
             add("editor.prop.owner", owner_name(world, soldier->owner));
             add("editor.prop.position", tiles(static_cast<std::uint32_t>(std::max(0, soldier->pos_x / 4096)),
                                               static_cast<std::uint32_t>(std::max(0, soldier->pos_y / 4096))));

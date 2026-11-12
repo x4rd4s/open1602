@@ -1515,6 +1515,7 @@ editor.unit.patrol_pick = Click where the unit patrols to: from the start of the
 editor.unit.patrol_set = The unit patrols from the start of the game.
 editor.unit.patrol_ended = The unit no longer patrols.
 editor.unit.patrol_refused = A patrol goes only to ground the unit walks on, on its own island.
+editor.unit.patrol_no_way = The unit finds no way there.
 editor.objects.mark.patrol = Patrol
 editor.step.city_owner = owner changed
 editor.crop.tobacco = Tobacco

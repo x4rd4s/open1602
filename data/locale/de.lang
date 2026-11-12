@@ -1445,6 +1445,7 @@ editor.unit.patrol_pick = Klicke, wohin die Einheit patrouilliert: Ab Spielbegin
 editor.unit.patrol_set = Die Einheit patrouilliert ab Spielbeginn.
 editor.unit.patrol_ended = Die Einheit patrouilliert nicht mehr.
 editor.unit.patrol_refused = Eine Patrouille führt nur auf Boden, den die Einheit betreten kann, auf ihrer eigenen Insel.
+editor.unit.patrol_no_way = Dorthin findet die Einheit keinen Weg.
 editor.objects.mark.patrol = Patrouille
 editor.step.city_owner = Besitzer gewechselt
 editor.crop.tobacco = Tabak

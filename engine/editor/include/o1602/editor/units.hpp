@@ -94,8 +94,9 @@ enum class UnitRefusal : std::uint8_t {
 
 /// Land unit `id` patrols from where it stands to world tile (x, y) and back, from the game's start,
 /// as the game's patrol order sends it (its two waypoints, back and forth). The tile must be ground
-/// a unit walks on, of the island the unit stands on. Fails (NotFound) without the unit,
-/// (InvalidFormat) with the refusal's name where the tile does not do.
+/// a unit walks on, of the island the unit stands on, and the unit must find a way there as the
+/// game's land paths do. Fails (NotFound) without the unit, (InvalidFormat) with the refusal's
+/// name where the tile does not do, (Unsupported) where the unit finds no way there.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_patrol(const sim::World& world,
                                                                            const assets::BuildingTable& buildings,
                                                                            std::uint32_t id, std::int64_t x,

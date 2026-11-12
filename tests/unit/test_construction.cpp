@@ -1974,6 +1974,24 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
     CHECK(!editor::set_patrol(island.world, island.buildings, soldier.id + 100, 24, 20).ok());
     CHECK(!editor::stop_patrol(island.world, soldier.id).ok());  // none yet
     {
+        // A clearing of one tile in the forest (world 32, 17): a unit may stand there, but no
+        // patrol leads there, the unit would find no way in.
+        sim::World walled = island.world;
+        REQUIRE(walled.island(0).map.place(*island.buildings.by_id(kGround), 22, 7, 0, 0).ok());
+        CHECK(editor::unit_fits(walled, island.buildings, 32, 17) == UnitRefusal::None);
+        CHECK(editor::place_unit(walled, island.buildings, *figures, 0, 1, 32, 17, 0).ok());
+        auto no_way = editor::set_patrol(walled, island.buildings, soldier.id, 32, 17);
+        REQUIRE(!no_way.ok());
+        CHECK(no_way.error().code == annokit::core::ErrorCode::Unsupported);
+        // Two tiles that touch only at a corner are no way either: the game cuts no corner.
+        REQUIRE(walled.island(0).map.place(*island.buildings.by_id(kGround), 23, 8, 0, 0).ok());
+        REQUIRE(walled.island(0).map.place(*island.buildings.by_id(kGround), 23, 7, 0, 0).ok());
+        CHECK(editor::unit_fits(walled, island.buildings, 32, 17) == UnitRefusal::None);
+        CHECK(!editor::set_patrol(walled, island.buildings, soldier.id, 32, 17).ok());  // still shut in the forest
+        // Around the forest it goes.
+        CHECK(editor::set_patrol(walled, island.buildings, soldier.id, 36, 17).ok());
+    }
+    {
         auto patrol = editor::set_patrol(island.world, island.buildings, soldier.id, 24, 20);
         REQUIRE(patrol.ok());
         (*patrol)->apply(island.world);

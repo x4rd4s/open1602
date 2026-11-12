@@ -489,6 +489,9 @@ void MapViewer::editor_object_model(EditorModel& m) const {
                 m.object_name = ui::tr("editor.objects.unit.spearman");
             } else if (tool == Tool::Unit && figure == assets::figure::kTradeCart) {
                 m.object_name = ui::tr("editor.objects.unit.cart");
+            } else if (const std::string name = tool == Tool::Unit ? editor_unit_name(figure) : std::string();
+                       !name.empty()) {
+                m.object_name = name;  // as the game names it (in the installed game's language)
             } else if (index < 4) {
                 m.object_name = ui::tr(key + std::to_string(index));
             } else {
@@ -667,6 +670,21 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
     m.ship = std::move(ship);
 }
 
+std::string MapViewer::editor_unit_name(std::uint16_t figure) const {
+    if (const assets::OwnUnit* unit = assets::find_own_unit(m_own_units, figure)) {
+        return unit->name(ui::current_language());
+    }
+    const assets::FigureType* type = m_figures.get(figure);
+    const assets::TextTable* texts = m_hud ? m_hud->texts() : nullptr;
+    if (type == nullptr || texts == nullptr || type->kind < 1 || type->kind > 4) {
+        return {};
+    }
+    // [FIGKIND] by the figure's kind, as the game's unit panel names it.
+    const std::vector<std::string>& lines = texts->section("FIGKIND");
+    const auto kind = static_cast<std::size_t>(type->kind);
+    return kind < lines.size() ? lines[kind] : std::string();
+}
+
 void MapViewer::editor_unit_model(EditorModel& m) const {
     if (m_editor->pick.kind != EditorPick::Kind::Soldier) {
         return;
@@ -708,7 +726,9 @@ void MapViewer::editor_set_patrol(const render::TilePos& tile) {
     m_editor->patrol_for.reset();
     auto op = editor::set_patrol(m_editor->document.world(), m_buildings, id, tile.x, tile.y);
     if (!op) {
-        editor_notice(ui::tr("editor.unit.patrol_refused"), true, op.error().message);
+        const bool no_way = op.error().code == annokit::core::ErrorCode::Unsupported;
+        editor_notice(ui::tr(no_way ? "editor.unit.patrol_no_way" : "editor.unit.patrol_refused"), true,
+                      op.error().message);
         return;
     }
     m_editor->document.perform(std::move(op).value());
