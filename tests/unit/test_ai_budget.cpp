@@ -131,4 +131,17 @@ TEST_CASE("ai supply: a run is due when the stock lasts less than the run takes"
     CHECK(Supply::slack(Supply::kNever, 6) > 0);
 }
 
+TEST_CASE("ai supply: a class nobody can rise into yet needs no source for its goods") {
+    constexpr std::uint32_t kT = 32;
+    // Nobody lives in the class below, nobody uses the good: the gate stays open without a source.
+    CHECK(!Supply::rise_needs_source(0, 0, 0));
+    CHECK(Supply::rise_stock(0, 0, 0, 10) == 0);
+    // Half the class below rising adds 2 t a minute the city does not make: a source is needed, and
+    // ten minutes of it in store.
+    CHECK(Supply::rise_needs_source(0, 2 * kT, 0));
+    CHECK(Supply::rise_stock(0, 2 * kT, 0, 10) == 20 * kT);
+    // A city that makes enough for its people after the rise needs none.
+    CHECK(!Supply::rise_needs_source(1 * kT, 2 * kT, 3 * kT));
+}
+
 }  // namespace o1602::sim::ai

@@ -1932,12 +1932,12 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
         if (w == food) {
             continue;
         }
-        // What the city will use after this rise: its people's use now and what the risers add. Not
-        // demand_ahead, which counts every class's next rise: with nobody in the class below, the
-        // rise adds nothing, and asking a source for it held the gate shut for the whole game.
-        const std::uint64_t use = std::uint64_t{demand(c, w)} + ascent_extra(c, k, w);
-        const std::uint64_t made = made_rate(c, w);
-        if (use <= made) {
+        // What the city will use after this rise: its people's use now and what the risers add
+        // (Supply::rise_needs_source).
+        const std::uint32_t use = demand(c, w);
+        const std::uint32_t added = ascent_extra(c, k, w);
+        const std::uint32_t made = made_rate(c, w);
+        if (!Supply::rise_needs_source(use, added, made)) {
             continue;
         }
         std::uint16_t price = 0;
@@ -1946,7 +1946,7 @@ bool Engine::ascent_ready(AiPlayer& p, const City& c, std::size_t k) {
             return false;
         }
         const std::uint32_t seconds = sail_seconds(p, city_point(c), city_point(m_world.cities()[*src]));
-        const std::uint64_t store = (use - made) * resupply_minutes(seconds);
+        const std::uint64_t store = Supply::rise_stock(use, added, made, resupply_minutes(seconds));
         if (store > c.capacity || c.stock(w) < store) {
             return false;
         }

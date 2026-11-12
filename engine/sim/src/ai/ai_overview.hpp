@@ -129,6 +129,21 @@ struct Supply {
         const std::uint64_t want = net * minutes + load;
         return static_cast<std::uint32_t>(want < capacity ? want : capacity);
     }
+    /// Whether a rise into a class needs a source for one of its goods: the city's use now (`use`)
+    /// and what this rise adds (`added`, 0 while nobody lives in the class below) exceed what it makes.
+    /// The next rises of the other classes do not count: asked a source for them, the gate of a
+    /// class nobody could rise into yet stayed shut for the whole game.
+    [[nodiscard]] static constexpr bool rise_needs_source(std::uint32_t use, std::uint32_t added,
+                                                          std::uint32_t made) noexcept {
+        return std::uint64_t{use} + added > made;
+    }
+    /// The stock of such a good the city holds before the rise: what it will use beyond what it makes
+    /// until a ship from its source (`minutes` away there and back) could bring more.
+    [[nodiscard]] static constexpr std::uint64_t rise_stock(std::uint32_t use, std::uint32_t added, std::uint32_t made,
+                                                            std::uint32_t minutes) noexcept {
+        const std::uint64_t after = std::uint64_t{use} + added;
+        return after > made ? (after - made) * minutes : 0;
+    }
     /// How much sooner the stock runs out than a run takes, 1/256 minute: below 0 a run is due.
     [[nodiscard]] static constexpr std::int64_t slack(std::uint64_t cover, std::uint32_t minutes) noexcept {
         const std::uint64_t c = cover < (std::uint64_t{1} << 62) ? cover : (std::uint64_t{1} << 62);
