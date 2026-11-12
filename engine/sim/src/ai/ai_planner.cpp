@@ -1303,8 +1303,12 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                     large = large || population(o) >= at.ai_colony_large_city;
                 }
             }
-            if (r.land < at.ai_colony_below_land || building_count(c) > at.ai_colony_buildings || big_cities > 1 ||
-                large) {
+            // Open1602: an improved rival settles a colony with land enough for a main city (kGrowFrom)
+            // however many cities it has; the original made every city after its second a colony
+            // without houses, whose land lay empty.
+            const bool room = rivals() && !p.pirates && r.land >= kGrowFrom;
+            if (r.land < at.ai_colony_below_land ||
+                (!room && (building_count(c) > at.ai_colony_buildings || big_cities > 1 || large))) {
                 set_stage(p, r, stage::kColony);
                 return;
             }
