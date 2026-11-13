@@ -369,6 +369,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # the branch a pull request goes into, for the computer players' constants
       - name: Install clang-format 18
         timeout-minutes: 35
         run: .github/scripts/apt-install.sh clang-format-18
@@ -381,6 +383,13 @@ jobs:
       - name: Check the repository holds only our own work
         # No files of the original game and no references into the original program (tools/check_public.py).
         run: python3 -I tools/check_public.py
+      - name: Check the computer players bring no new constant
+        # A number or named value a pull request adds to the computer players needs its derivation in
+        # tools/ai_constants_allowlist.txt (docs/ai-measurement.md).
+        if: github.event_name == 'pull_request'
+        run: python3 -I tools/check_ai_constants.py "origin/${{ github.base_ref }}"
+      - name: Test the measurement tools
+        run: python3 -I -m unittest discover -s tests/tools
       - name: Check the Python scripts compile
         # Syntax only: the tools run on the developer's machine, with the original data (BT-22).
         run: git ls-files -z '*.py' | xargs -0 python3 -c 'import sys; [compile(open(f, encoding="utf-8").read(), f, "exec") for f in sys.argv[1:]]'

@@ -613,6 +613,22 @@ TEST_CASE("ai arena: improved computers that like each other become allies, the 
     }
 }
 
+TEST_CASE("ai arena: a measurement's delay of the first steps changes only when it is set") {
+    // o1602-tool bench --ai-phase (tools/measure): runs of one world that differ by chance alone.
+    const auto after = [](std::uint32_t delay) {
+        Arena a;
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        if (delay != ~0U) {
+            s.computers().delay_first_step(delay);
+        }
+        run(s, 120'000);
+        return s.state_hash();
+    };
+    const std::uint64_t plain = after(~0U);
+    CHECK(after(0) == plain);
+    CHECK(after(3) != plain);
+}
+
 TEST_CASE("ai arena: improved computers draw a character and keep it through a save, the original's draw none") {
     for (const bool classic : {false, true}) {
         Arena a;

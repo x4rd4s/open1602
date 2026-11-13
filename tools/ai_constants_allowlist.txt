@@ -1,0 +1,4 @@
+# Values the computer players' code may bring in although they are numbers or names of their own
+# (tools/check_ai_constants.py). One per line:
+#     VALUE | PATH (a glob) | derived from: WHAT IT FOLLOWS FROM
+# An entry without its derivation is not taken.

@@ -199,6 +199,7 @@ public:
     // ai_core.cpp
     void tick(std::uint32_t dt_ms);
     void reset();
+    void delay_first_step(std::uint32_t steps) { m_delay_steps = steps; }
     void init_player(AiPlayer& p);
     /// Gives every computer slot without a state one (reset() makes them for the slots of the start).
     void adopt_new_computers();
@@ -1025,6 +1026,9 @@ private:
     std::vector<std::uint64_t> m_report_ms;
     /// The computer log only: the stage order's entry a player's last look stopped at.
     std::vector<std::int32_t> m_last_need;
+    /// A measurement's delay of each computer's first step (delay_first_step), and whom it reached.
+    std::uint32_t m_delay_steps = 0;
+    std::vector<bool> m_delayed;
 };
 
 /// Ring iterator: ring d (Chebyshev distance d + 1) around the

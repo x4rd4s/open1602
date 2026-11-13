@@ -42,6 +42,10 @@ public:
 
     /// Rebuilds the state of every computer player from the world (AI_Init).
     void reset();
+    /// For measurements only (o1602-tool bench --ai-phase): each computer's first step comes
+    /// `steps` steps later, so that runs of the same world show what chance alone moves. No game
+    /// calls it; 0 leaves every run as it was.
+    void delay_first_step(std::uint32_t steps);
 
     /// A ship a computer player or the pirates direct themselves (a nest founding): the pirates'
     /// own wandering leaves it alone.
