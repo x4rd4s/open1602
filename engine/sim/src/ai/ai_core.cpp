@@ -182,6 +182,9 @@ void Engine::tick(std::uint32_t dt_ms) {
         }
     } leave{*this};
     island_controller();
+    if (logging() && rivals()) {
+        log_supply();
+    }
     const bool computers_play =
         m_sim.rules().computers_play((m_world.game_settings().flags & World::GameSettings::kNoComputers) != 0);
     for (AiPlayer& p : m_state.players) {
@@ -892,6 +895,36 @@ void Engine::report(AiPlayer& p) {
             food_ahead(*c) ? 1 : 0, supplies_growth(*c) ? 1 : 0, unsigned{lacking_ware(*c, true)},
             goods_lacking(*c) ? 1 : 0, static_cast<long long>(yard_savings(p)),
             critical_short(p.player, ware::kAlcohol), critical_short(p.player, ware::kCloth));
+    }
+}
+
+void Engine::log_supply() {
+    // At each coarse sample of a city's goods statistics, what an improved rival's own ships
+    // brought it in that time, by ware, beside what its people ask for and its producers make:
+    // whether a colony's crop reaches the cities that lack it (only the log).
+    const auto& cities = m_world.cities();
+    m_supply_logged.resize(cities.size(), 0);
+    for (const AiPlayer& p : m_state.players) {
+        if (p.pirates) {
+            continue;
+        }
+        for (std::size_t i = 0; i < cities.size(); ++i) {
+            const City& c = cities[i];
+            const std::uint32_t closed = c.ledger.minutes_closed();
+            if (c.owner != p.player || closed == 0 || closed % GoodsLedger::kQuarterMinutes != 0 ||
+                m_supply_logged[i] == closed) {
+                continue;
+            }
+            m_supply_logged[i] = closed;
+            for (const std::uint8_t w : m_world.goods().trade_wares()) {
+                const std::uint64_t in = c.ledger.totals(w, GoodsLedger::kQuarterMinutes).of(GoodsFlow::ShippedIn);
+                if (in != 0) {
+                    log(p, "supply: city %u/%u ware %u shipped in %llu (demand %u, supply %u, stock %u)",
+                        unsigned{c.island}, unsigned{c.index}, unsigned{w}, static_cast<unsigned long long>(in),
+                        demand(c, w), supply(c, w), c.stock(w));
+                }
+            }
+        }
     }
 }
 
