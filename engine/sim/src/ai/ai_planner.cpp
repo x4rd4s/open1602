@@ -2675,6 +2675,39 @@ std::int64_t Engine::yard_savings(AiPlayer& p) {
     return small != nullptr && unlocked(p, *small) ? small->build_cost.money : 0;
 }
 
+void Engine::log_yard(const AiPlayer& p, YardWait why) const {
+    // Which of need_shipyard's conditions keeps an improved rival without its first yard, each time
+    // the condition changes (only the log).
+    if (!logging() || !rivals() || p.pirates) {
+        return;
+    }
+    if (m_yard_logged.size() <= p.player) {
+        m_yard_logged.resize(std::size_t{p.player} + 1, YardWait::None);
+    }
+    if (m_yard_logged[p.player] == why) {
+        return;
+    }
+    m_yard_logged[p.player] = why;
+    const char* text = "builds one";
+    switch (why) {
+        case YardWait::None:
+            break;
+        case YardWait::Weaving:
+            text = "no weaving mill or hut in the home city";
+            break;
+        case YardWait::Attempts:
+            text = "attempts used up";
+            break;
+        case YardWait::Locked:
+            text = "not unlocked";
+            break;
+        case YardWait::Afford:
+            text = "not affordable";
+            break;
+    }
+    log(p, "yard: %s (fleet target %d)", text, p.fleet_target);
+}
+
 bool Engine::need_shipyard(AiPlayer& p) {
     // A yard in the home city once the computer has ships and a weaving mill.
     City* c = current_city(p);
@@ -2683,13 +2716,15 @@ bool Engine::need_shipyard(AiPlayer& p) {
         return false;
     }
     if (!own_ships(p).empty() && !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
-        return false;
+        return false;  // asked again in the home city
     }
     if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0) {
+        log_yard(p, YardWait::Weaving);
         return false;
     }
     SlotState& s = r->slots[kSlotShipyard];
     if (s.attempts > 3) {
+        log_yard(p, YardWait::Attempts);
         return false;
     }
     const assets::BuildingType* big = by_id(id::kShipyardBig);
@@ -2699,6 +2734,7 @@ bool Engine::need_shipyard(AiPlayer& p) {
             return false;  // a yard elsewhere (or not every city surveyed yet)
         }
         if (small == nullptr || !unlocked(p, *small)) {
+            log_yard(p, YardWait::Locked);
             return false;
         }
         const assets::BuildingType* b = small;
@@ -2706,8 +2742,10 @@ bool Engine::need_shipyard(AiPlayer& p) {
             b = big;
         }
         if (!affordable(p, *c, *b)) {
+            log_yard(p, YardWait::Afford);
             return false;
         }
+        log_yard(p, YardWait::None);
         if (plan_building(p, kShipyard, *b, kSlotShipyard, false)) {
             reserve(p, *b);
         }

@@ -1008,6 +1008,10 @@ private:
     std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
+    /// Why need_shipyard() builds no yard: the last reason logged per player (only the log).
+    enum class YardWait : std::uint8_t { None, Weaving, Attempts, Locked, Afford };
+    mutable std::vector<YardWait> m_yard_logged;
+    void log_yard(const AiPlayer& p, YardWait why) const;
     /// Per city, the minutes of statistics log_supply() last wrote at (only the log).
     std::vector<std::uint32_t> m_supply_logged;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.
