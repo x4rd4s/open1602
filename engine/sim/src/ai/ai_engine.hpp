@@ -31,6 +31,7 @@
 #include "o1602/sim/computer_slots.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
+#include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/ship.hpp"
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/world.hpp"
@@ -662,6 +663,22 @@ private:
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
     [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                          std::int32_t r) const;
+    /// RC1: per tile of a city's island, the city's markets and Kontors (a bit each, its first 64)
+    /// whose carts reach the tile on roads (`reach`) and whose circle holds it (`inside`).
+    struct CartReach {
+        std::uint16_t island = 0;
+        std::uint8_t city = MapCell::kNoCity;
+        std::uint64_t revisions = 0;  ///< island_revision() it was taken at
+        std::int32_t width = 0;
+        std::vector<std::uint64_t> reach;
+        std::vector<std::uint64_t> inside;
+    };
+    [[nodiscard]] const CartReach& cart_reach(const AiPlayer& p) const;
+    /// RC1: whether a cart of the city's markets or Kontor would fetch from a building at (x0, y0,
+    /// x1, y1) with `road` (new road tiles from the city's roads to it) built: the market's circle
+    /// holds the new road and a tile of the building, and its carts reach them on roads.
+    [[nodiscard]] bool cart_reaches(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                    std::int32_t y1, std::span<const BuildItem> road = {}) const;
     bool farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                    std::int32_t y1);
     [[nodiscard]] assets::ServiceBits house_services(std::uint16_t island, std::int32_t x, std::int32_t y) const;
@@ -982,6 +999,9 @@ private:
         std::int64_t reliable = 0;
     };
     mutable std::vector<BudgetCache> m_budgets;
+    /// cart_reach() of the last city asked, and its finder.
+    mutable CartReach m_cart_reach;
+    mutable PathFinder m_reach_finder;
     /// The step colony_plan last ran in, per player.
     std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
