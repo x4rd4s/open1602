@@ -1504,6 +1504,8 @@ void Engine::order_ship(AiPlayer& p) {
             if (own_ships(p).empty()) {
                 buy_first_ship(p);
             }
+        } else if (!classic()) {
+            log_yard(p, YardWait::Survey);
         }
         return;
     }

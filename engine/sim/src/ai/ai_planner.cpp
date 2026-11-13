@@ -2682,15 +2682,28 @@ void Engine::log_yard(const AiPlayer& p, YardWait why) const {
         return;
     }
     if (m_yard_logged.size() <= p.player) {
-        m_yard_logged.resize(std::size_t{p.player} + 1, YardWait::None);
+        m_yard_logged.resize(std::size_t{p.player} + 1, YardWait::Unlogged);
     }
-    if (m_yard_logged[p.player] == why) {
-        return;
+    if (m_yard_logged[p.player] == why || (why == YardWait::Away && m_yard_logged[p.player] != YardWait::Unlogged)) {
+        return;  // away from the home city only until a reason there is known: it changes with every turn
     }
     m_yard_logged[p.player] = why;
     const char* text = "builds one";
     switch (why) {
+        case YardWait::Unlogged:
         case YardWait::None:
+            break;
+        case YardWait::Survey:
+            text = "survey on top, no yard wanted";
+            break;
+        case YardWait::Away:
+            text = "not in the home city";
+            break;
+        case YardWait::Elsewhere:
+            text = "a yard in another city";
+            break;
+        case YardWait::Unsurveyed:
+            text = "cities not all surveyed";
             break;
         case YardWait::Weaving:
             text = "no weaving mill or hut in the home city";
@@ -2705,7 +2718,7 @@ void Engine::log_yard(const AiPlayer& p, YardWait why) const {
             text = "not affordable";
             break;
     }
-    log(p, "yard: %s (fleet target %d)", text, p.fleet_target);
+    log(p, "yard: %s (fleet target %d, surveyed %u of %u)", text, p.fleet_target, p.surveyed, p.cities);
 }
 
 bool Engine::need_shipyard(AiPlayer& p) {
@@ -2716,6 +2729,7 @@ bool Engine::need_shipyard(AiPlayer& p) {
         return false;
     }
     if (!own_ships(p).empty() && !(p.home_valid && p.home_island == p.island && p.home_city == p.city)) {
+        log_yard(p, YardWait::Away);
         return false;  // asked again in the home city
     }
     if (r->slots[kSlotWebstube].count == 0 && r->slots[kSlotWeberei].count == 0) {
@@ -2730,7 +2744,8 @@ bool Engine::need_shipyard(AiPlayer& p) {
     const assets::BuildingType* big = by_id(id::kShipyardBig);
     const assets::BuildingType* small = by_id(id::kShipyardSmall);
     if (s.count == 0) {
-        if (slot_present(p, kSlotShipyard) != 0) {
+        if (const std::int32_t present = slot_present(p, kSlotShipyard); present != 0) {
+            log_yard(p, present < 0 ? YardWait::Unsurveyed : YardWait::Elsewhere);
             return false;  // a yard elsewhere (or not every city surveyed yet)
         }
         if (small == nullptr || !unlocked(p, *small)) {
