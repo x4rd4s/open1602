@@ -44,7 +44,9 @@ def code_of(line: str) -> str:
 
 
 def number_value(text: str) -> str:
-    t = text.replace("'", "").rstrip("uUlLfF")
+    t = text.replace("'", "")
+    # A suffix (u, l, f) ends the number; a hexadecimal number has no f suffix, its F is a digit.
+    t = t.rstrip("uUlL") if t[:2].lower() == "0x" else t.rstrip("uUlLfF")
     try:
         return str(int(t, 0)) if not re.search(r"[.eE]", t) or t.lower().startswith("0x") else repr(float(t))
     except ValueError:
