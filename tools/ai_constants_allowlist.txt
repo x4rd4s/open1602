@@ -2,3 +2,5 @@
 # (tools/check_ai_constants.py). One per line:
 #     VALUE | PATH (a glob) | derived from: WHAT IT FOLLOWS FROM
 # An entry without its derivation is not taken.
+13 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithColonyLoad = 12
+kStateWithArming | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 13, which saves Strategy::war_arming

@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <set>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -199,6 +201,156 @@ void print_players(const sim::World& world, const assets::BuildingTable& buildin
     }
 }
 
+/// One tagged section (or SIMU part) of a savegame's sections: tag, version, flags, size, payload.
+struct Piece {
+    std::string tag;
+    std::span<const std::uint8_t> body;
+};
+
+std::vector<Piece> split_pieces(std::span<const std::uint8_t> bytes) {
+    std::vector<Piece> pieces;
+    std::size_t at = 0;
+    while (at + 12 <= bytes.size()) {
+        std::string tag(reinterpret_cast<const char*>(bytes.data() + at), 4);
+        const std::uint32_t size =
+            static_cast<std::uint32_t>(bytes[at + 8]) | static_cast<std::uint32_t>(bytes[at + 9]) << 8 |
+            static_cast<std::uint32_t>(bytes[at + 10]) << 16 | static_cast<std::uint32_t>(bytes[at + 11]) << 24;
+        if (at + 12 + size > bytes.size()) {
+            break;
+        }
+        pieces.push_back(Piece{std::move(tag), bytes.subspan(at + 12, size)});
+        at += 12 + size;
+    }
+    return pieces;
+}
+
+/// The sections of both games, SIMU split into its parts: the names of those that differ, with
+/// their sizes and the first byte that differs.
+std::vector<std::string> differing_pieces(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b) {
+    const auto expand = [](std::span<const std::uint8_t> bytes) {
+        std::vector<Piece> out;
+        for (Piece& p : split_pieces(bytes)) {
+            if (p.tag == "SIMU" && p.body.size() > 2) {
+                for (Piece& part : split_pieces(p.body.subspan(2))) {
+                    out.push_back(Piece{"SIMU/" + part.tag, part.body});
+                }
+            } else {
+                out.push_back(std::move(p));
+            }
+        }
+        return out;
+    };
+    const std::vector<Piece> pa = expand(a);
+    const std::vector<Piece> pb = expand(b);
+    std::vector<std::string> lines;
+    for (const Piece& x : pa) {
+        const auto y = std::find_if(pb.begin(), pb.end(), [&](const Piece& p) { return p.tag == x.tag; });
+        if (y == pb.end()) {
+            lines.push_back(x.tag + " only in the game that ran on");
+            continue;
+        }
+        if (std::equal(x.body.begin(), x.body.end(), y->body.begin(), y->body.end())) {
+            continue;
+        }
+        const auto [ix, iy] = std::mismatch(x.body.begin(), x.body.end(), y->body.begin(), y->body.end());
+        lines.push_back(x.tag + ": " + std::to_string(x.body.size()) + " vs " + std::to_string(y->body.size()) +
+                        " bytes, first difference at byte " + std::to_string(ix - x.body.begin()));
+    }
+    for (const Piece& y : pb) {
+        if (std::none_of(pa.begin(), pa.end(), [&](const Piece& p) { return p.tag == y.tag; })) {
+            lines.push_back(y.tag + " only in the loaded game");
+        }
+    }
+    return lines;
+}
+
+void drain_events(sim::Simulation& s) {
+    (void)s.take_production_events();
+    (void)s.take_construction_events();
+    (void)s.take_military_events();
+    (void)s.take_city_events();
+    (void)s.take_ship_events();
+    (void)s.take_diplomacy_notices();
+    (void)s.take_command_results();
+}
+
+/// --reload-at: saves the running game, loads it into a second game and runs both side by side,
+/// tick by tick. A game loaded from a savegame has to go on exactly as the one that was never
+/// saved; the first tick at which their states differ, and which sections differ, show what the
+/// savegame loses. Returns the exit code: 0 if they stayed the same, 1 if not.
+int reload_check(sim::World& world, sim::Simulation& simulation, const assets::BuildingTable& buildings,
+                 const assets::FigureTable& figures, std::size_t minutes, std::size_t every) {
+    auto bytes = sim::write_game(world, buildings, &simulation);
+    if (!bytes) {
+        return fail(bytes.error());
+    }
+    std::vector<std::string> warnings;
+    auto loaded = sim::read_game(*bytes, buildings, &warnings, &figures);
+    if (!loaded) {
+        return fail(loaded.error());
+    }
+    for (const auto& text : warnings) {
+        std::fprintf(stderr, "warning (reload): %s\n", text.c_str());
+    }
+    sim::World twin = std::move(loaded).value();
+    sim::Simulation twin_simulation(twin, buildings, figures);
+    if (twin_simulation.state_damaged()) {
+        std::printf("reload: the state of the running game could not be read back\n");
+    }
+    const std::uint64_t ticks_per_minute = 60'000 / sim::Simulation::kTickMs;
+    const std::uint64_t ticks = minutes * ticks_per_minute;
+    std::set<std::string> reported;
+    std::optional<std::uint64_t> first;
+    const auto compare = [&](std::uint64_t tick) {
+        if (simulation.state_hash() == twin_simulation.state_hash()) {
+            return;
+        }
+        if (!first) {
+            first = tick;
+        } else if (tick % every != 0) {
+            return;
+        }
+        auto a = sim::encode_game(world, buildings, &simulation);
+        auto b = sim::encode_game(twin, buildings, &twin_simulation);
+        if (!a || !b) {
+            return;
+        }
+        for (const std::string& line : differing_pieces(*a, *b)) {
+            const std::string tag = line.substr(0, line.find(':'));
+            if (reported.insert(tag).second) {
+                std::printf("reload: tick %llu (%.2f s after loading): %s\n", static_cast<unsigned long long>(tick),
+                            static_cast<double>(tick * sim::Simulation::kTickMs) / 1000.0, line.c_str());
+            }
+        }
+        std::fflush(stdout);
+    };
+    std::printf("reload: saved at %llu ms of game time, %zu bytes; running both for %zu minutes\n",
+                static_cast<unsigned long long>(world.time_ms()), bytes->size(), minutes);
+    compare(0);
+    for (std::uint64_t tick = 1; tick <= ticks; ++tick) {
+        simulation.tick();
+        twin_simulation.tick();
+        drain_events(simulation);
+        drain_events(twin_simulation);
+        compare(tick);
+        if (tick % ticks_per_minute == 0) {
+            std::printf("reload: minute %llu, gold %s", static_cast<unsigned long long>(tick / ticks_per_minute),
+                        first ? "(states differ):" : "and state the same");
+            for (std::size_t p = 0; p < world.players().size(); ++p) {
+                if (world.players()[p].money != twin.players()[p].money) {
+                    std::printf(" P%zu %d/%d", p, world.players()[p].money, twin.players()[p].money);
+                }
+            }
+            std::printf("\n");
+        }
+    }
+    if (!first) {
+        std::printf("reload: both games stayed the same for %zu minutes\n", minutes);
+        return 0;
+    }
+    return 1;
+}
+
 }  // namespace
 
 int cmd_bench(const Args& args) {
@@ -314,6 +466,12 @@ int cmd_bench(const Args& args) {
     std::vector<std::uint64_t> step_max_ns(steps.size(), 0);
     const auto now_us = [&]() { return wall ? ms_since(Clock::time_point{}) * 1000.0 : *thread_cpu_us(); };
 
+    // --reload-at M: at the end of minute M (0: before the first tick), the game is saved, loaded
+    // into a second one, and both run on side by side for --reload-minutes (default 10).
+    const std::optional<std::size_t> reload_at = args.number("--reload-at");
+    const std::size_t reload_minutes = std::max<std::size_t>(args.number("--reload-minutes").value_or(10), 1);
+    const std::size_t reload_every = std::max<std::size_t>(args.number("--reload-every").value_or(20), 1);
+
     std::optional<sim::Simulation> simulation;
     for (std::size_t run = 0; run < repeats; ++run) {
         const bool last = run + 1 == repeats;
@@ -372,6 +530,9 @@ int cmd_bench(const Args& args) {
             }
             ++handed_over;
         }
+        if (reload_at == std::size_t{0}) {
+            return reload_check(*world, *simulation, *buildings, *figures, reload_minutes, reload_every);
+        }
         if (run == 0) {
             std::printf(
                 "world %ux%u, %zu islands, %zu players, all played by the computer (%zu human ones handed "
@@ -398,13 +559,7 @@ int cmd_bench(const Args& args) {
                 simulation->tick_timed(step_ns);
                 const double us = now_us() - start;
                 // What the interface would take; left lying, the buffers only grow to their bound.
-                (void)simulation->take_production_events();
-                (void)simulation->take_construction_events();
-                (void)simulation->take_military_events();
-                (void)simulation->take_city_events();
-                (void)simulation->take_ship_events();
-                (void)simulation->take_diplomacy_notices();
-                (void)simulation->take_command_results();
+                drain_events(*simulation);
                 best[tick] = run == 0 ? us : std::min(best[tick], us);
                 if (last) {
                     period.ticks.push_back(best[tick]);
@@ -413,6 +568,9 @@ int cmd_bench(const Args& args) {
                         step_max_ns[i] = std::max(step_max_ns[i], step_ns[i]);
                     }
                 }
+            }
+            if (last && reload_at && minute == *reload_at) {
+                return reload_check(*world, *simulation, *buildings, *figures, reload_minutes, reload_every);
             }
             if (last && (minute % period_minutes == 0 || minute == minutes)) {
                 const double mean = period.mean();
@@ -460,10 +618,18 @@ int cmd_bench(const Args& args) {
                     step_us / ticks, static_cast<double>(step_max_ns[i]) / 1000.0);
     }
 
-    // The multiplayer fingerprint (net::Session, every hash_interval frames) and a save. The first
-    // fingerprint hashes every block of tiles; the next one, 100 ticks (5 s of game time) later as in
-    // a session, only the blocks that changed in between (TB-26).
+    // The savegame first, so that --out holds the game at the end of its last minute: a run loaded
+    // from it lines up minute by minute with one that ran on. Then the multiplayer fingerprint
+    // (net::Session, every hash_interval frames): the first one hashes every block of tiles; the
+    // next one, 100 ticks (5 s of game time) later as in a session, only the blocks that changed in
+    // between (TB-26).
     auto start = Clock::now();
+    auto save = sim::write_game(*world, *buildings, &*simulation);
+    const double save_ms = ms_since(start);
+    if (!save) {
+        return fail(save.error());
+    }
+    start = Clock::now();
     const auto first_hash = simulation->state_hash();
     const double first_hash_ms = ms_since(start);
     for (int t = 0; t < 100; ++t) {
@@ -472,12 +638,6 @@ int cmd_bench(const Args& args) {
     start = Clock::now();
     const auto hash = simulation->state_hash();
     const double hash_ms = ms_since(start);
-    start = Clock::now();
-    auto save = sim::write_game(*world, *buildings, &*simulation);
-    const double save_ms = ms_since(start);
-    if (!save) {
-        return fail(save.error());
-    }
     std::printf("state hash %016llx in %.1f ms, the first %.1f ms%s; savegame %zu bytes in %.1f ms\n",
                 static_cast<unsigned long long>(hash), hash_ms, first_hash_ms,
                 hash != 0 && first_hash != 0 ? "" : " (failed)", save->size(), save_ms);

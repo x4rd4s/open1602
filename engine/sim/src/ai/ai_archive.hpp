@@ -419,6 +419,9 @@ void io(A& a, AiPlayer& p) {
         a(p.strategy.war_measure);
         a(p.strategy.war_ended_ms);
     }
+    if (a.version() >= kStateWithArming) {
+        a(p.strategy.war_arming);
+    }
 }
 
 template <class A>
