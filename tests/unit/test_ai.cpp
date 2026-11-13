@@ -729,12 +729,12 @@ TEST_CASE("ai: a computer arming for a war still arms after the game is loaded (
     REQUIRE(!state.players.empty());
     state.players[0].strategy.war_arming = true;
     annokit::core::ByteWriter out;
-    sim::ai::Saver saver(out);
+    sim::ai::Saver saver(out, sim::ai::kStateWithArming);
     saver(state);
     const std::vector<std::uint8_t> bytes = out.take();
     annokit::core::ByteReader in(bytes);
     sim::ComputerPlayers computers(s);
-    REQUIRE(computers.load(in, sim::ComputerPlayers::max_state_version()));
+    REQUIRE(computers.load(in, sim::ai::kStateWithArming));
     CHECK(computers.state_version() == sim::ai::kStateWithArming);
     // Saved again, it reads back with the flag.
     const std::vector<std::uint8_t> again = saved(computers);
