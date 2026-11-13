@@ -162,6 +162,23 @@ class ConstantsTest(unittest.TestCase):
     def test_a_derived_value_in_the_allowlist_passes(self):
         self.assertEqual(check_ai_constants.check(DIFF, [("250", "engine/sim/src/ai/*")]), [])
 
+    def test_a_value_listed_for_one_file_does_not_hide_moved_code_elsewhere(self):
+        diff = """diff --git a/engine/sim/src/ai/ai_state.hpp b/engine/sim/src/ai/ai_state.hpp
+--- a/engine/sim/src/ai/ai_state.hpp
++++ b/engine/sim/src/ai/ai_state.hpp
+@@ -1,1 +1,1 @@
+-inline constexpr std::uint32_t kStateVersion = 12;
++inline constexpr std::uint32_t kStateVersion = 13;
+diff --git a/engine/sim/src/ai/ai_x.cpp b/engine/sim/src/ai/ai_x.cpp
+--- a/engine/sim/src/ai/ai_x.cpp
++++ b/engine/sim/src/ai/ai_x.cpp
+@@ -5,1 +5,1 @@
+-    rings(13);
++    rings_of(13);
+"""
+        self.assertEqual(check_ai_constants.check(diff, [("13", "engine/sim/src/ai/ai_state.hpp")]), [])
+        self.assertEqual(len(check_ai_constants.check(diff, [])), 1)
+
     def test_new_named_values_count(self):
         diff = """diff --git a/engine/sim/src/ai/ai_x.hpp b/engine/sim/src/ai/ai_x.hpp
 --- a/engine/sim/src/ai/ai_x.hpp

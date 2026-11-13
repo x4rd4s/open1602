@@ -119,7 +119,9 @@ def check(text: str, entries: list[tuple[str, str]]) -> list[str]:
     names_removed = set()
     for path, _, sign, body in rows:
         code = code_of(body) if not path.endswith(".toml") else body
-        values = [number_value(n) for n in NUMBER.findall(code)]
+        # A value listed for this file counts on neither side: it may stand there, and it does not
+        # pay for the same number brought in elsewhere.
+        values = [number_value(n) for n in NUMBER.findall(code) if not allowed(entries, n, path)]
         (added if sign == "+" else removed).update(v for v in values if v not in ("0", "1", "0.0", "1.0"))
         if sign == "-":
             for rx in (CONSTEXPR, FIELD, TOML_KEY):
