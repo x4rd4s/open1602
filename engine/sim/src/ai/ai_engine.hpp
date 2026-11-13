@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <span>
@@ -613,6 +614,20 @@ private:
     /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
     /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
     bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
+    /// Open1602: a walk over the city's open ground from its roads (walk_ground), for claim_by_path
+    /// and farm_by_path.
+    struct GroundWalk {
+        std::int32_t width = 0;
+        std::vector<std::int32_t> prev;  ///< the tile before on the way, by y * width + x; -1 a road, -2 not reached
+        std::vector<std::int32_t> dist;  ///< tiles from the nearest road
+        /// Whether the way to `end` crosses the rectangle (x0, y0, w, h).
+        [[nodiscard]] bool crosses(std::int32_t end, std::int32_t x0, std::int32_t y0, std::int32_t w,
+                                   std::int32_t h) const;
+        /// The road along the way to `end`, from the city's road on.
+        [[nodiscard]] std::vector<BuildItem> road_to(std::int32_t end) const;
+    };
+    bool walk_ground(AiPlayer& p, GroundWalk& walk,
+                     const std::function<void(std::int32_t i, std::int32_t x, std::int32_t y)>& visit);
     bool farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain);
     bool claim_fields(AiPlayer& p, std::uint8_t slot);
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
