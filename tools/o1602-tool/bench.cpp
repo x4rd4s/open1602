@@ -358,6 +358,10 @@ int cmd_bench(const Args& args) {
             world->set_saved_rules(r);
         }
         simulation.emplace(*world, *buildings, *figures);
+        // A measurement's phase (tools/measure): the computers' first steps a few steps later.
+        if (const auto phase = args.number("--ai-phase")) {
+            simulation->computers().delay_first_step(static_cast<std::uint32_t>(*phase));
+        }
         std::size_t handed_over = 0;
         for (sim::PlayerId p = sim::first_human_player(*world); p != sim::kNoPlayer;
              p = sim::first_human_player(*world)) {

@@ -318,6 +318,7 @@ public:
     [[nodiscard]] const Combat& combat() const noexcept { return m_combat; }
     /// The computer players.
     [[nodiscard]] const ComputerPlayers& computers() const noexcept { return m_ai; }
+    [[nodiscard]] ComputerPlayers& computers() noexcept { return m_ai; }
     /// Shots, hits, deaths and destroyed buildings since the last call.
     [[nodiscard]] std::vector<MilitaryEvent> take_military_events() { return m_military_events.take(); }
     /// Treaties offered, signed or broken since the last call.

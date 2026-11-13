@@ -207,6 +207,17 @@ void Engine::tick(std::uint32_t dt_ms) {
         if (!computers_play) {
             continue;  // switched off: the original skips its whole AI tick
         }
+        // A measurement's delay (delay_first_step), once per computer before its first step.
+        if (m_delay_steps != 0) {
+            if (m_delayed.size() <= p.player) {
+                m_delayed.resize(std::size_t{p.player} + 1, false);
+            }
+            if (!m_delayed[p.player]) {
+                m_delayed[p.player] = true;
+                p.t_main += static_cast<std::int32_t>(m_delay_steps) * kStepMs;
+                p.t_10s += static_cast<std::int32_t>(m_delay_steps) * kStepMs;
+            }
+        }
         // Each computer steps every 50 ms of game time. The original lets only one slot act per
         // simulation slice, so its pace followed the frame rate and the number of computers (S-095).
         p.t_main -= dt;
@@ -900,6 +911,10 @@ void ComputerPlayers::tick(std::uint32_t dt_ms) {
 
 void ComputerPlayers::reset() {
     m_engine->reset();
+}
+
+void ComputerPlayers::delay_first_step(std::uint32_t steps) {
+    m_engine->delay_first_step(steps);
 }
 
 std::uint16_t ComputerPlayers::max_state_version() noexcept {
