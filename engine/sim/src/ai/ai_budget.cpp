@@ -113,6 +113,12 @@ std::int64_t Engine::reliable_income(const AiPlayer& p) const {
     return sum;
 }
 
+std::int64_t Engine::class_taxes(const City& city, std::size_t k, std::uint64_t people) const {
+    const auto& classes = m_buildings.resident_classes();
+    const std::int64_t rate = k < city.tax_rate.size() ? city.tax_rate[k] : kFullSupply;
+    return static_cast<std::int64_t>(std::uint64_t{classes[k].tax} * people * 6 / 32) * rate / kFullSupply;
+}
+
 bool Engine::young_colony(const City& c) const {
     // A city whose statistics do not yet cover the horizon: its build-out and supply still come.
     return c.ledger.minutes_closed() < m_world.balance().ai_budget_horizon_minutes;
@@ -149,7 +155,8 @@ std::int64_t Engine::reserved(const AiPlayer& p) const {
     if (!rivals() || p.pirates) {
         return 0;
     }
-    return p.settle.active || p.settle.ship != 0 ? std::int64_t{colony_money(p)} : 0;
+    // G4b: and from when the colony is planned (colony_plan).
+    return p.settle.active || p.settle.ship != 0 || p.settle.plan_crop != 0 ? std::int64_t{colony_money(p)} : 0;
 }
 
 bool Engine::can_commit(const AiPlayer& p, const Commitment& c, Spend what) const {
@@ -206,8 +213,7 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
     }
     const auto& classes = m_buildings.resident_classes();
     const auto taxes = [&](std::size_t k, std::uint64_t people) -> std::int64_t {
-        const std::int64_t rate = k < home->tax_rate.size() ? home->tax_rate[k] : kFullSupply;
-        return static_cast<std::int64_t>(std::uint64_t{classes[k].tax} * people * 6 / 32) * rate / kFullSupply;
+        return class_taxes(*home, k, people);
     };
     std::int64_t value = 0;
     for (std::size_t k = 1; k < classes.size() && k - 1 < home->inhabitants.size(); ++k) {

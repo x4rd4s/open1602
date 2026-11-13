@@ -4,3 +4,6 @@
 # An entry without its derivation is not taken.
 13 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithColonyLoad = 12
 kStateWithArming | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 13, which saves Strategy::war_arming
+14 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithArming = 13
+kStateWithColonyPlan | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 14, which saves Settlement::plan_crop, plan_ms and plan_ship
+kAnyCrop | engine/sim/src/ai/ai_state.hpp | derived from: a crop id no ware has (the largest std::uint8_t), for a colony on any island

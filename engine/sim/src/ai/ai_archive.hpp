@@ -288,6 +288,11 @@ void io(A& a, Settlement& s) {
         a(s.load_ms);
         a(s.load_food);
     }
+    if (a.version() >= kStateWithColonyPlan) {
+        a(s.plan_crop);
+        a(s.plan_ms);
+        a(s.plan_ship);
+    }
 }
 
 template <class A>

@@ -1020,6 +1020,11 @@ void Engine::unload_at(City& c, Ship& ship, bool keep_basics, bool destroy) {
 // ---------------------------------------------------------------------------------------------
 // Later colonies
 
+bool Engine::grows(std::uint16_t island, std::uint8_t crop) const {
+    const std::uint32_t f = fertility(island, crop);
+    return crop == ware::kOre ? f >= 64 : f == 128;
+}
+
 bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
     // Some city of any computer player lies on an island that grows the crop fully
     // (ore: a big or small vein; gold: a big one). Shared by all the original's computers; an
@@ -1029,20 +1034,26 @@ bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
         if (o == nullptr || o->role != PlayerRole::Computer || (rivals() && c.owner != p.player)) {
             continue;
         }
-        const std::uint32_t f = fertility(c.island, crop);
-        if (crop == ware::kOre ? f >= 64 : f == 128) {
+        if (grows(c.island, crop)) {
             return true;
         }
     }
     return false;
 }
 
-std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
+std::vector<std::uint8_t> Engine::colony_candidates(AiPlayer& p) {
+    // The original's order of motives; choose_colony_crop takes the first. G4b weighs them all.
+    std::vector<std::uint8_t> out;
+    const auto add = [&](std::uint8_t crop) {
+        if (std::find(out.begin(), out.end(), crop) == out.end()) {
+            out.push_back(crop);
+        }
+    };
     const std::uint8_t skip = p.settle.previous_crop;
     // Open1602: an improved computer looks for what its goal needs first: gold for its
     // aristocrats, ore to arm.
     if (const std::uint8_t g = goal_crop(p); g != 0 && g != skip) {
-        return g;
+        add(g);
     }
     // Open1602: and then a crop for what its home city's people use, make too little of and run
     // out of soonest, alcohol from wine or sugar: settlers without it fell back and the city into
@@ -1073,7 +1084,7 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
             }
             for (const std::uint8_t crop : n.crops) {
                 if (crop != 0 && crop != skip) {
-                    return crop;
+                    add(crop);
                 }
             }
         }
@@ -1081,7 +1092,7 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
     for (const std::uint8_t crop : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCocoaField,
                                     ware::kCottonField, ware::kSugarField}) {
         if (crop != skip && !crop_available(p, crop)) {
-            return crop;
+            add(crop);
         }
     }
     struct Pair {
@@ -1100,10 +1111,261 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
             continue;
         }
         if (pr.crop != skip && slot_present(p, pr.slot) == 0) {
-            return pr.crop;
+            add(pr.crop);
         }
     }
-    return 0;
+    return out;
+}
+
+std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
+    const std::vector<std::uint8_t> crops = colony_candidates(p);
+    return crops.empty() ? 0 : crops.front();
+}
+
+Engine::Chain Engine::colony_chain(const AiPlayer& p, std::uint8_t crop) const {
+    // The fields its colony order plants by the highest stage reached (colony_luxury), and the
+    // workshop that works their harvest where it takes one; a mine for ore or gold.
+    const std::uint32_t fields = colony_fields(p.max_stage);
+    const auto mine = [&](std::uint8_t slot) {
+        const auto d = need_def(slots(), slot, m_world.balance().computer_producers);
+        return d ? by_id(d->fixed) : nullptr;
+    };
+    switch (crop) {
+        case ware::kSpiceField:
+            return {{{producer(ware::kSpices, crop), fields}}};
+        case ware::kWineField:
+            return {{{producer(ware::kAlcohol, crop), fields}}};
+        case ware::kCocoaField:
+            return {{{producer(ware::kCocoa, crop), fields}}};
+        case ware::kTobaccoField:
+            return {{{producer(ware::kTobacco, crop), fields}, {producer(ware::kTobaccoGoods, ware::kTobacco), 1}}};
+        case ware::kSugarField:
+            return {{{producer(ware::kSugar, crop), fields}, {producer(ware::kAlcohol, ware::kSugar), 1}}};
+        case ware::kCottonField:
+            return {{{producer(ware::kWool, crop), fields}, {producer(ware::kCloth, ware::kWool), 1}}};
+        case ware::kOre:
+            return {{{mine(kSlotIronMine), 1}}};
+        case ware::kGold:
+            return {{{mine(kSlotGoldMine), 1}}};
+        default:
+            return {};
+    }
+}
+
+std::int64_t Engine::chain_upkeep(const AiPlayer& p, std::uint8_t crop) const {
+    std::int64_t sum = 0;
+    for (const auto& [b, n] : colony_chain(p, crop).parts) {
+        sum += b != nullptr ? std::int64_t{n} * b->running_cost : 0;
+    }
+    return sum;
+}
+
+std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
+    // Ranks the candidates of one computer at one time, so what all of them cost alike (the colony's
+    // gold, its Kontor, the gold the home city goes without until the colony delivers) is left out.
+    const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
+    if (home == nullptr || home->owner != p.player) {
+        return 0;
+    }
+    const Balance& at = m_world.balance();
+    const auto& classes = m_buildings.resident_classes();
+    const std::uint8_t food = m_buildings.food_ware();
+    std::uint8_t good = 0;  // the inhabitants' good the crop brings
+    switch (crop) {
+        case ware::kWineField:
+        case ware::kSugarField:
+            good = ware::kAlcohol;
+            break;
+        case ware::kTobaccoField:
+            good = ware::kTobaccoGoods;
+            break;
+        case ware::kSpiceField:
+            good = ware::kSpices;
+            break;
+        case ware::kCocoaField:
+            good = ware::kCocoa;
+            break;
+        case ware::kCottonField:
+            good = ware::kCloth;
+            break;
+        case ware::kGold:
+            good = ware::kJewellery;
+            break;
+        default:
+            break;
+    }
+    // The taxes a minute of a full house of class k at the home city's rate.
+    const auto house_tax = [&](std::size_t k) -> std::int64_t {
+        return class_taxes(*home, k, classes[k].max_per_house);
+    };
+    // The city the colony becomes, on the nearest island it knows to grow the crop (any island it
+    // knows for none): as many houses as its free land holds beside the fields, as densely as the
+    // home city's houses stand on its land, full of the highest class whose goods it will have (the
+    // crop's, food, and what the home city holds and can send). A city founded as a colony without
+    // houses (becomes_colony) has none.
+    std::int64_t city_value = 0;
+    const CityPlan* own = nullptr;
+    for (const CityPlan& r : p.plans) {
+        own = r.island == home->island && r.city == home->index ? &r : own;
+    }
+    const auto [home_x, home_y] = city_point(*home);
+    std::optional<std::uint16_t> island;
+    std::uint32_t nearest = 0;
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        const auto at_island = static_cast<std::uint16_t>(i);
+        if (crop != 0 && crop != kAnyCrop && !grows(at_island, crop)) {
+            continue;
+        }
+        if (!knows_crops(p, at_island) || !island_allowed(p, at_island) ||
+            std::ranges::any_of(m_world.cities(),
+                                [&](const City& c) { return c.island == at_island && c.owner == p.player; })) {
+            continue;
+        }
+        const WorldIsland& w = m_world.islands()[i];
+        const std::uint32_t sail = sail_seconds(p, {home_x, home_y}, island_point(w));
+        if (!island || sail < nearest) {
+            island = at_island;
+            nearest = sail;
+        }
+    }
+    const Chain chain = colony_chain(p, crop);
+    if (island && own != nullptr && own->land != 0) {
+        std::uint32_t land = free_land(*island, MapCell::kNoCity, nullptr);
+        const std::uint32_t fields = chain.parts.empty() ? 0 : chain.parts.front().second;
+        land -= std::min(land, fields * at.ai_colony_luxury_tiles);
+        if (!becomes_colony(p, nullptr, land, 0)) {
+            const std::uint64_t sites = std::uint64_t{land} * own->slots[kSlotHouses].count / own->land;
+            std::size_t top = 0;
+            for (std::size_t k = 0; k < classes.size(); ++k) {
+                const bool has_all = std::ranges::all_of(classes[k].needs, [&](const auto& n) {
+                    return n.ware == food || n.ware == good || home->stock(n.ware) != 0;
+                });
+                if (!has_all) {
+                    break;
+                }
+                top = k;
+            }
+            city_value = static_cast<std::int64_t>(sites) * house_tax(top);
+        }
+    }
+    // The houses of the home city that rise with the good: those of the class below the lowest that
+    // asks for it, as far as that class's other goods are in store, at the fuller houses of the class
+    // above.
+    std::int64_t rise = 0;
+    for (std::size_t k = 1; good != 0 && k < classes.size() && k - 1 < home->inhabitants.size(); ++k) {
+        if (std::ranges::none_of(classes[k].needs, [&](const auto& n) { return n.ware == good; })) {
+            continue;
+        }
+        std::uint64_t others = 0;
+        std::uint64_t held = 0;
+        for (const assets::ResidentClass::Need& n : classes[k].needs) {
+            if (n.ware != good && n.ware != food) {
+                ++others;
+                held += home->stock(n.ware) != 0 ? 1U : 0U;
+            }
+        }
+        const std::uint32_t per_house = std::max<std::uint32_t>(classes[k - 1].max_per_house, 1);
+        const std::uint64_t houses = home->inhabitants[k - 1] / per_house;
+        const std::uint64_t rising = others != 0 ? houses * held / others : houses;
+        rise = static_cast<std::int64_t>(rising) * (house_tax(k) - house_tax(k - 1));
+        break;
+    }
+    return city_value - chain_upkeep(p, crop) + rise;
+}
+
+void Engine::colony_plan(AiPlayer& p, bool asked) {
+    // Open1602 (G4b): one decision a step, whatever order or stage asks for the colony; asked in
+    // several modes a step, the colony was wanted for one crop and not wanted by turns.
+    if (m_colony_plan_ms.size() <= p.player) {
+        m_colony_plan_ms.resize(std::size_t{p.player} + 1, 0);
+    }
+    Settlement& s = p.settle;
+    if (!asked && s.plan_crop == 0) {
+        return;
+    }
+    const std::uint64_t step = std::max<std::uint64_t>(now_ms(), 1);
+    if (m_colony_plan_ms[p.player] == step) {
+        return;
+    }
+    m_colony_plan_ms[p.player] = step;
+    if (s.plan_ship != 0) {
+        const Ship* kept = m_world.ship(s.plan_ship);
+        if (kept == nullptr || kept->owner != p.player || kept->sinking) {
+            s.plan_ship = 0;
+        }
+    }
+    // Under way the plan stands: the ship is called home to load or sails.
+    if (s.active || s.ship != 0) {
+        return;
+    }
+    const auto clear = [&] {
+        if (s.plan_crop != 0) {
+            log(p, "colony plan dropped (crop %u)", unsigned{s.plan_crop});
+        }
+        s.plan_crop = 0;
+        s.plan_ms = 0;
+        s.plan_ship = 0;
+    };
+    // The candidates are the original's motives in its order, each as its budget weighs it
+    // (colony_commitment, its own gold set aside by reserved() left out for the plan's).
+    std::vector<std::uint8_t> crops = colony_candidates(p);
+    if (crops.empty()) {
+        crops.push_back(kAnyCrop);  // the original then founds on any island
+    }
+    Budget b = gold_budget(p);
+    if (s.plan_crop != 0) {
+        b.reserved -= colony_money(p);
+    }
+    std::vector<ColonyCandidate> weighed;
+    bool plan_holds = false;
+    for (const std::uint8_t crop : crops) {
+        ColonyCandidate c;
+        c.crop = crop;
+        c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
+        c.rank = c.passes ? colony_rank(p, crop) : 0;
+        plan_holds = plan_holds || (c.passes && crop == s.plan_crop);
+        weighed.push_back(c);
+    }
+    const std::optional<std::size_t> pick = pick_colony(weighed);
+    const std::optional<std::uint8_t> best = pick ? std::optional<std::uint8_t>{weighed[*pick].crop} : std::nullopt;
+    const std::int64_t best_rank = pick ? weighed[*pick].rank : 0;
+    if (!best || (!asked && !plan_holds)) {
+        clear();
+        return;
+    }
+    const bool load = colony_load_in_stock(p, false) || colony_load_in_stock(p, true);
+    if (!asked) {
+        if (s.plan_ship != 0 && !load) {
+            log(p, "colony plan: ship %u released (no load)", s.plan_ship);
+            s.plan_ship = 0;
+        }
+        return;  // the plan holds; a new one is made when an order asks
+    }
+    if (*best != s.plan_crop) {
+        // Another colony takes the plan's place only while no ship is kept for it.
+        if (plan_holds && s.plan_ship != 0) {
+            return;
+        }
+        log(p, "colony plan: crop %u rank %lld (first %u rank %lld)", unsigned{*best},
+            static_cast<long long>(best_rank), unsigned{crops.front()},
+            static_cast<long long>(colony_rank(p, crops.front())));
+        if (!plan_holds) {
+            s.plan_ship = 0;
+        }
+        s.plan_crop = *best;
+        s.plan_ms = step;
+    }
+    // A ship is kept for it once the home city holds the load, so that the supply runs do not take
+    // it while it is called home; before, kept from the plan on, it lay idle for most of an hour.
+    if (s.plan_ship != 0 && !load) {
+        log(p, "colony plan: ship %u released (no load)", s.plan_ship);
+        s.plan_ship = 0;
+    } else if (s.plan_ship == 0 && load) {
+        if (const std::uint32_t ship = colony_ship_candidate(p); ship != 0) {
+            s.plan_ship = ship;
+            log(p, "colony plan: ship %u kept", ship);
+        }
+    }
 }
 
 namespace {}  // namespace
@@ -1191,6 +1453,13 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
     if (Ship* s = settle_ship(p)) {
         return s->id;
     }
+    // G4b: the ship kept for the planned colony.
+    if (p.settle.plan_ship != 0) {
+        if (const Ship* kept = m_world.ship(p.settle.plan_ship);
+            kept != nullptr && kept->owner == p.player && !kept->sinking && !kept->repairing) {
+            return kept->id;
+        }
+    }
     // Open1602: an improved computer does not send its only ship to found a city while one of its
     // cities runs out of food (food_runs_out): the founding took the ship for twenty minutes, and a
     // colony of 450 people starved meanwhile.
@@ -1267,10 +1536,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     // that was then refused lay idle at the Kontor. Three colonies in two hours took a computer
     // from 24,000 gold into a debt it never left; a city that waited for a good of its next class
     // sat on 45,000 gold for hours.
-    if (rivals() && !p.pirates && p.settle.ship == 0 && !p.settle.active) {
-        if (!can_commit(p, colony_commitment(p, choose_colony_crop(p)), Spend::Colony)) {
-            return false;
-        }
+    // G4b: an improved rival weighs it in its one colony decision (colony_plan), below.
+    const bool planned = rivals() && !p.pirates;
+    if (planned && p.settle.ship == 0 && !p.settle.active) {
     } else if (!classic() && player(p).money < colony_money(p)) {
         return false;
     }
@@ -1318,6 +1586,13 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
     if (all && !force && !wants_room(p)) {
         return false;
     }
+    // G4b: the order asks; the plan decides which colony, if any.
+    if (planned) {
+        colony_plan(p, true);
+        if (p.settle.plan_crop == 0 && p.settle.ship == 0) {
+            return false;
+        }
+    }
     const std::uint32_t ship = colony_ship_candidate(p);
     if (ship == 0) {
         p.settle.ship = 0;
@@ -1348,7 +1623,9 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         }
         return true;
     }
-    return prepare_colony_ship(p, choose_colony_crop(p), food);
+    const std::uint8_t plan = p.settle.plan_crop;
+    return prepare_colony_ship(
+        p, planned && plan != 0 ? (plan == kAnyCrop ? std::uint8_t{0} : plan) : choose_colony_crop(p), food);
 }
 
 bool Engine::colony_loading(AiPlayer& p) {

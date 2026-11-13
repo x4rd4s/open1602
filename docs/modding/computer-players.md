@@ -486,6 +486,17 @@ Improved computers weigh the way at sea:
   the other, twenty minutes apart. Once its home city has 300 inhabitants and its people use a
   good none of its islands grows the crop for, it saves the colony's gold (its houses wait), from
   then until the Kontor stands, also while the ship goes home to load.
+- **One colony decision.** An improved rival decides on its next colony once a step, whichever of
+  its orders asks for one, among the crops the original's order of motives offers (its goal's gold
+  or ore, the good its people run out of soonest, the crops none of its islands grows, then the
+  workshops it lacks) and that its budget carries. Of those it takes the one that ranks highest: the
+  taxes of the city the colony becomes (as many houses as the free land of the nearest island it
+  knows for the crop holds beside the fields, as densely as its home city's houses stand, full of
+  the highest class whose goods it will have; none for a city founded as a colony without houses),
+  less the running costs of the crop's chain, plus the houses of the home city that rise with the
+  good. The rank refuses nothing. The plan keeps its gold and a ship that no supply run takes from
+  then on; another crop takes its place only while no ship is kept for it, and the plan ends when
+  its crop is no longer wanted or its budget no longer carries it.
 - **Colony crops.** An improved computer founds its next colony for the good its people use, make
   too little of and run out of soonest, where none of its cities has an island for it yet (alcohol
   from wine, else sugar; tobacco; spices; cocoa), after its goal's gold or ore. The original goes
@@ -527,7 +538,10 @@ Improved computers weigh the way at sea:
 The original's computers search a farm's site only beside their roads and keep it five rings away
 from any other farm or plantation; in a grown town that leaves no site however much free land the
 city or its island has. Improved computers keep their farms apart only within three rings, where
-their fields would overlap. When the houses still find sites but a farm or plantation does not,
+their fields would overlap. A rival whose city makes less food than it eats and finds no site
+for a pasture or grain farm beside its roads takes one off them, with a road to it over the
+city's open ground (up to 40 tiles, as for a market towards open land), scored as beside the
+roads. When the houses still find sites but a farm or plantation does not,
 the next road the city builds leads where the land ahead is open instead of along the town. When
 a farm finds no site at all, the computer looks for the place of its island with the most
 unclaimed land that fields can take (60 tiles within six of it at least), near its markets, and

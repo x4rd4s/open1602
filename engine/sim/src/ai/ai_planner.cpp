@@ -891,6 +891,25 @@ bool Engine::incomes_ok(const AiPlayer& p, std::int32_t minimum) const {
     return true;
 }
 
+bool Engine::becomes_colony(const AiPlayer& p, const City* founded, std::uint32_t land, std::uint32_t buildings) const {
+    // A city founded becomes a colony without houses with little land, with many buildings, beside
+    // more than one other city with people or beside a large one.
+    const Balance& at = m_world.balance();
+    std::uint32_t big_cities = 0;
+    bool large = false;
+    for (const City& o : m_world.cities()) {
+        if (o.owner == p.player && &o != founded) {
+            big_cities += population(o) >= at.ai_colony_other_people ? 1U : 0U;
+            large = large || population(o) >= at.ai_colony_large_city;
+        }
+    }
+    // Open1602: an improved rival settles a colony with land enough for a main city (kGrowFrom)
+    // however many cities it has; the original made every city after its second a colony
+    // without houses, whose land lay empty.
+    const bool room = rivals() && !p.pirates && land >= kGrowFrom;
+    return land < at.ai_colony_below_land || (!room && (buildings > at.ai_colony_buildings || big_cities > 1 || large));
+}
+
 std::int32_t Engine::land_rank(const AiPlayer& p) const {
     // -1 another own city has no land measured, 0 another has more, 1 the largest.
     const CityPlan* here = nullptr;
@@ -1123,29 +1142,44 @@ void Engine::unload_ship(AiPlayer& p, City& c) {
     }
 }
 
+std::uint32_t Engine::colony_fields(std::uint8_t max_stage) noexcept {
+    switch (max_stage) {
+        case stage::kSettlers:
+        case stage::kMain:
+        case stage::kMain2:
+        case stage::kCitizens2:
+            return 4;
+        case stage::kCitizens:
+        case stage::kMerchants:
+        case stage::kMerchants2:
+            return 6;
+        case stage::kAristocrats:
+        case stage::kAristocrats2:
+            return 10;
+        default:
+            return 8;
+    }
+}
+
 bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field) {
     // Luxury crops of a colony by the highest stage the player reached (stage 1, 0x17).
     const std::uint32_t n = r.land / tiles_per_field;
     const std::uint32_t q = full_crops(c.island);
+    const std::uint32_t cap = colony_fields(p.max_stage);
     switch (p.max_stage) {
         case stage::kSettlers:
         case stage::kMain:
         case stage::kMain2:
-            return luxury(p, std::min(n, grown(r, 4, true)), true);
         case stage::kCitizens:
-            return luxury(p, std::min(n, grown(r, 6, true)), true);
+            return luxury(p, std::min(n, grown(r, cap, true)), true);
         case stage::kCitizens2:
-            return luxury(p, std::min(n, grown(r, 4, true)), false);
+            return luxury(p, std::min(n, grown(r, cap, true)), false);
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kMerchants:
         case stage::kMerchants2:
         case stage::kAristocrats:
         case stage::kAristocrats2: {
-            const std::uint32_t cap = (p.max_stage == stage::kMerchants || p.max_stage == stage::kMerchants2) ? 6U
-                                      : (p.max_stage == stage::kAristocrats || p.max_stage == stage::kAristocrats2)
-                                          ? 10U
-                                          : 8U;
             const std::uint32_t k = std::min(n, grown(r, cap, true));
             if (q == 1) {
                 if (luxury(p, k, false)) {
@@ -1295,20 +1329,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kPioneers);
                 return;
             }
-            std::uint32_t big_cities = 0;
-            bool large = false;
-            for (const City& o : m_world.cities()) {
-                if (o.owner == p.player && &o != &c) {
-                    big_cities += population(o) >= at.ai_colony_other_people ? 1U : 0U;
-                    large = large || population(o) >= at.ai_colony_large_city;
-                }
-            }
-            // Open1602: an improved rival settles a colony with land enough for a main city (kGrowFrom)
-            // however many cities it has; the original made every city after its second a colony
-            // without houses, whose land lay empty.
-            const bool room = rivals() && !p.pirates && r.land >= kGrowFrom;
-            if (r.land < at.ai_colony_below_land ||
-                (!room && (building_count(c) > at.ai_colony_buildings || big_cities > 1 || large))) {
+            if (becomes_colony(p, &c, r.land, building_count(c))) {
                 set_stage(p, r, stage::kColony);
                 return;
             }
@@ -2534,6 +2555,10 @@ std::int64_t Engine::colony_savings(AiPlayer& p) {
     // So too while its ship goes home to load: the gold fell from 3600 to 130 in those minutes.
     if (p.settle.active || p.settle.ship != 0) {
         return colony_money(p);
+    }
+    // G4b: an improved rival from when the colony is planned (colony_plan); its ship is kept.
+    if (rivals() && !p.pirates) {
+        return p.settle.plan_crop != 0 ? colony_money(p) : 0;
     }
     // Only with a ship to sail: without one the gold lay idle (update_fleet_target orders one).
     return colony_crop_missing(p) && colony_ship_candidate(p) != 0 ? colony_money(p) : 0;

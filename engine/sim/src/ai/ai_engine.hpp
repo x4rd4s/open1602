@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <span>
@@ -368,11 +369,37 @@ private:
     [[nodiscard]] Ship* settle_ship(AiPlayer& p);
     [[nodiscard]] std::vector<Ship*> own_ships(const AiPlayer& p);
     bool want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food);
+    /// Open1602 (G4b): an improved rival's one colony decision a step. Of the crops the original's
+    /// order of motives offers (colony_candidates), those its budget carries (colony_commitment, as
+    /// before), the one that ranks highest by colony_rank (Settlement::plan_crop); the plan keeps
+    /// its gold and a ship (plan_ship).
+    void colony_plan(AiPlayer& p, bool asked);
+    /// G4b: the buildings of the chain a colony for `crop` builds, with their counts.
+    struct Chain {
+        std::vector<std::pair<const assets::BuildingType*, std::uint32_t>> parts;
+    };
+    [[nodiscard]] Chain colony_chain(const AiPlayer& p, std::uint8_t crop) const;
+    /// G4b: the running costs a minute of that chain.
+    [[nodiscard]] std::int64_t chain_upkeep(const AiPlayer& p, std::uint8_t crop) const;
+    /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
+    [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
+    /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
+    /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
+    /// home city's houses rise into. Ranks only; it refuses nothing.
+    [[nodiscard]] std::int64_t colony_rank(const AiPlayer& p, std::uint8_t crop);
+    /// Whether a city founded (`founded`, nullptr before the founding) with `land` free tiles and
+    /// `buildings` becomes a colony without houses (stage kColony).
+    [[nodiscard]] bool becomes_colony(const AiPlayer& p, const City* founded, std::uint32_t land,
+                                      std::uint32_t buildings) const;
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
+    /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
+    [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
+    /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
+    [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
     /// Loads the colony ship in city `c`; true once it holds its whole load, the settlement then starts.
     bool load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::uint8_t crop);
@@ -425,6 +452,9 @@ private:
                     bool grow = false);
     void unload_ship(AiPlayer& p, City& c);
     bool colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field);
+    /// The luxury fields a colony plants by the highest stage the player reached (colony_luxury,
+    /// colony_chain).
+    [[nodiscard]] static std::uint32_t colony_fields(std::uint8_t max_stage) noexcept;
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
     /// Open1602: how many workshops of slot `k` the producers of their raw material in a city keep
@@ -613,6 +643,21 @@ private:
     /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
     /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
     bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
+    /// Open1602: a walk over the city's open ground from its roads (walk_ground), for claim_by_path
+    /// and farm_by_path.
+    struct GroundWalk {
+        std::int32_t width = 0;
+        std::vector<std::int32_t> prev;  ///< the tile before on the way, by y * width + x; -1 a road, -2 not reached
+        std::vector<std::int32_t> dist;  ///< tiles from the nearest road
+        /// Whether the way to `end` crosses the rectangle (x0, y0, w, h).
+        [[nodiscard]] bool crosses(std::int32_t end, std::int32_t x0, std::int32_t y0, std::int32_t w,
+                                   std::int32_t h) const;
+        /// The road along the way to `end`, from the city's road on.
+        [[nodiscard]] std::vector<BuildItem> road_to(std::int32_t end) const;
+    };
+    bool walk_ground(AiPlayer& p, GroundWalk& walk,
+                     const std::function<void(std::int32_t i, std::int32_t x, std::int32_t y)>& visit);
+    bool farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain);
     bool claim_fields(AiPlayer& p, std::uint8_t slot);
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
     [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
@@ -725,6 +770,8 @@ private:
     void update_fleet_target(AiPlayer& p);
     /// Improved computers: where a city lies on the map, its Kontor (else its island's middle).
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> city_point(const City& c) const;
+    /// The middle of an island, in world tiles.
+    [[nodiscard]] static std::pair<std::int32_t, std::int32_t> island_point(const WorldIsland& isl) noexcept;
     /// Improved computers: the seconds a ship of the computer takes from (x0, y0) to (x1, y1), an
     /// estimate from the distance and the speed of its first ship.
     [[nodiscard]] std::uint32_t sail_seconds(const AiPlayer& p, std::pair<std::int32_t, std::int32_t> from,
@@ -935,6 +982,8 @@ private:
         std::int64_t reliable = 0;
     };
     mutable std::vector<BudgetCache> m_budgets;
+    /// The step colony_plan last ran in, per player.
+    std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
     /// Free land from which `grown` grows a stage's orders, during the grow pass of `run_stage`.

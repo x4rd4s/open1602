@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <functional>
 #include <span>
 #include <vector>
 
@@ -828,6 +829,80 @@ bool Engine::search_stonemason(AiPlayer& p) {
     }
 }
 
+namespace {
+
+/// What a farm's site needs about it (search_farm, search_grain, farm_by_path): the rings scored
+/// and the plantable tiles (pasture: within two rings; grain: the fields' own tiles).
+struct FarmRule {
+    std::int32_t rings = 0;
+    std::int32_t fields = 0;
+};
+FarmRule farm_rule(bool grain) {
+    return {13, grain ? 9 : 19};
+}
+
+void farm_tile(Acc& acc, const Tile& t, std::int32_t d, std::uint8_t own, bool improved) {
+    // A tile in ring d about a farm's site (search_farm, farm_by_path); the road is counted apart.
+    if (t.origin && t.prod == prod::kHouse && d < 2) {
+        acc.score -= 32 << (2 - d);
+    }
+    if (improved) {
+        acc.extra += town_cost(t, d);
+    }
+    if (t.prod == prod::kShipyard && d <= 3) {
+        acc.score -= 1000;
+    }
+    if (t.ware == own && t.prod != prod::kRipe && d > 2 && d < 10) {
+        acc.score += (10 - d) * 8;
+    }
+    if (plantable(t) && d < 2) {
+        ++acc.count;
+        acc.score += t.growth;
+    }
+    if (t.origin && market_or_kontor(t) && d < 13) {
+        acc.market = true;
+        if (t.kind == kind::kBuilding) {
+            acc.score += 12 - d;
+        } else if (d < 5) {
+            acc.score -= 128;
+        }
+    }
+    if (t.ware == ware::kGrain && d == 0) {
+        acc.score -= 64;
+    }
+    // Open1602: an improved computer keeps its farms apart only where their
+    // fields would overlap (three rings); five left no site in a grown town
+    // with a thousand free tiles, and its people starved.
+    if (raw_producer(t.ware) && d < (improved ? 3 : 5)) {
+        acc.score -= 32 << (5 - d);
+    }
+}
+
+void grain_tile(Acc& acc, const Tile& t, std::int32_t d, bool improved) {
+    // A tile in ring d about a grain farm's site (search_grain, farm_by_path); the road apart.
+    if (t.prod == prod::kShipyard && d <= 3) {
+        acc.score -= 500;
+    }
+    if (d == 0 && plantable(t)) {
+        ++acc.count;
+        acc.score += t.growth;
+    }
+    if (t.origin && market_or_kontor(t) && d < 13) {
+        acc.market = true;
+    }
+    if (raw_producer(t.ware) && d < 3) {
+        acc.score -= 32 << (3 - d);
+    }
+    if (t.origin && t.ware == ware::kGrain && t.prod != prod::kRipe && d > 1 && d < 9) {
+        acc.score += (8 - d) * 4;
+    }
+    if (improved) {
+        acc.extra += town_cost(t, d);
+    }
+}
+
+}  // namespace
+
 bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
     const assets::BuildingType* b = by_id(p.search.building);
     Search& s = p.search;
@@ -905,39 +980,7 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                               }
                               return;
                           }
-                          if (t.origin && t.prod == prod::kHouse && d < 2) {
-                              acc.score -= 32 << (2 - d);
-                          }
-                          if (improved) {
-                              acc.extra += town_cost(t, d);
-                          }
-                          if (t.prod == prod::kShipyard && d <= 3) {
-                              acc.score -= 1000;
-                          }
-                          if (t.ware == own && t.prod != prod::kRipe && d > 2 && d < 10) {
-                              acc.score += (10 - d) * 8;
-                          }
-                          if (plantable(t) && d < 2) {
-                              ++acc.count;
-                              acc.score += t.growth;
-                          }
-                          if (t.origin && market_or_kontor(t) && d < 13) {
-                              acc.market = true;
-                              if (t.kind == kind::kBuilding) {
-                                  acc.score += 12 - d;
-                              } else if (d < 5) {
-                                  acc.score -= 128;
-                              }
-                          }
-                          if (t.ware == ware::kGrain && d == 0) {
-                              acc.score -= 64;
-                          }
-                          // Open1602: an improved computer keeps its farms apart only where their
-                          // fields would overlap (three rings); five left no site in a grown town
-                          // with a thousand free tiles, and its people starved.
-                          if (raw_producer(t.ware) && d < (improved ? 3 : 5)) {
-                              acc.score -= 32 << (5 - d);
-                          }
+                          farm_tile(acc, t, d, own, improved);
                       });
                 if (side == 1 || side == -2) {
                     acc.score += 32;
@@ -945,8 +988,9 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
                 const std::int32_t score =
                     outside_zone(zone, margin, c, away_from_town(parity_penalty(acc.score, parity, 4), acc.extra));
-                const bool enough = woodcutter ? acc.count >= (sparse ? kSparseWoodTrees : 10)
-                                               : acc.count >= (sparse_farm ? kSparseFarmFields : 19);
+                const bool enough = woodcutter
+                                        ? acc.count >= (sparse ? kSparseWoodTrees : 10)
+                                        : acc.count >= (sparse_farm ? kSparseFarmFields : farm_rule(false).fields);
                 if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
                     s.best_x0 = c.x0;
@@ -997,35 +1041,17 @@ bool Engine::search_grain(AiPlayer& p) {
             }
             any = true;
             Acc acc;
-            rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, 13,
+            rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, farm_rule(true).rings,
                   [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
                       if (d <= 1 && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
                           acc.road = true;
                       }
-                      if (t.prod == prod::kShipyard && d <= 3) {
-                          acc.score -= 500;
-                      }
-                      if (d == 0 && plantable(t)) {
-                          ++acc.count;
-                          acc.score += t.growth;
-                      }
-                      if (t.origin && market_or_kontor(t) && d < 13) {
-                          acc.market = true;
-                      }
-                      if (raw_producer(t.ware) && d < 3) {
-                          acc.score -= 32 << (3 - d);
-                      }
-                      if (t.origin && t.ware == ware::kGrain && t.prod != prod::kRipe && d > 1 && d < 9) {
-                          acc.score += (8 - d) * 4;
-                      }
-                      if (improved) {
-                          acc.extra += town_cost(t, d);
-                      }
+                      grain_tile(acc, t, d, improved);
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
             const std::int32_t score = outside_zone(
                 zone, margin, c, away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra));
-            if (acc.count >= 9 && acc.road && acc.market && score > s.best &&
+            if (acc.count >= farm_rule(true).fields && acc.road && acc.market && score > s.best &&
                 farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -1981,13 +2007,11 @@ bool Engine::search_shipyard(AiPlayer& p) {
     }
 }
 
-bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t target_y) {
-    // Open1602: a market at the edge of the city's land towards (target_x, target_y), with a road
-    // to it over the city's open ground from any of its roads (up to kClaimPath tiles). The search
-    // along the road runs found no site for it in nine of ten tries: the runs end in the built-up
-    // town, away from the open land.
-    const assets::BuildingType* b = by_id(id::kMarket);
-    if (b == nullptr || p.island >= m_world.islands().size()) {
+bool Engine::walk_ground(AiPlayer& p, GroundWalk& walk,
+                         const std::function<void(std::int32_t i, std::int32_t x, std::int32_t y)>& visit) {
+    // Open1602: from every road of the city, nearest first, over its open ground (ground, forest,
+    // ruins) up to kClaimPath tiles; `visit` sees each tile reached, the roads first.
+    if (p.island >= m_world.islands().size()) {
         return false;
     }
     const IslandMap& map = m_world.islands()[p.island].map;
@@ -1996,44 +2020,101 @@ bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t targ
     if (width <= 0 || height <= 0) {
         return false;
     }
-    const std::int32_t start = market_distance(p, target_x, target_y);
-    std::vector<std::int32_t> prev(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
-    std::vector<std::int32_t> dist(prev.size(), 0);
+    walk.width = width;
+    walk.prev.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), -2);
+    walk.dist.assign(walk.prev.size(), 0);
     std::vector<std::int32_t> queue;
     for (std::int32_t y = 0; y < height; ++y) {
         for (std::int32_t x = 0; x < width; ++x) {
             const Tile t = tile(p.island, x, y);
             if (t.city == p.city && (t.kind == kind::kRoad || t.kind == kind::kBridge)) {
-                prev[static_cast<std::size_t>(y * width + x)] = -1;
+                walk.prev[static_cast<std::size_t>(y * width + x)] = -1;
                 queue.push_back(y * width + x);
             }
         }
     }
-    const auto on_path = [&](std::int32_t end, std::int32_t x0, std::int32_t y0, std::int32_t w, std::int32_t h) {
-        for (std::int32_t k = end; k >= 0; k = prev[static_cast<std::size_t>(k)]) {
-            const std::int32_t kx = k % width;
-            const std::int32_t ky = k / width;
-            if (kx >= x0 && kx < x0 + w && ky >= y0 && ky < y0 + h) {
-                return true;
-            }
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const std::int32_t i = queue[head];
+        const std::int32_t x = i % width;
+        const std::int32_t y = i / width;
+        visit(i, x, y);
+        if (walk.dist[static_cast<std::size_t>(i)] >= kClaimPath) {
+            continue;
         }
+        for (const auto& step : kStep) {
+            const std::int32_t nx = x + step[0];
+            const std::int32_t ny = y + step[1];
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+                continue;
+            }
+            const auto n = static_cast<std::size_t>(ny * width + nx);
+            const Tile t = tile(p.island, nx, ny);
+            if (walk.prev[n] != -2 || !t.valid() || t.city != p.city ||
+                !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
+                continue;
+            }
+            walk.prev[n] = i;
+            walk.dist[n] = walk.dist[static_cast<std::size_t>(i)] + 1;
+            queue.push_back(ny * width + nx);
+        }
+    }
+    return true;
+}
+
+bool Engine::GroundWalk::crosses(std::int32_t end, std::int32_t x0, std::int32_t y0, std::int32_t w,
+                                 std::int32_t h) const {
+    for (std::int32_t k = end; k >= 0; k = prev[static_cast<std::size_t>(k)]) {
+        const std::int32_t kx = k % width;
+        const std::int32_t ky = k / width;
+        if (kx >= x0 && kx < x0 + w && ky >= y0 && ky < y0 + h) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<BuildItem> Engine::GroundWalk::road_to(std::int32_t end) const {
+    std::vector<BuildItem> road;
+    for (std::int32_t k = end; prev[static_cast<std::size_t>(k)] != -1; k = prev[static_cast<std::size_t>(k)]) {
+        road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
+    }
+    std::reverse(road.begin(), road.end());
+    return road;
+}
+
+namespace {
+
+/// The sites of a w x h building beside the tile (x, y): east, west, south and north of it.
+std::array<std::pair<std::int32_t, std::int32_t>, 4> sites_beside(std::int32_t x, std::int32_t y, std::int32_t w,
+                                                                  std::int32_t h) {
+    return {std::pair{x + 1, y - h / 2}, std::pair{x - w, y - h / 2}, std::pair{x - w / 2, y + 1},
+            std::pair{x - w / 2, y - h}};
+}
+
+}  // namespace
+
+bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t target_y) {
+    // Open1602: a market at the edge of the city's land towards (target_x, target_y), with a road
+    // to it over the city's open ground from any of its roads (up to kClaimPath tiles). The search
+    // along the road runs found no site for it in nine of ten tries: the runs end in the built-up
+    // town, away from the open land.
+    const assets::BuildingType* b = by_id(id::kMarket);
+    if (b == nullptr) {
         return false;
-    };
+    }
+    const std::int32_t start = market_distance(p, target_x, target_y);
     std::int32_t best = start - kClaimStep;
     std::int32_t best_end = -1;
     std::array<std::int32_t, 4> site{};
     const auto bw = static_cast<std::int32_t>(b->size_x);
     const auto bh = static_cast<std::int32_t>(b->size_y);
-    for (std::size_t head = 0; head < queue.size(); ++head) {
-        const std::int32_t i = queue[head];
-        const std::int32_t x = i % width;
-        const std::int32_t y = i / width;
+    GroundWalk walk;
+    const bool walked = walk_ground(p, walk, [&](std::int32_t i, std::int32_t x, std::int32_t y) {
         // Market sites beside this tile, both ways round.
         for (const auto& [w, h] : {std::pair{bw, bh}, std::pair{bh, bw}}) {
-            for (const auto& [x0, y0] : {std::pair{x + 1, y - h / 2}, std::pair{x - w, y - h / 2},
-                                         std::pair{x - w / 2, y + 1}, std::pair{x - w / 2, y - h}}) {
+            for (const auto& [x0, y0] : sites_beside(x, y, w, h)) {
                 const std::int32_t d = tile_distance(x0 + w / 2 - target_x, y0 + h / 2 - target_y);
-                if (d >= best || !can_place(p, *b, x0, y0, w, h) || on_path(i, x0, y0, w, h)) {
+                if (d >= best || !can_place(p, *b, x0, y0, w, h) || walk.crosses(i, x0, y0, w, h)) {
                     continue;
                 }
                 best = d;
@@ -2041,34 +2122,11 @@ bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t targ
                 site = {x0, y0, w, h};
             }
         }
-        if (dist[static_cast<std::size_t>(i)] >= kClaimPath) {
-            continue;
-        }
-        for (std::uint8_t dir = 0; dir < 4; ++dir) {
-            const std::int32_t nx = x + kStep[dir][0];
-            const std::int32_t ny = y + kStep[dir][1];
-            if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
-                continue;
-            }
-            const auto n = static_cast<std::size_t>(ny * width + nx);
-            const Tile t = tile(p.island, nx, ny);
-            if (prev[n] != -2 || !t.valid() || t.city != p.city ||
-                !(t.kind == kind::kGround || t.kind == kind::kForest || t.kind == kind::kRuin)) {
-                continue;
-            }
-            prev[n] = i;
-            dist[n] = dist[static_cast<std::size_t>(i)] + 1;
-            queue.push_back(ny * width + nx);
-        }
-    }
-    if (best_end < 0) {
+    });
+    if (!walked || best_end < 0) {
         return false;
     }
-    std::vector<BuildItem> road;
-    for (std::int32_t k = best_end; prev[static_cast<std::size_t>(k)] != -1; k = prev[static_cast<std::size_t>(k)]) {
-        road.push_back(BuildItem{id::kRoadDirt, k % width, k / width, 0, 0});
-    }
-    std::reverse(road.begin(), road.end());
+    std::vector<BuildItem> road = walk.road_to(best_end);
     const std::size_t want = road.size();
     if (want != 0 && build(p, std::move(road), false) != want) {
         log(p, "fields: road to the market site at %d,%d not built", site[0], site[1]);
@@ -2083,6 +2141,75 @@ bool Engine::claim_by_path(AiPlayer& p, std::int32_t target_x, std::int32_t targ
     log(p, "fields: market at %d,%d with %zu road tiles, %d from the open land at %d,%d (was %d)", site[0], site[1],
         want, best, target_x, target_y, start);
     push(p, kLayout, true);
+    return true;
+}
+
+bool Engine::farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain) {
+    // Open1602: a hungry rival's pasture or grain farm away from its roads, where none beside them
+    // scores: a site beside a road over the city's open ground from any of its roads (up to
+    // kClaimPath tiles, as claim_by_path), scored as along the roads, with the road it brings. The
+    // road is built here; task_farm builds the farm at p.search's best site. At the food gap of
+    // ten hungry home cities a player found dozens of sites each with fields and a market in reach
+    // and no farm within three rings, most of them off the roads (the search's only ground).
+    const bool improved = !classic();
+    const TownZone* zone = improved && town_zone(p).valid ? &town_zone(p) : nullptr;
+    const std::int32_t margin = improved ? town_style_of(p).field_margin : 0;
+    const FarmRule rule = farm_rule(grain);
+    const auto w = static_cast<std::int32_t>(b.size_x);
+    const auto h = static_cast<std::int32_t>(b.size_y);
+    std::int32_t best = 0;
+    std::int32_t best_end = -1;
+    Site site;
+    GroundWalk walk;
+    const bool walked = walk_ground(p, walk, [&](std::int32_t i, std::int32_t x, std::int32_t y) {
+        // Beside the roads the search along them looked already; here only beside the new road.
+        if (walk.dist[static_cast<std::size_t>(i)] == 0) {
+            return;
+        }
+        for (const auto& [x0, y0] : sites_beside(x, y, w, h)) {
+            if (!can_place(p, b, x0, y0, w, h) || walk.crosses(i, x0, y0, w, h)) {
+                continue;
+            }
+            Site c;
+            c.x0 = x0;
+            c.y0 = y0;
+            c.x1 = x0 + w - 1;
+            c.y1 = y0 + h - 1;
+            Acc acc;
+            rings(p, RingFilter::Own, c.x0, c.y0, c.x1, c.y1, rule.rings,
+                  [&](const Tile& t, std::int32_t, std::int32_t, std::int32_t d) {
+                      if (grain) {
+                          grain_tile(acc, t, d, improved);
+                      } else {
+                          farm_tile(acc, t, d, b.ware, improved);
+                      }
+                  });
+            const std::int32_t score = outside_zone(zone, margin, c, away_from_town(acc.score, acc.extra));
+            if (acc.count >= rule.fields && acc.market && score > best && farm_room(p, b, c.x0, c.y0, c.x1, c.y1)) {
+                best = score;
+                best_end = i;
+                site = c;
+            }
+        }
+    });
+    if (!walked || best_end < 0) {
+        return false;
+    }
+    std::vector<BuildItem> road = walk.road_to(best_end);
+    const std::size_t want = road.size();
+    if (build(p, std::move(road), false) != want) {
+        log(p, "fields: road to the farm site at %d,%d not built", site.x0, site.y0);
+        return false;
+    }
+    Search& s = p.search;
+    s.best = best;
+    s.best_x0 = site.x0;
+    s.best_y0 = site.y0;
+    s.best_x1 = site.x1;
+    s.best_y1 = site.y1;
+    s.stub_x = -1;
+    s.stub_y = -1;
+    log(p, "fields: farm %u at %d,%d with %zu road tiles (score %d)", b.id, site.x0, site.y0, want, best);
     return true;
 }
 

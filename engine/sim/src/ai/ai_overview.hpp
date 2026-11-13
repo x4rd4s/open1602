@@ -105,4 +105,23 @@ struct Budget {
     [[nodiscard]] Refusal refusal(const Commitment& c) const noexcept;
 };
 
+/// G4b: a crop a colony may be founded for, in the original's order of motives.
+struct ColonyCandidate {
+    std::uint8_t crop = 0;
+    bool passes = false;    ///< its budget carries it
+    std::int64_t rank = 0;  ///< colony_rank
+};
+
+/// The candidate the colony plan takes: of those that pass, the highest rank; on equal ranks the
+/// earlier in the original's order. None passes, none.
+[[nodiscard]] inline std::optional<std::size_t> pick_colony(const std::vector<ColonyCandidate>& in) noexcept {
+    std::optional<std::size_t> best;
+    for (std::size_t i = 0; i < in.size(); ++i) {
+        if (in[i].passes && (!best || in[i].rank > in[*best].rank)) {
+            best = i;
+        }
+    }
+    return best;
+}
+
 }  // namespace o1602::sim::ai

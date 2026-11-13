@@ -1,0 +1,13 @@
+{
+  "change": "offroad",
+  "stage": "mechanism",
+  "passed": true,
+  "evidence": "mechanism, n=1, no significance",
+  "question": "Do hungry home cities find farm sites off their roads?",
+  "games": ["L-g12-404 from its minute-400 save, 400 minutes"],
+  "metrics": {
+    "food_balance_gap60": {"main": -2.4, "offroad": -0.5, "unit": "t/min", "better": "higher"},
+    "neighbour_loss_per_farm": {"offroad": -0.17, "added_per_farm": 1.3, "unit": "t/min"}
+  },
+  "notes": "2 of 76 new farms gave nothing: a full store with no market cart. Refactor onto the shared ground walk byte-identical to the measured build (stdout and AI log)."
+}

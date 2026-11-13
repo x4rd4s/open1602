@@ -1,0 +1,115 @@
+{
+ "arms": {
+  "bundle": {
+   "metrics": {
+    "colony_net_60": {
+     "arm": -9862.813055555556,
+     "base": -9966.572361111112,
+     "decides": true,
+     "difference": 103.75930555555533,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 1599.673721926598,
+     "verdict": "no measurable effect"
+    },
+    "food_balance_gap60": {
+     "arm": -11.250704166666667,
+     "base": -14.280245833333334,
+     "decides": true,
+     "difference": 3.029541666666667,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 1.971348505448876,
+     "verdict": "no measurable effect"
+    },
+    "foundings": {
+     "arm": 46.53611111111111,
+     "base": 46.147222222222226,
+     "decides": true,
+     "difference": 0.38888888888888573,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 8.02611739296428,
+     "verdict": "no measurable effect"
+    },
+    "gap_cities": {
+     "arm": 7.141666666666667,
+     "base": 7.270833333333333,
+     "decides": false,
+     "difference": 0.12916666666666643,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 1.038162226765592,
+     "verdict": "no measurable effect"
+    },
+    "low_gold_foundings": {
+     "arm": 13.05,
+     "base": 14.459722222222222,
+     "decides": true,
+     "difference": 1.4097222222222214,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 1.7661074505521865,
+     "verdict": "no measurable effect"
+    }
+   },
+   "sets": {
+    "long": {
+     "collapse_rate": {
+      "arm": 0.10416666666666666,
+      "base": 0.08072916666666667,
+      "difference": -0.023437499999999986,
+      "passes": true,
+      "se": 0.02740126462547663,
+      "verdict": "no measurable effect"
+     },
+     "inhabitants": {
+      "arm": 106502.375,
+      "base": 105229.875,
+      "difference": 1272.5,
+      "passes": true,
+      "se": 2950.976033299346,
+      "verdict": "no measurable effect"
+     }
+    },
+    "standard": {
+     "collapse_rate": {
+      "arm": 0.002976190476190476,
+      "base": 0.005952380952380952,
+      "difference": 0.002976190476190476,
+      "passes": true,
+      "se": 0.0045462060465831745,
+      "verdict": "no measurable effect"
+     },
+     "inhabitants": {
+      "arm": 138926.25,
+      "base": 133892.25,
+      "difference": 5034.0,
+      "passes": true,
+      "se": 2582.5204016619114,
+      "verdict": "no measurable effect"
+     }
+    }
+   }
+  }
+ },
+ "evidence": "final, n=4, 2 standard errors",
+ "passed": true,
+ "plan": "5f0876e24d8b14576cd5e02da3760f3e76b7dcadf701066a2dc7d3ee9436bd31",
+ "stage": "final"
+}

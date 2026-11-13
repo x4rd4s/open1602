@@ -729,12 +729,12 @@ TEST_CASE("ai: a computer arming for a war still arms after the game is loaded (
     REQUIRE(!state.players.empty());
     state.players[0].strategy.war_arming = true;
     annokit::core::ByteWriter out;
-    sim::ai::Saver saver(out);
+    sim::ai::Saver saver(out, sim::ai::kStateWithArming);
     saver(state);
     const std::vector<std::uint8_t> bytes = out.take();
     annokit::core::ByteReader in(bytes);
     sim::ComputerPlayers computers(s);
-    REQUIRE(computers.load(in, sim::ComputerPlayers::max_state_version()));
+    REQUIRE(computers.load(in, sim::ai::kStateWithArming));
     CHECK(computers.state_version() == sim::ai::kStateWithArming);
     // Saved again, it reads back with the flag.
     const std::vector<std::uint8_t> again = saved(computers);
@@ -1216,6 +1216,59 @@ TEST_CASE("ai: a computer answers a ship that is about to found a city on its is
     CHECK(answer(with([](Case& k) { k.size = 3; })));
     CHECK(!answer(with([](Case& k) { k.asker = kComputer; })));
     CHECK(!answer(with([](Case& k) { k.island = 7; })));
+}
+
+TEST_CASE("ai: a computer's colony plan and the ship kept for it survive a save") {
+    Game g(false);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ComputerPlayers ai(s);
+    ai.reset();
+    const std::uint32_t before = ai.state_version();
+    CHECK(before < sim::ai::kStateWithColonyPlan);  // no plan: the older version suffices
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(ai);
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, before);
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    state.players[0].settle.plan_crop = sim::ware::kTobaccoField;
+    state.players[0].settle.plan_ms = 123'456;
+    state.players[0].settle.plan_ship = 7;
+    annokit::core::ByteWriter out;
+    sim::ai::Saver saver(out, sim::ComputerPlayers::max_state_version());
+    saver(state);
+    const std::vector<std::uint8_t> bytes = out.take();
+    annokit::core::ByteReader in(bytes);
+    REQUIRE(ai.load(in, sim::ComputerPlayers::max_state_version()));
+    CHECK(ai.state_version() == sim::ai::kStateWithColonyPlan);
+    const std::vector<std::uint8_t> again = saved(ai);
+    annokit::core::ByteReader in2(again);
+    sim::StateIn reader(in2);
+    sim::ai::State copy;
+    sim::ai::Loader loader(reader, sim::ai::kStateWithColonyPlan);
+    loader(copy);
+    REQUIRE(reader.ok());
+    REQUIRE(!copy.players.empty());
+    CHECK(copy.players[0].settle.plan_crop == sim::ware::kTobaccoField);
+    CHECK(copy.players[0].settle.plan_ms == 123'456);
+    CHECK(copy.players[0].settle.plan_ship == 7);
+    // A game saved before (version 12, a ship being loaded) loads and saves the same bytes again.
+    state.players[0].settle.plan_crop = 0;
+    state.players[0].settle.plan_ms = 0;
+    state.players[0].settle.plan_ship = 0;
+    state.players[0].settle.load_ms = 7'000;
+    annokit::core::ByteWriter older;
+    sim::ai::Saver old_saver(older, sim::ai::kStateWithColonyLoad);
+    old_saver(state);
+    const std::vector<std::uint8_t> v12 = older.take();
+    annokit::core::ByteReader in3(v12);
+    REQUIRE(ai.load(in3, sim::ai::kStateWithColonyLoad));
+    CHECK(ai.state_version() == sim::ai::kStateWithColonyLoad);
+    CHECK(saved(ai) == v12);
 }
 
 TEST_CASE("ai: a founding the computers do not know of is ignored") {
