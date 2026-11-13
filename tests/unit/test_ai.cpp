@@ -713,6 +713,43 @@ TEST_CASE("ai: a state of version 2 loads without a yard request") {
     }
 }
 
+TEST_CASE("ai: a computer arming for a war still arms after the game is loaded (version 13)") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    run(s, 8'000);
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(s.computers());
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, s.computers().state_version());
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    state.players[0].strategy.war_arming = true;
+    annokit::core::ByteWriter out;
+    sim::ai::Saver saver(out);
+    saver(state);
+    const std::vector<std::uint8_t> bytes = out.take();
+    annokit::core::ByteReader in(bytes);
+    sim::ComputerPlayers computers(s);
+    REQUIRE(computers.load(in, sim::ComputerPlayers::max_state_version()));
+    CHECK(computers.state_version() == sim::ai::kStateWithArming);
+    // Saved again, it reads back with the flag.
+    const std::vector<std::uint8_t> again = saved(computers);
+    CHECK(again == bytes);
+    annokit::core::ByteReader back(again);
+    sim::StateIn reader(back);
+    sim::ai::State loaded;
+    sim::ai::Loader loader(reader, computers.state_version());
+    loader(loaded);
+    REQUIRE(reader.ok());
+    CHECK(loaded.players[0].strategy.war_arming);
+    // Without a computer arming, the state keeps its earlier version and bytes.
+    CHECK(s.computers().state_version() < sim::ai::kStateWithArming);
+}
+
 TEST_CASE("ai: land freed on its island lets a computer's city search its sites anew, not the original's") {
     for (const bool classic : {false, true}) {
         Game g;

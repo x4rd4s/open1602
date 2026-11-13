@@ -212,10 +212,9 @@ std::vector<Piece> split_pieces(std::span<const std::uint8_t> bytes) {
     std::size_t at = 0;
     while (at + 12 <= bytes.size()) {
         std::string tag(reinterpret_cast<const char*>(bytes.data() + at), 4);
-        const std::uint32_t size = static_cast<std::uint32_t>(bytes[at + 8]) |
-                                   static_cast<std::uint32_t>(bytes[at + 9]) << 8 |
-                                   static_cast<std::uint32_t>(bytes[at + 10]) << 16 |
-                                   static_cast<std::uint32_t>(bytes[at + 11]) << 24;
+        const std::uint32_t size =
+            static_cast<std::uint32_t>(bytes[at + 8]) | static_cast<std::uint32_t>(bytes[at + 9]) << 8 |
+            static_cast<std::uint32_t>(bytes[at + 10]) << 16 | static_cast<std::uint32_t>(bytes[at + 11]) << 24;
         if (at + 12 + size > bytes.size()) {
             break;
         }
@@ -335,7 +334,8 @@ int reload_check(sim::World& world, sim::Simulation& simulation, const assets::B
         drain_events(twin_simulation);
         compare(tick);
         if (tick % ticks_per_minute == 0) {
-            std::printf("reload: minute %llu, gold", static_cast<unsigned long long>(tick / ticks_per_minute));
+            std::printf("reload: minute %llu, gold %s", static_cast<unsigned long long>(tick / ticks_per_minute),
+                        first ? "(states differ):" : "and state the same");
             for (std::size_t p = 0; p < world.players().size(); ++p) {
                 if (world.players()[p].money != twin.players()[p].money) {
                     std::printf(" P%zu %d/%d", p, world.players()[p].money, twin.players()[p].money);
@@ -618,10 +618,18 @@ int cmd_bench(const Args& args) {
                     step_us / ticks, static_cast<double>(step_max_ns[i]) / 1000.0);
     }
 
-    // The multiplayer fingerprint (net::Session, every hash_interval frames) and a save. The first
-    // fingerprint hashes every block of tiles; the next one, 100 ticks (5 s of game time) later as in
-    // a session, only the blocks that changed in between (TB-26).
+    // The savegame first, so that --out holds the game at the end of its last minute: a run loaded
+    // from it lines up minute by minute with one that ran on. Then the multiplayer fingerprint
+    // (net::Session, every hash_interval frames): the first one hashes every block of tiles; the
+    // next one, 100 ticks (5 s of game time) later as in a session, only the blocks that changed in
+    // between (TB-26).
     auto start = Clock::now();
+    auto save = sim::write_game(*world, *buildings, &*simulation);
+    const double save_ms = ms_since(start);
+    if (!save) {
+        return fail(save.error());
+    }
+    start = Clock::now();
     const auto first_hash = simulation->state_hash();
     const double first_hash_ms = ms_since(start);
     for (int t = 0; t < 100; ++t) {
@@ -630,12 +638,6 @@ int cmd_bench(const Args& args) {
     start = Clock::now();
     const auto hash = simulation->state_hash();
     const double hash_ms = ms_since(start);
-    start = Clock::now();
-    auto save = sim::write_game(*world, *buildings, &*simulation);
-    const double save_ms = ms_since(start);
-    if (!save) {
-        return fail(save.error());
-    }
     std::printf("state hash %016llx in %.1f ms, the first %.1f ms%s; savegame %zu bytes in %.1f ms\n",
                 static_cast<unsigned long long>(hash), hash_ms, first_hash_ms,
                 hash != 0 && first_hash != 0 ? "" : " (failed)", save->size(), save_ms);
