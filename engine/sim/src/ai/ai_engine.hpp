@@ -815,7 +815,18 @@ private:
     /// Open1602 (rivals): the army a computer keeps whoever else is armed, by its inhabitants, and
     /// the share of the strongest army of another computer, at peace with it or not.
     [[nodiscard]] std::uint32_t rival_army_target(const AiPlayer& p) const;
+    /// Whether a sees b at least as strong as itself: strength(a, a) against strength(a, b).
     [[nodiscard]] bool stronger(PlayerId a, PlayerId b) const;
+    /// The original's computers and an improved one on the hardest level count every unit of
+    /// another player; an improved one on the other levels only what a human in its place sees.
+    [[nodiscard]] bool sees_all() const;
+    /// The weighted army of `owner` as `viewer` sees it: its own whole, of another player with
+    /// sees_all() the whole, else the soldiers on islands the viewer discovered (not those in holds
+    /// or castles).
+    [[nodiscard]] std::uint32_t seen_army(PlayerId viewer, PlayerId owner) const;
+    /// The cannons of `owner`'s ships afloat as `viewer` sees them: mounted ones of its own or with
+    /// sees_all(), else what each ship's type carries at most (a ship's window shows no cannons).
+    [[nodiscard]] std::uint32_t seen_cannons(PlayerId viewer, PlayerId owner) const;
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;
@@ -877,10 +888,10 @@ private:
     [[nodiscard]] std::string event_text(PlayerId a, PlayerId b) const;
     void end_war(AiPlayer& p, const char* why);
     [[nodiscard]] std::uint32_t war_measure(PlayerId target) const;
-    /// The armies and the fleets' cannons of `owner`, weighted as stronger() does.
-    [[nodiscard]] std::uint32_t strength(PlayerId owner) const;
+    /// The army and the fleet's cannons of `owner` as `viewer` sees them, weighted as stronger() does.
+    [[nodiscard]] std::uint32_t strength(PlayerId viewer, PlayerId owner) const;
     /// strength(), a human's raised on the harder levels (Balance::ai_human_threat_percent).
-    [[nodiscard]] std::uint32_t threat_of(PlayerId owner) const;
+    [[nodiscard]] std::uint32_t threat_of(PlayerId viewer, PlayerId owner) const;
     [[nodiscard]] std::uint8_t stance_of(const AiPlayer& p, PlayerId other) const;
     /// The gold in hand an improved computer founds a colony with: less while it is after land.
     [[nodiscard]] std::int32_t colony_money(const AiPlayer& p) const;

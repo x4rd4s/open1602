@@ -442,6 +442,12 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   island the computer has not explored and explores it before it patrols, one ship at a time. When
   no known island suits the island search, the settlement's ship sails to the nearest unknown one
   first, and explores every unexplored island it stops at.
+- **Other players' forces.** Below the hardest level a computer weighs another player's army
+  (its stance, a war, how far it arms) by what a player sees: the soldiers on islands it has
+  discovered, and each ship afloat with the cannons its type carries at most, since a foreign ship's
+  window shows none. Soldiers in holds or castles and on islands it has not discovered count for
+  nothing. On the hardest level, as the original's computers do, it counts every unit and every
+  mounted cannon.
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do
   not either. The computer gives them attack moves instead (`attack_move` of the orders): to a
   target city, against soldiers on its islands and on the ships' attack missions.

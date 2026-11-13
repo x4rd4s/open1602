@@ -15,6 +15,7 @@
 #include "ai_engine.hpp"
 
 #include "o1602/sim/mission.hpp"
+#include "o1602/sim/new_game.hpp"
 #include "o1602/sim/ships.hpp"
 
 namespace o1602::sim::ai {
@@ -201,7 +202,7 @@ std::uint32_t Engine::army_target(const AiPlayer& p) const {
         if (m_world.players()[h].role != PlayerRole::Human) {
             continue;
         }
-        std::uint32_t s = weighted_army(static_cast<PlayerId>(h));
+        std::uint32_t s = seen_army(p.player, static_cast<PlayerId>(h));
         s += s / 2;
         best = std::max(best, s);
     }
@@ -239,7 +240,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
             m_world.behaviour(pl) != FactionBehaviour::Settlers) {
             continue;
         }
-        rival = std::max(rival, weighted_army(other));
+        rival = std::max(rival, seen_army(p.player, other));
     }
     const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);
@@ -255,18 +256,47 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
 bool Engine::stronger(PlayerId a, PlayerId b) const {
     // The original compares the armies and the cannons of the fleets. The original takes b's fleet
     // on both sides, so only the armies count (S-102).
+    return strength(a, a) >= strength(a, b);
+}
+
+bool Engine::sees_all() const {
+    return !rivals() || difficulty() + 1 >= NewGameOptions::kDifficulties;
+}
+
+std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
+    if (viewer == owner || sees_all()) {
+        return weighted_army(owner);
+    }
+    // A human sees the soldiers on every island it discovered, and nothing of the others.
     const auto w = unit_weights();
-    const auto fleet = [&](PlayerId q) {
-        if (const Census* c = census(); c != nullptr && q < c->players) {
-            return c->cannons[q];
+    std::uint32_t s = 0;
+    for (const Soldier& u : m_world.soldiers()) {
+        if (u.owner == owner && !u.away() && u.island < m_world.islands().size() &&
+            island_of(u.island).discovered_by(viewer)) {
+            s += w[family_index(m_sim.m_figures, u.figure)];
         }
-        std::uint32_t n = 0;
-        for (const Ship& s : m_world.ships()) {
-            n += s.owner == q && !s.sinking ? s.cannons : 0U;
+    }
+    return s;
+}
+
+std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
+    const bool all = viewer == owner || sees_all();
+    if (const Census* c = census(); all && c != nullptr && owner < c->players) {
+        return c->cannons[owner];
+    }
+    // Ships are drawn everywhere, so a human sees every ship and its type.
+    std::uint32_t n = 0;
+    for (const Ship& s : m_world.ships()) {
+        if (s.owner != owner || s.sinking) {
+            continue;
         }
-        return n;
-    };
-    return weighted_army(a) + fleet(a) * w[3] >= weighted_army(b) + fleet(b) * w[3];
+        if (all) {
+            n += s.cannons;
+        } else if (const assets::FigureType* t = ship_type(s); t != nullptr) {
+            n += t->ship.max_cannons;
+        }
+    }
+    return n;
 }
 
 std::uint32_t Engine::soldiers_on_island(PlayerId owner, std::uint16_t island) const {

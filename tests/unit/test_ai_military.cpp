@@ -361,6 +361,7 @@ TEST_CASE("ai military: at peace, soldiers beside the Kontor of a colony are sen
         a.add(kComputer, 2 * (10 + 10) + k, 2 * (10 + 10));
     }
     a.add(kHuman, 2 * (100 + 4), 2 * (10 + 4), 1);  // an army to measure against, on the islet
+    a.world.island(1).discover(kComputer);          // where the computer sees it
     sim::Simulation s(a.world, a.buildings, a.figures);
     run(s, 10'000);  // the first 6-s look at the city
     const auto mine = a.soldiers(kComputer);
@@ -547,7 +548,7 @@ TEST_CASE("ai military: a computer keeps an army by its inhabitants with nobody 
 }
 
 TEST_CASE("ai military: a computer arms against the army of another computer at peace, short of its whole strength") {
-    const auto trained = [](bool rivals) {
+    const auto trained = [](bool rivals, bool seen = true) {
         Island a;
         std::vector<sim::Player> players = a.world.players();
         players.push_back(players[kComputer]);  // a second computer, its army on the islet
@@ -562,6 +563,9 @@ TEST_CASE("ai military: a computer arms against the army of another computer at 
         a.build(kKontor, 0, 0, other, 0, 1);  // its city there keeps its soldiers
         for (int i = 0; i < 16; ++i) {
             a.add(other, 2 * (100 + 1 + i % 6), 2 * (10 + 1 + i / 6), 1);
+        }
+        if (seen) {
+            a.world.island(1).discover(kComputer);  // a human there would see them
         }
         sim::Balance balance = a.world.balance();
         balance.ai_conqueror_army_percent = 100;  // the same for every character
@@ -578,4 +582,8 @@ TEST_CASE("ai military: a computer arms against the army of another computer at 
     CHECK(rivals >= 12);
     CHECK(rivals <= 14);
     CHECK(trained(false) == 0);
+    // An army on an island it has not discovered is not seen: only its inhabitants' army.
+    const std::size_t unseen = trained(true, false);
+    CHECK(unseen < rivals);
+    CHECK(unseen >= 8);
 }
