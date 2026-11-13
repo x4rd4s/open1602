@@ -19,6 +19,9 @@ A plan names its stage:
   final      several changes together, at full length, at least 4 phases on standard games and 8 on
              long ones; each change names the hash of the passed mechanism report it rests on.
 Every plan names its decision metrics; the inhabitants count only as a check that nothing got worse.
+A metric with `decides = false` is judged and reported but does not decide. A run whose metric has
+no value (a mean over no events) writes it as "n/a": the verdict leaves that run out of that metric
+and reports how many runs it left out per arm.
 Minutes are those run, after the start save when the plan has one.
 Exit code 0 when all is well, 1 when the plan or the results break a rule, 2 on wrong use.
 """
@@ -44,6 +47,8 @@ FULL_MINUTES = {"standard": 600, "long": 1200}
 COLLAPSE_PERCENT = 70
 # A difference counts beyond this many standard errors.
 SE_BAR = 2.0
+# A metric's value in a run that had nothing to measure (a mean over no events).
+NO_VALUE = "n/a"
 
 
 class Refused(Exception):
@@ -97,9 +102,13 @@ def check_plan(plan: dict) -> list[str]:
     metrics = plan.get("metric", [])
     if not metrics:
         errors.append("no decision metrics: name what the change must move")
+    elif not any(m.get("decides", True) for m in metrics):
+        errors.append("no decision metrics: every metric has decides = false")
     for m in metrics:
         if not m.get("name") or m.get("better") not in ("higher", "lower"):
             errors.append(f"metric {m.get('name')}: needs a name and better = higher or lower")
+        if not isinstance(m.get("decides", True), bool):
+            errors.append(f"metric {m.get('name')}: decides is true or false")
         if m.get("name") == "inhabitants":
             errors.append("inhabitants are no decision metric: they are checked as not worse anyway")
     start = plan.get("start")
@@ -292,19 +301,30 @@ def verdict(plan: dict, results: pathlib.Path) -> dict:
         for m in plan["metric"]:
             phases = max(plan["phases"].values())
 
-            def values(a: str, name=m["name"], phases=phases) -> list[float]:
+            def values(a: str, name=m["name"], phases=phases) -> tuple[list[float], int]:
+                """The phases' means over the runs with a value, and how many runs had none."""
                 vals = []
+                left_out = 0
                 for ph in range(phases):
-                    xs = [have[(a, ph, g["name"])]["metrics"][name] for g in plan["game"]
-                          if ph < plan["phases"][g["set"]]]
-                    vals.append(mean(xs))
-                return vals
-            j = judge(values(arm), values(base), m["better"])
+                    runs = [have[(a, ph, g["name"])]["metrics"][name] for g in plan["game"]
+                            if ph < plan["phases"][g["set"]]]
+                    xs = [x for x in runs if x != NO_VALUE]
+                    left_out += len(runs) - len(xs)
+                    if xs:
+                        vals.append(mean(xs))
+                return vals, left_out
+            arm_values, arm_left = values(arm)
+            base_values, base_left = values(base)
+            if not arm_values or not base_values:
+                raise Refused(f"metric {m['name']}: no run of {arm if not arm_values else base} has a value")
+            j = judge(arm_values, base_values, m["better"])
+            j["runs_without_value"] = {arm: arm_left, base: base_left}
             # A mechanism moves its metrics the right way; a final run must not make them worse.
             j["passes"] = j["verdict"] in (("better", "gain") if plan["stage"] == "mechanism"
                                            else ("gain", "no measurable effect", "better", "same"))
+            j["decides"] = m.get("decides", True)
             out["metrics"][m["name"]] = j
-            passed = passed and j["passes"]
+            passed = passed and (j["passes"] or not j["decides"])
         report["arms"][arm] = out
     report["passed"] = passed
     # What the report can be taken for: with one phase it shows a direction, not a measured gain.

@@ -35,6 +35,10 @@ be worse. Collapses count as a rate per player and run. A collapse is a player w
 70 % of their peak: a measurement constant, the definition the noise band above and every earlier
 run used, so that the rates stay comparable. A report with one phase (every mechanism run) says so
 (`"evidence": "mechanism, n=1, no significance"`): it shows a direction, not a measured gain.
+A metric marked `decides = false` is reported beside them but decides nothing, such as how often
+the event a decision metric measures happens at all. A run with nothing to measure for a metric (a
+mean over no events) gives it as `"n/a"`; the verdict leaves that run out of the metric and reports
+how many runs per arm it left out, so that a mean per event does not hide its count.
 A final run passes when no set and no decision metric is worse; a mechanism run passes when its
 metrics move the right way.
 
