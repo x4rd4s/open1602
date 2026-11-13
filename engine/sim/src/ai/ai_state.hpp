@@ -20,7 +20,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 12;
+inline constexpr std::uint32_t kStateVersion = 13;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -43,6 +43,9 @@ inline constexpr std::uint32_t kStateWithWarPlan = 11;
 /// (Settlement::load_ms, load_food).
 /// Written only while a ship is being loaded.
 inline constexpr std::uint32_t kStateWithColonyLoad = 12;
+/// Version 13: whether an improved computer arms for a war (Strategy::war_arming), which sets its
+/// army budget until its next look. Written only while a computer arms.
+inline constexpr std::uint32_t kStateWithArming = 13;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -439,7 +442,7 @@ struct Strategy {
     std::uint8_t war_fails = 0;
     std::uint32_t war_measure = 0;
     std::uint64_t war_ended_ms = 0;  ///< when its last war ended: no new one for a while
-    bool war_arming = false;         ///< it arms for a war (not saved: the next look sets it again)
+    bool war_arming = false;         ///< it arms for a war (state 13)
 };
 
 struct AiPlayer {

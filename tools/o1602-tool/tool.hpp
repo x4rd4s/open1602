@@ -53,7 +53,7 @@ inline constexpr std::string_view kFlags[] = {
 /// The options whose value is a whole number.
 inline constexpr std::string_view kNumbers[] = {
     "--anim",    "--count",  "--every",    "--first", "--gold-islands", "--island", "--level", "--minutes", "--period",
-    "--players", "--repeat", "--rotation", "--seed",  "--simulate",     "--stars",  "--time",  "--wav",     "--zoom",
+    "--players", "--reload-at", "--reload-every", "--reload-minutes", "--repeat", "--rotation", "--seed",  "--simulate",     "--stars",  "--time",  "--wav",     "--zoom",
 };
 
 /// A whole number that is the whole text ("6O" is none, not 6).
