@@ -40,6 +40,9 @@ constexpr std::int32_t kModsButton = 1;
 constexpr ui::Rect kModsButtonRect{24, 714, 160, 38};
 constexpr std::int32_t kEditorButton = 2;
 constexpr ui::Rect kEditorButtonRect{192, 714, 160, 38};
+/// Bottom right, below the picture frame (video_frame() ends at 726).
+constexpr std::int32_t kUpdatesButton = 3;
+constexpr ui::Rect kUpdatesButtonRect{840, 729, 160, 36};
 // HOST.GAD
 constexpr std::int32_t kNewGame = 31002;
 constexpr std::int32_t kLoadGame = 31003;
@@ -484,6 +487,7 @@ void MainMenu::set_scale(double scale) {
     }
     m_settings.set_scale(scale);
     m_mods.set_scale(scale);
+    m_updates.set_scale(scale);
     m_base_form.set_scale(scale);
 }
 
@@ -500,6 +504,7 @@ ui::Panel* MainMenu::panel() {
             p = m_settings.scope() == SetupScope::Scenario ? &m_mission : &m_colour;
             break;
         case Screen::Mods:  // drawn by its form
+        case Screen::Updates:
             break;
         case Screen::Colour:
             p = &m_colour;
@@ -922,6 +927,8 @@ std::vector<ui::DrawItem> MainMenu::draw(const std::array<const ui::Font*, ui::k
         return m_settings.draw(fonts);
     } else if (m_screen == Screen::Mods) {
         return m_mods.draw(m_mods_model, fonts);
+    } else if (m_screen == Screen::Updates) {
+        return m_updates.draw(m_update_model, fonts);
     }
     std::vector<ui::DrawItem> out = p->draw(fonts);
     if (m_screen == Screen::Base) {
@@ -936,6 +943,12 @@ void MainMenu::layout_base_form() {
     m_base_form.clear();
     m_base_form.button(kModsButton, kModsButtonRect, ui::tr("menu.mods"));
     m_base_form.button(kEditorButton, kEditorButtonRect, ui::tr("menu.editor"));
+    // A newer version is shown on the button itself, highlighted.
+    const Updater::Status& update = m_update_model.status;
+    const bool newer = update.phase == Updater::Phase::Available || update.phase == Updater::Phase::Downloading ||
+                       update.phase == Updater::Phase::Installed;
+    m_base_form.button(kUpdatesButton, kUpdatesButtonRect,
+                       newer ? ui::tr("menu.update_available", {update.latest}) : ui::tr("menu.updates"), true, newer);
 }
 
 std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down, ui::MouseButton button) {
@@ -998,9 +1011,27 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
         }
         return out;
     }
+    if (m_screen == Screen::Updates) {
+        if (const auto e = m_updates.mouse(m_update_model, x, y, down, button)) {
+            if (e->kind == UpdateMenu::Event::Kind::Close) {
+                m_screen = Screen::Base;
+            } else {
+                MenuEvent ev{MenuEvent::Kind::Update};
+                ev.update = e->kind;
+                out.push_back(std::move(ev));
+            }
+        }
+        return out;
+    }
     if (m_screen == Screen::Base && button == ui::MouseButton::Left) {
         layout_base_form();
         const auto clicked = m_base_form.mouse(x, y, down);
+        if (clicked == kUpdatesButton) {
+            m_update_model.notice.clear();
+            m_screen = Screen::Updates;
+            out.push_back(MenuEvent{MenuEvent::Kind::Update});
+            return out;
+        }
         if (clicked == kModsButton) {
             m_mods.open();
             m_mods_model.notice.clear();
@@ -1150,6 +1181,7 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                 break;
             case Screen::Settings:
             case Screen::Mods:
+            case Screen::Updates:
                 break;  // the forms', above
         }
     }
@@ -1173,6 +1205,7 @@ bool MainMenu::wheel(std::int32_t notches) {
         case Screen::Base:
         case Screen::Settings:
         case Screen::Colour:
+        case Screen::Updates:
             break;
     }
     return false;
@@ -1193,6 +1226,7 @@ bool MainMenu::back() {
             m_screen = Screen::Mission;
             break;
         case Screen::Mods:
+        case Screen::Updates:
             m_screen = Screen::Base;
             break;
         case Screen::Settings:

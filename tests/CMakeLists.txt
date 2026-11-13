@@ -55,6 +55,7 @@ add_executable(o1602_tests
     unit/test_names.cpp
     unit/test_tile_status.cpp
     unit/test_app_settings.cpp
+    unit/test_updater.cpp
     unit/test_command_line.cpp
     unit/test_game_folder.cpp
     unit/test_display_settings.cpp

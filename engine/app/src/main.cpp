@@ -33,6 +33,7 @@
 
 #include "annokit/core/file.hpp"
 #include "annokit/core/text.hpp"
+#include "annokit/update/process.hpp"
 
 #include "o1602/assets/scenario.hpp"
 #include "o1602/ui/localization.hpp"
@@ -267,7 +268,17 @@ int run_program(int argc, char** argv) {
         app::report_fatal(viewer.error().message);
         return 1;
     }
-    return (*viewer)->run();
+    const int code = (*viewer)->run();
+    const std::optional<app::MapViewer::Restart> restart = (*viewer)->restart();
+    viewer->reset();  // the window and the sound are gone before the new version starts
+    if (restart) {
+        if (auto started = annokit::update::start_program(restart->program, restart->arguments); !started) {
+            app::report_fatal("The update is installed, but Open1602 could not be started again: " +
+                              started.error().message + "\nStart it yourself.");
+            return 1;
+        }
+    }
+    return code;
 }
 
 }  // namespace

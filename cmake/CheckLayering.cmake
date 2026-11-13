@@ -67,7 +67,7 @@ endforeach()
 # o1602::menus: the sources engine/app/menus/CMakeLists.txt lists (and the headers beside them)
 # are built without the platform, so that tests and tools have them (LC-17): no platform,
 # render_sdl, video or SDL.
-set(menus_allowed annokit/core assets audio annokit/audio net annokit/net render sim ui)
+set(menus_allowed annokit/core assets audio annokit/audio net annokit/net render sim ui annokit/update)
 string(REPLACE ";" ", " menus_allowed_text "${menus_allowed}")
 file(READ "${ENGINE_DIR}/app/menus/CMakeLists.txt" menus_list)
 string(REGEX MATCHALL "\\.\\./src/[a-z_]+\\.cpp" menus_sources "${menus_list}")
