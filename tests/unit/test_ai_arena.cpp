@@ -572,8 +572,9 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // by default (only the rules' bytes); town zones and styles (state version 8); improved
         // computers without the original's gifts, setting their own taxes, moving on with less gold, seeing only what
         // their ships saw; saving for a colony whose crop none of their islands grows. Their
-        // cities keep the figures of the statistics windows (their overview).
-        test::check_golden("arena after an hour", s.state_hash(), 0x7b0ee2784b8deb4eULL);
+        // cities keep the figures of the statistics windows (their overview). One colony decision a
+        // step, among the original's motives, with the ship kept for it.
+        test::check_golden("arena after an hour", s.state_hash(), 0x2783e624f709f573ULL);
     }
 }
 
