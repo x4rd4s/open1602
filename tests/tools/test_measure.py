@@ -178,6 +178,11 @@ diff --git a/data/balance/balance.toml b/data/balance/balance.toml
         self.assertEqual(sorted(h.split(": ", 1)[1] for h in hits),
                          ["new balance key ai_new_threshold", "new named constant kNewFlag"])
 
+    def test_a_hexadecimal_number_keeps_its_digits(self):
+        self.assertEqual(check_ai_constants.number_value("0xFF"), "255")
+        self.assertEqual(check_ai_constants.number_value("0xFFu"), "255")
+        self.assertEqual(check_ai_constants.number_value("2.5f"), "2.5")
+
     def test_a_changed_balance_value_counts(self):
         diff = """diff --git a/data/balance/balance.toml b/data/balance/balance.toml
 --- a/data/balance/balance.toml
