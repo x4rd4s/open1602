@@ -120,6 +120,36 @@ class PlanTest(unittest.TestCase):
         results = self.run_results(plan, {("main", 0): 2.0, ("new", 0): 1.0}, {("main", 0): 100, ("new", 0): 100})
         self.assertFalse(measure.verdict(plan, results)["passed"])
 
+    def test_a_run_without_a_value_is_left_out_and_counted(self):
+        games = [dict(name=n, set="standard", players=4, seed=1, minutes=400) for n in ("g", "h")]
+        plan = self.plan(plan_text(games=games))
+        records = []
+        for arm, values in (("main", {"g": 1.0, "h": 1.0}), ("new", {"g": 2.0, "h": "n/a"})):
+            for game, value in values.items():
+                records.append({"plan": plan["_hash"], "arm": arm, "phase": 0, "game": game, "set": "standard",
+                                "inhabitants": 100, "collapses": 0, "players": 4, "metrics": {"food": value}})
+        results = self.root / "results.jsonl"
+        results.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
+        report = measure.verdict(plan, results)
+        food = report["arms"]["new"]["metrics"]["food"]
+        self.assertEqual(food["arm"], 2.0)
+        self.assertEqual(food["runs_without_value"], {"new": 1, "main": 0})
+        self.assertTrue(report["passed"])
+
+    def test_a_metric_that_does_not_decide_is_reported_only(self):
+        extra = '[[metric]]\nname = "gaps"\nbetter = "lower"\ndecides = false\n'
+        plan = self.plan(plan_text(extra=extra))
+        records = [{"plan": plan["_hash"], "arm": arm, "phase": 0, "game": "g", "set": "standard",
+                    "inhabitants": 100, "collapses": 0, "players": 4, "metrics": {"food": food, "gaps": gaps}}
+                   for arm, food, gaps in (("main", 1.0, 1.0), ("new", 2.0, 5.0))]
+        results = self.root / "results.jsonl"
+        results.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
+        report = measure.verdict(plan, results)
+        self.assertFalse(report["arms"]["new"]["metrics"]["gaps"]["passes"])
+        self.assertTrue(report["passed"])
+        only = plan_text(metrics=False, extra=extra)
+        self.assertTrue(measure.check_plan(self.plan(only)))
+
     def test_two_standard_errors_decide(self):
         a = [100.0, 102.0, 98.0, 100.0]
         self.assertEqual(measure.judge([x + 10 for x in a], a, "higher")["verdict"], "gain")
