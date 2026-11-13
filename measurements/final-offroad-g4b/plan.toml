@@ -1,0 +1,198 @@
+stage = "final"
+base = "main"
+question = "Do offroad farms and the G4b colony plan together make the improved computers no worse, on main with arming for a war?"
+
+# main: e3fa2169. bundle: main + offroad (shared ground walk) + G4b (colony plan, state version 14).
+[[arm]]
+name = "main"
+[[arm]]
+name = "bundle"
+
+[phases]
+standard = 4
+long = 8
+
+[[game]]
+name = "o4-101"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 101
+minutes = 600
+
+[[game]]
+name = "o4-202"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 202
+minutes = 600
+
+[[game]]
+name = "o4-303"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 303
+minutes = 600
+
+[[game]]
+name = "g4-101"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 101
+minutes = 600
+
+[[game]]
+name = "g4-202"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 202
+minutes = 600
+
+[[game]]
+name = "g4-303"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 303
+minutes = 600
+
+[[game]]
+name = "g8-101"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 101
+minutes = 600
+
+[[game]]
+name = "g8-202"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 202
+minutes = 600
+
+[[game]]
+name = "g8-303"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 303
+minutes = 600
+
+[[game]]
+name = "g8-505"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 505
+minutes = 600
+
+[[game]]
+name = "g8-606"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 606
+minutes = 600
+
+[[game]]
+name = "g8-707"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 707
+minutes = 600
+
+[[game]]
+name = "g12-404"
+set = "standard"
+players = 12
+world = "2500x1800"
+seed = 404
+minutes = 600
+
+[[game]]
+name = "L-o4-101"
+set = "long"
+players = 4
+world = "500x350"
+seed = 101
+minutes = 1200
+
+[[game]]
+name = "L-g8-101"
+set = "long"
+players = 8
+world = "2500x1800"
+seed = 101
+minutes = 1200
+
+[[game]]
+name = "L-g12-404"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 404
+minutes = 1200
+
+[[game]]
+name = "L-g12-808"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 808
+minutes = 1200
+
+[[game]]
+name = "L-g12-909"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 909
+minutes = 1200
+
+# Metrics, per run from the AI log (O1602_AI_LOG=1) of a build with the gate's logging patch (both
+# arms the same, it only logs). A count is 0 in a run without its event; a mean over no events is
+# "n/a" and the verdict leaves that run out of it and counts it.
+# food_balance_gap60: the food balance in t/min of each hungry home city an hour after its shortfall
+#   began, summed over those cities;
+# gap_cities: how many home cities open a food shortfall (reported, does not decide: a bundle that
+#   prevents shortfalls loses negative terms of the sum above, which should be visible);
+# low_gold_foundings: the colonies founded with less than 3,000 gold in hand (the definition of every
+#   earlier run);
+# foundings: the colonies founded;
+# colony_net_60: a colony's net gold (taxes + sales - running costs - purchases) over the 60 minutes
+#   after its founding, the mean over the run's colonies ("n/a" without one).
+# The inhabitants (not worse) and the collapse rate per player and run (not worse) are judged per
+# set by the verdict itself.
+[[metric]]
+name = "food_balance_gap60"
+better = "higher"
+[[metric]]
+name = "gap_cities"
+better = "lower"
+decides = false
+[[metric]]
+name = "low_gold_foundings"
+better = "lower"
+[[metric]]
+name = "foundings"
+better = "higher"
+[[metric]]
+name = "colony_net_60"
+better = "higher"
+
+[[change]]
+name = "offroad"
+report = "reports/offroad-mechanism.json"
+sha256 = "66a02798080cb3ea8b6a50317b9741a28c600e4e80a7f99cefd6be3bbd2a4bb6"
+
+[[change]]
+name = "g4b"
+report = "reports/g4b-mechanism.json"
+sha256 = "52c37f21eceb013ec8d02235c3d552084cda744f41b208f61801a7cfa610108a"

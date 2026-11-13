@@ -1,0 +1,14 @@
+{
+  "change": "g4b",
+  "stage": "mechanism",
+  "passed": true,
+  "evidence": "mechanism, n=1, no significance",
+  "question": "Does one colony decision among the original's motives, ranked by the city it becomes, keeping gold and ship, found better colonies?",
+  "games": ["g8-101", "L-g12-404", "L-g12-808", "400 minutes, phase 0, paired at the first differing decision"],
+  "metrics": {
+    "colony_net_60": {"pairs": 16, "mean_difference": 804, "standard_error": 521, "unit": "gold", "better": "higher"},
+    "colony_net_30": {"pairs": 17, "mean_difference": 112, "standard_error": 252, "unit": "gold", "better": "higher"},
+    "plan_to_founding_minutes": {"main": 57, "g4b": 23, "better": "lower"}
+  },
+  "notes": "Cleanup onto the shared helpers byte-identical to the measured build on all three games (stdout and AI log)."
+}
