@@ -1018,6 +1018,8 @@ private:
         Bought,
         Missing,
         Money,
+        Pending,
+        Waiting,
         Survey,
         Away,
         Elsewhere,

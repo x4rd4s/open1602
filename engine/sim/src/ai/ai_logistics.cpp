@@ -248,7 +248,7 @@ void Engine::logistics(AiPlayer& p) {
                            });
         const bool enough = static_cast<std::int32_t>(own_ships(p).size()) >= p.fleet_target;
         const bool bought = !enough && !spare && buy_ship(p);
-        if (!p.yard_valid && (enough || spare || bought)) {
+        if ((!p.yard_valid && (enough || bought)) || (!enough && spare)) {
             log_yard(p, enough ? YardWait::Enough : spare ? YardWait::Idle : YardWait::Bought);
         }
         if (!enough && !spare && !bought) {
@@ -1535,6 +1535,11 @@ void Engine::order_ship(AiPlayer& p) {
             at_yard = s;
             break;
         }
+    }
+    if (yard->order != CostBuilding::kNoOrder) {
+        log_yard(p, YardWait::Pending);
+    } else if (at_yard != nullptr) {
+        log_yard(p, YardWait::Waiting);
     }
     if (yard->order == CostBuilding::kNoOrder && at_yard == nullptr) {
         const Tile t = tile(p.yard_island, p.yard_x, p.yard_y);
