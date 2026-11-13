@@ -195,6 +195,12 @@ AppSettings parse_settings(std::string_view text, const AppSettings& defaults) {
             s.sea_creatures_every = std::clamp(number(value, s.sea_creatures_every), 0, 3600);
         } else if (key == "data_fixes") {
             s.data_fixes = flag(value, s.data_fixes);
+        } else if (key == "update_check") {
+            s.update_check = value == "ask"  ? UpdateCheck::Ask
+                             : value.empty() ? s.update_check
+                                             : (flag(value, false) ? UpdateCheck::On : UpdateCheck::Off);
+        } else if (key == "skipped_update") {
+            s.skipped_update = std::string(value);
         } else if (key.starts_with("display.")) {
             (void)read_display_line(s.display, key.substr(8), value);
         } else if (key.starts_with("endless.")) {
@@ -235,6 +241,15 @@ std::string write_settings(const AppSettings& s) {
     out += "sea_creatures_every = " + std::to_string(s.sea_creatures_every) + "\n";
     out += "# Corrections of the original's data (D-001, D-002, D-012, D-014); off: the data as it is\n";
     out += std::string("data_fixes = ") + (s.data_fixes ? "on" : "off") + "\n";
+    out += "# Look for a new release of Open1602 at every start: on, off, ask (asked once in the main menu)\n";
+    out += std::string("update_check = ") +
+           (s.update_check == UpdateCheck::Ask  ? "ask"
+            : s.update_check == UpdateCheck::On ? "on"
+                                                : "off") +
+           "\n";
+    if (!s.skipped_update.empty()) {
+        out += "skipped_update = " + s.skipped_update + "\n";
+    }
     if (const std::string name = to_file(s.player_name); !name.empty()) {
         out += "player_name = " + name + "\n";
     }

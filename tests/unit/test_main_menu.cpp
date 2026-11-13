@@ -208,6 +208,24 @@ TEST_CASE("main menu: the buttons of the main menu answer with their events") {
     CHECK(!menu.back());  // Escape in the main menu: nothing to go back to
 }
 
+TEST_CASE("main menu: the button Updates bottom right opens the screen Updates") {
+    Game g("o1602-test-menu-updates", {});
+    MainMenu menu(*g.dir, &g.texts);
+    REQUIRE(menu.usable());
+    // Below the picture frame, right of it.
+    auto events = menu.mouse(920, 747, true);
+    for (MenuEvent& e : menu.mouse(920, 747, false)) {
+        events.push_back(std::move(e));
+    }
+    CHECK(menu.screen() == MainMenu::Screen::Updates);
+    for (const MenuEvent& e : events) {
+        CHECK(e.kind == MenuEvent::Kind::Update);
+        CHECK(!e.update);  // only opened
+    }
+    CHECK(menu.back());
+    CHECK(menu.screen() == MainMenu::Screen::Base);
+}
+
 TEST_CASE("main menu: the History Edition's Options button opens the settings window, the others count one further") {
     Game g("o1602-test-menu-history-base", {}, history_base_layout());
     MainMenu menu(*g.dir, &g.texts);

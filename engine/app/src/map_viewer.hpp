@@ -32,6 +32,7 @@
 #include "names.hpp"
 #include "stock_notes.hpp"
 #include "templates.hpp"
+#include "updater.hpp"
 #include "video_controller.hpp"
 #include "viewer_options.hpp"
 #include "zoom_graphics.hpp"
@@ -112,6 +113,13 @@ public:
     /// The player's own scenarios (<data folder>/scenarios), listed after the game folder's;
     /// made if it is missing.
     [[nodiscard]] static std::filesystem::path own_scenario_folder();
+
+    /// What starts the new version once run() has returned: "Restart now" after an update.
+    struct Restart {
+        std::filesystem::path program;
+        std::vector<std::string> arguments;
+    };
+    [[nodiscard]] const std::optional<Restart>& restart() const noexcept { return m_restart; }
 
 private:
     MapViewer(assets::GameDirectory game, assets::BuildingTable buildings, sim::World world, assets::Palette palette,
@@ -272,6 +280,16 @@ private:
     void use_game_packages(bool again = false);
     /// What the main menu asked for this frame.
     void apply_menu();
+    /// Updates (viewer_updates.cpp): the updater for this copy, its leftovers removed, and the
+    /// check at the start when the player wants it.
+    void start_updater();
+    /// Every frame in the main menu: the screen "Updates" shown, and the questions at the start
+    /// (whether to look for updates; a newer version found).
+    void apply_updates(MainMenu& menu);
+    /// An action of the screen "Updates".
+    void handle_update(MainMenu& menu, UpdateMenu::Event::Kind action);
+    /// The answer to one of the updates' questions; false if no such question was asked.
+    bool answer_update_question(std::int32_t step);
     /// The end screen of a decided game, when it is due (EventPresenter::end_screen_due). Called
     /// every frame the game runs.
     void check_end_screen(std::uint64_t now);
@@ -993,14 +1011,21 @@ private:
     std::vector<EditorFile> m_editor_file_rows;
     EditorNewMap m_editor_new;  ///< the settings of the last new map
     bool m_running = true;
-    bool m_show_owners = false;              ///< ownership overlay (key O)
-    bool m_show_island_numbers = false;      ///< the islands' numbers over the map (editor)
-    bool m_show_fps = false;                 ///< the frame rate in the map's corner (Ctrl+F)
-    bool m_show_coordinates = false;         ///< the tile under the mouse in the map's corner (Ctrl+K)
-    bool m_show_unit_arms = false;           ///< coats of arms over the own land units (M)
-    bool m_show_fertility = false;           ///< fertility view (Ctrl+B): the build tool's or selected farm's crop
-    double m_fps = 0.0;                      ///< frames a second, measured for the title
-    bool m_quit_pending = false;             ///< "Ende" waits for the answer to its question
+    bool m_show_owners = false;          ///< ownership overlay (key O)
+    bool m_show_island_numbers = false;  ///< the islands' numbers over the map (editor)
+    bool m_show_fps = false;             ///< the frame rate in the map's corner (Ctrl+F)
+    bool m_show_coordinates = false;     ///< the tile under the mouse in the map's corner (Ctrl+K)
+    bool m_show_unit_arms = false;       ///< coats of arms over the own land units (M)
+    bool m_show_fertility = false;       ///< fertility view (Ctrl+B): the build tool's or selected farm's crop
+    double m_fps = 0.0;                  ///< frames a second, measured for the title
+    bool m_quit_pending = false;         ///< "Ende" waits for the answer to its question
+    std::unique_ptr<Updater> m_updater;  ///< the menu "Updates"; null in runs without the menu
+    /// Which question of the updates waits for its answer.
+    enum class UpdateQuestion : std::uint8_t { None, CheckAtStart, Offer };
+    UpdateQuestion m_update_question = UpdateQuestion::None;
+    bool m_update_offered = false;  ///< the newer version found at the start was offered once
+    std::string m_update_notice;    ///< what the last action of the screen "Updates" did
+    std::optional<Restart> m_restart;
     AppSettings m_app_settings;              ///< settings.cfg in the user's data folder
     SaveSlots m_slots;                       ///< names of the savegames of the panel DISK
     std::uint64_t m_slots_revision = 0;      ///< counts the changes of m_slots

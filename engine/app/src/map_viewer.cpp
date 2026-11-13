@@ -511,6 +511,7 @@ annokit::core::Result<std::unique_ptr<MapViewer>> MapViewer::create(const assets
     });
     viewer->m_input->load_key_settings(data_folder() / "keys.cfg");
     viewer->load_options();
+    viewer->start_updater();
     if (options.width > 0) {
         viewer->m_app_settings.display.fullscreen = false;  // --size: a window this time
     }
@@ -2683,6 +2684,9 @@ void MapViewer::apply_hud(const Hud::Action& action) {
             m_tool.set_orient_to_road(action.step != 0);
             break;
         case Hud::Action::Kind::Answer:
+            if (answer_update_question(action.step)) {
+                break;
+            }
             if (m_fetch_offer) {
                 answer_package_offer(action.step != 0);
                 break;
@@ -4098,6 +4102,7 @@ void MapViewer::apply_menu() {
     if (menu == nullptr) {
         return;
     }
+    apply_updates(*menu);
     if (m_hud->multiplayer_open()) {
         apply_multiplayer_menu();
         return;
@@ -4178,6 +4183,16 @@ void MapViewer::apply_menu() {
                 continue;
             case MenuEvent::Kind::Mods:
                 menu->set_mods(mods_model());
+                continue;
+            case MenuEvent::Kind::Update:
+                if (e.update) {
+                    handle_update(*menu, *e.update);
+                } else {
+                    m_update_notice.clear();  // the screen was opened
+                }
+                if (!m_running) {
+                    return;  // "Restart now"
+                }
                 continue;
             case MenuEvent::Kind::ToggleMod: {
                 std::string notice = toggle_mod(e.name);

@@ -371,7 +371,7 @@ net.colour.grey = Grey
 net.colour.purple = Purple
 net.colour.brown = Brown
 net.colour.number = Colour {1}
-net.refused.version = The host has another version of Open1602.
+net.refused.version = The host has another version of Open1602. Both need the same one: “Updates” in the main menu brings yours up to date.
 net.refused.content = The host has other game data.
 net.refused.full = No free slot.
 net.refused.closed = The host takes nobody into the running game.
@@ -2063,3 +2063,57 @@ editor.limit.balance = Game values changed by a package.
 editor.limit.script = A script.
 editor.limit.pirate_peace = A lasting peace with the pirates.
 editor.nothing = Nothing to undo
+
+# The screen "Updates" of the main menu and its questions (update_menu.cpp, viewer_updates.cpp)
+menu.updates = Updates
+# {1}: the newer version
+menu.update_available = Update {1}
+update.title = Updates
+update.hint = Open1602 looks for new versions on its GitHub page. Saved games, settings and mods stay as they are.
+update.installed = Installed version
+update.newest = Newest version
+update.unknown = not looked up yet
+update.state_idle = Click “Check now” to look for a new version.
+update.state_checking = Looking for a new version …
+update.state_up_to_date = Open1602 is up to date.
+# {1}: the newer version
+update.state_available = Version {1} is available.
+update.state_available_by_hand = Version {1} is available. Download it from the release page.
+# {1}: the newer version, {2}: megabytes received, {3}: megabytes in all
+update.state_downloading = Downloading version {1}: {2} of {3}
+update.state_connecting = Downloading version {1} …
+update.state_installing = Installing version {1} …
+update.state_installed = Version {1} is installed. Restart Open1602 to use it.
+update.state_restored = The previous version is back. Restart Open1602 to use it.
+update.problem_offline = GitHub cannot be reached. Check the internet connection and try again later.
+update.problem_no_release = The latest release has no update information yet. Try again later.
+update.problem_not_genuine = The update information is damaged or not genuine. Nothing was installed.
+update.problem_newer_format = This version cannot read the update information. Download the new version from the release page.
+update.problem_no_package = The new version has no package for this system yet. Try again later.
+update.problem_damaged = The download was damaged. Nothing was installed; try again.
+update.problem_install = The new version could not be put in place. Open1602 is unchanged (the log says why).
+update.problem_no_https = This system has no HTTPS library (libcurl). Download new versions from the release page.
+update.kind_not_packaged = This copy of Open1602 does not update itself: it was built by hand or installed by a package manager. New versions are shown here; install them as you installed this one.
+update.kind_translocated = macOS runs Open1602 from a read-only copy. Move Open1602.app into the folder “Applications” and start it from there to update it.
+update.kind_read_only = Open1602 may not write into its own folder. Move it into a folder of your own to update it.
+update.check_at_start = Look for a new version at every start
+update.check_at_start_hint = Open1602 then asks GitHub for the latest version: your address and the version are sent, nothing else.
+update.check = Check now
+update.install = Install
+update.cancel = Cancel
+update.restart = Restart now
+update.notes = Release notes
+update.download_page = Release page
+# {1}: the version kept from the last update
+update.restore = Bring back version {1}
+update.restore_failed = The previous version could not be brought back (the log says why).
+update.back = Back
+# {1}: the address
+update.open_failed = The browser could not be opened. The address is {1}
+update.ask_check_at_start = Should Open1602 look for a new version at every start?\nIt asks GitHub; this can be changed under “Updates”.
+# {1}: the newer version, {2}: the installed one
+update.offer = Open1602 {1} is available (installed: {2}).
+update.offer_install = Install now
+update.offer_download = Release page
+update.offer_later = Later
+update.offer_skip = Skip this version

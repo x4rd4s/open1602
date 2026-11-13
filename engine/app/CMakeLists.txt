@@ -19,10 +19,11 @@ add_executable(open1602
     src/map_input.cpp
     src/video_controller.cpp
     src/video_player.cpp
+    src/viewer_updates.cpp
 )
-target_link_libraries(open1602 PRIVATE o1602::sim o1602::render_sdl annokit::platform o1602::audio o1602::ui annokit::video o1602::net o1602::menus o1602::script o1602::editor)
+target_link_libraries(open1602 PRIVATE o1602::sim o1602::render_sdl annokit::platform o1602::audio o1602::ui annokit::video o1602::net o1602::menus o1602::script o1602::editor annokit::update)
 o1602_set_warnings(open1602)
-target_compile_definitions(open1602 PRIVATE O1602_VERSION="${PROJECT_VERSION}")  # the log's first line
+target_compile_definitions(open1602 PRIVATE O1602_VERSION="${PROJECT_VERSION}")  # the log's first line, updates
 o1602_set_output_dir(open1602)
 
 if(WIN32)
