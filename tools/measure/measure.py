@@ -13,6 +13,8 @@ Usage:
   python3 tools/measure/measure.py verdict PLAN.toml RESULTS.jsonl [--report OUT.json]
       The verdict by the plan's stage; refuses results of another plan or with runs missing.
 
+Every game names its difficulty level (0 to 3): below the hardest the improved computers see only
+what a player sees, so a plan without it is refused.
 A plan names its stage:
   mechanism  shows on at most 3 games and at most 400 minutes that a change does what it should;
   metric     the decision metrics on short runs (at most 400 minutes, one phase);
@@ -37,6 +39,9 @@ import tomllib
 
 STAGES = ("mechanism", "metric", "final")
 SETS = ("standard", "long")
+# The game's difficulty levels, 0 (easiest) to 3 (hardest): NewGameOptions::kDifficulties. The level
+# changes what the improved computers may see, so every game names it.
+LEVELS = 4
 # The rules of the stages (the review's process of 13 November).
 SHORT_MINUTES = 400       # mechanism and metric runs end where the effect lives
 MECHANISM_GAMES = 3
@@ -94,6 +99,9 @@ def check_plan(plan: dict) -> list[str]:
         for key in ("players", "seed", "minutes"):
             if not isinstance(g.get(key), int) or g[key] <= 0:
                 errors.append(f"game {g.get('name')}: {key} must be a positive number")
+        level = g.get("level")
+        if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level < LEVELS:
+            errors.append(f"game {g.get('name')}: level must be named, 0 to {LEVELS - 1}")
     phases = plan.get("phases", {})
     used_sets = {g.get("set") for g in games}
     for s in used_sets & set(SETS):
@@ -176,7 +184,7 @@ def jobs(plan: dict) -> list[tuple[str, int, dict, list[str]]]:
                 args = []
                 if plan.get("start"):
                     args.append(str(plan["_dir"] / plan["start"]["save"]))
-                args += ["--level", str(g.get("level", 3)), "--minutes", str(g["minutes"]),
+                args += ["--level", str(g["level"]), "--minutes", str(g["minutes"]),
                          "--period", str(g.get("period", 10)), "--per-player", "--ai", "open1602",
                          "--players", str(g["players"]), "--seed", str(g["seed"]), "--ai-phase", str(phase)]
                 if g.get("world"):
