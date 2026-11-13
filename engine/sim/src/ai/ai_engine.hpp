@@ -1024,6 +1024,12 @@ private:
     enum class YardWait : std::uint8_t {
         Unlogged,
         None,
+        NoHome,
+        Enough,
+        Idle,
+        Bought,
+        Missing,
+        Money,
         Survey,
         Away,
         Elsewhere,

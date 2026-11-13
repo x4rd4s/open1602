@@ -2693,6 +2693,24 @@ void Engine::log_yard(const AiPlayer& p, YardWait why) const {
         case YardWait::Unlogged:
         case YardWait::None:
             break;
+        case YardWait::NoHome:
+            text = "no home city";
+            break;
+        case YardWait::Enough:
+            text = "ships enough";
+            break;
+        case YardWait::Idle:
+            text = "a ship lies idle";
+            break;
+        case YardWait::Bought:
+            text = "bought a ship instead";
+            break;
+        case YardWait::Missing:
+            text = "its yard is not found";
+            break;
+        case YardWait::Money:
+            text = "money short for a ship";
+            break;
         case YardWait::Survey:
             text = "survey on top, no yard wanted";
             break;
