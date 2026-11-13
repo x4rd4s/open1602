@@ -2711,6 +2711,12 @@ void Engine::log_yard(const AiPlayer& p, YardWait why) const {
         case YardWait::Money:
             text = "money short for a ship";
             break;
+        case YardWait::Pending:
+            text = "an order is pending at its yard";
+            break;
+        case YardWait::Waiting:
+            text = "a ship waits at its yard";
+            break;
         case YardWait::Survey:
             text = "survey on top, no yard wanted";
             break;
