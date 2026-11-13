@@ -21,6 +21,7 @@
 #include "endless_setup.hpp"
 #include "game_settings_menu.hpp"
 #include "mods_menu.hpp"
+#include "update_menu.hpp"
 
 #include "o1602/assets/gad.hpp"
 #include "o1602/assets/game_directory.hpp"
@@ -115,6 +116,7 @@ struct MenuEvent {
         ToggleMod,     ///< turn the package `name` (its id, UTF-8) in the folder `path` on or off
         AdoptMod,      ///< copy the received package `name` in the folder `path` into the mods folder
         Editor,        ///< the editor (ADR 0013)
+        Update,        ///< an action of the screen "Updates" (`update`); opening it is Check-free
     };
     Kind kind = Kind::Quit;
     std::uint8_t level = 0;
@@ -135,11 +137,13 @@ struct MenuEvent {
     std::string package_scenario{};
     /// Scenario: the package's campaign it is a part of (part `level`, from 0), empty for none.
     std::string package_campaign{};
+    /// Update: what the screen "Updates" asks for; nothing when it was only opened.
+    std::optional<UpdateMenu::Event::Kind> update{};
 };
 
 class MainMenu {
 public:
-    enum class Screen : std::uint8_t { Base, Host, Mission, Colour, Settings, Mods };
+    enum class Screen : std::uint8_t { Base, Host, Mission, Colour, Settings, Mods, Updates };
 
     MainMenu(const assets::GameDirectory& game, const assets::TextTable* texts);
 
@@ -180,11 +184,21 @@ public:
     void set_form_style(const ui::FormStyle& style) {
         m_settings.set_style(style);
         m_mods.set_style(style);
+        m_updates.set_style(style);
         m_base_form.set_style(style);
     }
     /// What the screen "Mods" shows.
     void set_mods(ModsModel model) { m_mods_model = std::move(model); }
     [[nodiscard]] const ModsModel& mods() const noexcept { return m_mods_model; }
+    /// What the screen "Updates" and the button "Updates" show (every frame, it changes while
+    /// downloading).
+    void set_updates(UpdateModel model) { m_update_model = std::move(model); }
+    [[nodiscard]] const UpdateModel& updates() const noexcept { return m_update_model; }
+    /// Opens the screen "Updates" (the question at the start was answered with yes).
+    void open_updates() {
+        m_typing = false;
+        m_screen = Screen::Updates;
+    }
     /// Why the game the start dialog asked for did not start, shown in the dialog. False if the
     /// dialog is not open (the message is then only in the log).
     bool show_start_error(std::string text) {
@@ -279,6 +293,8 @@ private:
     GameSettingsMenu m_settings;
     ModsMenu m_mods;
     ModsModel m_mods_model;
+    UpdateMenu m_updates;
+    UpdateModel m_update_model;
     /// Open1602's own button "Mods" on the main menu's screen.
     ui::Form m_base_form;
     EndlessSetup m_endless;

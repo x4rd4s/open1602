@@ -25,8 +25,19 @@
 
 namespace o1602::app {
 
+/// Whether Open1602 looks for a new release at every start (the menu "Updates").
+enum class UpdateCheck : std::uint8_t {
+    Ask,  ///< not decided yet: the main menu asks once, until then nothing is looked up
+    On,
+    Off,
+};
+
 struct AppSettings {
     audio::AudioSettings audio;
+    UpdateCheck update_check = UpdateCheck::Ask;
+    /// A release the player chose to skip at the start ("1.2.0"): not offered at the start again,
+    /// still in the menu "Updates". Empty for none.
+    std::string skipped_update;
     bool mission_window = false;  ///< "Auftrag ansehen"
     /// The chapter of the tutorial chosen last, or the next one after „Einführungsspiel beenden“
     /// (the original's "Tutornr"): the tutorial runs this chapter, the menu offers it first.
