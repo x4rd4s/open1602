@@ -387,7 +387,7 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
     }
     pop(p);
     refund(p);
-    const Search s = p.search;
+    Search s = p.search;
     const assets::BuildingType* b = by_id(s.building);
     if (b == nullptr) {
         return;
@@ -418,6 +418,14 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
         // No site it can move to: pulled down as without moving (sweep), its slot builds a new one.
         demolish_tile(p, s.move_x, s.move_y);
         return;
+    }
+    // Open1602: a hungry rival's pasture or grain farm with no site beside its roads takes one off
+    // them, with a road to it (farm_by_path).
+    if (s.best <= 0 && rivals() && !p.pirates && (s.slot == kSlotCattle || s.slot == kSlotGrain)) {
+        if (const City* here = city(p.island, p.city);
+            here != nullptr && food_behind(*here) && farm_by_path(p, *b, task == kGrainFarm)) {
+            s = p.search;
+        }
     }
     if (s.best > 0) {
         std::vector<BuildItem> items;
