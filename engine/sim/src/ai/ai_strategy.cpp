@@ -207,6 +207,9 @@ void Engine::plan_strategy(AiPlayer& p) {
                 }
             }
         }
+        const auto presses = [&](std::uint32_t t) {
+            return near && mood <= 0 && t != 0 && std::uint64_t{own} * 100U >= std::uint64_t{t} * press;
+        };
         std::uint8_t s = stance::kNeutral;
         if (d.allied(p.player, b)) {
             s = stance::kPartner;  // an ally is neither pressed nor fought
@@ -215,7 +218,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         } else if (mood > kPartnerMood ||
                    (rel.trade == Treaty::Signed && mood >= 0 && st.character == character::kTrader)) {
             s = stance::kPartner;
-        } else if (near && mood <= 0 && theirs != 0 && std::uint64_t{own} * 100U >= std::uint64_t{theirs} * press) {
+        } else if (presses(theirs)) {
             // Only a rival it does not like: a friendly neighbour is left in peace.
             s = stance::kPressure;
         }
@@ -227,8 +230,7 @@ void Engine::plan_strategy(AiPlayer& p) {
             // census would give (b's own view of itself is the whole).
             const std::uint32_t all = threat_of(b, b);
             const bool press_seen = s == stance::kPressure;
-            const bool press_all = (s == stance::kNeutral || s == stance::kPressure) && near && mood <= 0 && all != 0 &&
-                                   std::uint64_t{own} * 100U >= std::uint64_t{all} * press;
+            const bool press_all = (s == stance::kNeutral || s == stance::kPressure) && presses(all);
             const bool threat_seen = (s == stance::kHostile || rel.peace == Treaty::None) && near && theirs > own;
             const bool threat_all = (s == stance::kHostile || rel.peace == Treaty::None) && near && all > own;
             if (all != theirs && (press_seen != press_all || threat_seen != threat_all)) {
