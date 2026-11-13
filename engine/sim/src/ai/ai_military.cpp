@@ -190,7 +190,7 @@ std::uint32_t Engine::weighted_army(PlayerId owner) const {
     return s;
 }
 
-std::uint32_t Engine::army_target(const AiPlayer& p) const {
+std::uint32_t Engine::army_target(const AiPlayer& p, bool whole) const {
     // A scenario can ask for a fixed strength instead: a hundred cannons' worth,
     // on every level.
     if (player(p).scenario.has(scenario_flag::kFixedArmy)) {
@@ -202,7 +202,8 @@ std::uint32_t Engine::army_target(const AiPlayer& p) const {
         if (m_world.players()[h].role != PlayerRole::Human) {
             continue;
         }
-        std::uint32_t s = seen_army(p.player, static_cast<PlayerId>(h));
+        const auto human = static_cast<PlayerId>(h);
+        std::uint32_t s = seen_army(whole ? human : p.player, human);
         s += s / 2;
         best = std::max(best, s);
     }
@@ -219,10 +220,10 @@ std::uint32_t Engine::army_target(const AiPlayer& p) const {
             best *= 2;
             break;
     }
-    return rivals() ? std::max(best, rival_army_target(p)) : best;
+    return rivals() ? std::max(best, rival_army_target(p, whole)) : best;
 }
 
-std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
+std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     // A swordsman's strength per so many inhabitants, and a share of the strongest army of the other
     // computers, at peace or not: a peace can end, as a player knows. The share stays below the whole, so that two
     // computers arming against each other settle at their inhabitants' army instead of outbidding each other.
@@ -240,7 +241,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
             m_world.behaviour(pl) != FactionBehaviour::Settlers) {
             continue;
         }
-        rival = std::max(rival, seen_army(p.player, other));
+        rival = std::max(rival, seen_army(whole ? other : p.player, other));
     }
     const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);

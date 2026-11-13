@@ -1354,16 +1354,10 @@ void Engine::update_fleet_target(AiPlayer& p) {
         t = std::min(t + supply, std::max(n, 1) + static_cast<std::int32_t>(kMaxSupplyShips));
     }
     if (p.present[kSlotCannons]) {
-        std::vector<std::int32_t> cannons(m_world.players().size(), 0);
-        for (const Ship& s : m_world.ships()) {
-            if (s.owner < cannons.size() && !s.sinking) {
-                cannons[s.owner] += s.cannons;
-            }
-        }
         std::int32_t h = 0;
         for (std::size_t q = 0; q < m_world.players().size(); ++q) {
             if (m_world.players()[q].role == PlayerRole::Human) {
-                h = std::max(h, cannons[q]);
+                h = std::max(h, static_cast<std::int32_t>(seen_cannons(p.player, static_cast<PlayerId>(q))));
             }
         }
         switch (difficulty()) {
@@ -1380,7 +1374,7 @@ void Engine::update_fleet_target(AiPlayer& p) {
                 break;
         }
         const City* home = home_city(p);
-        const std::int32_t own = cannons[p.player];
+        const auto own = static_cast<std::int32_t>(seen_cannons(p.player, p.player));
         if (t > 0 && own < h && home != nullptr && home->stock(m_buildings.materials().cannons) > kTon && own / t > 3) {
             t = h / 8;
         }

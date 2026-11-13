@@ -811,10 +811,11 @@ private:
     [[nodiscard]] std::array<std::uint32_t, 4> army_counts(PlayerId owner) const;
     [[nodiscard]] std::array<std::uint32_t, 4> unit_weights() const;
     [[nodiscard]] std::uint32_t weighted_army(PlayerId owner) const;
-    [[nodiscard]] std::uint32_t army_target(const AiPlayer& p) const;
+    /// With `whole`, from the whole census whatever the computer sees (only the log compares it).
+    [[nodiscard]] std::uint32_t army_target(const AiPlayer& p, bool whole = false) const;
     /// Open1602 (rivals): the army a computer keeps whoever else is armed, by its inhabitants, and
     /// the share of the strongest army of another computer, at peace with it or not.
-    [[nodiscard]] std::uint32_t rival_army_target(const AiPlayer& p) const;
+    [[nodiscard]] std::uint32_t rival_army_target(const AiPlayer& p, bool whole = false) const;
     /// Whether a sees b at least as strong as itself: strength(a, a) against strength(a, b).
     [[nodiscard]] bool stronger(PlayerId a, PlayerId b) const;
     /// The original's computers and an improved one on the hardest level count every unit of

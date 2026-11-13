@@ -245,6 +245,22 @@ void Engine::plan_strategy(AiPlayer& p) {
         pressing = pressing || s == stance::kPressure;
     }
 
+    if (logging() && !sees_all()) {
+        // The measurement of the information contract: the cannons and the army target the whole
+        // census would give.
+        for (std::size_t bi = 0; bi < players; ++bi) {
+            const auto b = static_cast<PlayerId>(bi);
+            const std::uint32_t seen = seen_cannons(p.player, b);
+            const std::uint32_t all = seen_cannons(b, b);
+            if (b != p.player && seen != all) {
+                log(p, "seen: player %u cannons %u (census %u)", b, seen, all);
+            }
+        }
+        if (const std::uint32_t seen = army_target(p), all = army_target(p, true); seen != all) {
+            log(p, "seen: army target %u (census %u)", seen, all);
+        }
+    }
+
     // The goal: the economy first in debt; arms against a stronger enemy nearby or, as a conqueror,
     // against a weaker one; gold once the aristocrats are near without a gold mine; land as a
     // settler, or with gold to spare and few cities; else the economy.
