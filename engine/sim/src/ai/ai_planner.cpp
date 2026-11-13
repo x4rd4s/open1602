@@ -1142,29 +1142,44 @@ void Engine::unload_ship(AiPlayer& p, City& c) {
     }
 }
 
+std::uint32_t Engine::colony_fields(std::uint8_t max_stage) noexcept {
+    switch (max_stage) {
+        case stage::kSettlers:
+        case stage::kMain:
+        case stage::kMain2:
+        case stage::kCitizens2:
+            return 4;
+        case stage::kCitizens:
+        case stage::kMerchants:
+        case stage::kMerchants2:
+            return 6;
+        case stage::kAristocrats:
+        case stage::kAristocrats2:
+            return 10;
+        default:
+            return 8;
+    }
+}
+
 bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field) {
     // Luxury crops of a colony by the highest stage the player reached (stage 1, 0x17).
     const std::uint32_t n = r.land / tiles_per_field;
     const std::uint32_t q = full_crops(c.island);
+    const std::uint32_t cap = colony_fields(p.max_stage);
     switch (p.max_stage) {
         case stage::kSettlers:
         case stage::kMain:
         case stage::kMain2:
-            return luxury(p, std::min(n, grown(r, 4, true)), true);
         case stage::kCitizens:
-            return luxury(p, std::min(n, grown(r, 6, true)), true);
+            return luxury(p, std::min(n, grown(r, cap, true)), true);
         case stage::kCitizens2:
-            return luxury(p, std::min(n, grown(r, 4, true)), false);
+            return luxury(p, std::min(n, grown(r, cap, true)), false);
         case stage::kCitizensSmall:
         case stage::kMerchantsSmall:
         case stage::kMerchants:
         case stage::kMerchants2:
         case stage::kAristocrats:
         case stage::kAristocrats2: {
-            const std::uint32_t cap = (p.max_stage == stage::kMerchants || p.max_stage == stage::kMerchants2) ? 6U
-                                      : (p.max_stage == stage::kAristocrats || p.max_stage == stage::kAristocrats2)
-                                          ? 10U
-                                          : 8U;
             const std::uint32_t k = std::min(n, grown(r, cap, true));
             if (q == 1) {
                 if (luxury(p, k, false)) {

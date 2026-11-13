@@ -1020,6 +1020,11 @@ void Engine::unload_at(City& c, Ship& ship, bool keep_basics, bool destroy) {
 // ---------------------------------------------------------------------------------------------
 // Later colonies
 
+bool Engine::grows(std::uint16_t island, std::uint8_t crop) const {
+    const std::uint32_t f = fertility(island, crop);
+    return crop == ware::kOre ? f >= 64 : f == 128;
+}
+
 bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
     // Some city of any computer player lies on an island that grows the crop fully
     // (ore: a big or small vein; gold: a big one). Shared by all the original's computers; an
@@ -1029,8 +1034,7 @@ bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
         if (o == nullptr || o->role != PlayerRole::Computer || (rivals() && c.owner != p.player)) {
             continue;
         }
-        const std::uint32_t f = fertility(c.island, crop);
-        if (crop == ware::kOre ? f >= 64 : f == 128) {
+        if (grows(c.island, crop)) {
             return true;
         }
     }
@@ -1121,26 +1125,7 @@ std::uint8_t Engine::choose_colony_crop(AiPlayer& p) {
 Engine::Chain Engine::colony_chain(const AiPlayer& p, std::uint8_t crop) const {
     // The fields its colony order plants by the highest stage reached (colony_luxury), and the
     // workshop that works their harvest where it takes one; a mine for ore or gold.
-    std::uint32_t fields = 8;
-    switch (p.max_stage) {
-        case stage::kSettlers:
-        case stage::kMain:
-        case stage::kMain2:
-        case stage::kCitizens2:
-            fields = 4;
-            break;
-        case stage::kCitizens:
-        case stage::kMerchants:
-        case stage::kMerchants2:
-            fields = 6;
-            break;
-        case stage::kAristocrats:
-        case stage::kAristocrats2:
-            fields = 10;
-            break;
-        default:
-            break;
-    }
+    const std::uint32_t fields = colony_fields(p.max_stage);
     const auto mine = [&](std::uint8_t slot) {
         const auto d = need_def(slots(), slot, m_world.balance().computer_producers);
         return d ? by_id(d->fixed) : nullptr;
@@ -1211,9 +1196,7 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
     }
     // The taxes a minute of a full house of class k at the home city's rate.
     const auto house_tax = [&](std::size_t k) -> std::int64_t {
-        const std::int64_t rate = k < home->tax_rate.size() ? home->tax_rate[k] : kFullSupply;
-        return static_cast<std::int64_t>(std::uint64_t{classes[k].max_per_house} * classes[k].tax * 6 / 32) * rate /
-               kFullSupply;
+        return class_taxes(*home, k, classes[k].max_per_house);
     };
     // The city the colony becomes, on the nearest island it knows to grow the crop (any island it
     // knows for none): as many houses as its free land holds beside the fields, as densely as the
@@ -1230,11 +1213,8 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
     std::uint32_t nearest = 0;
     for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
         const auto at_island = static_cast<std::uint16_t>(i);
-        if (crop != 0 && crop != kAnyCrop) {
-            const std::uint32_t f = fertility(at_island, crop);
-            if ((crop == ware::kOre || crop == ware::kGold) ? f < 64 : f != 128) {
-                continue;
-            }
+        if (crop != 0 && crop != kAnyCrop && !grows(at_island, crop)) {
+            continue;
         }
         if (!knows_crops(p, at_island) || !island_allowed(p, at_island) ||
             std::ranges::any_of(m_world.cities(),
@@ -1242,9 +1222,7 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
             continue;
         }
         const WorldIsland& w = m_world.islands()[i];
-        const std::uint32_t sail = sail_seconds(
-            p, {home_x, home_y},
-            {static_cast<std::int32_t>(w.x + w.map.width() / 2), static_cast<std::int32_t>(w.y + w.map.height() / 2)});
+        const std::uint32_t sail = sail_seconds(p, {home_x, home_y}, island_point(w));
         if (!island || sail < nearest) {
             island = at_island;
             nearest = sail;

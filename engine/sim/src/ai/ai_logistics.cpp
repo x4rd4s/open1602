@@ -1410,6 +1410,10 @@ std::pair<std::int32_t, std::int32_t> Engine::city_point(const City& c) const {
     if (c.warehouse_x && c.warehouse_y) {
         return {static_cast<std::int32_t>(isl.x + *c.warehouse_x), static_cast<std::int32_t>(isl.y + *c.warehouse_y)};
     }
+    return island_point(isl);
+}
+
+std::pair<std::int32_t, std::int32_t> Engine::island_point(const WorldIsland& isl) noexcept {
     return {static_cast<std::int32_t>(isl.x + isl.map.width() / 2),
             static_cast<std::int32_t>(isl.y + isl.map.height() / 2)};
 }

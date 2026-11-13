@@ -396,6 +396,10 @@ private:
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     [[nodiscard]] bool crop_available(const AiPlayer& p, std::uint8_t crop) const;
+    /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
+    [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
+    /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
+    [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
     /// Loads the colony ship in city `c`; true once it holds its whole load, the settlement then starts.
     bool load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::uint8_t crop);
@@ -448,6 +452,9 @@ private:
                     bool grow = false);
     void unload_ship(AiPlayer& p, City& c);
     bool colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field);
+    /// The luxury fields a colony plants by the highest stage the player reached (colony_luxury,
+    /// colony_chain).
+    [[nodiscard]] static std::uint32_t colony_fields(std::uint8_t max_stage) noexcept;
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
     /// Open1602: how many workshops of slot `k` the producers of their raw material in a city keep
@@ -763,6 +770,8 @@ private:
     void update_fleet_target(AiPlayer& p);
     /// Improved computers: where a city lies on the map, its Kontor (else its island's middle).
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> city_point(const City& c) const;
+    /// The middle of an island, in world tiles.
+    [[nodiscard]] static std::pair<std::int32_t, std::int32_t> island_point(const WorldIsland& isl) noexcept;
     /// Improved computers: the seconds a ship of the computer takes from (x0, y0) to (x1, y1), an
     /// estimate from the distance and the speed of its first ship.
     [[nodiscard]] std::uint32_t sail_seconds(const AiPlayer& p, std::pair<std::int32_t, std::int32_t> from,

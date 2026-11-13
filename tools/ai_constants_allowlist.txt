@@ -2,3 +2,6 @@
 # (tools/check_ai_constants.py). One per line:
 #     VALUE | PATH (a glob) | derived from: WHAT IT FOLLOWS FROM
 # An entry without its derivation is not taken.
+13 | engine/sim/src/ai/ai_state.hpp | derived from: the computers' next state version after 12 (kStateVersion, kStateWithColonyPlan)
+kStateWithColonyPlan | engine/sim/src/ai/ai_state.hpp | derived from: names state version 13, as every kStateWith… names the version that added its field
+kAnyCrop | engine/sim/src/ai/ai_state.hpp | derived from: a crop id no ware has (the largest std::uint8_t), for a colony on any island

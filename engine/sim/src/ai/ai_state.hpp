@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -357,7 +358,7 @@ struct Settlement {
 };
 
 /// Settlement::plan_crop of a colony for food or cloth its home island has no room for.
-inline constexpr std::uint8_t kAnyCrop = 0xFF;
+inline constexpr std::uint8_t kAnyCrop = std::numeric_limits<std::uint8_t>::max();
 
 /// A castle the computer recruits in.
 struct CastleEntry {
