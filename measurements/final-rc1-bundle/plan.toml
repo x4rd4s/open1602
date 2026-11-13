@@ -1,0 +1,197 @@
+stage = "final"
+base = "main"
+question = "Does the small bundle (farms only where carts reach them, plus logging and measurement tools) keep the improved computers no worse?"
+
+# main: the arm's commit. bundle: main + RC1 (cart reach for farm sites) + log_supply + yard logging +
+# the level and human seat of the measurement tools. Only RC1 changes play. Level 3, where the earlier
+# gates and the noise band ran.
+[[arm]]
+name = "main"
+[[arm]]
+name = "bundle"
+
+[phases]
+standard = 4
+long = 8
+
+[[game]]
+name = "o4-101"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 101
+level = 3
+minutes = 600
+
+[[game]]
+name = "o4-202"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 202
+level = 3
+minutes = 600
+
+[[game]]
+name = "o4-303"
+set = "standard"
+players = 4
+world = "500x350"
+seed = 303
+level = 3
+minutes = 600
+
+[[game]]
+name = "g4-101"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 101
+level = 3
+minutes = 600
+
+[[game]]
+name = "g4-202"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 202
+level = 3
+minutes = 600
+
+[[game]]
+name = "g4-303"
+set = "standard"
+players = 4
+world = "2500x1800"
+seed = 303
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-101"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 101
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-202"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 202
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-303"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 303
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-505"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 505
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-606"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 606
+level = 3
+minutes = 600
+
+[[game]]
+name = "g8-707"
+set = "standard"
+players = 8
+world = "2500x1800"
+seed = 707
+level = 3
+minutes = 600
+
+[[game]]
+name = "g12-404"
+set = "standard"
+players = 12
+world = "2500x1800"
+seed = 404
+level = 3
+minutes = 600
+
+[[game]]
+name = "L-o4-101"
+set = "long"
+players = 4
+world = "500x350"
+seed = 101
+level = 3
+minutes = 1200
+
+[[game]]
+name = "L-g8-101"
+set = "long"
+players = 8
+world = "2500x1800"
+seed = 101
+level = 3
+minutes = 1200
+
+[[game]]
+name = "L-g12-404"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 404
+level = 3
+minutes = 1200
+
+[[game]]
+name = "L-g12-808"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 808
+level = 3
+minutes = 1200
+
+[[game]]
+name = "L-g12-909"
+set = "long"
+players = 12
+world = "2500x1800"
+seed = 909
+level = 3
+minutes = 1200
+
+# Metrics, per run from the AI log (O1602_AI_LOG=1) of a build with the gate's logging patch (both
+# arms the same, it only logs).
+# unreachable_farms: the farms a computer placed whose first sample has no market or Kontor whose carts
+#   reach it by road;
+# food_balance_gap60: as in the offroad gate, reported only.
+# The inhabitants (not worse) and the collapse rate per player and run (not worse) are judged per
+# set by the verdict itself.
+[[metric]]
+name = "unreachable_farms"
+better = "lower"
+[[metric]]
+name = "food_balance_gap60"
+better = "higher"
+decides = false
+
+[[change]]
+name = "rc1"
+report = "reports/rc1-mechanism.json"
+sha256 = "8e97f416af89e9481e7b7d4ef186b501c7e77dd4ab8c460ee101a62b08047665"
