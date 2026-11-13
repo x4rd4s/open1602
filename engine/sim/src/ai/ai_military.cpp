@@ -280,6 +280,20 @@ std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
     return s;
 }
 
+bool Engine::warship(std::uint32_t figure) const {
+    for (std::size_t type = 0; type < figure::kShips.size(); ++type) {
+        if (figure::kShips[type] == figure) {
+            return figure::warship_type(type);
+        }
+    }
+    for (const auto& [number, type] : m_sim.m_figures->package_ships()) {
+        if (number == figure) {
+            return figure::warship_type(type);
+        }
+    }
+    return false;
+}
+
 std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
     const bool all = viewer == owner || sees_all();
     if (const Census* c = census(); all && c != nullptr && owner < c->players) {
@@ -293,7 +307,7 @@ std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
         }
         if (all) {
             n += s.cannons;
-        } else if (const assets::FigureType* t = ship_type(s); t != nullptr) {
+        } else if (const assets::FigureType* t = ship_type(s); t != nullptr && warship(s.figure)) {
             n += t->ship.max_cannons;
         }
     }

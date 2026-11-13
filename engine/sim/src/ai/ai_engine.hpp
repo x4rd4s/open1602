@@ -825,8 +825,11 @@ private:
     /// sees_all() the whole, else the soldiers on islands the viewer discovered (not those in holds
     /// or castles).
     [[nodiscard]] std::uint32_t seen_army(PlayerId viewer, PlayerId owner) const;
+    /// Whether a ship of `figure` is of a warship type (also a package's), as its hull shows.
+    [[nodiscard]] bool warship(std::uint32_t figure) const;
     /// The cannons of `owner`'s ships afloat as `viewer` sees them: mounted ones of its own or with
-    /// sees_all(), else what each ship's type carries at most (a ship's window shows no cannons).
+    /// sees_all(), else what each warship's type carries at most (a ship's window shows no cannons;
+    /// a merchant ship counts none, an armed one as a player would take it).
     [[nodiscard]] std::uint32_t seen_cannons(PlayerId viewer, PlayerId owner) const;
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);

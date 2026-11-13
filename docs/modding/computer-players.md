@@ -444,8 +444,8 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   first, and explores every unexplored island it stops at.
 - **Other players' forces.** Below the hardest level a computer weighs another player's army
   (its stance, a war, how far it arms) by what a player sees: the soldiers on islands it has
-  discovered, and each ship afloat with the cannons its type carries at most, since a foreign ship's
-  window shows none. Soldiers in holds or castles and on islands it has not discovered count for
+  discovered, and each warship afloat with the cannons its type carries at most, since a foreign
+  ship's window shows none (a merchant ship counts none, as its hull shows). Soldiers in holds or castles and on islands it has not discovered count for
   nothing. On the hardest level, as the original's computers do, it counts every unit and every
   mounted cannon.
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do

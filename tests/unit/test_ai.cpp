@@ -1339,13 +1339,18 @@ TEST_CASE("ai: a computer a human has hurt declares war if it is as strong, else
             "Objekt: FIGUR\n"
             "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
             "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n  Rohmenge: 25\n"
+            "  Nummer: 25\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 3\n  Maxkanon: 8\n  Speed: 550\n"
+            "  Drehtime: 0.13\n  Maxenergy: 65\n  Hitpoint: 2.0\n  Preis: 1500\n  Rohstoff: 23\n  Rohmenge: 32\n"
             "  Nummer: 13\n  Gfx: 0\n  Hitpoint: 50.0\n  Worktime: 1.0\n"
             "EndObj\n",
             types));
         REQUIRE(figures.ok());
         g.figures = std::move(figures).value();
         if (human_fleet) {
-            g.add_ship(kHuman, 5, 80).cannons = 20;
+            // A warship (KRIEG1): a merchant ship's cannons are not seen below the hardest level.
+            sim::Ship& warship = g.add_ship(kHuman, 5, 80);
+            warship.figure = assets::figure::ship_figure(assets::figure::kFirstWarship);
+            warship.cannons = 20;
         }
         sim::Simulation s(g.world, g.buildings, g.figures);
         found_city(g, s);

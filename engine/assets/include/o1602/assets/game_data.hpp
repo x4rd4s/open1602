@@ -354,6 +354,12 @@ inline constexpr std::int32_t kUnitColours = 4;
 [[nodiscard]] constexpr std::uint16_t ship_figure(std::size_t type) noexcept {
     return type < kShips.size() ? kShips[type] : std::uint16_t{0};
 }
+/// The first of the warship types (KRIEG1); the types before it are merchant ships.
+inline constexpr std::size_t kFirstWarship = 2;
+/// Whether the shipyard type `type` (0..kShips.size()-1, also a package ship's) is a warship.
+[[nodiscard]] constexpr bool warship_type(std::size_t type) noexcept {
+    return type >= kFirstWarship && type < kShips.size();
+}
 inline constexpr std::uint16_t kTrader = 29;      ///< HANDLER: the free trader's ship
 inline constexpr std::uint16_t kPirate = 31;      ///< PIRAT
 inline constexpr std::uint16_t kSpearman = 33;    ///< SPEER1: the natives' warrior, the same for everyone
