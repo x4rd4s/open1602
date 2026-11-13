@@ -931,6 +931,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
         }
     }
     for (const ai::AiPlayer& p : m_state->players) {
+        if (p.strategy.war_arming) {
+            return static_cast<std::uint16_t>(ai::kStateWithArming);
+        }
+    }
+    for (const ai::AiPlayer& p : m_state->players) {
         if (p.settle.load_ms != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithColonyLoad);
         }

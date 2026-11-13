@@ -146,7 +146,17 @@ o1602-tool bench SAVEGAME/game00.gam --minutes 60   # a savegame of the original
 o1602-tool bench --minutes 600 --out late.o1602     # keep the end state, e.g. for the game's --load
 o1602-tool bench --minutes 60 --repeat 5            # the fastest of five runs per tick, for comparing code
 o1602-tool bench --players 4 --minutes 240 --ai classic --per-player  # the original's computers, each one's economy
+o1602-tool bench --players 12 --seed 909 --reload-at 280 --reload-minutes 10  # does a loaded game go on the same?
 ```
+
+`--out` writes the game as it is at the end of its last minute, so a run that loads the file lines
+up minute by minute with a longer run of the same game. `--reload-at M` checks that a game loaded
+from a savegame goes on exactly as the one that was never saved: at the end of minute M (0: right
+at the start) it saves the game, loads it into a second one and runs both side by side for
+`--reload-minutes` (default 10). It prints the first tick at which each section of the savegame
+comes to differ (the state of the running game split into its parts: `SIMU/LOGI`, `SIMU/AIST`, ...),
+then every `--reload-every` ticks (default 20) the sections newly differing, and once a minute
+the players whose gold differs. It exits with 1 if the games came apart.
 
 `--ai classic` or `--ai open1602` picks the computers of a new world (the rule "Computer opponents";
 Open1602's by default, a savegame keeps its own). `--per-player` adds to each period, per player, its cities, inhabitants, gold, units and

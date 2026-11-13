@@ -188,7 +188,7 @@ of a section (tag, u16 version, u16 flags with bit 0 "required", u32 size) and i
 | `LOGI` | 2 | yes | the figures (walkers) with their slots and generations, the jobs, the reserved tiles and the statistics; version 1 is without the shipyards' pack donkeys |
 | `FLET` | 4 or 5 | yes | the fleet's clocks, the free trader's tools, the pirates' clock, running explorations, the market statistics of the last pass; version 5 with the free traders' choices under `Rules::trader_reach` |
 | `MILI` | 3 | yes | the clocks of regeneration (1), the castles (2) and the natives (3) |
-| `AIST` | 5 or 6 | no | the plans of the computer opponents (version 6 with 64-bit city flags and services, written only when a public building of a kind of its own lies beyond bit 31); a reader that cannot read this part lets them look at the world anew |
+| `AIST` | 5 to 13 | no | the plans of the computer opponents; each later version is written only while its state is in use: 6 64-bit city flags and services (a public building of a kind of its own beyond bit 31), 7 a farm to move, 8 the town seed, 9 the fleet target's clock and the islands given up, 10 the strategy, 11 the war plan, 12 a colony ship called home to load, 13 arming for a war; a reader that cannot read this part lets them look at the world anew |
 
 A part of a later version or with an unknown tag is skipped if not required; otherwise the game is
 refused with the part's name ("SIMU: LOGI (version 3) needs a newer Open1602"). A part whose body
