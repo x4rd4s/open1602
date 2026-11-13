@@ -31,7 +31,10 @@ Per set of games the verdict compares each arm with the base arm over the phases
 standard error of the difference from the spread of both. A difference of more than two standard
 errors in the better direction is a gain, one of more than two in the other direction is worse, and
 anything between is no measurable effect. The inhabitants are only checked for harm: an arm must not
-be worse. Collapses (a player ending below 70 % of its peak) count as a rate per player and run.
+be worse. Collapses count as a rate per player and run. A collapse is a player whose inhabitants end below
+70 % of their peak: a measurement constant, the definition the noise band above and every earlier
+run used, so that the rates stay comparable. A report with one phase (every mechanism run) says so
+(`"evidence": "mechanism, n=1, no significance"`): it shows a direction, not a measured gain.
 A final run passes when no set and no decision metric is worse; a mechanism run passes when its
 metrics move the right way.
 
@@ -42,7 +45,7 @@ metrics move the right way.
   rules, results of another plan or of a plan changed after the runs, runs or metrics that are
   missing, and a final plan whose changes do not name a passed mechanism report by its hash.
 - `tools/measure/run.sh PLAN.toml ARM=/path/to/o1602-tool ...` runs a committed plan on this
-  machine: not while the game runs, only into a new folder under `/tmp`, headless and silent, and
+  machine: not while the game runs (no new run starts while a person plays; the pause is logged), only into a new folder under `/tmp`, headless and silent, and
   without writing to any repository.
 - `tools/check_ai_constants.py` fails a pull request that brings a new number or named value into
   the computer players' code, the balance values or the balance files. A value that follows from

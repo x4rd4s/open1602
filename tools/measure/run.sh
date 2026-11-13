@@ -6,7 +6,8 @@
 #   tools/measure/run.sh PLAN.toml ARM=/path/to/o1602-tool [ARM=...]
 #
 # One o1602-tool per arm of the plan, each built from that arm's sources. The script
-# - refuses while the game runs (a person may be playing on this machine),
+# - refuses to start while the game runs (a person may be playing on this machine), and starts no
+#   new run while it runs later (the running ones finish; the pause goes into PAUSES),
 # - refuses a plan that git does not track or that differs from the last commit, and a plan that
 #   breaks its stage's rules (measure.py check),
 # - writes only into a new folder under /tmp, which it prints,
@@ -25,7 +26,10 @@ shift
 here=$(cd "$(dirname "$0")" && pwd)
 measure="python3 -I $here/measure.py"
 
-if pgrep -x 1602.exe >/dev/null 2>&1 || pgrep -x open1602 >/dev/null 2>&1; then
+game_runs() {
+    pgrep -x 1602.exe >/dev/null 2>&1 || pgrep -x open1602 >/dev/null 2>&1
+}
+if game_runs; then
     echo "refused: the game runs on this machine" >&2
     exit 1
 fi
@@ -82,6 +86,15 @@ while IFS=$'\t' read -r -a job; do
     while [ "$(jobs -rp | wc -l)" -ge "$(nproc)" ]; do
         wait -n || true
     done
+    # A person may start the game during a long run: no new run starts while it runs (the running
+    # ones finish), and the pause is logged.
+    if game_runs; then
+        echo "$(date -u +%FT%TZ) paused: the game runs; no new run starts until it ends" | tee -a "$out/PAUSES" >&2
+        while game_runs; do
+            sleep 30
+        done
+        echo "$(date -u +%FT%TZ) resumed" | tee -a "$out/PAUSES" >&2
+    fi
     run_one "${job[@]}" &
 done <"$jobs"
 wait

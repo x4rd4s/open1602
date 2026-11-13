@@ -39,7 +39,8 @@ SHORT_MINUTES = 400       # mechanism and metric runs end where the effect lives
 MECHANISM_GAMES = 3
 FINAL_PHASES = {"standard": 4, "long": 8}
 FULL_MINUTES = {"standard": 600, "long": 1200}
-# A player collapsed when it ends below this share of its peak (in percent).
+# A player collapsed when it ends below this share of its peak (in percent): the definition of the
+# noise band and of every run measured before these tools, so that the rates stay comparable.
 COLLAPSE_PERCENT = 70
 # A difference counts beyond this many standard errors.
 SE_BAR = 2.0
@@ -306,6 +307,10 @@ def verdict(plan: dict, results: pathlib.Path) -> dict:
             passed = passed and j["passes"]
         report["arms"][arm] = out
     report["passed"] = passed
+    # What the report can be taken for: with one phase it shows a direction, not a measured gain.
+    n = min(plan["phases"][g["set"]] for g in plan["game"])
+    report["evidence"] = (f"{plan['stage']}, n={n}, no significance" if n < 2
+                          else f"{plan['stage']}, n={n}, {SE_BAR:g} standard errors")
     return report
 
 

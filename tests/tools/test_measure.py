@@ -104,6 +104,11 @@ class PlanTest(unittest.TestCase):
         with self.assertRaises(measure.Refused):
             measure.verdict(changed, results)
 
+    def test_a_one_phase_report_says_it_has_no_significance(self):
+        plan = self.plan(plan_text())
+        results = self.run_results(plan, {("main", 0): 1.0, ("new", 0): 2.0}, {("main", 0): 100, ("new", 0): 100})
+        self.assertEqual(measure.verdict(plan, results)["evidence"], "mechanism, n=1, no significance")
+
     def test_the_verdict_refuses_missing_runs_and_metrics(self):
         plan = self.plan(plan_text())
         results = self.run_results(plan, {("main", 0): 1.0}, {("main", 0): 100})
@@ -173,6 +178,19 @@ diff --git a/data/balance/balance.toml b/data/balance/balance.toml
         self.assertEqual(sorted(h.split(": ", 1)[1] for h in hits),
                          ["new balance key ai_new_threshold", "new named constant kNewFlag"])
 
+    def test_a_changed_balance_value_counts(self):
+        diff = """diff --git a/data/balance/balance.toml b/data/balance/balance.toml
+--- a/data/balance/balance.toml
++++ b/data/balance/balance.toml
+@@ -5,1 +5,1 @@
+-ai_food_ahead_minutes = 30
++ai_food_ahead_minutes = 40
+"""
+        hits = check_ai_constants.check(diff, [])
+        self.assertEqual(len(hits), 1)
+        self.assertIn("new number 40", hits[0])
+        self.assertIn("balance.toml:5", hits[0])
+
     def test_an_allowlist_entry_needs_its_derivation(self):
         with tempfile.TemporaryDirectory() as d:
             root = pathlib.Path(d)
@@ -190,6 +208,9 @@ class RunnerTest(unittest.TestCase):
             self.assertNotIn(word, code)
         self.assertIn("mktemp -d /tmp/", code)
         self.assertIn("pgrep -x 1602.exe", code)
+        # Checked again before every run, not only at the start.
+        loop = code.split("run_one \"${job[@]}\" &")[0].rsplit("while IFS", 1)[1]
+        self.assertIn("game_runs", loop)
         self.assertIn("SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy", code)
 
 
