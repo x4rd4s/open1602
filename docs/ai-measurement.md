@@ -103,6 +103,14 @@ So a level has its own noise band, and a change is measured on the level its que
 Changes to what the computers may know are measured at level 2, with one game at level 3 as a
 control that must stay identical.
 
+`bench` seats no human: every human seat is handed to a computer. `--human-seat P` gives seat P back
+to a person who gives no commands, so that the computers' rules about humans (their army and fleet
+targets, the threat of a human, a war on a human) meet a human's city, army and ships. Such a human
+is taken over from a savegame made by the computers at the same level, at a minute when the seat has
+an army and a warship. It builds nothing and answers nothing, so it falls behind: decisions about it
+are read in the first one or two hours after the save, and its inhabitants and gold are reported
+over the run.
+
 The evaluation that computes the decision metrics from the runs' logs writes them per run as
 `ARM/PHASE/GAME.metrics.json` (`{"food_balance_gap60": 0.4}`); `measure.py collect` then binds them
 to the plan's hash.
