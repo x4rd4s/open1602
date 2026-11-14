@@ -2101,6 +2101,10 @@ bool Engine::search_shipyard(AiPlayer& p) {
                     // original also places a yard none of them reaches, which never gets the
                     // material of the ships it is ordered.
                     if (score > s.best && rivals() && !yard_reaches(p, *b, item.x, item.y, item.rotation)) {
+                        if (logging()) {
+                            m_yard_unreached.resize(std::max<std::size_t>(m_yard_unreached.size(), p.player + 1U), 0);
+                            ++m_yard_unreached[p.player];
+                        }
                         continue;
                     }
                     if (score > s.best) {

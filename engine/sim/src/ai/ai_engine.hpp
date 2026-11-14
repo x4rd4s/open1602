@@ -1034,6 +1034,9 @@ private:
         Afford
     };
     mutable std::vector<YardWait> m_yard_logged;
+    /// Per player, the yard sites of the running search refused because the yard's carriers would
+    /// reach no store (only the log).
+    std::vector<std::uint32_t> m_yard_unreached;
     void log_yard(const AiPlayer& p, YardWait why) const;
     /// Per city, the minutes of statistics log_supply() last wrote at (only the log).
     std::vector<std::uint32_t> m_supply_logged;

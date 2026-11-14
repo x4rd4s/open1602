@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <optional>
+#include <utility>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -791,6 +792,12 @@ void Engine::task_shipyard(AiPlayer& p) {
     const Search s = p.search;
     const assets::BuildingType* b = by_id(s.building);
     CityPlan* r = current_plan(p);
+    if (p.player < m_yard_unreached.size()) {
+        if (const std::uint32_t refused = std::exchange(m_yard_unreached[p.player], 0); refused != 0 && r != nullptr) {
+            log(p, "city %u/%u: %u yard sites refused, no store in the carriers' reach%s", r->island, r->city, refused,
+                s.best <= 0 ? ", no site left" : "");
+        }
+    }
     if (b == nullptr || r == nullptr) {
         return;
     }
