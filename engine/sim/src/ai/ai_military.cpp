@@ -409,15 +409,15 @@ void Engine::watch_fights() {
             r.challenged_ms = 0;
         }
     }
-    // A ship gone, or at its owner's Kontor, where cannons are mounted and taken off: seen anew.
+    // A ship gone, or at a Kontor, its owner's or another's, where it can load cannons: seen anew.
+    // Cannons already in its holds it can mount anywhere, unseen by a player as well, until it fires.
     std::erase_if(seen, [&](const Sighting& r) {
         const Ship* s = m_world.ship(r.ship);
         if (s == nullptr || s->sinking) {
             return true;
         }
-        return !ship_moving(*s) && std::ranges::any_of(m_world.cities(), [&](const City& c) {
-            return c.owner == s->owner && ship_at_city(*s, c);
-        });
+        return !ship_moving(*s) &&
+               std::ranges::any_of(m_world.cities(), [&](const City& c) { return ship_at_city(*s, c); });
     });
 }
 

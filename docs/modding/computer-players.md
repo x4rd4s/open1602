@@ -450,8 +450,8 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   with no warship of its own it counts the most the type carries. A fight shows more: a hit's damage
   tells the fewest cannons that fire it, and a warship shot at within its own range that stands
   without an order or the white flag and has not fired back after a reload (its type's Worktime)
-  carries none. What it learnt of a ship holds until the ship lies at its owner's Kontor, where
-  cannons go on and off. Soldiers in holds or castles and on islands it has not discovered count for
+  carries none. What it learnt of a ship holds until the ship lies at a Kontor, its owner's or
+  another's, where it can load cannons to mount them from its holds. Soldiers in holds or castles and on islands it has not discovered count for
   nothing. On the hardest level, as the original's computers do, it counts every unit and every
   mounted cannon.
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do
