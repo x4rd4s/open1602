@@ -110,6 +110,11 @@ is taken over from a savegame made by the computers at the same level, at a minu
 an army and a warship. It builds nothing and answers nothing, so it falls behind: decisions about it
 are read in the first one or two hours after the save, and its inhabitants and gold are reported
 over the run.
+In a plan a game names its own start save and the seat (`save`, `sha256`, `human_seat`), so that
+each game starts from its own computers' save. A final run otherwise starts with the world; a game
+with a human seat starts from its save. A change about humans (what the computers know of them, war
+and peace with them) passes its final gate only with such games, against a noise band of the same
+games.
 
 The evaluation that computes the decision metrics from the runs' logs writes them per run as
 `ARM/PHASE/GAME.metrics.json` (`{"food_balance_gap60": 0.4}`); `measure.py collect` then binds them

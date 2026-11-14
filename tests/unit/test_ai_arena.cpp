@@ -54,8 +54,9 @@ constexpr sim::PlayerId kSecond = 1;
 constexpr sim::PlayerId kTrader = 2;
 constexpr sim::PlayerId kNatives = 3;
 
-/// With `yard`, a weaving hut and the small shipyard too, so that a computer wants a yard.
-assets::BuildingTable make_buildings(bool yard = false) {
+/// With `yard`, a weaving hut and the small shipyard too, so that a computer wants a yard; the
+/// yard's carriers walk `yard_radius` tiles.
+assets::BuildingTable make_buildings(bool yard = false, int yard_radius = 10) {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"BGRUPPE", 5}, {"BGRUPPE_WARE", 6}};
     const std::string yard_records =
         "  @Nummer: +1\n  Id: 20507\n  Kind: 14\n  Gfx: 90\n  Size: 2, 2\n  Wegspeed: 120, 120, 120, 100\n"
@@ -63,7 +64,10 @@ assets::BuildingTable make_buildings(bool yard = false) {
         "    Maxlager: 4\n    Interval: 20\n    Kosten: 5, 2\n    Arbeiter: 2\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 50\n  EndObj\n"
         "  @Nummer: +1\n  Id: 22115\n  Kind: 36\n  Gfx: 100\n  Size: 2, 3\n  Wegspeed: 120, 120, 120, 100\n"
-        "  Objekt: HAUS_PRODTYP\n    Kind: 14\n    Rohstoff: 23\n    Rohmenge: 2\n    Kosten: 30, 12\n  EndObj\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 14\n    Rohstoff: 23\n    Rohmenge: 2\n    Figurnr: 80\n    Radius: " +
+        std::to_string(yard_radius) +
+        "\n"
+        "    Kosten: 30, 12\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 200\n  EndObj\n";
     const auto doc = assets::cod::parse(
         "Nahrung: 1.3\n"
@@ -185,8 +189,11 @@ struct Arena {
     assets::FigureTable figures = make_figures();
     sim::World world{150, 80};
 
-    explicit Arena(bool with_yard = false, bool with_fish = true, std::int32_t fish_from_row = 0)
-        : yard(with_yard), fish(with_fish), fish_from(fish_from_row), buildings(make_buildings(with_yard)) {
+    explicit Arena(bool with_yard = false, bool with_fish = true, std::int32_t fish_from_row = 0, int yard_radius = 10)
+        : yard(with_yard),
+          fish(with_fish),
+          fish_from(fish_from_row),
+          buildings(make_buildings(with_yard, yard_radius)) {
         add_island(10, 15);
         add_island(90, 15);
         std::vector<sim::Player> players(4);
@@ -284,6 +291,54 @@ void run(sim::Simulation& s, std::uint32_t ms) {
     for (std::uint32_t t = 0; t < ms; t += sim::Simulation::kTickMs) {
         s.tick();
     }
+}
+
+/// Runs the first computer of `a` until it founds its city, gives the city a weaving hut and takes
+/// its ships away, so that it wants a yard; then up to `minutes` minutes for the yard. Returns the
+/// yard it built.
+std::optional<sim::BuildingAt> wanted_yard(Arena& a, sim::Simulation& s, int minutes) {
+    for (int minute = 0; minute < 10 && a.cities_of(kFirst) == 0; ++minute) {
+        run(s, 60'000);
+    }
+    REQUIRE(a.cities_of(kFirst) == 1);
+    run(s, 60'000);
+    std::uint16_t island = 0;
+    std::uint8_t index = 0;
+    for (const sim::City& c : a.world.cities()) {
+        if (c.owner == kFirst) {
+            island = c.island;
+            index = c.index;
+        }
+    }
+    bool weaving = false;
+    for (std::int32_t y = 0; y < 50 && !weaving; ++y) {
+        for (std::int32_t x = 0; x < 50 && !weaving; ++x) {
+            sim::BuildOrder order;
+            order.player = kFirst;
+            order.island = island;
+            order.items.push_back(sim::BuildItem{kWebstube, x, y, 0, 0});
+            const sim::BuildPlan plan = sim::plan_build(a.world, a.buildings, order);
+            if (plan.city == index && plan.items.front().ok()) {
+                weaving = sim::execute_build(a.world, a.buildings, order, {}, nullptr).items.front().ok();
+            }
+        }
+    }
+    REQUIRE(weaving);
+    a.world.erase_ships([](const sim::Ship& ship) { return ship.owner == kFirst; });
+    for (int minute = 0; minute < minutes; ++minute) {
+        run(s, 60'000);
+        const sim::IslandMap& map = a.world.islands()[island].map;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::TilePos at{static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)};
+                const auto b = sim::building_at(a.world, a.buildings, island, at);
+                if (b && b->type->id == kYard && b->origin == at) {
+                    return b;
+                }
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 std::vector<std::uint8_t> saved(const sim::ComputerPlayers& ai) {
@@ -409,6 +464,50 @@ TEST_CASE("ai arena: a computer builds its shipyard at the open sea, not at a la
     }
     REQUIRE(yard.has_value());
     CHECK(yard->x >= 43);  // its water side on the beach of column 46, not on the lake's (column 41)
+    // Its carriers reach a store of the city for the wood of the ships.
+    const auto at = sim::building_at(a.world, a.buildings, island, *yard);
+    REQUIRE(at.has_value());
+    sim::PathFinder finder;
+    CHECK(sim::yard_reaches_store(finder, a.world, a.buildings, island, *at, a.figures.get(80)->speed_type));
+}
+
+TEST_CASE("ai arena: a shipyard reaches a store only within its circle, over land") {
+    Arena a(true);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    for (int minute = 0; minute < 10 && a.cities_of(kFirst) == 0; ++minute) {
+        run(s, 60'000);
+    }
+    REQUIRE(a.cities_of(kFirst) == 1);
+    std::optional<sim::BuildingAt> kontor;
+    std::uint16_t island = 0;
+    for (std::uint16_t i = 0; i < a.world.islands().size() && !kontor; ++i) {
+        const sim::IslandMap& map = a.world.islands()[i].map;
+        for (std::uint32_t y = 0; y < map.height() && !kontor; ++y) {
+            for (std::uint32_t x = 0; x < map.width() && !kontor; ++x) {
+                const auto b = sim::building_at(a.world, a.buildings, i,
+                                                {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+                if (b && b->type->id == kKontor && map.top(x, y).owner == kFirst) {
+                    kontor = b;
+                    island = i;
+                }
+            }
+        }
+    }
+    REQUIRE(kontor.has_value());
+    const assets::BuildingType* type = a.buildings.by_id(kYard);
+    REQUIRE(type != nullptr);
+    const std::uint8_t speed = a.figures.get(80)->speed_type;
+    sim::PathFinder finder;
+    // Beside the Kontor, on the open ground of the city's west side.
+    sim::BuildingAt near{type, {kontor->origin.x - 4, kontor->origin.y}, 0, 2, 3, kontor->city};
+    CHECK(sim::yard_reaches_store(finder, a.world, a.buildings, island, near, speed));
+    // Far up the coast: the Kontor lies outside the yard's circle.
+    const std::int32_t far_y = kontor->origin.y > 25 ? 1 : 46;
+    sim::BuildingAt far{type, {kontor->origin.x - 4, far_y}, 0, 2, 3, kontor->city};
+    CHECK(!sim::yard_reaches_store(finder, a.world, a.buildings, island, far, speed));
+    // Another city's store does not count.
+    near.city = static_cast<std::uint8_t>(kontor->city + 1);
+    CHECK(!sim::yard_reaches_store(finder, a.world, a.buildings, island, near, speed));
 }
 
 TEST_CASE("ai arena: a computer's shipyard builds ships of a package of the type it wants too") {
@@ -757,7 +856,13 @@ TEST_CASE("ai arena: damaged warships wait for the yard where they are, not by s
     const sim::Target home = sim::Target::city_of(island, index);
     std::set<std::uint32_t> patrolled;
     std::set<std::uint32_t> sent_home;
+    // The city keeps wood in store, so that the yard, which also fetches it for the ship it builds,
+    // never runs out of material for the repairs.
+    sim::City* city = a.world.city(island, index);
+    REQUIRE(city != nullptr);
     for (int k = 0; k < 60; ++k) {
+        city->ensure_ware(assets::ware::kWood);
+        city->goods[assets::ware::kWood] = city->capacity;
         run(s, 10'000);
         for (const std::uint32_t id : damaged) {
             const sim::Ship* ship = a.world.ship(id);
@@ -775,4 +880,62 @@ TEST_CASE("ai arena: damaged warships wait for the yard where they are, not by s
     }
     CHECK(patrolled.empty());
     CHECK(sent_home.empty());
+}
+
+TEST_CASE("ai arena: an improved computer passes over a yard site its carriers reach no store from") {
+    // With carriers that walk 10 tiles, the best site has the Kontor in reach. With 2 tiles it has
+    // not: the computer takes the next site that has, and the yard gets its wood.
+    const std::uint8_t speed = make_figures().get(80)->speed_type;
+    Arena wide(true, true, 0, 10);
+    sim::Simulation ws(wide.world, wide.buildings, wide.figures);
+    const auto best = wanted_yard(wide, ws, 20);
+    REQUIRE(best.has_value());
+    Arena narrow(true, true, 0, 2);
+    sim::Simulation ns(narrow.world, narrow.buildings, narrow.figures);
+    const auto yard = wanted_yard(narrow, ns, 20);
+    REQUIRE(yard.has_value());
+    CHECK(yard->origin != best->origin);
+    sim::PathFinder finder;
+    CHECK(sim::yard_reaches_store(finder, narrow.world, narrow.buildings, 0, *yard, speed));
+    sim::BuildingAt passed = *best;
+    passed.type = yard->type;
+    passed.city = yard->city;
+    CHECK(!sim::yard_reaches_store(finder, narrow.world, narrow.buildings, 0, passed, speed));
+    // Its order gets the wood of the city's store.
+    sim::City* city = nullptr;
+    for (const sim::City& c : narrow.world.cities()) {
+        if (c.owner == kFirst) {
+            city = narrow.world.city(c.island, c.index);
+        }
+    }
+    REQUIRE(city != nullptr);
+    bool supplied = false;
+    for (int second = 0; second < 600 && !supplied; ++second) {
+        city->ensure_ware(assets::ware::kWood);
+        city->goods[assets::ware::kWood] = city->capacity;
+        run(ns, 1'000);
+        for (const sim::CostBuilding& b : narrow.world.cost_buildings()) {
+            supplied = supplied || (b.kind == sim::CostBuilding::Kind::Shipyard &&
+                                    b.order != sim::CostBuilding::kNoOrder && b.wood != 0);
+        }
+    }
+    CHECK(supplied);
+}
+
+TEST_CASE("ai arena: without a yard site in its carriers' reach of a store an improved computer builds none") {
+    // Carriers that walk no tile reach nothing. The original's computer builds the yard anyway, which
+    // never gets its material.
+    const std::uint8_t speed = make_figures().get(80)->speed_type;
+    for (const bool classic : {false, true}) {
+        Arena a(true, true, 0, 0);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        const auto yard = wanted_yard(a, s, 20);
+        CHECK(yard.has_value() == classic);
+        if (yard) {
+            sim::PathFinder finder;
+            CHECK(!sim::yard_reaches_store(finder, a.world, a.buildings, 0, *yard, speed));
+        }
+    }
 }
