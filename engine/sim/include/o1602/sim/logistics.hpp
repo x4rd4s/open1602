@@ -62,6 +62,16 @@ struct BuildingAt {
 /// Centre tile: origin + (size - 1) / 2.
 [[nodiscard]] TilePos centre_tile(const BuildingAt& building) noexcept;
 
+/// Prepares `finder` for a carrier of the shipyard `yard`: its circle over land, the producers,
+/// markets and warehouses of its city as goals (entered, never crossed), its own footprint open.
+/// Logistics::send_yard_carrier searches from the yard's door for a store with the ware.
+void begin_yard_search(PathFinder& finder, const IslandMap& map, const assets::BuildingTable& buildings,
+                       const BuildingAt& yard, std::uint8_t speed_type);
+/// Whether that search finds any market or warehouse of the yard's city: a yard placed where it
+/// does not gets no material and builds no ship. `yard` need not stand yet.
+[[nodiscard]] bool yard_reaches_store(PathFinder& finder, const World& world, const assets::BuildingTable& buildings,
+                                      std::uint16_t island, const BuildingAt& yard, std::uint8_t speed_type);
+
 /// Forest spots where deer may settle: tiles of odd rows and the island's column
 /// parity where at least 4 of the tile and its 4 neighbours carry trees.
 [[nodiscard]] std::vector<TilePos> deer_census_spots(const World& world, const assets::BuildingTable& buildings,

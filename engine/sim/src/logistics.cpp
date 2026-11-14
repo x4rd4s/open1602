@@ -78,6 +78,56 @@ std::uint16_t to_u16(std::int32_t v) noexcept {
 
 }  // namespace
 
+namespace {
+
+void mark_city_goals(PathFinder& finder, const IslandMap& map, const assets::BuildingTable& buildings,
+                     std::uint8_t city, std::int32_t last_kind, std::uint8_t speed_type) {
+    const TilePos corner = finder.window_min();
+    for (std::uint32_t j = 0; j < finder.window_height(); ++j) {
+        for (std::uint32_t i = 0; i < finder.window_width(); ++i) {
+            const TilePos t{corner.x + static_cast<std::int32_t>(i), corner.y + static_cast<std::int32_t>(j)};
+            if (!finder.inside(t) || !map.contains(t.x, t.y)) {
+                continue;
+            }
+            const MapCell& cell = map.top(static_cast<std::uint32_t>(t.x), static_cast<std::uint32_t>(t.y));
+            if (cell.city != city || cell.empty()) {
+                continue;
+            }
+            const assets::BuildingType* b = buildings.by_sprite(cell.sprite);
+            if (b != nullptr && b->prod_kind >= prod::kWorkshop && b->prod_kind <= last_kind) {
+                finder.set(t, PathFinder::Cell::Goal, b->walk_speed[std::min<std::uint8_t>(speed_type, 3)]);
+            }
+        }
+    }
+}
+
+}  // namespace
+
+void begin_yard_search(PathFinder& finder, const IslandMap& map, const assets::BuildingTable& buildings,
+                       const BuildingAt& yard, std::uint8_t speed_type) {
+    finder.begin(map, buildings, catchment_of(*yard.type, yard.rotation, yard.origin), WalkClass::Land, speed_type);
+    // Goals: the producers, markets and Kontors of the yard's city; only the stores hold the goods.
+    mark_city_goals(finder, map, buildings, yard.city, kLastSourceKind, speed_type);
+    finder.open_footprint(yard.origin, yard.width, yard.height);
+}
+
+bool yard_reaches_store(PathFinder& finder, const World& world, const assets::BuildingTable& buildings,
+                        std::uint16_t island, const BuildingAt& yard, std::uint8_t speed_type) {
+    if (island >= world.islands().size() || yard.type == nullptr) {
+        return false;
+    }
+    begin_yard_search(finder, world.islands()[island].map, buildings, yard, speed_type);
+    return finder
+        .search(door_tile(yard),
+                [&](TilePos t) {
+                    const auto at = building_at(world, buildings, island, t);
+                    return at && at->city == yard.city && is_storehouse(at->type->prod_kind)
+                               ? PathFinder::Answer::Accept
+                               : PathFinder::Answer::Reject;
+                })
+        .has_value();
+}
+
 std::optional<BuildingAt> building_at(const World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                                       TilePos tile) {
     if (island >= world.islands().size()) {
@@ -274,23 +324,7 @@ std::uint16_t Logistics::reserve(const BuildingAt& at, std::uint16_t island, std
 }
 
 void Logistics::mark_goals(const IslandMap& map, std::uint8_t city, std::int32_t last_kind, std::uint8_t speed_type) {
-    const TilePos corner = m_finder.window_min();
-    for (std::uint32_t j = 0; j < m_finder.window_height(); ++j) {
-        for (std::uint32_t i = 0; i < m_finder.window_width(); ++i) {
-            const TilePos t{corner.x + static_cast<std::int32_t>(i), corner.y + static_cast<std::int32_t>(j)};
-            if (!m_finder.inside(t) || !map.contains(t.x, t.y)) {
-                continue;
-            }
-            const MapCell& cell = map.top(static_cast<std::uint32_t>(t.x), static_cast<std::uint32_t>(t.y));
-            if (cell.city != city || cell.empty()) {
-                continue;
-            }
-            const assets::BuildingType* b = m_buildings->by_sprite(cell.sprite);
-            if (b != nullptr && b->prod_kind >= prod::kWorkshop && b->prod_kind <= last_kind) {
-                m_finder.set(t, PathFinder::Cell::Goal, b->walk_speed[std::min<std::uint8_t>(speed_type, 3)]);
-            }
-        }
-    }
+    mark_city_goals(m_finder, map, *m_buildings, city, last_kind, speed_type);
 }
 
 void Logistics::send_carrier(std::uint32_t home, std::uint8_t ware, std::uint16_t figure) {
@@ -655,12 +689,7 @@ bool Logistics::send_yard_carrier(std::uint16_t island, TilePos origin, std::uin
     if (!hb || hb->origin != origin) {
         return false;
     }
-    const IslandMap& map = m_world->islands()[island].map;
-    m_finder.begin(map, *m_buildings, catchment_of(*hb->type, hb->rotation, hb->origin), WalkClass::Land,
-                   fig->speed_type);
-    // Goals: markets and Kontors of the yard's city, which hold the city's goods.
-    mark_goals(map, hb->city, kLastSourceKind, fig->speed_type);
-    m_finder.open_footprint(hb->origin, hb->width, hb->height);
+    begin_yard_search(m_finder, m_world->islands()[island].map, *m_buildings, *hb, fig->speed_type);
     Walker w;
     w.kind = WalkerKind::Carrier;
     w.island = island;

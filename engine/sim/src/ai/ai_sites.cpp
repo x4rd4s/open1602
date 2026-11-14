@@ -2027,6 +2027,18 @@ bool Engine::search_fisher(AiPlayer& p) {
     return true;
 }
 
+bool Engine::yard_reaches(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                          std::uint8_t rotation) const {
+    const assets::FigureTable* figures = m_sim.figures();
+    const assets::FigureType* fig = figures == nullptr ? nullptr : figures->get(b.worker_figure);
+    if (fig == nullptr) {
+        return false;
+    }
+    BuildingAt yard{&b, TilePos{x, y}, rotation, 1, 1, p.city};
+    rotated_size(b, rotation, yard.width, yard.height);
+    return yard_reaches_store(m_reach_finder, m_world, m_buildings, p.island, yard, fig->speed_type);
+}
+
 bool Engine::search_shipyard(AiPlayer& p) {
     // The coast nearest to a road, with room for the yard; in Open1602 only at the open
     // sea.
@@ -2085,6 +2097,16 @@ bool Engine::search_shipyard(AiPlayer& p) {
                     }
                     any = true;
                     const std::int32_t score = 7 - dist;
+                    // Open1602: the yard's carriers reach a market or the Kontor of the city; the
+                    // original also places a yard none of them reaches, which never gets the
+                    // material of the ships it is ordered.
+                    if (score > s.best && rivals() && !yard_reaches(p, *b, item.x, item.y, item.rotation)) {
+                        if (logging()) {
+                            m_yard_unreached.resize(std::max<std::size_t>(m_yard_unreached.size(), p.player + 1U), 0);
+                            ++m_yard_unreached[p.player];
+                        }
+                        continue;
+                    }
                     if (score > s.best) {
                         s.best = score;
                         s.best_x0 = ox;

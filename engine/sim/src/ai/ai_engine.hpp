@@ -674,6 +674,10 @@ private:
         std::vector<std::uint64_t> inside;
     };
     [[nodiscard]] const CartReach& cart_reach(const AiPlayer& p) const;
+    /// Whether the carriers of a shipyard `b` placed at (x, y) with `rotation` reach a market or
+    /// the Kontor of p's city (Logistics::send_yard_carrier's search).
+    [[nodiscard]] bool yard_reaches(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                    std::uint8_t rotation) const;
     /// Logs what each improved rival's ships brought its cities (only the log).
     void log_supply();
     /// RC1: whether a cart of the city's markets or Kontor would fetch from a building at (x0, y0,
@@ -1053,6 +1057,9 @@ private:
         Afford
     };
     mutable std::vector<YardWait> m_yard_logged;
+    /// Per player, the yard sites of the running search refused because the yard's carriers would
+    /// reach no store (only the log).
+    std::vector<std::uint32_t> m_yard_unreached;
     void log_yard(const AiPlayer& p, YardWait why) const;
     /// Per city, the minutes of statistics log_supply() last wrote at (only the log).
     std::vector<std::uint32_t> m_supply_logged;
