@@ -442,6 +442,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   island the computer has not explored and explores it before it patrols, one ship at a time. When
   no known island suits the island search, the settlement's ship sails to the nearest unknown one
   first, and explores every unexplored island it stops at.
+- **Partners' Kontors.** Below the hardest level a computer buys at a partner's Kontor only on an
+  island it has discovered, and counts there on what the Kontor's window offers a player: the stock
+  less what the Kontor keeps and what its carriers have reserved, nothing under a ton. On the hardest
+  level it knows every partner's Kontor and its stock less what it keeps.
 - **Other players' forces.** Below the hardest level a computer weighs another player's army
   (its stance, a war, how far it arms) by what a player sees: the soldiers on islands it has
   discovered, and each ship afloat by what it can tell of its cannons, since a foreign ship's window
