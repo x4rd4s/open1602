@@ -1391,12 +1391,13 @@ TEST_CASE("ai: a fight at sea shows an improved computer a warship's cannons, no
         REQUIRE(figures.ok());
         g.figures = std::move(figures).value();
         // At war, a computer's warship with 8 cannons and a human's without any, 4 tiles apart.
+        const std::uint16_t warship = assets::figure::ship_figure(assets::figure::kFirstWarship);
         sim::Ship& own = g.add_ship(kComputer, 78, 45);
-        own.figure = assets::figure::ship_figure(assets::figure::kFirstWarship);
+        own.figure = warship;
         own.cannons = 8;
         const std::uint32_t shooter = own.id;
-        sim::Ship& other = g.add_ship(kHuman, 82, 45);
-        other.figure = own.figure;
+        sim::Ship& other = g.add_ship(kHuman, 82, 45);  // `own` may be moved by now
+        other.figure = warship;
         other.cannons = 0;
         other.held = held;  // under the white flag it is kept from firing back
         const std::uint32_t target = other.id;
