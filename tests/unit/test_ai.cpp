@@ -1308,6 +1308,49 @@ TEST_CASE("ai: computers sign trade treaties with each other and leave their pea
     CHECK(d.relation(kComputer, kTrader).trade == with_trader);
 }
 
+TEST_CASE("ai: below the hardest level a computer knows a partner's Kontor as a human would") {
+    // A human opens a partner's Kontor window on an island they have discovered and see there its
+    // offer: stock less what it keeps and what carriers have reserved, nothing under a ton. The
+    // hardest level sees every Kontor and its stock less what it keeps.
+    constexpr std::uint8_t kWare = assets::ware::kCloth;
+    constexpr std::uint32_t kTon = 32;
+    for (const std::uint8_t difficulty : {std::uint8_t{2}, std::uint8_t{3}}) {
+        Game g;
+        sim::World::GameSettings settings = g.world.game_settings();
+        settings.difficulty = difficulty;
+        g.world.set_game_settings(settings);
+        sim::City c;
+        c.island = 1;
+        c.owner = kHuman;
+        g.world.add_city(c);
+        sim::City* city = g.world.city(1, 0);
+        REQUIRE(city != nullptr);
+        city->ensure_ware(kWare);
+        city->trade.resize(std::size_t{kWare} + 1);
+        city->trade[kWare].sell = true;
+        city->trade[kWare].keep = 10 * kTon;
+        city->goods[kWare] = 30 * kTon;
+        city->reserved[kWare] = 4 * kTon;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        const bool hardest = difficulty == 3;
+        REQUIRE(!g.world.islands()[1].discovered_by(kComputer));
+        CHECK(engine.kontor_known(p, *city) == hardest);
+        g.world.island(1).discover(kComputer);
+        CHECK(engine.kontor_known(p, *city));
+        CHECK(engine.kontor_offer(*city, kWare) == (hardest ? 20U : 16U) * kTon);
+        // Less than a ton the window does not offer.
+        city->reserved[kWare] = 20 * kTon - kTon / 2;
+        CHECK(engine.kontor_offer(*city, kWare) == (hardest ? 20U * kTon : 0U));
+        // What it does not sell it offers nowhere.
+        city->trade[kWare].sell = false;
+        CHECK(engine.kontor_offer(*city, kWare) == 0U);
+    }
+}
+
 TEST_CASE("ai: a computer at war takes a human's peace offer, unless it is still angry") {
     for (const bool angry : {false, true}) {
         Game g;

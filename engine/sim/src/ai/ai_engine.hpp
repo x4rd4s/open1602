@@ -215,6 +215,14 @@ public:
     /// or the world's islands shared among its players, by the difficulty.
     [[nodiscard]] std::uint32_t city_limit() const;
 
+    // ai_logistics.cpp
+    /// Whether `p` knows partner city `c`'s Kontor, its prices and offer: on an island it discovered,
+    /// or with sees_all().
+    [[nodiscard]] bool kontor_known(const AiPlayer& p, const City& c) const;
+    /// What `c`'s Kontor offers of `w`: below the hardest level what its window shows (stock less
+    /// what it keeps and what is reserved there, nothing under a ton), else stock less what it keeps.
+    [[nodiscard]] std::uint64_t kontor_offer(const City& c, std::uint8_t w) const;
+
 private:
     // ---- ai_core.cpp ----
     void step(AiPlayer& p);

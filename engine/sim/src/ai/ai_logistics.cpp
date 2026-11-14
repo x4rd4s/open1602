@@ -623,6 +623,13 @@ void Engine::patrol_route(AiPlayer& p, Ship& s, std::uint16_t island) {
     n.last_stop = s.route.current;
 }
 
+bool Engine::kontor_known(const AiPlayer& p, const City& c) const {
+    // Open1602 (C4): a player sees a partner's prices and offer in its Kontor's window, which they
+    // open by clicking the Kontor on an island they have discovered (with a trade treaty); one on an
+    // island they have never seen they do not know of. A computer below the hardest level knows no more.
+    return sees_all() || island_of(c.island).discovered_by(p.player);
+}
+
 std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home_island, std::uint8_t w,
                                                  std::uint16_t* price, const City* to) {
     // An own city on another island with goods to spare, else the cheapest Kontor
@@ -665,7 +672,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (m_world.player(c.owner) == nullptr ||
-                m_world.diplomacy().relation(p.player, c.owner).trade != Treaty::Signed) {
+                m_world.diplomacy().relation(p.player, c.owner).trade != Treaty::Signed || !kontor_known(p, c)) {
                 continue;
             }
             const City::Trade* t = c.trade_of(w);
@@ -983,16 +990,35 @@ std::uint32_t Engine::own_spare(const City& c, std::uint8_t w, std::uint32_t res
     return c.stock(w) >= keep + kMinSupplyRun ? c.stock(w) - keep : 0;
 }
 
+std::uint64_t Engine::kontor_offer(const City& c, std::uint8_t w) const {
+    const City::Trade* t = c.trade_of(w);
+    if (t == nullptr || !t->sell) {
+        return 0;
+    }
+    std::uint64_t offer = c.stock(w) > t->keep ? c.stock(w) - t->keep : 0U;
+    // Open1602 (C4): below the hardest level what the Kontor's window offers, stock less what it
+    // keeps and what is reserved there, nothing under a ton (the human's "Angebot").
+    if (!sees_all()) {
+        offer = offer > c.reserved_of(w) ? offer - c.reserved_of(w) : 0U;
+        offer = offer >= kTon ? offer : 0U;
+    }
+    return offer;
+}
+
 std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
     // Open1602: what an improved computer can still buy of a ware at a partner's Kontor: what it
     // sells beyond what it keeps (and 5 t), less what the computer's own runs are already on their
     // way to load there; natives only for as much as the goodwill there pays for. Bought on what
     // the Kontor merely held, nearly two thirds of the runs came back empty.
     const City::Trade* t = c.trade_of(w);
-    if (t == nullptr || !t->sell || c.stock(w) <= t->keep + 5 * kTon) {
+    if (t == nullptr || !t->sell || !kontor_known(p, c)) {
         return 0;
     }
-    std::uint64_t spare = c.stock(w) - t->keep - 5 * kTon;
+    const std::uint64_t offer = kontor_offer(c, w);
+    if (offer <= 5 * kTon) {
+        return 0;
+    }
+    std::uint64_t spare = offer - 5 * kTon;
     if (m_world.acts_as(c.owner, FactionBehaviour::Natives)) {
         const std::uint32_t goodwill = p.player < c.goodwill.size() ? c.goodwill[p.player] : 0U;
         const std::uint32_t per_ton = std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U);
