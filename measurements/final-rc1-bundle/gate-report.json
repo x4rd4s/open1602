@@ -1,0 +1,76 @@
+{
+ "arms": {
+  "bundle": {
+   "metrics": {
+    "food_balance_gap60": {
+     "arm": -11.404683333333333,
+     "base": -11.250704166666667,
+     "decides": false,
+     "difference": -0.1539791666666659,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 1.9088694127398829,
+     "verdict": "no measurable effect"
+    },
+    "unreachable_farms": {
+     "arm": 0.576388888888889,
+     "base": 6.102777777777778,
+     "decides": true,
+     "difference": 5.526388888888889,
+     "passes": true,
+     "runs_without_value": {
+      "bundle": 0,
+      "main": 0
+     },
+     "se": 0.4408594875269266,
+     "verdict": "gain"
+    }
+   },
+   "sets": {
+    "long": {
+     "collapse_rate": {
+      "arm": 0.08854166666666667,
+      "base": 0.10416666666666666,
+      "difference": 0.015624999999999986,
+      "passes": true,
+      "se": 0.02147450846675865,
+      "verdict": "no measurable effect"
+     },
+     "inhabitants": {
+      "arm": 107627.875,
+      "base": 106502.375,
+      "difference": 1125.5,
+      "passes": true,
+      "se": 2612.498751708519,
+      "verdict": "no measurable effect"
+     }
+    },
+    "standard": {
+     "collapse_rate": {
+      "arm": 0.002976190476190476,
+      "base": 0.002976190476190476,
+      "difference": -0.0,
+      "passes": true,
+      "se": 0.004208968935634211,
+      "verdict": "no measurable effect"
+     },
+     "inhabitants": {
+      "arm": 141259.75,
+      "base": 138926.25,
+      "difference": 2333.5,
+      "passes": true,
+      "se": 1902.9103039817721,
+      "verdict": "no measurable effect"
+     }
+    }
+   }
+  }
+ },
+ "evidence": "final, n=4, 2 standard errors",
+ "passed": true,
+ "plan": "7ee070051bc13056513fd49f37bcfb22965356488916ff3ad0099f440fd5cc47",
+ "stage": "final"
+}

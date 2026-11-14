@@ -100,6 +100,31 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(measure.check_plan(self.plan(ok)), [])
         self.assertTrue(measure.check_plan(self.plan(ok.replace(digest, "1" * 64))))
 
+    def test_a_game_names_its_own_start_save_and_human_seat(self):
+        save = self.root / "g.o1602"
+        save.write_bytes(b"save")
+        digest = hashlib.sha256(b"save").hexdigest()
+        seat = f'save = "g.o1602"\nsha256 = "{digest}"\nhuman_seat = 0\n'
+        game = lambda keys: plan_text().replace("[[metric]]", keys + "[[metric]]", 1)  # noqa: E731
+        plan = self.plan(game(seat))
+        self.assertEqual(measure.check_plan(plan), [])
+        args = measure.jobs(plan)[0][3]
+        self.assertEqual(args[0], str(self.root / "g.o1602"))
+        self.assertEqual(args[args.index("--human-seat") + 1], "0")
+        self.assertTrue(measure.check_plan(self.plan(game(seat.replace(digest, "1" * 64)))))
+        self.assertTrue(measure.check_plan(self.plan(game("human_seat = 0\n"))))
+        both = plan_text(extra=f'[start]\nsave = "g.o1602"\nsha256 = "{digest}"\n')
+        self.assertTrue(measure.check_plan(self.plan(both.replace("[[metric]]", seat + "[[metric]]", 1))))
+        # A final run starts from a game's save only for a human seat.
+        games = [dict(name="g", set="standard", players=4, seed=1, minutes=600)]
+        final = plan_text(stage="final", games=games, phases="standard = 4")
+        no_seat = final.replace("[[metric]]", f'save = "g.o1602"\nsha256 = "{digest}"\n[[metric]]', 1)
+        self.assertIn("game g: a final run starts with the world, or from a save for a human seat",
+                      measure.check_plan(self.plan(no_seat)))
+        with_seat = final.replace("[[metric]]", seat + "[[metric]]", 1)
+        self.assertNotIn("game g: a final run starts with the world, or from a save for a human seat",
+                         measure.check_plan(self.plan(with_seat)))
+
     def run_results(self, plan, food, inhabitants):
         records = []
         for (arm, phase), value in food.items():

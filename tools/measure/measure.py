@@ -13,6 +13,9 @@ Usage:
   python3 tools/measure/measure.py verdict PLAN.toml RESULTS.jsonl [--report OUT.json]
       The verdict by the plan's stage; refuses results of another plan or with runs missing.
 
+A game may start from a save of its own (`save` and its `sha256`), and with `human_seat` a seat of that
+save is a human who gives no commands (o1602-tool bench --human-seat); a final run starts with the
+world, except a game with a human seat, which starts from the save the computers made.
 Every game names its difficulty level (0 to 3): below the hardest the improved computers see only
 what a player sees, so a plan without it is refused.
 A plan names its stage:
@@ -24,7 +27,7 @@ Every plan names its decision metrics; the inhabitants count only as a check tha
 A metric with `decides = false` is judged and reported but does not decide. A run whose metric has
 no value (a mean over no events) writes it as "n/a": the verdict leaves that run out of that metric
 and reports how many runs it left out per arm.
-Minutes are those run, after the start save when the plan has one.
+Minutes are those run, after the start save when the plan or the game has one.
 Exit code 0 when all is well, 1 when the plan or the results break a rule, 2 on wrong use.
 """
 from __future__ import annotations
@@ -119,6 +122,21 @@ def check_plan(plan: dict) -> list[str]:
             errors.append(f"metric {m.get('name')}: decides is true or false")
         if m.get("name") == "inhabitants":
             errors.append("inhabitants are no decision metric: they are checked as not worse anyway")
+    for g in games:
+        seat = g.get("human_seat")
+        if seat is not None and (not isinstance(seat, int) or isinstance(seat, bool) or seat < 0):
+            errors.append(f"game {g.get('name')}: human_seat is a player number")
+        if g.get("save") is None:
+            if seat is not None:
+                errors.append(f"game {g.get('name')}: a human seat needs the game's own start save")
+            continue
+        if plan.get("start") is not None:
+            errors.append(f"game {g.get('name')}: a start save for the plan or for each game, not both")
+        save = plan["_dir"] / str(g["save"])
+        if not save.is_file():
+            errors.append(f"game {g.get('name')}: start save {g['save']} not found")
+        elif file_hash(save) != g.get("sha256"):
+            errors.append(f"game {g.get('name')}: start save {g['save']}: its hash is not the plan's")
     start = plan.get("start")
     if start is not None:
         save = plan["_dir"] / str(start.get("save", ""))
@@ -143,6 +161,9 @@ def check_plan(plan: dict) -> list[str]:
                 errors.append(f"a final run has at least {FINAL_PHASES[s]} phases on {s} games")
         if start is not None:
             errors.append("a final run starts with the world, not from a save")
+        for g in games:
+            if g.get("save") is not None and g.get("human_seat") is None:
+                errors.append(f"game {g.get('name')}: a final run starts with the world, or from a save for a human seat")
         for g in games:
             if g.get("set") in SETS and g.get("minutes") != FULL_MINUTES[g["set"]]:
                 errors.append(f"game {g.get('name')}: a final run is {FULL_MINUTES[g['set']]} minutes")
@@ -184,11 +205,15 @@ def jobs(plan: dict) -> list[tuple[str, int, dict, list[str]]]:
                 args = []
                 if plan.get("start"):
                     args.append(str(plan["_dir"] / plan["start"]["save"]))
+                elif g.get("save"):
+                    args.append(str(plan["_dir"] / g["save"]))
                 args += ["--level", str(g["level"]), "--minutes", str(g["minutes"]),
                          "--period", str(g.get("period", 10)), "--per-player", "--ai", "open1602",
                          "--players", str(g["players"]), "--seed", str(g["seed"]), "--ai-phase", str(phase)]
                 if g.get("world"):
                     args += ["--world", g["world"]]
+                if g.get("human_seat") is not None:
+                    args += ["--human-seat", str(g["human_seat"])]
                 out.append((arm["name"], phase, g, args))
     return out
 
