@@ -259,6 +259,11 @@ void Engine::plan_strategy(AiPlayer& p) {
         if (const std::uint32_t seen = army_target(p), all = army_target(p, true); seen != all) {
             log(p, "seen: army target %u (census %u)", seen, all);
         }
+        std::uint32_t mounted = 0;
+        std::uint32_t most = 0;
+        own_cannons(p.player, mounted, most);
+        log(p, "seen: own warships carry %u of %u cannons, %zu ships seen in a fight", mounted, most,
+            m_state.sightings.size());
     }
 
     // The goal: the economy first in debt; arms against a stronger enemy nearby or, as a conqueror,

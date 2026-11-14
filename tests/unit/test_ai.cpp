@@ -1375,6 +1375,80 @@ TEST_CASE("ai: a computer a human has hurt declares war if it is as strong, else
     }
 }
 
+TEST_CASE("ai: a fight at sea shows an improved computer a warship's cannons, not more") {
+    for (const bool held : {false, true}) {
+        Game g;
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
+            "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n  Rohmenge: 25\n"
+            "  Nummer: 25\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 3\n  Maxkanon: 8\n  Speed: 550\n"
+            "  Drehtime: 0.13\n  Maxenergy: 65\n  Hitpoint: 2.0\n  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n"
+            "  Stirbtime: 4.0\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        g.figures = std::move(figures).value();
+        // At war, a computer's warship with 8 cannons and a human's without any, 4 tiles apart.
+        sim::Ship& own = g.add_ship(kComputer, 78, 45);
+        own.figure = assets::figure::ship_figure(assets::figure::kFirstWarship);
+        own.cannons = 8;
+        const std::uint32_t shooter = own.id;
+        sim::Ship& other = g.add_ship(kHuman, 82, 45);
+        other.figure = own.figure;
+        other.cannons = 0;
+        other.held = held;  // under the white flag it is kept from firing back
+        const std::uint32_t target = other.id;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        auto& d = g.world.diplomacy();
+        d.relation(kComputer, kHuman).peace = sim::Treaty::None;
+        d.relation(kHuman, kComputer).peace = sim::Treaty::None;
+        REQUIRE(d.hostile(kComputer, kHuman));
+        const auto state = [&] {
+            const std::vector<std::uint8_t> bytes = saved(s.computers());
+            annokit::core::ByteReader in(bytes);
+            sim::StateIn reader(in);
+            sim::ai::State out;
+            sim::ai::Loader loader(reader, s.computers().state_version());
+            loader(out);
+            REQUIRE(reader.ok());
+            return out;
+        };
+        const auto sighting = [](const sim::ai::State& st, std::uint32_t ship) -> const sim::ai::Sighting* {
+            const auto it = std::ranges::find(st.sightings, ship, &sim::ai::Sighting::ship);
+            return it != st.sightings.end() ? &*it : nullptr;
+        };
+        // Before the first shot nothing is seen, and the state keeps its earlier version.
+        CHECK(s.computers().state_version() < sim::ai::kStateWithSightings);
+        // A shot of 8 cannons does twice a single cannon's damage (cannon_factor 2): three at least.
+        bool fired = false;
+        bool unarmed = false;
+        for (std::uint32_t t = 0; t < 30'000 && !unarmed; t += 500) {
+            run(s, 500);
+            const sim::ai::State st = state();
+            if (const sim::ai::Sighting* r = sighting(st, shooter)) {
+                CHECK(r->armed == 3);
+                fired = true;
+            }
+            if (const sim::ai::Sighting* r = sighting(st, target)) {
+                unarmed = r->unarmed;
+            }
+        }
+        CHECK(fired);
+        // The human's ship did not fire back within a reload: it has no cannons. Under the white flag
+        // that tells nothing.
+        CHECK(unarmed == !held);
+        // The sightings travel with the saved game.
+        REQUIRE(s.computers().state_version() == sim::ai::kStateWithSightings);
+        const std::vector<std::uint8_t> bytes = saved(s.computers());
+        annokit::core::ByteReader in(bytes);
+        sim::ComputerPlayers computers(s);
+        REQUIRE(computers.load(in, sim::ai::kStateWithSightings));
+        CHECK(saved(computers) == bytes);
+    }
+}
+
 TEST_CASE("ai: a rich computer buys peace from the pirates, a poor one does not") {
     for (const std::int32_t money : {9'000, 100'000}) {
         Game g;

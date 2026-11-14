@@ -15,8 +15,6 @@ namespace o1602::sim {
 
 namespace {
 
-constexpr std::int32_t kEighth = kPosUnit / 8;  // 1/8 tile in position units
-
 /// The island a trade cart drives on.
 std::uint16_t cart_island(const World& world, const Ship& cart) {
     if (!world.contains(cart.x, cart.y)) {

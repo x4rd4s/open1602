@@ -444,8 +444,14 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   first, and explores every unexplored island it stops at.
 - **Other players' forces.** Below the hardest level a computer weighs another player's army
   (its stance, a war, how far it arms) by what a player sees: the soldiers on islands it has
-  discovered, and each warship afloat with the cannons its type carries at most, since a foreign
-  ship's window shows none (a merchant ship counts none, as its hull shows). Soldiers in holds or castles and on islands it has not discovered count for
+  discovered, and each warship afloat by what it can tell of its cannons, since a foreign ship's
+  window shows none (a merchant ship counts none, as its hull shows). It expects another player's
+  warship to be armed as its own warships are, by the share of their most cannons they carry, and
+  with no warship of its own it counts the most the type carries. A fight shows more: a hit's damage
+  tells the fewest cannons that fire it, and a warship shot at within its own range that stands
+  without an order or the white flag and has not fired back after a reload (its type's Worktime)
+  carries none. What it learnt of a ship holds until the ship lies at its owner's Kontor, where
+  cannons go on and off. Soldiers in holds or castles and on islands it has not discovered count for
   nothing. On the hardest level, as the original's computers do, it counts every unit and every
   mounted cannon.
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do

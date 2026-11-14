@@ -831,6 +831,14 @@ private:
     /// sees_all(), else what each warship's type carries at most (a ship's window shows no cannons;
     /// a merchant ship counts none, an armed one as a player would take it).
     [[nodiscard]] std::uint32_t seen_cannons(PlayerId viewer, PlayerId owner) const;
+    /// Open1602 (G5/B): what fights at sea show of warships' cannons (State::sightings).
+    void watch_fights();
+    /// The cannons `viewer` takes a foreign warship `s` of type `t` to carry: what a fight showed,
+    /// else its type's maximum times the share of their maximum its own warships carry.
+    [[nodiscard]] std::uint32_t guessed_cannons(const Ship& s, const assets::FigureType& t, std::uint32_t mounted,
+                                                std::uint32_t most) const;
+    /// The cannons on `player`'s own warships and their types' maximum.
+    void own_cannons(PlayerId player, std::uint32_t& mounted, std::uint32_t& most) const;
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;

@@ -96,6 +96,7 @@ void Engine::reset() {
     }
     m_state.island_cursor = 0;
     m_state.max_score = 0;
+    m_state.sightings.clear();
     m_state.initialised = true;
 }
 
@@ -182,6 +183,9 @@ void Engine::tick(std::uint32_t dt_ms) {
         }
     } leave{*this};
     island_controller();
+    if (rivals() && !sees_all()) {
+        watch_fights();
+    }
     if (logging() && rivals()) {
         log_supply();
     }
@@ -958,6 +962,9 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    if (!m_state->sightings.empty()) {
+        return static_cast<std::uint16_t>(ai::kStateWithSightings);
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.settle.plan_ms != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithColonyPlan);
