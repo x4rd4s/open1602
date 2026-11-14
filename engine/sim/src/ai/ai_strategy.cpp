@@ -261,9 +261,12 @@ void Engine::plan_strategy(AiPlayer& p) {
         }
         std::uint32_t mounted = 0;
         std::uint32_t most = 0;
-        own_cannons(p.player, mounted, most);
-        log(p, "seen: own warships carry %u of %u cannons, %zu ships seen in a fight", mounted, most,
-            m_state.sightings.size());
+        std::uint32_t merchant_mounted = 0;
+        std::uint32_t merchant_most = 0;
+        own_cannons(p.player, true, mounted, most);
+        own_cannons(p.player, false, merchant_mounted, merchant_most);
+        log(p, "seen: own warships carry %u of %u cannons, merchant ships %u of %u, %zu ships seen in a fight", mounted,
+            most, merchant_mounted, merchant_most, m_state.sightings.size());
     }
 
     // The goal: the economy first in debt; arms against a stronger enemy nearby or, as a conqueror,

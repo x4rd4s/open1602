@@ -1450,6 +1450,49 @@ TEST_CASE("ai: a fight at sea shows an improved computer a warship's cannons, no
     }
 }
 
+TEST_CASE("ai: a computer a human has hurt guesses the human's merchant ships armed as its own are") {
+    // Merchant ships carry cannons too, and a ship's window shows none: the computer takes another
+    // player's merchant ships to carry the share of their most that its own carry.
+    for (const bool armed : {false, true}) {
+        Game g;
+        add_pirates(g);
+        constexpr sim::PlayerId kPirates = 4;
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
+            "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n  Rohmenge: 25\n"
+            "  Nummer: 25\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 3\n  Maxkanon: 8\n  Speed: 550\n"
+            "  Drehtime: 0.13\n  Maxenergy: 65\n  Hitpoint: 2.0\n  Preis: 1500\n  Rohstoff: 23\n  Rohmenge: 32\n"
+            "  Nummer: 13\n  Gfx: 0\n  Hitpoint: 50.0\n  Worktime: 1.0\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        g.figures = std::move(figures).value();
+        // Four merchant ships of the human's with all their cannons, far off.
+        for (std::uint32_t k = 0; k < 4; ++k) {
+            g.add_ship(kHuman, 5 + 4 * k, 80).cannons = 6;
+        }
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        found_city(g, s);
+        // The computer's own merchant ship: unarmed, or with all its cannons.
+        for (sim::Ship& ship : g.world.ships()) {
+            if (ship.owner == kComputer) {
+                ship.cannons = armed ? 6 : 0;
+            }
+        }
+        auto& d = g.world.diplomacy();
+        REQUIRE(d.relation(kComputer, kHuman).peace == sim::Treaty::Signed);
+        d.relation(kComputer, kHuman).damage = 400;
+        g.world.player(kComputer)->money = 30'000;
+        run(s, 31'000);
+        // Unarmed itself it takes the human's merchant ships for unarmed and declares war; armed, it
+        // takes them for armed as well, is the weaker and pays the pirates.
+        CHECK((d.relation(kComputer, kHuman).peace == sim::Treaty::None) == !armed);
+        CHECK(remembers(g.world, kPirates, sim::DiplomacyEventType::BribedBy, kComputer) == armed);
+    }
+}
+
 TEST_CASE("ai: a rich computer buys peace from the pirates, a poor one does not") {
     for (const std::int32_t money : {9'000, 100'000}) {
         Game g;

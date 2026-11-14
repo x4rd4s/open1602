@@ -301,10 +301,15 @@ std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
         return c->cannons[owner];
     }
     // Ships are drawn everywhere, so a human sees every ship and its type, but not its cannons.
-    std::uint32_t mounted = 0;
-    std::uint32_t most = 0;
+    // Open1602: merchant ships carry cannons too; the computer counts its own, so it guesses those of
+    // others as well, each class by its own ships of that class (they are armed very differently).
+    std::uint32_t war_mounted = 0;
+    std::uint32_t war_most = 0;
+    std::uint32_t merchant_mounted = 0;
+    std::uint32_t merchant_most = 0;
     if (!all) {
-        own_cannons(viewer, mounted, most);
+        own_cannons(viewer, true, war_mounted, war_most);
+        own_cannons(viewer, false, merchant_mounted, merchant_most);
     }
     std::uint32_t n = 0;
     for (const Ship& s : m_world.ships()) {
@@ -313,21 +318,27 @@ std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
         }
         if (all) {
             n += s.cannons;
-        } else if (const assets::FigureType* t = ship_type(s); t != nullptr && warship(s.figure)) {
-            n += guessed_cannons(s, *t, mounted, most);
+        } else if (const assets::FigureType* t = armable(s)) {
+            const bool war = warship(s.figure);
+            n += guessed_cannons(s, *t, war ? war_mounted : merchant_mounted, war ? war_most : merchant_most);
         }
     }
     return n;
 }
 
-void Engine::own_cannons(PlayerId player, std::uint32_t& mounted, std::uint32_t& most) const {
+const assets::FigureType* Engine::armable(const Ship& s) const {
+    const assets::FigureType* t = s.cart() ? nullptr : ship_type(s);
+    return t != nullptr && t->ship.max_cannons != 0 ? t : nullptr;
+}
+
+void Engine::own_cannons(PlayerId player, bool warships, std::uint32_t& mounted, std::uint32_t& most) const {
     mounted = 0;
     most = 0;
     for (const Ship& s : m_world.ships()) {
-        if (s.owner != player || s.sinking || !warship(s.figure)) {
+        if (s.owner != player || s.sinking || warship(s.figure) != warships) {
             continue;
         }
-        if (const assets::FigureType* t = ship_type(s)) {
+        if (const assets::FigureType* t = armable(s)) {
             mounted += std::min<std::uint32_t>(s.cannons, t->ship.max_cannons);
             most += t->ship.max_cannons;
         }
@@ -337,9 +348,10 @@ void Engine::own_cannons(PlayerId player, std::uint32_t& mounted, std::uint32_t&
 std::uint32_t Engine::guessed_cannons(const Ship& s, const assets::FigureType& t, std::uint32_t mounted,
                                       std::uint32_t most) const {
     const std::uint32_t max = t.ship.max_cannons;
-    // As its own warships carry: a player who arms his ships half expects the same of others.
-    // Without warships of its own it knows no better than the type's maximum.
-    std::uint32_t guess = most == 0 ? max : max * mounted / most;
+    // As its own ships of the class carry: a player who arms his ships half expects the same of
+    // others. Without ships of the class of its own it knows no better than the type's maximum.
+    // Rounded to the nearest cannon: cut down, every small ship lost up to one at every look.
+    std::uint32_t guess = most == 0 ? max : (max * mounted + most / 2) / most;
     const auto seen = std::ranges::find(m_state.sightings, s.id, &Sighting::ship);
     if (seen != m_state.sightings.end()) {
         if (seen->unarmed) {
@@ -351,10 +363,10 @@ std::uint32_t Engine::guessed_cannons(const Ship& s, const assets::FigureType& t
 }
 
 void Engine::watch_fights() {
-    // Open1602 (G5/B): what a fight at sea shows of a warship's cannons. A ship without cannons never
-    // fires, and a hit's damage tells the step of cannon_factor it fired with. A ship shot at within
-    // its own range that stands, has no order and no white flag fires back if it has cannons: if it
-    // has not after a reload (its type's Worktime), it has none.
+    // Open1602 (G5/B): what a fight at sea shows of a ship's cannons, a warship's or a merchant
+    // ship's. A ship without cannons never fires, and a hit's damage tells the step of cannon_factor
+    // it fired with. A ship shot at within its own range that stands, has no order and no white flag
+    // fires back if it has cannons: if it has not after a reload (its type's Worktime), it has none.
     std::vector<Sighting>& seen = m_state.sightings;
     const auto record = [&](std::uint32_t id) -> Sighting& {
         const auto it = std::ranges::find(seen, id, &Sighting::ship);
@@ -367,8 +379,8 @@ void Engine::watch_fights() {
     const std::uint64_t now = now_ms();
     for (const PendingHit& h : m_world.pending_hits()) {
         const Ship* from = h.shooter.kind == Target::Kind::Ship ? m_world.ship(h.shooter.ship) : nullptr;
-        if (const assets::FigureType* t = from != nullptr ? ship_type(*from) : nullptr;
-            t != nullptr && warship(from->figure) && t->combat.hit != 0) {
+        if (const assets::FigureType* t = from != nullptr ? armable(*from) : nullptr;
+            t != nullptr && t->combat.hit != 0) {
             const std::uint32_t step = h.damage / t->combat.hit;
             std::uint8_t fewest = 1;
             while (fewest < t->ship.max_cannons && Combat::cannon_factor(fewest) < step) {
@@ -380,9 +392,9 @@ void Engine::watch_fights() {
             r.challenged_ms = 0;
         }
         const Ship* at = h.target.kind == Target::Kind::Ship ? m_world.ship(h.target.ship) : nullptr;
-        const assets::FigureType* t = at != nullptr ? ship_type(*at) : nullptr;
-        if (t == nullptr || !warship(at->figure) || at->sinking || at->held || ship_moving(*at) ||
-            !at->target.empty() || h.attacker == at->owner || !m_world.diplomacy().hostile(at->owner, h.attacker)) {
+        const assets::FigureType* t = at != nullptr ? armable(*at) : nullptr;
+        if (t == nullptr || at->sinking || at->held || ship_moving(*at) || !at->target.empty() ||
+            h.attacker == at->owner || !m_world.diplomacy().hostile(at->owner, h.attacker)) {
             continue;
         }
         // The shooter within its own reach (Shotradius in 1/8 tile).
