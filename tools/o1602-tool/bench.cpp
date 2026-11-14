@@ -530,6 +530,20 @@ int cmd_bench(const Args& args) {
             }
             ++handed_over;
         }
+        // --human-seat P: seat P is a person's who gives no commands (a "frozen human"), so that the
+        // computers' rules about humans are measured against a city, an army and ships of a human.
+        std::optional<sim::PlayerId> frozen;
+        if (const auto seat = args.number("--human-seat")) {
+            const auto p = static_cast<sim::PlayerId>(*seat);
+            const sim::Player* pl = world->player(p);
+            if (*seat >= world->players().size() || pl == nullptr ||
+                world->behaviour(*pl) != sim::FactionBehaviour::Settlers ||
+                !simulation->execute(sim::PlayerControl{p, false}).accepted) {
+                return fail(annokit::core::make_error(annokit::core::ErrorCode::Unsupported,
+                                                      "player " + std::to_string(*seat) + " cannot take a human seat"));
+            }
+            frozen = p;
+        }
         if (reload_at == std::size_t{0}) {
             return reload_check(*world, *simulation, *buildings, *figures, reload_minutes, reload_every);
         }
@@ -541,6 +555,9 @@ int cmd_bench(const Args& args) {
                 minutes);
             if (repeats > 1) {
                 std::printf(", fastest of %zu runs per tick", repeats);
+            }
+            if (frozen) {
+                std::printf(", player %u a human who gives no commands", unsigned{*frozen});
             }
             std::printf(
                 "\n(%s in microseconds per tick of %u ms game time; 20 ticks per second at speed 1, %u at "

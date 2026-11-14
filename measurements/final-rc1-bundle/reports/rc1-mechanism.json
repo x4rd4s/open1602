@@ -1,0 +1,13 @@
+{
+  "change": "rc1",
+  "stage": "mechanism",
+  "passed": true,
+  "evidence": "mechanism, n=1 per game, no significance",
+  "question": "Do improved rivals place farms only where a market's carts reach them?",
+  "games": ["L-g12-909, L-g12-404, L-g12-101 from their minute-400 saves, 400 minutes, level 3"],
+  "metrics": {
+    "unreachable_farms": {"main": 18, "rc1": 0, "unit": "new farms without a cart route", "better": "lower"},
+    "hungry_cases_with_reachable_site": {"rc1": 20, "of": 20}
+  },
+  "notes": "No collapses in either arm; inhabitants summed over the three games +2.8 % with a large spread per player (the games diverge). No runtime cost; wood supply unchanged."
+}

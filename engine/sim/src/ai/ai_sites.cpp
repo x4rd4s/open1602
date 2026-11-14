@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdlib>
 #include <functional>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -98,6 +99,9 @@ std::int32_t away_from_town(std::int32_t score, std::int32_t cost) {
     return score > 0 ? std::max(score - cost, 1) : score;
 }
 
+/// The four straight neighbours of a tile.
+constexpr std::array<std::array<std::int32_t, 2>, 4> kStep{{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}};
+
 /// A candidate site: a rectangle of island tiles.
 struct Site {
     std::int32_t x0 = 0;
@@ -111,6 +115,14 @@ struct Site {
     [[nodiscard]] std::int32_t w() const { return x1 - x0 + 1; }
     [[nodiscard]] std::int32_t h() const { return y1 - y0 + 1; }
 };
+
+/// The road tile a farm's site brings (task_farm builds it with the farm), if any.
+std::vector<BuildItem> stub_road(const Site& c) {
+    if (c.stub_x < 0) {
+        return {};
+    }
+    return {BuildItem{id::kRoadDirt, c.stub_x, c.stub_y, 0, 0}};
+}
 
 /// Tile of the segment frame: `along` steps in the run's direction, `perp` to its left.
 void frame(const Segment& s, std::int32_t cx, std::int32_t cy, std::int32_t along, std::int32_t perp, std::int32_t& x,
@@ -991,7 +1003,9 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                 const bool enough = woodcutter
                                         ? acc.count >= (sparse ? kSparseWoodTrees : 10)
                                         : acc.count >= (sparse_farm ? kSparseFarmFields : farm_rule(false).fields);
-                if (enough && acc.road && acc.market && score > s.best && farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
+                if (enough && acc.road && acc.market && score > s.best &&
+                    (!rivals() || cart_reaches(p, c.x0, c.y0, c.x1, c.y1, stub_road(c))) &&
+                    farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                     s.best = score;
                     s.best_x0 = c.x0;
                     s.best_y0 = c.y0;
@@ -1052,6 +1066,7 @@ bool Engine::search_grain(AiPlayer& p) {
             const std::int32_t score = outside_zone(
                 zone, margin, c, away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra));
             if (acc.count >= farm_rule(true).fields && acc.road && acc.market && score > s.best &&
+                (!rivals() || cart_reaches(p, c.x0, c.y0, c.x1, c.y1, stub_road(c))) &&
                 farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
                 s.best = score;
                 s.best_x0 = c.x0;
@@ -1334,6 +1349,98 @@ bool Engine::search_claim(AiPlayer& p) {
     }
 }
 
+const Engine::CartReach& Engine::cart_reach(const AiPlayer& p) const {
+    // The carts' own search (Logistics::send_cart): from the market's middle over the roads inside
+    // its circle. Taken again when a tile of the island changed.
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const std::uint64_t revisions = island_revision(p.island);
+    CartReach& r = m_cart_reach;
+    if (r.island == p.island && r.city == p.city && r.revisions == revisions && !r.reach.empty()) {
+        return r;
+    }
+    r.island = p.island;
+    r.city = p.city;
+    r.revisions = revisions;
+    r.width = static_cast<std::int32_t>(map.width());
+    r.reach.assign(std::size_t{map.width()} * map.height(), 0);
+    r.inside.assign(r.reach.size(), 0);
+    std::uint32_t bit = 0;
+    for (const Production& pr : m_world.productions()) {
+        if (!pr.used || pr.island != p.island || !map.contains(pr.x, pr.y)) {
+            continue;
+        }
+        const MapCell& cell = map.top(pr.x, pr.y);
+        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
+        if (cell.city != p.city || b == nullptr || b->destroyed || b->ware != ware::kAll ||
+            (b->prod_kind != prod::kMarket && b->prod_kind != prod::kKontor)) {
+            continue;
+        }
+        const std::uint64_t mask = std::uint64_t{1}
+                                   << std::min<std::uint32_t>(bit++, std::numeric_limits<std::uint64_t>::digits - 1);
+        const TilePos origin{pr.x, pr.y};
+        std::uint32_t w = 1;
+        std::uint32_t h = 1;
+        rotated_size(*b, cell.rotation, w, h);
+        const Catchment area = catchment_of(*b, cell.rotation, origin);
+        m_reach_finder.begin(map, m_buildings, area, WalkClass::Roads, 0);
+        m_reach_finder.open_footprint(origin, w, h);
+        m_reach_finder.search(area.centre, [](TilePos) { return PathFinder::Answer::Reject; });
+        const TilePos min = m_reach_finder.window_min();
+        for (std::uint32_t j = 0; j < m_reach_finder.window_height(); ++j) {
+            for (std::uint32_t i = 0; i < m_reach_finder.window_width(); ++i) {
+                const TilePos t{min.x + static_cast<std::int32_t>(i), min.y + static_cast<std::int32_t>(j)};
+                if (!map.contains(t.x, t.y) || !m_reach_finder.inside(t)) {
+                    continue;
+                }
+                const auto k = static_cast<std::size_t>(t.y) * map.width() + static_cast<std::size_t>(t.x);
+                r.inside[k] |= mask;
+                if (m_reach_finder.reached(t)) {
+                    r.reach[k] |= mask;
+                }
+            }
+        }
+    }
+    return r;
+}
+
+bool Engine::cart_reaches(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
+                          std::span<const BuildItem> road) const {
+    const CartReach& r = cart_reach(p);
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto at = [&](const std::vector<std::uint64_t>& v, std::int32_t x, std::int32_t y) -> std::uint64_t {
+        return map.contains(x, y) ? v[static_cast<std::size_t>(y) * map.width() + static_cast<std::size_t>(x)] : 0;
+    };
+    const auto on_road = [&](std::int32_t x, std::int32_t y) {
+        return std::ranges::any_of(road, [&](const BuildItem& i) { return i.x == x && i.y == y; });
+    };
+    // The markets whose circle holds the whole new road and whose carts reach a tile beside it.
+    std::uint64_t by_road = road.empty() ? 0 : ~std::uint64_t{0};
+    std::uint64_t joined = 0;
+    for (const BuildItem& i : road) {
+        by_road &= at(r.inside, i.x, i.y);
+        for (const auto& step : kStep) {
+            joined |= at(r.reach, i.x + step[0], i.y + step[1]);
+        }
+    }
+    by_road &= joined;
+    // A tile of the building in the circle beside a road the carts reach, or beside the new road.
+    std::uint64_t found = 0;
+    for (std::int32_t y = y0; y <= y1; ++y) {
+        for (std::int32_t x = x0; x <= x1; ++x) {
+            const std::uint64_t in = at(r.inside, x, y);
+            for (const auto& step : kStep) {
+                const std::int32_t nx = x + step[0];
+                const std::int32_t ny = y + step[1];
+                if (nx >= x0 && nx <= x1 && ny >= y0 && ny <= y1) {
+                    continue;
+                }
+                found |= in & (at(r.reach, nx, ny) | (on_road(nx, ny) ? by_road : 0));
+            }
+        }
+    }
+    return found != 0;
+}
+
 bool Engine::farm_room(AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                        std::int32_t y1) {
     // Room for the fields the maintenance sweep wants to see later (14, grain 7): the original
@@ -1580,12 +1687,6 @@ bool Engine::search_pirate_houses(AiPlayer& p) {
 
 // ---------------------------------------------------------------------------------------------
 // Coast and mountain walks
-
-namespace {
-
-constexpr std::array<std::array<std::int32_t, 2>, 4> kStep{{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}};
-
-}  // namespace
 
 std::int32_t Engine::coast_walk(AiPlayer& p, std::int32_t x, std::int32_t y, std::uint8_t dir, std::int32_t* cx,
                                 std::int32_t* cy, bool water) {
@@ -2185,7 +2286,9 @@ bool Engine::farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain
                       }
                   });
             const std::int32_t score = outside_zone(zone, margin, c, away_from_town(acc.score, acc.extra));
-            if (acc.count >= rule.fields && acc.market && score > best && farm_room(p, b, c.x0, c.y0, c.x1, c.y1)) {
+            if (acc.count >= rule.fields && acc.market && score > best &&
+                (!rivals() || cart_reaches(p, c.x0, c.y0, c.x1, c.y1, walk.road_to(i))) &&
+                farm_room(p, b, c.x0, c.y0, c.x1, c.y1)) {
                 best = score;
                 best_end = i;
                 site = c;

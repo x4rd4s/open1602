@@ -12,6 +12,9 @@ byte-identical runs (stdout and computer log) on the mechanism games.
 
 ## Runs
 
+All games ran at level 3, the hardest: the default of `measure.py` before every game had to name
+its level, so `measure.py check` now refuses this plan as it stands.
+
 - `plan.toml`: two arms, `main` (e3fa2169) and `bundle` (main with both changes), 13 standard games
   at 600 minutes with 4 phases and 5 long games at 1,200 minutes with 8 phases, 184 runs.
 - Both arms ran with the same logging-only patch (not in the repository): the net of each city 30

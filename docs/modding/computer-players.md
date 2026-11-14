@@ -541,7 +541,10 @@ city or its island has. Improved computers keep their farms apart only within th
 their fields would overlap. A rival whose city makes less food than it eats and finds no site
 for a pasture or grain farm beside its roads takes one off them, with a road to it over the
 city's open ground (up to 40 tiles, as for a market towards open land), scored as beside the
-roads. When the houses still find sites but a farm or plantation does not,
+roads. The original takes a market or Kontor within twelve rings of a farm's site as its market;
+an improved rival takes only one whose carts would reach the farm: its circle holds a tile of the
+farm and the road the farm brings, and the carts reach it over roads inside the circle, as the
+city's catchment view shows. When the houses still find sites but a farm or plantation does not,
 the next road the city builds leads where the land ahead is open instead of along the town. When
 a farm finds no site at all, the computer looks for the place of its island with the most
 unclaimed land that fields can take (60 tiles within six of it at least), near its markets, and

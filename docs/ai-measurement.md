@@ -81,6 +81,7 @@ set = "long"
 players = 12
 world = "2500x1800"
 seed = 404
+level = 3                      # the difficulty, 0 to 3; required
 minutes = 400
 
 [[metric]]
@@ -93,6 +94,22 @@ better = "higher"
 # report = "reports/offroad-mechanism.json"
 # sha256 = "…"
 ```
+
+Every game names its difficulty `level` (0 to 3); `measure.py` refuses a plan without it. The level
+changes more than what the computers see (below the hardest only what a player sees): the world's
+ore, crops and treasures, droughts and the pirates' cannons, how often a computer looks at its
+strategy and how hard it presses, its army and fleet targets, its iron mines and its city limit.
+So a level has its own noise band, and a change is measured on the level its question is about.
+Changes to what the computers may know are measured at level 2, with one game at level 3 as a
+control that must stay identical.
+
+`bench` seats no human: every human seat is handed to a computer. `--human-seat P` gives seat P back
+to a person who gives no commands, so that the computers' rules about humans (their army and fleet
+targets, the threat of a human, a war on a human) meet a human's city, army and ships. Such a human
+is taken over from a savegame made by the computers at the same level, at a minute when the seat has
+an army and a warship. It builds nothing and answers nothing, so it falls behind: decisions about it
+are read in the first one or two hours after the save, and its inhabitants and gold are reported
+over the run.
 
 The evaluation that computes the decision metrics from the runs' logs writes them per run as
 `ARM/PHASE/GAME.metrics.json` (`{"food_balance_gap60": 0.4}`); `measure.py collect` then binds them

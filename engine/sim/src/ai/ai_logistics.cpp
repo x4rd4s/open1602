@@ -207,6 +207,9 @@ void Engine::logistics(AiPlayer& p) {
     }
     bool healthy = false;
     City* home = home_city(p);
+    if ((home == nullptr || p.cities == 0) && !p.yard_valid) {
+        log_yard(p, YardWait::NoHome);
+    }
     if (home != nullptr && p.cities != 0) {
         if (p.yard_valid) {
             healthy = yard_service(p);
@@ -243,7 +246,12 @@ void Engine::logistics(AiPlayer& p) {
         const bool spare = rivals() && std::ranges::any_of(own_ships(p), [&](const Ship* s) {
                                return ship_idle(p, *s) && !s->for_sale;
                            });
-        if (static_cast<std::int32_t>(own_ships(p).size()) < p.fleet_target && !spare && !buy_ship(p)) {
+        const bool enough = static_cast<std::int32_t>(own_ships(p).size()) >= p.fleet_target;
+        const bool bought = !enough && !spare && buy_ship(p);
+        if ((!p.yard_valid && (enough || bought)) || (!enough && spare)) {
+            log_yard(p, enough ? YardWait::Enough : spare ? YardWait::Idle : YardWait::Bought);
+        }
+        if (!enough && !spare && !bought) {
             order_ship(p);
         }
     }
@@ -1504,6 +1512,8 @@ void Engine::order_ship(AiPlayer& p) {
             if (own_ships(p).empty()) {
                 buy_first_ship(p);
             }
+        } else if (!classic()) {
+            log_yard(p, YardWait::Survey);
         }
         return;
     }
@@ -1514,6 +1524,7 @@ void Engine::order_ship(AiPlayer& p) {
         }
     }
     if (yard == nullptr) {
+        log_yard(p, YardWait::Missing);
         return;
     }
     const std::vector<Ship*> ships = own_ships(p);
@@ -1524,6 +1535,11 @@ void Engine::order_ship(AiPlayer& p) {
             at_yard = s;
             break;
         }
+    }
+    if (yard->order != CostBuilding::kNoOrder) {
+        log_yard(p, YardWait::Pending);
+    } else if (at_yard != nullptr) {
+        log_yard(p, YardWait::Waiting);
     }
     if (yard->order == CostBuilding::kNoOrder && at_yard == nullptr) {
         const Tile t = tile(p.yard_island, p.yard_x, p.yard_y);
@@ -1553,6 +1569,9 @@ void Engine::order_ship(AiPlayer& p) {
         plan.cost = price;
         const bool budget = !rivals() || p.pirates || can_commit(p, plan, Spend::Ship);
         const std::int64_t needed = classic() ? price / 2 : price;
+        if (!budget || std::int64_t{player(p).money} <= needed) {
+            log_yard(p, YardWait::Money);
+        }
         if (budget && std::int64_t{player(p).money} > needed) {
             ShipyardOrder order;
             order.player = p.player;

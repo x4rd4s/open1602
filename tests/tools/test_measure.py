@@ -14,6 +14,7 @@ import check_ai_constants  # noqa: E402
 import measure  # noqa: E402
 
 GAME = '[[game]]\nname = "{name}"\nset = "{set}"\nplayers = {players}\nseed = {seed}\nminutes = {minutes}\n'
+LEVEL = 'level = {level}\n'
 
 
 def plan_text(stage="mechanism", games=None, phases='standard = 1', metrics=True, extra=""):
@@ -22,6 +23,9 @@ def plan_text(stage="mechanism", games=None, phases='standard = 1', metrics=True
     text += f"[phases]\n{phases}\n"
     for g in games:
         text += GAME.format(**g)
+        if g.get("level", 2) is not None:
+            level = g.get("level", 2)
+            text += LEVEL.format(level=str(level).lower() if isinstance(level, bool) else level)
     if metrics:
         text += '[[metric]]\nname = "food"\nbetter = "higher"\n'
     return text + extra
@@ -48,6 +52,16 @@ class PlanTest(unittest.TestCase):
         self.assertTrue(measure.check_plan(self.plan(plan_text(games=games))))
         long = [dict(name="g", set="long", players=12, seed=1, minutes=1200)]
         self.assertTrue(measure.check_plan(self.plan(plan_text(games=long, phases="long = 1"))))
+
+    def test_every_game_names_its_level(self):
+        for level in (None, -1, 4, True):
+            games = [dict(name="g", set="standard", players=4, seed=1, minutes=400, level=level)]
+            self.assertTrue(measure.check_plan(self.plan(plan_text(games=games))), level)
+        games = [dict(name="g", set="standard", players=4, seed=1, minutes=400, level=3)]
+        plan = self.plan(plan_text(games=games))
+        self.assertEqual(measure.check_plan(plan), [])
+        args = measure.jobs(plan)[0][3]
+        self.assertEqual(args[args.index("--level") + 1], "3")
 
     def test_only_a_final_run_has_more_phases(self):
         self.assertTrue(measure.check_plan(self.plan(plan_text(stage="metric", phases="standard = 4"))))
