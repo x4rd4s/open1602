@@ -63,7 +63,8 @@ assets::BuildingTable make_buildings(bool yard = false) {
         "    Maxlager: 4\n    Interval: 20\n    Kosten: 5, 2\n    Arbeiter: 2\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 50\n  EndObj\n"
         "  @Nummer: +1\n  Id: 22115\n  Kind: 36\n  Gfx: 100\n  Size: 2, 3\n  Wegspeed: 120, 120, 120, 100\n"
-        "  Objekt: HAUS_PRODTYP\n    Kind: 14\n    Rohstoff: 23\n    Rohmenge: 2\n    Kosten: 30, 12\n  EndObj\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 14\n    Rohstoff: 23\n    Rohmenge: 2\n    Figurnr: 80\n    Radius: 10\n"
+        "    Kosten: 30, 12\n  EndObj\n"
         "  Objekt: HAUS_BAUKOST\n    Money: 200\n  EndObj\n";
     const auto doc = assets::cod::parse(
         "Nahrung: 1.3\n"
@@ -409,6 +410,50 @@ TEST_CASE("ai arena: a computer builds its shipyard at the open sea, not at a la
     }
     REQUIRE(yard.has_value());
     CHECK(yard->x >= 43);  // its water side on the beach of column 46, not on the lake's (column 41)
+    // Its carriers reach a store of the city for the wood of the ships.
+    const auto at = sim::building_at(a.world, a.buildings, island, *yard);
+    REQUIRE(at.has_value());
+    sim::PathFinder finder;
+    CHECK(sim::yard_reaches_store(finder, a.world, a.buildings, island, *at, a.figures.get(80)->speed_type));
+}
+
+TEST_CASE("ai arena: a shipyard reaches a store only within its circle, over land") {
+    Arena a(true);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    for (int minute = 0; minute < 10 && a.cities_of(kFirst) == 0; ++minute) {
+        run(s, 60'000);
+    }
+    REQUIRE(a.cities_of(kFirst) == 1);
+    std::optional<sim::BuildingAt> kontor;
+    std::uint16_t island = 0;
+    for (std::uint16_t i = 0; i < a.world.islands().size() && !kontor; ++i) {
+        const sim::IslandMap& map = a.world.islands()[i].map;
+        for (std::uint32_t y = 0; y < map.height() && !kontor; ++y) {
+            for (std::uint32_t x = 0; x < map.width() && !kontor; ++x) {
+                const auto b = sim::building_at(a.world, a.buildings, i,
+                                                {static_cast<std::int32_t>(x), static_cast<std::int32_t>(y)});
+                if (b && b->type->id == kKontor && map.top(x, y).owner == kFirst) {
+                    kontor = b;
+                    island = i;
+                }
+            }
+        }
+    }
+    REQUIRE(kontor.has_value());
+    const assets::BuildingType* type = a.buildings.by_id(kYard);
+    REQUIRE(type != nullptr);
+    const std::uint8_t speed = a.figures.get(80)->speed_type;
+    sim::PathFinder finder;
+    // Beside the Kontor, on the open ground of the city's west side.
+    sim::BuildingAt near{type, {kontor->origin.x - 4, kontor->origin.y}, 0, 2, 3, kontor->city};
+    CHECK(sim::yard_reaches_store(finder, a.world, a.buildings, island, near, speed));
+    // Far up the coast: the Kontor lies outside the yard's circle.
+    const std::int32_t far_y = kontor->origin.y > 25 ? 1 : 46;
+    sim::BuildingAt far{type, {kontor->origin.x - 4, far_y}, 0, 2, 3, kontor->city};
+    CHECK(!sim::yard_reaches_store(finder, a.world, a.buildings, island, far, speed));
+    // Another city's store does not count.
+    near.city = static_cast<std::uint8_t>(kontor->city + 1);
+    CHECK(!sim::yard_reaches_store(finder, a.world, a.buildings, island, near, speed));
 }
 
 TEST_CASE("ai arena: a computer's shipyard builds ships of a package of the type it wants too") {
@@ -757,7 +802,13 @@ TEST_CASE("ai arena: damaged warships wait for the yard where they are, not by s
     const sim::Target home = sim::Target::city_of(island, index);
     std::set<std::uint32_t> patrolled;
     std::set<std::uint32_t> sent_home;
+    // The city keeps wood in store, so that the yard, which also fetches it for the ship it builds,
+    // never runs out of material for the repairs.
+    sim::City* city = a.world.city(island, index);
+    REQUIRE(city != nullptr);
     for (int k = 0; k < 60; ++k) {
+        city->ensure_ware(assets::ware::kWood);
+        city->goods[assets::ware::kWood] = city->capacity;
         run(s, 10'000);
         for (const std::uint32_t id : damaged) {
             const sim::Ship* ship = a.world.ship(id);

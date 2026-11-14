@@ -522,6 +522,10 @@ Improved computers weigh the way at sea:
   back (the game's refund setting), it counts the small yard's refund in the big one's price and
   tears the small one down first, once the big one's site is found; without a refund it tears it
   down only once the big one stands.
+- **Shipyard within reach of a store.** The original's computers place a yard at the coast nearest
+  to a road, also where none of its carriers reaches a market or the Kontor of the city; such a yard
+  takes a ship order and never gets the material for it. An improved computer takes only a site
+  from whose door the yard's own carriers find a store within the yard's circle.
 - **Ships without a job.** A ship of an improved computer that has nothing to do guards the home
   island as a patrol (the supply takes it again at the end of a leg), and no new ship is ordered
   while one lies idle.
