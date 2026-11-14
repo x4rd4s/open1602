@@ -350,7 +350,8 @@ std::uint32_t Engine::guessed_cannons(const Ship& s, const assets::FigureType& t
     const std::uint32_t max = t.ship.max_cannons;
     // As its own ships of the class carry: a player who arms his ships half expects the same of
     // others. Without ships of the class of its own it knows no better than the type's maximum.
-    std::uint32_t guess = most == 0 ? max : max * mounted / most;
+    // Rounded to the nearest cannon: cut down, every small ship lost up to one at every look.
+    std::uint32_t guess = most == 0 ? max : (max * mounted + most / 2) / most;
     const auto seen = std::ranges::find(m_state.sightings, s.id, &Sighting::ship);
     if (seen != m_state.sightings.end()) {
         if (seen->unarmed) {

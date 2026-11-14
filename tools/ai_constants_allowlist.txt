@@ -9,3 +9,4 @@ kStateWithColonyPlan | engine/sim/src/ai/ai_state.hpp | derived from: the name o
 15 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithColonyPlan = 14
 kStateWithSightings | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 15, which saves State::sightings
 kAnyCrop | engine/sim/src/ai/ai_state.hpp | derived from: a crop id no ware has (the largest std::uint8_t), for a colony on any island
+2 | engine/sim/src/ai/ai_military.cpp | derived from: rounding to the nearest whole cannon (adding half the divisor, most / 2) in guessed_cannons
