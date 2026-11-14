@@ -14,4 +14,13 @@ that gives no commands), so it is measured along without a mechanism report of i
 
 ## Result
 
-Pending.
+Passed (`gate-report.json`: final, n=4, 2 standard errors; 184 runs).
+
+| | main | bundle | difference (se) | verdict |
+|---|---|---|---|---|
+| unreachable farms per run (decides) | 6.10 | 0.58 | 5.53 fewer (0.44) | gain |
+| food balance an hour into a shortfall (reported) | -11.25 | -11.40 | -0.15 (1.91) | no measurable effect |
+| inhabitants, standard set | 138,926 | 141,260 | +2,334 (1,903) | no measurable effect |
+| collapse rate, standard set | 0.0030 | 0.0030 | 0 (0.0042) | no measurable effect |
+| inhabitants, long set | 106,502 | 107,628 | +1,126 (2,612) | no measurable effect |
+| collapse rate, long set | 0.104 | 0.089 | 0.016 lower (0.021) | no measurable effect |
