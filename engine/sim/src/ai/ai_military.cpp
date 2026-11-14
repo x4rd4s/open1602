@@ -14,7 +14,9 @@
 
 #include "ai_engine.hpp"
 
+#include "o1602/sim/combat.hpp"
 #include "o1602/sim/mission.hpp"
+#include "o1602/sim/new_game.hpp"
 #include "o1602/sim/ships.hpp"
 
 namespace o1602::sim::ai {
@@ -189,7 +191,7 @@ std::uint32_t Engine::weighted_army(PlayerId owner) const {
     return s;
 }
 
-std::uint32_t Engine::army_target(const AiPlayer& p) const {
+std::uint32_t Engine::army_target(const AiPlayer& p, bool whole) const {
     // A scenario can ask for a fixed strength instead: a hundred cannons' worth,
     // on every level.
     if (player(p).scenario.has(scenario_flag::kFixedArmy)) {
@@ -201,7 +203,8 @@ std::uint32_t Engine::army_target(const AiPlayer& p) const {
         if (m_world.players()[h].role != PlayerRole::Human) {
             continue;
         }
-        std::uint32_t s = weighted_army(static_cast<PlayerId>(h));
+        const auto human = static_cast<PlayerId>(h);
+        std::uint32_t s = seen_army(whole ? human : p.player, human);
         s += s / 2;
         best = std::max(best, s);
     }
@@ -218,10 +221,10 @@ std::uint32_t Engine::army_target(const AiPlayer& p) const {
             best *= 2;
             break;
     }
-    return rivals() ? std::max(best, rival_army_target(p)) : best;
+    return rivals() ? std::max(best, rival_army_target(p, whole)) : best;
 }
 
-std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
+std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     // A swordsman's strength per so many inhabitants, and a share of the strongest army of the other
     // computers, at peace or not: a peace can end, as a player knows. The share stays below the whole, so that two
     // computers arming against each other settle at their inhabitants' army instead of outbidding each other.
@@ -239,7 +242,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
             m_world.behaviour(pl) != FactionBehaviour::Settlers) {
             continue;
         }
-        rival = std::max(rival, weighted_army(other));
+        rival = std::max(rival, seen_army(whole ? other : p.player, other));
     }
     const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);
@@ -255,18 +258,167 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p) const {
 bool Engine::stronger(PlayerId a, PlayerId b) const {
     // The original compares the armies and the cannons of the fleets. The original takes b's fleet
     // on both sides, so only the armies count (S-102).
+    return strength(a, a) >= strength(a, b);
+}
+
+bool Engine::sees_all() const {
+    return !rivals() || difficulty() + 1 >= NewGameOptions::kDifficulties;
+}
+
+std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
+    if (viewer == owner || sees_all()) {
+        return weighted_army(owner);
+    }
+    // A human sees the soldiers on every island it discovered, and nothing of the others.
     const auto w = unit_weights();
-    const auto fleet = [&](PlayerId q) {
-        if (const Census* c = census(); c != nullptr && q < c->players) {
-            return c->cannons[q];
+    std::uint32_t s = 0;
+    for (const Soldier& u : m_world.soldiers()) {
+        if (u.owner == owner && !u.away() && u.island < m_world.islands().size() &&
+            island_of(u.island).discovered_by(viewer)) {
+            s += w[family_index(m_sim.m_figures, u.figure)];
         }
-        std::uint32_t n = 0;
-        for (const Ship& s : m_world.ships()) {
-            n += s.owner == q && !s.sinking ? s.cannons : 0U;
+    }
+    return s;
+}
+
+bool Engine::warship(std::uint32_t figure) const {
+    for (std::size_t type = 0; type < figure::kShips.size(); ++type) {
+        if (figure::kShips[type] == figure) {
+            return figure::warship_type(type);
         }
-        return n;
+    }
+    for (const auto& [number, type] : m_sim.m_figures->package_ships()) {
+        if (number == figure) {
+            return figure::warship_type(type);
+        }
+    }
+    return false;
+}
+
+std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
+    const bool all = viewer == owner || sees_all();
+    if (const Census* c = census(); all && c != nullptr && owner < c->players) {
+        return c->cannons[owner];
+    }
+    // Ships are drawn everywhere, so a human sees every ship and its type, but not its cannons.
+    std::uint32_t mounted = 0;
+    std::uint32_t most = 0;
+    if (!all) {
+        own_cannons(viewer, mounted, most);
+    }
+    std::uint32_t n = 0;
+    for (const Ship& s : m_world.ships()) {
+        if (s.owner != owner || s.sinking) {
+            continue;
+        }
+        if (all) {
+            n += s.cannons;
+        } else if (const assets::FigureType* t = ship_type(s); t != nullptr && warship(s.figure)) {
+            n += guessed_cannons(s, *t, mounted, most);
+        }
+    }
+    return n;
+}
+
+void Engine::own_cannons(PlayerId player, std::uint32_t& mounted, std::uint32_t& most) const {
+    mounted = 0;
+    most = 0;
+    for (const Ship& s : m_world.ships()) {
+        if (s.owner != player || s.sinking || !warship(s.figure)) {
+            continue;
+        }
+        if (const assets::FigureType* t = ship_type(s)) {
+            mounted += std::min<std::uint32_t>(s.cannons, t->ship.max_cannons);
+            most += t->ship.max_cannons;
+        }
+    }
+}
+
+std::uint32_t Engine::guessed_cannons(const Ship& s, const assets::FigureType& t, std::uint32_t mounted,
+                                      std::uint32_t most) const {
+    const std::uint32_t max = t.ship.max_cannons;
+    // As its own warships carry: a player who arms his ships half expects the same of others.
+    // Without warships of its own it knows no better than the type's maximum.
+    std::uint32_t guess = most == 0 ? max : max * mounted / most;
+    const auto seen = std::ranges::find(m_state.sightings, s.id, &Sighting::ship);
+    if (seen != m_state.sightings.end()) {
+        if (seen->unarmed) {
+            return 0;
+        }
+        guess = std::max<std::uint32_t>(guess, seen->armed);
+    }
+    return std::min(guess, max);
+}
+
+void Engine::watch_fights() {
+    // Open1602 (G5/B): what a fight at sea shows of a warship's cannons. A ship without cannons never
+    // fires, and a hit's damage tells the step of cannon_factor it fired with. A ship shot at within
+    // its own range that stands, has no order and no white flag fires back if it has cannons: if it
+    // has not after a reload (its type's Worktime), it has none.
+    std::vector<Sighting>& seen = m_state.sightings;
+    const auto record = [&](std::uint32_t id) -> Sighting& {
+        const auto it = std::ranges::find(seen, id, &Sighting::ship);
+        if (it != seen.end()) {
+            return *it;
+        }
+        seen.push_back(Sighting{id});
+        return seen.back();
     };
-    return weighted_army(a) + fleet(a) * w[3] >= weighted_army(b) + fleet(b) * w[3];
+    const std::uint64_t now = now_ms();
+    for (const PendingHit& h : m_world.pending_hits()) {
+        const Ship* from = h.shooter.kind == Target::Kind::Ship ? m_world.ship(h.shooter.ship) : nullptr;
+        if (const assets::FigureType* t = from != nullptr ? ship_type(*from) : nullptr;
+            t != nullptr && warship(from->figure) && t->combat.hit != 0) {
+            const std::uint32_t step = h.damage / t->combat.hit;
+            std::uint8_t fewest = 1;
+            while (fewest < t->ship.max_cannons && Combat::cannon_factor(fewest) < step) {
+                ++fewest;
+            }
+            Sighting& r = record(from->id);
+            r.armed = std::max(r.armed, fewest);
+            r.unarmed = false;
+            r.challenged_ms = 0;
+        }
+        const Ship* at = h.target.kind == Target::Kind::Ship ? m_world.ship(h.target.ship) : nullptr;
+        const assets::FigureType* t = at != nullptr ? ship_type(*at) : nullptr;
+        if (t == nullptr || !warship(at->figure) || at->sinking || at->held || ship_moving(*at) ||
+            !at->target.empty() || h.attacker == at->owner || !m_world.diplomacy().hostile(at->owner, h.attacker)) {
+            continue;
+        }
+        // The shooter within its own reach (Shotradius in 1/8 tile).
+        const std::int64_t reach = std::int64_t{t->combat.range8} * kEighth;
+        if (std::max(std::abs(std::int64_t{h.from_x} - at->pos_x), std::abs(std::int64_t{h.from_y} - at->pos_y)) >
+            reach) {
+            continue;
+        }
+        Sighting& r = record(at->id);
+        if (r.armed == 0 && !r.unarmed && r.challenged_ms == 0) {
+            r.challenged_ms = now;
+        }
+    }
+    for (Sighting& r : seen) {
+        const Ship* s = m_world.ship(r.ship);
+        if (s == nullptr || r.challenged_ms == 0) {
+            continue;
+        }
+        const assets::FigureType* t = ship_type(*s);
+        if (t == nullptr || s->held || ship_moving(*s) || !s->target.empty()) {
+            r.challenged_ms = 0;  // it was kept from firing: nothing learnt
+        } else if (t->work_time_ms != 0 && now - r.challenged_ms >= t->work_time_ms) {
+            r.unarmed = true;
+            r.challenged_ms = 0;
+        }
+    }
+    // A ship gone, or at a Kontor, its owner's or another's, where it can load cannons: seen anew.
+    // Cannons already in its holds it can mount anywhere, unseen by a player as well, until it fires.
+    std::erase_if(seen, [&](const Sighting& r) {
+        const Ship* s = m_world.ship(r.ship);
+        if (s == nullptr || s->sinking) {
+            return true;
+        }
+        return !ship_moving(*s) &&
+               std::ranges::any_of(m_world.cities(), [&](const City& c) { return ship_at_city(*s, c); });
+    });
 }
 
 std::uint32_t Engine::soldiers_on_island(PlayerId owner, std::uint16_t island) const {

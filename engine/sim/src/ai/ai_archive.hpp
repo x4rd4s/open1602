@@ -430,12 +430,23 @@ void io(A& a, AiPlayer& p) {
 }
 
 template <class A>
+void io(A& a, Sighting& s) {
+    a(s.ship);
+    a(s.armed);
+    a(s.unarmed);
+    a(s.challenged_ms);
+}
+
+template <class A>
 void io(A& a, State& s) {
     a(s.players);
     a(s.max_score);
     a(s.islands);
     a(s.island_cursor);
     a(s.initialised);
+    if (a.version() >= kStateWithSightings) {
+        a(s.sightings);
+    }
 }
 
 }  // namespace o1602::sim::ai

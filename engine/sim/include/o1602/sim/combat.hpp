@@ -23,6 +23,9 @@
 
 namespace o1602::sim {
 
+/// 1/8 tile, the unit of a fighter's position and range, in position units.
+inline constexpr std::int32_t kEighth = kPosUnit / 8;
+
 /// A figure in another's list: who, and how far (1/8 tile, the original's distance of centres).
 struct Neighbour {
     Target unit;

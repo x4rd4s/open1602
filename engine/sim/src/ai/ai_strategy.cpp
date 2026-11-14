@@ -68,24 +68,15 @@ const char* goal_name(std::uint8_t g) {
 
 }  // namespace
 
-std::uint32_t Engine::strength(PlayerId owner) const {
+std::uint32_t Engine::strength(PlayerId viewer, PlayerId owner) const {
     // The armies and the fleets' cannons, as stronger() compares them.
-    const auto w = unit_weights();
-    std::uint32_t cannons = 0;
-    if (const Census* c = census(); c != nullptr && owner < c->players) {
-        cannons = c->cannons[owner];
-    } else {
-        for (const Ship& s : m_world.ships()) {
-            cannons += s.owner == owner && !s.sinking ? s.cannons : 0U;
-        }
-    }
-    return weighted_army(owner) + cannons * w[3];
+    return seen_army(viewer, owner) + seen_cannons(viewer, owner) * unit_weights()[3];
 }
 
-std::uint32_t Engine::threat_of(PlayerId owner) const {
+std::uint32_t Engine::threat_of(PlayerId viewer, PlayerId owner) const {
     // On the harder levels a human counts as stronger than its army: the humans are the most
     // dangerous rivals. Nothing on the two easier levels.
-    std::uint32_t s = strength(owner);
+    std::uint32_t s = strength(viewer, owner);
     const Player* pl = m_world.player(owner);
     if (pl != nullptr && pl->role == PlayerRole::Human && difficulty() >= 2) {
         const std::uint64_t pct = 100U + std::uint64_t{m_world.balance().ai_human_threat_percent} * (difficulty() - 1U);
@@ -181,7 +172,7 @@ void Engine::plan_strategy(AiPlayer& p) {
     const std::size_t players = m_world.players().size();
     st.stances.resize(players, stance::kNeutral);
     const Diplomacy& d = m_world.diplomacy();
-    const std::uint32_t own = strength(p.player);
+    const std::uint32_t own = strength(p.player, p.player);
     const City* home = p.home_valid ? m_world.city(p.home_island, p.home_city) : nullptr;
     const auto home_at = home != nullptr ? city_point(*home) : std::pair<std::int32_t, std::int32_t>{0, 0};
     // A conqueror presses earlier, a trader later; harder levels press earlier too.
@@ -205,7 +196,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         }
         const Relation& rel = d.relation(p.player, b);
         const std::int32_t mood = d.mood(m_world, p.player, b, 0, now_ms());
-        const std::uint32_t theirs = threat_of(b);
+        const std::uint32_t theirs = threat_of(p.player, b);
         bool near = false;
         if (home != nullptr) {
             for (const City& c : m_world.cities()) {
@@ -216,6 +207,9 @@ void Engine::plan_strategy(AiPlayer& p) {
                 }
             }
         }
+        const auto presses = [&](std::uint32_t t) {
+            return near && mood <= 0 && t != 0 && std::uint64_t{own} * 100U >= std::uint64_t{t} * press;
+        };
         std::uint8_t s = stance::kNeutral;
         if (d.allied(p.player, b)) {
             s = stance::kPartner;  // an ally is neither pressed nor fought
@@ -224,18 +218,52 @@ void Engine::plan_strategy(AiPlayer& p) {
         } else if (mood > kPartnerMood ||
                    (rel.trade == Treaty::Signed && mood >= 0 && st.character == character::kTrader)) {
             s = stance::kPartner;
-        } else if (near && mood <= 0 && theirs != 0 && std::uint64_t{own} * 100U >= std::uint64_t{theirs} * press) {
+        } else if (presses(theirs)) {
             // Only a rival it does not like: a friendly neighbour is left in peace.
             s = stance::kPressure;
         }
         if (s != st.stances[bi]) {
             log(p, "stance towards player %u: %u (mood %d, strength %u against %u)", b, s, mood, own, theirs);
         }
+        if (logging() && !sees_all()) {
+            // The measurement of the information contract: the stance and the threat the whole
+            // census would give (b's own view of itself is the whole).
+            const std::uint32_t all = threat_of(b, b);
+            const bool press_seen = s == stance::kPressure;
+            const bool press_all = (s == stance::kNeutral || s == stance::kPressure) && presses(all);
+            const bool threat_seen = (s == stance::kHostile || rel.peace == Treaty::None) && near && theirs > own;
+            const bool threat_all = (s == stance::kHostile || rel.peace == Treaty::None) && near && all > own;
+            if (all != theirs && (press_seen != press_all || threat_seen != threat_all)) {
+                log(p, "seen: player %u strength %u (census %u), pressure %d (census %d), threat %d (census %d)", b,
+                    theirs, all, press_seen, press_all, threat_seen, threat_all);
+            }
+        }
         st.stances[bi] = s;
         // An angry rival, or one at war with it, that is stronger and near is a threat; a peace
         // can end, but arming against every stronger neighbour at peace would set off a race.
         threat = threat || ((s == stance::kHostile || rel.peace == Treaty::None) && near && theirs > own);
         pressing = pressing || s == stance::kPressure;
+    }
+
+    if (logging() && !sees_all()) {
+        // The measurement of the information contract: the cannons and the army target the whole
+        // census would give.
+        for (std::size_t bi = 0; bi < players; ++bi) {
+            const auto b = static_cast<PlayerId>(bi);
+            const std::uint32_t seen = seen_cannons(p.player, b);
+            const std::uint32_t all = seen_cannons(b, b);
+            if (b != p.player && seen != all) {
+                log(p, "seen: player %u cannons %u (census %u)", b, seen, all);
+            }
+        }
+        if (const std::uint32_t seen = army_target(p), all = army_target(p, true); seen != all) {
+            log(p, "seen: army target %u (census %u)", seen, all);
+        }
+        std::uint32_t mounted = 0;
+        std::uint32_t most = 0;
+        own_cannons(p.player, mounted, most);
+        log(p, "seen: own warships carry %u of %u cannons, %zu ships seen in a fight", mounted, most,
+            m_state.sightings.size());
     }
 
     // The goal: the economy first in debt; arms against a stronger enemy nearby or, as a conqueror,
@@ -485,7 +513,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         return;
     }
     const Balance& bal = m_world.balance();
-    const std::uint32_t own = strength(p.player);
+    const std::uint32_t own = strength(p.player, p.player);
     PlayerId best = kNoPlayer;
     std::uint64_t best_ratio = 0;
     for (std::size_t bi = 0; bi < st.stances.size(); ++bi) {
@@ -494,7 +522,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         if (st.stances[bi] != stance::kPressure || pl == nullptr || (pl->role == PlayerRole::Human && level == 0)) {
             continue;
         }
-        const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, threat_of(b));
+        const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, threat_of(p.player, b));
         if (ratio > best_ratio) {
             best = b;
             best_ratio = ratio;
@@ -523,7 +551,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         return;
     }
     log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
-        threat_of(best));
+        threat_of(p.player, best));
     start_war(p, best);
 }
 

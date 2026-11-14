@@ -442,6 +442,18 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   island the computer has not explored and explores it before it patrols, one ship at a time. When
   no known island suits the island search, the settlement's ship sails to the nearest unknown one
   first, and explores every unexplored island it stops at.
+- **Other players' forces.** Below the hardest level a computer weighs another player's army
+  (its stance, a war, how far it arms) by what a player sees: the soldiers on islands it has
+  discovered, and each warship afloat by what it can tell of its cannons, since a foreign ship's
+  window shows none (a merchant ship counts none, as its hull shows). It expects another player's
+  warship to be armed as its own warships are, by the share of their most cannons they carry, and
+  with no warship of its own it counts the most the type carries. A fight shows more: a hit's damage
+  tells the fewest cannons that fire it, and a warship shot at within its own range that stands
+  without an order or the white flag and has not fired back after a reload (its type's Worktime)
+  carries none. What it learnt of a ship holds until the ship lies at a Kontor, its owner's or
+  another's, where it can load cannons to mount them from its holds. Soldiers in holds or castles and on islands it has not discovered count for
+  nothing. On the hardest level, as the original's computers do, it counts every unit and every
+  mounted cannon.
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do
   not either. The computer gives them attack moves instead (`attack_move` of the orders): to a
   target city, against soldiers on its islands and on the ships' attack missions.

@@ -21,7 +21,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 14;
+inline constexpr std::uint32_t kStateVersion = 15;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -50,6 +50,9 @@ inline constexpr std::uint32_t kStateWithArming = 13;
 /// Version 14: an improved computer's colony plan (Settlement::plan_crop, plan_ms, plan_ship).
 /// Written only while it has one.
 inline constexpr std::uint32_t kStateWithColonyPlan = 14;
+/// Version 15: what the improved computers saw of foreign warships in a fight (State::sightings).
+/// Written only once one was seen.
+inline constexpr std::uint32_t kStateWithSightings = 15;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -414,6 +417,17 @@ struct IslandWatch {
     std::uint64_t next_ms = 0;
 };
 
+/// Open1602, improved computers below the hardest level: what a fight showed of a warship's
+/// cannons, which nobody sees otherwise. Fights at sea are in everyone's sight, so one record
+/// serves every computer. It holds until the ship is seen at its owner's Kontor, where cannons are
+/// mounted.
+struct Sighting {
+    std::uint32_t ship = 0;           ///< Ship::id
+    std::uint8_t armed = 0;           ///< at least this many cannons (it fired); 0: not seen firing
+    bool unarmed = false;             ///< shot at in its range, it never fired back
+    std::uint64_t challenged_ms = 0;  ///< when it was shot at so (0: not waiting)
+};
+
 /// One computer player (or the pirates).
 /// Open1602, improved computers: how a computer plays (its character, drawn once per game) and
 /// what it is after for now (its goal and its stance towards each player), chosen by the strategy
@@ -532,6 +546,7 @@ struct State {
     std::vector<IslandWatch> islands;  ///< by island
     std::uint32_t island_cursor = 0;
     bool initialised = false;
+    std::vector<Sighting> sightings;  ///< by ship, in the order seen
 };
 
 }  // namespace o1602::sim::ai
