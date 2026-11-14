@@ -303,11 +303,13 @@ std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
     // Ships are drawn everywhere, so a human sees every ship and its type, but not its cannons.
     // Open1602: merchant ships carry cannons too; the computer counts its own, so it guesses those of
     // others as well, each class by its own ships of that class (they are armed very differently).
-    std::array<std::uint32_t, 2> mounted{};
-    std::array<std::uint32_t, 2> most{};
+    std::uint32_t war_mounted = 0;
+    std::uint32_t war_most = 0;
+    std::uint32_t merchant_mounted = 0;
+    std::uint32_t merchant_most = 0;
     if (!all) {
-        own_cannons(viewer, false, mounted[0], most[0]);
-        own_cannons(viewer, true, mounted[1], most[1]);
+        own_cannons(viewer, true, war_mounted, war_most);
+        own_cannons(viewer, false, merchant_mounted, merchant_most);
     }
     std::uint32_t n = 0;
     for (const Ship& s : m_world.ships()) {
@@ -317,8 +319,8 @@ std::uint32_t Engine::seen_cannons(PlayerId viewer, PlayerId owner) const {
         if (all) {
             n += s.cannons;
         } else if (const assets::FigureType* t = armable(s)) {
-            const std::size_t k = warship(s.figure) ? 1 : 0;
-            n += guessed_cannons(s, *t, mounted[k], most[k]);
+            const bool war = warship(s.figure);
+            n += guessed_cannons(s, *t, war ? war_mounted : merchant_mounted, war ? war_most : merchant_most);
         }
     }
     return n;
