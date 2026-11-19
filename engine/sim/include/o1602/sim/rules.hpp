@@ -455,9 +455,6 @@ struct Rules {
         return computer_players == Computers::On || (computer_players == Computers::Game && !game_says_off);
     }
 
-    /// Whether a demolition gives back all the build costs.
-    [[nodiscard]] constexpr bool full_refund() const noexcept { return refund_share() == 100; }
-
     /// Share of the build costs a demolition gives back, in percent.
     [[nodiscard]] constexpr std::uint32_t refund_share() const noexcept {
         switch (demolish_refund) {

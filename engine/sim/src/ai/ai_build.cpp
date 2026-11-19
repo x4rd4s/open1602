@@ -1578,13 +1578,9 @@ bool Engine::demolish_surplus(AiPlayer& p, const City& c, CityPlan& r, const Til
         spare = s.count > fed + 1;
         far = s.count > 2 * fed + 2;
     }
-    // A producer switched off while its good fills the warehouse, beyond two of its kind: only
-    // where the refund gives back all it cost. The city needs it again as soon as the stock goes
-    // down (the planner asks for it then), so without a full refund each round costs its price.
-    if (!spare && s.count > 2 && stock_full(c, t.ware) && m_sim.rules().full_refund()) {
-        spare = true;
-        far = c.stock(t.ware) >= c.capacity;
-    }
+    // Open1602: not a producer switched off while its good fills the warehouse. The city asks
+    // for it again as soon as the stock goes down, and more of it as it grows: it stays switched
+    // off.
     if (!spare ||
         !worth_demolishing(t.type->idle_cost, build_value(t.type->build_cost), m_sim.rules().refund_share(), far)) {
         return false;
