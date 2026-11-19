@@ -3,6 +3,7 @@
 // market or Kontor, sends an armed ship home for the soldiers beside its Kontor, plans a landing on
 // a beach near the target's market and puts the troops ashore there.
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -26,6 +27,8 @@ constexpr std::uint32_t kMarket = 20809;
 constexpr std::uint32_t kHouse = 20605;
 constexpr std::uint32_t kWall = 22501;
 constexpr std::uint32_t kTree = 21304;
+constexpr std::uint32_t kTowerHouse = 22601;
+constexpr std::uint16_t kTowerFigure = 30;
 constexpr std::uint16_t kSword = 1;
 constexpr std::uint16_t kShipFigure = 21;
 
@@ -52,6 +55,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: +1\n  Id: 22501\n  Kind: 4\n  Gfx: 60\n  Size: 1, 1\n  Maxenergy: 6\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"
         "  @Nummer: +1\n  Id: 21304\n  Kind: 10\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 4\n  NoShotFlg: 1\n"
+        "  @Nummer: +1\n  Id: 22601\n  Kind: 6\n  Gfx: 80\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
+        "  Ruinenr: 255\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -70,7 +75,9 @@ assets::FigureTable make_figures(bool guns = false) {
                     "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
                     "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n"
                     "  Rohmenge: 25\n") +
-            (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") + "EndObj\n",
+            (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") +
+            "  Nummer: 30\n  Gfx: 0\n  Blocknr: 3\n  Shotradius: 7.5\n  Hitpoint: 4.0\n  Worktime: 3.0\n"
+            "  Shottime: 0.6\n  Maxenergy: 1\nEndObj\n",
         types);
     auto table = assets::FigureTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -345,4 +352,49 @@ TEST_CASE("ai landing: an improved computer shoots trees behind the beach open t
     }
     CHECK(trees() < planted);  // felled
     CHECK(a.soldiers_on(kComputer, 1) > 0);
+}
+
+TEST_CASE("ai landing: an improved computer lands where no tower covers the way to the market") {
+    // A tower of the human's (11, 1) stands more than ten tiles from every beach, but its range
+    // covers the straight way to the market (20, 10) from the landing cells of the northern beach
+    // tiles. The beaches nearest the market (rows 7 to 13) are equally near; the computer takes
+    // one whose way the tower does not reach: the party stands on row 10 or farther south.
+    Coast a;
+    a.build(kKontor, 28, 14, kComputer, 0);
+    a.build(kMarket, 18, 14, kComputer, 0);
+    a.build(kKontor, 0, 24, kHuman, 1);
+    a.build(kMarket, 20, 10, kHuman, 1);
+    for (std::int32_t k = 0; k < 4; ++k) {
+        a.build(kHouse, 14 + 3 * k, 20, kHuman, 1);
+    }
+    REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTowerHouse), 11, 1, 0, 0, kHuman, 1).ok());
+    sim::Tower tower;
+    tower.island = 1;
+    tower.x = 11;
+    tower.y = 1;
+    tower.owner = kHuman;
+    tower.figure = kTowerFigure;
+    a.world.towers().push_back(tower);
+    for (std::int32_t k = 0; k < 6; ++k) {
+        a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+    }
+    sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+    ship.cargo.resize(4);
+    ship.cannons = 4;
+    a.world.add_ship(ship);
+    REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+    a.world.island(1).discover(kComputer);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    for (std::uint32_t t = 0; t < 8 * 60 && a.soldiers_on(kComputer, 1) == 0; ++t) {
+        run(s, 1'000);
+    }
+    REQUIRE(a.soldiers_on(kComputer, 1) > 0);
+    // Where they stood when they came ashore: south of the tower's reach (cells are half tiles).
+    std::int32_t north = 1000;
+    for (const sim::Soldier& u : a.world.soldiers()) {
+        if (u.owner == kComputer && u.island == 1) {
+            north = std::min(north, u.cell_y() / 2 - 10);
+        }
+    }
+    CHECK(north >= 10);
 }

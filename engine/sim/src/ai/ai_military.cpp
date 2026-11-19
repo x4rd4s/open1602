@@ -12,6 +12,7 @@
 #include <queue>
 #include <span>
 #include <string>
+#include <tuple>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -1466,6 +1467,19 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
             ships.emplace_back(o.x, o.y);
         }
     }
+    // The towers' reach, for the way-cover test of an improved computer (wall breaches keep the
+    // original's radius: the ships shoot from the water).
+    const bool cover = rivals() && !wall;
+    std::vector<Fighter> tower_reach;
+    if (cover) {
+        for (const Tower& tw : m_world.towers()) {
+            if (tw.island == island && m_world.diplomacy().hostile(p.player, tw.owner)) {
+                if (const auto f = m_sim.combat().fighter(Target::building(tw.island, tw.x, tw.y))) {
+                    tower_reach.push_back(*f);
+                }
+            }
+        }
+    }
     // Beach tiles within 24 tiles of a target, scored by the danger around them.
     std::uint32_t sealed = 0;
     std::int32_t best = 10000;
@@ -1483,9 +1497,14 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
                 continue;
             }
             std::int32_t near = 1000;
+            std::pair<std::int32_t, std::int32_t> goal{0, 0};
             for (const auto& [tx, ty] : targets) {
-                near =
-                    std::min(near, sea_distance(static_cast<std::int32_t>(x) - tx, static_cast<std::int32_t>(y) - ty));
+                const std::int32_t d =
+                    sea_distance(static_cast<std::int32_t>(x) - tx, static_cast<std::int32_t>(y) - ty);
+                if (d < near) {
+                    near = d;
+                    goal = {tx, ty};
+                }
             }
             if (near > 24) {
                 continue;
@@ -1496,10 +1515,43 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
             for (const auto& [ox, oy] : soldiers) {
                 score += sea_distance(ox - wx, oy - wy) <= 16 ? 10 : 0;
             }
-            for (const auto& [tx, ty] : towers) {
-                score +=
-                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10 ? 100 : 0;
+            // The towers that threaten a landing here.
+            std::int32_t threats = 0;
+            if (cover) {
+                // Open1602: a tower threatens where it can shoot at the landing party on its way to
+                // the target (its own reach, as the towers aim), not by a flat radius around the
+                // beach. The way starts at the cell the party will stand on (as the landing log
+                // measures it): the one the ship unloads to from the water it sails to
+                // (water_near); else the beach.
+                const std::int32_t gx = 2 * (static_cast<std::int32_t>(isl.x) + goal.first);
+                const std::int32_t gy = 2 * (static_cast<std::int32_t>(isl.y) + goal.second);
+                std::int32_t bx2 = 2 * wx + 1;
+                std::int32_t by2 = 2 * wy + 1;
+                if (!tower_reach.empty()) {
+                    const Target anchor =
+                        water_near(island, static_cast<std::int32_t>(x), static_cast<std::int32_t>(y));
+                    if (const auto cell = m_sim.military().landing_cell_at(
+                            static_cast<std::int32_t>(anchor.x), static_cast<std::int32_t>(anchor.y), p.player)) {
+                        std::tie(bx2, by2) = *cell;
+                    }
+                }
+                const std::int32_t n = std::max({std::abs(gx - bx2), std::abs(gy - by2), 1});
+                for (const Fighter& f : tower_reach) {
+                    for (std::int32_t k = 0; k <= n; ++k) {
+                        if (f.cells.distance(bx2 + (gx - bx2) * k / n, by2 + (gy - by2) * k / n) <= f.range8 / 4) {
+                            ++threats;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                for (const auto& [tx, ty] : towers) {
+                    threats += sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10
+                                   ? 1
+                                   : 0;
+                }
             }
+            score += 100 * threats;
             for (const auto& [ox, oy] : ships) {
                 score += sea_distance(ox - wx, oy - wy) <= 16 ? 30 : 0;
             }
