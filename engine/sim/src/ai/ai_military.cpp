@@ -2823,11 +2823,7 @@ std::vector<Engine::BuildingCount> Engine::buildings_of(std::uint16_t island, Pl
                 t.kind == kind::kRuin || t.kind == kind::kBeachRuin) {
                 continue;
             }
-            // build_value counts the materials per 1/32 t; the log wants gold: money plus the
-            // materials per ton.
-            const auto& cost = t.type->build_cost;
-            const auto money = static_cast<std::uint64_t>(std::max<std::int32_t>(cost.money, 0));
-            const std::uint64_t value = money + (build_value(cost) - money) / kStockUnitsPerTon;
+            const std::uint64_t value = build_value(t.type->build_cost);
             auto it = std::ranges::find(out, t.type->id, &BuildingCount::id);
             if (it == out.end()) {
                 out.push_back(BuildingCount{t.type->id, 1, value});

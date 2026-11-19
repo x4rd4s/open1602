@@ -239,10 +239,11 @@ inline constexpr bool worth_demolishing(std::uint64_t idle_cost, std::uint64_t v
 }
 
 /// The value of a building's costs in gold: its gold and its materials at about what the trader asks
-/// for them.
+/// for them per ton (the costs hold the materials in 1/32 t, kStockUnitsPerTon).
 inline constexpr std::uint64_t build_value(const assets::BuildingType::BuildCost& c) noexcept {
-    return static_cast<std::uint64_t>(std::max<std::int32_t>(c.money, 0)) + std::uint64_t{c.wood} * 40 +
-           std::uint64_t{c.bricks} * 50 + std::uint64_t{c.tools} * 90 + std::uint64_t{c.cannons} * 150;
+    const std::uint64_t materials = std::uint64_t{c.wood} * 40 + std::uint64_t{c.bricks} * 50 +
+                                    std::uint64_t{c.tools} * 90 + std::uint64_t{c.cannons} * 150;
+    return static_cast<std::uint64_t>(std::max<std::int32_t>(c.money, 0)) + materials / assets::kStockUnitsPerTon;
 }
 
 /// How many workshops `raw_producers` producers of their raw material keep busy: one for every
