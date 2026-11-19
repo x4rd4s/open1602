@@ -1072,6 +1072,34 @@ TEST_CASE("military: an attack move fights on the way; holding the position chas
     CHECK(!f.world.soldier(id)->hold);
 }
 
+TEST_CASE("military: an attack move on a building fights back an enemy unit that attacks it there") {
+    for (const bool attack_move : {false, true}) {
+        Field f;
+        f.build(kHouse, 20, 5, 1);
+        f.start();
+        f.war(0, 1);
+        const std::uint32_t id = f.add(kSword, 0, 2 * 26, 2 * 15).id;  // island tile (16, 5)
+        sim::SoldierOrder order{0, {id}, sim::Target::building(0, 20, 5), true};
+        order.attack_move = attack_move;
+        REQUIRE(f.military->order(order));
+        f.run(8'000);  // at the house, hacking at it
+        REQUIRE(f.military->building_damage(0, 20, 5) > 0);
+        // A defender comes up beside it and fights it.
+        const sim::Soldier* me = f.world.soldier(id);
+        REQUIRE(me != nullptr);
+        sim::Soldier& foe = f.add(kSword, 1, me->cell_x() + 1, me->cell_y());
+        const std::uint32_t foe_id = foe.id;
+        const std::uint32_t full = f.figures.get(kSword)->combat.max_health;
+        foe.target = sim::Target::soldier(id);
+        f.run(6'000);
+        const sim::Soldier* other = f.world.soldier(foe_id);
+        // Sent plainly against the house, it keeps at the house (original); with the attack move it
+        // turns on the enemy unit.
+        const bool hurt = other == nullptr || (other->health != 0 && other->health < full);
+        CHECK(hurt == attack_move);
+    }
+}
+
 TEST_CASE("military: a unit sees the nearest of many enemies, nearest first (S-114)") {
     Field f;
     f.war(0, 1);
