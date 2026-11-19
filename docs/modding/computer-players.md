@@ -256,7 +256,9 @@ four. "4, as in the original" keeps the original's way.
 - *Pulling down what the city has no use for.* The maintenance sweep pulls down a producer that is
   switched off or out of raw material when the city has no use for it: a workshop more than one
   above what the producers of its raw material keep busy (above) while none of that is in store, or
-  a producer switched off while its good fills three quarters of the room, beyond two of its kind.
+  a producer switched off while its good fills three quarters of the room, beyond two of its kind,
+  this one only where demolishing gives back the full price (the city asks for it again as soon as
+  the stock goes down, so pulling it down without a full refund paid its price again each time).
   It does so only when that pays by the game's refund on demolition: what the building costs to keep
   while switched off over an hour and what the refund gives back must reach half of what building it
   again would cost (its gold and its materials at about the trader's prices), a quarter where the
