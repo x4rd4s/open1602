@@ -860,6 +860,20 @@ void Military::decide(Soldier& s) {
             enemy = s.target;
         }
     }
+    // Open1602 (ADR 0010): an attack move fights every enemy unit it meets, at its target too. A
+    // building it was sent against waits while a hostile soldier within reach fights it, so that
+    // the unit does not hack at a wall while it is cut down.
+    if (s.attack_move && enemy == s.target && s.target.kind == Target::Kind::Building) {
+        if (const auto me = m_combat->fighter(self)) {
+            for (const Candidate& c : m_combat->rank(*me, m_combat->hostiles(self), me->range8 + 64)) {
+                if (c.unit.kind == Target::Kind::Soldier && c.near && now >= s.next_attack_ms &&
+                    fire_direction(s, *type, c.unit)) {
+                    enemy = c.unit;
+                    break;
+                }
+            }
+        }
+    }
     // Otherwise the best enemy in range, or one to chase (step 5).
     std::optional<Target> chase;
     if (enemy.empty()) {

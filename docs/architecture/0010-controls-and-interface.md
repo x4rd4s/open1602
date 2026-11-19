@@ -195,7 +195,8 @@ units and ships, view; Tab and the arrows or a click on a tab turn the page, `ap
 formations, filtering and Tab (types of the selection one after another; `ui::UnitSelection`), right-click and
 minimap commands, command chains in the simulation, the confirmations, the military mode windows, the
 message videos in the minimap window, attack-move (ships and soldiers attack enemies in
-range, pursue them and then continue; in the savegame `STNC`), hold position (they
+range, pursue them and then continue; soldiers sent against a building fight an enemy unit within reach
+before the building; in the savegame `STNC`), hold position (they
 only shoot at enemies in range, do not pursue), quicksave and quickload (F5, F9) and the
 explore button next to repair and pirates in the ship window (U-013), ship and city list (L,
 Shift+L), diplomacy window with tribute (V; confirmation before breaking a peace treaty; with more
