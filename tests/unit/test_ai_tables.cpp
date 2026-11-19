@@ -251,11 +251,18 @@ TEST_CASE("ai tables: a city short of food weighs a way's food against its upkee
 }
 
 TEST_CASE("ai tables: a building the city has no use for comes down as the refund rule makes it pay") {
+    // The costs hold the materials in 1/32 t, as building_table reads them from haeuser.cod; their
+    // value is per ton.
+    constexpr std::uint32_t kT = o1602::assets::kStockUnitsPerTon;
     o1602::assets::BuildingType::BuildCost weaver;
     weaver.money = 200;
-    weaver.wood = 3;
-    weaver.tools = 2;
+    weaver.wood = 3 * kT;
+    weaver.tools = 2 * kT;
     CHECK(build_value(weaver) == 200 + 3 * 40 + 2 * 90);
+    // Half a ton of wood is worth half a ton's price.
+    o1602::assets::BuildingType::BuildCost half;
+    half.wood = kT / 2;
+    CHECK(build_value(half) == 20);
     o1602::assets::BuildingType::BuildCost odd;
     odd.money = -5;
     CHECK(build_value(odd) == 0);

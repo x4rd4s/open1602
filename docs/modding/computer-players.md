@@ -255,13 +255,14 @@ four. "4, as in the original" keeps the original's way.
   less land stays such a colony, as in the original.
 - *Pulling down what the city has no use for.* The maintenance sweep pulls down a producer that is
   switched off or out of raw material when the city has no use for it: a workshop more than one
-  above what the producers of its raw material keep busy (above) while none of that is in store, or
-  a producer switched off while its good fills three quarters of the room, beyond two of its kind.
+  above what the producers of its raw material keep busy (above) while none of that is in store. A
+  producer switched off because its good fills the warehouse stays standing, switched off: the city
+  asks for it again as soon as the stock goes down, and for more of it as it grows.
   It does so only when that pays by the game's refund on demolition: what the building costs to keep
   while switched off over an hour and what the refund gives back must reach half of what building it
   again would cost (its gold and its materials at about the trader's prices), a quarter where the
-  city has more than twice what it can use or its room is full. Without refund only buildings that
-  cost enough to keep while switched off go, and the more so the more of them are too many.
+  city has more than twice what it can use. Without refund only buildings that cost enough to keep
+  while switched off go, and the more so the more of them are too many.
 - *Moving farms that lack room.* A farm or plantation (not a woodcutter) with a road but too
   little room for its fields is moved, as the game's setting for moving buildings allows, when the
   city plans its next building: to the best site its farm task finds, where its fields are planted.
