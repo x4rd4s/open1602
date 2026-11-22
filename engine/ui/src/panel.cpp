@@ -57,6 +57,12 @@ void Panel::set_fit(std::int32_t id, bool on, std::optional<std::int32_t> room) 
     }
 }
 
+void Panel::set_mark(std::int32_t id, std::optional<TextMark> mark) {
+    if (const auto i = m_layout.index_of(id)) {
+        m_state[*i].mark = mark;
+    }
+}
+
 void Panel::set_selected(std::int32_t id, bool on) {
     if (const auto i = m_layout.index_of(id)) {
         m_state[*i].selected = on;
@@ -311,6 +317,48 @@ std::uint8_t Panel::state_of(std::size_t index) const {
     return (m_down && m_pressed == index) || m_state[index].selected ? 1 : 0;
 }
 
+void Panel::draw_mark(std::vector<DrawItem>& out, DrawItem item, const TextMark& mark, const Font* font) const {
+    const double k = m_scale;
+    const std::string text = item.text;
+    const std::size_t caret = std::min(mark.caret, text.size());
+    const std::size_t first = std::min(mark.first, text.size());
+    const std::size_t last = std::clamp(mark.last, first, text.size());
+    const bool selected = first < last;
+    // The underscore behind the text belongs to it, so that a centred name is centred with it.
+    std::string shown(text);
+    if (!selected && caret == text.size()) {
+        shown += '_';
+    }
+    const auto at = [&](std::size_t to) {
+        return static_cast<std::int32_t>(std::lround(text_width(font, text.substr(0, to)) * k));
+    };
+    const double width = text_width(font, shown) * k;
+    const std::int32_t left = item.align == Align::Centre  ? item.x - static_cast<std::int32_t>(std::trunc(width / 2))
+                              : item.align == Align::Right ? item.x - static_cast<std::int32_t>(std::lround(width))
+                                                           : item.x;
+    if (selected) {
+        const double cell = font != nullptr ? font->height() / font->design_scale() : 18.0;
+        DrawItem ground;
+        ground.kind = DrawItem::Kind::Fill;
+        ground.colour = kMarkColour;
+        ground.half = true;
+        ground.x = left + at(first);
+        ground.w = at(last) - at(first);
+        ground.h = static_cast<std::int32_t>(std::lround(cell * k));
+        ground.y = item.y - ground.h;
+        out.push_back(ground);
+    }
+    item.text = shown;
+    out.push_back(item);
+    if (!selected && caret < text.size()) {
+        // Inside the text the underscore lies under the letter after the caret.
+        item.text = "_";
+        item.align = Align::Left;
+        item.x = left + at(caret);
+        out.push_back(std::move(item));
+    }
+}
+
 void Panel::draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint8_t state,
                         const std::array<const Font*, kFontSlots>& fonts) const {
     const assets::Gadget& g = m_layout.gadgets[index];
@@ -375,7 +423,7 @@ void Panel::draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint
         case GadgetKind::TextLeft:
         case GadgetKind::TextCentre:
         case GadgetKind::TextRight:
-            if (!s.text.empty()) {
+            if (!s.text.empty() || s.mark) {
                 item.kind = DrawItem::Kind::Text;
                 item.align = g.kind == GadgetKind::TextLeft     ? Align::Left
                              : g.kind == GadgetKind::TextCentre ? Align::Centre
@@ -384,6 +432,10 @@ void Panel::draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint
                 const Font* font = g.block >= 0 && g.block < static_cast<std::int32_t>(kFontSlots)
                                        ? fonts[static_cast<std::size_t>(g.block)]
                                        : nullptr;
+                if (s.mark) {
+                    draw_mark(out, item, *s.mark, font);
+                    break;
+                }
                 // Without a font, or in a gadget without a width, there is nothing to measure against.
                 if (s.fit && font != nullptr && (s.fit_room || g.size[0] > 0)) {
                     // The text starts Posoffs.x into the gadget.

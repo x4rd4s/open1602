@@ -500,13 +500,17 @@ public:
         if (multiplayer_open()) {
             form = &m_multiplayer->form();
         } else if (m_menu_active) {
-            return {};
+            return m_menu ? m_menu->selected_text() : std::string();
         } else if (chat_open()) {
             form = &m_chat->form();
         } else if (templates_open() && m_templates->typing()) {
             form = &m_templates->form();
         } else if (m_editing && m_editor && m_editor->typing()) {
             form = &m_editor->form();
+        } else if (naming()) {
+            return m_names.selected_text();
+        } else if (m_options && m_mode == kModeOptions && m_options->editing()) {
+            return m_options->selected_text();
         }
         return form != nullptr ? form->selected_text() : std::string();
     }

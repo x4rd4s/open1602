@@ -32,6 +32,7 @@
 #include "o1602/render/banner.hpp"
 #include "o1602/sim/player.hpp"
 #include "o1602/ui/panel.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 namespace o1602::app {
 
@@ -257,8 +258,11 @@ public:
 
     [[nodiscard]] bool typing() const noexcept { return m_typing; }
     void type(std::string_view text);
-    /// Backspace 8, Enter 13 (confirms: NameEntered), Escape 27 (back to the choice of the game).
+    /// The keys of ui::TextCaret::edit() (Backspace, Delete, the arrows, Home, End, Ctrl+A), Enter 13
+    /// (confirms: NameEntered), Escape 27 (back to the choice of the game).
     std::optional<MenuEvent> key(int key);
+    /// The selected part of the name being typed (Ctrl+C), empty if none.
+    [[nodiscard]] std::string selected_text() const;
     /// The name the field shows when none was typed yet ("Namenlos" in German).
     [[nodiscard]] static const std::string& default_name();
 
@@ -345,7 +349,8 @@ private:
     /// The colour screen leads to a scenario's start dialog, not to the endless game's.
     bool m_colour_for_scenario = false;
     std::uint8_t m_tutorial_chapter = 0;
-    bool m_name_fresh = false;  ///< the name was put in, not typed: the first key replaces it
+    /// In m_name. A name put in, not typed, is selected: the first key replaces it.
+    ui::TextCaret m_caret;
     bool m_typing = false;
 };
 

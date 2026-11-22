@@ -14,6 +14,8 @@
 #include "o1602/sim/command_io.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/simulation.hpp"
+#include "o1602/ui/panel.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 using namespace o1602;
 
@@ -81,15 +83,17 @@ TEST_CASE("names: a ship's name is typed in its window and becomes the ship's on
     app::NameEdit edit;
     CHECK(!edit.start(g.world, kMe, g.my_ship()).has_value());
     REQUIRE(edit.active());
-    // While typing, the window shows the text with the cursor; other names stay as they are.
-    CHECK(edit.shown(g.my_ship(), "Mine") == "Mine_");
+    // While typing, the window shows the text with the caret at its end; other names stay as they are.
+    CHECK(edit.shown(g.my_ship(), "Mine") == "Mine");
+    CHECK((edit.mark(g.my_ship()) == ui::TextMark{4, 4, 4}));
+    CHECK(!edit.mark(g.their_ship()).has_value());
     CHECK(edit.shown(g.their_ship(), "Theirs") == "Theirs");
     for (int i = 0; i < 4; ++i) {
         CHECK(!edit.key(kBackspace).has_value());
     }
     CHECK(edit.text().empty());
     edit.type("Seeadler");
-    CHECK(edit.shown(g.my_ship(), "Mine") == "Seeadler_");
+    CHECK(edit.shown(g.my_ship(), "Mine") == "Seeadler");
     const auto command = edit.key(kEnter);
     CHECK(!edit.active());
     REQUIRE(command.has_value());
@@ -103,6 +107,42 @@ TEST_CASE("names: a ship's name is typed in its window and becomes the ship's on
     CHECK(g.apply(*command));
     CHECK(g.name(g.my_ship()) == "Seeadler");
     CHECK(edit.shown(g.my_ship(), g.name(g.my_ship())) == "Seeadler");
+}
+
+TEST_CASE("names: the caret moves, letters are selected and replaced as in every text field") {
+    Game g;
+    app::NameEdit edit;
+    (void)edit.start(g.world, kMe, g.my_ship());
+    CHECK(!edit.key(ui::kKeyHome).has_value());
+    edit.type("Die ");
+    CHECK(edit.text() == "Die Mine");
+    CHECK((edit.mark(g.my_ship()) == ui::TextMark{4, 4, 4}));
+    CHECK(!edit.key(ui::kKeyDelete).has_value());
+    CHECK(edit.text() == "Die ine");
+    CHECK(!edit.key(ui::kKeyEnd | ui::kKeyShift).has_value());
+    CHECK(edit.selected_text() == "ine");
+    CHECK((edit.mark(g.my_ship()) == ui::TextMark{7, 4, 7}));
+    edit.type(
+        "M\xF6"
+        "we");
+    CHECK(edit.text() ==
+          "Die M\xF6"
+          "we");
+    // Ctrl+A and a letter replace the whole name; a name typed again starts with the caret at its end.
+    CHECK(!edit.key(ui::kKeySelectAll).has_value());
+    CHECK(edit.selected_text() ==
+          "Die M\xF6"
+          "we");
+    edit.type("K");
+    CHECK(edit.text() == "K");
+    edit.cancel();
+    (void)edit.start(g.world, kMe, g.my_ship());
+    CHECK((edit.mark(g.my_ship()) == ui::TextMark{4, 4, 4}));
+    CHECK(edit.selected_text().empty());
+    // Typed at the caret, the name still stops at 16 characters.
+    CHECK(!edit.key(ui::kKeyHome).has_value());
+    edit.type(std::string(20, 'x'));
+    CHECK(edit.text() == std::string(12, 'x') + "Mine");
 }
 
 TEST_CASE("names: only own cities and own ships that are not sinking can be renamed") {

@@ -7,10 +7,6 @@ namespace o1602::app {
 
 namespace {
 
-constexpr int kBackspace = 8;
-constexpr int kEnter = 13;
-constexpr int kEscape = 27;
-
 [[nodiscard]] std::string_view trimmed(std::string_view s) noexcept {
     const std::size_t first = s.find_first_not_of(' ');
     if (first == std::string_view::npos) {
@@ -99,6 +95,7 @@ std::optional<sim::Command> NameEdit::start(const sim::World& world, sim::Player
     m_player = player;
     m_original = *name;
     m_text = name->substr(0, kMaxLength);
+    m_caret.reset();
     m_shown = true;
     return kept;
 }
@@ -108,38 +105,47 @@ std::string NameEdit::shown(const NameTarget& target, std::string_view name) {
         return std::string(name);
     }
     m_shown = true;
-    return m_text + kCursor;
+    return m_text;
+}
+
+std::optional<ui::TextMark> NameEdit::mark(const NameTarget& target) const {
+    if (m_target != target) {
+        return std::nullopt;
+    }
+    const auto [first, last] = m_caret.selection(m_text);
+    return ui::TextMark{m_caret.caret(m_text), first, last};
+}
+
+std::string NameEdit::selected_text() const {
+    if (!m_target) {
+        return {};
+    }
+    const auto [first, last] = m_caret.selection(m_text);
+    return m_text.substr(first, last - first);
 }
 
 void NameEdit::type(std::string_view text) {
     if (!m_target) {
         return;
     }
+    std::string typed;
     for (const char c : text) {
         const auto b = static_cast<unsigned char>(c);
-        if (b < 0x20 || b == 0x7F) {
-            continue;  // the keys that edit come through key()
+        if (b >= 0x20 && b != 0x7F) {
+            typed.push_back(c);  // the keys that edit come through key()
         }
-        if (m_text.size() >= kMaxLength) {
-            break;
-        }
-        m_text.push_back(c);
     }
+    m_caret.insert(m_text, typed, kMaxLength);
 }
 
 std::optional<sim::Command> NameEdit::key(int key) {
-    if (!m_target) {
+    if (!m_target || m_caret.edit(m_text, key)) {
         return std::nullopt;
     }
     switch (key) {
-        case kBackspace:
-            if (!m_text.empty()) {
-                m_text.pop_back();
-            }
-            return std::nullopt;
-        case kEnter:
+        case ui::kKeyEnter:
             return commit();
-        case kEscape:
+        case ui::kKeyEscape:
             cancel();
             return std::nullopt;
         default:
@@ -167,6 +173,7 @@ void NameEdit::cancel() noexcept {
     m_target.reset();
     m_player = sim::kNoPlayer;
     m_text.clear();
+    m_caret.reset();
     m_original.clear();
     m_shown = false;
 }

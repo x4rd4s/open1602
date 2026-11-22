@@ -104,6 +104,15 @@ struct DrawItem {
     std::int32_t cols = 0;
 };
 
+/// A text being typed in a text gadget: the caret stands before byte `caret` of the gadget's text,
+/// bytes [first, last) of it are selected (first == last: none).
+struct TextMark {
+    std::size_t caret = 0;
+    std::size_t first = 0;
+    std::size_t last = 0;
+    bool operator==(const TextMark&) const = default;
+};
+
 /// What the mouse did to a panel.
 struct PanelEvent {
     enum class Kind : std::uint8_t {
@@ -128,6 +137,10 @@ public:
     /// A text gadget's text cut so that it ends `room` design units right of the gadget's position
     /// (by default its width), its end replaced by "..." (a long savegame name ran past the list).
     void set_fit(std::int32_t id, bool on, std::optional<std::int32_t> room = std::nullopt);
+    /// A text gadget's text being typed (Open1602: the original shows an underscore behind the text
+    /// only): an underscore behind the text with the caret at its end, under the letter after the
+    /// caret inside it, and the selected letters on a gold ground. Nothing: the text is only shown.
+    void set_mark(std::int32_t id, std::optional<TextMark> mark);
     void set_selected(std::int32_t id, bool on);
     [[nodiscard]] bool selected(std::int32_t id) const;
     void set_hidden(std::int32_t id, bool on);
@@ -201,6 +214,7 @@ private:
         std::array<std::int32_t, 2> slider{};
         std::int32_t scroll = 0;
         std::string text;
+        std::optional<TextMark> mark;
         bool fit = false;
         std::optional<std::int32_t> fit_room;
         std::optional<std::pair<std::int32_t, std::int32_t>> graphic;  ///< gfx, press offset
@@ -214,6 +228,10 @@ private:
     [[nodiscard]] std::optional<std::pair<std::vector<std::string>, std::int32_t>> flow_lines(
         std::size_t index, const std::array<const Font*, kFontSlots>& fonts) const;
     [[nodiscard]] std::optional<std::size_t> hit(std::int32_t x, std::int32_t y) const;
+    /// A text gadget's text being typed (set_mark()): `item` its text as laid out.
+    void draw_mark(std::vector<DrawItem>& out, DrawItem item, const TextMark& mark, const Font* font) const;
+    /// The ground of the selected letters of a text being typed: gold (STADTFLD.COL 215), at half strength.
+    static constexpr std::int32_t kMarkColour = 215;
     void draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint8_t state,
                      const std::array<const Font*, kFontSlots>& fonts) const;
     void slide(std::size_t index, std::int32_t gx, std::int32_t gy);

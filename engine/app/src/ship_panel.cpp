@@ -875,6 +875,7 @@ private:
         // Someone else's ship: the owner's coat of arms at the plate's left end.
         show_owner(m_ship, kHeading, k.foreign ? ship_name(ship) : c.shown_name(NameTarget::of(ship), ship_name(ship)),
                    ship.owner, c);
+        c.show_mark(m_ship, kHeading.name, NameTarget::of(ship));
         m_ship.set_no_select(kName, !can_rename(c.world(), c.local, NameTarget::of(ship)));
         const bool own = !k.foreign;
         const bool idle = own && !k.moving;
@@ -939,6 +940,7 @@ private:
         // Someone else's cart: the owner's coat of arms at the plate's left end, as on a ship.
         show_owner(p, kCartHeading, k.foreign ? ship_name(ship) : c.shown_name(NameTarget::of(ship), ship_name(ship)),
                    ship.owner, c);
+        c.show_mark(p, kCartHeading.name, NameTarget::of(ship));
         p.set_no_select(kCartName, !can_rename(c.world(), c.local, NameTarget::of(ship)));
         const bool own = !k.foreign;
         const bool idle = own && !k.moving;
