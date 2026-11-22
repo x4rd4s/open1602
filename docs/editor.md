@@ -254,7 +254,7 @@ steps it back. Each change is one step of undo.
 | Monuments, Arches | How many monuments and triumphal arches the player may build (0 to 9). |
 | Name | A click on it renames the player; left empty, the game calls the player after its colour. |
 | Faction | Shown only when a content package brings factions of the settlers' behaviour ([factions.md](modding/factions.md)): the slot's faction, the settlers or one of the packages'. The scenario keeps it, as `slot.<n>` of a package's scenario does. |
-| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
+| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; a map without the free trader (a new one of open sea) gets him with it, as every new game has him, and a map saved without him gets him when it is opened; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
 
 A player without a city and a ship is out of the game (defeated) as soon as it starts: give a new player a ship or a Kontor on the
 page **Place objects**.
