@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <future>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <random>
@@ -2297,7 +2298,9 @@ void MapViewer::draw_stock_notes() {
 
 void MapViewer::draw_unit_arms() {
     const sim::Player* local = m_state->world.player(m_local_player);
-    if (m_hud == nullptr || !m_show_unit_arms || local == nullptr) {
+    // A spectator (no player of its own) sees them over every player's units, each with its owner's.
+    const bool watching = m_local_player == sim::kNoPlayer;
+    if (m_hud == nullptr || !m_show_unit_arms || (local == nullptr && !watching)) {
         return;
     }
     // As the History Edition shows them: a small coat of arms on a thin pole over each of the
@@ -2315,9 +2318,10 @@ void MapViewer::draw_unit_arms() {
         m_camera.world_to_screen(px, py, sx, sy);
         return std::pair{static_cast<std::int32_t>(std::floor(sx)), static_cast<std::int32_t>(std::floor(sy))};
     };
-    std::vector<Hud::UnitArms> marks;
+    std::map<sim::BannerId, std::vector<Hud::UnitArms>> marks;  // by the owner's banner
     for (const sim::Soldier& s : m_state->world.soldiers()) {
-        if (s.owner != m_local_player || s.away()) {
+        const sim::Player* owner = watching ? m_state->world.player(s.owner) : local;
+        if ((!watching && s.owner != m_local_player) || owner == nullptr || s.away()) {
             continue;
         }
         const render::FigureInstance* f = m_soldiers.find(s.id);
@@ -2331,9 +2335,11 @@ void MapViewer::draw_unit_arms() {
         if (x < v.x - h || x > v.x + v.w + h || foot < v.y || arms > v.y + v.h) {
             continue;
         }
-        marks.push_back(Hud::UnitArms{ui::Rect{x - h / 2, top - h, h, h}, x, top, foot});
+        marks[owner->banner].push_back(Hud::UnitArms{ui::Rect{x - h / 2, top - h, h, h}, x, top, foot});
     }
-    m_hud->draw_unit_arms(marks, local->banner);
+    for (const auto& [banner, of_banner] : marks) {
+        m_hud->draw_unit_arms(of_banner, banner);
+    }
 }
 
 void MapViewer::draw_corner_info() {
@@ -3525,22 +3531,7 @@ annokit::core::Status MapViewer::start_package_scenario(const std::string& id, c
     if (!world) {
         return world.error();
     }
-    // A map saved into its package (the editor's "Save to a package") names the package as it was
-    // before the map was written into it: the package of the scenario is the one installed.
-    if (const auto& named = world->packages()) {
-        std::vector<assets::ContentPackage> packages = *named;
-        for (assets::ContentPackage& p : packages) {
-            const auto it = std::find_if(m_packages.begin(), m_packages.end(),
-                                         [&](const assets::ModPackage& m) { return m.id == p.id; });
-            if (p.id == scenario->package && it != m_packages.end()) {
-                p = it->content();
-            }
-        }
-        world->set_packages(std::move(packages));
-    }
-    std::vector<std::string> warnings;
-    sim::apply_package_scenario(*world, *scenario, ui::current_language(), &warnings);
-    world->set_package_scenario(scenario->id);
+    std::vector<std::string> warnings = make_package_scenario(*world, *scenario);
     if (const assets::PackageCampaign* c = assets::find_campaign(m_package_campaigns, campaign)) {
         sim::World::CampaignPart state{c->id, part, {}};
         // What winning the part before left; nothing for the first part.
@@ -3579,6 +3570,27 @@ annokit::core::Status MapViewer::start_package_scenario(const std::string& id, c
     }
     report_load_problems(warning_count + warnings.size());
     return annokit::core::Ok{};
+}
+
+std::vector<std::string> MapViewer::make_package_scenario(sim::World& world,
+                                                          const assets::PackageScenario& scenario) const {
+    // A map saved into its package (the editor's "Save to a package") names the package as it was
+    // before the map was written into it: the package of the scenario is the one installed.
+    if (const auto& named = world.packages()) {
+        std::vector<assets::ContentPackage> packages = *named;
+        for (assets::ContentPackage& p : packages) {
+            const auto it = std::find_if(m_packages.begin(), m_packages.end(),
+                                         [&](const assets::ModPackage& m) { return m.id == p.id; });
+            if (p.id == scenario.package && it != m_packages.end()) {
+                p = it->content();
+            }
+        }
+        world.set_packages(std::move(packages));
+    }
+    std::vector<std::string> warnings;
+    sim::apply_package_scenario(world, scenario, ui::current_language(), &warnings);
+    world.set_package_scenario(scenario.id);
+    return warnings;
 }
 
 void MapViewer::give_mod_content(sim::World& world) const {

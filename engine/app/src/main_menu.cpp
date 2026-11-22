@@ -313,6 +313,12 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         out.push_back(std::move(s));
     }
     for (const assets::PackageScenario& p : scenarios) {
+        // A part of a campaign is chosen inside it, not once more on its own.
+        if (std::any_of(campaigns.begin(), campaigns.end(), [&](const assets::PackageCampaign& c) {
+                return std::find(c.parts.begin(), c.parts.end(), p.id) != c.parts.end();
+            })) {
+            continue;
+        }
         MenuScenario s;
         s.name = p.name(language);
         s.base = base_of(p.id);
@@ -321,6 +327,35 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         s.package_scenario = p.id;
         s.briefing = p.briefing(language);
         out.push_back(std::move(s));
+    }
+    return out;
+}
+
+std::vector<MenuScenario> package_scenario_parts(std::span<const assets::PackageScenario> scenarios,
+                                                 std::span<const assets::PackageCampaign> campaigns,
+                                                 std::string_view language, std::string heading) {
+    std::vector<MenuScenario> out;
+    for (MenuScenario& entry : package_scenario_list(scenarios, campaigns, language, std::move(heading))) {
+        if (entry.package_campaign.empty()) {
+            out.push_back(std::move(entry));
+            continue;
+        }
+        for (std::size_t i = 0; i < entry.files.size() && i < entry.package_parts.size(); ++i) {
+            MenuScenario part;
+            const auto named = std::find_if(entry.part_names.begin(), entry.part_names.end(),
+                                            [&](const auto& n) { return n.first == entry.files[i].first; });
+            const std::string part_name = named != entry.part_names.end() && !named->second.empty()
+                                              ? named->second
+                                              : ui::tr("menu.part", {std::to_string(i + 1)});
+            part.name = entry.name + ": " + part_name;
+            part.base = entry.base;
+            part.base += "_" + std::to_string(i + 1);
+            part.header.ranking = entry.header.ranking;
+            part.files.emplace_back(std::uint8_t{0xFF}, entry.files[i].second);
+            part.package_scenario = entry.package_parts[i].scenario;
+            part.briefing = entry.package_parts[i].briefing.empty() ? entry.briefing : entry.package_parts[i].briefing;
+            out.push_back(std::move(part));
+        }
     }
     return out;
 }

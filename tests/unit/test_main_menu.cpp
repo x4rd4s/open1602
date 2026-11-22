@@ -669,13 +669,15 @@ TEST_CASE("main menu: the packages' scenarios under their own heading, with star
 }
 
 TEST_CASE("main menu: a package's campaign is one entry with a part per scenario") {
-    std::vector<assets::PackageScenario> scenarios(2);
+    std::vector<assets::PackageScenario> scenarios(3);
     scenarios[0].id = "isles:north";
     scenarios[0].file = std::filesystem::path("north.szs");
     scenarios[0].briefings.emplace_back("en", "Go north.");
     scenarios[0].names.emplace_back("en", "The North");
     scenarios[1].id = "isles:south";
     scenarios[1].file = std::filesystem::path("south.szs");
+    scenarios[2].id = "isles:east";  // of no campaign
+    scenarios[2].file = std::filesystem::path("east.szs");
     std::vector<assets::PackageCampaign> campaigns(1);
     campaigns[0].id = "isles:frost";
     campaigns[0].names.emplace_back("en", "Frost");
@@ -683,7 +685,7 @@ TEST_CASE("main menu: a package's campaign is one entry with a part per scenario
     campaigns[0].stars = 3;
     campaigns[0].parts = {"isles:north", "isles:south"};
     const auto list = app::package_scenario_list(scenarios, campaigns, "en", "----Mods----");
-    REQUIRE(list.size() == 4);  // heading, campaign, two scenarios
+    REQUIRE(list.size() == 3);  // heading, campaign, the scenario of no campaign; its parts not again
     const app::MenuScenario& c = list[1];
     CHECK(c.name == "Frost");
     CHECK(c.package_campaign == "isles:frost");
@@ -702,5 +704,5 @@ TEST_CASE("main menu: a package's campaign is one entry with a part per scenario
     CHECK(c.package_parts[0].scenario == "isles:north");
     CHECK(c.package_parts[0].briefing == "Go north.");
     CHECK(c.package_parts[1].briefing.empty());
-    CHECK(list[2].package_scenario == "isles:north");
+    CHECK(list[2].package_scenario == "isles:east");
 }

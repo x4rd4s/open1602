@@ -64,11 +64,19 @@ struct MenuScenario {
     std::vector<std::pair<std::uint8_t, std::string>> part_names;
 };
 
-/// The entries of the packages' campaigns and then their scenarios under their heading (`heading`,
-/// Windows-1252), in the packages' load order, in `language`; none without any.
+/// The entries of the packages' campaigns and then their scenarios that are part of none (a part
+/// is chosen in its campaign), under their heading (`heading`, Windows-1252), in the packages'
+/// load order, in `language`; none without any.
 [[nodiscard]] std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageScenario> scenarios,
                                                               std::span<const assets::PackageCampaign> campaigns,
                                                               std::string_view language, std::string heading);
+
+/// package_scenario_list() for the multiplayer menu, which has no campaign progress and offers no
+/// choice of parts: each part of a campaign is an entry of its own, "<campaign>: <part>" (the part's
+/// scenario's name, else "Part n"), with the part's briefing, else the campaign's.
+[[nodiscard]] std::vector<MenuScenario> package_scenario_parts(std::span<const assets::PackageScenario> scenarios,
+                                                               std::span<const assets::PackageCampaign> campaigns,
+                                                               std::string_view language, std::string heading);
 
 /// The scenarios of the game folder in the menu's order: originals (tutorial, endless game,
 /// numbered missions by number), campaigns by stars and number, the other adventures by stars,

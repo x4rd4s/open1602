@@ -330,7 +330,8 @@ assets::GadgetLayout with_owner_heading(assets::GadgetLayout layout, const Owner
 }
 
 void show_owner(ui::Panel& panel, const OwnerHeading& h, std::string name, sim::PlayerId owner, const PanelContext& c) {
-    const sim::Player* p = c.local != sim::kNoPlayer && owner != c.local ? c.world().player(owner) : nullptr;
+    // A spectator (no player of its own) sees every owner's arms: nothing is its own.
+    const sim::Player* p = owner != c.local ? c.world().player(owner) : nullptr;
     const assets::Gadget* arms = panel.layout().find(h.name + kOwnerArms);
     const bool shown = p != nullptr && arms != nullptr;
     panel.set_visible(h.name, !shown);
