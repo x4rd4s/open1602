@@ -371,27 +371,11 @@ bool can_add_party(const sim::World& world, Neutral party) {
     return p == nullptr || (p->status == sim::PlayerStatus::Absent && p->role != sim::PlayerRole::Neutral);
 }
 
-annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party) {
-    auto after = with_party(world, party);
-    if (!after) {
-        return after.error();
-    }
-    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after).value(), "party_add"));
-}
+namespace {
 
-bool add_missing_trader(sim::World& world) {
-    if (player_slots(world).empty() || !can_add_party(world, Neutral::Trader)) {
-        return false;
-    }
-    auto after = with_party(world, Neutral::Trader);
-    if (!after) {
-        return false;
-    }
-    world = std::move(after).value();
-    return true;
-}
-
-annokit::core::Result<sim::World> with_party(const sim::World& world, Neutral party) {
+/// `after`, a copy of `world`, gets `party` as add_party() adds it. An error message where
+/// add_party() fails, else empty (the codes are add_party()'s).
+std::optional<annokit::core::Error> put_party(const sim::World& world, sim::World& after, Neutral party) {
     if (!can_add_party(world, party)) {
         return make_error(ErrorCode::Unsupported, "the world has the party already, or its slot is taken");
     }
@@ -423,7 +407,6 @@ annokit::core::Result<sim::World> with_party(const sim::World& world, Neutral pa
     p.banner = party == Neutral::Pirates ? 4 : party == Neutral::Natives ? 5 : 6;
     p.infra_mask = party == Neutral::Trader ? 0 : 0xFFFFFFFFU;
     players[slot] = std::move(p);
-    sim::World after = world;
     keep_relations(world, after, players);
     // The party towards everyone as in a new game.
     sim::Diplomacy fresh;
@@ -433,7 +416,29 @@ annokit::core::Result<sim::World> with_party(const sim::World& world, Neutral pa
         after.diplomacy().relation(slot, o) = fresh.relation(slot, o);
         after.diplomacy().relation(o, slot) = fresh.relation(o, slot);
     }
-    return after;
+    return std::nullopt;
+}
+
+}  // namespace
+
+annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party) {
+    sim::World after = world;
+    if (auto error = put_party(world, after, party)) {
+        return *error;
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "party_add"));
+}
+
+bool add_missing_trader(sim::World& world) {
+    if (player_slots(world).empty() || !can_add_party(world, Neutral::Trader)) {
+        return false;
+    }
+    sim::World after = world;
+    if (put_party(world, after, Neutral::Trader)) {
+        return false;
+    }
+    world = std::move(after);
+    return true;
 }
 
 Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {

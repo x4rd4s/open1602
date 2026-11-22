@@ -157,8 +157,6 @@ enum class Neutral : std::uint8_t { Natives, Pirates, Trader };
 /// nests and ships of the natives and the pirates. Fails (Unsupported) where can_add_party() is
 /// false, (NotFound) for a world without a faction of that behaviour.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party);
-/// The world with `party` added as add_party() adds it. Fails as add_party().
-[[nodiscard]] annokit::core::Result<sim::World> with_party(const sim::World& world, Neutral party);
 /// Gives a world with humans or computers the free trader where it has none and his slot is free,
 /// as a new game has him (whether he calls at a player's Kontors stays the player's switch). True
 /// when he was added. add_player() does it for a map of open sea; for maps saved without him.
