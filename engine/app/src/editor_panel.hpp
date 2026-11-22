@@ -292,8 +292,12 @@ struct EditorShip {
     std::uint32_t cannons = 0;      ///< mounted cannons
     std::uint32_t max_cannons = 0;  ///< what the ship type takes (0: none, a cart)
     bool for_sale = false;          ///< offered for sale from the game's start
-    bool can_sell = false;          ///< a human's or computer's ship, which can be offered
-    bool cart = false;              ///< a trade cart: its stops are the cities of its island
+    /// The price of the offer, in 1/128 of the ship type's (0 to sim::ShipCommand::kMaxSaleFactor),
+    /// and what that comes to in gold.
+    std::uint16_t sale_factor = 128;
+    std::int32_t sale_price = 0;
+    bool can_sell = false;  ///< a human's or computer's ship, which can be offered
+    bool cart = false;      ///< a trade cart: its stops are the cities of its island
     /// The cities a stop can be (a ship's: each with a Kontor; a cart's: those of its island),
     /// by name; the first, "none", empties a stop.
     std::vector<std::string> route_targets;
@@ -621,7 +625,7 @@ struct EditorRequest {
         ShipCargo,       ///< the selected ship's hold `index` with `amount` (1/32 t) of `ware`
         ShipName,        ///< the selected ship or cart named `name`
         ShipCannons,     ///< the selected ship with `amount` mounted cannons
-        ShipSale,        ///< the selected ship offered for sale (`index` 1) or no longer (0)
+        ShipSale,  ///< the selected ship offered for sale (`index` 1, at `amount`/128 of its price) or no longer (0)
         /// The selected ship's route: `route` says what changes.
         ShipRoute,
         UnitPatrol,     ///< the map's next click sets where the selected unit patrols to
@@ -699,7 +703,7 @@ struct EditorRequest {
     EditorTerrain terrain{};      ///< Terrain
     EditorObjects objects{};      ///< Objects
     EditorPlayer player{};        ///< SetPlayer
-    std::uint32_t amount = 0;     ///< CityGoods, ShipCargo
+    std::uint32_t amount = 0;     ///< CityGoods, ShipCargo; ShipSale: the price in 1/128
     std::uint8_t ware = 0;        ///< ShipCargo
     /// CityTrade: what the Kontor does with the ware.
     struct Trade {

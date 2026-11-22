@@ -224,10 +224,12 @@ the right button as many as the ship takes or none. Each change is one step of u
 
 **Name** types a new name for the ship or trade cart, up to 40 characters, as its owner may give it
 (a ship without one is named from the ship names when the game starts). **For sale** offers a
-human's or computer's ship for sale from the start at its full price, as its owner offers it in
-the game; other players, computers too, can buy it.
+human's or computer's ship for sale from the start, as its owner offers it in the game; other
+players, computers too, can buy it. **Price** below it sets what it costs, in steps of 10 % of the
+ship type's price (- and +, from nothing to three times the price; the right button: the type's own
+price again), as the price slider of the ship's window in the game.
 
-Beside it, **Route** gives the ship or trade cart a trade route as its route window in the game
+Beside it, **Route** gives the ship or trade cart (select the cart on the map, as a ship) a trade route as its route window in the game
 does: **Stop 1 of 8** (a cart: of 4) chooses the stop to change, **City** the city it goes to (a
 ship's any city with a Kontor, a cart's only those of its island, its own or a foreign one it may
 trade with, and only one it finds a way to; **No stop** empties it), and
@@ -236,7 +238,8 @@ whether the stop **loads** it until that much is on board or **unloads** up to t
 tons (+ and - by 10 t, with the right button by 1 t). **Runs from the start** switches the route on:
 the ship or cart sets off along it as soon as the game begins, from its first stop. Changed while
 on, the route begins again from its first stop; without any stop it is off. Switched off, the ship
-waits where it was placed. Each change is one step of undo.
+waits where it was placed. Each change is one step of undo. **Route** stays grey while there is no
+city to go to: for a cart, while its island has no city with a Kontor.
 In the game, a cart that finds no way to a stop of its route goes on to the next one; three rounds
 like that warn its player as refused transfers do (Open1602).
 
