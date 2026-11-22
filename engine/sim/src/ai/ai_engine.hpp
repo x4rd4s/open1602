@@ -1087,8 +1087,9 @@ private:
     void tower_goals(std::uint16_t island, const City& hostile, const std::vector<std::uint32_t>& soldiers,
                      std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const;
     /// Open1602: keeps the goals of an attack the soldiers can walk up to; with none of them, the
-    /// first obstacle on the cheapest way to one (`way_in`).
-    void reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,
+    /// first obstacle on the cheapest way to one (`way_in`). False, and `goals` as they were, when
+    /// neither is found.
+    bool reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,
                          const std::vector<std::uint32_t>& soldiers,
                          std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const;
     /// Open1602: the tree, field, wall, gate or building of `hostile`'s owner that stands first on

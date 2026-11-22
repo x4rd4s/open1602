@@ -1865,6 +1865,13 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             // to the soldiers first; the original goes for its houses alone, and once these are
             // gone its soldiers stand in front of the tower for good.
             tower_goals(island, c, mine, goals);
+            // Only the towers, so that a house within reach does not keep the soldiers from
+            // cutting their way to a tower behind a forest; the houses when no way leads to one.
+            if (!goals.empty() && reachable_goals(a, island, c, mine, goals)) {
+                hostile = &c;
+                break;
+            }
+            goals.clear();
         }
         for (const House& h : m_world.houses()) {
             if (h.island == island && h.city == c.index && goals.size() < 16) {
@@ -2227,11 +2234,11 @@ void Engine::tower_goals(std::uint16_t island, const City& hostile, const std::v
     }
 }
 
-void Engine::reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,
+bool Engine::reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,
                              const std::vector<std::uint32_t>& soldiers,
                              std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const {
     if (goals.empty()) {
-        return;
+        return false;
     }
     const std::vector<std::uint8_t> reach = land_reach(a.player, island, soldiers);
     const WorldIsland& isl = island_of(island);
@@ -2277,9 +2284,11 @@ void Engine::reachable_goals(const AiPlayer& a, std::uint16_t island, const City
             kept.push_back(*in);
         }
     }
-    if (!kept.empty()) {
-        goals = std::move(kept);
+    if (kept.empty()) {
+        return false;
     }
+    goals = std::move(kept);
+    return true;
 }
 
 std::optional<std::pair<std::int32_t, std::int32_t>> Engine::way_in(const AiPlayer& a, std::uint16_t island,

@@ -505,13 +505,14 @@ TEST_CASE("ai military: soldiers kept out by a forest cut their way in and take 
 }
 
 TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved soldiers cut their way to its tower") {
-    // Feedback 15: a city of nothing but a tower behind a forest, its markets and Kontor
+    // Feedback 15: a city of a house and a tower behind a forest, its markets and Kontor
     // destroyed. A city with a tower is not defenceless and cannot be taken over. The original's
     // soldiers find nothing to attack and stand; Open1602's go for the tower, through the trees.
     const auto play = [](bool classic, std::size_t& at_trees) {
         Island a;
         a.build(kKontor, 4, 8, kComputer, 0);
         a.build(kTower, 70, 8, kHuman, 1);
+        a.build(kHouse, 40, 4, kHuman, 1);  // within reach, before the forest
         for (std::int32_t y = 0; y < 20; ++y) {
             for (std::int32_t x = 60; x <= 62; ++x) {
                 a.tree(x, y);
