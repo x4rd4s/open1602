@@ -1739,6 +1739,15 @@ TEST_CASE("selection panels: a spectator reads the holds of every ship and cart,
     const auto line = p->help(38092, stranger, spectator);
     REQUIRE(line.has_value());
     CHECK(!line->empty());
+    // The owner's coat of arms in the heading, for the player and the spectator alike.
+    p->refresh(stranger, player);
+    CHECK(answers(*p, 38002 + 902));
+    p->refresh(stranger, spectator);
+    CHECK(answers(*p, 38002 + 902));
+    CHECK(!answers(*p, 38002));
+    const auto ship_owner = p->help(38002 + 902, stranger, spectator);
+    REQUIRE(ship_owner.has_value());
+    CHECK(*ship_owner == app::player_name(t.world.players()[kOther]));
     // Nothing to order: no cannons mounted from the hold, no route, no transfer or trade.
     CHECK(!answers(*p, 38021));
     CHECK(click(*p, 38091, stranger, spectator).empty());
@@ -1749,7 +1758,13 @@ TEST_CASE("selection panels: a spectator reads the holds of every ship and cart,
     REQUIRE(w != nullptr);
     w->refresh(altair, player);
     CHECK(!answers(*w, 59091));
+    CHECK(answers(*w, 59002 + 902));  // the owner's coat of arms, as on a ship
+    CHECK(!answers(*w, 59002));
+    const auto cart_owner = w->help(59002 + 902, altair, player);
+    REQUIRE(cart_owner.has_value());
+    CHECK(*cart_owner == app::player_name(t.world.players()[kOther]));
     w->refresh(altair, spectator);
+    CHECK(answers(*w, 59002 + 902));
     CHECK(answers(*w, 59091));
     CHECK(!answers(*w, 59006));  // the route switch
     CHECK(click(*w, 59091, altair, spectator).empty());
