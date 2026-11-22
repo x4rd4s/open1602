@@ -66,6 +66,10 @@ constexpr std::uint64_t kLandingLogMs = 60'000;
 /// Guard posts kept per city.
 constexpr std::size_t kMaxPosts = 64;
 
+/// A hostile tower this near a beach (sea_distance, tiles) makes it dangerous to land on
+/// (landing_beach) and, for an improved computer, a tower to shell first (covering_tower).
+constexpr std::int32_t kTowerCover = 10;
+
 /// The pirate nest's offer comes again after more than 42 s (0x1A4 tenths, task 5).
 constexpr std::uint64_t kNestOfferMs = 42'000;
 constexpr std::uint32_t kDisbandPaybackMinutes = 30;  // a soldier is disbanded only if its upkeep pays the cost back
@@ -1218,7 +1222,8 @@ void Engine::missions(AiPlayer& p) {
                     n.counter = 0;
                     break;
                 }
-                if (const auto gap = landing_beach(p, *t)) {
+                const auto gap = landing_beach(p, *t);
+                if (gap && !(rivals() && covering_tower(p, *t, *gap))) {
                     log(p, "ship %u: the wall of city %u/%u is open at %d,%d", s->id, t->island, t->index, gap->first,
                         gap->second);
                     if (soldiers_aboard(*s) > kFewSoldiers) {
@@ -1288,7 +1293,86 @@ void Engine::plan_landing(AiPlayer& p, Ship& s, ShipNote& n) {
         }
         return;
     }
+    // Open1602 (3b): a tower that covers the beach is shelled first by a warship, as a player
+    // does, while the troops wait aboard; without one free, or after the tries, they land as before.
+    if (rivals()) {
+        if (const auto tower = covering_tower(p, *t, *beach); tower && shell_tower(p, s, n, *t, *tower)) {
+            return;
+        }
+    }
     ship_send(p, s, water_near(t->island, beach->first, beach->second), kMissionLanding, t->owner);
+}
+
+std::optional<std::pair<std::int32_t, std::int32_t>> Engine::covering_tower(
+    const AiPlayer& p, const City& c, std::pair<std::int32_t, std::int32_t> beach) const {
+    // The hostile tower of the city's island nearest to the beach, within kTowerCover of it.
+    std::optional<std::pair<std::int32_t, std::int32_t>> best;
+    std::int32_t best_d = kTowerCover + 1;
+    for (const Tower& tw : m_world.towers()) {
+        if (tw.island != c.island || !m_world.diplomacy().hostile(p.player, tw.owner)) {
+            continue;
+        }
+        const std::int32_t d = sea_distance(tw.x - beach.first, tw.y - beach.second);
+        if (d < best_d) {
+            best_d = d;
+            best = std::pair{static_cast<std::int32_t>(tw.x), static_cast<std::int32_t>(tw.y)};
+        }
+    }
+    return best;
+}
+
+bool Engine::shell_tower(AiPlayer& p, Ship& s, ShipNote& n, const City& t,
+                         std::pair<std::int32_t, std::int32_t> tower) {
+    // The troop ship waits while a warship shells the tower; true while it waits.
+    if (n.counter == 0) {
+        log(p, "ship %u lands under the tower at %d,%d of city %u/%u: no tries left", s.id, tower.first, tower.second,
+            t.island, t.index);
+        return false;
+    }
+    --n.counter;
+    const std::uint32_t param = city_param(t);
+    if (std::ranges::any_of(p.ships,
+                            [&](const ShipNote& o) { return o.mission == kMissionBreach && o.param == param; })) {
+        return true;
+    }
+    Ship* best = free_warship(p);
+    if (best == nullptr) {
+        log(p, "ship %u lands under the tower at %d,%d of city %u/%u: no warship free", s.id, tower.first, tower.second,
+            t.island, t.index);
+        return false;
+    }
+    log(p, "ship %u shells the tower at %d,%d of city %u/%u for ship %u", best->id, tower.first, tower.second, t.island,
+        t.index, s.id);
+    ship_send(
+        p, *best,
+        Target::building(t.island, static_cast<std::uint32_t>(tower.first), static_cast<std::uint32_t>(tower.second)),
+        kMissionBreach, param);
+    return true;
+}
+
+Ship* Engine::free_warship(AiPlayer& p) {
+    // The strongest healthy ship with cannons and nothing else to do, no troops aboard.
+    Ship* best = nullptr;
+    std::uint32_t best_score = 0;
+    // Only ships the computer has a note of: called inside the missions' loop over the notes, a new
+    // note (note()) would move the list under that loop.
+    for (Ship* o : own_ships(p)) {
+        const auto on_it = std::ranges::find(p.ships, o->id, &ShipNote::id);
+        if (on_it == p.ships.end()) {
+            continue;
+        }
+        const ShipNote& on = *on_it;
+        if (o->id == p.settle.ship || o->held || on.mission != 0 || on.supply || o->cannons == 0 ||
+            soldiers_aboard(*o) != 0 || !healthy(*o)) {
+            continue;
+        }
+        const std::uint32_t score = ship_strength(health128(*o), o->cannons);
+        if (score > best_score) {
+            best = o;
+            best_score = score;
+        }
+    }
+    return best;
 }
 
 bool Engine::beach_wall(std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -1342,26 +1426,7 @@ void Engine::breach(AiPlayer& p, Ship& s, ShipNote& n, const City& t) {
         }
         return;
     }
-    Ship* best = nullptr;
-    std::uint32_t best_score = 0;
-    // Only ships the computer has a note of: called inside the missions' loop over the notes, a new
-    // note (note()) would move the list under that loop.
-    for (Ship* o : own_ships(p)) {
-        const auto on_it = std::ranges::find(p.ships, o->id, &ShipNote::id);
-        if (on_it == p.ships.end()) {
-            continue;
-        }
-        const ShipNote& on = *on_it;
-        if (o->id == p.settle.ship || o->held || on.mission != 0 || on.supply || o->cannons == 0 ||
-            soldiers_aboard(*o) != 0 || !healthy(*o)) {
-            continue;
-        }
-        const std::uint32_t score = ship_strength(health128(*o), o->cannons);
-        if (score > best_score) {
-            best = o;
-            best_score = score;
-        }
-    }
+    Ship* best = free_warship(p);
     const Target at =
         Target::building(t.island, static_cast<std::uint32_t>(wall->first), static_cast<std::uint32_t>(wall->second));
     const char* what = tile(t.island, wall->first, wall->second).kind == kind::kForest ? "trees" : "wall";
@@ -1384,6 +1449,12 @@ void Engine::breach(AiPlayer& p, Ship& s, ShipNote& n, const City& t) {
 
 std::optional<std::pair<std::int32_t, std::int32_t>> Engine::breach_target(const AiPlayer& p, const City& c) const {
     // What a breach shoots at: a wall on the beach, else what seals the landing cells of the beach.
+    // Open1602 (3b): with a beach free, the tower that covers it.
+    if (rivals()) {
+        if (const auto beach = landing_beach(p, c)) {
+            return covering_tower(p, c, *beach);
+        }
+    }
     if (const auto wall = landing_beach(p, c, true)) {
         return wall;
     }
@@ -1504,7 +1575,9 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
             }
             for (const auto& [tx, ty] : towers) {
                 score +=
-                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10 ? 100 : 0;
+                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= kTowerCover
+                        ? 100
+                        : 0;
             }
             for (const auto& [ox, oy] : ships) {
                 score += sea_distance(ox - wx, oy - wy) <= 16 ? 30 : 0;

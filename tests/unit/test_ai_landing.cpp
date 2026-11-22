@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../test_framework.hpp"
@@ -26,6 +27,7 @@ constexpr std::uint32_t kMarket = 20809;
 constexpr std::uint32_t kHouse = 20605;
 constexpr std::uint32_t kWall = 22501;
 constexpr std::uint32_t kTree = 21304;
+constexpr std::uint32_t kTower = 22601;
 constexpr std::uint16_t kSword = 1;
 constexpr std::uint16_t kShipFigure = 21;
 
@@ -52,6 +54,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: +1\n  Id: 22501\n  Kind: 4\n  Gfx: 60\n  Size: 1, 1\n  Maxenergy: 6\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"
         "  @Nummer: +1\n  Id: 21304\n  Kind: 10\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 4\n  NoShotFlg: 1\n"
+        "  @Nummer: +1\n  Id: 22601\n  Kind: 6\n  Gfx: 80\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
+        "  Ruinenr: 255\n"  // a stone tower
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -59,8 +63,9 @@ assets::BuildingTable make_buildings() {
     return std::move(table).value();
 }
 
-/// With `guns` the ship fires (a range and a reload time), as a warship in the game data.
-assets::FigureTable make_figures(bool guns = false) {
+/// With `guns` the ship fires (a range and a reload time), as a warship in the game data; with
+/// `tower` a tower's figure (KANONTURM, 38) that does not shoot.
+assets::FigureTable make_figures(bool guns = false, bool tower = false) {
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
     const auto doc = assets::cod::parse(
         std::string("Objekt: FIGUR\n"
@@ -70,7 +75,9 @@ assets::FigureTable make_figures(bool guns = false) {
                     "  Nummer: 21\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n  Speed: 500\n"
                     "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n"
                     "  Rohmenge: 25\n") +
-            (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") + "EndObj\n",
+            (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") +
+            (tower ? "  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: 1.0\n  Worktime: 3.0\n" : "") +
+            "EndObj\n",
         types);
     auto table = assets::FigureTable::from_cod(doc);
     REQUIRE(table.ok());
@@ -345,4 +352,72 @@ TEST_CASE("ai landing: an improved computer shoots trees behind the beach open t
     }
     CHECK(trees() < planted);  // felled
     CHECK(a.soldiers_on(kComputer, 1) > 0);
+}
+
+TEST_CASE("ai landing: an improved computer has a warship shell the tower over the beach before it lands") {
+    // Step 3b: every beach of the human's city lies within reach of one of its two towers. With a
+    // warship lying idle, it shells the tower over the beach while the troops wait aboard; with
+    // none, the troops land under the tower as before.
+    const auto play = [](bool warship, std::uint32_t& towers_at_landing) {
+        Coast a;
+        a.figures = make_figures(true, true);
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        const std::pair<std::int32_t, std::int32_t> spots[] = {{2, 5}, {2, 22}};
+        for (const auto& [x, y] : spots) {
+            REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
+            sim::Tower tw;
+            tw.island = 1;
+            tw.x = static_cast<std::uint16_t>(x);
+            tw.y = static_cast<std::uint16_t>(y);
+            tw.owner = kHuman;
+            tw.figure = 38;  // KANONTURM
+            a.world.towers().push_back(tw);
+        }
+        const auto towers = [&] {
+            std::uint32_t n = 0;
+            for (const auto& [x, y] : spots) {
+                const sim::MapCell& c =
+                    a.world.islands()[1].map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                n += !c.empty() && a.buildings.by_sprite(c.sprite) != nullptr &&
+                             a.buildings.by_sprite(c.sprite)->id == kTower
+                         ? 1U
+                         : 0U;
+            }
+            return n;
+        };
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        std::vector<std::pair<int, int>> at{{41, 15}};
+        if (warship) {
+            at.emplace_back(42, 20);
+        }
+        for (const auto& [x, y] : at) {
+            sim::Ship ship = sim::make_ship("Ship", static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                                            kShipFigure, kComputer, 2);
+            ship.cargo.resize(4);
+            ship.cannons = 4;
+            a.world.add_ship(ship);
+        }
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        REQUIRE(towers() == 2);
+        for (std::uint32_t t = 0; t < 12 * 60 && a.soldiers_on(kComputer, 1) == 0; ++t) {
+            run(s, 1'000);
+        }
+        towers_at_landing = towers();
+        return a.soldiers_on(kComputer, 1) > 0;
+    };
+    std::uint32_t towers = 0;
+    CHECK(play(true, towers));
+    CHECK(towers < 2);  // shelled first
+    CHECK(play(false, towers));
+    CHECK(towers == 2);  // no warship: landed under the towers
 }

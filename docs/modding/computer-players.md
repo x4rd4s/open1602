@@ -467,6 +467,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   trees and walls where they can reach none. With the markets and the Kontor gone, a city with a
   tower is still defended and cannot be taken over: they go for its towers then, all of them for
   the nearest one, before its houses.
+- **Towers over the beach.** A landing goes to the beach farthest from the city's towers, soldiers
+  and ships. When even that beach lies within ten tiles of a tower, an improved computer has a
+  free warship (healthy, with cannons, no troops aboard) shell the tower first while the troops
+  wait aboard. With no warship free, or after the tries, they land under the tower as before.
 
 ## Ships, ways and colonies
 

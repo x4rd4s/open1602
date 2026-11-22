@@ -1064,6 +1064,14 @@ private:
     void plan_landing(AiPlayer& p, Ship& s, ShipNote& n);
     /// Open1602: a warship (or the troop ship itself) shoots a gap into a walled coast.
     void breach(AiPlayer& p, Ship& s, ShipNote& n, const City& t);
+    /// Open1602 (3b): the hostile tower nearest to `beach` that covers it (kTowerCover), if any.
+    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> covering_tower(
+        const AiPlayer& p, const City& c, std::pair<std::int32_t, std::int32_t> beach) const;
+    /// Open1602 (3b): a free warship shells `tower` while troop ship `s` waits; false when the
+    /// troops land at once (no warship free, no tries left).
+    bool shell_tower(AiPlayer& p, Ship& s, ShipNote& n, const City& t, std::pair<std::int32_t, std::int32_t> tower);
+    /// Open1602: the strongest healthy armed ship without a mission or troops (breach, shell_tower).
+    Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
     bool attack_ok(AiPlayer& p, const City& t);
     void start_attack(AiPlayer& p, const City& t);
