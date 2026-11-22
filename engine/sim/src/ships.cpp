@@ -1648,6 +1648,15 @@ bool Fleet::may_trade(PlayerId ship_owner, PlayerId city_owner) const {
            m_world->diplomacy().may_trade(ship_owner, city_owner);
 }
 
+bool Fleet::trades_at(const Ship& ship, PlayerId city_owner) const {
+    if (may_trade(ship.owner, city_owner)) {
+        return true;
+    }
+    const Player* owner = m_world->player(ship.owner);
+    return ship.cart() && owner != nullptr && m_world->behaviour(*owner) == FactionBehaviour::Pirates &&
+           m_world->player(city_owner) != nullptr && !m_world->diplomacy().hostile(ship.owner, city_owner);
+}
+
 std::uint32_t Fleet::move_goods(Ship& ship, City& city, std::uint8_t ware, bool to_ship, std::uint32_t amount,
                                 std::uint8_t hold, bool limits, std::uint16_t price,
                                 std::span<const std::uint8_t> order) {
@@ -1804,7 +1813,7 @@ std::uint32_t Fleet::transfer(const CargoTransfer& t) {
                 found = i;
                 break;
             }
-            if (!found && may_trade(ship->owner, c.owner)) {
+            if (!found && trades_at(*ship, c.owner)) {
                 found = i;
             }
         }
@@ -2098,7 +2107,7 @@ std::vector<std::uint8_t> Fleet::route_unload_order(const Ship& ship, std::uint8
 
 bool Fleet::route_city_stop(Ship& ship, const RouteStop& stop) {
     City* city = m_world->city(stop.target.island, stop.target.city);
-    if (city == nullptr || !may_trade(ship.owner, city->owner)) {
+    if (city == nullptr || !trades_at(ship, city->owner)) {
         return false;  // no treaty: skipped without a warning, like the original
     }
     city->ships_gave_up = 0;  // a ship got through

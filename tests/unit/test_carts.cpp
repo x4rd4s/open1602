@@ -765,3 +765,51 @@ TEST_CASE("carts: the editor refuses a route stop the cart finds no way to") {
                              sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 1)})
               .ok());
 }
+
+TEST_CASE("carts: a map's cart of the pirates trades from their nest at peace only (Open1602)") {
+    Land land;
+    std::vector<sim::Player> players = land.world.players();
+    sim::make_neutral(players[0], sim::faction::kPirates);  // the west city is their nest
+    players[0].money = 10000;
+    land.world.set_players(players);
+    land.world.diplomacy().reset(players, land.world.factions());
+    // The editor puts it down beside the nest's Kontor, as a player's.
+    REQUIRE(editor::cart_fits(land.world, land.buildings, 0, 12, 14) == editor::UnitRefusal::None);
+    auto placed = editor::place_cart(land.world, land.buildings, land.figures, 0, 12, 14, 0);
+    REQUIRE(placed.ok());
+    (*placed)->apply(land.world);
+    sim::City& west = *land.world.city(0, 0);
+    sim::City& east = *land.world.city(0, 1);
+    west.goods[kWood] = 60 * kTon;
+    east.trade[kWood].buy = true;
+    east.trade[kWood].buy_price = 10;
+    east.trade[kWood].limit = 60 * kTon;
+    const std::uint32_t id = land.world.ships().back().id;
+    sim::Fleet fleet(land.world, land.buildings, land.figures, land.rules);
+    using Op = sim::RouteEdit::Op;
+    sim::RouteEdit e{sim::kNoPlayer, id, Op::SetStop, 0, 0, sim::Target::city_of(0, 0)};
+    REQUIRE(fleet.edit_route(e));
+    e.op = Op::SetEntry;
+    e.value = sim::RouteEntry{kWood, false, 30 * kTon};
+    REQUIRE(fleet.edit_route(e));
+    e = sim::RouteEdit{sim::kNoPlayer, id, Op::SetStop, 1, 0, sim::Target::city_of(0, 1)};
+    REQUIRE(fleet.edit_route(e));
+    e.op = Op::SetEntry;
+    e.value = sim::RouteEntry{kWood, true, 30 * kTon};
+    REQUIRE(fleet.edit_route(e));
+    REQUIRE(fleet.edit_route(sim::RouteEdit{sim::kNoPlayer, id, Op::Start}));
+    // At war with the computer (as every game starts): the cart loads at the nest, sells nothing.
+    REQUIRE(land.world.diplomacy().hostile(0, 1));
+    run(fleet, land.world, 60000);
+    CHECK(east.goods[kWood] == 0);
+    CHECK(land.world.players()[0].money == 10000);
+    // At peace it sells at the computer's Kontor, though the pirates have no trade treaty.
+    CHECK(!land.world.diplomacy().may_trade(0, 1));
+    land.world.diplomacy().relation(0, 1).peace = sim::Treaty::Signed;
+    land.world.diplomacy().relation(1, 0).peace = sim::Treaty::Signed;
+    run(fleet, land.world, 60000);
+    CHECK(east.goods[kWood] >= 30 * kTon);
+    CHECK(land.world.players()[0].money >= 10000 + 300);
+    // A cart takes no cannons, whatever the pirates' ships get.
+    CHECK(land.world.ship(id)->cannons == 0);
+}

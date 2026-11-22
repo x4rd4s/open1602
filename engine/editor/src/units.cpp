@@ -36,10 +36,11 @@ bool owner_ok(const sim::World& world, sim::PlayerId owner) {
                             world.acts_as(owner, sim::FactionBehaviour::Pirates));
 }
 
-/// The players who keep trade carts: humans and computers.
+/// The players who keep trade carts: humans and computers; Open1602: the pirates too, from their nest.
 bool cart_owner_ok(const sim::World& world, sim::PlayerId owner) {
     const sim::Player* p = world.player(owner);
-    return p != nullptr && (p->role == sim::PlayerRole::Human || p->role == sim::PlayerRole::Computer);
+    return p != nullptr && (p->role == sim::PlayerRole::Human || p->role == sim::PlayerRole::Computer ||
+                            world.acts_as(owner, sim::FactionBehaviour::Pirates));
 }
 
 /// The nearest of `owner`'s cities whose Kontor or market a cart on (x, y) reaches, if any.

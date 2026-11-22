@@ -549,6 +549,10 @@ private:
     /// The holds a route stop unloads `ware` from, those the route does not name for it first.
     [[nodiscard]] std::vector<std::uint8_t> route_unload_order(const Ship& ship, std::uint8_t ware) const;
     [[nodiscard]] bool may_trade(PlayerId ship_owner, PlayerId city_owner) const;
+    /// Whether `ship` trades at a city of `city_owner`: as may_trade(); Open1602: a cart of the
+    /// pirates (only a map puts one there) also at the cities of its island it is at peace with,
+    /// although the pirates have no trade treaty with anyone.
+    [[nodiscard]] bool trades_at(const Ship& ship, PlayerId city_owner) const;
     [[nodiscard]] const assets::FigureType* type_of(const Ship& ship) const;
     [[nodiscard]] std::size_t holds(const Ship& ship) const;
     [[nodiscard]] std::uint32_t space_for(const Ship& ship, std::uint8_t ware, std::uint8_t hold = 0xFF) const;
