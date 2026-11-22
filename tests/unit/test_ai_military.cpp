@@ -508,32 +508,42 @@ TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved s
     // Feedback 15: a city of nothing but a tower behind a forest, its markets and Kontor
     // destroyed. A city with a tower is not defenceless and cannot be taken over. The original's
     // soldiers find nothing to attack and stand; Open1602's go for the tower, through the trees.
-    Island a;
-    a.build(kKontor, 4, 8, kComputer, 0);
-    a.build(kTower, 70, 8, kHuman, 1);
-    for (std::int32_t y = 0; y < 20; ++y) {
-        for (std::int32_t x = 60; x <= 62; ++x) {
-            a.tree(x, y);
+    const auto play = [](bool classic, std::size_t& at_trees) {
+        Island a;
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kTower, 70, 8, kHuman, 1);
+        for (std::int32_t y = 0; y < 20; ++y) {
+            for (std::int32_t x = 60; x <= 62; ++x) {
+                a.tree(x, y);
+            }
         }
-    }
-    for (std::int32_t k = 0; k < 6; ++k) {
-        a.add(kComputer, 100, 24 + 2 * k);
-    }
-    a.war();
-    sim::Simulation s(a.world, a.buildings, a.figures);
-    run(s, 20'000);
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 100, 24 + 2 * k);
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 20'000);
+        at_trees = 0;
+        for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
+            if (soldier->target.kind == sim::Target::Kind::Building) {
+                at_trees += soldier->target.x == 60 ? 1U : 0U;  // the first tree on the way
+            }
+        }
+        const sim::IslandMap& map = a.world.islands()[0].map;
+        REQUIRE(map.top(70, 8).owner == kHuman);
+        // Five minutes: after about seven, the lone tower's tile ends up without owner in both arms,
+        // with no soldier at it.
+        run(s, 5 * 60'000);
+        return map.top(70, 8).empty() || map.top(70, 8).owner != kHuman ||
+               a.buildings.by_sprite(map.top(70, 8).sprite)->destroyed;  // the tower has fallen
+    };
     std::size_t at_trees = 0;
-    for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
-        if (soldier->target.kind == sim::Target::Kind::Building) {
-            at_trees += soldier->target.x == 60 ? 1U : 0U;  // the first tree on the way
-        }
-    }
+    CHECK(play(false, at_trees));
     CHECK(at_trees >= 4);
-    const sim::IslandMap& map = a.world.islands()[0].map;
-    REQUIRE(map.top(70, 8).owner == kHuman);
-    run(s, 10 * 60'000);
-    CHECK((map.top(70, 8).empty() || map.top(70, 8).owner != kHuman ||
-           a.buildings.by_sprite(map.top(70, 8).sprite)->destroyed));  // the tower has fallen
+    CHECK(!play(true, at_trees));
+    CHECK(at_trees == 0);
 }
 
 TEST_CASE("ai military: soldiers defend their own city before they go for an enemy city") {

@@ -854,6 +854,9 @@ void Engine::task_mine(AiPlayer& p) {
             const BuildPlan plan = plan_build(m_world, m_buildings, order);
             if (plan.items.front().ok()) {
                 placed = build(p, order.items, false);
+                if (placed != 0 && rivals() && !reached) {
+                    log(p, "mine at %d,%d: placed at %d,%d, no cart reaches it yet", hx, hy, hx + o.dx, hy + o.dy);
+                }
                 break;
             }
         }

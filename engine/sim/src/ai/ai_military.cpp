@@ -2193,12 +2193,19 @@ void Engine::tower_goals(std::uint16_t island, const City& hostile, const std::v
                          std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const {
     std::int64_t cx = 0;
     std::int64_t cy = 0;
+    std::int64_t n = 0;
     for (const std::uint32_t id : soldiers) {
         const Soldier* s = m_world.soldier(id);
+        if (s == nullptr) {
+            continue;
+        }
         cx += s->cell_x() / 2;
         cy += s->cell_y() / 2;
+        ++n;
     }
-    const auto n = static_cast<std::int64_t>(std::max<std::size_t>(1, soldiers.size()));
+    if (n == 0) {
+        return;
+    }
     const WorldIsland& isl = island_of(island);
     cx = cx / n - isl.x;
     cy = cy / n - isl.y;
