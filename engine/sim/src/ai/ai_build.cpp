@@ -1394,14 +1394,6 @@ void Engine::task_survey(AiPlayer& p) {
             ore_running_out(p) ? ", ore runs low" : "");
         demolish_tile(p, x, y);
     }
-    // Open1602 (F15): a mine no cart of the city reaches any longer (its market was pulled down or
-    // destroyed, a road broken) fills and stands for good: a market towards it, as for a slope out
-    // of the carts' reach (task_mine). One at a time, as the city builds one market at a time.
-    if (!finds.unfetched_mines.empty()) {
-        const SurveyFinds::Mine& m = finds.unfetched_mines.front();
-        log(p, "city %u/%u: no cart fetches from the mine at %d,%d", r->island, r->city, m.x, m.y);
-        (void)claim_land(p, m.slot, m.x, m.y);
-    }
     if (cotton_island && weberei_ok) {
         std::uint32_t n = 0;
         if (r->slots[kSlotCotton].count >= 2) {
@@ -1555,8 +1547,6 @@ bool Engine::survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t 
             m_world.production(p.island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y));
         if (pr != nullptr && t.type->max_idle_cycles != 0 && pr->idle_cycles >= t.type->max_idle_cycles) {
             finds.starved_mines.emplace_back(ix, iy);
-        } else if (rivals() && !mine_reached(p, *t.type, ix, iy, island_of(p.island).map.top(x, y).rotation, {})) {
-            finds.unfetched_mines.push_back(SurveyFinds::Mine{ix, iy, *slot});
         }
     }
     return true;
