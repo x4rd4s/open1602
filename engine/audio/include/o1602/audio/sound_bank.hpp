@@ -30,6 +30,9 @@ public:
     [[nodiscard]] std::optional<std::filesystem::path> find(std::string_view relative) const;
     /// Reads and decodes a file; touches no bank, so another thread may call it.
     [[nodiscard]] static annokit::core::Result<annokit::audio::Pcm> decode_file(const std::filesystem::path& path);
+    /// Why the file cannot be played, from its first bytes: missing, no sound file, or an
+    /// encoding that is not read; nothing if it looks playable (decoding it tells the rest).
+    [[nodiscard]] static std::optional<std::string> file_problem(const std::filesystem::path& path);
     [[nodiscard]] const std::string& last_error() const noexcept { return m_error; }
 
 private:

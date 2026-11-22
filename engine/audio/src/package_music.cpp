@@ -8,6 +8,7 @@
 
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/package_sounds.hpp"
+#include "o1602/audio/sound_bank.hpp"
 
 namespace o1602::audio {
 
@@ -77,8 +78,8 @@ void apply_music_file(std::vector<MusicTrack>& tracks, std::string_view package,
             continue;
         }
         track.file = folder / annokit::core::path_from_utf8(file);
-        if (!assets::is_sound_file(track.file)) {
-            warnings.push_back(at + file + " is missing or no WAV, Ogg Vorbis or FLAC file");
+        if (const auto problem = SoundBank::file_problem(track.file)) {
+            warnings.push_back(at + file + " " + *problem + "; the track is passed over");
             continue;
         }
         if (track.replaces.empty() && std::any_of(tracks.begin(), tracks.end(), [&](const MusicTrack& m) {

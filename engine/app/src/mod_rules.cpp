@@ -138,6 +138,12 @@ ModRules load_mod_rules(std::span<const assets::ModPackage> packages, assets::Bu
             assets::apply_sounds_file(rules.sounds, package.id, package.folder, text, problems);
             for (std::size_t i = before; i < rules.sounds.size(); ++i) {
                 assets::PackageSound& sound = rules.sounds[i];
+                if (const auto problem = audio::SoundBank::file_problem(sound.file)) {
+                    // A WAVE file of an encoding the game does not read: said here, not first
+                    // when the game starts and decodes it.
+                    problems.push_back(sound.id + ": " + annokit::core::path_to_utf8(sound.file.filename()) + " " +
+                                       *problem);
+                }
                 if (!sound.replaces.empty() && audio::samples_named(sound.replaces).empty()) {
                     problems.push_back(sound.id + ": SAMPLES has no sound \"" + sound.replaces +
                                        "\" to replace; it plays only where it is named");

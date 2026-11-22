@@ -42,6 +42,17 @@ annokit::core::Result<annokit::audio::Pcm> SoundBank::decode_file(const std::fil
     return pcm;
 }
 
+std::optional<std::string> SoundBank::file_problem(const std::filesystem::path& path) {
+    const auto head = annokit::core::read_file_head(path, annokit::audio::kSoundHeadBytes);
+    if (!head) {
+        return std::string("is missing");
+    }
+    if (auto ok = annokit::audio::check_sound_head(head->bytes); !ok) {
+        return "cannot be played (" + ok.error().message + ")";
+    }
+    return std::nullopt;
+}
+
 std::shared_ptr<const annokit::audio::Pcm> SoundBank::load(std::string_view relative) const {
     const auto path = find(relative);
     if (!path) {
