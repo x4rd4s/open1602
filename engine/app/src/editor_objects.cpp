@@ -228,7 +228,7 @@ std::optional<editor::Neutral> missing_party(const sim::World& world, sim::Playe
 /// and the pirates; for a ship the free trader last, else the neutral buildings' player last. The
 /// natives, the pirates and the neutral buildings' player stand there by their slots while the
 /// world has none of them (a map of open sea): they come with the first choice of them,
-/// MapViewer::editor_neutral_owner. A trade cart only for humans and computers; `existing` only
+/// MapViewer::editor_neutral_owner. A trade cart for humans, computers and the pirates the world has; `existing` only
 /// players the world has.
 std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = false, bool cart = false,
                                          bool existing = false) {
@@ -242,6 +242,14 @@ std::vector<sim::PlayerId> object_owners(const sim::World& world, bool ship = fa
         }
     }
     if (cart) {
+        // Open1602: the pirates' carts too, from a nest the world has.
+        for (std::size_t i = 0; i < world.players().size(); ++i) {
+            const auto p = static_cast<sim::PlayerId>(i);
+            if (world.players()[i].role == sim::PlayerRole::Neutral &&
+                world.acts_as(p, sim::FactionBehaviour::Pirates)) {
+                owners.push_back(p);
+            }
+        }
         return owners;
     }
     // The natives and the pirates by slot, those to come where they will stand: choosing one

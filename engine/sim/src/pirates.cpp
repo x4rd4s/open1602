@@ -204,7 +204,7 @@ void Fleet::pirates_step() {
         const assets::FigureType* t = m_figures->get(figure::kPirate);
         const std::uint32_t cap = t != nullptr && t->ship.max_cannons != 0 ? t->ship.max_cannons : kMaxPirateCannons;
         for (Ship& s : m_world->ships()) {
-            if (s.owner == p && s.cannons == 0 && !s.sinking) {
+            if (s.owner == p && s.cannons == 0 && !s.sinking && !s.cart()) {
                 s.cannons = static_cast<std::uint8_t>(std::min(cannons, cap));
                 m_pirate_spawn_ms = interval_ms;
             }
