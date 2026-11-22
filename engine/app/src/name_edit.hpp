@@ -15,6 +15,8 @@
 
 #include "o1602/sim/simulation.hpp"
 #include "o1602/sim/world.hpp"
+#include "o1602/ui/panel.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 namespace o1602::app {
 
@@ -44,12 +46,12 @@ struct NameTarget {
 /// The name being typed (the original's text input). A click on the name
 /// starts it; Enter, a click elsewhere in the window or closing the window keeps the name, Escape
 /// takes it back (Open1602: the original has no way back and changes the name with every key).
+/// Open1602: the caret moves and letters are selected as in every other text field (ui::TextCaret);
+/// the original only appends and takes the last letter.
 class NameEdit {
 public:
     /// Characters of a name: the original's input takes 16.
     static constexpr std::size_t kMaxLength = 16;
-    /// The cursor behind the text while typing, as in the original.
-    static constexpr char kCursor = '_';
 
     /// Starts typing the name of `target` with its current name; nothing if `player` may not rename
     /// it, or if that name is typed already. A name being typed for another target is kept first:
@@ -59,14 +61,20 @@ public:
     [[nodiscard]] const std::optional<NameTarget>& target() const noexcept { return m_target; }
     [[nodiscard]] const std::string& text() const noexcept { return m_text; }
 
-    /// What a window shows as the name of `target`: while it is typed the text with the cursor,
-    /// else `name` (the world's). Tells the editor that the target is still on screen.
+    /// What a window shows as the name of `target`: while it is typed the text typed so far, else
+    /// `name` (the world's). Tells the editor that the target is still on screen.
     [[nodiscard]] std::string shown(const NameTarget& target, std::string_view name);
+    /// The caret and the selection in the name of `target` while it is typed (ui::Panel::set_mark()),
+    /// nothing else.
+    [[nodiscard]] std::optional<ui::TextMark> mark(const NameTarget& target) const;
+    /// The selected part of the name being typed (Ctrl+C), empty if none.
+    [[nodiscard]] std::string selected_text() const;
 
-    /// Text typed (Windows-1252): control characters are dropped, the name stops at kMaxLength.
+    /// Text typed (Windows-1252): control characters are dropped; it takes the selection's place
+    /// or goes in at the caret, the name stops at kMaxLength.
     void type(std::string_view text);
-    /// A key while typing: Backspace (8) takes the last character, Enter (13) keeps the name (its
-    /// command comes back), Escape (27) takes it back.
+    /// A key while typing: the keys of ui::TextCaret::edit() (Backspace, Delete, the arrows, Home,
+    /// End, Ctrl+A), Enter (13) keeps the name (its command comes back), Escape (27) takes it back.
     std::optional<sim::Command> key(int key);
     /// Ends typing and keeps the name: the command, if the name changed and is one.
     std::optional<sim::Command> commit();
@@ -86,6 +94,7 @@ private:
     std::optional<NameTarget> m_target;
     sim::PlayerId m_player = sim::kNoPlayer;
     std::string m_text;
+    ui::TextCaret m_caret;   ///< in m_text
     std::string m_original;  ///< the name when typing started
     bool m_shown = false;    ///< a window showed the target this frame
     bool m_clicked_name = false;

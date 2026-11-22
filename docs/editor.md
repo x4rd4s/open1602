@@ -137,7 +137,7 @@ player, without costs, and takes them away again. Each click, or each drag, is o
 |---|---|
 | Tool | **Build**: a left click puts the building down about the mouse, for the owner; dragged, the next one goes where it no longer covers the last, so roads, walls and fields are dragged out. **Template**: a left click builds one of the templates saved in games (the copy tool's pieces, kept in the folder "templates" of the user's data folder) about the mouse, for the owner; what does not fit is left out. **Ship**: a left click puts a new, empty ship on the water. **Unit**: a left click puts a land unit on an island, or a trade cart on a road of its owner's land. **Resource**: a left click puts a vein into an ore mountain, a treasure under open ground or deer into a forest. **Paint territory**: dragged over land, gives it to the owner's city on that island without a building that claims it (a city of its own needs its Kontor first); the right button takes it back, except where a market, Kontor or tower of the city covers it or one of its buildings stands. **Left button** switches the tool to taking land back with the left button; the right button then gives it. **Remove**: a left click takes the ship or unit under the mouse away, else the treasure, deer or vein there, else the building, as its owner demolishes it. |
 | Group | The groups of the build menu (with the buildings packages add to it), then the natives' and pirates' buildings (the natives' huts named by what they are: chief's, warriors', tobacco growers', spice growers' and dwelling huts, each in the natives' two looks; the pyramid, the pirates' warehouse, houses and tower, ...), last the special objects (below); not for ships and units. |
-| Building, Template, Ship, Unit, Resource, Brush | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) the natives' spearman, placed for the natives only, and the trade cart; a big or small iron vein, gold, a treasure or deer; for Paint territory the brush's size (its shape is the terrain brush's) and which way the left button paints (Left button). |
+| Building, Template, Ship, Unit, Resource, Brush | The group's buildings by name; the templates by name, read again from their folder each time the tool is chosen; the four ships of the shipyards (with those packages add), the pirates' ship and the free trader's ship, the four land units of the castle (with those packages add) the natives' spearman (for the natives, a human or a computer: a player's spearman cannot go on board or be trained, and disbanding him costs nothing; the computers count him with their swordsmen), and the trade cart; a big or small iron vein, gold, a treasure or deer; for Paint territory the brush's size (its shape is the terrain brush's) and which way the left button paints (Left button). |
 | Rotation | A quarter clockwise, for a building that turns or a template; the way a ship or unit faces. |
 | Owner | The player the building, template, ship or unit is for: one of the map's humans and computers, or the natives or the pirates where the map has them; for a ship also the free trader; for a trade cart only the humans and computers. For buildings, templates and units the last is "Neutral": buildings for nobody on free land, without a Kontor, which soldiers take ([the neutral buildings](modding/factions.md#the-neutral-buildings)); the map gets their player when it is first chosen. |
 | Placed lately | The last six objects placed, the last first: a click takes one in hand again (its tool, building or type and rotation), for the owner chosen now. |
@@ -224,10 +224,15 @@ the right button as many as the ship takes or none. Each change is one step of u
 
 **Name** types a new name for the ship or trade cart, up to 40 characters, as its owner may give it
 (a ship without one is named from the ship names when the game starts). **For sale** offers a
-human's or computer's ship for sale from the start at its full price, as its owner offers it in
-the game; other players, computers too, can buy it.
+human's or computer's ship for sale from the start, as its owner offers it in the game; other
+players, computers too, can buy it. A ship of the pirates or the natives can be offered too:
+players buy it only while they are at peace with its owner (with the pirates after paying for
+peace), and the pirates' ship is worth the price of the dearest ship a shipyard builds. The
+pirates build new ships without it as they always do. **Price** below it sets what it costs, in steps of 10 % of the
+ship type's price (- and +, from nothing to three times the price; the right button: the type's own
+price again), as the price slider of the ship's window in the game.
 
-Beside it, **Route** gives the ship or trade cart a trade route as its route window in the game
+Beside it, **Route** gives the ship or trade cart (select the cart on the map, as a ship) a trade route as its route window in the game
 does: **Stop 1 of 8** (a cart: of 4) chooses the stop to change, **City** the city it goes to (a
 ship's any city with a Kontor, a cart's only those of its island, its own or a foreign one it may
 trade with, and only one it finds a way to; **No stop** empties it), and
@@ -236,7 +241,8 @@ whether the stop **loads** it until that much is on board or **unloads** up to t
 tons (+ and - by 10 t, with the right button by 1 t). **Runs from the start** switches the route on:
 the ship or cart sets off along it as soon as the game begins, from its first stop. Changed while
 on, the route begins again from its first stop; without any stop it is off. Switched off, the ship
-waits where it was placed. Each change is one step of undo.
+waits where it was placed. Each change is one step of undo. **Route** stays grey while there is no
+city to go to: for a cart, while its island has no city with a Kontor.
 In the game, a cart that finds no way to a stop of its route goes on to the next one; three rounds
 like that warn its player as refused transfers do (Open1602).
 
@@ -254,7 +260,7 @@ steps it back. Each change is one step of undo.
 | Monuments, Arches | How many monuments and triumphal arches the player may build (0 to 9). |
 | Name | A click on it renames the player; left empty, the game calls the player after its colour. |
 | Faction | Shown only when a content package brings factions of the settlers' behaviour ([factions.md](modding/factions.md)): the slot's faction, the settlers or one of the packages'. The scenario keeps it, as `slot.<n>` of a package's scenario does. |
-| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
+| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; a map without the free trader (a new one of open sea) gets him with it, as every new game has him, and a map saved without him gets him when it is opened; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
 
 A player without a city and a ship is out of the game (defeated) as soon as it starts: give a new player a ship or a Kontor on the
 page **Place objects**.

@@ -93,10 +93,14 @@ enum class UnitRefusal : std::uint8_t {
                                                                                  std::uint32_t id,
                                                                                  std::uint32_t cannons);
 
+/// Whether ships of `owner` may be offered for sale: a human's, a computer's, the pirates' and the
+/// natives' (bought only at peace with them), not the free trader's.
+[[nodiscard]] bool ship_sellable(const sim::World& world, sim::PlayerId owner);
+
 /// Ship `id` offered for sale from the game's start at its price · `factor` / 128 (0 to
 /// sim::ShipCommand::kMaxSaleFactor), or no longer (`on` false), as its owner offers it in the
 /// game. Fails (NotFound) without the ship, (Unsupported) for a trade cart or a ship of nobody
-/// who trades ships (only humans and computers), (OutOfRange) for a factor beyond the game's.
+/// who sells ships (ship_sellable), (OutOfRange) for a factor beyond the game's.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_ship_for_sale(const sim::World& world,
                                                                                   std::uint32_t id, bool on,
                                                                                   std::uint16_t factor = 128);

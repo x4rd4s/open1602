@@ -7,7 +7,9 @@
 // the form draws it and answers the mouse. Pure logic, like ui::Panel.
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -17,6 +19,7 @@
 
 #include "o1602/ui/font.hpp"
 #include "o1602/ui/panel.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 namespace o1602::ui {
 
@@ -128,18 +131,36 @@ public:
 
     /// The field that takes the keys, if any.
     [[nodiscard]] std::optional<Id> focus() const noexcept { return m_focus; }
+    /// Another field (or none) takes the keys: its caret is at the end of its text, nothing selected.
     void set_focus(std::optional<Id> id) noexcept {
         if (id != m_focus) {
-            m_all_selected = false;
+            m_caret.reset();
         }
         m_focus = id;
     }
     /// Ctrl+A: the whole text of the field with the focus is selected (shown on the selected
     /// colour); what is typed next replaces it, Backspace removes it.
-    void select_all() noexcept { m_all_selected = m_focus.has_value(); }
-    [[nodiscard]] bool all_selected() const noexcept { return m_all_selected && m_focus.has_value(); }
+    void select_all() noexcept {
+        if (m_focus) {
+            m_caret.select_all();
+        }
+    }
+    [[nodiscard]] bool all_selected() const noexcept { return m_focus.has_value() && m_caret.all_selected(); }
     /// Whether the whole text was selected; the selection is gone afterwards (any key ends it).
-    bool take_all_selected() noexcept { return std::exchange(m_all_selected, false) && m_focus.has_value(); }
+    bool take_all_selected() noexcept { return m_caret.take_all_selected() && m_focus.has_value(); }
+
+    /// Where the caret stands in `text`, the focused field's text (its end, unless moved).
+    [[nodiscard]] std::size_t caret(std::string_view text) const noexcept { return m_caret.caret(text); }
+    /// The part of `text`, the focused field's text, that is selected: [first, second), empty
+    /// (both at the caret) if nothing is.
+    [[nodiscard]] std::pair<std::size_t, std::size_t> selection(std::string_view text) const noexcept;
+    /// Text typed into `text`, the focused field's (TextCaret::insert()).
+    void insert(std::string& text, std::string_view typed, std::size_t most) { m_caret.insert(text, typed, most); }
+    /// A key for `text`, the focused field's (TextCaret::edit()). False for any other key (and
+    /// without a focus), which the owner handles.
+    bool edit(std::string& text, int key) { return m_focus.has_value() && m_caret.edit(text, key); }
+    /// The selected text of the focused field as last laid out (Ctrl+C); empty for a secret one.
+    [[nodiscard]] std::string selected_text() const;
 
     /// The mouse at (x, y) in pixels of the form's region: the widget clicked (pressed and
     /// released on it with the same button), if any. The right button clicks cycle buttons only;
@@ -214,7 +235,7 @@ private:
     MouseButton m_clicked_with = MouseButton::Left;
     std::optional<Id> m_hovered;
     std::optional<Id> m_focus;
-    bool m_all_selected = false;  ///< select_all()
+    TextCaret m_caret;  ///< of the focused field's text
     bool m_released = false;
     double m_slide = 0.0;  ///< the held slider's knob, then where it was let go
 };

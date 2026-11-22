@@ -313,6 +313,12 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         out.push_back(std::move(s));
     }
     for (const assets::PackageScenario& p : scenarios) {
+        // A part of a campaign is chosen inside it, not once more on its own.
+        if (std::any_of(campaigns.begin(), campaigns.end(), [&](const assets::PackageCampaign& c) {
+                return std::find(c.parts.begin(), c.parts.end(), p.id) != c.parts.end();
+            })) {
+            continue;
+        }
         MenuScenario s;
         s.name = p.name(language);
         s.base = base_of(p.id);
@@ -321,6 +327,35 @@ std::vector<MenuScenario> package_scenario_list(std::span<const assets::PackageS
         s.package_scenario = p.id;
         s.briefing = p.briefing(language);
         out.push_back(std::move(s));
+    }
+    return out;
+}
+
+std::vector<MenuScenario> package_scenario_parts(std::span<const assets::PackageScenario> scenarios,
+                                                 std::span<const assets::PackageCampaign> campaigns,
+                                                 std::string_view language, std::string heading) {
+    std::vector<MenuScenario> out;
+    for (MenuScenario& entry : package_scenario_list(scenarios, campaigns, language, std::move(heading))) {
+        if (entry.package_campaign.empty()) {
+            out.push_back(std::move(entry));
+            continue;
+        }
+        for (std::size_t i = 0; i < entry.files.size() && i < entry.package_parts.size(); ++i) {
+            MenuScenario part;
+            const auto named = std::find_if(entry.part_names.begin(), entry.part_names.end(),
+                                            [&](const auto& n) { return n.first == entry.files[i].first; });
+            const std::string part_name = named != entry.part_names.end() && !named->second.empty()
+                                              ? named->second
+                                              : ui::tr("menu.part", {std::to_string(i + 1)});
+            part.name = entry.name + ": " + part_name;
+            part.base = entry.base;
+            part.base += "_" + std::to_string(i + 1);
+            part.header.ranking = entry.header.ranking;
+            part.files.emplace_back(std::uint8_t{0xFF}, entry.files[i].second);
+            part.package_scenario = entry.package_parts[i].scenario;
+            part.briefing = entry.package_parts[i].briefing.empty() ? entry.briefing : entry.package_parts[i].briefing;
+            out.push_back(std::move(part));
+        }
     }
     return out;
 }
@@ -973,7 +1008,13 @@ void MainMenu::refresh_mission() {
 
 void MainMenu::refresh_colour() {
     ui::Panel& p = *m_colour;
-    p.set_text(kNameBox, m_typing ? m_name + "_" : m_name);
+    p.set_text(kNameBox, m_name);
+    std::optional<ui::TextMark> mark;
+    if (m_typing) {
+        const auto [first, last] = m_caret.selection(m_name);
+        mark = ui::TextMark{m_caret.caret(m_name), first, last};
+    }
+    p.set_mark(kNameBox, mark);
     // The further colours' coats of arms, golden under the mouse; the banner in the hall with the
     // same pattern shows the colour (render/shape_tint.hpp).
     // While the name is typed the mouse does not choose (mouse()): no coat of arms lights up.
@@ -1299,6 +1340,9 @@ std::vector<MenuEvent> MainMenu::mouse(std::int32_t x, std::int32_t y, bool down
                 break;
             case Screen::Colour:
                 if (e.id == kNameBox) {
+                    if (!m_typing) {
+                        m_caret.reset();
+                    }
                     m_typing = true;
                 } else if ((e.id >= kBanner && e.id < kBanner + static_cast<std::int32_t>(sim::kOriginalPlayers)) ||
                            (e.id >= kMoreArms && e.id < kMoreArms + static_cast<std::int32_t>(kMoreBanners))) {
@@ -1335,7 +1379,7 @@ void MainMenu::open_colour_screen() {
         m_name = default_name();
     }
     m_typing = true;
-    m_name_fresh = true;
+    m_caret.select_all();
 }
 
 void MainMenu::open_scenario_settings() {
@@ -1416,29 +1460,33 @@ void MainMenu::type(std::string_view text) {
         return;
     }
     constexpr std::size_t kMaxName = 19;
-    if (std::exchange(m_name_fresh, false) && !text.empty()) {
-        m_name.clear();
-    }
+    std::string typed;
     for (const char c : text) {
-        if (static_cast<unsigned char>(c) >= 0x20 && m_name.size() < kMaxName) {
-            m_name.push_back(c);
+        if (static_cast<unsigned char>(c) >= 0x20) {
+            typed.push_back(c);
         }
     }
+    m_caret.insert(m_name, typed, kMaxName);
+}
+
+std::string MainMenu::selected_text() const {
+    if (!m_typing) {
+        return {};
+    }
+    const auto [first, last] = m_caret.selection(m_name);
+    return m_name.substr(first, last - first);
 }
 
 std::optional<MenuEvent> MainMenu::key(int key) {
     if (!m_typing) {
         return std::nullopt;
     }
-    if (key == 8) {
-        if (std::exchange(m_name_fresh, false)) {
-            m_name.clear();
-        } else if (!m_name.empty()) {
-            m_name.pop_back();
-        }
-    } else if (key == 13) {
+    if (m_caret.edit(m_name, key)) {
+        return std::nullopt;
+    }
+    if (key == 13) {
         m_typing = false;
-        m_name_fresh = false;
+        m_caret.reset();
         if (m_name.empty()) {
             m_name = default_name();
         }

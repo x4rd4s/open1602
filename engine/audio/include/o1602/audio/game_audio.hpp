@@ -15,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -311,6 +312,8 @@ private:
     void take_loaded(bool wait);
     void fade_out();
     [[nodiscard]] std::optional<std::string> pick(std::uint64_t game_ms);
+    /// Whether the track's file could not be decoded once: it is not tried again.
+    [[nodiscard]] bool broken(const std::string& title) const { return m_broken.contains(title); }
 
     annokit::audio::Mixer* m_mixer;
     SoundBank* m_bank;
@@ -325,6 +328,9 @@ private:
     annokit::audio::Mixer::VoiceId m_voice = annokit::audio::Mixer::kNoVoice;
     std::string m_title;
     std::vector<std::string> m_history;  ///< last tracks played, newest last
+    /// Tracks whose file could not be decoded: passed over from then on, so that a broken file is
+    /// not read again and again (a list of only broken tracks would else retry it every frame).
+    std::set<std::string> m_broken;
     std::optional<std::size_t> m_current;
     bool m_battle = false;
     std::uint64_t m_mode_ms = 0;  ///< game time of the last shot or mode change

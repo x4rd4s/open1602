@@ -1187,6 +1187,7 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
                 if (m_setup.kind == Kind::Scenario && m_chosen && *m_chosen < model.scenarios.size()) {
                     const MenuScenario& s = model.scenarios[*m_chosen];
                     setup.file = s.files.empty() ? std::filesystem::path{} : s.files.front().second;
+                    setup.package_scenario = s.package_scenario;
                     setup.file_name = s.name;
                 } else if (m_setup.kind == Kind::Savegame && m_chosen) {
                     setup.slot = *m_chosen;
@@ -1374,15 +1375,13 @@ void MultiplayerMenu::type(std::string_view text) {
         return;
     }
     const bool digits = *focus == kSeed || *focus == kPort;
-    if (!text.empty() && m_form.take_all_selected()) {
-        s->clear();  // typed over the whole text (Ctrl+A)
-    }
+    std::string typed;
     for (const char c : text) {
-        const bool ok = digits ? (c >= '0' && c <= '9') : static_cast<unsigned char>(c) >= 0x20;
-        if (ok && s->size() < field_limit(*focus)) {
-            s->push_back(c);
+        if (digits ? (c >= '0' && c <= '9') : static_cast<unsigned char>(c) >= 0x20) {
+            typed.push_back(c);
         }
     }
+    m_form.insert(*s, typed, field_limit(*focus));
 }
 
 std::vector<MultiplayerEvent> MultiplayerMenu::key(const MultiplayerModel& model, int key) {
@@ -1393,19 +1392,10 @@ std::vector<MultiplayerEvent> MultiplayerMenu::key(const MultiplayerModel& model
         m_form.set_focus(std::nullopt);
         return out;
     }
-    if (key == 1) {
-        m_form.select_all();  // Ctrl+A
+    if (m_form.edit(*s, key)) {
         return out;
     }
-    const bool all = m_form.take_all_selected();
     switch (key) {
-        case 8:
-            if (all) {
-                s->clear();
-            } else if (!s->empty()) {
-                s->pop_back();
-            }
-            break;
         case 9: {
             // The next field of the screen.
             constexpr std::array<Id, 8> kOrder = {kName,     kAddress, kJoinPassword, kTitle,

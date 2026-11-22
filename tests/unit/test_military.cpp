@@ -108,6 +108,9 @@ assets::FigureTable make_figures() {
         "  Worktime: 2.0\n  Shottime: 0.7\n  Maxenergy: 15\n  Hitpoint: 2.4\n"
         "  Nummer: 38\n  Gfx: 0\n  Blocknr: 1\n  Shotradius: 7.5\n  Worktime: 3.0\n  Shottime: 0.6\n"
         "  Maxenergy: 24\n  Hitpoint: 4.0\n"
+        // The natives' spearman (SPEER1).
+        "  Nummer: 33\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Shotradius: 0.75\n  Maxstepcnt: 1\n"
+        "  Worktime: 0.8\n  Shottime: 0.6\n  Maxenergy: 15\n  Hitpoint: 1.0\n"
         // A small ship with two holds.
         "  Nummer: 21\n  Gfx: 0\n  Blocknr: 1\n  Maxware: 2\n"
         // A trade cart (TRADER1).
@@ -620,6 +623,24 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
     CHECK(boat->cargo[0].ware == 0);
 }
 
+TEST_CASE("military: a player's spearman (from a map) does not go on board") {
+    Field f;
+    f.start();
+    sim::Ship ship = sim::make_ship("Boat", 8, 15, 21, 0);
+    ship.cargo.resize(4);
+    f.world.add_ship(ship);
+    const std::uint32_t ship_id = f.world.ships().back().id;
+    const std::uint32_t id = f.add(assets::figure::kSpearman, 0, 2 * 14, 2 * 15).id;
+    CHECK(!f.military->order(sim::SoldierOrder{0, {id}, sim::Target::other_ship(ship_id)}));
+    // Sent there anyway (a target of an old order): he stays ashore, the holds stay empty.
+    f.world.soldier(id)->target = sim::Target::other_ship(ship_id);
+    f.run(10'000);
+    REQUIRE(f.world.soldier(id) != nullptr);
+    CHECK(f.world.ship(ship_id)->cargo[0].ware == 0);
+    // He walks elsewhere as any unit.
+    CHECK(f.military->order(sim::SoldierOrder{0, {id}, sim::Target::spot(2 * 16, 2 * 15)}));
+}
+
 TEST_CASE("military: soldiers do not land behind another player's wall along the coast") {
     for (const bool original : {false, true}) {
         for (const sim::PlayerId wall_owner : {sim::PlayerId{1}, sim::PlayerId{0}}) {
@@ -898,6 +919,62 @@ TEST_CASE("military: a village without huts is gone, its land free, and it curse
     CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
     CHECK(std::any_of(f.construction.begin(), f.construction.end(),
                       [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
+}
+
+TEST_CASE("military: the land of a village that is gone goes to the city whose land covers it") {
+    Field f(false, true);
+    // Player 0's Kontor (circle of 8 tiles) beside the village; one tile of the village lies in its
+    // circle, one far outside it.
+    f.build(kKontor, 4, 4, 0, 0);
+    f.world.city(0, 0)->warehouse_x = 4;
+    f.world.city(0, 0)->warehouse_y = 4;
+    f.build(kKontorRuin, 20, 5, 2, 1);
+    f.world.city(0, 1)->warehouse_x = 20;
+    f.world.city(0, 1)->warehouse_y = 5;
+    for (const std::int32_t x : {14, 16, 18}) {
+        f.build(kVillageHut, x, 9, 2, 1);
+    }
+    f.world.island(0).map.set_city(7, 8, 1, 2);
+    f.world.island(0).map.set_city(24, 12, 1, 2);
+    f.start();
+    for (const std::uint16_t x : std::array<std::uint16_t, 3>{14, 16, 18}) {
+        f.military->damage_building(0, x, 9, 32 * 3, true, 0, &f.construction);
+        f.run(50);
+    }
+    CHECK(f.world.city(0, 1) == nullptr);
+    // Within the Kontor's circle the land is player 0's at once, no new market needed.
+    CHECK(f.world.islands()[0].map.top(7, 8).city == 0);
+    CHECK(f.world.islands()[0].map.top(7, 8).owner == 0);
+    // Outside it the land is free.
+    CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+    CHECK(f.world.islands()[0].map.top(24, 12).owner == sim::kNoPlayer);
+    CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
+    // The Kontor's city stays as it was.
+    CHECK(f.world.city(0, 0) != nullptr);
+    CHECK(f.world.islands()[0].map.top(4, 4).city == 0);
+}
+
+TEST_CASE("military: the land of a computer's city it gives up goes to the city whose land covers it") {
+    Field f;
+    // Player 1, a computer, city 0: its Kontor destroyed, one house left. Player 0's city 1 has a
+    // Kontor whose circle reaches one tile of it.
+    f.build(kKontorDestroyed, 20, 5, 1, 0);
+    f.world.city(0, 0)->warehouse_x = 20;
+    f.world.city(0, 0)->warehouse_y = 5;
+    f.build(kHouse, 14, 9, 1, 0);
+    f.build(kKontor, 4, 4, 0, 1);
+    f.world.city(0, 1)->warehouse_x = 4;
+    f.world.city(0, 1)->warehouse_y = 4;
+    f.world.island(0).map.set_city(7, 8, 0, 1);
+    f.world.island(0).map.set_city(24, 12, 0, 1);
+    f.start();
+    f.military->damage_building(0, 14, 9, 32 * 30, true, 0, &f.construction);
+    f.run(50);
+    CHECK(f.world.city(0, 0) == nullptr);
+    CHECK(f.world.islands()[0].map.top(7, 8).city == 1);
+    CHECK(f.world.islands()[0].map.top(7, 8).owner == 0);
+    CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+    CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
 }
 
 TEST_CASE("military: as in the original, the ruins of a village without huts keep its land") {

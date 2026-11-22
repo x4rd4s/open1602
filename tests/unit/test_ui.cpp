@@ -90,6 +90,49 @@ assets::GadgetLayout layout() {
 
 }  // namespace
 
+TEST_CASE("ui: a text being typed in a panel shows its caret and its selection") {
+    assets::GadgetLayout l;
+    assets::Gadget name;
+    name.id = 7;
+    name.kind = assets::GadgetKind::TextCentre;
+    name.pos = {100, 50};
+    l.gadgets.push_back(name);
+    ui::Panel panel(l, 1.0);
+    const std::array<const ui::Font*, ui::kFontSlots> fonts{};  // every byte 9 wide
+    panel.set_text(7, "Abc");
+    // The caret at the end: the underscore behind the text, centred with it.
+    panel.set_mark(7, ui::TextMark{3, 3, 3});
+    auto items = panel.draw(fonts);
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text == "Abc_");
+    CHECK(items[0].x == 100);
+    // Inside the text: under the letter after the caret, the text centred without it.
+    panel.set_mark(7, ui::TextMark{1, 1, 1});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Abc");
+    CHECK(items[1].text == "_");
+    CHECK(items[1].align == ui::Align::Left);
+    CHECK(items[1].x == 100 - 13 + 9);
+    // Selected letters on a gold ground, no caret.
+    panel.set_mark(7, ui::TextMark{3, 1, 3});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].kind == ui::DrawItem::Kind::Fill);
+    CHECK(items[0].x == 100 - 13 + 9);
+    CHECK(items[0].w == 18);
+    CHECK(items[0].half);
+    CHECK(items[1].text == "Abc");
+    // An empty name being typed shows the underscore alone; without the mark only the text shows.
+    panel.set_text(7, "");
+    panel.set_mark(7, ui::TextMark{});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text == "_");
+    panel.set_mark(7, std::nullopt);
+    CHECK(panel.draw(fonts).empty());
+}
+
 TEST_CASE("ui: a GAD layout with include, relative numbers and pairs that keep their second value") {
     const auto l = layout();
     REQUIRE(l.gadgets.size() == 4);  // the highest Nummer, not the 300 defaults of ObjFill
@@ -309,6 +352,9 @@ TEST_CASE("ui: text width, colours, wrapping with hyphens and hard breaks") {
     CHECK((ui::wrap_text(font, "aa bb cc", 20) == std::vector<std::string>{"aa bb", "cc"}));
     CHECK((ui::wrap_text(font, "aa\n\nbb", 100) == std::vector<std::string>{"aa", "bb"}));  // several breaks: one
     CHECK((ui::wrap_text(font, "abc--def", 100) == std::vector<std::string>{"abcdef"}));
+    // A word ending in a hyphen keeps the space after it: "Nord- und Süd", a list's "- item".
+    CHECK((ui::wrap_text(font, "ab- cd", 100) == std::vector<std::string>{"ab- cd"}));
+    CHECK((ui::wrap_text(font, "- ab", 100) == std::vector<std::string>{"- ab"}));
     CHECK((ui::wrap_text(font, "x abc--def", 24) == std::vector<std::string>{"x abc-", "def"}));
     CHECK((ui::wrap_text(font, "abcdefgh", 12) == std::vector<std::string>{"abc", "def", "gh"}));
     // A line starting with a byte from 0x80 keeps it after a hard break (U-017).
@@ -618,6 +664,88 @@ TEST_CASE("ui: a form of Open1602's own: clicks, focus, cut texts and the scale"
     CHECK(texts[0].back() == '_');
     CHECK(texts[0].size() < std::string("eine sehr lange Adresse_").size());
     CHECK(texts[1] == "******");
+}
+
+TEST_CASE("ui: a form's field is edited at its caret: arrows, Home, End, Delete and a selection by Shift") {
+    ui::Form form;
+    std::string text = "Insel";
+    form.field(1, ui::Rect{0, 0, 300, 30}, text);
+    // Without a focus the keys are the owner's.
+    CHECK(!form.edit(text, ui::kKeyLeft));
+    form.set_focus(1);
+    CHECK(form.caret(text) == 5);  // at the end
+    CHECK(form.edit(text, ui::kKeyLeft));
+    CHECK(form.edit(text, ui::kKeyLeft));
+    form.insert(text, "xy", 64);
+    CHECK(text == "Insxyel");
+    CHECK(form.caret(text) == 5);
+    CHECK(form.edit(text, ui::kKeyDelete));
+    CHECK(text == "Insxyl");
+    CHECK(form.edit(text, ui::kKeyBackspace));
+    CHECK(text == "Insxl");
+    CHECK(form.edit(text, ui::kKeyHome));
+    CHECK(form.caret(text) == 0);
+    CHECK(form.edit(text, ui::kKeyBackspace));  // nothing before the caret
+    CHECK(text == "Insxl");
+    // Shift selects on the caret's way; typing replaces the selection, the limit counts.
+    CHECK(form.edit(text, ui::kKeyRight + ui::kKeyShift));
+    CHECK(form.edit(text, ui::kKeyRight + ui::kKeyShift));
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{0, 2}));
+    form.field(1, ui::Rect{0, 0, 300, 30}, text);
+    CHECK(form.selected_text() == "In");
+    form.insert(text, "ABCDEF", 7);
+    CHECK(text == "ABCDsxl");
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{4, 4}));
+    // Left without Shift ends a selection at its left side.
+    CHECK(form.edit(text, ui::kKeyEnd + ui::kKeyShift));
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{4, 7}));
+    CHECK(form.edit(text, ui::kKeyLeft));
+    CHECK(form.caret(text) == 4);
+    CHECK(form.selection(text).first == form.selection(text).second);
+    // Ctrl+A and Delete empty it; another key than these is the owner's.
+    CHECK(form.edit(text, ui::kKeySelectAll));
+    CHECK(form.all_selected());
+    CHECK(form.edit(text, ui::kKeyDelete));
+    CHECK(text.empty());
+    CHECK(!form.edit(text, ui::kKeyEnter));
+    // A secret field's text is not copied.
+    std::string secret = "geheim";
+    form.clear();
+    form.field(2, ui::Rect{0, 0, 300, 30}, secret, true);
+    form.set_focus(2);
+    form.select_all();
+    CHECK(form.selected_text().empty());
+}
+
+TEST_CASE("ui: a form's field shows the caret inside its text and keeps it in sight") {
+    ui::Form form;
+    std::string text = "abcdefghijklmnopqrstuvwxyz";
+    form.set_focus(1);
+    for (int i = 0; i < 20; ++i) {
+        (void)form.edit(text, ui::kKeyLeft);
+    }
+    // 9 units a byte without a font: 100 wide, 84 inside, room for 9 bytes.
+    form.field(1, ui::Rect{0, 0, 100, 30}, text);
+    std::vector<ui::DrawItem> texts;
+    for (const ui::DrawItem& d : form.draw({nullptr, nullptr, nullptr})) {
+        if (d.kind == ui::DrawItem::Kind::Text) {
+            texts.push_back(d);
+        }
+    }
+    REQUIRE(texts.size() == 2);
+    CHECK(texts[0].text == "abcdefghi");  // the start, the caret (after "f") in sight
+    CHECK(texts[1].text == "_");
+    CHECK(texts[1].x == texts[0].x + 6 * 9);
+    // At the far end the text's start is left out, as before.
+    (void)form.edit(text, ui::kKeyEnd);
+    texts.clear();
+    for (const ui::DrawItem& d : form.draw({nullptr, nullptr, nullptr})) {
+        if (d.kind == ui::DrawItem::Kind::Text) {
+            texts.push_back(d);
+        }
+    }
+    REQUIRE(texts.size() == 1);
+    CHECK(texts[0].text == "stuvwxyz_");
 }
 
 TEST_CASE("ui: a banner's colour made legible as text on a dark ground") {

@@ -298,7 +298,7 @@ std::vector<std::string> wrap_text(const Font& font, std::string_view text, std:
                 ++j;
             }
             const std::string_view word = text.substr(i, j - i);
-            const std::string sep = line.empty() || line.back() == '-' ? "" : " ";
+            const std::string sep = line.empty() ? "" : " ";
             const std::string candidate = line + sep + without_hyphens(word);
             if (!wrap || font.width(candidate) <= max_width) {
                 line = candidate;

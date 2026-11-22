@@ -44,10 +44,11 @@ struct HostSetup {
     /// sized for them.
     std::uint8_t players = 4;
     static constexpr std::uint8_t kMinPlayers = 4;
-    std::filesystem::path file;  ///< scenario
-    std::size_t slot = 0;        ///< savegame: its slot
-    std::string file_name;       ///< its name for the lobby (Windows-1252)
-    std::string title;           ///< the game's name
+    std::filesystem::path file;    ///< scenario
+    std::string package_scenario;  ///< scenario: a package's, by its id ("<package>:<name>"); empty: none
+    std::size_t slot = 0;          ///< savegame: its slot
+    std::string file_name;         ///< its name for the lobby (Windows-1252)
+    std::string title;             ///< the game's name
     std::string password;
     bool lan = true;  ///< answer searches on the local network
     bool join_running = true;
@@ -231,6 +232,8 @@ public:
     [[nodiscard]] const std::string& name() const noexcept { return m_name; }
 
     [[nodiscard]] bool typing() const noexcept { return m_form.focus().has_value(); }
+    /// The widgets as laid out last, with the field typed in.
+    [[nodiscard]] const ui::Form& form() const noexcept { return m_form; }
     void type(std::string_view text);
     /// Ctrl+A 1 (selects the field's whole text), Backspace 8, Tab 9 (next field), Enter 13 (sends
     /// the chat, connects), Escape 27.

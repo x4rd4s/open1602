@@ -142,7 +142,7 @@ part.2 = "south"
 | `carry.money` | `true`: every human starts a part with the money the player had when winning the part before, instead of the part's `money` |
 | `parts.free` | `true`: every part is open from the start, to be played in any order. Without it, part 1 alone is open at first |
 
-The campaign is one entry of the scenario list, its parts the choices of the mission screen, each called by its scenario's name (or "Part n" without one). At
+The campaign is one entry of the scenario list, its parts the choices of the mission screen, each called by its scenario's name (or "Part n" without one); a scenario that is a part of a campaign is not listed again on its own. In the multiplayer menu every part is open. At
 first only part 1 is open (unless `parts.free`); winning a part alone opens the next, as the original's campaigns do. The
 progress is kept with the original's (`progress.cfg` in the user data folder, a line
 `package <part> <campaign id>`).

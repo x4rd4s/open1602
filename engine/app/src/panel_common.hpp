@@ -221,8 +221,8 @@ struct OwnerHeading {
 /// The layout with the gadgets of the owner's heading added: a second name line, centred beside
 /// the arms, the arms' shadow and the arms (Ids name + 900, + 901, + 902).
 [[nodiscard]] assets::GadgetLayout with_owner_heading(assets::GadgetLayout layout, const OwnerHeading& h);
-/// The heading: `name` alone for one's own unit or ship (or a game without a local player); for
-/// someone else's the owner's coat of arms beside it, as the colour of the figure alone is hard
+/// The heading: `name` alone for one's own unit, ship or cart; for someone else's (for a
+/// spectator, everyone's) the owner's coat of arms beside it, as the colour of the figure alone is hard
 /// to tell apart, with the owner's name as its help line.
 void show_owner(ui::Panel& panel, const OwnerHeading& h, std::string name, sim::PlayerId owner, const PanelContext& c);
 /// The help line of the owner's heading: the owner's name over the arms and the name beside them.

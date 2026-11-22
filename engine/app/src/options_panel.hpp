@@ -16,6 +16,7 @@
 #include "o1602/assets/text_table.hpp"
 #include "o1602/audio/game_audio.hpp"
 #include "o1602/ui/panel.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 namespace o1602::app {
 
@@ -82,10 +83,12 @@ public:
 
     /// A savegame's name is being typed (clicking a slot starts it, mode 3).
     [[nodiscard]] bool editing() const noexcept { return m_editing; }
-    /// Typed text (Windows-1252); Backspace, Enter and Escape as `key` 8, 13 and 27. Enter on a
-    /// free slot saves the new game at once; Escape drops the name typed.
+    /// Typed text (Windows-1252), at the caret; the keys of ui::TextCaret::edit() move it, Enter
+    /// (13) on a free slot saves the new game at once; Escape (27) drops the name typed.
     void type(std::string_view text);
     [[nodiscard]] std::optional<OptionsEvent> key(int key);
+    /// The selected part of the name being typed (Ctrl+C), empty if none.
+    [[nodiscard]] std::string selected_text() const;
 
 private:
     enum class Page : std::uint8_t { Root, Disk, Musik, Anno };
@@ -110,6 +113,7 @@ private:
     bool m_editing = false;
     bool m_new_slot = false;        ///< the name is typed into a free slot (Enter saves)
     std::string m_name;             ///< the name being typed
+    ui::TextCaret m_caret;          ///< in m_name
     bool m_renamed = false;         ///< m_name is the new name of the selected slot (until saved)
     std::size_t m_list_first = 0;   ///< first music title shown
     bool m_volume_unsaved = false;  ///< a volume slider moved and has not been let go yet

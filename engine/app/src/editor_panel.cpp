@@ -184,35 +184,38 @@ constexpr Id kSoundTest = 298;
 constexpr Id kRandomFertility = 299;  ///< the selected island's crops rolled at the start, or not
 /// A click on "-" or "+" beside a volume: a twentieth of the slider.
 constexpr std::uint32_t kVolumeStep = EditorModel::kVolumeRange / 20;
-constexpr Id kCheckLine = 800;            ///< + the line of the check list (a line that leads somewhere)
-constexpr Id kRecent = 190;               ///< + the object placed lately (the page "Objects")
-constexpr Id kShipCargoPage = 1000;       ///< the selected ship's holds
-constexpr Id kFirstHoldWare = 1010;       ///< + the hold on the page "Cargo": its ware
-constexpr Id kFirstHoldLess = 1030;       ///< + the hold: fewer tons
-constexpr Id kFirstHoldMore = 1050;       ///< + the hold: more tons
-constexpr std::size_t kHoldRows = 20;     ///< holds the page "Cargo" shows at most
-constexpr Id kShipRoutePage = 1070;       ///< the selected ship's trade route
-constexpr Id kRouteActive = 1071;         ///< the route runs from the start, or not
-constexpr Id kRouteStop = 1072;           ///< the stop the page "Route" shows
-constexpr Id kRouteTarget = 1073;         ///< the stop's city
-constexpr Id kFirstRouteWare = 1080;      ///< + the entry of the stop: its ware
-constexpr Id kFirstRouteMode = 1090;      ///< + the entry: loads or unloads
-constexpr Id kFirstRouteLess = 1100;      ///< + the entry: fewer tons
-constexpr Id kFirstRouteMore = 1110;      ///< + the entry: more tons
-constexpr std::size_t kRouteEntries = 8;  ///< entries of a stop the page shows at most
-constexpr Id kUnitPatrol = 1130;          ///< the selected unit's patrol: where to, on the map
-constexpr Id kUnitPatrolOff = 1131;       ///< the selected unit's patrol ended
-constexpr Id kShipNamePage = 1132;        ///< the selected ship's or cart's name
-constexpr Id kShipSale = 1133;            ///< the selected ship offered for sale, or no longer
-constexpr Id kShipCannonsLess = 1134;     ///< one mounted cannon fewer
-constexpr Id kShipCannonsMore = 1135;     ///< one mounted cannon more
-constexpr Id kPlayerMoneyPage = 1136;     ///< the page that types a player's starting money
-constexpr Id kTabAttitude = 1137;         ///< the players dialog's tab of the computers' attitude
-constexpr Id kAttitudePage = 1138;        ///< the page of the computers' attitude (column)
-constexpr Id kCampaignOrder = 1139;       ///< the campaign's parts all open, or one after the other
-constexpr Id kAttitudeCell = 1140;        ///< + the AttitudeColumn of the slot shown (column)
-constexpr Id kAttitudeTable = 1150;       ///< + kAttitudeColumns * the row + the column of the table
-constexpr Id kPlayerTable = 300;          ///< + 8 * the row + the column of the players' table
+constexpr Id kCheckLine = 800;                  ///< + the line of the check list (a line that leads somewhere)
+constexpr Id kRecent = 190;                     ///< + the object placed lately (the page "Objects")
+constexpr Id kShipCargoPage = 1000;             ///< the selected ship's holds
+constexpr Id kFirstHoldWare = 1010;             ///< + the hold on the page "Cargo": its ware
+constexpr Id kFirstHoldLess = 1030;             ///< + the hold: fewer tons
+constexpr Id kFirstHoldMore = 1050;             ///< + the hold: more tons
+constexpr std::size_t kHoldRows = 20;           ///< holds the page "Cargo" shows at most
+constexpr Id kShipRoutePage = 1070;             ///< the selected ship's trade route
+constexpr Id kRouteActive = 1071;               ///< the route runs from the start, or not
+constexpr Id kRouteStop = 1072;                 ///< the stop the page "Route" shows
+constexpr Id kRouteTarget = 1073;               ///< the stop's city
+constexpr Id kFirstRouteWare = 1080;            ///< + the entry of the stop: its ware
+constexpr Id kFirstRouteMode = 1090;            ///< + the entry: loads or unloads
+constexpr Id kFirstRouteLess = 1100;            ///< + the entry: fewer tons
+constexpr Id kFirstRouteMore = 1110;            ///< + the entry: more tons
+constexpr std::size_t kRouteEntries = 8;        ///< entries of a stop the page shows at most
+constexpr Id kUnitPatrol = 1130;                ///< the selected unit's patrol: where to, on the map
+constexpr Id kUnitPatrolOff = 1131;             ///< the selected unit's patrol ended
+constexpr Id kShipNamePage = 1132;              ///< the selected ship's or cart's name
+constexpr Id kShipSale = 1133;                  ///< the selected ship offered for sale, or no longer
+constexpr Id kShipCannonsLess = 1134;           ///< one mounted cannon fewer
+constexpr Id kShipCannonsMore = 1135;           ///< one mounted cannon more
+constexpr Id kPlayerMoneyPage = 1136;           ///< the page that types a player's starting money
+constexpr Id kTabAttitude = 1137;               ///< the players dialog's tab of the computers' attitude
+constexpr Id kAttitudePage = 1138;              ///< the page of the computers' attitude (column)
+constexpr Id kCampaignOrder = 1139;             ///< the campaign's parts all open, or one after the other
+constexpr Id kAttitudeCell = 1140;              ///< + the AttitudeColumn of the slot shown (column)
+constexpr Id kAttitudeTable = 1150;             ///< + kAttitudeColumns * the row + the column of the table
+constexpr Id kShipPriceLess = 1240;             ///< the offer's price 10 % lower (right button: the type's own)
+constexpr Id kShipPriceMore = 1241;             ///< the offer's price 10 % higher (right button: the type's own)
+constexpr std::uint32_t kPriceStep = 128 / 10;  ///< 10 % of the price, in 1/128
+constexpr Id kPlayerTable = 300;                ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
 constexpr Id kRelationTable = 500;  ///< + 16 * the row + the column of the diplomacy table
 constexpr std::size_t kTableSide = 16;
@@ -1358,6 +1361,19 @@ void EditorPanel::layout_selection(const EditorModel& model) {
                      ui::tr(model.ship->for_sale ? "editor.ship.sale_on" : "editor.ship.sale_off"),
                      model.ship->can_sell, model.ship->for_sale);
             y += kButtonH + kGap;
+            if (model.ship->for_sale) {
+                // The price: in steps of 10 % of the type's, the right button back to it.
+                constexpr std::int32_t kStep = 28;
+                const EditorShip& ship = *model.ship;
+                f.label(Rect{m_x, y, m_w - 2 * kStep - 4, kButtonH},
+                        ui::tr("editor.ship.price", {std::to_string((ship.sale_factor * 100U + 64U) / 128U),
+                                                     std::to_string(ship.sale_price)}));
+                f.cycle_button(kShipPriceLess, Rect{m_x + m_w - 2 * kStep - 2, y, kStep, kButtonH}, "-",
+                               ship.sale_factor > 0);
+                f.cycle_button(kShipPriceMore, Rect{m_x + m_w - kStep, y, kStep, kButtonH}, "+",
+                               ship.sale_factor < sim::ShipCommand::kMaxSaleFactor);
+                y += kButtonH + kGap;
+            }
         } else if (model.unit) {
             const std::int32_t half = (m_w - kGap) / 2;
             f.button(kUnitPatrol, Rect{m_x, y, half, kButtonH}, ui::tr("editor.unit.patrol"), true,
@@ -4019,6 +4035,24 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
             }
             EditorRequest r{EditorRequest::Kind::ShipSale};
             r.index = model.ship->for_sale ? 0 : 1;
+            r.amount = 128;
+            return r;
+        }
+        case kShipPriceLess:
+        case kShipPriceMore: {
+            if (!model.ship || !model.ship->for_sale) {
+                return std::nullopt;
+            }
+            const std::uint32_t factor = model.ship->sale_factor;
+            EditorRequest r{EditorRequest::Kind::ShipSale};
+            r.index = 1;
+            r.amount = !forward ? 128U
+                       : *id == kShipPriceMore
+                           ? std::min<std::uint32_t>(factor + kPriceStep, sim::ShipCommand::kMaxSaleFactor)
+                           : factor - std::min(factor, kPriceStep);
+            if (r.amount == factor) {
+                return std::nullopt;
+            }
             return r;
         }
         case kShipCannonsLess:
@@ -4450,25 +4484,25 @@ void EditorPanel::type(std::string_view text) {
     if (!typing()) {
         return;
     }
-    if (!text.empty() && m_form.take_all_selected()) {
-        m_text.clear();  // typed over the whole name (Ctrl+A, or the name offered)
-    }
+    const std::size_t most = m_page == Page::PlayerMoney ? 9
+                             : m_page == Page::GoalText  ? kMaxMissionText
+                             : m_page == Page::ScenarioText
+                                 ? scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row))
+                                 : kMaxName;
+    const auto [first, last] = m_form.selection(m_text);
+    std::string typed;
     for (const char c : text) {
-        const std::size_t most = m_page == Page::GoalText ? kMaxMissionText
-                                 : m_page == Page::ScenarioText
-                                     ? scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row))
-                                     : kMaxName;
         if (m_page == Page::PlayerMoney) {
             // Digits, and a minus in front for a debt.
-            if (((c >= '0' && c <= '9') || (c == '-' && m_text.empty())) && m_text.size() < 9) {
-                m_text.push_back(c);
+            const bool front = first == 0 && typed.empty() && (last >= m_text.size() || m_text[last] != '-');
+            if ((c >= '0' && c <= '9') || (c == '-' && front)) {
+                typed.push_back(c);
             }
-            continue;
-        }
-        if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F && m_text.size() < most) {
-            m_text.push_back(c);
+        } else if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F) {
+            typed.push_back(c);
         }
     }
+    m_form.insert(m_text, typed, most);
 }
 
 std::optional<EditorRequest> EditorPanel::key(int key) {
@@ -4478,19 +4512,10 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
         }
         return std::nullopt;
     }
-    if (key == 1) {
-        m_form.select_all();
+    if (m_form.edit(m_text, key)) {
         return std::nullopt;
     }
-    const bool all = m_form.take_all_selected();
     switch (key) {
-        case 8:
-            if (all) {
-                m_text.clear();
-            } else if (!m_text.empty()) {
-                m_text.pop_back();
-            }
-            return std::nullopt;
         case 10:  // Shift+Enter: a line break where the text may have lines, else Enter
             if (const bool lines = m_page == Page::GoalText ||
                                    (m_page == Page::ScenarioText &&
@@ -4499,14 +4524,10 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
                 !lines) {
                 return commit_name();
             }
-            if (all) {
-                m_text.clear();
-            }
-            if (m_text.size() < (m_page == Page::GoalText
-                                     ? kMaxMissionText
-                                     : scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row)))) {
-                m_text.push_back('\n');
-            }
+            m_form.insert(m_text, "\n",
+                          m_page == Page::GoalText
+                              ? kMaxMissionText
+                              : scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row)));
             return std::nullopt;
         case 13:
             return commit_name();

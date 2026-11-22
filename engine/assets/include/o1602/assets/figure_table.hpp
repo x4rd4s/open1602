@@ -4,6 +4,7 @@
 // Only the fields needed for drawing are decoded so far.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -183,6 +184,12 @@ public:
                    ? m_unit_cost[static_cast<std::size_t>(unit_type)]
                    : 0;
     }
+    /// What disbanding a unit of `figure` costs: unit_cost() of its type's Kind, nothing for the
+    /// natives' spearman (a player's too, from a map: no castle trains him).
+    [[nodiscard]] std::uint32_t disband_cost(std::uint32_t figure) const noexcept {
+        const FigureType* t = get(figure);
+        return t != nullptr && figure != figure::kSpearman ? unit_cost(t->kind) : 0;
+    }
     /// Formations (FORMATION records): slots as offsets in tiles, in the order units take them.
     struct FormationSlot {
         std::int32_t x = 0;
@@ -220,6 +227,22 @@ public:
             }
         }
         return std::nullopt;
+    }
+    /// What a ship of `figure` is worth when it is sold: its price, or for a ship that no shipyard
+    /// builds and that has none (the pirates' ship) the dearest price of the shipyards' ships. 0 for
+    /// no ship.
+    [[nodiscard]] std::uint32_t ship_value(std::uint32_t figure) const noexcept {
+        const FigureType* f = get(figure);
+        if (f == nullptr || f->ship.price != 0) {
+            return f != nullptr ? f->ship.price : 0;
+        }
+        std::uint32_t dearest = 0;
+        for (const std::uint16_t s : figure::kShips) {
+            if (const FigureType* t = get(s)) {
+                dearest = std::max(dearest, t->ship.price);
+            }
+        }
+        return dearest;
     }
     /// The packages' ships (number, type) in the order they were added.
     [[nodiscard]] std::span<const std::pair<std::uint32_t, std::uint8_t>> package_ships() const noexcept {

@@ -275,6 +275,9 @@ annokit::core::Status MapViewer::enter_editor(sim::World world, const std::files
     }
     // Towers whose building is gone (older maps, the original's scenarios) would hold their island.
     (void)editor::forget_fallen_towers(world, m_buildings);
+    // A map saved without the free trader (open sea, before he came with its first player) gets
+    // him, as every new game has him.
+    (void)editor::add_missing_trader(world);
     std::unique_ptr<GameState> next;
     try {
         next = make_state(std::move(world), m_options.rules, true);

@@ -650,6 +650,10 @@ private:
     std::string toggle_mod(const std::string& id);
     /// The scenarios and campaigns of m_packages (docs/modding/scenarios.md), for the menu.
     void load_package_scenarios();
+    /// The map of package scenario `scenario`, read from its file, made the scenario: its money,
+    /// goals and script (sim::apply_package_scenario), the package the one installed. The warnings.
+    [[nodiscard]] std::vector<std::string> make_package_scenario(sim::World& world,
+                                                                 const assets::PackageScenario& scenario) const;
     /// Starts the package scenario `id`: its map with its money and goals, its script with the
     /// packages' (`rules`: of the start dialog, else the options'). As part `part` (from 0) of the
     /// package campaign `campaign`, if not empty, with what the part before left.

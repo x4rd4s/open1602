@@ -83,6 +83,8 @@ public:
     [[nodiscard]] bool saving() const noexcept { return m_mode == Mode::Save; }
     /// A name is being typed: the keys go here.
     [[nodiscard]] bool typing() const noexcept { return m_mode == Mode::Save || m_renaming.has_value(); }
+    /// The widgets as laid out last, with the field typed in.
+    [[nodiscard]] const ui::Form& form() const noexcept { return m_form; }
     [[nodiscard]] const std::string& text() const noexcept { return m_text; }
     /// The window's height in design units.
     [[nodiscard]] std::int32_t height(const TemplatesModel& model) const;

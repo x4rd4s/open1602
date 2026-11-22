@@ -57,6 +57,7 @@ public:
         // Open1602: the name can be typed here too, as in the ship window.
         show_owner(m_panel, kShipHeading,
                    own ? c.shown_name(NameTarget::of(*ship), ship_name(*ship)) : ship_name(*ship), ship->owner, c);
+        c.show_mark(m_panel, kShipHeading.name, NameTarget::of(*ship));
         m_panel.set_no_select(kName, !can_rename(c.world(), c.local, NameTarget::of(*ship)));
         const bool moving = !ship->target.empty() || ship->motion.path_index < ship->motion.path.size();
         for (const std::int32_t id :
@@ -253,7 +254,7 @@ public:
             m_panel.set_visible(id, own);
         }
         m_panel.set_selected(kPatrol, s->patrol.active || m_picking);
-        m_panel.set_text(kCost, std::to_string(t != nullptr ? c.figures.unit_cost(t->kind) : 0));
+        m_panel.set_text(kCost, std::to_string(c.figures.disband_cost(s->figure)));
     }
 
     void clicked(const ui::PanelEvent& e, const Selection&, const PanelContext& c,

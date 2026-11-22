@@ -661,9 +661,10 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
         }
         ship.cannons = s->cannons;
         ship.for_sale = s->for_sale;
-        const sim::Player* owner = world.player(s->owner);
-        ship.can_sell =
-            owner != nullptr && (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer);
+        ship.sale_factor = s->sale_factor;
+        ship.sale_price =
+            static_cast<std::int32_t>(std::uint64_t{m_figures.ship_value(s->figure)} * s->sale_factor / 128U);
+        ship.can_sell = editor::ship_sellable(world, s->owner);
     }
     // The route: its stops by the cities it can go to, their wares.
     ship.cart = s->cart();
@@ -828,7 +829,9 @@ void MapViewer::editor_ship_request(const EditorRequest& request) {
         return;
     }
     if (request.kind == EditorRequest::Kind::ShipSale) {
-        if (editor_perform(editor::set_ship_for_sale(world, m_editor->pick.id, request.index != 0))) {
+        const auto factor =
+            static_cast<std::uint16_t>(std::min<std::uint32_t>(request.amount, sim::ShipCommand::kMaxSaleFactor));
+        if (editor_perform(editor::set_ship_for_sale(world, m_editor->pick.id, request.index != 0, factor))) {
             m_editor->notice.clear();
         }
         return;
@@ -1341,9 +1344,8 @@ std::vector<std::uint16_t> MapViewer::editor_figures(EditorObjects::Tool tool) c
         for (const std::uint32_t family : m_figures.unit_families()) {
             figures.push_back(static_cast<std::uint16_t>(family));
         }
-        if (m_figures.get(assets::figure::kSpearman) != nullptr &&
-            m_editor->document.world().first_of(sim::FactionBehaviour::Natives) != sim::kNoPlayer) {
-            figures.push_back(assets::figure::kSpearman);  // for the natives
+        if (m_figures.get(assets::figure::kSpearman) != nullptr) {
+            figures.push_back(assets::figure::kSpearman);  // the natives', for players too
         }
         if (m_figures.get(assets::figure::kTradeCart) != nullptr) {
             figures.push_back(assets::figure::kTradeCart);  // a player's trade cart, on its roads
@@ -1412,7 +1414,8 @@ std::string MapViewer::editor_figure_refusal(editor::UnitRefusal refused, const 
             break;
     }
     if (!ship && editor_figure() == assets::figure::kSpearman &&
-        !m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Natives)) {
+        (m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Pirates) ||
+         m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Neutral))) {
         return ui::tr("editor.objects.refused.spearman");
     }
     if (ship && (editor_figure() == assets::figure::kTrader ||

@@ -104,6 +104,11 @@ bool Military::order(const SoldierOrder& o) {
     std::unordered_set<std::uint32_t> seen;
     for (std::size_t i = 0; i < o.soldiers.size(); ++i) {
         Soldier* s = m_world->soldier(o.soldiers[i]);
+        // The natives' spearmen (a player's too, from a map) never go on board.
+        const Ship* to = o.target.kind == Target::Kind::Ship ? m_world->ship(o.target.ship) : nullptr;
+        if (s != nullptr && s->figure == figure::kSpearman && to != nullptr && to->owner == s->owner) {
+            continue;
+        }
         if (s != nullptr && !s->away() && (o.player == kNoPlayer || s->owner == o.player) &&
             seen.insert(s->id).second) {
             units.push_back(s);
@@ -217,10 +222,9 @@ bool Military::command(const SoldierCommand& c) {
             s->motion.path_index = 0;
             return true;
         case SoldierCommand::Op::Disband: {
-            // The original charges the third value of the Soldat: line.
-            const assets::FigureType* type = type_of(*s);
-            if (Player* p = m_world->player(s->owner); p != nullptr && type != nullptr) {
-                p->money = money_plus(p->money, -static_cast<std::int64_t>(m_figures->unit_cost(type->kind)));
+            // The original charges the third value of the Soldat: line (FigureTable::disband_cost).
+            if (Player* p = m_world->player(s->owner); p != nullptr) {
+                p->money = money_plus(p->money, -static_cast<std::int64_t>(m_figures->disband_cost(s->figure)));
             }
             kill(*s, kNoPlayer, true);
             return true;
