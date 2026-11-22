@@ -30,6 +30,7 @@ constexpr std::uint32_t kSwordsmith = 20511;
 constexpr std::uint32_t kWall = 20902;
 constexpr std::uint32_t kGate = 20904;
 constexpr std::uint32_t kTree = 20202;
+constexpr std::uint32_t kTower = 22601;
 constexpr std::uint16_t kSword = 1;
 
 constexpr sim::PlayerId kHuman = 0;
@@ -62,6 +63,8 @@ assets::BuildingTable make_buildings() {
         "  Ruinenr: 255\n"  // a gate
         "  @Nummer: 8\n  Id: 20202\n  Kind: 10\n  Gfx: 90\n  Size: 1, 1\n  Maxenergy: 3\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"  // a tree
+        "  @Nummer: 9\n  Id: 22601\n  Kind: 6\n  Gfx: 100\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
+        "  Ruinenr: 255\n"  // a stone tower
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -499,6 +502,49 @@ TEST_CASE("ai military: soldiers kept out by a forest cut their way in and take 
     REQUIRE(map.top(70, 8).owner == kHuman);
     run(s, 8 * 60'000);
     CHECK(map.top(70, 8).empty() || map.top(70, 8).owner != kHuman);  // through the forest, the Kontor has fallen
+}
+
+TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved soldiers cut their way to its tower") {
+    // Feedback 15: a city of a house and a tower behind a forest, its markets and Kontor
+    // destroyed. A city with a tower is not defenceless and cannot be taken over. The original's
+    // soldiers find nothing to attack and stand; Open1602's go for the tower, through the trees.
+    const auto play = [](bool classic, std::size_t& at_trees) {
+        Island a;
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kTower, 70, 8, kHuman, 1);
+        a.build(kHouse, 40, 4, kHuman, 1);  // within reach, before the forest
+        for (std::int32_t y = 0; y < 20; ++y) {
+            for (std::int32_t x = 60; x <= 62; ++x) {
+                a.tree(x, y);
+            }
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 100, 24 + 2 * k);
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 20'000);
+        at_trees = 0;
+        for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
+            if (soldier->target.kind == sim::Target::Kind::Building) {
+                at_trees += soldier->target.x == 60 ? 1U : 0U;  // the first tree on the way
+            }
+        }
+        const sim::IslandMap& map = a.world.islands()[0].map;
+        REQUIRE(map.top(70, 8).owner == kHuman);
+        // Five minutes: after about seven, the lone tower's tile ends up without owner in both arms,
+        // with no soldier at it.
+        run(s, 5 * 60'000);
+        return map.top(70, 8).empty() || map.top(70, 8).owner != kHuman ||
+               a.buildings.by_sprite(map.top(70, 8).sprite)->destroyed;  // the tower has fallen
+    };
+    std::size_t at_trees = 0;
+    CHECK(play(false, at_trees));
+    CHECK(at_trees >= 4);
+    CHECK(!play(true, at_trees));
+    CHECK(at_trees == 0);
 }
 
 TEST_CASE("ai military: soldiers defend their own city before they go for an enemy city") {
