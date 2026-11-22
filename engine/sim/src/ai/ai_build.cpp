@@ -1394,6 +1394,19 @@ void Engine::task_survey(AiPlayer& p) {
             ore_running_out(p) ? ", ore runs low" : "");
         demolish_tile(p, x, y);
     }
+    // Open1602 (F15): a mine no cart of the city reaches any longer (its market pulled down or
+    // destroyed, a road broken) fills and stands for good. Where the city has no other mine of its
+    // kind the carts reach, a market towards it, as for a slope out of their reach (task_mine);
+    // a search that finds no site gives the slot up (task_claim_land), and with it the claims.
+    for (const SurveyFinds::Mine& m : finds.mines) {
+        const bool other =
+            std::ranges::any_of(finds.mines, [&](const SurveyFinds::Mine& o) { return o.slot == m.slot && o.fetched; });
+        if (!m.fetched && !other && r->slots[m.slot].fail_level < 2) {
+            log(p, "city %u/%u: no cart fetches from the mine at %d,%d", r->island, r->city, m.x, m.y);
+            (void)claim_land(p, m.slot, m.x, m.y);
+            break;
+        }
+    }
     if (cotton_island && weberei_ok) {
         std::uint32_t n = 0;
         if (r->slots[kSlotCotton].count >= 2) {
@@ -1547,6 +1560,9 @@ bool Engine::survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t 
             m_world.production(p.island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y));
         if (pr != nullptr && t.type->max_idle_cycles != 0 && pr->idle_cycles >= t.type->max_idle_cycles) {
             finds.starved_mines.emplace_back(ix, iy);
+        } else if (rivals()) {
+            const bool fetched = mine_reached(p, *t.type, ix, iy, island_of(p.island).map.top(x, y).rotation, {});
+            finds.mines.push_back(SurveyFinds::Mine{ix, iy, *slot, fetched});
         }
     }
     return true;

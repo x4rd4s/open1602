@@ -104,6 +104,15 @@ struct Cheats;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
+    /// Open1602 (F15): the other mines of an improved computer, with their slot and whether a
+    /// cart of the city reaches them.
+    struct Mine {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::uint8_t slot = 0;
+        bool fetched = false;
+    };
+    std::vector<Mine> mines;
     std::vector<std::pair<std::int32_t, std::int32_t>> sheep;
     std::vector<std::pair<std::int32_t, std::int32_t>> webstuben;
 };
