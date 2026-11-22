@@ -832,24 +832,30 @@ void Engine::task_mine(AiPlayer& p) {
         road_line(p, s.best_x0 + d[0], s.best_y0 + d[1], s.extra, static_cast<std::uint8_t>(s.rotation), true);
     }
     std::size_t placed = 0;
-    for (const auto& o : kMineOffsets) {
-        // Open1602 (F15): of the placements, only one the carts reach. The test above takes any
-        // of them, and the first that can be built may lie a tile out of their reach.
-        if (rivals() && !mine_reached(p, *mine, hx + o.dx, hy + o.dy, o.rotation, road)) {
+    // Open1602 (F15): the placements the carts reach first. The test above takes any of them, and
+    // the first that can be built may lie a tile out of their reach. Where none of those can be
+    // built, the others as before: the city's markets and roads often reach them soon after.
+    for (const bool reached : {true, false}) {
+        if (placed != 0 || (reached && !rivals())) {
             continue;
         }
-        BuildOrder order;
-        order.player = p.player;
-        order.island = p.island;
-        order.orient_to_road = false;
-        order.items.push_back(BuildItem{mine->id, hx + o.dx, hy + o.dy, o.rotation, 0});
-        if (!outside && !circles.empty() && !masons_reach(circles, *mine, hx + o.dx, hy + o.dy, o.rotation)) {
-            continue;
-        }
-        const BuildPlan plan = plan_build(m_world, m_buildings, order);
-        if (plan.items.front().ok()) {
-            placed = build(p, order.items, false);
-            break;
+        for (const auto& o : kMineOffsets) {
+            if (rivals() && mine_reached(p, *mine, hx + o.dx, hy + o.dy, o.rotation, road) != reached) {
+                continue;
+            }
+            BuildOrder order;
+            order.player = p.player;
+            order.island = p.island;
+            order.orient_to_road = false;
+            order.items.push_back(BuildItem{mine->id, hx + o.dx, hy + o.dy, o.rotation, 0});
+            if (!outside && !circles.empty() && !masons_reach(circles, *mine, hx + o.dx, hy + o.dy, o.rotation)) {
+                continue;
+            }
+            const BuildPlan plan = plan_build(m_world, m_buildings, order);
+            if (plan.items.front().ok()) {
+                placed = build(p, order.items, false);
+                break;
+            }
         }
     }
     log(p, "mine at %d,%d: %s", hx, hy, placed != 0 ? "built" : "failed");

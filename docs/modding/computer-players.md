@@ -579,7 +579,8 @@ unclaimed land that fields can take (60 tiles within six of it at least), near i
 builds a market at the edge of its land towards it, with a road there over its own ground (up to
 40 tiles); failing that, a market along its roads that comes nearer. The farm then searches anew.
 A mine is built only where a Kontor's or market's carts reach it, of its placements around the
-slope only one they reach; a slope out of their reach waits for a market towards it. A mine no
+slope first one they reach (the others only when none of those can be built); a slope out of their
+reach waits for a market towards it. A mine no
 cart reaches any longer, its market pulled down or destroyed, gets a market towards it the same way
 when the city has no other mine of its kind the carts reach; when no market site comes nearer, the
 city gives it up, as a slope.
