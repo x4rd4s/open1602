@@ -1451,6 +1451,7 @@ editor.ship.name = Name
 editor.ship.renamed = Es heißt jetzt {1}.
 editor.ship.sale_on = Zu verkaufen: ja
 editor.ship.sale_off = Zu verkaufen: nein
+editor.ship.price = Preis: {1} % ({2} Gold)
 editor.ship.cannons = Kanonen: {1} von {2}
 editor.unit.patrol = Patrouille
 editor.unit.patrol_off = Beenden

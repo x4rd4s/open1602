@@ -661,6 +661,10 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
         }
         ship.cannons = s->cannons;
         ship.for_sale = s->for_sale;
+        ship.sale_factor = s->sale_factor;
+        if (const assets::FigureType* type = m_figures.get(s->figure)) {
+            ship.sale_price = static_cast<std::int32_t>(std::uint64_t{type->ship.price} * s->sale_factor / 128U);
+        }
         const sim::Player* owner = world.player(s->owner);
         ship.can_sell =
             owner != nullptr && (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer);
@@ -828,7 +832,9 @@ void MapViewer::editor_ship_request(const EditorRequest& request) {
         return;
     }
     if (request.kind == EditorRequest::Kind::ShipSale) {
-        if (editor_perform(editor::set_ship_for_sale(world, m_editor->pick.id, request.index != 0))) {
+        const auto factor =
+            static_cast<std::uint16_t>(std::min<std::uint32_t>(request.amount, sim::ShipCommand::kMaxSaleFactor));
+        if (editor_perform(editor::set_ship_for_sale(world, m_editor->pick.id, request.index != 0, factor))) {
             m_editor->notice.clear();
         }
         return;

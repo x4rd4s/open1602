@@ -1239,6 +1239,65 @@ TEST_CASE("editor panel: a ship's holds are loaded on the page Cargo") {
     CHECK(panel.page() == EditorPanel::Page::Selection);
 }
 
+TEST_CASE("editor panel: a ship offered for sale gets its price in steps of 10 percent") {
+    ui::set_language("en");
+    EditorPanel panel;
+    panel.set_room(200, 560);
+    EditorModel m = document();
+    m.selection = "Ship";
+    app::EditorShip ship;
+    ship.name = "Elise";
+    ship.can_sell = true;
+    m.ship = ship;
+    CHECK(panel.show_selection());
+    (void)panel.draw(m, kNoFonts);
+    CHECK(!says(panel, "Price: 100 % (0 gold)"));  // no price while it is not for sale
+    auto r = click(panel, m, "For sale: no");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ShipSale);
+    CHECK(r->index == 1);
+    CHECK(r->amount == 128U);
+    m.ship->for_sale = true;
+    m.ship->sale_factor = 128;
+    m.ship->sale_price = 2000;
+    (void)panel.draw(m, kNoFonts);
+    REQUIRE(says(panel, "Price: 100 % (2000 gold)"));
+    std::vector<ui::Rect> less;
+    std::vector<ui::Rect> more;
+    for (const ui::Form::Widget& w : panel.form().widgets()) {
+        if (w.text == "-") {
+            less.push_back(w.rect);
+        } else if (w.text == "+") {
+            more.push_back(w.rect);
+        }
+    }
+    REQUIRE(less.size() == 1);
+    REQUIRE(more.size() == 1);
+    const auto press = [&](const ui::Rect& at, ui::MouseButton button) {
+        (void)panel.mouse(at.x + 2, at.y + 2, true, m, button);
+        return panel.mouse(at.x + 2, at.y + 2, false, m, button);
+    };
+    r = press(more[0], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ShipSale);
+    CHECK(r->index == 1);
+    CHECK(r->amount == 140U);
+    r = press(less[0], ui::MouseButton::Left);
+    REQUIRE(r.has_value());
+    CHECK(r->amount == 116U);
+    // The right button: the type's own price again (nothing to do at it).
+    CHECK(!press(less[0], ui::MouseButton::Right).has_value());
+    m.ship->sale_factor = 200;
+    (void)panel.draw(m, kNoFonts);
+    r = press(more[0], ui::MouseButton::Right);
+    REQUIRE(r.has_value());
+    CHECK(r->amount == 128U);
+    // Switched off: no longer for sale.
+    r = click(panel, m, "For sale: yes");
+    REQUIRE(r.has_value());
+    CHECK(r->index == 0);
+}
+
 TEST_CASE("editor panel: a ship's trade route is set on the page Route") {
     ui::set_language("en");
     EditorPanel panel;
