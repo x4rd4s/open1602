@@ -346,3 +346,37 @@ TEST_CASE("ai landing: an improved computer shoots trees behind the beach open t
     CHECK(trees() < planted);  // felled
     CHECK(a.soldiers_on(kComputer, 1) > 0);
 }
+
+TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
+    // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
+    // attack that took it straight back kept it from both (every 10 s).
+    const auto landed = [](bool damaged) {
+        Coast a;
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        if (damaged) {
+            ship.health = 50 * 32 / 4;  // Maxenergy 50, in 1/32
+        }
+        a.world.add_ship(ship);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        for (std::uint32_t t = 0; t < 3 * 60 && a.soldiers_on(kComputer, 1) == 0; ++t) {
+            run(s, 1'000);
+        }
+        return a.soldiers_on(kComputer, 1);
+    };
+    CHECK(landed(true) == 0);
+    CHECK(landed(false) > 0);
+}
