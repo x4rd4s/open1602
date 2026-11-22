@@ -79,7 +79,8 @@ struct PlayerValues {
 /// A new computer player in the next slot (sim::player_slot), with the first free banner, the money
 /// of the first computer and nothing else: without a city or a ship it is out of the game (defeated)
 /// as soon as it starts, unless the scenario gives it one; at peace with everyone. The relations
-/// of the others stay. Fails (LimitExceeded) with sim::kMaxPlayers players.
+/// of the others stay. A map without the free trader (one of open sea) gets him with it
+/// (add_missing_trader()). Fails (LimitExceeded) with sim::kMaxPlayers players.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& world);
 
 /// Takes the last player slot away (the highest of player_slots()), and the empty slots before it
@@ -156,6 +157,10 @@ enum class Neutral : std::uint8_t { Natives, Pirates, Trader };
 /// nests and ships of the natives and the pirates. Fails (Unsupported) where can_add_party() is
 /// false, (NotFound) for a world without a faction of that behaviour.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party);
+/// Gives a world with humans or computers the free trader where it has none and his slot is free,
+/// as a new game has him (whether he calls at a player's Kontors stays the player's switch). True
+/// when he was added. add_player() does it for a map of open sea; for maps saved without him.
+bool add_missing_trader(sim::World& world);
 
 /// The neutral parties the world has (a slot of that behaviour), in the order of Neutral.
 [[nodiscard]] std::vector<Neutral> neutral_parties(const sim::World& world);

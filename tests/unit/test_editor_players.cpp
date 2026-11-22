@@ -133,7 +133,8 @@ TEST_CASE("editor players: a map of four slots gets its fifth player behind thre
     REQUIRE(op.ok());
     (*op)->apply(world);
     REQUIRE(world.players().size() == 8);
-    CHECK(world.players()[4].status == sim::PlayerStatus::Absent);
+    CHECK(world.acts_as(4, sim::FactionBehaviour::Trader));  // the free trader comes with it
+    CHECK(world.players()[5].status == sim::PlayerStatus::Absent);
     CHECK(world.players()[7].status == sim::PlayerStatus::Playing);
     CHECK(editor::player_slots(world).size() == 5);
     // The empty slots are not players with a start.
@@ -145,7 +146,7 @@ TEST_CASE("editor players: a map of four slots gets its fifth player behind thre
     auto gone = editor::remove_last_player(world);
     REQUIRE(gone.ok());
     (*gone)->apply(world);
-    CHECK(world.players().size() == 4);  // the empty slots go with it
+    CHECK(world.players().size() == 5);  // the empty slots go with it, the trader stays
 }
 
 TEST_CASE("editor players: relations at the start are set on both sides and kept when a player comes") {
@@ -356,8 +357,9 @@ TEST_CASE("editor players: a slot given a package's faction of the settlers' beh
 }
 
 TEST_CASE("editor players: on a map of open sea the human is never a slot that only holds a place") {
-    // A new map without islands has no players: five added fill the slots 0 to 3 and 7, the slots
-    // 4 to 6 between them only hold places. The human is the fifth.
+    // A new map without islands has no players: five added fill the slots 0 to 3 and 7, the free
+    // trader comes in slot 4 with the first, the slots 5 and 6 only hold places. The human is the
+    // fifth.
     sim::World world(40, 40);
     for (int n = 0; n < 5; ++n) {
         auto op = editor::add_player(world);
@@ -381,7 +383,8 @@ TEST_CASE("editor players: on a map of open sea the human is never a slot that o
     REQUIRE(loaded.ok());
     CHECK(sim::first_human_player(*loaded) == 7);
     CHECK(loaded->players()[7].money == 30000);
-    for (sim::PlayerId slot = 4; slot < 7; ++slot) {
+    CHECK(loaded->acts_as(4, sim::FactionBehaviour::Trader));
+    for (sim::PlayerId slot = 5; slot < 7; ++slot) {
         CHECK(loaded->players()[slot].status == sim::PlayerStatus::Absent);
     }
     CHECK((editor::player_slots(*loaded) == editor::player_slots(world)));
@@ -395,7 +398,7 @@ TEST_CASE("editor players: the natives and the pirates come to a map that lacks 
         REQUIRE(op.ok());
         (*op)->apply(world);
     }
-    CHECK(editor::neutral_parties(world).empty());
+    CHECK((editor::neutral_parties(world) == std::vector<Neutral>{Neutral::Trader}));  // came with the players
     CHECK(editor::can_add_party(world, Neutral::Natives));
     CHECK(editor::can_add_party(world, Neutral::Pirates));
     auto pirates = editor::add_party(world, Neutral::Pirates);
@@ -403,14 +406,15 @@ TEST_CASE("editor players: the natives and the pirates come to a map that lacks 
     (*pirates)->apply(world);
     REQUIRE(world.players().size() == 6);
     CHECK(world.acts_as(editor::party_slot(Neutral::Pirates), sim::FactionBehaviour::Pirates));
-    CHECK(world.players()[4].status == sim::PlayerStatus::Absent);  // the trader's place
+    CHECK(world.acts_as(4, sim::FactionBehaviour::Trader));
     CHECK(!editor::can_add_party(world, Neutral::Pirates));
     CHECK(!editor::add_party(world, Neutral::Pirates).ok());
     auto natives = editor::add_party(world, Neutral::Natives);
     REQUIRE(natives.ok());
     (*natives)->apply(world);
     CHECK(world.acts_as(editor::party_slot(Neutral::Natives), sim::FactionBehaviour::Natives));
-    CHECK((editor::neutral_parties(world) == std::vector<Neutral>{Neutral::Natives, Neutral::Pirates}));
+    CHECK(
+        (editor::neutral_parties(world) == std::vector<Neutral>{Neutral::Natives, Neutral::Pirates, Neutral::Trader}));
     // As in a new game: at war with the pirates, at peace and trading with the natives.
     CHECK(!editor::neutral_relations(world, 0, Neutral::Pirates).peace);
     CHECK(editor::neutral_relations(world, 1, Neutral::Natives).peace);
@@ -438,4 +442,35 @@ TEST_CASE("editor players: the test game is played as the player chosen, the oth
     // Not a human's or computer's slot: nothing changes.
     CHECK(!editor::test_as(world, 5));
     CHECK(world.players()[5].role == sim::PlayerRole::Neutral);
+}
+
+TEST_CASE("editor players: a map of open sea gets the free trader with its first player") {
+    using editor::Neutral;
+    sim::World world(40, 40);
+    CHECK(!editor::add_missing_trader(world));  // nobody for him to call at
+    auto op = editor::add_player(world);
+    REQUIRE(op.ok());
+    (*op)->apply(world);
+    REQUIRE(world.players().size() == 5);
+    CHECK(world.first_of(sim::FactionBehaviour::Trader) == 4);
+    CHECK(world.players()[4].status == sim::PlayerStatus::Playing);
+    CHECK(world.players()[4].banner == 6);  // the colours a new game gives him
+    CHECK(editor::neutral_relations(world, 0, Neutral::Trader).trade);
+    // Undone, he goes with the player.
+    (*op)->revert(world);
+    CHECK(world.first_of(sim::FactionBehaviour::Trader) == sim::kNoPlayer);
+
+    // A map saved without him gets him when it is opened; one that has him stays as it is.
+    sim::World saved(40, 40);
+    std::vector<sim::Player> players(2);
+    players[0].role = sim::PlayerRole::Human;
+    players[1].role = sim::PlayerRole::Computer;
+    saved.set_players(players);
+    CHECK(editor::add_missing_trader(saved));
+    CHECK(saved.first_of(sim::FactionBehaviour::Trader) == 4);
+    CHECK(saved.players()[2].status == sim::PlayerStatus::Absent);
+    CHECK(!editor::add_missing_trader(saved));
+    sim::World full = seven_slots();
+    CHECK(!editor::add_missing_trader(full));
+    CHECK(full.players().size() == 7);
 }

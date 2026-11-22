@@ -227,7 +227,7 @@ public:
           m_stock(std::move(l.lager)),
           m_lists(std::move(l.handel)) {
         if (l.trader) {
-            m_cart.emplace(std::move(*l.trader), 1.0);
+            m_cart.emplace(with_owner_heading(std::move(*l.trader), kCartHeading), 1.0);
         }
         const assets::GadgetLayout& sl = m_ship.layout();
         m_gfx_ware = sl.constant("GFXWARE").value_or(192);
@@ -445,7 +445,7 @@ public:
         if (ship == nullptr) {
             return std::nullopt;
         }
-        if (auto owner = owner_help(id, kHeading, ship->owner, c)) {
+        if (auto owner = owner_help(id, ship->cart() && m_cart ? kCartHeading : kHeading, ship->owner, c)) {
             return owner;
         }
         const auto line = [&](std::size_t n) { return std::optional<std::string>(help_line(c, n)); };
@@ -932,7 +932,9 @@ private:
     /// for the three); the route.
     void refresh_cart(const sim::Ship& ship, const Context& k, const PanelContext& c) {
         ui::Panel& p = *m_cart;
-        p.set_text(kCartName, c.shown_name(NameTarget::of(ship), ship_name(ship)));
+        // Someone else's cart: the owner's coat of arms at the plate's left end, as on a ship.
+        show_owner(p, kCartHeading, k.foreign ? ship_name(ship) : c.shown_name(NameTarget::of(ship), ship_name(ship)),
+                   ship.owner, c);
         p.set_no_select(kCartName, !can_rename(c.world(), c.local, NameTarget::of(ship)));
         const bool own = !k.foreign;
         const bool idle = own && !k.moving;
@@ -2085,6 +2087,9 @@ private:
     static constexpr std::int32_t kCartRouteEditor = 59005;
     static constexpr std::int32_t kCartRoute = 59006;
     static constexpr std::int32_t kCartStop = 59007;
+    /// The heading with the owner of someone else's cart: the arms over the plate's round left end,
+    /// the name between them and the wheel at the right end.
+    static constexpr OwnerHeading kCartHeading{kCartName, 6, 0, 192};
     static constexpr std::int32_t kCartHoldIcon = 59051;
     static constexpr std::int32_t kCartHoldBar = 59071;
     static constexpr std::int32_t kCartHoldButton = 59091;
