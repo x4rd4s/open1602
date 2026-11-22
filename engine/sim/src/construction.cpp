@@ -2966,6 +2966,38 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
     return true;
 }
 
+std::size_t collapse_market_ruins(World& world, const assets::BuildingTable& buildings,
+                                  std::vector<ConstructionEvent>* events) {
+    // The original's markets collapsed between a few seconds and about 4.5 minutes after they were
+    // destroyed (King's Edition and History Edition alike); the rubble stays.
+    std::size_t collapsed = 0;
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        const auto island = static_cast<std::uint16_t>(i);
+        std::vector<TilePos> ruins;
+        const IslandMap& map = world.islands()[i].map;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const MapCell& c = map.top(x, y);
+                const assets::BuildingType* t = c.empty() ? nullptr : buildings.by_sprite(c.sprite);
+                if (t == nullptr || !t->destroyed || t->prod_kind != prod::kMarket || c.city == MapCell::kNoCity) {
+                    continue;
+                }
+                const SubTile sub = map.sub_tile(buildings, x, y);
+                if (sub.origin_x == static_cast<std::int32_t>(x) && sub.origin_y == static_cast<std::int32_t>(y)) {
+                    ruins.push_back(TilePos{sub.origin_x, sub.origin_y});
+                }
+            }
+        }
+        for (const TilePos& at : ruins) {
+            if (world.random(RandomStream::Construction).below(kMarketRuinCollapseOdds) == 0 &&
+                destroy_building(world, buildings, island, at, events)) {
+                ++collapsed;
+            }
+        }
+    }
+    return collapsed;
+}
+
 bool capture_neutral_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island,
                               TilePos origin, PlayerId taker, std::vector<ConstructionEvent>* events) {
     if (island >= world.islands().size() || !world.acts_as(taker, FactionBehaviour::Settlers)) {

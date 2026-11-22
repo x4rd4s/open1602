@@ -1228,6 +1228,7 @@ void Simulation::disasters_step() {
     }
     const std::size_t first = m_construction_events.size();
     advance_disasters(*m_world, *m_buildings, m_rules, m_disaster_events.sink(), m_construction_events.sink());
+    (void)collapse_market_ruins(*m_world, *m_buildings, m_construction_events.sink());
     handle(m_construction_events.events(), first);
 }
 
