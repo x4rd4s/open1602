@@ -12,6 +12,7 @@
 #include <queue>
 #include <span>
 #include <string>
+#include <tuple>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -24,6 +25,11 @@
 namespace o1602::sim::ai {
 
 namespace {
+
+/// Whether `t` is a tower, as the survey counts them (task_survey).
+bool is_tower(const Tile& t) {
+    return t.kind == kind::kTower || t.kind == kind::kTowerBeach || t.prod == prod::kTower;
+}
 
 /// Whether a ship lies within 16 tiles of the island's rectangle: farther out it reaches no beach
 /// tile of it (landing_beach's danger, and the ships off the island the landing log follows).
@@ -1853,6 +1859,13 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
                 goals.emplace_back(pr.x, pr.y);
             }
         }
+        if (rivals() && goals.empty()) {
+            // Open1602 (F15): with its markets and Kontor gone, a city with a tower is still
+            // defended (city_defenceless) and cannot be taken. Its towers come first, the nearest
+            // to the soldiers first; the original goes for its houses alone, and once these are
+            // gone its soldiers stand in front of the tower for good.
+            tower_goals(island, c, mine, goals);
+        }
         for (const House& h : m_world.houses()) {
             if (h.island == island && h.city == c.index && goals.size() < 16) {
                 goals.emplace_back(h.x, h.y);
@@ -1873,9 +1886,13 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
         }
     }
     if (hostile != nullptr) {
+        // Open1602 (F15): a tower shoots back, and four soldiers fall one by one where all of them
+        // take it: all go for a tower.
+        const bool tower =
+            rivals() && !goals.empty() && is_tower(tile(island, goals.front().first, goals.front().second));
         std::size_t next = 0;
         for (std::size_t g = 0; g < goals.size() && next < mine.size(); ++g) {
-            const std::size_t count = g == 0 ? 4 : 2;
+            const std::size_t count = tower ? mine.size() : g == 0 ? 4 : 2;
             SoldierOrder order;
             order.player = a.player;
             order.attack = true;
@@ -2170,6 +2187,37 @@ std::optional<Target> Engine::boarding_water(const AiPlayer& p, const Ship& s, c
         }
     }
     return std::nullopt;
+}
+
+void Engine::tower_goals(std::uint16_t island, const City& hostile, const std::vector<std::uint32_t>& soldiers,
+                         std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const {
+    std::int64_t cx = 0;
+    std::int64_t cy = 0;
+    for (const std::uint32_t id : soldiers) {
+        const Soldier* s = m_world.soldier(id);
+        cx += s->cell_x() / 2;
+        cy += s->cell_y() / 2;
+    }
+    const auto n = static_cast<std::int64_t>(std::max<std::size_t>(1, soldiers.size()));
+    const WorldIsland& isl = island_of(island);
+    cx = cx / n - isl.x;
+    cy = cy / n - isl.y;
+    std::vector<std::tuple<std::int64_t, std::int32_t, std::int32_t>> towers;  // distance, origin
+    const auto w = static_cast<std::int32_t>(isl.map.width());
+    const auto h = static_cast<std::int32_t>(isl.map.height());
+    for (std::int32_t y = 0; y < h; ++y) {
+        for (std::int32_t x = 0; x < w; ++x) {
+            const Tile t = tile(island, x, y);
+            if (t.valid() && t.origin && t.city == hostile.index && t.owner == hostile.owner && is_tower(t) &&
+                !t.type->destroyed) {
+                towers.emplace_back(std::abs(x - cx) + std::abs(y - cy), x, y);
+            }
+        }
+    }
+    std::ranges::sort(towers);
+    for (const auto& [d, x, y] : towers) {
+        goals.emplace_back(x, y);
+    }
 }
 
 void Engine::reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,

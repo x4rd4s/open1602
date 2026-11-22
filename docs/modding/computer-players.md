@@ -462,6 +462,11 @@ their soldiers and ships attack every enemy near them on their own. Improved com
 - **Units.** Soldiers and warships no longer chase enemies of their own accord; a human's units do
   not either. The computer gives them attack moves instead (`attack_move` of the orders): to a
   target city, against soldiers on its islands and on the ships' attack missions.
+- **Targets in a city.** The original's soldiers go for a city's markets, its Kontor and houses.
+  An improved computer's go for those they can walk up to, and cut or break their way through
+  trees and walls where they can reach none. With the markets and the Kontor gone, a city with a
+  tower is still defended and cannot be taken over: they go for its towers then, all of them for
+  the nearest one, before its houses.
 
 ## Ships, ways and colonies
 
@@ -573,6 +578,9 @@ a farm finds no site at all, the computer looks for the place of its island with
 unclaimed land that fields can take (60 tiles within six of it at least), near its markets, and
 builds a market at the edge of its land towards it, with a road there over its own ground (up to
 40 tiles); failing that, a market along its roads that comes nearer. The farm then searches anew.
+A mine is built only where a Kontor's or market's carts reach it, of its placements around the
+slope only one they reach; a slope out of their reach waits for a market towards it. A mine no
+cart reaches any longer, its market pulled down or destroyed, gets a market towards it the same way.
 
 ## Trade and treaties
 

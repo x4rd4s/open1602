@@ -3005,6 +3005,10 @@ TEST_CASE("ai: an improved computer builds a mine only where the carts of its Ko
     CHECK(!engine.mine_reached(p, mine, 40, 20, {}));
     const std::vector<sim::BuildItem> planned{sim::BuildItem{20411, 42, 20, 0, 0}, sim::BuildItem{20411, 41, 20, 0, 0}};
     CHECK(engine.mine_reached(p, mine, 40, 20, planned));
+    // Feedback 15: of the placements around the slope tile, the one beside the road is reached,
+    // the one a tile west of it not; task_mine builds only the first.
+    CHECK(engine.mine_reached(p, mine, 42, 12, 0, {}));
+    CHECK(!engine.mine_reached(p, mine, 41, 12, 0, {}));
 }
 
 TEST_CASE("ai: an improved computer does not wait for carts at a quarry") {

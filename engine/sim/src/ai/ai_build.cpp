@@ -687,15 +687,19 @@ bool Engine::mine_reached(const AiPlayer& p, const assets::BuildingType& mine, s
         // no cart ever comes for it.
         return true;
     }
-    return std::ranges::any_of(kMineOffsets, [&](const MineOffset& o) {
-        std::uint32_t w = 1;
-        std::uint32_t h = 1;
-        rotated_size(mine, o.rotation, w, h);
-        const std::int32_t x0 = x + o.dx;
-        const std::int32_t y0 = y + o.dy;
-        return cart_reaches(p, x0, y0, x0 + static_cast<std::int32_t>(w) - 1, y0 + static_cast<std::int32_t>(h) - 1,
-                            road);
-    });
+    return std::ranges::any_of(
+        kMineOffsets, [&](const MineOffset& o) { return mine_reached(p, mine, x + o.dx, y + o.dy, o.rotation, road); });
+}
+
+bool Engine::mine_reached(const AiPlayer& p, const assets::BuildingType& mine, std::int32_t x0, std::int32_t y0,
+                          std::uint8_t rotation, std::span<const BuildItem> road) const {
+    if (mine.prod_kind == prod::kQuarry) {
+        return true;
+    }
+    std::uint32_t w = 1;
+    std::uint32_t h = 1;
+    rotated_size(mine, rotation, w, h);
+    return cart_reaches(p, x0, y0, x0 + static_cast<std::int32_t>(w) - 1, y0 + static_cast<std::int32_t>(h) - 1, road);
 }
 
 std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
@@ -801,11 +805,12 @@ void Engine::task_mine(AiPlayer& p) {
     const std::int32_t hy = p.search.best_y1;
     // The step of a straight road from the road to the slope.
     const auto& d = kStep[static_cast<std::uint32_t>(s.rotation) & 3U];
+    std::vector<BuildItem> road;
     if (rivals()) {
         // Open1602 (F13): only the carts of a Kontor or market fetch a mine's goods, so a mine
         // where none reaches it fills and idles until it is torn down as exhausted. A slope out
         // of their reach waits for a market towards it, as a deposit on free land does.
-        std::vector<BuildItem> road = path;
+        road = path;
         if (road.empty()) {
             for (std::int32_t k = 1; k <= s.extra; ++k) {
                 road.push_back(BuildItem{id::kRoadDirt, s.best_x0 + d[0] * k, s.best_y0 + d[1] * k, 0, 0});
@@ -828,6 +833,11 @@ void Engine::task_mine(AiPlayer& p) {
     }
     std::size_t placed = 0;
     for (const auto& o : kMineOffsets) {
+        // Open1602 (F15): of the placements, only one the carts reach. The test above takes any
+        // of them, and the first that can be built may lie a tile out of their reach.
+        if (rivals() && !mine_reached(p, *mine, hx + o.dx, hy + o.dy, o.rotation, road)) {
+            continue;
+        }
         BuildOrder order;
         order.player = p.player;
         order.island = p.island;
@@ -1384,6 +1394,14 @@ void Engine::task_survey(AiPlayer& p) {
             ore_running_out(p) ? ", ore runs low" : "");
         demolish_tile(p, x, y);
     }
+    // Open1602 (F15): a mine no cart of the city reaches any longer (its market was pulled down or
+    // destroyed, a road broken) fills and stands for good: a market towards it, as for a slope out
+    // of the carts' reach (task_mine). One at a time, as the city builds one market at a time.
+    if (!finds.unfetched_mines.empty()) {
+        const SurveyFinds::Mine& m = finds.unfetched_mines.front();
+        log(p, "city %u/%u: no cart fetches from the mine at %d,%d", r->island, r->city, m.x, m.y);
+        (void)claim_land(p, m.slot, m.x, m.y);
+    }
     if (cotton_island && weberei_ok) {
         std::uint32_t n = 0;
         if (r->slots[kSlotCotton].count >= 2) {
@@ -1537,6 +1555,8 @@ bool Engine::survey_tile(AiPlayer& p, const City& c, CityPlan& r, std::uint32_t 
             m_world.production(p.island, static_cast<std::uint16_t>(x), static_cast<std::uint16_t>(y));
         if (pr != nullptr && t.type->max_idle_cycles != 0 && pr->idle_cycles >= t.type->max_idle_cycles) {
             finds.starved_mines.emplace_back(ix, iy);
+        } else if (rivals() && !mine_reached(p, *t.type, ix, iy, island_of(p.island).map.top(x, y).rotation, {})) {
+            finds.unfetched_mines.push_back(SurveyFinds::Mine{ix, iy, *slot});
         }
     }
     return true;

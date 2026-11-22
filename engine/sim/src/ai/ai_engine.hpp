@@ -104,6 +104,13 @@ struct Cheats;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
+    /// Open1602 (F15): mines no cart of the city reaches, with their slot.
+    struct Mine {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::uint8_t slot = 0;
+    };
+    std::vector<Mine> unfetched_mines;
     std::vector<std::pair<std::int32_t, std::int32_t>> sheep;
     std::vector<std::pair<std::int32_t, std::int32_t>> webstuben;
 };
@@ -293,6 +300,9 @@ public:
     /// quarry, whose stone the stonemason fetches.
     [[nodiscard]] bool mine_reached(const AiPlayer& p, const assets::BuildingType& mine, std::int32_t x, std::int32_t y,
                                     std::span<const BuildItem> road) const;
+    /// The same for the one placement with origin (x0, y0) and `rotation`.
+    [[nodiscard]] bool mine_reached(const AiPlayer& p, const assets::BuildingType& mine, std::int32_t x0,
+                                    std::int32_t y0, std::uint8_t rotation, std::span<const BuildItem> road) const;
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
@@ -1070,6 +1080,10 @@ private:
     /// Open1602: the tiles of `c`'s island from which `p`'s soldiers can walk up to the city's
     /// buildings, or with `kontor` to its Kontor, one flag per tile.
     [[nodiscard]] std::vector<std::uint8_t> walk_reach_to(const AiPlayer& p, const City& c, bool kontor) const;
+    /// Open1602 (F15): adds the towers of `hostile` to `goals`, the nearest to the middle of
+    /// `soldiers` first.
+    void tower_goals(std::uint16_t island, const City& hostile, const std::vector<std::uint32_t>& soldiers,
+                     std::vector<std::pair<std::int32_t, std::int32_t>>& goals) const;
     /// Open1602: keeps the goals of an attack the soldiers can walk up to; with none of them, the
     /// first obstacle on the cheapest way to one (`way_in`).
     void reachable_goals(const AiPlayer& a, std::uint16_t island, const City& hostile,
