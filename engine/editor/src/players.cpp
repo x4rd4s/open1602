@@ -232,6 +232,8 @@ annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& w
     players[slot] = std::move(fresh);
     sim::World after = world;
     keep_relations(world, after, std::move(players));
+    // A map with players has the free trader, as a new game (a map of open sea starts without anyone).
+    (void)add_missing_trader(after);
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_add"));
 }
 
@@ -370,6 +372,26 @@ bool can_add_party(const sim::World& world, Neutral party) {
 }
 
 annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& world, Neutral party) {
+    auto after = with_party(world, party);
+    if (!after) {
+        return after.error();
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after).value(), "party_add"));
+}
+
+bool add_missing_trader(sim::World& world) {
+    if (player_slots(world).empty() || !can_add_party(world, Neutral::Trader)) {
+        return false;
+    }
+    auto after = with_party(world, Neutral::Trader);
+    if (!after) {
+        return false;
+    }
+    world = std::move(after).value();
+    return true;
+}
+
+annokit::core::Result<sim::World> with_party(const sim::World& world, Neutral party) {
     if (!can_add_party(world, party)) {
         return make_error(ErrorCode::Unsupported, "the world has the party already, or its slot is taken");
     }
@@ -411,7 +433,7 @@ annokit::core::Result<std::unique_ptr<Operation>> add_party(const sim::World& wo
         after.diplomacy().relation(slot, o) = fresh.relation(slot, o);
         after.diplomacy().relation(o, slot) = fresh.relation(o, slot);
     }
-    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "party_add"));
+    return after;
 }
 
 Relations relations(const sim::World& world, sim::PlayerId a, sim::PlayerId b) {
