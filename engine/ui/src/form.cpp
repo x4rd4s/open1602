@@ -244,6 +244,96 @@ void Form::field(Id id, Rect r, const std::string& text, bool secret) {
     m_widgets.push_back(std::move(w));
 }
 
+std::pair<std::size_t, std::size_t> Form::selection(std::string_view text) const noexcept {
+    const std::size_t c = caret(text);
+    if (!m_focus || !m_anchor) {
+        return {c, c};
+    }
+    const std::size_t a = std::min(*m_anchor, text.size());
+    return {std::min(a, c), std::max(a, c)};
+}
+
+void Form::insert(std::string& text, std::string_view typed, std::size_t most) {
+    if (typed.empty()) {
+        return;
+    }
+    const auto [first, last] = selection(text);
+    text.erase(first, last - first);
+    typed = typed.substr(0, most > text.size() ? most - text.size() : 0);
+    text.insert(first, typed);
+    m_caret = first + typed.size();
+    m_anchor.reset();
+}
+
+bool Form::edit(std::string& text, int key) {
+    if (!m_focus) {
+        return false;
+    }
+    const bool shift = (key & kKeyShift) != 0;
+    const int k = key & ~kKeyShift;
+    const auto [first, last] = selection(text);
+    const std::size_t c = caret(text);
+    switch (k) {
+        case kKeySelectAll:
+            select_all();
+            return true;
+        case kKeyBackspace:
+        case kKeyDelete:
+            if (first < last) {
+                text.erase(first, last - first);
+                m_caret = first;
+            } else if (k == kKeyBackspace && c > 0) {
+                text.erase(c - 1, 1);
+                m_caret = c - 1;
+            } else if (k == kKeyDelete && c < text.size()) {
+                text.erase(c, 1);
+                m_caret = c;
+            }
+            m_anchor.reset();
+            return true;
+        case kKeyLeft:
+        case kKeyRight:
+        case kKeyHome:
+        case kKeyEnd: {
+            std::size_t to = 0;
+            if (!shift && first < last && (k == kKeyLeft || k == kKeyRight)) {
+                to = k == kKeyLeft ? first : last;  // the selection ends at its side
+            } else if (k == kKeyLeft) {
+                to = c > 0 ? c - 1 : 0;
+            } else if (k == kKeyRight) {
+                to = std::min(c + 1, text.size());
+            } else if (k == kKeyEnd) {
+                to = text.size();
+            }
+            if (!shift) {
+                m_anchor.reset();
+            } else if (!m_anchor) {
+                m_anchor = c;
+            }
+            m_caret = to;
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+std::string Form::selected_text() const {
+    if (!m_focus) {
+        return {};
+    }
+    for (const Widget& w : m_widgets) {
+        if (w.kind == Widget::Kind::Field && w.id == *m_focus) {
+            if (w.on) {
+                return {};  // a password stays where it is
+            }
+            const auto [first, last] = selection(w.text);
+            return w.text.substr(first, last - first);
+        }
+    }
+    return {};
+}
+
 void Form::check(Id id, Rect r, std::string text, bool on, bool enabled) {
     Widget w = make(Widget::Kind::Check, id, r, std::move(text));
     w.on = on;
@@ -490,9 +580,55 @@ std::vector<DrawItem> Form::draw(const std::array<const Font*, kFontSlots>& font
             }
             case Widget::Kind::Field: {
                 const bool focused = m_focus == w.id;
-                const bool all = focused && m_all_selected && !w.text.empty();
+                if (!focused) {
+                    framed(w.rect, m_style.field);
+                    text(w.rect, w.text, Align::Left, m_style.text);
+                    break;
+                }
+                const auto [first, last] = selection(w.text);
+                const bool all = first == 0 && last == w.text.size() && !w.text.empty();
                 framed(w.rect, all ? m_style.selected : m_style.field);
-                text(w.rect, focused && !all ? w.text + "_" : w.text, Align::Left, m_style.text, focused);
+                // The text from where the caret (an underscore after it, as at the end) stays in
+                // sight, cut where the field ends.
+                const std::size_t c = caret(w.text);
+                const double room = std::max(0.0, w.rect.w - 2.0 * kPadding);
+                const std::string_view all_text = w.text;
+                const auto width = [&](std::size_t from, std::size_t to) {
+                    return text_width(font, all_text.substr(from, to - from));
+                };
+                const double caret_w = text_width(font, "_");
+                std::size_t start = 0;
+                for (std::size_t hi = c; start < hi;) {  // the first start that keeps the caret in sight
+                    const std::size_t mid = start + (hi - start) / 2;
+                    if (width(mid, c) + caret_w <= room) {
+                        hi = mid;
+                    } else {
+                        start = mid + 1;
+                    }
+                }
+                std::size_t end = w.text.size();
+                while (end > c && width(start, end) > room) {
+                    --end;
+                }
+                const bool caret_shown = first == last;
+                if (!all && first < last) {
+                    const std::size_t a = std::clamp(first, start, end);
+                    const std::size_t b = std::clamp(last, start, end);
+                    const auto xa = static_cast<std::int32_t>(std::lround(width(start, a)));
+                    const auto xb = static_cast<std::int32_t>(std::lround(width(start, b)));
+                    fill(Rect{w.rect.x + kPadding + xa, w.rect.y + kBorder + 2, xb - xa, w.rect.h - 2 * kBorder - 4},
+                         m_style.selected);
+                }
+                std::string shown(all_text.substr(start, end - start));
+                if (caret_shown && c == w.text.size()) {
+                    shown += '_';
+                }
+                text(w.rect, std::move(shown), Align::Left, m_style.text, true);
+                if (caret_shown && c < w.text.size()) {
+                    // Inside the text the underscore lies under the letter after the caret.
+                    const auto x = static_cast<std::int32_t>(std::lround(width(start, c)));
+                    text(Rect{w.rect.x + x, w.rect.y, w.rect.w - x, w.rect.h}, "_", Align::Left, m_style.text, true);
+                }
                 break;
             }
             case Widget::Kind::Check: {

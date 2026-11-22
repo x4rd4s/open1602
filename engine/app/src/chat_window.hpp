@@ -71,6 +71,8 @@ public:
     void open();
     void close() noexcept { m_open = false; }
     [[nodiscard]] bool is_open() const noexcept { return m_open; }
+    /// The widgets as laid out last, with the line typed in.
+    [[nodiscard]] const ui::Form& form() const noexcept { return m_form; }
     /// The window's height in design units: the more players to choose from, the taller.
     [[nodiscard]] std::int32_t height(const ChatModel& model) const;
     /// The players chosen, ascending; empty: everyone.

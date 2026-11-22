@@ -7,7 +7,9 @@
 // the form draws it and answers the mouse. Pure logic, like ui::Panel.
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -57,6 +59,21 @@ inline constexpr std::int32_t kTextPadding = 8;
 /// Where the bottom of the cell of text goes, design units, so that its ink sits in the middle of
 /// the line from `y`, `height` high (the digits' ink, Font::ink_drop()).
 [[nodiscard]] std::int32_t text_bottom(const Font* font, std::int32_t y, std::int32_t height);
+
+/// The keys of a field being typed in that are no text (Hud::type_key()).
+inline constexpr int kKeySelectAll = 1;  ///< Ctrl+A
+inline constexpr int kKeyBackspace = 8;
+inline constexpr int kKeyTab = 9;
+inline constexpr int kKeyLineBreak = 10;  ///< Shift+Enter
+inline constexpr int kKeyEnter = 13;
+inline constexpr int kKeyEscape = 27;
+inline constexpr int kKeyLeft = 0x101;
+inline constexpr int kKeyRight = 0x102;
+inline constexpr int kKeyHome = 0x103;
+inline constexpr int kKeyEnd = 0x104;
+inline constexpr int kKeyDelete = 0x105;
+/// Added to kKeyLeft, kKeyRight, kKeyHome or kKeyEnd: Shift is held, the caret selects on its way.
+inline constexpr int kKeyShift = 0x1000;
 
 /// The mouse button of a press or release.
 enum class MouseButton : std::uint8_t { Left, Right };
@@ -128,18 +145,48 @@ public:
 
     /// The field that takes the keys, if any.
     [[nodiscard]] std::optional<Id> focus() const noexcept { return m_focus; }
+    /// Another field (or none) takes the keys: its caret is at the end of its text, nothing selected.
     void set_focus(std::optional<Id> id) noexcept {
         if (id != m_focus) {
-            m_all_selected = false;
+            m_caret = std::string::npos;
+            m_anchor.reset();
         }
         m_focus = id;
     }
     /// Ctrl+A: the whole text of the field with the focus is selected (shown on the selected
     /// colour); what is typed next replaces it, Backspace removes it.
-    void select_all() noexcept { m_all_selected = m_focus.has_value(); }
-    [[nodiscard]] bool all_selected() const noexcept { return m_all_selected && m_focus.has_value(); }
+    void select_all() noexcept {
+        if (m_focus) {
+            m_anchor = 0;
+            m_caret = std::string::npos;
+        }
+    }
+    [[nodiscard]] bool all_selected() const noexcept {
+        return m_focus.has_value() && m_anchor == 0 && m_caret == std::string::npos;
+    }
     /// Whether the whole text was selected; the selection is gone afterwards (any key ends it).
-    bool take_all_selected() noexcept { return std::exchange(m_all_selected, false) && m_focus.has_value(); }
+    bool take_all_selected() noexcept {
+        const bool all = all_selected();
+        m_anchor.reset();
+        return all;
+    }
+
+    /// Where the caret stands in `text`, the focused field's text (its end, unless moved).
+    [[nodiscard]] std::size_t caret(std::string_view text) const noexcept { return std::min(m_caret, text.size()); }
+    /// The part of `text`, the focused field's text, that is selected: [first, second), empty
+    /// (both at the caret) if nothing is.
+    [[nodiscard]] std::pair<std::size_t, std::size_t> selection(std::string_view text) const noexcept;
+    /// Text typed into `text`, the focused field's: it takes the selection's place, or goes in at the
+    /// caret, as far as `most` bytes in all allow; the caret follows it. The owner leaves out what
+    /// the field does not take before. Nothing typed leaves the selection as it is.
+    void insert(std::string& text, std::string_view typed, std::size_t most);
+    /// A key for `text`, the focused field's: Ctrl+A (kKeySelectAll) selects it all, Backspace and
+    /// Delete remove the selection or the byte before or after the caret, Left, Right, Home and End
+    /// move the caret, with kKeyShift selecting on the way. False for any other key (and without
+    /// a focus), which the owner handles.
+    bool edit(std::string& text, int key);
+    /// The selected text of the focused field as last laid out (Ctrl+C); empty for a secret one.
+    [[nodiscard]] std::string selected_text() const;
 
     /// The mouse at (x, y) in pixels of the form's region: the widget clicked (pressed and
     /// released on it with the same button), if any. The right button clicks cycle buttons only;
@@ -214,7 +261,8 @@ private:
     MouseButton m_clicked_with = MouseButton::Left;
     std::optional<Id> m_hovered;
     std::optional<Id> m_focus;
-    bool m_all_selected = false;  ///< select_all()
+    std::size_t m_caret = std::string::npos;  ///< in the focused field's text; npos: at its end
+    std::optional<std::size_t> m_anchor;      ///< where the selection began; none: nothing selected
     bool m_released = false;
     double m_slide = 0.0;  ///< the held slider's knob, then where it was let go
 };

@@ -254,33 +254,23 @@ void TemplateWindow::type(std::string_view text) {
     if (!typing()) {
         return;
     }
-    if (!text.empty() && m_form.take_all_selected()) {
-        m_text.clear();  // typed over the whole name (Ctrl+A, or the name offered)
-    }
+    std::string typed;
     for (const char c : text) {
-        if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F && m_text.size() < kMaxTemplateName) {
-            m_text.push_back(c);
+        if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F) {
+            typed.push_back(c);
         }
     }
+    m_form.insert(m_text, typed, kMaxTemplateName);
 }
 
 std::optional<TemplateRequest> TemplateWindow::key(int key) {
     if (!typing()) {
         return std::nullopt;
     }
-    if (key == 1) {
-        m_form.select_all();
+    if (m_form.edit(m_text, key)) {
         return std::nullopt;
     }
-    const bool all = m_form.take_all_selected();
     switch (key) {
-        case 8:
-            if (all) {
-                m_text.clear();
-            } else if (!m_text.empty()) {
-                m_text.pop_back();
-            }
-            return std::nullopt;
         case 13:
             return commit();
         case 27:
