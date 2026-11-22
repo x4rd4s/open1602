@@ -1617,12 +1617,15 @@ void Engine::log_sealed(const AiPlayer& p, const City& c, std::uint32_t beaches)
 }
 
 bool Engine::takes_landing(const AiPlayer& p, const Ship& s, const ShipNote& n) const {
+    // Open1602: an improved computer's only when healthy. yard_service calls a badly damaged ship
+    // to the yard even on a mission, and start_attack took it straight back for the next attack:
+    // every 10 s, so that it never got repaired nor sailed (x3 o4-404-p0, 453 attack orders).
     return s.id != p.settle.ship && !s.held && n.mission == 0 && !n.supply && s.cannons != 0 &&
-           free_holds(s) + soldiers_aboard(s) >= kLandingHolds;
+           free_holds(s) + soldiers_aboard(s) >= kLandingHolds && (classic() || healthy(s));
 }
 
 Ship* Engine::best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same) {
-    // An armed ship with room, healthy and well armed.
+    // An armed ship with room, well armed (and healthy, for an improved computer: takes_landing).
     (void)max_same;
     for (const ShipNote& n : p.ships) {
         const Ship* s = m_world.ship(n.id);
