@@ -309,6 +309,9 @@ TEST_CASE("ui: text width, colours, wrapping with hyphens and hard breaks") {
     CHECK((ui::wrap_text(font, "aa bb cc", 20) == std::vector<std::string>{"aa bb", "cc"}));
     CHECK((ui::wrap_text(font, "aa\n\nbb", 100) == std::vector<std::string>{"aa", "bb"}));  // several breaks: one
     CHECK((ui::wrap_text(font, "abc--def", 100) == std::vector<std::string>{"abcdef"}));
+    // A word ending in a hyphen keeps the space after it: "Nord- und Süd", a list's "- item".
+    CHECK((ui::wrap_text(font, "ab- cd", 100) == std::vector<std::string>{"ab- cd"}));
+    CHECK((ui::wrap_text(font, "- ab", 100) == std::vector<std::string>{"- ab"}));
     CHECK((ui::wrap_text(font, "x abc--def", 24) == std::vector<std::string>{"x abc-", "def"}));
     CHECK((ui::wrap_text(font, "abcdefgh", 12) == std::vector<std::string>{"abc", "def", "gh"}));
     // A line starting with a byte from 0x80 keeps it after a hard break (U-017).
