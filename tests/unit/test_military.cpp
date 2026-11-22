@@ -900,6 +900,62 @@ TEST_CASE("military: a village without huts is gone, its land free, and it curse
                       [](const auto& e) { return e.kind == sim::ConstructionEvent::Kind::CityDissolved; }));
 }
 
+TEST_CASE("military: the land of a village that is gone goes to the city whose land covers it") {
+    Field f(false, true);
+    // Player 0's Kontor (circle of 8 tiles) beside the village; one tile of the village lies in its
+    // circle, one far outside it.
+    f.build(kKontor, 4, 4, 0, 0);
+    f.world.city(0, 0)->warehouse_x = 4;
+    f.world.city(0, 0)->warehouse_y = 4;
+    f.build(kKontorRuin, 20, 5, 2, 1);
+    f.world.city(0, 1)->warehouse_x = 20;
+    f.world.city(0, 1)->warehouse_y = 5;
+    for (const std::int32_t x : {14, 16, 18}) {
+        f.build(kVillageHut, x, 9, 2, 1);
+    }
+    f.world.island(0).map.set_city(7, 8, 1, 2);
+    f.world.island(0).map.set_city(24, 12, 1, 2);
+    f.start();
+    for (const std::uint16_t x : std::array<std::uint16_t, 3>{14, 16, 18}) {
+        f.military->damage_building(0, x, 9, 32 * 3, true, 0, &f.construction);
+        f.run(50);
+    }
+    CHECK(f.world.city(0, 1) == nullptr);
+    // Within the Kontor's circle the land is player 0's at once, no new market needed.
+    CHECK(f.world.islands()[0].map.top(7, 8).city == 0);
+    CHECK(f.world.islands()[0].map.top(7, 8).owner == 0);
+    // Outside it the land is free.
+    CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+    CHECK(f.world.islands()[0].map.top(24, 12).owner == sim::kNoPlayer);
+    CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
+    // The Kontor's city stays as it was.
+    CHECK(f.world.city(0, 0) != nullptr);
+    CHECK(f.world.islands()[0].map.top(4, 4).city == 0);
+}
+
+TEST_CASE("military: the land of a computer's city it gives up goes to the city whose land covers it") {
+    Field f;
+    // Player 1, a computer, city 0: its Kontor destroyed, one house left. Player 0's city 1 has a
+    // Kontor whose circle reaches one tile of it.
+    f.build(kKontorDestroyed, 20, 5, 1, 0);
+    f.world.city(0, 0)->warehouse_x = 20;
+    f.world.city(0, 0)->warehouse_y = 5;
+    f.build(kHouse, 14, 9, 1, 0);
+    f.build(kKontor, 4, 4, 0, 1);
+    f.world.city(0, 1)->warehouse_x = 4;
+    f.world.city(0, 1)->warehouse_y = 4;
+    f.world.island(0).map.set_city(7, 8, 0, 1);
+    f.world.island(0).map.set_city(24, 12, 0, 1);
+    f.start();
+    f.military->damage_building(0, 14, 9, 32 * 30, true, 0, &f.construction);
+    f.run(50);
+    CHECK(f.world.city(0, 0) == nullptr);
+    CHECK(f.world.islands()[0].map.top(7, 8).city == 1);
+    CHECK(f.world.islands()[0].map.top(7, 8).owner == 0);
+    CHECK(f.world.islands()[0].map.top(24, 12).city == sim::MapCell::kNoCity);
+    CHECK(f.world.islands()[0].map.top(20, 5).city == sim::MapCell::kNoCity);
+}
+
 TEST_CASE("military: as in the original, the ruins of a village without huts keep its land") {
     Field f(false, true);
     sim::OriginalBugs bugs;

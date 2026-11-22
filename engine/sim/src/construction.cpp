@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <limits>
 #include <set>
 
@@ -2170,7 +2171,12 @@ public:
     /// fields; not grass, trees, fish or terrain.
     bool ruinable(const assets::BuildingType& b) const { return territory_building(m_buildings, b); }
 
-    void dissolve_city(std::uint8_t index) {
+    /// Dissolves city `index`: what stands of it falls to ruins and its land becomes free. With
+    /// `to_covering` (Open1602, a native village or a computer's city that is gone) a tile within
+    /// the land of a city of a human or computer that still stands (the circle of its market or
+    /// Kontor, the reach of its tower) goes to that city with the ruin on it instead, as when a
+    /// city loses its last market (take_fallen_land); the lowest city number if several cover it.
+    void dissolve_city(std::uint8_t index, bool to_covering = false) {
         IslandMap& m = map();
         for (std::uint32_t y = 0; y < m.height(); ++y) {
             for (std::uint32_t x = 0; x < m.width(); ++x) {
@@ -2185,11 +2191,27 @@ public:
                 }
             }
         }
+        std::vector<CityMask> covered;
+        CityMask standing = 0;
+        if (to_covering) {
+            covered = territory_coverage(m_world, m_buildings, m_island, {});
+            standing =
+                standing_cities(m_world, m_buildings, m_island, {}) & static_cast<CityMask>(~(CityMask{1} << index));
+        }
+        const std::uint32_t w = m.width();
         for (std::uint32_t y = 0; y < m.height(); ++y) {
-            for (std::uint32_t x = 0; x < m.width(); ++x) {
-                if (m.top(x, y).city == index) {
-                    m.set_city(x, y, MapCell::kNoCity, kNoPlayer);
+            for (std::uint32_t x = 0; x < w; ++x) {
+                if (m.top(x, y).city != index) {
+                    continue;
                 }
+                const CityMask bits = to_covering ? covered[std::size_t{y} * w + x] & standing : CityMask{0};
+                if (bits == 0) {
+                    m.set_city(x, y, MapCell::kNoCity, kNoPlayer);
+                    continue;
+                }
+                const auto next = static_cast<std::uint8_t>(std::countr_zero(bits));
+                lose_tile(x, y, next);
+                services_of(next);
             }
         }
         // The land the editor gave it goes with it: a later city of the same number gets none.
@@ -2938,7 +2960,7 @@ bool destroy_building(World& world, const assets::BuildingTable& buildings, std:
     // house or of the Kontor holds it.
     if (!world.original_bugs().native_land && ((natives && native_village_gone(world, buildings, island, b->city)) ||
                                                (computer && computer_city_gone(world, buildings, island, b->city)))) {
-        builder.dissolve_city(b->city);
+        builder.dissolve_city(b->city, true);
     }
     builder.finish();
     return true;
@@ -3087,7 +3109,7 @@ std::size_t give_up_razed_cities(World& world, const assets::BuildingTable& buil
     }
     for (const auto& [island, city] : gone) {
         Builder builder(world, buildings, island, events);
-        builder.dissolve_city(city);
+        builder.dissolve_city(city, true);
         builder.finish();
     }
     return gone.size();
