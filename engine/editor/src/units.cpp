@@ -397,14 +397,22 @@ annokit::core::Result<std::unique_ptr<Operation>> set_ship_cannons(const sim::Wo
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "ship_cannons"));
 }
 
+bool ship_sellable(const sim::World& world, sim::PlayerId owner) {
+    const sim::Player* p = world.player(owner);
+    return p != nullptr && (p->role == sim::PlayerRole::Human || p->role == sim::PlayerRole::Computer ||
+                            world.acts_as(owner, sim::FactionBehaviour::Pirates) ||
+                            world.acts_as(owner, sim::FactionBehaviour::Natives));
+}
+
 annokit::core::Result<std::unique_ptr<Operation>> set_ship_for_sale(const sim::World& world, std::uint32_t id, bool on,
                                                                     std::uint16_t factor) {
     const sim::Ship* ship = world.ship(id);
     if (ship == nullptr) {
         return make_error(ErrorCode::NotFound, "no such ship");
     }
-    if (ship->cart() || !cart_owner_ok(world, ship->owner)) {
-        return make_error(ErrorCode::Unsupported, "only a human's or computer's ship is for sale");
+    if (ship->cart() || !ship_sellable(world, ship->owner)) {
+        return make_error(ErrorCode::Unsupported,
+                          "only a human's, computer's, the pirates' or natives' ship is for sale");
     }
     if (factor > sim::ShipCommand::kMaxSaleFactor) {
         return make_error(ErrorCode::OutOfRange,

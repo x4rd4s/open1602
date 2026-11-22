@@ -662,12 +662,9 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
         ship.cannons = s->cannons;
         ship.for_sale = s->for_sale;
         ship.sale_factor = s->sale_factor;
-        if (const assets::FigureType* type = m_figures.get(s->figure)) {
-            ship.sale_price = static_cast<std::int32_t>(std::uint64_t{type->ship.price} * s->sale_factor / 128U);
-        }
-        const sim::Player* owner = world.player(s->owner);
-        ship.can_sell =
-            owner != nullptr && (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer);
+        ship.sale_price =
+            static_cast<std::int32_t>(std::uint64_t{m_figures.ship_value(s->figure)} * s->sale_factor / 128U);
+        ship.can_sell = editor::ship_sellable(world, s->owner);
     }
     // The route: its stops by the cities it can go to, their wares.
     ship.cart = s->cart();

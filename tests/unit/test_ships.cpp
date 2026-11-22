@@ -1348,6 +1348,37 @@ TEST_CASE("ships: a ship offered for sale changes hands for its price") {
     CHECK(!fleet.command(cmd(0, id, Op::Buy)));
 }
 
+TEST_CASE("ships: a ship of the pirates for sale (a map's) is bought at peace with them only") {
+    Sea sea;
+    std::vector<sim::Player> players = sea.world.players();
+    players.resize(7);
+    sim::make_neutral(players[5], sim::faction::kPirates);
+    sim::make_neutral(players[6], sim::faction::kNatives);
+    sea.world.set_players(players);
+    sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);
+    using Op = sim::ShipCommand::Op;
+    sim::Ship& ship = sea.add(10, 10, 29, 5);
+    const std::uint32_t id = ship.id;
+    ship.for_sale = true;
+    // A ship that no shipyard builds and that has no price is worth the dearest of theirs.
+    CHECK(sea.figures.ship_value(29) == 1000);
+    CHECK(fleet.sale_price(ship) == 1000);
+    // At war with the pirates (as every game starts): no sale.
+    REQUIRE(sea.world.diplomacy().hostile(0, 5));
+    CHECK(!fleet.command(cmd(0, id, Op::Buy)));
+    sea.world.diplomacy().relation(0, 5).peace = sim::Treaty::Signed;
+    CHECK(fleet.command(cmd(0, id, Op::Buy)));
+    CHECK(sea.world.ship(id)->owner == 0);
+    CHECK(sea.world.player(5)->money == 1000);
+    // The natives' ship goes the same way; they are at peace from the start.
+    sim::Ship& canoe = sea.add(12, 10, 21, 6);
+    canoe.for_sale = true;
+    const std::uint32_t canoe_id = canoe.id;
+    REQUIRE(!sea.world.diplomacy().hostile(1, 6));
+    CHECK(fleet.command(cmd(1, canoe_id, Op::Buy)));
+    CHECK(sea.world.ship(canoe_id)->owner == 1);
+}
+
 TEST_CASE("ships: an offer for sale is announced once, price changes stay quiet") {
     Sea sea;
     sim::Fleet fleet(sea.world, sea.buildings, sea.figures, sea.rules);

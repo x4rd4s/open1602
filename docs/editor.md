@@ -225,7 +225,10 @@ the right button as many as the ship takes or none. Each change is one step of u
 **Name** types a new name for the ship or trade cart, up to 40 characters, as its owner may give it
 (a ship without one is named from the ship names when the game starts). **For sale** offers a
 human's or computer's ship for sale from the start, as its owner offers it in the game; other
-players, computers too, can buy it. **Price** below it sets what it costs, in steps of 10 % of the
+players, computers too, can buy it. A ship of the pirates or the natives can be offered too:
+players buy it only while they are at peace with its owner (with the pirates after paying for
+peace), and the pirates' ship is worth the price of the dearest ship a shipyard builds. The
+pirates build new ships without it as they always do. **Price** below it sets what it costs, in steps of 10 % of the
 ship type's price (- and +, from nothing to three times the price; the right button: the type's own
 price again), as the price slider of the ship's window in the game.
 

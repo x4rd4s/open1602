@@ -16,11 +16,10 @@ constexpr std::uint32_t kTon = kStockUnitsPerTon;
 }  // namespace
 
 std::int32_t Fleet::sale_price(const Ship& ship) const {
-    const assets::FigureType* t = type_of(ship);
-    if (t == nullptr) {
+    if (type_of(ship) == nullptr) {
         return 0;
     }
-    return static_cast<std::int32_t>(std::uint64_t{t->ship.price} * ship.sale_factor / 128U);
+    return static_cast<std::int32_t>(std::uint64_t{m_figures->ship_value(ship.figure)} * ship.sale_factor / 128U);
 }
 
 void Fleet::change_owner(Ship& ship, PlayerId owner) {
@@ -160,6 +159,10 @@ bool Fleet::command(const ShipCommand& c) {
             Player* seller = m_world->player(ship->owner);
             if (!ship->for_sale || buyer == nullptr || seller == nullptr || c.player == ship->owner ||
                 (buyer->role != PlayerRole::Human && buyer->role != PlayerRole::Computer)) {
+                return false;
+            }
+            // Open1602: the pirates and the natives (a map's ship for sale) sell only at peace.
+            if (seller->role == PlayerRole::Neutral && m_world->diplomacy().hostile(c.player, ship->owner)) {
                 return false;
             }
             const std::int32_t price = sale_price(*ship);

@@ -898,6 +898,10 @@ private:
         // Sale: an own ship can be offered; another's only shows its price, and can be bought.
         m_ship.set_visible(kSale, own || ship.for_sale);
         m_ship.set_selected(kSale, ship.for_sale && own);
+        // The pirates and the natives (a map's ship for sale) sell only at peace.
+        const sim::Player* seller = c.world().player(ship.owner);
+        m_ship.set_disabled(kSale, !own && seller != nullptr && seller->role == sim::PlayerRole::Neutral &&
+                                       c.world().diplomacy().hostile(c.local, ship.owner));
         for (const std::int32_t id : {kPriceTrack, kPriceSlider, kPriceDown, kPriceUp}) {
             m_ship.set_visible(id, ship.for_sale && own);
         }

@@ -2075,6 +2075,7 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
         CHECK(island.world.ship(id)->cannons == 0);
 
         CHECK(!editor::set_ship_for_sale(island.world, id, true, sim::ShipCommand::kMaxSaleFactor + 1).ok());
+        CHECK(editor::ship_sellable(island.world, island.world.ship(id)->owner));
         auto sale = editor::set_ship_for_sale(island.world, id, true, 192);
         REQUIRE(sale.ok());
         (*sale)->apply(island.world);
