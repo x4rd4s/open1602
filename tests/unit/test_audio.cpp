@@ -89,7 +89,7 @@ TEST_CASE("audio: damaged and unknown files fail without crashing") {
     bytes.resize(30);  // cut inside the fmt chunk
     CHECK(!annokit::audio::decode_wav(bytes).ok());
     CHECK(!annokit::audio::decode_wav(wave(0x55, 2, 22050, 16, {0, 0, 0, 0})).ok());  // MP3
-    CHECK(!annokit::audio::decode_wav(wave(1, 7, 22050, 8, {0})).ok());
+    CHECK(!annokit::audio::decode_wav(wave(1, 9, 22050, 8, {0})).ok());               // more than eight channels
 }
 
 TEST_CASE("audio: the mixer resamples, pans and clips") {
@@ -615,7 +615,9 @@ TEST_CASE("audio: music.toml adds a package's tracks after MUSIC8's") {
     CHECK(own[1].title == "storm");
     CHECK(own[1].battle);
     REQUIRE(warnings.size() == 5);
-    CHECK(warnings[0] == "shanty/music.toml line 7: readme.txt is missing or no WAV, Ogg Vorbis or FLAC file");
+    CHECK(warnings[0] ==
+          "shanty/music.toml line 7: readme.txt cannot be played (not a sound file (WAV, Ogg Vorbis "
+          "or FLAC)); the track is passed over");
     CHECK(warnings[1] ==
           "shanty/music.toml line 10: 'file' is the path of a sound file in the package, folders split by '/'");
     CHECK(warnings[2] == "shanty/music.toml line 11: [none] needs a 'file'");
@@ -682,6 +684,87 @@ TEST_CASE("audio: music.toml replaces a track of MUSIC8 by its title") {
     plain.play("b Song");
     plain.finish_loading();
     CHECK(plain.playing().empty());
+}
+
+TEST_CASE("audio: music.toml takes ADPCM WAVE files and warns of encodings it cannot play") {
+    FakeGame fake;
+    std::filesystem::create_directories(fake.root / "mods" / "venice" / "music");
+    // Microsoft ADPCM, stereo, two blocks of 20 bytes (as the music of other games often is).
+    fake.write("mods/venice/music/adpcm.wav", wave(2, 2, 44100, 4, std::vector<std::uint8_t>(40, 0), 20));
+    // MPEG audio in a WAVE file: not read.
+    fake.write("mods/venice/music/mp3.wav", wave(0x55, 2, 44100, 0, std::vector<std::uint8_t>(40, 0), 1));
+    const auto folder = fake.root / "mods" / "venice";
+    std::vector<audio::MusicTrack> own;
+    std::vector<std::string> warnings;
+    audio::apply_music_file(own, "venice", folder,
+                            "[adpcm]\n"
+                            "file = \"music/adpcm.wav\"\n"
+                            "[mp3]\n"
+                            "file = \"music/mp3.wav\"\n"
+                            "[gone]\n"
+                            "file = \"music/gone.wav\"\n",
+                            warnings);
+    REQUIRE(own.size() == 1);
+    CHECK(own[0].title == "adpcm");
+    REQUIRE(warnings.size() == 2);
+    CHECK(warnings[0] ==
+          "venice/music.toml line 3: music/mp3.wav cannot be played (WAVE: encoding 85, 0 bit); the track is passed "
+          "over");
+    CHECK(warnings[1] == "venice/music.toml line 5: music/gone.wav is missing; the track is passed over");
+
+    auto game = assets::GameDirectory::open(fake.root);
+    REQUIRE(game.ok());
+    std::vector<std::string> tracks;
+    std::vector<std::string> fights;
+    audio::Music::scan(*game, tracks, fights);
+    audio::SoundBank bank(*game);
+    annokit::audio::Mixer mixer(22050, 8);
+    audio::Music music(mixer, bank, tracks, fights, 1602, own);
+    music.play("adpcm");
+    music.finish_loading();
+    CHECK(music.playing() == "adpcm");
+}
+
+TEST_CASE("audio: a track whose file does not decode is not tried again") {
+    FakeGame fake;
+    std::filesystem::create_directories(fake.root / "mods" / "broken");
+    // Looks like a WAVE file by its head but holds no data chunk: it fails only when decoded.
+    std::vector<std::uint8_t> head = wave(1, 2, 22050, 16, {});
+    head.resize(head.size() - 8);
+    fake.write("mods/broken/song.wav", head);
+    const auto file = fake.root / "mods" / "broken" / "song.wav";
+    auto game = assets::GameDirectory::open(fake.root);
+    REQUIRE(game.ok());
+    std::vector<std::string> tracks;
+    std::vector<std::string> fights;
+    audio::Music::scan(*game, tracks, fights);
+    audio::SoundBank bank(*game);
+    annokit::audio::Mixer mixer(22050, 8);
+    audio::Music music(mixer, bank, tracks, fights, 1602, {audio::MusicTrack{"Broken", file, false, {}}});
+    audio::AudioSettings s;
+    s.disabled_songs = {"A Song", "b Song", "c song"};  // only the broken track is on
+    music.set_settings(s);
+    music.update(0, 16);
+    music.finish_loading();
+    CHECK(music.playing().empty());
+    // Even once the file is mended, the track stays passed over for this session: no file is read
+    // and decoded again and again while nothing else may play.
+    fake.write("mods/broken/song.wav", wave(1, 2, 22050, 16, std::vector<std::uint8_t>(400, 0)));
+    for (std::uint64_t t = 16; t < 160; t += 16) {
+        music.update(t, 16);
+        music.finish_loading();
+    }
+    CHECK(music.playing().empty());
+    music.play("Broken");
+    music.finish_loading();
+    CHECK(music.playing().empty());
+    // The other tracks still play.
+    s.disabled_songs.clear();
+    music.set_settings(s);
+    music.update(200, 16);
+    music.finish_loading();
+    CHECK(!music.playing().empty());
+    CHECK(music.playing() != "Broken");
 }
 
 TEST_CASE("audio: a package's sound plays by its number among the original's") {

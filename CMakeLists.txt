@@ -97,7 +97,7 @@ include(FetchContent)
 set(ANNOKIT_BUILD_PLATFORM ${O1602_BUILD_GAME})
 FetchContent_Declare(annokit
     GIT_REPOSITORY https://github.com/x4rd4s/annokit.git
-    GIT_TAG 2cfcb293c1e30e77932f71fdeab1c527994648c6)
+    GIT_TAG 1e0606164ac97dc1ba193601fb7fb2ea0e36beec)
 FetchContent_MakeAvailable(annokit)
 add_subdirectory(engine)
 

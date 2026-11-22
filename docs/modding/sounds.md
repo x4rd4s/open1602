@@ -15,11 +15,14 @@ original's `SAMPLES`. The voice of an original message is replaced in `messages.
 
 | Format | Read |
 |---|---|
-| WAV | PCM of 8 or 16 bits, and the original's 4-bit music |
+| WAV | PCM of 8, 16, 24 or 32 bits, 32- or 64-bit float, Microsoft ADPCM, IMA ADPCM, and the original's 4-bit music |
 | Ogg Vorbis (`.ogg`) | any quality |
 | FLAC (`.flac`) | any bit depth |
 
-The game tells the format by the file's first bytes, not by its name. Any sample rate up to
+The game tells the format by the file's first bytes, not by its name, and checks a WAV file's
+encoding when the package is loaded: a file it cannot play (MP3 inside a WAV file, for example) is
+passed over with a warning then, not first when it would be heard. A file in another format can be
+converted, e.g. `ffmpeg -i in.wav out.flac`. Any sample rate up to
 192,000 Hz is played; the mixer converts it to the device's. A file of more than two channels keeps
 its front left and right, and a file longer than 20 minutes is cut there.
 
@@ -51,9 +54,10 @@ battle = true
 
 The packages' tracks come after the original's in the music list, in the packages' load order, and
 are played at random or in order with them; the player turns them off there as the original's. A
-track whose file is missing or is no sound file, or whose title another track has, is passed over
-with a warning that names the file and the line. A track is decoded when it starts, beside the
-game, as the original's are.
+track whose file is missing or is no sound file the game can play, or whose title another track
+has, is passed over with a warning that names the file and the line. A track is decoded when it
+starts, beside the game, as the original's are; one whose file still fails then is passed over for
+the rest of the session.
 
 ### Replacing a track of the original
 

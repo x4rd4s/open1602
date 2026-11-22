@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <iterator>
 #include <thread>
 
 #include "annokit/core/file.hpp"
@@ -485,7 +486,7 @@ void Music::play(const std::string& title) {
     }
     const auto it =
         std::find_if(m_tracks.begin(), m_tracks.end(), [&](const std::string& t) { return lower(t) == lower(title); });
-    if (it == m_tracks.end()) {
+    if (it == m_tracks.end() || broken(*it)) {
         return;
     }
     stop();
@@ -508,16 +509,25 @@ std::optional<std::string> Music::pick(std::uint64_t game_ms) {
     };
     if (m_battle && game_ms - m_mode_ms <= kBattleStartMs && !m_fights.empty()) {
         // A battle track, not the last one again.
-        for (int attempt = 0; attempt < 20; ++attempt) {
-            const std::string& t =
-                m_fights[std::uniform_int_distribution<std::size_t>(0, m_fights.size() - 1)(m_random)];
-            if (m_fights.size() == 1 || !recent(t, 1)) {
-                return t;
+        std::vector<std::string> fights;
+        std::copy_if(m_fights.begin(), m_fights.end(), std::back_inserter(fights),
+                     [&](const std::string& t) { return !broken(t); });
+        if (!fights.empty()) {
+            for (int attempt = 0; attempt < 20; ++attempt) {
+                const std::string& t =
+                    fights[std::uniform_int_distribution<std::size_t>(0, fights.size() - 1)(m_random)];
+                if (fights.size() == 1 || !recent(t, 1)) {
+                    return t;
+                }
             }
+            return fights.front();
         }
-        return m_fights.front();
     }
-    const auto enabled = static_cast<std::size_t>(std::count(m_enabled.begin(), m_enabled.end(), true));
+    const auto usable = [&](std::size_t i) { return m_enabled[i] && !broken(m_tracks[i]); };
+    std::size_t enabled = 0;
+    for (std::size_t i = 0; i < m_tracks.size(); ++i) {
+        enabled += usable(i) ? 1U : 0U;
+    }
     if (enabled == 0) {
         return std::nullopt;
     }
@@ -526,7 +536,7 @@ std::optional<std::string> Music::pick(std::uint64_t game_ms) {
         std::vector<std::size_t> candidates;
         const std::size_t window = std::min<std::size_t>(enabled / 2, kHistory);
         for (std::size_t i = 0; i < m_tracks.size(); ++i) {
-            if (m_enabled[i] && !recent(m_tracks[i], window)) {
+            if (usable(i) && !recent(m_tracks[i], window)) {
                 candidates.push_back(i);
             }
         }
@@ -540,7 +550,7 @@ std::optional<std::string> Music::pick(std::uint64_t game_ms) {
     std::size_t i = m_current ? *m_current : m_tracks.size() - 1;
     for (std::size_t n = 0; n < m_tracks.size(); ++n) {
         i = (i + 1) % m_tracks.size();
-        if (m_enabled[i]) {
+        if (usable(i)) {
             m_current = i;
             return m_tracks[i];
         }
@@ -559,6 +569,7 @@ void Music::start(const std::string& title) {
                       : replaced != m_replaced.end() ? std::optional(replaced->second)
                                                      : m_bank->find("MUSIC8/" + title + ".wav");
     if (!path) {
+        m_broken.insert(title);
         return;
     }
     // The thread gets its own copy of the path: it may outlive the bank (the program ends).
@@ -579,7 +590,8 @@ void Music::take_loaded(bool wait) {
     m_loading.reset();
     auto pcm = loading.pcm.get();
     if (!pcm) {
-        std::fprintf(stderr, "music: %s\n", pcm.error().message.c_str());
+        std::fprintf(stderr, "music: %s; the track is passed over from now on\n", pcm.error().message.c_str());
+        m_broken.insert(loading.title);
         return;
     }
     annokit::audio::PlayOptions o;

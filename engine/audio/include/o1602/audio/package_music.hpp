@@ -31,8 +31,9 @@ struct MusicTrack {
 };
 
 /// Reads `music.toml` of `package` (in `folder`) and adds its tracks to `tracks`. Checks that each
-/// file is there and is a sound file by its first bytes; it is decoded when the track starts. A
-/// table that cannot be read is passed over with a warning.
+/// file is there and, by its first bytes, a sound file of an encoding the game reads
+/// (SoundBank::file_problem); it is decoded when the track starts. A table that cannot be read or
+/// a file that cannot be played is passed over with a warning.
 void apply_music_file(std::vector<MusicTrack>& tracks, std::string_view package, const std::filesystem::path& folder,
                       std::string_view utf8, std::vector<std::string>& warnings);
 

@@ -212,7 +212,8 @@ std::vector<std::string> GameSound::tracks() const {
     std::vector<std::string> fights;
     audio::Music::scan(*m_game, tracks, fights);
     for (const audio::MusicTrack& t : m_package_music) {
-        if (!t.battle && std::find(tracks.begin(), tracks.end(), t.title) == tracks.end()) {
+        // A track in place of one of MUSIC8 keeps that one's entry.
+        if (t.replaces.empty() && !t.battle && std::find(tracks.begin(), tracks.end(), t.title) == tracks.end()) {
             tracks.push_back(t.title);
         }
     }
