@@ -38,13 +38,14 @@ assets::BuildingTable make_buildings() {
         "  KreuzBase: 7\n  Ausbauflg: 1\n  Ruinenr: 14\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 8\n  EndObj\n"  // market
         "  @Nummer: 4\n  Id: 20823\n  Kind: 14\n  Gfx: 50\n  Size: 2, 2\n  Destroyflg: 1\n"
-        "  KreuzBase: 7\n  Ausbauflg: 1\n"
+        "  KreuzBase: 7\n  Ausbauflg: 1\n  Ruinenr: 2\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 8\n  EndObj\n"  // destroyed market
         "  @Nummer: 5\n  Id: 22121\n  Kind: 35\n  Gfx: 60\n  Size: 2, 2\n  Destroyflg: 1\n"
         "  KreuzBase: 6\n  Ausbauflg: 1\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 8\n    Radius: 8\n  EndObj\n"  // destroyed Kontor
         "  @Nummer: 6\n  Id: 20105\n  Kind: 6\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 55\n"
-        "  Objekt: HAUS_PRODTYP\n    Kind: 16\n  EndObj\n"  // tower
+        "  Objekt: HAUS_PRODTYP\n    Kind: 16\n  EndObj\n"                  // tower
+        "  @Nummer: 7\n  Id: 22611\n  Kind: 12\n  Gfx: 80\n  Size: 1, 1\n"  // rubble of a brick house
         "EndObj\n";
     const auto doc = assets::cod::parse(text, types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -173,4 +174,35 @@ TEST_CASE("market capture: an already defenceless city keeps its land until some
     CHECK(sim::city_defenceless(f.world, f.buildings, 0, 1));
     CHECK(m.top(20, 5).city == 1);
     CHECK(sim::plan_build(f.world, f.buildings, f.market_order()).placed == 0);
+}
+
+TEST_CASE("market capture: a destroyed market collapses after a while, its land with it; a destroyed Kontor stays") {
+    Island f;
+    sim::IslandMap& m = f.world.island(0).map;
+    REQUIRE(m.place(*f.buildings.by_id(kKontorDestroyed), 34, 5, 0, 0, 1, 1).ok());
+    REQUIRE(m.place(*f.buildings.by_id(kHouse), 24, 9, 0, 0, 1, 1).ok());
+    CHECK(m.top(24, 5).city == 1);
+    // Each epoch it falls with a chance; a few hundred of them bring it down.
+    std::size_t epochs = 0;
+    while (f.id_at(20, 5) == kMarketDestroyed && epochs < 400) {
+        (void)sim::collapse_market_ruins(f.world, f.buildings, nullptr);
+        ++epochs;
+    }
+    CHECK(epochs > 0);
+    REQUIRE(epochs < 400);
+    // Rubble on each of its tiles.
+    for (const auto& [x, y] : {std::pair{20U, 5U}, std::pair{21U, 5U}, std::pair{20U, 6U}, std::pair{21U, 6U}}) {
+        CHECK(f.id_at(x, y) == 22611);
+    }
+    // The land only it held is lost, the house on it falls; the destroyed Kontor keeps its circle.
+    CHECK(m.top(24, 5).city == sim::MapCell::kNoCity);
+    CHECK(f.id_at(24, 9) != kHouse);
+    CHECK(f.id_at(34, 5) == kKontorDestroyed);
+    CHECK(m.top(34, 5).city == 1);
+    CHECK(m.top(30, 5).city == 1);
+    // Nothing more falls.
+    for (int i = 0; i < 200; ++i) {
+        CHECK(sim::collapse_market_ruins(f.world, f.buildings, nullptr) == 0);
+    }
+    CHECK(f.id_at(34, 5) == kKontorDestroyed);
 }

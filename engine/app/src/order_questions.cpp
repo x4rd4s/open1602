@@ -65,8 +65,7 @@ std::optional<std::string> order_question(const sim::World& world, const assets:
     if (const auto* c = std::get_if<sim::SoldierCommand>(&command);
         c != nullptr && c->op == sim::SoldierCommand::Op::Disband) {
         const sim::Soldier* s = world.soldier(c->soldier);
-        const assets::FigureType* t = s != nullptr ? figures.get(s->figure) : nullptr;
-        const std::uint32_t cost = t != nullptr ? figures.unit_cost(t->kind) : 0;
+        const std::uint32_t cost = s != nullptr ? figures.disband_cost(s->figure) : 0;
         return ui::tr("dialog.disband_unit", {std::to_string(cost)});
     }
     if (const auto* o = std::get_if<sim::DiplomacyOrder>(&command);

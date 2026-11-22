@@ -345,6 +345,14 @@ void fit_connection(World& world, const assets::BuildingTable& buildings, std::u
 bool destroy_building(World& world, const assets::BuildingTable& buildings, std::uint16_t island, TilePos origin,
                       std::vector<ConstructionEvent>* events);
 
+/// A destroyed market ("Markt zerstört") collapses after a while, as in the original: every
+/// epoch of the disasters (10 s) each one falls with a chance of kMarketRuinCollapseOdds to the
+/// ruins of its Ruinenr, one per tile (destroy_building), and the land that only it held is
+/// lost, what stands there falling to ruins. A destroyed Kontor stays. The number collapsed.
+inline constexpr std::uint32_t kMarketRuinCollapseOdds = 16;
+std::size_t collapse_market_ruins(World& world, const assets::BuildingTable& buildings,
+                                  std::vector<ConstructionEvent>* events);
+
 /// The neutral buildings (FactionBehaviour::Neutral): the building with origin `origin`, whose
 /// health the soldiers of `taker` (a human or a computer) spent, goes over to `taker` whole with the
 /// ground it stands on, into the first of the taker's cities on the island whose land (the circles

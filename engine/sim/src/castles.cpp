@@ -460,8 +460,8 @@ void Military::castle_delivery(std::uint16_t island, std::uint16_t x, std::uint1
 bool Military::board(Soldier& s, Ship& ship) {
     // The first empty hold takes the unit, its health as the amount.
     const assets::FigureType* type = type_of(s);
-    if (type == nullptr || ship.owner != s.owner || ship.sinking) {
-        return false;
+    if (type == nullptr || ship.owner != s.owner || ship.sinking || s.figure == figure::kSpearman) {
+        return false;  // the natives' spearman has no hold of his own (Military::order)
     }
     for (CargoSlot& c : std::span<CargoSlot>(ship.cargo.data(), usable_holds(ship, *m_figures))) {
         if (c.ware != 0) {

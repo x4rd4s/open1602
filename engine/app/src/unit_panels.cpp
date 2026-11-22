@@ -253,7 +253,7 @@ public:
             m_panel.set_visible(id, own);
         }
         m_panel.set_selected(kPatrol, s->patrol.active || m_picking);
-        m_panel.set_text(kCost, std::to_string(t != nullptr ? c.figures.unit_cost(t->kind) : 0));
+        m_panel.set_text(kCost, std::to_string(c.figures.disband_cost(s->figure)));
     }
 
     void clicked(const ui::PanelEvent& e, const Selection&, const PanelContext& c,

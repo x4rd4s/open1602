@@ -2075,6 +2075,7 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
         CHECK(island.world.ship(id)->cannons == 0);
 
         CHECK(!editor::set_ship_for_sale(island.world, id, true, sim::ShipCommand::kMaxSaleFactor + 1).ok());
+        CHECK(editor::ship_sellable(island.world, island.world.ship(id)->owner));
         auto sale = editor::set_ship_for_sale(island.world, id, true, 192);
         REQUIRE(sale.ok());
         (*sale)->apply(island.world);
@@ -2152,21 +2153,30 @@ TEST_CASE("construction: the editor gives the pirates a ship of theirs") {
     CHECK(!editor::place_ship(island.world, island.buildings, *figures, 3, assets::figure::kPirate, 6, 6, 0).ok());
 }
 
-TEST_CASE("construction: the editor gives the natives their spearmen, and them alone") {
+TEST_CASE("construction: the editor gives the natives their spearmen, and the players too") {
     Island island;
     std::vector<sim::Player> players = island.world.players();
-    players.resize(3);
+    players.resize(4);
     sim::make_neutral(players[2], sim::faction::kNatives);
+    sim::make_neutral(players[3], sim::faction::kPirates);
     island.world.set_players(players);
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
     const auto doc = assets::cod::parse(
+        "Soldat: 1, 5, 80\n"
         "Objekt: FIGUR\n"
+        "  Nummer: 1\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Maxenergy: 20\n"
         "  Nummer: 33\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Maxenergy: 15\n"
         "EndObj\n",
         types);
     auto figures = assets::FigureTable::from_cod(doc);
     REQUIRE(figures.ok());
-    CHECK(!editor::place_unit(island.world, island.buildings, *figures, 0, assets::figure::kSpearman, 20, 20, 0).ok());
+    // Disbanding him costs nothing, though his Kind is a swordsman's.
+    CHECK(figures->disband_cost(1) == 80);
+    CHECK(figures->disband_cost(assets::figure::kSpearman) == 0);
+    // Not the pirates'; a player's from the map, and the natives'.
+    CHECK(!editor::place_unit(island.world, island.buildings, *figures, 3, assets::figure::kSpearman, 20, 20, 0).ok());
+    auto own = editor::place_unit(island.world, island.buildings, *figures, 0, assets::figure::kSpearman, 22, 20, 0);
+    REQUIRE(own.ok());
     auto unit = editor::place_unit(island.world, island.buildings, *figures, 2, assets::figure::kSpearman, 20, 20, 0);
     REQUIRE(unit.ok());
     (*unit)->apply(island.world);
