@@ -66,10 +66,6 @@ constexpr std::uint64_t kLandingLogMs = 60'000;
 /// Guard posts kept per city.
 constexpr std::size_t kMaxPosts = 64;
 
-/// A hostile tower this near a beach (sea_distance, tiles) makes it dangerous to land on
-/// (landing_beach) and, for an improved computer, a tower to shell first (covering_tower).
-constexpr std::int32_t kTowerCover = 10;
-
 /// The pirate nest's offer comes again after more than 42 s (0x1A4 tenths, task 5).
 constexpr std::uint64_t kNestOfferMs = 42'000;
 constexpr std::uint32_t kDisbandPaybackMinutes = 30;  // a soldier is disbanded only if its upkeep pays the cost back
@@ -1223,7 +1219,7 @@ void Engine::missions(AiPlayer& p) {
                     break;
                 }
                 const auto gap = landing_beach(p, *t);
-                if (gap && !(rivals() && covering_tower(p, *t, *gap))) {
+                if (gap && !(rivals() && !covering_towers(p, *t, *gap).empty())) {
                     log(p, "ship %u: the wall of city %u/%u is open at %d,%d", s->id, t->island, t->index, gap->first,
                         gap->second);
                     if (soldiers_aboard(*s) > kFewSoldiers) {
@@ -1293,40 +1289,97 @@ void Engine::plan_landing(AiPlayer& p, Ship& s, ShipNote& n) {
         }
         return;
     }
-    // Open1602 (3b): a tower that covers the beach is shelled first by a warship, as a player
-    // does, while the troops wait aboard; without one free, or after the tries, they land as before.
+    // Open1602 (3b): the towers that cover the landing or the way from it to the city are shelled
+    // first by enough warships, as a player does, while the troops wait aboard at home. Only when
+    // that pays: see shell_towers. Otherwise they land as before.
     if (rivals()) {
-        if (const auto tower = covering_tower(p, *t, *beach); tower && shell_tower(p, s, n, *t, *tower)) {
+        if (const auto towers = covering_towers(p, *t, *beach); !towers.empty() && shell_towers(p, s, n, *t, towers)) {
             return;
         }
     }
     ship_send(p, s, water_near(t->island, beach->first, beach->second), kMissionLanding, t->owner);
 }
 
-std::optional<std::pair<std::int32_t, std::int32_t>> Engine::covering_tower(
-    const AiPlayer& p, const City& c, std::pair<std::int32_t, std::int32_t> beach) const {
-    // The hostile tower of the city's island nearest to the beach, within kTowerCover of it.
-    std::optional<std::pair<std::int32_t, std::int32_t>> best;
-    std::int32_t best_d = kTowerCover + 1;
+std::vector<std::pair<std::int32_t, std::int32_t>> Engine::way_to(const City& c, std::int32_t cx,
+                                                                  std::int32_t cy) const {
+    // The cells on the straight line from cell (cx, cy) to the city's market, or its Kontor, which
+    // a party walks or cuts its way along (way_in).
+    std::vector<std::pair<std::int32_t, std::int32_t>> way;
+    std::optional<std::pair<std::int32_t, std::int32_t>> goal;
+    for (const Production& pr : m_world.productions()) {
+        if (!goal && pr.used && pr.island == c.island) {
+            const Tile tt = tile(c.island, pr.x, pr.y);
+            if (tt.valid() && tt.city == c.index && tt.prod == prod::kMarket) {
+                goal = std::pair{static_cast<std::int32_t>(pr.x), static_cast<std::int32_t>(pr.y)};
+            }
+        }
+    }
+    if (!goal && c.warehouse_x && c.warehouse_y) {
+        goal = std::pair{static_cast<std::int32_t>(*c.warehouse_x), static_cast<std::int32_t>(*c.warehouse_y)};
+    }
+    if (goal) {
+        const WorldIsland& isl = island_of(c.island);
+        const std::int32_t gx = 2 * (static_cast<std::int32_t>(isl.x) + goal->first);
+        const std::int32_t gy = 2 * (static_cast<std::int32_t>(isl.y) + goal->second);
+        const std::int32_t n = std::max({std::abs(gx - cx), std::abs(gy - cy), 1});
+        for (std::int32_t k = 0; k <= n; ++k) {
+            way.emplace_back(cx + (gx - cx) * k / n, cy + (gy - cy) * k / n);
+        }
+    }
+    return way;
+}
+
+std::vector<Engine::TowerCover> Engine::covering_towers(const AiPlayer& p, const City& c,
+                                                        std::pair<std::int32_t, std::int32_t> beach) const {
+    // The hostile towers of the island whose own reach (their fighter's cells within range8 / 4,
+    // as they shoot and as the landing log counts them) covers the landing at `beach` or a cell of
+    // the way from it to the city; the nearest to the landing first.
+    const Combat& combat = m_sim.combat();
+    const WorldIsland& isl = island_of(c.island);
+    const std::int32_t cx = 2 * (static_cast<std::int32_t>(isl.x) + beach.first);
+    const std::int32_t cy = 2 * (static_cast<std::int32_t>(isl.y) + beach.second);
+    std::vector<std::pair<std::int32_t, std::int32_t>> way = way_to(c, cx, cy);
+    if (way.empty()) {
+        way.emplace_back(cx, cy);
+    }
+    std::vector<std::pair<std::int32_t, TowerCover>> found;  // distance, tower
     for (const Tower& tw : m_world.towers()) {
         if (tw.island != c.island || !m_world.diplomacy().hostile(p.player, tw.owner)) {
             continue;
         }
-        const std::int32_t d = sea_distance(tw.x - beach.first, tw.y - beach.second);
-        if (d < best_d) {
-            best_d = d;
-            best = std::pair{static_cast<std::int32_t>(tw.x), static_cast<std::int32_t>(tw.y)};
+        const auto f = combat.fighter(Target::building(tw.island, tw.x, tw.y));
+        const Tile b = tile(tw.island, tw.x, tw.y);
+        if (!f || !b.valid() || b.type->destroyed || !std::ranges::any_of(way, [&](const auto& w) {
+                return f->cells.distance(w.first, w.second) <= f->range8 / 4;
+            })) {
+            continue;
         }
+        TowerCover t;
+        t.x = tw.x;
+        t.y = tw.y;
+        const std::uint32_t damage = m_sim.military().building_damage(tw.island, tw.x, tw.y);
+        t.health = b.type->max_health > damage ? b.type->max_health - damage : 1U;
+        t.threat = f->threat;
+        t.value = build_value(b.type->build_cost);
+        found.emplace_back(f->cells.distance(cx, cy), t);
     }
-    return best;
+    std::ranges::stable_sort(found, {}, &std::pair<std::int32_t, TowerCover>::first);
+    std::vector<TowerCover> out;
+    for (const auto& [d, t] : found) {
+        out.push_back(t);
+    }
+    return out;
 }
 
-bool Engine::shell_tower(AiPlayer& p, Ship& s, ShipNote& n, const City& t,
-                         std::pair<std::int32_t, std::int32_t> tower) {
-    // The troop ship waits while a warship shells the tower; true while it waits.
+bool Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers) {
+    // Merlin's rule (plan "Landungstruppen und Türme", 2026-11-19): a fleet big enough to wreck
+    // the towers, so that the landing loses no soldiers; ships may be lost while the damage is
+    // worth more than the own losses. In gold from the game's data: the towers' build value and the
+    // soldiers aboard, whom the towers would shoot (their cost by the Soldat: line), against the
+    // price of the ships the towers sink while they are shelled. True while the troop ship waits
+    // (at home: the landing is planned there, out of the towers' reach).
     if (n.counter == 0) {
-        log(p, "ship %u lands under the tower at %d,%d of city %u/%u: no tries left", s.id, tower.first, tower.second,
-            t.island, t.index);
+        log(p, "ship %u lands under %zu towers of city %u/%u: no tries left", s.id, towers.size(), t.island, t.index);
         return false;
     }
     --n.counter;
@@ -1335,25 +1388,86 @@ bool Engine::shell_tower(AiPlayer& p, Ship& s, ShipNote& n, const City& t,
                             [&](const ShipNote& o) { return o.mission == kMissionBreach && o.param == param; })) {
         return true;
     }
-    Ship* best = free_warship(p);
-    if (best == nullptr) {
-        log(p, "ship %u lands under the tower at %d,%d of city %u/%u: no warship free", s.id, tower.first, tower.second,
-            t.island, t.index);
+    const std::vector<Ship*> fleet = free_warships(p);
+    if (fleet.empty()) {
+        log(p, "ship %u lands under %zu towers of city %u/%u: no warship free", s.id, towers.size(), t.island, t.index);
         return false;
     }
-    log(p, "ship %u shells the tower at %d,%d of city %u/%u for ship %u", best->id, tower.first, tower.second, t.island,
-        t.index, s.id);
-    ship_send(
-        p, *best,
-        Target::building(t.island, static_cast<std::uint32_t>(tower.first), static_cast<std::uint32_t>(tower.second)),
-        kMissionBreach, param);
+    const assets::FigureTable* figures = m_sim.figures();
+    std::uint64_t health = 0;  // the towers' buildings, 1/32
+    std::uint64_t threat = 0;  // their fire, 1/32 per second
+    std::uint64_t gain = 0;    // gold
+    for (const TowerCover& c : towers) {
+        health += c.health;
+        threat += c.threat;
+        gain += c.value;
+    }
+    for (const CargoSlot& c : s.cargo) {
+        if (is_soldier_ware(c.ware) && figures != nullptr) {
+            gain += figures->disband_cost(hold_unit(c));
+        }
+    }
+    // Ships one by one, the strongest first: each adds its fire (Hitpoint * cannons per Worktime,
+    // the naval reload), shortens the shelling and so the towers' fire on the fleet, which sinks
+    // the weakest hulls first. The fewest ships that lose none; else the cheapest loss.
+    std::uint64_t fire = 0;  // 1/32 per second
+    std::size_t best = 0;
+    std::uint64_t best_loss = 0;
+    for (std::size_t k = 0; k < fleet.size(); ++k) {
+        const assets::FigureType* ft = ship_type(*fleet[k]);
+        if (ft == nullptr || ft->work_time_ms == 0) {
+            continue;
+        }
+        fire += std::uint64_t{ft->combat.hit} * fleet[k]->cannons * 1000U / ft->work_time_ms;
+        if (fire == 0) {
+            continue;
+        }
+        const std::uint64_t taken = threat * health / fire;          // 1/32 HP the fleet takes
+        std::vector<std::pair<std::uint64_t, std::uint64_t>> hulls;  // health, price
+        for (std::size_t i = 0; i <= k; ++i) {
+            const assets::FigureType* it = ship_type(*fleet[i]);
+            const std::uint64_t max = it != nullptr && it->ship.max_health != 0 ? it->ship.max_health : 1U;
+            const std::uint64_t h = fleet[i]->health != 0 ? std::min<std::uint64_t>(fleet[i]->health, max) : max;
+            hulls.emplace_back(h, it != nullptr ? it->ship.price : 0U);
+        }
+        std::ranges::sort(hulls);
+        std::uint64_t left = taken;
+        std::uint64_t loss = 0;
+        for (const auto& [h, price] : hulls) {
+            if (left < h) {
+                break;
+            }
+            left -= h;
+            loss += price;
+        }
+        if (best == 0 || loss < best_loss) {
+            best = k + 1;
+            best_loss = loss;
+        }
+        if (loss == 0) {
+            break;
+        }
+    }
+    if (best == 0 || best_loss >= gain) {
+        log(p, "ship %u lands under %zu towers of city %u/%u: shelling does not pay (loss %llu, gain %llu)", s.id,
+            towers.size(), t.island, t.index, static_cast<unsigned long long>(best_loss),
+            static_cast<unsigned long long>(gain));
+        return false;
+    }
+    const Target at = Target::building(t.island, towers.front().x, towers.front().y);
+    for (std::size_t k = 0; k < best; ++k) {
+        log(p, "ship %u shells %zu towers of city %u/%u for ship %u (%zu ships, loss %llu, gain %llu)", fleet[k]->id,
+            towers.size(), t.island, t.index, s.id, best, static_cast<unsigned long long>(best_loss),
+            static_cast<unsigned long long>(gain));
+        ship_send(p, *fleet[k], at, kMissionBreach, param);
+    }
     return true;
 }
 
-Ship* Engine::free_warship(AiPlayer& p) {
-    // The strongest healthy ship with cannons and nothing else to do, no troops aboard.
-    Ship* best = nullptr;
-    std::uint32_t best_score = 0;
+std::vector<Ship*> Engine::free_warships(AiPlayer& p) {
+    // The healthy ships with cannons and nothing else to do, no troops aboard: the strongest first,
+    // equals in the order of the ships.
+    std::vector<std::pair<std::uint32_t, Ship*>> found;
     // Only ships the computer has a note of: called inside the missions' loop over the notes, a new
     // note (note()) would move the list under that loop.
     for (Ship* o : own_ships(p)) {
@@ -1366,13 +1480,20 @@ Ship* Engine::free_warship(AiPlayer& p) {
             soldiers_aboard(*o) != 0 || !healthy(*o)) {
             continue;
         }
-        const std::uint32_t score = ship_strength(health128(*o), o->cannons);
-        if (score > best_score) {
-            best = o;
-            best_score = score;
-        }
+        found.emplace_back(ship_strength(health128(*o), o->cannons), o);
     }
-    return best;
+    std::ranges::stable_sort(found, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
+    std::vector<Ship*> out;
+    for (const auto& [score, o] : found) {
+        out.push_back(o);
+    }
+    return out;
+}
+
+Ship* Engine::free_warship(AiPlayer& p) {
+    // The strongest of them (breach); of equals the first, as before.
+    const std::vector<Ship*> all = free_warships(p);
+    return all.empty() ? nullptr : all.front();
 }
 
 bool Engine::beach_wall(std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -1449,10 +1570,14 @@ void Engine::breach(AiPlayer& p, Ship& s, ShipNote& n, const City& t) {
 
 std::optional<std::pair<std::int32_t, std::int32_t>> Engine::breach_target(const AiPlayer& p, const City& c) const {
     // What a breach shoots at: a wall on the beach, else what seals the landing cells of the beach.
-    // Open1602 (3b): with a beach free, the tower that covers it.
+    // Open1602 (3b): with a beach free, the covering tower nearest to it (covering_towers).
     if (rivals()) {
         if (const auto beach = landing_beach(p, c)) {
-            return covering_tower(p, c, *beach);
+            const auto towers = covering_towers(p, c, *beach);
+            if (towers.empty()) {
+                return std::nullopt;
+            }
+            return std::pair{static_cast<std::int32_t>(towers.front().x), static_cast<std::int32_t>(towers.front().y)};
         }
     }
     if (const auto wall = landing_beach(p, c, true)) {
@@ -1575,9 +1700,7 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
             }
             for (const auto& [tx, ty] : towers) {
                 score +=
-                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= kTowerCover
-                        ? 100
-                        : 0;
+                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10 ? 100 : 0;
             }
             for (const auto& [ox, oy] : ships) {
                 score += sea_distance(ox - wx, oy - wy) <= 16 ? 30 : 0;
@@ -2830,33 +2953,9 @@ void Engine::log_landing(const AiPlayer& p, const Ship& s, std::uint32_t first_i
             break;
         }
     }
-    // The way to the city: the cells on the straight line from the landing to its market or
-    // Kontor, which the party walks or cuts its way along (way_in).
-    std::vector<std::pair<std::int32_t, std::int32_t>> way;
-    if (city < cities.size()) {
-        std::optional<std::pair<std::int32_t, std::int32_t>> goal;
-        for (const Production& pr : m_world.productions()) {
-            if (!goal && pr.used && pr.island == island) {
-                const Tile tt = tile(island, pr.x, pr.y);
-                if (tt.valid() && tt.city == cities[city].index && tt.prod == prod::kMarket) {
-                    goal = std::pair{static_cast<std::int32_t>(pr.x), static_cast<std::int32_t>(pr.y)};
-                }
-            }
-        }
-        if (!goal && cities[city].warehouse_x && cities[city].warehouse_y) {
-            goal = std::pair{static_cast<std::int32_t>(*cities[city].warehouse_x),
-                             static_cast<std::int32_t>(*cities[city].warehouse_y)};
-        }
-        if (goal) {
-            const WorldIsland& isl = island_of(island);
-            const std::int32_t gx = 2 * (static_cast<std::int32_t>(isl.x) + goal->first);
-            const std::int32_t gy = 2 * (static_cast<std::int32_t>(isl.y) + goal->second);
-            const std::int32_t n = std::max({std::abs(gx - cx), std::abs(gy - cy), 1});
-            for (std::int32_t k = 0; k <= n; ++k) {
-                way.emplace_back(cx + (gx - cx) * k / n, cy + (gy - cy) * k / n);
-            }
-        }
-    }
+    // The way to the city (way_to).
+    const std::vector<std::pair<std::int32_t, std::int32_t>> way =
+        city < cities.size() ? way_to(cities[city], cx, cy) : std::vector<std::pair<std::int32_t, std::int32_t>>{};
     std::uint32_t covering = 0;
     std::uint32_t reach = 0;
     std::uint32_t towers = 0;

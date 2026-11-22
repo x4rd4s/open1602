@@ -56,6 +56,7 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: +1\n  Id: 21304\n  Kind: 10\n  Gfx: 70\n  Size: 1, 1\n  Maxenergy: 4\n  NoShotFlg: 1\n"
         "  @Nummer: +1\n  Id: 22601\n  Kind: 6\n  Gfx: 80\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"  // a stone tower
+        "  Objekt: HAUS_BAUKOST\n    Money: 300\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -64,8 +65,8 @@ assets::BuildingTable make_buildings() {
 }
 
 /// With `guns` the ship fires (a range and a reload time), as a warship in the game data; with
-/// `tower` a tower's figure (KANONTURM, 38) that does not shoot.
-assets::FigureTable make_figures(bool guns = false, bool tower = false) {
+/// `tower` a tower's figure (KANONTURM, 38) of that Hitpoint.
+assets::FigureTable make_figures(bool guns = false, const char* tower = nullptr) {
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
     const auto doc = assets::cod::parse(
         std::string("Objekt: FIGUR\n"
@@ -76,7 +77,9 @@ assets::FigureTable make_figures(bool guns = false, bool tower = false) {
                     "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n"
                     "  Rohmenge: 25\n") +
             (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") +
-            (tower ? "  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: 1.0\n  Worktime: 3.0\n" : "") +
+            (tower != nullptr ? std::string("  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: ") +
+                                    tower + "\n  Worktime: 3.0\n  Shotradius: 7.5\n"
+                              : std::string()) +
             "EndObj\n",
         types);
     auto table = assets::FigureTable::from_cod(doc);
@@ -355,12 +358,12 @@ TEST_CASE("ai landing: an improved computer shoots trees behind the beach open t
 }
 
 TEST_CASE("ai landing: an improved computer has a warship shell the tower over the beach before it lands") {
-    // Step 3b: every beach of the human's city lies within reach of one of its two towers. With a
-    // warship lying idle, it shells the tower over the beach while the troops wait aboard; with
-    // none, the troops land under the tower as before.
-    const auto play = [](bool warship, std::uint32_t& towers_at_landing) {
+    // Step 3b: the beach and the way inland lie within reach of the human's towers. With a warship
+    // lying idle, it shells them while the troops wait aboard, when the towers' value is more than
+    // the ship they would sink; with none, or towers that would sink it, the troops land under them.
+    const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole) {
         Coast a;
-        a.figures = make_figures(true, true);
+        a.figures = make_figures(true, tower_hit);
         a.build(kKontor, 28, 14, kComputer, 0);
         a.build(kMarket, 18, 14, kComputer, 0);
         a.build(kKontor, 0, 14, kHuman, 1);
@@ -409,17 +412,25 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
         a.world.island(1).discover(kComputer);
         sim::Simulation s(a.world, a.buildings, a.figures);
         REQUIRE(towers() == 2);
-        for (std::uint32_t t = 0; t < 12 * 60 && a.soldiers_on(kComputer, 1) == 0; ++t) {
+        for (std::uint32_t t = 0; t < 12 * 60 && a.soldiers_on(kComputer, 1) == 0 && a.world.ship(1) != nullptr; ++t) {
             run(s, 1'000);
         }
         towers_at_landing = towers();
+        const sim::Ship* w = a.world.ship(2);
+        warship_whole = w != nullptr && (w->health == 0 || w->health == 50 * 32);  // Maxenergy 50, 1/32
         return a.soldiers_on(kComputer, 1) > 0;
     };
     std::uint32_t towers = 0;
-    CHECK(play(true, towers));
+    bool whole = false;
+    CHECK(play(true, "1.0", towers, whole));
     CHECK(towers < 2);  // shelled first
-    CHECK(play(false, towers));
+    CHECK(play(false, "1.0", towers, whole));
     CHECK(towers == 2);  // no warship: landed under the towers
+    // Towers that would sink the warship, worth less than it: it stays out of their reach, the
+    // troop ship goes in under them as before (and here is sunk).
+    play(true, "40.0", towers, whole);
+    CHECK(towers == 2);
+    CHECK(whole);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

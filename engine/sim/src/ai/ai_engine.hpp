@@ -1064,13 +1064,27 @@ private:
     void plan_landing(AiPlayer& p, Ship& s, ShipNote& n);
     /// Open1602: a warship (or the troop ship itself) shoots a gap into a walled coast.
     void breach(AiPlayer& p, Ship& s, ShipNote& n, const City& t);
-    /// Open1602 (3b): the hostile tower nearest to `beach` that covers it (kTowerCover), if any.
-    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> covering_tower(
-        const AiPlayer& p, const City& c, std::pair<std::int32_t, std::int32_t> beach) const;
-    /// Open1602 (3b): a free warship shells `tower` while troop ship `s` waits; false when the
-    /// troops land at once (no warship free, no tries left).
-    bool shell_tower(AiPlayer& p, Ship& s, ShipNote& n, const City& t, std::pair<std::int32_t, std::int32_t> tower);
-    /// Open1602: the strongest healthy armed ship without a mission or troops (breach, shell_tower).
+    /// Open1602 (3b): a hostile tower over a landing, as covering_towers() sees it.
+    struct TowerCover {
+        std::uint16_t x = 0;
+        std::uint16_t y = 0;
+        std::uint32_t health = 0;  ///< what is left of the building
+        std::uint32_t threat = 0;  ///< its fire, 1/32 HP per second
+        std::uint64_t value = 0;   ///< its build value, gold
+    };
+    /// Open1602: the straight way of cells from (cx, cy) to the market or Kontor of `c`.
+    [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> way_to(const City& c, std::int32_t cx,
+                                                                            std::int32_t cy) const;
+    /// Open1602 (3b): the hostile towers whose reach covers the landing at `beach` or the way
+    /// from it to the city, the nearest first.
+    [[nodiscard]] std::vector<TowerCover> covering_towers(const AiPlayer& p, const City& c,
+                                                          std::pair<std::int32_t, std::int32_t> beach) const;
+    /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that
+    /// pays in gold; false when the troops land at once.
+    bool shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers);
+    /// Open1602: the healthy armed ships without a mission or troops, the strongest first.
+    std::vector<Ship*> free_warships(AiPlayer& p);
+    /// Open1602: the first of free_warships() (breach).
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
     bool attack_ok(AiPlayer& p, const City& t);

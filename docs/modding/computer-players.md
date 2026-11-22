@@ -468,9 +468,14 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   tower is still defended and cannot be taken over: they go for its towers then, all of them for
   the nearest one, before its houses.
 - **Towers over the beach.** A landing goes to the beach farthest from the city's towers, soldiers
-  and ships. When even that beach lies within ten tiles of a tower, an improved computer has a
-  free warship (healthy, with cannons, no troops aboard) shell the tower first while the troops
-  wait aboard. With no warship free, or after the tries, they land under the tower as before.
+  and ships. An improved computer then looks at the hostile towers whose own range (their
+  `Shotradius`) covers the landing cell or the straight way from it to the market or Kontor. It
+  shells them first with as many free warships (healthy, with cannons, no troops aboard) as it
+  takes to lose none, the strongest first, while the troops wait aboard at home. It does so only
+  when that pays in gold: the towers' build value and the soldiers aboard (their cost by the
+  `Soldat:` line) must be worth more than the price of the ships the towers' fire would sink
+  during the shelling. With no warship free, when it does not pay, or after the tries, the troops
+  land under the towers as before.
 
 ## Ships, ways and colonies
 
