@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <limits>
 #include <span>
+#include <string>
 #include <string_view>
 #include <tuple>
 
@@ -14,12 +15,14 @@
 #include "order_questions.hpp"
 
 #include "annokit/core/file.hpp"
+#include "annokit/core/text.hpp"
 
 #include "o1602/render/island_renderer.hpp"
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/ui/build_menu.hpp"
+#include "o1602/ui/form.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -1130,16 +1133,68 @@ void MapInput::handle_event(const SDL_Event& event) {
         case SDL_EVENT_KEY_DOWN:
             if (m_hud && m_hud->typing()) {
                 // A savegame's name is typed: the keys go there, not to the key table.
-                if (event.key.key == SDLK_BACKSPACE) {
-                    m_hud->type_key(8);
-                } else if (event.key.key == SDLK_RETURN || event.key.key == SDLK_KP_ENTER) {
-                    m_hud->type_key((event.key.mod & SDL_KMOD_SHIFT) != 0 ? 10 : 13);  // 10: a line break
-                } else if (event.key.key == SDLK_ESCAPE) {
-                    m_hud->type_key(27);
-                } else if (event.key.key == SDLK_TAB) {
-                    m_hud->type_key(9);
-                } else if (event.key.key == SDLK_A && (event.key.mod & SDL_KMOD_CTRL) != 0) {
-                    m_hud->type_key(1);  // select the whole text (Open1602's own fields)
+                const bool ctrl = (event.key.mod & SDL_KMOD_CTRL) != 0;
+                const int shift = (event.key.mod & SDL_KMOD_SHIFT) != 0 ? ui::kKeyShift : 0;
+                switch (event.key.key) {
+                    case SDLK_BACKSPACE:
+                        m_hud->type_key(ui::kKeyBackspace);
+                        break;
+                    case SDLK_DELETE:
+                        m_hud->type_key(ui::kKeyDelete);
+                        break;
+                    case SDLK_RETURN:
+                    case SDLK_KP_ENTER:
+                        m_hud->type_key(shift != 0 ? ui::kKeyLineBreak : ui::kKeyEnter);
+                        break;
+                    case SDLK_ESCAPE:
+                        m_hud->type_key(ui::kKeyEscape);
+                        break;
+                    case SDLK_TAB:
+                        m_hud->type_key(ui::kKeyTab);
+                        break;
+                    case SDLK_LEFT:
+                        m_hud->type_key(ui::kKeyLeft + shift);
+                        break;
+                    case SDLK_RIGHT:
+                        m_hud->type_key(ui::kKeyRight + shift);
+                        break;
+                    case SDLK_HOME:
+                        m_hud->type_key(ui::kKeyHome + shift);
+                        break;
+                    case SDLK_END:
+                        m_hud->type_key(ui::kKeyEnd + shift);
+                        break;
+                    case SDLK_A:
+                        if (ctrl) {
+                            m_hud->type_key(ui::kKeySelectAll);  // the whole text (Open1602's own fields)
+                        }
+                        break;
+                    case SDLK_C:
+                    case SDLK_X:
+                        if (ctrl) {
+                            if (const std::string chosen = m_hud->selected_text(); !chosen.empty()) {
+                                (void)SDL_SetClipboardText(annokit::core::cp1252_to_utf8(chosen).c_str());
+                                if (event.key.key == SDLK_X) {
+                                    m_hud->type_key(ui::kKeyDelete);
+                                }
+                            }
+                        }
+                        break;
+                    case SDLK_V:
+                        if (ctrl) {
+                            if (char* pasted = SDL_GetClipboardText(); pasted != nullptr) {
+                                // Line breaks of what was copied go as spaces; the fields are lines.
+                                std::string text = utf8_to_cp1252(pasted);
+                                SDL_free(pasted);
+                                std::replace(text.begin(), text.end(), '\r', ' ');
+                                std::replace(text.begin(), text.end(), '\n', ' ');
+                                std::replace(text.begin(), text.end(), '\t', ' ');
+                                m_hud->type_text(text);
+                            }
+                        }
+                        break;
+                    default:
+                        break;
                 }
                 break;
             }

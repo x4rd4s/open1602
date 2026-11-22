@@ -232,6 +232,8 @@ public:
     [[nodiscard]] const std::string& name() const noexcept { return m_name; }
 
     [[nodiscard]] bool typing() const noexcept { return m_form.focus().has_value(); }
+    /// The widgets as laid out last, with the field typed in.
+    [[nodiscard]] const ui::Form& form() const noexcept { return m_form; }
     void type(std::string_view text);
     /// Ctrl+A 1 (selects the field's whole text), Backspace 8, Tab 9 (next field), Enter 13 (sends
     /// the chat, connects), Escape 27.

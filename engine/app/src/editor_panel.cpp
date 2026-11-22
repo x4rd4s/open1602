@@ -4484,25 +4484,25 @@ void EditorPanel::type(std::string_view text) {
     if (!typing()) {
         return;
     }
-    if (!text.empty() && m_form.take_all_selected()) {
-        m_text.clear();  // typed over the whole name (Ctrl+A, or the name offered)
-    }
+    const std::size_t most = m_page == Page::PlayerMoney ? 9
+                             : m_page == Page::GoalText  ? kMaxMissionText
+                             : m_page == Page::ScenarioText
+                                 ? scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row))
+                                 : kMaxName;
+    const auto [first, last] = m_form.selection(m_text);
+    std::string typed;
     for (const char c : text) {
-        const std::size_t most = m_page == Page::GoalText ? kMaxMissionText
-                                 : m_page == Page::ScenarioText
-                                     ? scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row))
-                                     : kMaxName;
         if (m_page == Page::PlayerMoney) {
             // Digits, and a minus in front for a debt.
-            if (((c >= '0' && c <= '9') || (c == '-' && m_text.empty())) && m_text.size() < 9) {
-                m_text.push_back(c);
+            const bool front = first == 0 && typed.empty() && (last >= m_text.size() || m_text[last] != '-');
+            if ((c >= '0' && c <= '9') || (c == '-' && front)) {
+                typed.push_back(c);
             }
-            continue;
-        }
-        if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F && m_text.size() < most) {
-            m_text.push_back(c);
+        } else if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7F) {
+            typed.push_back(c);
         }
     }
+    m_form.insert(m_text, typed, most);
 }
 
 std::optional<EditorRequest> EditorPanel::key(int key) {
@@ -4512,19 +4512,10 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
         }
         return std::nullopt;
     }
-    if (key == 1) {
-        m_form.select_all();
+    if (m_form.edit(m_text, key)) {
         return std::nullopt;
     }
-    const bool all = m_form.take_all_selected();
     switch (key) {
-        case 8:
-            if (all) {
-                m_text.clear();
-            } else if (!m_text.empty()) {
-                m_text.pop_back();
-            }
-            return std::nullopt;
         case 10:  // Shift+Enter: a line break where the text may have lines, else Enter
             if (const bool lines = m_page == Page::GoalText ||
                                    (m_page == Page::ScenarioText &&
@@ -4533,14 +4524,10 @@ std::optional<EditorRequest> EditorPanel::key(int key) {
                 !lines) {
                 return commit_name();
             }
-            if (all) {
-                m_text.clear();
-            }
-            if (m_text.size() < (m_page == Page::GoalText
-                                     ? kMaxMissionText
-                                     : scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row)))) {
-                m_text.push_back('\n');
-            }
+            m_form.insert(m_text, "\n",
+                          m_page == Page::GoalText
+                              ? kMaxMissionText
+                              : scenario_row_length(static_cast<EditorScenarioRow>(m_scenario_row)));
             return std::nullopt;
         case 13:
             return commit_name();

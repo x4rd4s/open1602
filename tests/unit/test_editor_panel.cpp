@@ -2242,6 +2242,20 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     REQUIRE(r.has_value());
     CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::BriefingDe));
     CHECK(r->name == "Found a city.\nKeep it fed.");
+    // The caret goes back into the text: what is typed and the line break go in there.
+    m.scenario_texts[static_cast<std::size_t>(app::EditorScenarioRow::BriefingDe)] = "Found a city.";
+    (void)click(panel, m, "Found a city.");
+    REQUIRE(panel.page() == EditorPanel::Page::ScenarioText);
+    for (int i = 0; i < 5; ++i) {
+        CHECK(!panel.key(ui::kKeyLeft).has_value());
+    }
+    panel.type("new ");
+    CHECK(!panel.key(ui::kKeyEnd + ui::kKeyShift).has_value());
+    CHECK(!panel.key(10).has_value());  // in place of the selected "city."
+    panel.type("town.");
+    r = panel.key(13);
+    REQUIRE(r.has_value());
+    CHECK(r->name == "Found a new \ntown.");
     (void)click(panel, m, "Two Coasts");
     REQUIRE(panel.page() == EditorPanel::Page::ScenarioText);
     r = panel.key(10);

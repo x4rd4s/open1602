@@ -623,6 +623,88 @@ TEST_CASE("ui: a form of Open1602's own: clicks, focus, cut texts and the scale"
     CHECK(texts[1] == "******");
 }
 
+TEST_CASE("ui: a form's field is edited at its caret: arrows, Home, End, Delete and a selection by Shift") {
+    ui::Form form;
+    std::string text = "Insel";
+    form.field(1, ui::Rect{0, 0, 300, 30}, text);
+    // Without a focus the keys are the owner's.
+    CHECK(!form.edit(text, ui::kKeyLeft));
+    form.set_focus(1);
+    CHECK(form.caret(text) == 5);  // at the end
+    CHECK(form.edit(text, ui::kKeyLeft));
+    CHECK(form.edit(text, ui::kKeyLeft));
+    form.insert(text, "xy", 64);
+    CHECK(text == "Insxyel");
+    CHECK(form.caret(text) == 5);
+    CHECK(form.edit(text, ui::kKeyDelete));
+    CHECK(text == "Insxyl");
+    CHECK(form.edit(text, ui::kKeyBackspace));
+    CHECK(text == "Insxl");
+    CHECK(form.edit(text, ui::kKeyHome));
+    CHECK(form.caret(text) == 0);
+    CHECK(form.edit(text, ui::kKeyBackspace));  // nothing before the caret
+    CHECK(text == "Insxl");
+    // Shift selects on the caret's way; typing replaces the selection, the limit counts.
+    CHECK(form.edit(text, ui::kKeyRight + ui::kKeyShift));
+    CHECK(form.edit(text, ui::kKeyRight + ui::kKeyShift));
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{0, 2}));
+    form.field(1, ui::Rect{0, 0, 300, 30}, text);
+    CHECK(form.selected_text() == "In");
+    form.insert(text, "ABCDEF", 7);
+    CHECK(text == "ABCDsxl");
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{4, 4}));
+    // Left without Shift ends a selection at its left side.
+    CHECK(form.edit(text, ui::kKeyEnd + ui::kKeyShift));
+    CHECK((form.selection(text) == std::pair<std::size_t, std::size_t>{4, 7}));
+    CHECK(form.edit(text, ui::kKeyLeft));
+    CHECK(form.caret(text) == 4);
+    CHECK(form.selection(text).first == form.selection(text).second);
+    // Ctrl+A and Delete empty it; another key than these is the owner's.
+    CHECK(form.edit(text, ui::kKeySelectAll));
+    CHECK(form.all_selected());
+    CHECK(form.edit(text, ui::kKeyDelete));
+    CHECK(text.empty());
+    CHECK(!form.edit(text, ui::kKeyEnter));
+    // A secret field's text is not copied.
+    std::string secret = "geheim";
+    form.clear();
+    form.field(2, ui::Rect{0, 0, 300, 30}, secret, true);
+    form.set_focus(2);
+    form.select_all();
+    CHECK(form.selected_text().empty());
+}
+
+TEST_CASE("ui: a form's field shows the caret inside its text and keeps it in sight") {
+    ui::Form form;
+    std::string text = "abcdefghijklmnopqrstuvwxyz";
+    form.set_focus(1);
+    for (int i = 0; i < 20; ++i) {
+        (void)form.edit(text, ui::kKeyLeft);
+    }
+    // 9 units a byte without a font: 100 wide, 84 inside, room for 9 bytes.
+    form.field(1, ui::Rect{0, 0, 100, 30}, text);
+    std::vector<ui::DrawItem> texts;
+    for (const ui::DrawItem& d : form.draw({nullptr, nullptr, nullptr})) {
+        if (d.kind == ui::DrawItem::Kind::Text) {
+            texts.push_back(d);
+        }
+    }
+    REQUIRE(texts.size() == 2);
+    CHECK(texts[0].text == "abcdefghi");  // the start, the caret (after "f") in sight
+    CHECK(texts[1].text == "_");
+    CHECK(texts[1].x == texts[0].x + 6 * 9);
+    // At the far end the text's start is left out, as before.
+    (void)form.edit(text, ui::kKeyEnd);
+    texts.clear();
+    for (const ui::DrawItem& d : form.draw({nullptr, nullptr, nullptr})) {
+        if (d.kind == ui::DrawItem::Kind::Text) {
+            texts.push_back(d);
+        }
+    }
+    REQUIRE(texts.size() == 1);
+    CHECK(texts[0].text == "stuvwxyz_");
+}
+
 TEST_CASE("ui: a banner's colour made legible as text on a dark ground") {
     const assets::Rgba ground{35, 23, 12, 255};
     CHECK(ui::contrast(assets::Rgba{0, 0, 0, 255}, assets::Rgba{255, 255, 255, 255}) > 20.9);

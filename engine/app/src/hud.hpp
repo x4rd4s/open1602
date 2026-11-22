@@ -473,8 +473,8 @@ public:
     [[nodiscard]] std::vector<ChatSay> take_chat() { return std::exchange(m_chat_says, {}); }
 
     /// A name or a line of the chat is being typed (a savegame's, the player's in the menu, an own
-    /// ship's or city's in its window): the keys go there (Windows-1252 text, Ctrl+A 1, Backspace 8,
-    /// Tab 9, Enter 13, Escape 27).
+    /// ship's or city's in its window): the keys go there (Windows-1252 text, and the keys of
+    /// ui::kKeySelectAll and the others: Ctrl+A, Backspace, Tab, Enter, Escape, the arrows).
     [[nodiscard]] bool typing() const noexcept {
         if (m_menu_active) {
             return multiplayer_open() ? m_multiplayer->typing() : m_menu && m_menu->typing();
@@ -492,6 +492,23 @@ public:
             return true;
         }
         return m_options && m_mode == kModeOptions && m_options->editing();
+    }
+    /// The text selected in the field being typed in (Ctrl+C, Ctrl+X), Windows-1252; empty if
+    /// nothing is, or the field shows its text as stars.
+    [[nodiscard]] std::string selected_text() const {
+        const ui::Form* form = nullptr;
+        if (multiplayer_open()) {
+            form = &m_multiplayer->form();
+        } else if (m_menu_active) {
+            return {};
+        } else if (chat_open()) {
+            form = &m_chat->form();
+        } else if (templates_open() && m_templates->typing()) {
+            form = &m_templates->form();
+        } else if (m_editing && m_editor && m_editor->typing()) {
+            form = &m_editor->form();
+        }
+        return form != nullptr ? form->selected_text() : std::string();
     }
     void type_text(std::string_view text) {
         if (multiplayer_open()) {
