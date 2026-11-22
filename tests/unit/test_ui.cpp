@@ -90,6 +90,49 @@ assets::GadgetLayout layout() {
 
 }  // namespace
 
+TEST_CASE("ui: a text being typed in a panel shows its caret and its selection") {
+    assets::GadgetLayout l;
+    assets::Gadget name;
+    name.id = 7;
+    name.kind = assets::GadgetKind::TextCentre;
+    name.pos = {100, 50};
+    l.gadgets.push_back(name);
+    ui::Panel panel(l, 1.0);
+    const std::array<const ui::Font*, ui::kFontSlots> fonts{};  // every byte 9 wide
+    panel.set_text(7, "Abc");
+    // The caret at the end: the underscore behind the text, centred with it.
+    panel.set_mark(7, ui::TextMark{3, 3, 3});
+    auto items = panel.draw(fonts);
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text == "Abc_");
+    CHECK(items[0].x == 100);
+    // Inside the text: under the letter after the caret, the text centred without it.
+    panel.set_mark(7, ui::TextMark{1, 1, 1});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].text == "Abc");
+    CHECK(items[1].text == "_");
+    CHECK(items[1].align == ui::Align::Left);
+    CHECK(items[1].x == 100 - 13 + 9);
+    // Selected letters on a gold ground, no caret.
+    panel.set_mark(7, ui::TextMark{3, 1, 3});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 2);
+    CHECK(items[0].kind == ui::DrawItem::Kind::Fill);
+    CHECK(items[0].x == 100 - 13 + 9);
+    CHECK(items[0].w == 18);
+    CHECK(items[0].half);
+    CHECK(items[1].text == "Abc");
+    // An empty name being typed shows the underscore alone; without the mark only the text shows.
+    panel.set_text(7, "");
+    panel.set_mark(7, ui::TextMark{});
+    items = panel.draw(fonts);
+    REQUIRE(items.size() == 1);
+    CHECK(items[0].text == "_");
+    panel.set_mark(7, std::nullopt);
+    CHECK(panel.draw(fonts).empty());
+}
+
 TEST_CASE("ui: a GAD layout with include, relative numbers and pairs that keep their second value") {
     const auto l = layout();
     REQUIRE(l.gadgets.size() == 4);  // the highest Nummer, not the 300 defaults of ObjFill

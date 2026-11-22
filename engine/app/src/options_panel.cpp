@@ -351,7 +351,13 @@ void OptionsPanel::refresh_disk(const OptionsModel& model) {
         if (name.empty()) {
             name = ui::tr("options.slot.empty");  // a free slot shows as one, not as a blank row
         }
-        m_disk.set_text(kSlotName + k, typing ? m_name + "_" : name);
+        m_disk.set_text(kSlotName + k, typing ? m_name : name);
+        std::optional<ui::TextMark> mark;
+        if (typing) {
+            const auto [first, last] = m_caret.selection(m_name);
+            mark = ui::TextMark{m_caret.caret(m_name), first, last};
+        }
+        m_disk.set_mark(kSlotName + k, mark);
         // A long name ends in "..." instead of running past the row, or under the icon of the
         // humans; the one being typed is whole.
         std::optional<std::int32_t> room;
@@ -488,6 +494,7 @@ std::vector<OptionsEvent> OptionsPanel::mouse(std::int32_t x, std::int32_t y, bo
                     }
                     m_name = model.slot_names[m_slot];
                     m_new_slot = m_name.empty();
+                    m_caret.reset();
                     m_editing = true;
                     m_renamed = true;
                 } else if (e.id == m_slots_up && m_slot_first > 0) {
@@ -684,20 +691,28 @@ void OptionsPanel::type(std::string_view text) {
         return;
     }
     constexpr std::size_t kMaxName = 18;  // the original's limit (with 0x13)
+    std::string typed;
     for (const char c : text) {
-        if (static_cast<unsigned char>(c) >= 0x20 && m_name.size() < kMaxName) {
-            m_name.push_back(c);
+        if (static_cast<unsigned char>(c) >= 0x20) {
+            typed.push_back(c);
         }
     }
+    m_caret.insert(m_name, typed, kMaxName);
+}
+
+std::string OptionsPanel::selected_text() const {
+    if (!m_editing) {
+        return {};
+    }
+    const auto [first, last] = m_caret.selection(m_name);
+    return m_name.substr(first, last - first);
 }
 
 std::optional<OptionsEvent> OptionsPanel::key(int key) {
-    if (!m_editing) {
+    if (!m_editing || m_caret.edit(m_name, key)) {
         return std::nullopt;
     }
-    if (key == 8 && !m_name.empty()) {
-        m_name.pop_back();
-    } else if (key == 13) {
+    if (key == 13) {
         m_editing = false;
         if (m_new_slot && !m_name.empty()) {
             // Open1602: a new savegame is saved with its name; a renamed one waits for "Sichern".

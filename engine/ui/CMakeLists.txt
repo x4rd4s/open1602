@@ -10,6 +10,7 @@ add_library(o1602_ui
     src/localization.cpp
     src/package_icons.cpp
     src/panel.cpp
+    src/text_caret.cpp
     src/text_format.cpp
     src/unit_selection.cpp
 )

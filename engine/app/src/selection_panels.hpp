@@ -50,6 +50,11 @@ struct PanelContext {
     [[nodiscard]] std::string shown_name(const NameTarget& target, std::string_view world_name) const {
         return names != nullptr ? names->shown(target, world_name) : std::string(world_name);
     }
+    /// Shows the caret and the selection in gadget `id` of `panel` while the name of `target` is
+    /// typed there, nothing otherwise.
+    void show_mark(ui::Panel& panel, std::int32_t id, const NameTarget& target) const {
+        panel.set_mark(id, names != nullptr ? names->mark(target) : std::nullopt);
+    }
     /// A click on the name of `target`: typing it starts if the local player may rename it.
     void start_rename(const NameTarget& target, std::vector<sim::Command>& out) const {
         if (names != nullptr) {

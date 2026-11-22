@@ -737,6 +737,7 @@ private:
         const std::int64_t balance = tax - cost + sales - purchases;
         // The name: a click on it types a new one, also on the Kontor page.
         m_stadt.set_text(city_ids::kTitle, c.shown_name(NameTarget::of(city), city_name(city)));
+        c.show_mark(m_stadt, city_ids::kTitle, NameTarget::of(city));
         m_stadt.set_no_select(city_ids::kTitle, !can_rename(c.world(), c.local, NameTarget::of(city)));
         const std::array<std::pair<std::size_t, std::int64_t>, 6> rows{
             {{15, people}, {19, tax}, {18, cost}, {64, sales}, {65, purchases}, {80, balance}}};
@@ -756,6 +757,7 @@ private:
 
     void refresh_kontor(const sim::City& city, const PanelContext& c) {
         m_kontor.set_text(city_ids::kKTitle, c.shown_name(NameTarget::of(city), city_name(city)));
+        c.show_mark(m_kontor, city_ids::kKTitle, NameTarget::of(city));
         m_kontor.set_no_select(city_ids::kKTitle, !can_rename(c.world(), c.local, NameTarget::of(city)));
         m_kontor.set_selected(city_ids::kKMode, m_sell);
         const std::vector<std::uint8_t> list = wares(city, c.world().goods());

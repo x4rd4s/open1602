@@ -11,6 +11,7 @@
 
 #include "o1602/assets/gad.hpp"
 #include "o1602/assets/text_table.hpp"
+#include "o1602/ui/text_caret.hpp"
 
 using namespace o1602;
 using app::OptionsEvent;
@@ -167,6 +168,14 @@ TEST_CASE("options panel: the savegames are named, saved, loaded and the game le
     // A used slot: a new name waits for "Sichern"; Escape drops it.
     o.click(48061, model);
     o.panel.type(" game");
+    // The caret moves and selects as in every text field: the "r" is taken out and typed again.
+    for (int i = 0; i < 8; ++i) {
+        CHECK(!o.panel.key(ui::kKeyLeft).has_value());
+    }
+    CHECK(!o.panel.key(ui::kKeyRight | ui::kKeyShift).has_value());
+    CHECK(o.panel.selected_text() == "r");
+    CHECK(!o.panel.key(ui::kKeyDelete).has_value());
+    o.panel.type("r");
     CHECK(!o.panel.key(13).has_value());
     auto events = o.click(48011, model);
     REQUIRE(events.size() == 1);
