@@ -418,6 +418,11 @@ void MapViewer::open_multiplayer_menu() {
             own_scenario_list(own_scenario_folder(), ui::tr("menu.own_scenarios"), model.scenarios);
         model.scenarios.insert(model.scenarios.end(), std::make_move_iterator(own.begin()),
                                std::make_move_iterator(own.end()));
+        // The packages' scenarios, each part of a campaign on its own (no progress here).
+        std::vector<MenuScenario> packaged = package_scenario_parts(
+            m_package_scenarios, m_package_campaigns, ui::current_language(), ui::tr("menu.package_scenarios"));
+        model.scenarios.insert(model.scenarios.end(), std::make_move_iterator(packaged.begin()),
+                               std::make_move_iterator(packaged.end()));
     }
     // Before the menu first draws and takes them: the click that opened it ends the frame's menu
     // work, so apply_multiplayer_menu() would only fill them after that first drawing, and the
@@ -659,6 +664,18 @@ annokit::core::Status MapViewer::host_lobby(const HostSetup& setup) {
         auto loaded = read_world(path);
         if (!loaded) {
             return loaded.error();
+        }
+        // A package's scenario: its money, goals and script, as when it is started alone.
+        if (setup.kind == HostSetup::Kind::Scenario && !setup.package_scenario.empty()) {
+            const assets::PackageScenario* scenario =
+                assets::find_scenario(m_package_scenarios, setup.package_scenario);
+            if (scenario == nullptr) {
+                return annokit::core::make_error(annokit::core::ErrorCode::NotFound,
+                                                 "no scenario " + setup.package_scenario);
+            }
+            for (const std::string& w : make_package_scenario(*loaded, *scenario)) {
+                std::fprintf(stderr, "warning: %s\n", w.c_str());
+            }
         }
         // The slots of the humans and computers of the game; human ones are open for whoever comes.
         const std::vector<sim::Player>& players = loaded->players();

@@ -1187,6 +1187,7 @@ void MultiplayerMenu::click(const MultiplayerModel& model, Id id, std::vector<Mu
                 if (m_setup.kind == Kind::Scenario && m_chosen && *m_chosen < model.scenarios.size()) {
                     const MenuScenario& s = model.scenarios[*m_chosen];
                     setup.file = s.files.empty() ? std::filesystem::path{} : s.files.front().second;
+                    setup.package_scenario = s.package_scenario;
                     setup.file_name = s.name;
                 } else if (m_setup.kind == Kind::Savegame && m_chosen) {
                     setup.slot = *m_chosen;
