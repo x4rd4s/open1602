@@ -309,13 +309,15 @@ annokit::core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& w
                                                              std::uint8_t direction) {
     const auto unit = figures.unit_of(family);
     const assets::FigureType* type = figures.get(family);
-    // The natives' spearman is theirs alone, as in a game.
+    // The natives' spearman: theirs, or (Open1602) a human's or computer's from the map, who can
+    // neither train nor ship him.
     const bool spearman = family == assets::figure::kSpearman;
     UnitRefusal refused = UnitRefusal::None;
     if (type == nullptr || (!spearman && (!unit || unit->family != family))) {
         refused = UnitRefusal::NoType;
     } else if ((!owner_ok(world, owner) && !world.acts_as(owner, sim::FactionBehaviour::Neutral)) ||
-               (spearman && !world.acts_as(owner, sim::FactionBehaviour::Natives))) {
+               (spearman && (world.acts_as(owner, sim::FactionBehaviour::Pirates) ||
+                             world.acts_as(owner, sim::FactionBehaviour::Neutral)))) {
         refused = UnitRefusal::NoOwner;
     } else {
         refused = unit_fits(world, buildings, x, y);

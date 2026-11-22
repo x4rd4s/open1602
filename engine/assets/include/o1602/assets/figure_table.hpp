@@ -184,6 +184,12 @@ public:
                    ? m_unit_cost[static_cast<std::size_t>(unit_type)]
                    : 0;
     }
+    /// What disbanding a unit of `figure` costs: unit_cost() of its type's Kind, nothing for the
+    /// natives' spearman (a player's too, from a map: no castle trains him).
+    [[nodiscard]] std::uint32_t disband_cost(std::uint32_t figure) const noexcept {
+        const FigureType* t = get(figure);
+        return t != nullptr && figure != figure::kSpearman ? unit_cost(t->kind) : 0;
+    }
     /// Formations (FORMATION records): slots as offsets in tiles, in the order units take them.
     struct FormationSlot {
         std::int32_t x = 0;

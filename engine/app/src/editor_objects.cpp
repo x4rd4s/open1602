@@ -1344,9 +1344,8 @@ std::vector<std::uint16_t> MapViewer::editor_figures(EditorObjects::Tool tool) c
         for (const std::uint32_t family : m_figures.unit_families()) {
             figures.push_back(static_cast<std::uint16_t>(family));
         }
-        if (m_figures.get(assets::figure::kSpearman) != nullptr &&
-            m_editor->document.world().first_of(sim::FactionBehaviour::Natives) != sim::kNoPlayer) {
-            figures.push_back(assets::figure::kSpearman);  // for the natives
+        if (m_figures.get(assets::figure::kSpearman) != nullptr) {
+            figures.push_back(assets::figure::kSpearman);  // the natives', for players too
         }
         if (m_figures.get(assets::figure::kTradeCart) != nullptr) {
             figures.push_back(assets::figure::kTradeCart);  // a player's trade cart, on its roads
@@ -1415,7 +1414,8 @@ std::string MapViewer::editor_figure_refusal(editor::UnitRefusal refused, const 
             break;
     }
     if (!ship && editor_figure() == assets::figure::kSpearman &&
-        !m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Natives)) {
+        (m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Pirates) ||
+         m_editor->document.world().acts_as(editor_object_owner(), sim::FactionBehaviour::Neutral))) {
         return ui::tr("editor.objects.refused.spearman");
     }
     if (ship && (editor_figure() == assets::figure::kTrader ||

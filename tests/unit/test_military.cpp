@@ -108,6 +108,9 @@ assets::FigureTable make_figures() {
         "  Worktime: 2.0\n  Shottime: 0.7\n  Maxenergy: 15\n  Hitpoint: 2.4\n"
         "  Nummer: 38\n  Gfx: 0\n  Blocknr: 1\n  Shotradius: 7.5\n  Worktime: 3.0\n  Shottime: 0.6\n"
         "  Maxenergy: 24\n  Hitpoint: 4.0\n"
+        // The natives' spearman (SPEER1).
+        "  Nummer: 33\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Shotradius: 0.75\n  Maxstepcnt: 1\n"
+        "  Worktime: 0.8\n  Shottime: 0.6\n  Maxenergy: 15\n  Hitpoint: 1.0\n"
         // A small ship with two holds.
         "  Nummer: 21\n  Gfx: 0\n  Blocknr: 1\n  Maxware: 2\n"
         // A trade cart (TRADER1).
@@ -618,6 +621,24 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
     CHECK(f.world.soldiers()[0].health == 640);
     CHECK(f.world.soldiers()[0].figure == kSword);
     CHECK(boat->cargo[0].ware == 0);
+}
+
+TEST_CASE("military: a player's spearman (from a map) does not go on board") {
+    Field f;
+    f.start();
+    sim::Ship ship = sim::make_ship("Boat", 8, 15, 21, 0);
+    ship.cargo.resize(4);
+    f.world.add_ship(ship);
+    const std::uint32_t ship_id = f.world.ships().back().id;
+    const std::uint32_t id = f.add(assets::figure::kSpearman, 0, 2 * 14, 2 * 15).id;
+    CHECK(!f.military->order(sim::SoldierOrder{0, {id}, sim::Target::other_ship(ship_id)}));
+    // Sent there anyway (a target of an old order): he stays ashore, the holds stay empty.
+    f.world.soldier(id)->target = sim::Target::other_ship(ship_id);
+    f.run(10'000);
+    REQUIRE(f.world.soldier(id) != nullptr);
+    CHECK(f.world.ship(ship_id)->cargo[0].ware == 0);
+    // He walks elsewhere as any unit.
+    CHECK(f.military->order(sim::SoldierOrder{0, {id}, sim::Target::spot(2 * 16, 2 * 15)}));
 }
 
 TEST_CASE("military: soldiers do not land behind another player's wall along the coast") {
