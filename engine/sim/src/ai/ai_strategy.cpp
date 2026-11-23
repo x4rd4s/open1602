@@ -634,7 +634,12 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
 bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     // A city of `b` stands on an island that grows fully a crop whose good p's cities lack now
     // (goods_short), while no free island that grows it is open to p (fertile_island_open): what
-    // a player conquers when he cannot found the colony.
+    // a player conquers when he cannot found the colony. Not at its city limit: the island its war
+    // frees it could not settle (probe p16, x3 o4-505-p3: P2 at 4 of 4 cities razed P1's two
+    // fertile cities, and every colony check stopped at the limit).
+    if (own_city_count(p.player) >= city_limit()) {
+        return false;
+    }
     const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
         {ware::kSpiceField, ware::kSpices},
         {ware::kTobaccoField, ware::kTobaccoGoods},
