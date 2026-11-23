@@ -349,6 +349,10 @@ public:
     /// (production_switches): torn down, its fields would be swept with it and cost the whole
     /// plantation again once the ware sells or is wanted (gate f25, g4-202 P1).
     [[nodiscard]] static bool may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept;
+    /// Whether a luxury crop is planted on an island of `fertility` (island_fertility): where it
+    /// grows fully; where it grows half only while the computer's cities lack its good (`lacking`)
+    /// and no partner offers it (`for_sale`), as a player plants it when the market runs dry.
+    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool for_sale) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.

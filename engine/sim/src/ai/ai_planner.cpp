@@ -488,6 +488,10 @@ bool Engine::may_shed(const assets::BuildingType& b, const WareSet& keep) noexce
            b.prod_kind != prod::kFarm;
 }
 
+bool Engine::plants_on(std::uint32_t fertility, bool lacking, bool for_sale) noexcept {
+    return fertility == 128 || (fertility != 0 && lacking && !for_sale);
+}
+
 Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) const {
     // The wares the computer needs: building material and food, what its inhabitants want and
     // what its own buildings work into such a ware, down the chain, and the weapons while it arms
@@ -3155,8 +3159,20 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         });
     }
     for (const Crop& crop : order) {
-        if (!crop.eligible || fertility(c->island, crop.field) != 128) {
+        if (!crop.eligible) {
             continue;
+        }
+        if (const std::uint32_t f = fertility(c->island, crop.field); !plants_on(f, false, true)) {
+            // Open1602: where it grows only half, an improved computer plants it too while its cities
+            // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
+            // only by ship; when the market ran dry its citizens left, 420 to 133).
+            std::uint16_t price = 0;
+            const bool lacking = rivals() && goods_ahead(p.player, crop.good) != 0;
+            if (!plants_on(f, lacking, lacking && supply_source(p, home->island, crop.good, &price, home))) {
+                continue;
+            }
+            log(p, "city %u/%u: plants field ware %u on half-fertile land, no partner offers ware %u", c->island,
+                c->index, crop.field, crop.good);
         }
         if (crop.slot == kSlotWine) {
             wine_island = true;

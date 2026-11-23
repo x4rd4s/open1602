@@ -91,3 +91,13 @@ TEST_CASE("ai debt: a farm with fields only goes off; other producers of a ware 
     CHECK(!Engine::may_shed(producer(assets::prod::kMarket, kCocoa), keep));
     CHECK(!Engine::may_shed(producer(assets::prod::kWorkshop, 0), keep));
 }
+
+TEST_CASE("ai luxury: a crop on half-fertile land only while its good is lacking and nobody offers it") {
+    // Gate f26, g4-202 P3: its tobacco goods came only by ship from partners; when none offered
+    // them its citizens left (420 to 133). Its second island grows tobacco half.
+    CHECK(Engine::plants_on(128, false, true));   // fully fertile: as before
+    CHECK(Engine::plants_on(64, true, false));    // half, lacking, the market dry
+    CHECK(!Engine::plants_on(64, true, true));    // a partner offers it: bought
+    CHECK(!Engine::plants_on(64, false, false));  // not lacking
+    CHECK(!Engine::plants_on(0, true, false));    // it does not grow there
+}
