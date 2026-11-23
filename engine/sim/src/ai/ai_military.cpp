@@ -5,6 +5,7 @@
 // foreign city after every step, the soldiers on one island per tick, the treaties every 30 s.
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <functional>
 #include <limits>
@@ -1645,13 +1646,18 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
     if (threat == 0) {
         return 1;
     }
-    // k (k + 1) / 2 * (health / n) * 1000 / threat >= work
-    const std::uint64_t need = work * n * threat;
-    std::uint64_t k = 1;
-    while (k * (k + 1) / 2 * health * 1000U < need) {
+    // k (k + 1) / 2 * (health / n) * 1000 / threat >= work: the least k with k (k + 1) / 2 >= q,
+    // from the root of the quadratic, set exact in whole numbers.
+    const std::uint64_t per = health * 1000U;
+    const std::uint64_t q = (work * n * threat + per - 1) / per;
+    auto k = static_cast<std::uint64_t>((std::sqrt(8.0 * static_cast<double>(q) + 1.0) - 1.0) / 2.0);
+    while (k * (k + 1) / 2 < q) {
         ++k;
     }
-    return static_cast<std::size_t>(k);
+    while (k > 1 && (k - 1) * k / 2 >= q) {
+        --k;
+    }
+    return static_cast<std::size_t>(std::max<std::uint64_t>(k, 1));
 }
 
 bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -2325,16 +2331,18 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             // a player takes them, the nearest to the soldiers first (towers_over_way).
             std::int64_t sx = 0;
             std::int64_t sy = 0;
+            std::int64_t n = 0;
             for (const std::uint32_t id : mine) {
                 if (const Soldier* u = m_world.soldier(id)) {
                     sx += u->cell_x();
                     sy += u->cell_y();
+                    ++n;
                 }
             }
-            const auto n = static_cast<std::int64_t>(mine.size());
             std::vector<std::pair<std::int32_t, std::int32_t>> over;
             for (const TowerCover& tc :
-                 towers_over_way(a, c, static_cast<std::int32_t>(sx / n), static_cast<std::int32_t>(sy / n))) {
+                 n == 0 ? std::vector<TowerCover>{}
+                        : towers_over_way(a, c, static_cast<std::int32_t>(sx / n), static_cast<std::int32_t>(sy / n))) {
                 over.emplace_back(tc.x, tc.y);
             }
             if (!over.empty() && reachable_goals(a, island, c, mine, over)) {
