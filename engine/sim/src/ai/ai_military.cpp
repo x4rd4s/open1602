@@ -1303,10 +1303,11 @@ void Engine::plan_landing(AiPlayer& p, Ship& s, ShipNote& n) {
         return;
     }
     // Open1602 (3b): the towers that cover the landing or the way from it to the city are shelled
-    // first by enough warships, as a player does, while the troops wait aboard at home. Only when
-    // that pays: see shell_towers. Otherwise they land as before.
+    // first by enough warships, as a player does, while the troops wait aboard at home; where none
+    // can, the landing is called off (shell_towers).
     if (rivals()) {
-        if (const auto towers = covering_towers(p, *t, *beach); !towers.empty() && shell_towers(p, s, n, *t, towers)) {
+        if (const auto towers = covering_towers(p, *t, *beach); !towers.empty()) {
+            shell_towers(p, s, n, *t, towers);
             return;
         }
     }
@@ -1384,41 +1385,31 @@ std::vector<Engine::TowerCover> Engine::covering_towers(const AiPlayer& p, const
     return out;
 }
 
-bool Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers) {
+Engine::Shelling Engine::plan_shelling(const AiPlayer& p, const City& t, const std::vector<TowerCover>& towers,
+                                       const std::vector<Ship*>& fleet, const Ship* troops) const {
     // Merlin's rule (plan "Landungstruppen und Türme", 2026-11-19): a fleet big enough to wreck
     // the towers, so that the landing loses no soldiers; ships may be lost while the damage is
     // worth more than the own losses. In gold from the game's data: the towers' build value and the
-    // soldiers aboard, whom the towers would shoot (their cost by the Soldat: line), against the
-    // price of the ships the towers sink while they are shelled. True while the troop ship waits
-    // (at home: the landing is planned there, out of the towers' reach).
-    if (n.counter == 0) {
-        log(p, "ship %u lands under %zu towers of city %u/%u: no tries left", s.id, towers.size(), t.island, t.index);
-        return false;
-    }
-    --n.counter;
-    const std::uint32_t param = city_param(t);
-    if (std::ranges::any_of(p.ships,
-                            [&](const ShipNote& o) { return o.mission == kMissionBreach && o.param == param; })) {
-        return true;
-    }
-    const std::vector<Ship*> fleet = free_warships(p);
+    // soldiers aboard `troops`, whom the towers would shoot (their cost by the Soldat: line),
+    // against the price of the ships the towers sink while they are shelled. `fleet` the strongest
+    // first.
+    Shelling out;
     if (fleet.empty()) {
-        log(p, "ship %u lands under %zu towers of city %u/%u: no warship free", s.id, towers.size(), t.island, t.index);
-        return false;
+        out.refusal = "no warship free";
+        return out;
     }
     // The towers the strongest ship can shell from the water; a tower inland, out of the ships'
     // range, no ship wrecks. The ships shoot from the water nearest to each (water_near), where
     // every hostile tower that reaches that water fires on them, the coast's too.
-    std::vector<TowerCover> targets;
+    std::vector<TowerCover>& targets = out.targets;
     for (const TowerCover& c : towers) {
         if (shells_from_water(*fleet.front(), t.island, c.x, c.y)) {
             targets.push_back(c);
         }
     }
     if (targets.empty()) {
-        log(p, "ship %u lands under %zu towers of city %u/%u: none within the ships' reach from the water", s.id,
-            towers.size(), t.island, t.index);
-        return false;
+        out.refusal = "none within the ships' reach from the water";
+        return out;
     }
     std::vector<std::pair<std::int32_t, std::int32_t>> spots;  // half tiles
     for (const TowerCover& c : targets) {
@@ -1447,8 +1438,8 @@ bool Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
         }
     }
     // The soldiers aboard count only when no covering tower is left for them to land under.
-    if (targets.size() == towers.size()) {
-        for (const CargoSlot& c : s.cargo) {
+    if (troops != nullptr && targets.size() == towers.size()) {
+        for (const CargoSlot& c : troops->cargo) {
             if (is_soldier_ware(c.ware) && figures != nullptr) {
                 gain += figures->disband_cost(hold_unit(c));
             }
@@ -1484,7 +1475,15 @@ bool Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
             const assets::FigureType* it = ship_type(*fleet[i]);
             const std::uint64_t max = it != nullptr && it->ship.max_health != 0 ? it->ship.max_health : 1U;
             const std::uint64_t h = fleet[i]->health != 0 ? std::min<std::uint64_t>(fleet[i]->health, max) : max;
-            hulls.emplace_back(h, it != nullptr ? it->ship.price : 0U);
+            std::uint64_t price = it != nullptr ? it->ship.price : 0U;
+            if (fleet[i] == troops && figures != nullptr) {
+                for (const CargoSlot& c : troops->cargo) {
+                    if (is_soldier_ware(c.ware)) {
+                        price += figures->disband_cost(hold_unit(c));
+                    }
+                }
+            }
+            hulls.emplace_back(h, price);
         }
         std::ranges::sort(hulls);
         std::uint64_t left = taken;
@@ -1504,25 +1503,56 @@ bool Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
             break;
         }
     }
+    out.ships = best;
+    out.loss = best_loss;
+    out.gain = gain;
     if (best == 0) {
-        log(p, "ship %u lands under %zu towers of city %u/%u: the %zu free warships would turn away first", s.id,
-            towers.size(), t.island, t.index, fleet.size());
-        return false;
+        out.refusal = "the warships would turn away first";
+    } else if (best_loss >= gain) {
+        out.refusal = "shelling does not pay";
     }
-    if (best_loss >= gain) {
-        log(p, "ship %u lands under %zu towers of city %u/%u: shelling does not pay (loss %llu, gain %llu)", s.id,
-            towers.size(), t.island, t.index, static_cast<unsigned long long>(best_loss),
+    return out;
+}
+
+void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers) {
+    // The towers over the landing are shelled first (plan_shelling), while the troop ship waits at
+    // home, out of their reach, or by the troop ship itself. Open1602:
+    // where no fleet can wreck them it calls the landing off rather than land under them, where every
+    // party died without taking a city (gate f17: 27 of 27).
+    const std::uint32_t param = city_param(t);
+    const auto call_off = [&](const char* why, std::uint64_t loss, std::uint64_t gain) {
+        log(p, "ship %u calls the landing under %zu towers of city %u/%u off: %s (loss %llu, gain %llu)", s.id,
+            towers.size(), t.island, t.index, why, static_cast<unsigned long long>(loss),
             static_cast<unsigned long long>(gain));
-        return false;
+        mission_end(p, s, n);
+    };
+    if (n.counter == 0) {
+        call_off("no tries left", 0, 0);
+        return;
     }
-    const Target at = Target::building(t.island, targets.front().x, targets.front().y);
-    for (std::size_t k = 0; k < best; ++k) {
+    --n.counter;
+    if (std::ranges::any_of(p.ships,
+                            [&](const ShipNote& o) { return o.mission == kMissionBreach && o.param == param; })) {
+        return;
+    }
+    // With no warship free the troop ship shells them itself, as a breach does, its soldiers aboard
+    // counted with its price.
+    std::vector<Ship*> fleet = free_warships(p);
+    if (fleet.empty() && s.cannons != 0 && healthy(s)) {
+        fleet.push_back(&s);
+    }
+    const Shelling plan = plan_shelling(p, t, towers, fleet, &s);
+    if (plan.refusal != nullptr) {
+        call_off(plan.refusal, plan.loss, plan.gain);
+        return;
+    }
+    const Target at = Target::building(t.island, plan.targets.front().x, plan.targets.front().y);
+    for (std::size_t k = 0; k < plan.ships; ++k) {
         log(p, "ship %u shells %zu of %zu towers of city %u/%u for ship %u (%zu ships, loss %llu, gain %llu)",
-            fleet[k]->id, targets.size(), towers.size(), t.island, t.index, s.id, best,
-            static_cast<unsigned long long>(best_loss), static_cast<unsigned long long>(gain));
+            fleet[k]->id, plan.targets.size(), towers.size(), t.island, t.index, s.id, plan.ships,
+            static_cast<unsigned long long>(plan.loss), static_cast<unsigned long long>(plan.gain));
         ship_send(p, *fleet[k], at, kMissionBreach, param);
     }
-    return true;
 }
 
 bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -1906,7 +1936,47 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
     if (building_count(t) <= 4 || defenceless(t.island, t.index)) {
         return false;
     }
-    return soldiers_near(p.player, *home, 8, 4).size() >= 4;
+    if (soldiers_near(p.player, *home, 8, 4).size() < 4) {
+        return false;
+    }
+    // Open1602: no attack on a city whose towers over the landing no fleet of the computer's armed,
+    // healthy ships could wreck (plan_shelling, its gain aside: the troops are not aboard yet); the
+    // landing would be called off.
+    if (rivals()) {
+        if (const auto beach = landing_beach(p, t)) {
+            if (const auto towers = covering_towers(p, t, *beach); !towers.empty()) {
+                std::vector<std::pair<std::uint32_t, Ship*>> armed;
+                for (Ship* o : own_ships(p)) {
+                    if (o->cannons != 0 && healthy(*o)) {
+                        armed.emplace_back(ship_strength(health128(*o), o->cannons), o);
+                    }
+                }
+                std::ranges::stable_sort(armed, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
+                std::vector<Ship*> fleet;
+                for (const auto& [score, o] : armed) {
+                    fleet.push_back(o);
+                }
+                const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
+                // A stopgap until parties are sized to take such towers on land. Logged when it begins
+                // and ends.
+                const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
+                const auto logged = std::ranges::find(m_skips_logged, key);
+                if (plan.ships == 0) {
+                    if (logged == m_skips_logged.end()) {
+                        m_skips_logged.push_back(key);
+                        log(p, "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s)",
+                            t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "");
+                    }
+                    return false;
+                }
+                if (logged != m_skips_logged.end()) {
+                    m_skips_logged.erase(logged);
+                    log(p, "skips city %u/%u no more: its towers within the fleet's reach", t.island, t.index);
+                }
+            }
+        }
+    }
+    return true;
 }
 
 void Engine::start_attack(AiPlayer& p, const City& t) {
