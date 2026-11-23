@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "../../engine/sim/src/ai/ai_engine.hpp"
 #include "../test_framework.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -480,6 +481,41 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     // both (trace trS: soldiers aboard were left out of the party).
     CHECK(play(true, "6.0", towers, whole, {{10, 10}}, 4, &landed, false, 4));
     CHECK(landed == 8);
+}
+
+TEST_CASE("ai landing: a convoy takes an empty armed supply ship off its route, after the other ships") {
+    // Trace trV: in 32 of 50 skips the landing ships were short of holds, while armed supply ships
+    // lay empty between two loads. A player takes such a ship off its route; one with goods aboard
+    // keeps them for the city.
+    Coast a;
+    a.figures = make_figures(true);
+    a.build(kKontor, 28, 14, kComputer, 0);
+    for (const auto& [x, y] : std::vector<std::pair<int, int>>{{41, 15}, {42, 20}, {43, 25}, {44, 30}}) {
+        sim::Ship ship = sim::make_ship("Ship", static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                                        kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        if (y == 25) {
+            ship.cargo[0].ware = 1;  // goods for the city
+            ship.cargo[0].amount = 32;
+        }
+        a.world.add_ship(ship);
+    }
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const auto& ships = a.world.ships();
+    for (std::size_t k = 0; k < ships.size(); ++k) {
+        sim::ai::ShipNote n;
+        n.id = ships[k].id;
+        n.supply = k == 0 || k == 2;  // the first: empty on its route; the third: with goods
+        n.mission = k == 3 ? 1 : 0;   // the fourth: fetching troops
+        p.ships.push_back(n);
+    }
+    const std::vector<std::uint32_t> want{ships[1].id, ships[0].id};
+    CHECK(engine.landing_ship_ids(p) == want);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

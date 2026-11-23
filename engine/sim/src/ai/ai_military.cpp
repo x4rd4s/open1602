@@ -2247,8 +2247,29 @@ std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
         }
     }
     std::ranges::stable_sort(found, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
+    // Then the armed supply ships lying empty between two loads, as a player takes a ship off its
+    // route for an attack: after all the others, so that a convoy takes them only when those are
+    // too few (trace trV: in 14 of 32 skips short of holds they would have closed the gap). The
+    // logistics give the supply job to another ship.
+    std::vector<std::pair<std::uint32_t, Ship*>> supply;
+    for (Ship* s : own_ships(p)) {
+        const auto it = std::ranges::find(p.ships, s->id, &ShipNote::id);
+        if (it == p.ships.end() || !it->supply || it->mission != 0 || s->id == p.settle.ship || s->held ||
+            s->cannons == 0 || !healthy(*s) || free_holds(*s) != usable_holds(*s, *m_sim.m_figures) ||
+            free_holds(*s) < kLandingHolds) {
+            continue;
+        }
+        const std::uint32_t score = ship_strength(health128(*s), s->cannons);
+        if (score > 8) {
+            supply.emplace_back(score, s);
+        }
+    }
+    std::ranges::stable_sort(supply, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
     std::vector<Ship*> out;
     for (const auto& [score, s] : found) {
+        out.push_back(s);
+    }
+    for (const auto& [score, s] : supply) {
         out.push_back(s);
     }
     return out;
@@ -2462,7 +2483,8 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
         for (Ship* o : landing_ships(p)) {
             if (ships.size() < convoy && o != ship) {
                 ships.push_back(o);
-                log(p, "ship %u joins the attack on city %u/%u (convoy of %zu)", o->id, t.island, t.index, convoy);
+                log(p, "ship %u joins the attack on city %u/%u (convoy of %zu)%s", o->id, t.island, t.index, convoy,
+                    note(p, o->id).supply ? ", leaving its supply route" : "");
             }
         }
     }
