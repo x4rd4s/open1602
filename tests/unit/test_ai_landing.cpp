@@ -527,6 +527,49 @@ TEST_CASE("ai landing: a convoy takes an empty armed supply ship off its route, 
     CHECK(engine.landing_ship_ids(p) == armed);
 }
 
+TEST_CASE("ai landing: a troop ship waits for the soldiers still walking aboard") {
+    // Probe p5: a ship moved to water its soldiers can reach (move_to_board) lies beyond the
+    // Kontor's reach of 8 tiles; with no soldier left near the Kontor it judged the three aboard
+    // too few and called the attack off while the rest walked to it, ten times in a row. An improved
+    // computer waits for them, up to its tries; the original decides at once.
+    for (const bool classic : {false, true}) {
+        Coast a;
+        a.figures = make_figures(true);
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        for (std::size_t k = 0; k < 3; ++k) {
+            ship.cargo[k].ware = assets::unit_ware(kSword);
+            ship.cargo[k].amount = sim::kHoldCapacity;
+        }
+        ship.order = sim::Target::position(41, 15);
+        a.world.add_ship(ship);
+        const std::uint32_t id = a.world.ships().back().id;
+        a.add(kComputer, 2 * (10 + 8), 2 * (10 + 18), 0);  // 20 tiles from the Kontor
+        a.world.soldiers().back().target = sim::Target::other_ship(id);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        sim::ai::ShipNote n;
+        n.id = id;
+        n.mission = 5;
+        n.counter = 10;
+        n.param = (1U << 8) | 1U;  // city 1 on island 1
+        p.ships.push_back(n);
+        engine.run_missions(p);
+        CHECK((p.ships.front().mission == 5) == !classic);
+    }
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).

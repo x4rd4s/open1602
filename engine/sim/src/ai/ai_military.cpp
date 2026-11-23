@@ -1174,7 +1174,19 @@ void Engine::missions(AiPlayer& p) {
                     const std::size_t before = soldiers_near(p.player, *home, 8, 16).size();
                     board(p, *s, *home, free_holds(*s));
                     --n.counter;
-                    if (before != 0) {
+                    // Open1602: soldiers still on their way aboard are waited for too: off a ship
+                    // moved to where they can board it (move_to_board) they leave the Kontor's
+                    // reach, and the ship called its attack off with the first three aboard, ten
+                    // times in a row (probe p5).
+                    const bool walking = rivals() && std::ranges::any_of(m_world.soldiers(), [&](const Soldier& u) {
+                                             return u.owner == p.player && !u.away() &&
+                                                    u.target.kind == Target::Kind::Ship && u.target.ship == s->id;
+                                         });
+                    if (before == 0 && walking) {
+                        log(p, "ship %u waits for the soldiers walking aboard (%u aboard, %u tries left)", s->id,
+                            aboard, unsigned{n.counter});
+                    }
+                    if (before != 0 || walking) {
                         break;
                     }
                 }
