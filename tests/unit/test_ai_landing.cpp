@@ -648,6 +648,48 @@ TEST_CASE("ai landing: an attack weighs the shelling with the warships free for 
     CHECK(ids() == alone);
 }
 
+TEST_CASE("ai landing: an improved computer starts no attack its landing would end at once") {
+    // plan_landing ends a landing with 8 of the computer's soldiers on the island; the original's
+    // attack_ok starts one up to 10. An improved computer's attack_ok holds to the 8, so that no
+    // ship sails only to turn home.
+    for (const bool classic : {false, true}) {
+        Coast a;
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        for (std::int32_t k = 0; k < 8; ++k) {
+            a.add(kComputer, 2 * (60 + 20) + k, 2 * (10 + 25), 1);  // already on the enemy's island
+        }
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        a.world.add_ship(ship);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        sim::ai::ShipNote n;
+        n.id = a.world.ships().back().id;
+        p.ships.push_back(n);
+        CHECK(engine.attack_ok_for(p, *a.world.city(1, 1)) == classic);
+    }
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).

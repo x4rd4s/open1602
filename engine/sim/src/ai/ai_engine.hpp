@@ -329,6 +329,11 @@ public:
                                                                                      bool wall = false,
                                                                                      bool any = false) const;
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
+    /// Whether `p` would attack city `t` now (attack_ok); for tests.
+    [[nodiscard]] bool attack_ok_for(AiPlayer& p, const City& t) {
+        std::size_t convoy = 1;
+        return attack_ok(p, t, convoy);
+    }
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// Open1602: the fleet attack_ok weighs the shelling of a city's towers with: the one

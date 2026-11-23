@@ -2434,7 +2434,9 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
         }
     }
     const City* home = home_city(p);
-    if (home == nullptr || soldiers_on_island(p.player, t.island) >= 10) {
+    // Open1602: an improved computer's landing ends with 8 of its soldiers on the island
+    // (plan_landing), so it starts none there: the original's 10 here sent ships that turned home.
+    if (home == nullptr || soldiers_on_island(p.player, t.island) >= (rivals() ? 8U : 10U)) {
         return false;
     }
     if (building_count(t) <= 4 || defenceless(t.island, t.index)) {
@@ -2455,11 +2457,35 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                 // started attacks shell_towers then called off ("the warships would turn away
                 // first"), every 30 s for one city (gate f24).
                 const std::vector<Ship*> fleet = attack_fleet(p);
-                const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
+                // Weighed as shell_towers will: with the troop ship's soldiers aboard, those at home
+                // it takes, so that a shelling refused there ("shelling does not pay") is refused
+                // here, and the party storms or no attack starts.
+                std::vector<Ship*> shellers = fleet;
+                const std::vector<Ship*> landing = landing_ships(p);
+                std::optional<Ship> loaded;
+                if (!landing.empty()) {
+                    loaded = *landing.front();
+                    std::size_t slot = 0;
+                    for (const Soldier* u : soldiers_near(p.player, *home, 8, free_holds(*landing.front()))) {
+                        while (slot < loaded->cargo.size() && loaded->cargo[slot].ware != 0) {
+                            ++slot;
+                        }
+                        if (slot < loaded->cargo.size()) {
+                            loaded->cargo[slot].ware = unit_ware(u->figure);
+                            loaded->cargo[slot].amount = 1;
+                        }
+                    }
+                    for (Ship*& o : shellers) {
+                        if (o == landing.front()) {
+                            o = &*loaded;
+                        }
+                    }
+                }
+                const Shelling plan = plan_shelling(p, t, towers, shellers, loaded ? &*loaded : nullptr);
                 // Or the party that as many ships as it takes bring from home storms them on land
                 // (plan_convoy). Logged when it begins and ends.
                 const Convoy cv =
-                    plan.ships == 0
+                    plan.refusal != nullptr
                         ? plan_convoy(p, t, *home, towers, landing_ships(p),
                                       {2 * (static_cast<std::int32_t>(island_of(t.island).x) + beach->first) + 1,
                                        2 * (static_cast<std::int32_t>(island_of(t.island).y) + beach->second) + 1})
