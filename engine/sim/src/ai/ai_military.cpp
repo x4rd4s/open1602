@@ -2722,11 +2722,15 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
         return !b.valid() || b.type->destroyed || b.kind == kind::kGround || b.kind == kind::kRuin ||
                b.kind == kind::kBeachRuin;
     };
+    std::size_t stale = 0;  // logged with the orders
     for (const Soldier& s : m_world.soldiers()) {
-        if (s.owner == a.player && s.island == island && !s.away() &&
-            (s.target.empty() || s.target.kind == Target::Kind::Position || s.target.kind == Target::Kind::Spot ||
-             gone(s.target))) {
-            mine.push_back(s.id);
+        if (s.owner == a.player && s.island == island && !s.away()) {
+            if (s.target.empty() || s.target.kind == Target::Kind::Position || s.target.kind == Target::Kind::Spot) {
+                mine.push_back(s.id);
+            } else if (gone(s.target)) {
+                mine.push_back(s.id);
+                ++stale;
+            }
         }
     }
     if (mine.empty()) {
@@ -2818,6 +2822,10 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
         // seven cut a forest ring under its fire, the others stood).
         const bool tower = rivals() && !goals.empty() &&
                            (for_tower || is_tower(tile(island, goals.front().first, goals.front().second)));
+        if (stale != 0) {
+            log(a, "re-orders %zu soldiers on island %u whose target no longer stands (%s)", stale, island,
+                tower ? "to a tower" : "to the city");
+        }
         std::size_t next = 0;
         for (std::size_t g = 0; g < goals.size() && next < mine.size(); ++g) {
             const std::size_t count = tower ? mine.size() : g == 0 ? 4 : 2;
@@ -2835,6 +2843,10 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             }
         }
     } else {
+        if (stale != 0) {
+            log(a, "re-orders %zu soldiers on island %u whose target no longer stands (to the soldiers)", stale,
+                island);
+        }
         // The enemy soldier nearest to the middle of ours.
         const Soldier* enemy = nullptr;
         std::int64_t cx = 0;
