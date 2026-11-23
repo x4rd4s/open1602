@@ -741,6 +741,96 @@ TEST_CASE("ai landing: an improved computer starts no attack whose shelling woul
     CHECK(!engine.attack_ok_for(p, *a.world.city(1, 1)));
 }
 
+TEST_CASE("ai landing: a shelling that leaves a tower the party cannot storm starts no attack") {
+    // Probe p8: the ships reach the tower on the coast, not the one inland. attack_ok weighed only
+    // the shelling and started the attack, the ships wrecked the coast tower, and the landing was
+    // called off under the inland one, which the 7 soldiers aboard were too few to storm; four
+    // times for one city. The tower left by the shelling now needs a party that storms it, at the
+    // start (attack_ok) as at the landing (shell_towers). A weaker tower the six storm.
+    const auto play = [](const char* hit, bool aboard, bool& ok, bool& shelled, bool& called_off) {
+        Coast a;
+        a.figures = make_figures(true, hit);
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (const auto& [x, y] : std::vector<std::pair<int, int>>{{2, 5}, {10, 9}}) {  // the coast, inland
+            REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
+            sim::Tower tw;
+            tw.island = 1;
+            tw.x = static_cast<std::uint16_t>(x);
+            tw.y = static_cast<std::uint16_t>(y);
+            tw.owner = kHuman;
+            tw.figure = 38;  // KANONTURM
+            a.world.towers().push_back(tw);
+        }
+        if (!aboard) {
+            for (std::int32_t k = 0; k < 6; ++k) {
+                a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+            }
+        }
+        for (std::uint32_t k = 0; k < 8; ++k) {  // a convoy of two with six soldiers, six warships
+            sim::Ship ship = sim::make_ship("Ship", 41, 15 + 4 * k, kShipFigure, kComputer, 2);
+            ship.cargo.resize(4);
+            ship.cannons = 4;
+            for (std::size_t h = 0; aboard && k < 2 && h < (k == 0 ? 4U : 2U); ++h) {
+                ship.cargo[h].ware = assets::unit_ware(kSword);
+                ship.cargo[h].amount = sim::kHoldCapacity;
+            }
+            if (aboard && k < 2) {
+                ship.order = sim::Target::position(ship.x, ship.y);  // arrived at home
+            }
+            a.world.add_ship(ship);
+        }
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        for (const sim::Ship& ship : a.world.ships()) {
+            sim::ai::ShipNote n;
+            n.id = ship.id;
+            p.ships.push_back(n);
+        }
+        ok = false;
+        shelled = false;
+        called_off = false;
+        if (!aboard) {
+            ok = engine.attack_ok_for(p, *a.world.city(1, 1));
+            return;
+        }
+        for (std::size_t k = 0; k < 2; ++k) {
+            p.ships[k].mission = 6;
+            p.ships[k].counter = 10;
+            p.ships[k].param = (1U << 8) | 1U;  // city 1 on island 1
+        }
+        engine.run_missions(p);
+        shelled = std::ranges::any_of(p.ships, [](const sim::ai::ShipNote& o) { return o.mission == 11; });
+        called_off = p.ships.front().mission != 6;
+    };
+    bool ok = false;
+    bool shelled = false;
+    bool called_off = false;
+    play("8.0", false, ok, shelled, called_off);
+    CHECK(!ok);
+    play("6.0", false, ok, shelled, called_off);
+    CHECK(ok);
+    play("8.0", true, ok, shelled, called_off);
+    CHECK(!shelled);
+    CHECK(called_off);
+    play("6.0", true, ok, shelled, called_off);
+    CHECK(shelled);
+    CHECK(!called_off);
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).

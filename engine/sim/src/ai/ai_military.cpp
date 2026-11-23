@@ -1615,6 +1615,17 @@ Engine::Shelling Engine::plan_shelling(const AiPlayer& p, const City& t, const s
     return out;
 }
 
+std::vector<Engine::TowerCover> Engine::unshelled(const std::vector<TowerCover>& towers, const Shelling& plan) {
+    // The towers of `towers` that `plan` does not shell: those the ships cannot reach from the water.
+    std::vector<TowerCover> rest;
+    for (const TowerCover& c : towers) {
+        if (std::ranges::none_of(plan.targets, [&](const TowerCover& o) { return o.x == c.x && o.y == c.y; })) {
+            rest.push_back(c);
+        }
+    }
+    return rest;
+}
+
 void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers,
                           std::pair<std::int32_t, std::int32_t> beach) {
     // The towers over the landing are shelled first (plan_shelling), while the troop ship waits at
@@ -1647,36 +1658,48 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
         fleet.push_back(&s);
     }
     const Shelling plan = plan_shelling(p, t, towers, fleet, &s);
+    // The soldiers aboard the convoy, the ships of this attack (start_attack) waiting at home;
+    // while one of them still boards, the others wait for it.
+    std::vector<Ship*> convoy;
+    bool boarding = false;
+    for (const ShipNote& o : p.ships) {
+        Ship* os = m_world.ship(o.id);
+        if (os == nullptr || o.param != param || (o.mission != 5 && o.mission != 6)) {
+            continue;
+        }
+        if (o.mission == 5) {
+            boarding = true;
+        } else if (os == &s || !ship_moving(*os)) {
+            convoy.push_back(os);
+        }
+    }
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+    for (const Ship* o : convoy) {
+        for (const CargoSlot& c : o->cargo) {
+            if (is_soldier_ware(c.ware)) {
+                party.emplace_back(hold_unit(c), 0U);
+            }
+        }
+    }
+    const WorldIsland& bi = island_of(t.island);
+    const std::pair<std::int32_t, std::int32_t> from{2 * (static_cast<std::int32_t>(bi.x) + beach.first) + 1,
+                                                     2 * (static_cast<std::int32_t>(bi.y) + beach.second) + 1};
+    // The towers the ships cannot shell from the water the party storms once the others fall; a
+    // shelling that leaves more than it can storm ends in a call-off under them, and the attack
+    // started again on the next scan (probe p8: 4 starts, no landing).
+    if (plan.refusal == nullptr) {
+        const std::vector<TowerCover> rest = unshelled(towers, plan);
+        if (!rest.empty() && storm_needs(p, t, rest, party, from) > party.size()) {
+            if (boarding && n.counter != 0) {
+                return;
+            }
+            call_off("the towers out of the ships' reach outlast the party", plan.loss, plan.gain);
+            return;
+        }
+    }
     if (plan.refusal != nullptr) {
-        // The soldiers aboard the convoy, the ships of this attack (start_attack) waiting at home;
-        // while one of them still boards, the others wait for it.
-        std::vector<Ship*> convoy;
-        bool boarding = false;
-        for (const ShipNote& o : p.ships) {
-            Ship* os = m_world.ship(o.id);
-            if (os == nullptr || o.param != param || (o.mission != 5 && o.mission != 6)) {
-                continue;
-            }
-            if (o.mission == 5) {
-                boarding = true;
-            } else if (os == &s || !ship_moving(*os)) {
-                convoy.push_back(os);
-            }
-        }
-        std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
-        for (const Ship* o : convoy) {
-            for (const CargoSlot& c : o->cargo) {
-                if (is_soldier_ware(c.ware)) {
-                    party.emplace_back(hold_unit(c), 0U);
-                }
-            }
-        }
-        const WorldIsland& bi = island_of(t.island);
         std::size_t plain = 0;  // logged: what it needs without the walk
-        const std::size_t needs = storm_needs(p, t, towers, party,
-                                              {2 * (static_cast<std::int32_t>(bi.x) + beach.first) + 1,
-                                               2 * (static_cast<std::int32_t>(bi.y) + beach.second) + 1},
-                                              &plain);
+        const std::size_t needs = storm_needs(p, t, towers, party, from, &plain);
         if (needs <= party.size()) {
             for (Ship* o : convoy) {
                 log(p,
@@ -2484,12 +2507,16 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                 const Shelling plan = plan_shelling(p, t, towers, shellers, loaded ? &*loaded : nullptr);
                 // Or the party that as many ships as it takes bring from home storms them on land
                 // (plan_convoy). Logged when it begins and ends.
+                // A shelling that leaves towers out of the ships' reach needs the party that storms
+                // those (shell_towers), as many ships as it takes.
+                const std::pair<std::int32_t, std::int32_t> from{
+                    2 * (static_cast<std::int32_t>(island_of(t.island).x) + beach->first) + 1,
+                    2 * (static_cast<std::int32_t>(island_of(t.island).y) + beach->second) + 1};
+                const std::vector<TowerCover> rest = plan.refusal != nullptr ? towers : unshelled(towers, plan);
                 const Convoy cv =
-                    plan.refusal != nullptr
-                        ? plan_convoy(p, t, *home, towers, landing_ships(p),
-                                      {2 * (static_cast<std::int32_t>(island_of(t.island).x) + beach->first) + 1,
-                                       2 * (static_cast<std::int32_t>(island_of(t.island).y) + beach->second) + 1})
-                        : Convoy{1, 0, 0, 0};
+                    !rest.empty() ? plan_convoy(p, t, *home, rest, landing_ships(p), from) : Convoy{1, 0, 0, 0};
+                const char* why =
+                    plan.refusal != nullptr ? plan.refusal : "some out of the ships' reach from the water";
                 const std::size_t needs = cv.needs;
                 const std::size_t has = cv.has;
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
@@ -2501,15 +2528,13 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                             log(p,
                                 "skips city %u/%u: its %zu towers (%zu by no market or Kontor) over the landing "
                                 "out of the fleet's reach (%s), no party at home that harms them (%zu soldiers)",
-                                t.island, t.index, towers.size(), by_city_rule(towers),
-                                plan.refusal != nullptr ? plan.refusal : "", has);
+                                t.island, t.index, towers.size(), by_city_rule(towers), why, has);
                         } else {
                             log(p,
                                 "skips city %u/%u: its %zu towers (%zu by no market or Kontor) over the landing "
                                 "out of the fleet's reach (%s), a party would need %zu soldiers (%zu without the "
                                 "walk), has %zu",
-                                t.island, t.index, towers.size(), by_city_rule(towers),
-                                plan.refusal != nullptr ? plan.refusal : "", needs, cv.plain, has);
+                                t.island, t.index, towers.size(), by_city_rule(towers), why, needs, cv.plain, has);
                         }
                     }
                     return false;
@@ -2517,7 +2542,7 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                 if (logged != m_skips_logged.end()) {
                     m_skips_logged.erase(logged);
                     log(p, "skips city %u/%u no more: %s (%zu ships)", t.island, t.index,
-                        plan.ships != 0 ? "its towers within the fleet's reach" : "a party big enough to storm them",
+                        rest.empty() ? "its towers within the fleet's reach" : "a party big enough to storm them",
                         cv.ships);
                 }
                 convoy = cv.ships;

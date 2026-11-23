@@ -1121,6 +1121,8 @@ private:
         std::uint64_t gain = 0;           ///< gold, the towers and the soldiers aboard `troops`
         const char* refusal = nullptr;    ///< why not, or none
     };
+    /// The towers of `towers` that `plan` leaves standing: those out of the ships' reach.
+    [[nodiscard]] static std::vector<TowerCover> unshelled(const std::vector<TowerCover>& towers, const Shelling& plan);
     [[nodiscard]] Shelling plan_shelling(const AiPlayer& p, const City& t, const std::vector<TowerCover>& towers,
                                          const std::vector<Ship*>& fleet, const Ship* troops) const;
     /// Open1602 (3b): shells `towers` while troop ship `s` waits, waits for a warship, or calls the
