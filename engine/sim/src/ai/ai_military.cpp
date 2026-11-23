@@ -1957,11 +1957,21 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
                     fleet.push_back(o);
                 }
                 const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
+                // A stopgap until parties are sized to take such towers on land. Logged when it begins
+                // and ends.
+                const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
+                const auto logged = std::ranges::find(m_skips_logged, key);
                 if (plan.ships == 0) {
-                    // A stopgap until parties are sized to take such towers on land.
-                    log(p, "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s)", t.island,
-                        t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "");
+                    if (logged == m_skips_logged.end()) {
+                        m_skips_logged.push_back(key);
+                        log(p, "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s)",
+                            t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "");
+                    }
                     return false;
+                }
+                if (logged != m_skips_logged.end()) {
+                    m_skips_logged.erase(logged);
+                    log(p, "skips city %u/%u no more: its towers within the fleet's reach", t.island, t.index);
                 }
             }
         }

@@ -480,7 +480,7 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   is left, must be worth more than the price of the ships the towers' fire would sink. A ship
   still sailing up to its tower spends no try. With no warship free the troop ship shells them
   itself, its soldiers counted with its price. Where no fleet of its ships can wreck the towers
-  (none in reach, or they would turn away first), it attacks no such city; and when a landing
+  (none in reach, or they would turn away first), it attacks no such city (a stopgap: a party sized to take such towers on land is the step to come); and when a landing
   comes to it anyway (it does not pay, or after the tries) it calls the landing off and takes the
   troops home rather than land them under the towers: in the gate games every such party died
   without taking the city.

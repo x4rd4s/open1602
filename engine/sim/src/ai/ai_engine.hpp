@@ -1315,6 +1315,8 @@ private:
     mutable std::vector<YardWait> m_yard_logged;
     /// Player and city whose sealed beaches were logged (only the log).
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_sealed_logged;
+    /// Player and city attack_ok passes over for towers out of the fleet's reach (only the log).
+    mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
     /// Per player, the yard sites of the running search refused because the yard's carriers would
