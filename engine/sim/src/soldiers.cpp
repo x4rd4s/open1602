@@ -655,9 +655,11 @@ std::pair<std::int32_t, std::int32_t> Military::free_cell(std::int32_t x, std::i
 }
 
 bool Military::boards_from(const Ship& ship, std::int32_t x, std::int32_t y) noexcept {
+    // A way to the ship ends within kFriendlyGoal of it (plan_to), and only then does the soldier
+    // board (arrived(), up to kBoardRange): a cell beyond the way's goal is no way on board.
     const std::int32_t sx = 2 * static_cast<std::int32_t>(ship.x);
     const std::int32_t sy = 2 * static_cast<std::int32_t>(ship.y);
-    return CellRect{sx, sy, sx + 1, sy + 1}.distance(x, y) <= kBoardRange;
+    return CellRect{sx, sy, sx + 1, sy + 1}.distance(x, y) <= std::min(kBoardRange, kFriendlyGoal);
 }
 
 bool Military::arrived(Soldier& s) {
