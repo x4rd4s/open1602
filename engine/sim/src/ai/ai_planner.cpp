@@ -588,7 +588,7 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     }
     // Far in debt nothing is kept for later: what no city needs now goes, whatever it refunds.
     const bool far = player(p).money < kShedFarMoney;
-    const WareSet soon = needed_wares(p, !far);
+    const WareSet soon = needed_wares(p, !far, true);
     const WareSet unsold = needed_wares(p, !far, false);
     const std::uint32_t refund = m_sim.rules().refund_share();
     const IslandMap& map = island_of(c.island).map;
@@ -703,11 +703,11 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     // Saving for its army or in debt it also switches off what none of its cities needs now
     // (needed_wares), until it can afford them again.
     const bool saving = saving_costs(p);
-    const WareSet needed = saving ? needed_wares(p, false) : WareSet{};
-    const WareSet unsold = saving ? needed_wares(p, false, false) : WareSet{};
+    // Not what sold lately: that keeps a producer from being torn down (shed_producers), not
+    // running at a loss (gate f26, l2 404-p5: P13 at 38 gold and -74 a minute kept 8 running).
+    const WareSet needed = saving ? needed_wares(p, false, false) : WareSet{};
     std::uint32_t saved = 0;
     std::uint32_t idled = 0;
-    std::uint32_t selling = 0;  // kept running only because their ware sold in the last hour
     // Open1602: the food of the city and what its producers work into food (cattle, grain, flour)
     // keep running in debt; without it the people leave faster than any saving pays back.
     WareSet feeds{};
@@ -818,8 +818,6 @@ void Engine::production_switches(AiPlayer& p, City& c) {
             set(false);
             ++idled;
         }
-        // Counted as it ends the pass: one switched off for a full store is not kept running.
-        selling += saving && w != 0 && needed[w] && !unsold[w] && enabled ? 1U : 0U;
     }
     if (saved != 0) {
         log(p, "city %u/%u: switches %u full producers off in debt", c.island, c.index, saved);
@@ -827,10 +825,6 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     if (idled != 0) {
         log(p, "city %u/%u: switches %u producers off nobody needs now (gold %d, income %d)", c.island, c.index, idled,
             player(p).money, net_income(p));
-    }
-    if (auto& last = p.debt_kept[{c.island, c.index}]; last.running != selling) {
-        last.running = selling;
-        log(p, "city %u/%u: keeps %u producers running whose ware sold in the last hour", c.island, c.index, selling);
     }
     for (const auto& [index, on] : changes) {
         const Production& pr = m_world.productions()[index];

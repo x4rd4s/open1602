@@ -601,8 +601,9 @@ private:
     /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
     void shed_producers(AiPlayer& p, City& c);
     void shed_public(AiPlayer& p, City& c);
-    /// With `sales` also the wares its cities sold in the last hour (sold_wares).
-    [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon, bool sales = true) const;
+    /// With `sales` also the wares its cities sold in the last hour (sold_wares): kept standing in
+    /// debt (shed_producers), not kept running (production_switches).
+    [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon, bool sales) const;
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
     [[nodiscard]] bool saving_costs(const AiPlayer& p) const;
     void tax_rates(AiPlayer& p, City& c);

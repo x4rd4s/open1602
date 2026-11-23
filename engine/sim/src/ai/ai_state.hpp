@@ -535,11 +535,9 @@ struct AiPlayer {
     /// Not saved: where Engine::note() last found a ship in `ships`, checked before it is used
     /// (`ships` may have been reordered or shortened since). Only looked up, never walked.
     std::unordered_map<std::uint32_t, std::uint32_t> ship_slots;
-    /// Not saved: by city (island, index), what the refresh last logged as kept in debt: producers
-    /// kept running because their ware sold (production_switches), kept standing because it sold,
-    /// farms with fields kept standing (shed_producers). Logged again only when it changes.
+    /// Not saved: by city (island, index), what shed_producers last logged as kept standing in
+    /// debt, logged again only when it changes.
     struct DebtKept {
-        std::uint32_t running = 0;   ///< kept running because their ware sold
         std::uint32_t standing = 0;  ///< kept standing because their ware sold
         std::uint32_t farms = 0;     ///< farms with fields kept standing
     };
