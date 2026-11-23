@@ -467,10 +467,34 @@ void Engine::set_material_lock(AiPlayer& p, City& c, bool on) {
     log(p, "city %u/%u: material %s", c.island, c.index, on ? "locked, goods are missing" : "free again");
 }
 
-Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon) const {
+Engine::WareSet Engine::sold_wares(const World& world, PlayerId player) {
+    WareSet sold{};
+    for (const City& c : world.cities()) {
+        if (c.owner != player) {
+            continue;
+        }
+        for (std::size_t w = 0; w < sold.size(); ++w) {
+            const auto ware = static_cast<std::uint8_t>(w);
+            if (c.ledger.used(ware) && c.ledger.totals(ware, GoodsLedger::kMinutes).of(GoodsFlow::Sold) != 0) {
+                sold[w] = true;
+            }
+        }
+    }
+    return sold;
+}
+
+bool Engine::may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept {
+    return b.ware != 0 && !keep[b.ware] && b.prod_kind >= prod::kWorkshop && b.prod_kind <= prod::kFisher &&
+           b.prod_kind != prod::kFarm;
+}
+
+Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) const {
     // The wares the computer needs: building material and food, what its inhabitants want and
     // what its own buildings work into such a ware, down the chain, and the weapons while it arms
-    // or is at war. With `soon` also what the next class of each of its cities will want.
+    // or is at war. With `soon` also what the next class of each of its cities will want. With
+    // `sales` also what its cities sold in the last hour (Open1602): in debt a ware that sells
+    // earns the gold it lacks (gate f25, g4-202 P1 tore down 18 cocoa plantations of a ware it
+    // sold until five minutes before).
     WareSet needed{};
     const auto& m = m_buildings.materials();
     for (const std::uint8_t w : {m.wood, m.tools, m.bricks, m_buildings.food_ware()}) {
@@ -502,6 +526,12 @@ Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon) const {
     if (p.strategy.goal == goal::kMilitary || p.strategy.war_target != kNoPlayer) {
         for (const std::uint8_t w : {ware::kMuskets, m.cannons}) {
             needed[w] = true;
+        }
+    }
+    if (sales) {
+        const WareSet sold = sold_wares(m_world, p.player);
+        for (std::size_t w = 0; w < needed.size(); ++w) {
+            needed[w] = needed[w] || sold[w];
         }
     }
     std::vector<const assets::BuildingType*> made;  // the computer's producers, once per type
@@ -558,10 +588,13 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     }
     // Far in debt nothing is kept for later: what no city needs now goes, whatever it refunds.
     const bool far = player(p).money < kShedFarMoney;
-    const WareSet soon = needed_wares(p, !far);
+    const WareSet soon = needed_wares(p, !far, true);
+    const WareSet unsold = needed_wares(p, !far, false);
     const std::uint32_t refund = m_sim.rules().refund_share();
     const IslandMap& map = island_of(c.island).map;
     std::vector<std::pair<std::int32_t, std::int32_t>> shed;
+    std::uint32_t selling = 0;  // kept only because their ware sold in the last hour
+    std::uint32_t farms = 0;    // farms with fields, which only go off
     for (const Production& pr : m_world.productions()) {
         if (shed.size() >= kShedPerVisit) {
             break;
@@ -574,8 +607,13 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
             continue;
         }
         const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
-        if (b == nullptr || b->ware == 0 || soon[b->ware] || b->prod_kind == prod::kMarket ||
-            b->prod_kind == prod::kKontor || b->prod_kind < prod::kWorkshop || b->prod_kind > prod::kFisher) {
+        if (b == nullptr || !may_shed(*b, soon)) {
+            if (b != nullptr && b->ware != 0 && soon[b->ware] && !unsold[b->ware] &&
+                (may_shed(*b, unsold) || b->prod_kind == prod::kFarm)) {
+                ++selling;  // a farm too: kept standing by the sale before its fields keep it
+            } else if (b != nullptr && b->prod_kind == prod::kFarm && b->ware != 0 && !soon[b->ware]) {
+                ++farms;
+            }
             continue;
         }
         if (!far && !worth_demolishing(b->idle_cost, build_value(b->build_cost), refund, true)) {
@@ -590,6 +628,14 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
     if (done != 0) {
         log(p, "city %u/%u: tears down %zu producers nobody needs in debt (gold %d)", c.island, c.index, done,
             player(p).money);
+    }
+    if (auto& last = p.debt_kept[{c.island, c.index}]; last.standing != selling || last.farms != farms) {
+        last.standing = selling;
+        last.farms = farms;
+        log(p,
+            "city %u/%u: in debt keeps %u producers whose ware sold in the last hour and %u farms with fields "
+            "(switched off, not torn down)",
+            c.island, c.index, selling, farms);
     }
 }
 
@@ -658,7 +704,9 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     // Saving for its army or in debt it also switches off what none of its cities needs now
     // (needed_wares), until it can afford them again.
     const bool saving = saving_costs(p);
-    const WareSet needed = saving ? needed_wares(p, false) : WareSet{};
+    // Not what sold lately: that keeps a producer from being torn down (shed_producers), not
+    // running at a loss (gate f26, l2 404-p5: P13 at 38 gold and -74 a minute kept 8 running).
+    const WareSet needed = saving ? needed_wares(p, false, false) : WareSet{};
     std::uint32_t saved = 0;
     std::uint32_t idled = 0;
     // Open1602: the food of the city and what its producers work into food (cattle, grain, flour)
