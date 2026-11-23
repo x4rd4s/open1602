@@ -604,6 +604,50 @@ TEST_CASE("ai landing: a troop ship waits for the soldiers still walking aboard"
     }
 }
 
+TEST_CASE("ai landing: an attack weighs the shelling with the warships free for it") {
+    // Gate f24: attack_ok weighed the shelling with every armed ship, those on supply runs too, and
+    // shell_towers then had only the free ones: "the warships would turn away first", the landing
+    // called off, and the same city attacked again 30 s later, 14 times. The fleet is now the one
+    // shell_towers will have: the free warships without the troop ship, or the troop ship alone.
+    Coast a;
+    a.figures = make_figures(true);
+    a.build(kKontor, 28, 14, kComputer, 0);
+    for (const auto& [x, y] : std::vector<std::pair<int, int>>{{41, 15}, {42, 20}, {43, 25}}) {
+        sim::Ship ship = sim::make_ship("Ship", static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
+                                        kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = static_cast<std::uint8_t>(y == 15 ? 6 : 4);  // the first the strongest
+        a.world.add_ship(ship);
+    }
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const auto& ships = a.world.ships();
+    for (std::size_t k = 0; k < ships.size(); ++k) {
+        sim::ai::ShipNote n;
+        n.id = ships[k].id;
+        n.supply = k == 2;  // the third on a supply run, with goods aboard
+        p.ships.push_back(n);
+    }
+    a.world.ship(ships[2].id)->cargo[0] = sim::CargoSlot{1, 32, 0, 0};
+    const auto ids = [&] {
+        std::vector<std::uint32_t> out;
+        for (const sim::Ship* o : engine.attack_fleet(p)) {
+            out.push_back(o->id);
+        }
+        return out;
+    };
+    // The strongest takes the troops; the second shells; the supply ship stays on its run.
+    const std::vector<std::uint32_t> second{ships[1].id};
+    CHECK(ids() == second);
+    // With the second on a mission, the troop ship shells alone.
+    p.ships[1].mission = 1;
+    const std::vector<std::uint32_t> alone{ships[0].id};
+    CHECK(ids() == alone);
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).

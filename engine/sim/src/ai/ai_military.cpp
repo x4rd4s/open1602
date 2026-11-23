@@ -1932,6 +1932,21 @@ bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_
                static_cast<std::int32_t>(ft->combat.range8 / 4);
 }
 
+std::vector<Ship*> Engine::attack_fleet(AiPlayer& p) {
+    std::vector<Ship*> landing = landing_ships(p);
+    const Ship* troops = landing.empty() ? nullptr : landing.front();
+    std::vector<Ship*> fleet;
+    for (Ship* o : free_warships(p)) {
+        if (o != troops) {
+            fleet.push_back(o);
+        }
+    }
+    if (fleet.empty() && !landing.empty()) {
+        fleet.push_back(landing.front());
+    }
+    return fleet;
+}
+
 std::vector<Ship*> Engine::free_warships(AiPlayer& p) {
     // The healthy ships with cannons and nothing else to do, no troops aboard: the strongest first,
     // equals in the order of the ships.
@@ -2434,17 +2449,12 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
     if (rivals()) {
         if (const auto beach = landing_beach(p, t)) {
             if (const auto towers = covering_towers(p, t, *beach); !towers.empty()) {
-                std::vector<std::pair<std::uint32_t, Ship*>> armed;
-                for (Ship* o : own_ships(p)) {
-                    if (o->cannons != 0 && healthy(*o)) {
-                        armed.emplace_back(ship_strength(health128(*o), o->cannons), o);
-                    }
-                }
-                std::ranges::stable_sort(armed, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
-                std::vector<Ship*> fleet;
-                for (const auto& [score, o] : armed) {
-                    fleet.push_back(o);
-                }
+                // The fleet shell_towers will have: the warships free then, the troop ship apart
+                // (the first landing ship, as start_attack takes it), or the troop ship itself when
+                // none is. Every armed ship counted, those on supply runs and missions too, it
+                // started attacks shell_towers then called off ("the warships would turn away
+                // first"), every 30 s for one city (gate f24).
+                const std::vector<Ship*> fleet = attack_fleet(p);
                 const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
                 // Or the party that as many ships as it takes bring from home storms them on land
                 // (plan_convoy). Logged when it begins and ends.

@@ -331,6 +331,10 @@ public:
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
+    /// Open1602: the fleet attack_ok weighs the shelling of a city's towers with: the one
+    /// shell_towers will have, the warships free then (free_warships) without the troop ship (the
+    /// first landing ship), or the troop ship alone when none is.
+    [[nodiscard]] std::vector<Ship*> attack_fleet(AiPlayer& p);
     /// Open1602: the ids of the ships a convoy may take, in the order it takes them (landing_ships).
     [[nodiscard]] std::vector<std::uint32_t> landing_ship_ids(AiPlayer& p) {
         std::vector<std::uint32_t> out;
