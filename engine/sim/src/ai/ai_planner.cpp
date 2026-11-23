@@ -3184,18 +3184,18 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             // Open1602: where it grows only half, an improved computer plants it too while its cities
             // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
             // only by ship; when the market ran dry its citizens left, 420 to 133).
-            std::uint16_t price = 0;
             // Lacking now (goods_short), not only once houses rise (goods_ahead): planted early for
             // the next class, half the output at full upkeep slowed the founding of cities (gate
             // f28, l3 g8-606-p3 P0: 3 cities and 1145 inhabitants against 5 and 2842).
             const bool lacking = rivals() && goods_short(p.player, crop.good) != 0;
             // A last resort only (Merlin, 2026-11-23): not while a free island that grows it fully
-            // is open for a colony (fertile_island_open), not while a partner offers enough of it (a
-            // source, and the city has not run dry of it), and only what it can pay now: a
-            // need it cannot afford waits (need()), and a half-fertile plantation out of reach held
-            // the city's planner for hours (gate f27, x3 o4-505-p0 P1: 7,605 such waits).
-            const bool traded =
-                lacking && c->stock(crop.good) != 0 && supply_source(p, home->island, crop.good, &price, home);
+            // is open for a colony (fertile_island_open), not while trade covers it, and only what
+            // it can pay now: a need it cannot afford waits (need()), and a half-fertile plantation
+            // out of reach held the city's planner for hours (gate f27, x3 o4-505-p0 P1).
+            // Trade is not enough once the city has run dry of the good while its people use it
+            // (goods_short): whatever partners sell, it did not arrive. Not before: on any refused
+            // colony it planted from the first hour (probe p17: l3 up to -27 %).
+            const bool traded = lacking && c->stock(crop.good) != 0;
             if (!plants_on(f, lacking, traded, lacking && !traded && fertile_island_open(p, crop.field),
                            lacking && !traded && slot_affordable_now(p, crop.slot))) {
                 continue;
