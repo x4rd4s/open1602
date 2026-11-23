@@ -1216,7 +1216,10 @@ void Engine::missions(AiPlayer& p) {
                         --n.counter;
                         break;
                     }
-                    if (!storms_alone(p, *s, owner)) {
+                    if (storms_alone(p, *s, owner)) {
+                        log(p, "ship %u lands alone: the others still under way, its %u soldiers enough for the towers",
+                            s->id, soldiers_aboard(*s));
+                    } else {
                         log(p,
                             "ship %u calls the convoy's landing off: the others still under way, its %u soldiers "
                             "too few for the towers",
@@ -1403,6 +1406,12 @@ std::vector<Engine::TowerCover> Engine::covering_towers(const AiPlayer& p, const
                            2 * (static_cast<std::int32_t>(isl.y) + beach.second));
 }
 
+// Logged with the towers a decision weighs: how many of them count only as their city has no
+// market or Kontor (F15), so that the gate can tell this lever from the others.
+std::size_t Engine::by_city_rule(const std::vector<TowerCover>& towers) {
+    return static_cast<std::size_t>(std::ranges::count_if(towers, &TowerCover::city_rule));
+}
+
 std::size_t Engine::towers_in_the_way(const AiPlayer& p, const City& c, std::int32_t cx, std::int32_t cy) const {
     return towers_over_way(p, c, cx, cy).size();
 }
@@ -1442,12 +1451,13 @@ std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const
         if (!f || !b.valid() || b.type->destroyed) {
             continue;
         }
-        if (!(towers_only && b.city == c.index) && !std::ranges::any_of(way, [&](const auto& w) {
-                return f->cells.distance(w.first, w.second) <= f->range8 / 4;
-            })) {
+        const bool on_way = std::ranges::any_of(
+            way, [&](const auto& w) { return f->cells.distance(w.first, w.second) <= f->range8 / 4; });
+        if (!on_way && !(towers_only && b.city == c.index)) {
             continue;
         }
         TowerCover t;
+        t.city_rule = !on_way;
         t.x = tw.x;
         t.y = tw.y;
         const std::uint32_t damage = m_sim.military().building_damage(tw.island, tw.x, tw.y);
@@ -1602,8 +1612,10 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
     // party too small for them died without taking a city (gate f17: 27 of 27).
     const std::uint32_t param = city_param(t);
     const auto call_off = [&](const char* why, std::uint64_t loss, std::uint64_t gain) {
-        log(p, "ship %u calls the landing under %zu towers of city %u/%u off: %s (loss %llu, gain %llu)", s.id,
-            towers.size(), t.island, t.index, why, static_cast<unsigned long long>(loss),
+        log(p,
+            "ship %u calls the landing under %zu towers (%zu by no market or Kontor) of city %u/%u off: %s (loss "
+            "%llu, gain %llu)",
+            s.id, towers.size(), by_city_rule(towers), t.island, t.index, why, static_cast<unsigned long long>(loss),
             static_cast<unsigned long long>(gain));
         mission_end(p, s, n);
     };
@@ -1656,9 +1668,10 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
         if (needs <= party.size()) {
             for (Ship* o : convoy) {
                 log(p,
-                    "ship %u storms the %zu towers of city %u/%u with %zu soldiers in %zu ships (needs %zu, %zu "
-                    "without the walk): %s",
-                    o->id, towers.size(), t.island, t.index, party.size(), convoy.size(), needs, plain, plan.refusal);
+                    "ship %u storms the %zu towers (%zu by no market or Kontor) of city %u/%u with %zu soldiers in "
+                    "%zu ships (needs %zu, %zu without the walk): %s",
+                    o->id, towers.size(), by_city_rule(towers), t.island, t.index, party.size(), convoy.size(), needs,
+                    plain, plan.refusal);
                 ship_send(p, *o, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
             }
             return;
@@ -2387,15 +2400,17 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                         m_skips_logged.push_back(key);
                         if (needs == SIZE_MAX) {
                             log(p,
-                                "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
-                                "no party at home that harms them (%zu soldiers)",
-                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", has);
+                                "skips city %u/%u: its %zu towers (%zu by no market or Kontor) over the landing "
+                                "out of the fleet's reach (%s), no party at home that harms them (%zu soldiers)",
+                                t.island, t.index, towers.size(), by_city_rule(towers),
+                                plan.refusal != nullptr ? plan.refusal : "", has);
                         } else {
                             log(p,
-                                "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
-                                "a party would need %zu soldiers (%zu without the walk), has %zu",
-                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", needs,
-                                cv.plain, has);
+                                "skips city %u/%u: its %zu towers (%zu by no market or Kontor) over the landing "
+                                "out of the fleet's reach (%s), a party would need %zu soldiers (%zu without the "
+                                "walk), has %zu",
+                                t.island, t.index, towers.size(), by_city_rule(towers),
+                                plan.refusal != nullptr ? plan.refusal : "", needs, cv.plain, has);
                         }
                     }
                     return false;

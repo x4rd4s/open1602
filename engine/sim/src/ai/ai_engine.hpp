@@ -1078,7 +1078,10 @@ private:
         std::uint32_t health = 0;  ///< what is left of the building
         std::uint32_t threat = 0;  ///< its fire, 1/32 HP per second
         std::uint64_t value = 0;   ///< its build value, gold
+        bool city_rule = false;    ///< counted only as its city has no market or Kontor (F15), logged
     };
+    /// Open1602: how many of `towers` count only by the no-market-or-Kontor rule, for the logs.
+    [[nodiscard]] static std::size_t by_city_rule(const std::vector<TowerCover>& towers);
     /// Open1602: the straight way of cells from (cx, cy) to the market or Kontor of `c`.
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> way_to(const City& c, std::int32_t cx,
                                                                             std::int32_t cy) const;
