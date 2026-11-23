@@ -1958,6 +1958,9 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
                 }
                 const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
                 if (plan.ships == 0) {
+                    // A stopgap until parties are sized to take such towers on land.
+                    log(p, "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s)", t.island,
+                        t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "");
                     return false;
                 }
             }
