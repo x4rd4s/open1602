@@ -1080,6 +1080,9 @@ private:
                                                                             std::int32_t cy) const;
     /// Open1602 (3b): the hostile towers whose reach covers the landing at `beach` or the way
     /// from it to the city, the nearest first.
+    /// Open1602: covering_towers() for the way from cell (cx, cy).
+    [[nodiscard]] std::vector<TowerCover> towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
+                                                          std::int32_t cy) const;
     [[nodiscard]] std::vector<TowerCover> covering_towers(const AiPlayer& p, const City& c,
                                                           std::pair<std::int32_t, std::int32_t> beach) const;
     /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that
@@ -1096,7 +1099,14 @@ private:
                                          const std::vector<Ship*>& fleet, const Ship* troops) const;
     /// Open1602 (3b): shells `towers` while troop ship `s` waits, waits for a warship, or calls the
     /// landing off; always handles the landing.
-    void shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers);
+    void shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers,
+                      std::pair<std::int32_t, std::int32_t> beach);
+    /// Open1602: how many of a party (red figure, health, 0 full) it takes to wreck `towers` of
+    /// city `c` on land, against their fire and that of the hostile soldiers on the island: the
+    /// party loses a unit to that fire every unit's health in turn, and fires till then. SIZE_MAX
+    /// when the party does no harm.
+    [[nodiscard]] std::size_t storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
+                                          const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units) const;
     /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
     /// water nearest to it (water_near), within its Shotradius.
     [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;

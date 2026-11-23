@@ -360,8 +360,8 @@ TEST_CASE("ai landing: an improved computer shoots trees behind the beach open t
 TEST_CASE("ai landing: an improved computer has a warship shell the tower over the beach before it lands") {
     // Step 3b: the beach and the way inland lie within reach of the human's towers. With a warship
     // lying idle, it shells them while the troops wait aboard, when the towers' value is more than
-    // the ship they would sink; with none the troop ship does. Towers no ship can wreck, the
-    // computer lands no party under.
+    // the ship they would sink; with none the troop ship does. Under towers no ship can wreck the
+    // computer lands only a party big enough to storm them.
     const std::vector<std::pair<std::int32_t, std::int32_t>> on_beach = {{2, 5}, {2, 22}};
     const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole,
                          const std::vector<std::pair<std::int32_t, std::int32_t>>& spots) {
@@ -434,8 +434,12 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     CHECK(towers == 2);
     CHECK(whole);
     // A tower inland over the way to the market, beyond the ships' range from any water: no ship
-    // sails up to it, and no party lands under it.
-    CHECK(!play(true, "1.0", towers, whole, {{10, 10}}));
+    // sails up to it. A party big enough to wreck it on land lands under it and storms it.
+    CHECK(play(true, "1.0", towers, whole, {{10, 10}}));
+    CHECK(towers == 1);
+    CHECK(whole);
+    // One too strong for the soldiers a ship takes: no party lands under it.
+    CHECK(!play(true, "40.0", towers, whole, {{10, 10}}));
     CHECK(towers == 1);
     CHECK(whole);
 }

@@ -27,3 +27,6 @@ kLandingLogMs | engine/sim/src/ai/ai_military.cpp | derived from: one minute of 
 60'000 | engine/sim/src/ai/ai_military.cpp | derived from: kLandingLogMs, one minute of game time as the landing-party log's sampling period (only the log)
 1000 | engine/sim/src/ai/ai_military.cpp | derived from: milliseconds per second, turning a ship's fire per Worktime (work_time_ms) into fire per second, the unit of a tower's threat (Combat::Fighter::threat), in shell_towers
 128 | engine/sim/src/ai/ai_logistics.cpp | derived from: the scale of health128 (health * 128 / max), whose kHealthy line hull_to_spare turns back into the ship's health
+8 | engine/sim/src/ai/ai_military.cpp | derived from: the 8 tiles around the home Kontor within which soldiers_near finds the soldiers a troop ship boards (mission 5, board), the same range in attack_ok's party for storm_needs
+8.0 | engine/sim/src/ai/ai_military.cpp | derived from: the root of k (k + 1) / 2 = q, k = (sqrt(8 q + 1) - 1) / 2, in storm_needs
+2.0 | engine/sim/src/ai/ai_military.cpp | derived from: the root of k (k + 1) / 2 = q, k = (sqrt(8 q + 1) - 1) / 2, in storm_needs
