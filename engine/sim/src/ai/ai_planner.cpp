@@ -3162,6 +3162,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         if (!crop.eligible) {
             continue;
         }
+        bool half = false;  // grows half here, planted for a dry market
         if (const std::uint32_t f = fertility(c->island, crop.field); !plants_on(f, false, true)) {
             // Open1602: where it grows only half, an improved computer plants it too while its cities
             // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
@@ -3171,8 +3172,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             if (!plants_on(f, lacking, lacking && supply_source(p, home->island, crop.good, &price, home))) {
                 continue;
             }
-            log(p, "city %u/%u: plants field ware %u on half-fertile land, no partner offers ware %u", c->island,
-                c->index, crop.field, crop.good);
+            half = true;
         }
         if (crop.slot == kSlotWine) {
             wine_island = true;
@@ -3195,6 +3195,10 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             continue;
         }
         if (need(p, crop.slot, want)) {
+            if (half) {
+                log(p, "city %u/%u: plants field ware %u on half-fertile land, no partner offers ware %u", c->island,
+                    c->index, crop.field, crop.good);
+            }
             return true;
         }
         if (exclusive && crop.slot != kSlotSugar) {
