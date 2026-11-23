@@ -494,7 +494,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   the walk through the towers' reach to its own, under their fire before it can shoot: the
   shortest walk over open land from the beach (the straight line where none leads there, as
   through a forest), at the land's `Wegspeed`. It does not count the units slowing each other
-  down, so it still expects the walk to be shorter than it is. A troop ship whose soldiers are too few calls the landing off and
+  down, so it still expects the walk to be shorter than it is.
+  A city with no market and no Kontor standing falls with its towers, which its soldiers go for
+  wherever they stand: then all its towers count as over the landing, whether or not they cover
+  the beach or a way. A troop ship whose soldiers are too few calls the landing off and
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
 

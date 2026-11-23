@@ -1391,6 +1391,23 @@ std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const
     if (way.empty()) {
         way.emplace_back(cx, cy);
     }
+    // Open1602 (F15): a city with no market and no Kontor standing is taken by its towers
+    // (tower_goals), so every tower of it lies in the way.
+    bool towers_only = false;
+    if (rivals()) {
+        bool standing = std::ranges::any_of(m_world.productions(), [&](const Production& pr) {
+            if (!pr.used || pr.island != c.island) {
+                return false;
+            }
+            const Tile tt = tile(c.island, pr.x, pr.y);
+            return tt.valid() && tt.city == c.index && tt.prod == prod::kMarket && !tt.type->destroyed;
+        });
+        if (!standing && c.warehouse_x && c.warehouse_y) {
+            const Tile k = tile(c.island, *c.warehouse_x, *c.warehouse_y);
+            standing = k.valid() && !k.type->destroyed && k.type->kind == kind::kHq;
+        }
+        towers_only = !standing;
+    }
     std::vector<std::pair<std::int32_t, TowerCover>> found;  // distance, tower
     for (const Tower& tw : m_world.towers()) {
         if (tw.island != c.island || !m_world.diplomacy().hostile(p.player, tw.owner)) {
@@ -1398,7 +1415,10 @@ std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const
         }
         const auto f = combat.fighter(Target::building(tw.island, tw.x, tw.y));
         const Tile b = tile(tw.island, tw.x, tw.y);
-        if (!f || !b.valid() || b.type->destroyed || !std::ranges::any_of(way, [&](const auto& w) {
+        if (!f || !b.valid() || b.type->destroyed) {
+            continue;
+        }
+        if (!(towers_only && b.city == c.index) && !std::ranges::any_of(way, [&](const auto& w) {
                 return f->cells.distance(w.first, w.second) <= f->range8 / 4;
             })) {
             continue;
