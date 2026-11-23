@@ -26,3 +26,4 @@ kBrokeCash | engine/sim/src/ai/ai_strategy.cpp | derived from: the 2000 gold of 
 kLandingLogMs | engine/sim/src/ai/ai_military.cpp | derived from: one minute of game time, the sampling period of the landing-party log of the landing troops plan (only the log, no effect on play)
 60'000 | engine/sim/src/ai/ai_military.cpp | derived from: kLandingLogMs, one minute of game time as the landing-party log's sampling period (only the log)
 1000 | engine/sim/src/ai/ai_military.cpp | derived from: milliseconds per second, turning a ship's fire per Worktime (work_time_ms) into fire per second, the unit of a tower's threat (Combat::Fighter::threat), in shell_towers
+128 | engine/sim/src/ai/ai_logistics.cpp | derived from: the scale of health128 (health * 128 / max), whose kHealthy line hull_to_spare turns back into the ship's health
