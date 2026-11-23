@@ -467,6 +467,20 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   trees and walls where they can reach none. With the markets and the Kontor gone, a city with a
   tower is still defended and cannot be taken over: they go for its towers then, all of them for
   the nearest one, before its houses.
+- **Towers over the beach.** A landing goes to the beach farthest from the city's towers, soldiers
+  and ships. An improved computer then looks at the hostile towers whose own range (their
+  `Shotradius`) covers the landing cell or the straight way from it to the market or Kontor. Those
+  its warships can reach, from the open water nearest to each and within the ships' own
+  `Shotradius`, it shells first, while the troops wait aboard at home. It sends as many free
+  warships (healthy, with cannons, no troops aboard) as it takes, the strongest first. The fire
+  they take counts every hostile tower that reaches the water they shoot from, the coast's too.
+  Each ship turns for the yard once it is no longer healthy, so a fleet goes only when what its
+  ships can spare outlasts the shelling. It goes only when that pays in gold, too: the towers'
+  build value, and the soldiers aboard (their cost by the `Soldat:` line) when no covering tower
+  is left, must be worth more than the price of the ships the towers' fire would sink. A ship
+  still sailing up to its tower spends no try. With no tower in reach, no warship free, no fleet
+  strong enough, when it does not pay, or after the tries, the troops land under the towers as
+  before.
 
 ## Ships, ways and colonies
 

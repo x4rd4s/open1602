@@ -1411,8 +1411,9 @@ void Engine::task_survey(AiPlayer& p) {
         const bool other =
             std::ranges::any_of(finds.mines, [&](const SurveyFinds::Mine& o) { return o.slot == m.slot && o.fetched; });
         if (!m.fetched && !other && r->slots[m.slot].fail_level < 2) {
-            log(p, "city %u/%u: no cart fetches from the mine at %d,%d", r->island, r->city, m.x, m.y);
-            (void)claim_land(p, m.slot, m.x, m.y);
+            if (claim_land(p, m.slot, m.x, m.y)) {
+                log(p, "city %u/%u: no cart fetches from the mine at %d,%d", r->island, r->city, m.x, m.y);
+            }
             break;
         }
     }
