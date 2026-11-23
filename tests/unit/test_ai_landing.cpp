@@ -690,6 +690,57 @@ TEST_CASE("ai landing: an improved computer starts no attack its landing would e
     }
 }
 
+TEST_CASE("ai landing: an improved computer starts no attack whose shelling would not pay") {
+    // attack_ok asked only whether some fleet finishes the shelling; shell_towers then refused one
+    // that does not pay (a ship of 1000 sunk for a tower worth 300) and, with no party enough to
+    // storm it, called the landing off, and attack_ok sent the ship again. attack_ok now weighs the
+    // shelling as shell_towers will, and skips the city.
+    Coast a;
+    a.figures = make_figures(true, "30.0");
+    a.build(kKontor, 28, 14, kComputer, 0);
+    a.build(kMarket, 18, 14, kComputer, 0);
+    a.build(kKontor, 0, 14, kHuman, 1);
+    a.build(kMarket, 6, 6, kHuman, 1);
+    for (std::int32_t k = 0; k < 4; ++k) {
+        a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+    }
+    for (const auto& [x, y] : std::vector<std::pair<int, int>>{{2, 5}, {2, 22}}) {
+        REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
+        sim::Tower tw;
+        tw.island = 1;
+        tw.x = static_cast<std::uint16_t>(x);
+        tw.y = static_cast<std::uint16_t>(y);
+        tw.owner = kHuman;
+        tw.figure = 38;  // KANONTURM
+        a.world.towers().push_back(tw);
+    }
+    for (std::int32_t k = 0; k < 6; ++k) {
+        a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+    }
+    for (std::uint32_t k = 0; k < 7; ++k) {  // a troop ship and six warships, which finish losing one
+        sim::Ship ship = sim::make_ship("Ship", 41, 15 + 5 * k, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        a.world.add_ship(ship);
+    }
+    REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+    a.world.island(1).discover(kComputer);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    p.home_valid = true;
+    p.home_island = 0;
+    p.home_city = 0;
+    for (const sim::Ship& ship : a.world.ships()) {
+        sim::ai::ShipNote n;
+        n.id = ship.id;
+        p.ships.push_back(n);
+    }
+    CHECK(!engine.attack_ok_for(p, *a.world.city(1, 1)));
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).
