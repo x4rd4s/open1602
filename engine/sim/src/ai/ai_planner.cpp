@@ -608,8 +608,9 @@ void Engine::shed_producers(AiPlayer& p, City& c) {
         }
         const assets::BuildingType* b = m_buildings.by_sprite(cell.sprite);
         if (b == nullptr || !may_shed(*b, soon)) {
-            if (b != nullptr && may_shed(*b, unsold)) {
-                ++selling;
+            if (b != nullptr && b->ware != 0 && soon[b->ware] && !unsold[b->ware] &&
+                (may_shed(*b, unsold) || b->prod_kind == prod::kFarm)) {
+                ++selling;  // a farm too: kept standing by the sale before its fields keep it
             } else if (b != nullptr && b->prod_kind == prod::kFarm && b->ware != 0 && !soon[b->ware]) {
                 ++farms;
             }
