@@ -2803,6 +2803,11 @@ void Engine::peacetime_orders(AiPlayer& a, std::uint16_t island) {
     }
 }
 
+bool Engine::may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
+                          std::int32_t budget) noexcept {
+    return money > 0 && ((below_core && next <= civil) || std::int64_t{next} * 4 <= std::int64_t{budget} * 3);
+}
+
 bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<PlayerId>& enemies) {
     bool ordered = false;
     // A hostile city: the group with the most soldiers goes for its markets, its Kontor,
