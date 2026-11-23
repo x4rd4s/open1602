@@ -488,8 +488,8 @@ bool Engine::may_shed(const assets::BuildingType& b, const WareSet& keep) noexce
            b.prod_kind != prod::kFarm;
 }
 
-bool Engine::plants_on(std::uint32_t fertility, bool lacking, bool for_sale, bool pays) noexcept {
-    return fertility == 128 || (fertility != 0 && lacking && !for_sale && pays);
+bool Engine::plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony, bool pays) noexcept {
+    return fertility == 128 || (fertility != 0 && lacking && !traded && !colony && pays);
 }
 
 Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) const {
@@ -3180,7 +3180,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             continue;
         }
         bool half = false;  // grows half here, planted for a dry market
-        if (const std::uint32_t f = fertility(c->island, crop.field); !plants_on(f, false, true, false)) {
+        if (const std::uint32_t f = fertility(c->island, crop.field); !plants_on(f, false, true, true, false)) {
             // Open1602: where it grows only half, an improved computer plants it too while its cities
             // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
             // only by ship; when the market ran dry its citizens left, 420 to 133).
@@ -3189,11 +3189,15 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             // the next class, half the output at full upkeep slowed the founding of cities (gate
             // f28, l3 g8-606-p3 P0: 3 cities and 1145 inhabitants against 5 and 2842).
             const bool lacking = rivals() && goods_short(p.player, crop.good) != 0;
-            // Only what it can pay now: a need it cannot afford waits (need()), and a half-fertile
-            // plantation out of reach held the city's planner for hours (gate f27, x3 o4-505-p0 P1:
-            // 7,605 such waits at 33..101 gold).
-            if (!plants_on(f, lacking, lacking && supply_source(p, home->island, crop.good, &price, home),
-                           lacking && slot_affordable_now(p, crop.slot))) {
+            // A last resort only (Merlin, 2026-11-23): not while a free island that grows it fully
+            // is open for a colony (fertile_island_open), not while a partner offers enough of it (a
+            // source, and the city has not run dry of it), and only what it can pay now: a
+            // need it cannot afford waits (need()), and a half-fertile plantation out of reach held
+            // the city's planner for hours (gate f27, x3 o4-505-p0 P1: 7,605 such waits).
+            const bool traded =
+                lacking && c->stock(crop.good) != 0 && supply_source(p, home->island, crop.good, &price, home);
+            if (!plants_on(f, lacking, traded, lacking && !traded && fertile_island_open(p, crop.field),
+                           lacking && !traded && slot_affordable_now(p, crop.slot))) {
                 continue;
             }
             half = true;

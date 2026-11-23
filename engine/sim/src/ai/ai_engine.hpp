@@ -351,11 +351,12 @@ public:
     /// plantation again once the ware sells or is wanted (gate f25, g4-202 P1).
     [[nodiscard]] static bool may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept;
     /// Whether a luxury crop is planted on an island of `fertility` (island_fertility): where it
-    /// grows fully; where it grows half only while the computer's cities lack its good now
-    /// (`lacking`, goods_short) and no partner offers it (`for_sale`), as a player plants it when
-    /// the market runs dry, and only when it can pay for it now (`pays`): one it cannot afford
-    /// would hold the planner.
-    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool for_sale, bool pays) noexcept;
+    /// grows fully; where it grows half only as a last resort: while the computer's cities lack
+    /// its good now (`lacking`, goods_short), trade does not cover it (`traded`: a partner offers
+    /// it and the city has not run dry), no island that grows it fully is open for a colony
+    /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
+    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
+                                        bool pays) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -582,6 +583,9 @@ private:
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
     /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
     [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
+    /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
+    /// colony for the crop has room there.
+    [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;
     /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
     [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);

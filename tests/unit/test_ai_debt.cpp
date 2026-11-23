@@ -92,14 +92,16 @@ TEST_CASE("ai debt: a farm with fields only goes off; other producers of a ware 
     CHECK(!Engine::may_shed(producer(assets::prod::kWorkshop, 0), keep));
 }
 
-TEST_CASE("ai luxury: a crop on half-fertile land only while its good is lacking and nobody offers it") {
+TEST_CASE("ai luxury: a crop on half-fertile land only as the last resort") {
     // Gate f26, g4-202 P3: its tobacco goods came only by ship from partners; when none offered
-    // them its citizens left (420 to 133). Its second island grows tobacco half.
-    CHECK(Engine::plants_on(128, false, true, false));  // fully fertile: as before
-    CHECK(Engine::plants_on(64, true, false, true));    // half, lacking, the market dry, paid
-    CHECK(!Engine::plants_on(64, true, true, true));    // a partner offers it: bought
-    CHECK(!Engine::plants_on(64, false, false, true));  // not lacking
-    CHECK(!Engine::plants_on(0, true, false, true));    // it does not grow there
+    // them its citizens left (420 to 133). Its second island grows tobacco half. Merlin: only when
+    // no fertile island is open and trade is not enough.
+    CHECK(Engine::plants_on(128, false, true, true, false));   // fully fertile: as before
+    CHECK(Engine::plants_on(64, true, false, false, true));    // half: lacking, no trade, no colony, paid
+    CHECK(!Engine::plants_on(64, true, true, false, true));    // trade covers it: bought
+    CHECK(!Engine::plants_on(64, true, false, true, true));    // a fertile island is open: a colony
+    CHECK(!Engine::plants_on(64, false, false, false, true));  // not lacking
+    CHECK(!Engine::plants_on(0, true, false, false, true));    // it does not grow there
     // Gate f27: one it cannot pay now waited in need() on every planner step, for hours.
-    CHECK(!Engine::plants_on(64, true, false, false));
+    CHECK(!Engine::plants_on(64, true, false, false, false));
 }
