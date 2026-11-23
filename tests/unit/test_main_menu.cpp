@@ -22,6 +22,7 @@
 #include "o1602/assets/text_table.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/world.hpp"
+#include "o1602/ui/localization.hpp"
 
 using namespace o1602;
 using app::MainMenu;
@@ -224,6 +225,26 @@ TEST_CASE("main menu: the button Updates bottom right opens the screen Updates")
     }
     CHECK(menu.back());
     CHECK(menu.screen() == MainMenu::Screen::Base);
+}
+
+TEST_CASE("main menu: the version stands bottom right beside the button Updates, only once it is set") {
+    Game g("o1602-test-menu-version", {});
+    MainMenu menu(*g.dir, &g.texts);
+    REQUIRE(menu.usable());
+    const std::string line = ui::tr("menu.version", {"1.2.3"});
+    CHECK(!shows(menu, line));
+    menu.set_version("1.2.3");
+    CHECK(menu.version() == "1.2.3");
+    bool found = false;
+    for (const ui::DrawItem& d : menu.draw(kNoFonts)) {
+        if (d.kind == ui::DrawItem::Kind::Text && d.text == line) {
+            found = true;
+            CHECK(d.align == ui::Align::Right);
+            CHECK(d.x < 840);  // left of the button "Updates"
+            CHECK(d.y > 729);  // on its line, below the picture frame
+        }
+    }
+    CHECK(found);
 }
 
 TEST_CASE("main menu: the History Edition's Options button opens the settings window, the others count one further") {

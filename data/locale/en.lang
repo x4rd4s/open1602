@@ -2118,6 +2118,8 @@ editor.nothing = Nothing to undo
 menu.updates = Updates
 # {1}: the newer version
 menu.update_available = Update {1}
+# {1}: this program's version, beside the button "Updates"
+menu.version = Open1602 {1}
 update.title = Updates
 update.hint = Open1602 looks for new versions on its GitHub page. Saved games, settings and mods stay as they are.
 update.installed = Installed version
