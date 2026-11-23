@@ -2487,6 +2487,8 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
             }
         }
         if (!gather.soldiers.empty()) {
+            log(p, "gathers %zu soldiers at the Kontor for the attack on city %u/%u", gather.soldiers.size(), t.island,
+                t.index);
             execute(gather);
         }
     }
