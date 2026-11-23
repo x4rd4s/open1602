@@ -3185,7 +3185,10 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
             // only by ship; when the market ran dry its citizens left, 420 to 133).
             std::uint16_t price = 0;
-            const bool lacking = rivals() && goods_ahead(p.player, crop.good) != 0;
+            // Lacking now (goods_short), not only once houses rise (goods_ahead): planted early for
+            // the next class, half the output at full upkeep slowed the founding of cities (gate
+            // f28, l3 g8-606-p3 P0: 3 cities and 1145 inhabitants against 5 and 2842).
+            const bool lacking = rivals() && goods_short(p.player, crop.good) != 0;
             // Only what it can pay now: a need it cannot afford waits (need()), and a half-fertile
             // plantation out of reach held the city's planner for hours (gate f27, x3 o4-505-p0 P1:
             // 7,605 such waits at 33..101 gold).
