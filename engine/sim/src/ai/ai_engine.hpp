@@ -334,6 +334,14 @@ public:
         std::size_t convoy = 1;
         return attack_ok(p, t, convoy);
     }
+    /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
+    /// it: below its core army while its civil income carries that, beyond it within three
+    /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
+    /// on credit and the upkeep took half the civil income (gate f24, l3 g12-404-p3 P7).
+    [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
+                                           std::int32_t budget) noexcept {
+        return money > 0 && ((below_core && next <= civil) || std::int64_t{next} * 4 <= std::int64_t{budget} * 3);
+    }
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.

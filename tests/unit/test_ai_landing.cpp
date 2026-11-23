@@ -831,6 +831,63 @@ TEST_CASE("ai landing: a shelling that leaves a tower the party cannot storm sta
     CHECK(!called_off);
 }
 
+TEST_CASE("ai landing: a ship that comes late lands its soldiers to join those ashore") {
+    // Gate f24: a convoy's slow ship reached the city after the others had stormed it; alone it was
+    // too few for the towers and turned home with its 4 soldiers. With soldiers of the computer's
+    // already ashore it lands them as reinforcements; with none it calls the landing off as before.
+    for (const bool ashore : {true, false}) {
+        Coast a;
+        a.figures = make_figures(true, "30.0");
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (const auto& [x, y] : std::vector<std::pair<int, int>>{{2, 5}, {2, 22}}) {
+            REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
+            sim::Tower tw;
+            tw.island = 1;
+            tw.x = static_cast<std::uint16_t>(x);
+            tw.y = static_cast<std::uint16_t>(y);
+            tw.owner = kHuman;
+            tw.figure = 38;  // KANONTURM
+            a.world.towers().push_back(tw);
+        }
+        if (ashore) {
+            a.add(kComputer, 2 * (60 + 20), 2 * (10 + 25), 1);
+        }
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        for (std::size_t h = 0; h < 4; ++h) {
+            ship.cargo[h].ware = assets::unit_ware(kSword);
+            ship.cargo[h].amount = sim::kHoldCapacity;
+        }
+        ship.order = sim::Target::position(41, 15);  // arrived at home
+        a.world.add_ship(ship);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        sim::ai::ShipNote n;
+        n.id = a.world.ships().back().id;
+        n.mission = 6;
+        n.counter = 10;
+        n.param = (1U << 8) | 1U;  // city 1 on island 1
+        p.ships.push_back(n);
+        engine.run_missions(p);
+        CHECK((p.ships.front().mission == sim::ai::kMissionLanding) == ashore);
+    }
+}
+
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
     // A ship at a quarter of its health. The yard calls such a ship in even on a mission, and an
     // attack that took it straight back kept it from both (every 10 s).

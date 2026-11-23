@@ -851,9 +851,8 @@ void Engine::recruit(AiPlayer& p) {
         }
     }
     const std::int32_t next = upkeep + unit_upkeep_estimate(p);
-    const bool can_add =
-        !pays || (!training && ((weighted_army(p.player) < core && player(p).money > 0 && next <= civil_income(p)) ||
-                                std::int64_t{next} * 4 <= std::int64_t{army_budget(p)} * 3));
+    const bool can_add = !pays || (!training && may_add_unit(weighted_army(p.player) < core, player(p).money, next,
+                                                             civil_income(p), army_budget(p)));
     // A tower beside the market (cannons from the city: 2 t in the home city, 1 t elsewhere).
     const bool home = p.home_valid && p.home_island == c->island && p.home_city == c->index;
     const std::uint32_t cannons_needed = home ? 0x41U : 0x20U;
@@ -1635,6 +1634,17 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
     // party too small for them died without taking a city (gate f17: 27 of 27).
     const std::uint32_t param = city_param(t);
     const auto call_off = [&](const char* why, std::uint64_t loss, std::uint64_t gain) {
+        // Open1602: soldiers of the computer's already ashore there, the party of this attack that
+        // landed before, get the ship's as reinforcements, as a player lands them; a ship of a
+        // convoy that came late turned home with them (gate f24: 4 soldiers, 400 s after the
+        // others had stormed).
+        if (const std::uint32_t ashore = soldiers_on_island(p.player, t.island);
+            ashore != 0 && soldiers_aboard(s) != 0) {
+            log(p, "ship %u lands its %u soldiers to join the %u ashore on island %u (instead of: %s)", s.id,
+                soldiers_aboard(s), ashore, t.island, why);
+            ship_send(p, s, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
+            return;
+        }
         log(p,
             "ship %u calls the landing under %zu towers (%zu by no market or Kontor) of city %u/%u off: %s (loss "
             "%llu, gain %llu)",

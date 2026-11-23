@@ -420,6 +420,18 @@ TEST_CASE("ai military: a computer with a castle and a sword smith trains swords
     }
 }
 
+TEST_CASE("ai military: an improved computer in debt adds no unit, by its budget neither") {
+    // Gate f24: P7 refilled its army after a lost landing, ten units, the first at gold -686 by its
+    // army budget, and slid into debt with its upkeep at half its civil income.
+    using sim::ai::Engine;
+    CHECK(Engine::may_add_unit(true, 100, 50, 60, 0));     // the core, carried by the civil income
+    CHECK(!Engine::may_add_unit(true, 100, 70, 60, 0));    // not carried
+    CHECK(Engine::may_add_unit(false, 100, 270, 0, 366));  // within the budget
+    CHECK(!Engine::may_add_unit(false, 100, 280, 0, 366));
+    CHECK(!Engine::may_add_unit(false, -686, 270, 0, 366));  // in debt
+    CHECK(!Engine::may_add_unit(true, 0, 50, 60, 0));
+}
+
 TEST_CASE("ai military: a computer trains soldiers of a package of the kind it wants too") {
     Island a;
     // Pikemen of a package: swordsmen by their kind, with more health.
