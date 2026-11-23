@@ -516,6 +516,15 @@ TEST_CASE("ai landing: a convoy takes an empty armed supply ship off its route, 
     }
     const std::vector<std::uint32_t> want{ships[1].id, ships[0].id};
     CHECK(engine.landing_ship_ids(p) == want);
+    // Its run brings tools the city lacks (supply_urgency, as the supply logic weighs it): it stays
+    // on its route, so that the city's supply does not stop for the attack.
+    sim::Ship* first = a.world.ship(ships[0].id);
+    REQUIRE(first != nullptr);
+    first->route.stops[0].target = sim::Target::city_of(0, 0);
+    first->route.stops[0].entries[0] = sim::RouteEntry{a.buildings.materials().tools, true, 50 * 32};
+    REQUIRE(a.world.city(0, 0)->stock(a.buildings.materials().tools) == 0);
+    const std::vector<std::uint32_t> armed{ships[1].id};
+    CHECK(engine.landing_ship_ids(p) == armed);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

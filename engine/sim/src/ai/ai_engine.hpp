@@ -1143,6 +1143,9 @@ private:
     /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
     /// armed), the strongest first.
     [[nodiscard]] std::vector<Ship*> landing_ships(AiPlayer& p);
+    /// Open1602: whether a ware a supply ship's route brings to a city of the computer's runs out
+    /// there within kHomeFirstMinutes (supply_urgency), so that the ship stays on it.
+    [[nodiscard]] bool supply_run_urgent(const AiPlayer& p, const Ship& s) const;
     /// Open1602: whether the soldiers aboard `s`, off an island of `owner`, are enough alone to
     /// storm the towers over their way to a city there (storm_needs).
     [[nodiscard]] bool storms_alone(const AiPlayer& p, const Ship& s, PlayerId owner);

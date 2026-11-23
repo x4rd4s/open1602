@@ -2256,7 +2256,7 @@ std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
         const auto it = std::ranges::find(p.ships, s->id, &ShipNote::id);
         if (it == p.ships.end() || !it->supply || it->mission != 0 || s->id == p.settle.ship || s->held ||
             s->cannons == 0 || !healthy(*s) || free_holds(*s) != usable_holds(*s, *m_sim.m_figures) ||
-            free_holds(*s) < kLandingHolds) {
+            free_holds(*s) < kLandingHolds || supply_run_urgent(p, *s)) {
             continue;
         }
         const std::uint32_t score = ship_strength(health128(*s), s->cannons);
@@ -2273,6 +2273,29 @@ std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
         out.push_back(s);
     }
     return out;
+}
+
+bool Engine::supply_run_urgent(const AiPlayer& p, const Ship& s) const {
+    // The supply logic's own test (supply_destination): a ware that lasts a city less than
+    // kHomeFirstMinutes; the gate L-g12-909 P8 lost a city when its supply stopped.
+    for (const RouteStop& stop : s.route.stops) {
+        if (stop.target.kind != Target::Kind::City) {
+            continue;
+        }
+        const City* c = city(stop.target.island, stop.target.city);
+        if (c == nullptr || c->owner != p.player) {
+            continue;
+        }
+        std::uint32_t target = 0;
+        (void)supply_wares(p, *c, &target);
+        for (const RouteEntry& e : stop.entries) {
+            if (e.unload && e.ware != 0 &&
+                supply_urgency(*c, e.ware, target) < std::uint64_t{kHomeFirstMinutes} * 256) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City& home,
@@ -2485,6 +2508,17 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
                 ships.push_back(o);
                 log(p, "ship %u joins the attack on city %u/%u (convoy of %zu)%s", o->id, t.island, t.index, convoy,
                     note(p, o->id).supply ? ", leaving its supply route" : "");
+                if (note(p, o->id).supply) {
+                    // Logged for the gate's rule 3: the run it leaves, stop by stop.
+                    for (const RouteStop& stop : o->route.stops) {
+                        for (const RouteEntry& e : stop.entries) {
+                            if (stop.target.kind == Target::Kind::City && e.unload && e.ware != 0) {
+                                log(p, "supply run of ship %u skipped for the attack: ware %u to city %u/%u", o->id,
+                                    e.ware, stop.target.island, stop.target.city);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
