@@ -1103,10 +1103,11 @@ private:
                       std::pair<std::int32_t, std::int32_t> beach);
     /// Open1602: how many of a party (red figure, health, 0 full) it takes to wreck `towers` of
     /// city `c` on land, against their fire and that of the hostile soldiers on the island: the
-    /// party loses a unit to that fire every unit's health in turn, and fires till then. SIZE_MAX
-    /// when the party does no harm.
+    /// party loses a unit to that fire every unit's health in turn, and fires till then, after its
+    /// walk from cell `from` (the beach) through their reach. SIZE_MAX when the party does no harm.
     [[nodiscard]] std::size_t storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
-                                          const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units) const;
+                                          const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units,
+                                          std::pair<std::int32_t, std::int32_t> from) const;
     /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
     /// water nearest to it (water_near), within its Shotradius.
     [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;
@@ -1121,6 +1122,9 @@ private:
     /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
     /// armed), the strongest first.
     [[nodiscard]] std::vector<Ship*> landing_ships(AiPlayer& p);
+    /// Open1602: whether the soldiers aboard `s`, off an island of `owner`, are enough alone to
+    /// storm the towers over their way to a city there (storm_needs).
+    [[nodiscard]] bool storms_alone(const AiPlayer& p, const Ship& s, PlayerId owner);
     /// Open1602: the fewest of `ships`, the first first, whose holds take a party from `home` big
     /// enough to storm `towers` of `t` (storm_needs); `ships` 0 when none is, with the last needs
     /// and party size.
@@ -1130,7 +1134,8 @@ private:
         std::size_t has = 0;
     };
     [[nodiscard]] Convoy plan_convoy(const AiPlayer& p, const City& t, const City& home,
-                                     const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships);
+                                     const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,
+                                     std::pair<std::int32_t, std::int32_t> from);
     void raid_outpost(AiPlayer& p, const City& t);
     void target_scan(AiPlayer& p);
     [[nodiscard]] std::vector<PlayerId> island_enemies(const AiPlayer& a, std::uint16_t island) const;

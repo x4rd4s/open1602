@@ -222,6 +222,9 @@ public:
     /// What a shot of `damage` does to a building of HAUS kind `kind`: the shots that are not a
     /// cannon's do only 51/128 on gates, walls, towers and the other sturdy kinds.
     [[nodiscard]] static std::uint32_t building_hit(std::uint32_t damage, bool cannon, std::int32_t kind) noexcept;
+    /// The time a unit of Speed `speed` takes for a half tile of Wegspeed `ways`, straight or
+    /// diagonal, microseconds: run_us without the crowding.
+    [[nodiscard]] static std::uint64_t cell_us(std::uint32_t speed, std::uint32_t ways, bool diagonal) noexcept;
     /// Applies damage to a building: destroyed at its Maxenergy.
     void damage_building(std::uint16_t island, std::uint16_t x, std::uint16_t y, std::uint32_t damage, bool cannon,
                          PlayerId attacker, std::vector<ConstructionEvent>* construction);

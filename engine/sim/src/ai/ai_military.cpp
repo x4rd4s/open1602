@@ -1184,15 +1184,33 @@ void Engine::missions(AiPlayer& p) {
             case 9: {
                 const PlayerId owner = static_cast<PlayerId>(n.param & 0xFF);
                 // Open1602: a convoy's ships (shell_towers) unload together, once none of them is
-                // still under way to the beach, or after their tries (every 10 s).
-                if (rivals() && n.mission == kMissionLanding && n.counter != 0 &&
-                    std::ranges::any_of(p.ships, [&](const ShipNote& o) {
+                // still under way to the beach, after their tries (every 10 s) only when the
+                // soldiers aboard storm the towers alone; else the whole convoy calls it off, no
+                // ships one by one.
+                if (rivals() && n.mission == kMissionLanding && std::ranges::any_of(p.ships, [&](const ShipNote& o) {
                         const Ship* os = m_world.ship(o.id);
                         return o.id != n.id && o.mission == kMissionLanding && o.param == n.param && os != nullptr &&
                                !os->sinking && soldiers_aboard(*os) != 0 && ship_moving(*os);
                     })) {
-                    --n.counter;
-                    break;
+                    if (n.counter != 0) {
+                        --n.counter;
+                        break;
+                    }
+                    if (!storms_alone(p, *s, owner)) {
+                        log(p,
+                            "ship %u calls the convoy's landing off: the others still under way, its %u soldiers "
+                            "too few for the towers",
+                            s->id, soldiers_aboard(*s));
+                        const std::uint32_t param = n.param;
+                        for (ShipNote& o : p.ships) {
+                            if (o.mission == kMissionLanding && o.param == param) {
+                                if (Ship* os = m_world.ship(o.id)) {
+                                    mission_end(p, *os, o);
+                                }
+                            }
+                        }
+                        break;
+                    }
                 }
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
                     log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
@@ -1585,7 +1603,10 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
                 }
             }
         }
-        const std::size_t needs = storm_needs(p, t, towers, party);
+        const WorldIsland& bi = island_of(t.island);
+        const std::size_t needs = storm_needs(p, t, towers, party,
+                                              {2 * (static_cast<std::int32_t>(bi.x) + beach.first) + 1,
+                                               2 * (static_cast<std::int32_t>(bi.y) + beach.second) + 1});
         if (needs <= party.size()) {
             for (Ship* o : convoy) {
                 log(p, "ship %u storms the %zu towers of city %u/%u with %zu soldiers in %zu ships (needs %zu): %s",
@@ -1610,11 +1631,15 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
 }
 
 std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
-                                const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units) const {
+                                const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units,
+                                std::pair<std::int32_t, std::int32_t> from) const {
     // In unit-seconds (ms): the work of wrecking the towers (their health by the party's mean fire
     // on them, Military::building_hit) and of beating the island's hostile soldiers, against what
     // k units give under the towers' and soldiers' fire E, which kills one of mean health h every
-    // h / E: k + (k - 1) + ... + 1 times h / E.
+    // D = h / E. The party first walks the towers' reach down to its own under that fire
+    // on the straight line from `from` (Military::cell_us by the land's Wegspeed, the walk T):
+    // unit i fires from T on until it falls at i D, so k give the sum of i D - T over the i whose
+    // i D is past T.
     const assets::FigureTable* figures = m_sim.figures();
     if (figures == nullptr) {
         return SIZE_MAX;
@@ -1623,6 +1648,9 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
         std::uint32_t damage = 0;  // 1/32 HP per shot
         std::uint32_t work_time_ms = 1;
         bool cannon = false;
+        std::int32_t range8 = 0;  // Shotradius, 1/8 tile
+        std::uint32_t speed = 0;
+        std::uint8_t speed_type = 0;
     };
     std::vector<Unit> party;
     std::uint64_t health = 0;  // 1/32 HP
@@ -1635,6 +1663,9 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
         const std::uint32_t max = std::max<std::uint32_t>(1, ft->combat.max_health);
         const std::uint32_t now = h != 0 ? std::min(h, max) : max;
         Unit u;
+        u.range8 = static_cast<std::int32_t>(ft->combat.range8);
+        u.speed = ft->speed;
+        u.speed_type = ft->speed_type;
         u.damage = Combat::scaled_damage(ft->combat.hit, now, max);
         u.work_time_ms = ft->work_time_ms;
         u.cannon = ft->kind == figtype::kGunner;
@@ -1648,10 +1679,40 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
     const std::uint64_t n = party.size();
     std::uint64_t work = 0;    // unit-ms
     std::uint64_t threat = 0;  // 1/32 HP per second
+    std::uint64_t walk = 0;    // T, ms: the longest walk through a tower's reach
     for (const TowerCover& tc : towers) {
         const Tile b = tile(c.island, tc.x, tc.y);
         if (!b.valid()) {
             continue;
+        }
+        if (const auto f = m_sim.combat().fighter(Target::building(c.island, tc.x, tc.y))) {
+            // The cells of the line from `from` to the tower within its reach, and not yet within
+            // the unit's own.
+            const std::int32_t tx = f->x8 / 4;
+            const std::int32_t ty = f->y8 / 4;
+            const std::int32_t steps = std::max(std::abs(tx - from.first), std::abs(ty - from.second));
+            std::uint64_t us = 0;  // the party's walks through its reach, summed
+            std::int32_t px = from.first;
+            std::int32_t py = from.second;
+            for (std::int32_t k = 1; k <= steps; ++k) {
+                const std::int32_t x = from.first + (tx - from.first) * k / steps;
+                const std::int32_t y = from.second + (ty - from.second) * k / steps;
+                const bool diagonal = x != px && y != py;
+                px = x;
+                py = y;
+                const std::int32_t d = f->cells.distance(x, y);
+                if (d > f->range8 / 4) {
+                    continue;
+                }
+                for (const Unit& u : party) {
+                    if (d > u.range8 / 4) {
+                        std::uint8_t ways = 0;
+                        (void)m_sim.combat().land().cell(x, y, u.speed_type, &ways);
+                        us += Military::cell_us(u.speed, ways, diagonal);
+                    }
+                }
+            }
+            walk = std::max<std::uint64_t>(walk, us / party.size() / 1000U);
         }
         std::uint64_t on = 0;
         for (const Unit& u : party) {
@@ -1679,18 +1740,28 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
     if (threat == 0) {
         return 1;
     }
-    // k (k + 1) / 2 * (health / n) * 1000 / threat >= work: the least k with k (k + 1) / 2 >= q,
-    // from the root of the quadratic, set exact in whole numbers.
-    const std::uint64_t per = health * 1000U;
-    const std::uint64_t q = (work * n * threat + per - 1) / per;
-    auto k = static_cast<std::uint64_t>((std::sqrt(8.0 * static_cast<double>(q) + 1.0) - 1.0) / 2.0);
-    while (k * (k + 1) / 2 < q) {
+    // Times n E: f(k) = A (k (k + 1) / 2 - m (m + 1) / 2) - B (k - m) >= C, with A = health 1000
+    // (n h 1000), B = n T E, C = n work E, and m = B / A the units that fall on the walk; the least
+    // k from the root of the quadratic, set exact in whole numbers.
+    const auto a = static_cast<std::int64_t>(health * 1000U);
+    const auto b = static_cast<std::int64_t>(n * walk * threat);
+    const auto cc = static_cast<std::int64_t>(work * n * threat);
+    const std::int64_t m = b / a;
+    const auto f = [&](std::int64_t k) { return a * (k * (k + 1) / 2 - m * (m + 1) / 2) - b * (k - m); };
+    const double qa = static_cast<double>(a) / 2.0;
+    const double qb = static_cast<double>(a) / 2.0 - static_cast<double>(b);
+    const double qc = static_cast<double>(b) * static_cast<double>(m) -
+                      static_cast<double>(a) * static_cast<double>(m) * static_cast<double>(m + 1) / 2.0 -
+                      static_cast<double>(cc);
+    auto k = std::max<std::int64_t>(
+        m + 1, static_cast<std::int64_t>((-qb + std::sqrt(std::max(0.0, qb * qb - 4.0 * qa * qc))) / (2.0 * qa)));
+    while (f(k) < cc) {
         ++k;
     }
-    while (k > 1 && (k - 1) * k / 2 >= q) {
+    while (k > m + 1 && f(k - 1) >= cc) {
         --k;
     }
-    return static_cast<std::size_t>(std::max<std::uint64_t>(k, 1));
+    return static_cast<std::size_t>(std::max<std::int64_t>(k, 1));
 }
 
 bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -1994,6 +2065,31 @@ bool Engine::takes_landing(const AiPlayer& p, const Ship& s, const ShipNote& n) 
            free_holds(s) + soldiers_aboard(s) >= kLandingHolds && (classic() || healthy(s));
 }
 
+bool Engine::storms_alone(const AiPlayer& p, const Ship& s, PlayerId owner) {
+    // The towers over the way from the ship to a city of `owner` on the island it lies off
+    // (towers_over_way) against the soldiers aboard (storm_needs); none over the way: it lands.
+    for (const City& c : m_world.cities()) {
+        if (c.owner != owner || c.island != s.near_island) {
+            continue;
+        }
+        const auto towers =
+            towers_over_way(p, c, 2 * static_cast<std::int32_t>(s.x) + 1, 2 * static_cast<std::int32_t>(s.y) + 1);
+        if (towers.empty()) {
+            continue;
+        }
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+        for (const CargoSlot& h : s.cargo) {
+            if (is_soldier_ware(h.ware)) {
+                party.emplace_back(hold_unit(h), 0U);
+            }
+        }
+        return storm_needs(p, c, towers, party,
+                           {2 * static_cast<std::int32_t>(s.x) + 1, 2 * static_cast<std::int32_t>(s.y) + 1}) <=
+               party.size();
+    }
+    return true;
+}
+
 std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
     // As best_armed_ship: strength above 8, equals in the order of the ships. Only notes the
     // computer has: a ship without one is idle.
@@ -2018,7 +2114,8 @@ std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
 }
 
 Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City& home,
-                                   const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships) {
+                                   const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,
+                                   std::pair<std::int32_t, std::int32_t> from) {
     // Ship by ship: their holds take the soldiers at home (as they board, soldiers_near), until
     // these storm the towers, or no more soldiers are at home for another ship.
     Convoy out;
@@ -2029,7 +2126,7 @@ Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City&
         for (const Soldier* u : soldiers_near(p.player, home, 8, holds)) {
             party.emplace_back(u->figure, u->health);
         }
-        out.needs = storm_needs(p, t, towers, party);
+        out.needs = storm_needs(p, t, towers, party, from);
         out.has = party.size();
         if (out.needs <= out.has) {
             out.ships = k + 1;
@@ -2148,7 +2245,11 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                 // Or the party that as many ships as it takes bring from home storms them on land
                 // (plan_convoy). Logged when it begins and ends.
                 const Convoy cv =
-                    plan.ships == 0 ? plan_convoy(p, t, *home, towers, landing_ships(p)) : Convoy{1, 0, 0};
+                    plan.ships == 0
+                        ? plan_convoy(p, t, *home, towers, landing_ships(p),
+                                      {2 * (static_cast<std::int32_t>(island_of(t.island).x) + beach->first) + 1,
+                                       2 * (static_cast<std::int32_t>(island_of(t.island).y) + beach->second) + 1})
+                        : Convoy{1, 0, 0};
                 const std::size_t needs = cv.needs;
                 const std::size_t has = cv.has;
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};

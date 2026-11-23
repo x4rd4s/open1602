@@ -234,6 +234,10 @@ void Military::advance(Soldier& s, std::uint32_t budget_us) {
     }
 }
 
+std::uint64_t Military::cell_us(std::uint32_t speed, std::uint32_t ways, bool diagonal) noexcept {
+    return (diagonal ? kDiagonalCellUs : kStraightCellUs) * ways / std::max<std::uint32_t>(1, speed);
+}
+
 std::uint32_t Military::run_us(const Soldier& s, std::uint8_t direction, std::uint8_t cells) const {
     const assets::FigureType* type = type_of(s);
     const std::uint32_t speed = type != nullptr ? std::max<std::uint32_t>(1, type->speed) : 200U;

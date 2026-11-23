@@ -65,8 +65,9 @@ assets::BuildingTable make_buildings() {
 }
 
 /// With `guns` the ship fires (a range and a reload time), as a warship in the game data; with
-/// `tower` a tower's figure (KANONTURM, 38) of that Hitpoint.
-assets::FigureTable make_figures(bool guns = false, const char* tower = nullptr) {
+/// `tower` a tower's figure (KANONTURM, 38) of that Hitpoint; with `slow` a second ship of the
+/// same kind (22) that sails at a 25th of its speed.
+assets::FigureTable make_figures(bool guns = false, const char* tower = nullptr, bool slow = false) {
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
     const auto doc = assets::cod::parse(
         std::string("Objekt: FIGUR\n"
@@ -77,6 +78,11 @@ assets::FigureTable make_figures(bool guns = false, const char* tower = nullptr)
                     "  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n  Rohstoff: 23\n"
                     "  Rohmenge: 25\n") +
             (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "") +
+            (slow ? std::string("  Nummer: 22\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 4\n  Maxkanon: 6\n"
+                                "  Speed: 20\n  Drehtime: 0.13\n  Maxenergy: 50\n  Hitpoint: 2.0\n  Preis: 1000\n"
+                                "  Rohstoff: 23\n  Rohmenge: 25\n") +
+                        (guns ? "  Shotradius: 7\n  Shottime: 1.0\n  Worktime: 5.0\n" : "")
+                  : std::string()) +
             (tower != nullptr ? std::string("  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: ") +
                                     tower + "\n  Worktime: 3.0\n  Shotradius: 7.5\n"
                               : std::string()) +
@@ -365,9 +371,9 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     const std::vector<std::pair<std::int32_t, std::int32_t>> on_beach = {{2, 5}, {2, 22}};
     const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole,
                          const std::vector<std::pair<std::int32_t, std::int32_t>>& spots, std::int32_t party = 6,
-                         std::uint32_t* landed = nullptr) {
+                         std::uint32_t* landed = nullptr, bool slow = false) {
         Coast a;
-        a.figures = make_figures(true, tower_hit);
+        a.figures = make_figures(true, tower_hit, slow);
         a.build(kKontor, 28, 14, kComputer, 0);
         a.build(kMarket, 18, 14, kComputer, 0);
         a.build(kKontor, 0, 14, kHuman, 1);
@@ -406,7 +412,7 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
         }
         for (const auto& [x, y] : at) {
             sim::Ship ship = sim::make_ship("Ship", static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y),
-                                            kShipFigure, kComputer, 2);
+                                            slow && y == 20 ? 22U : kShipFigure, kComputer, 2);
             ship.cargo.resize(4);
             ship.cannons = 4;
             a.world.add_ship(ship);
@@ -458,6 +464,10 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     CHECK(play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed));
     CHECK(landed > 4);
     CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 4));
+    // The second ship of the convoy sails slowly: the first, off the beach long before it, lands
+    // no party too small alone, and the convoy turns home.
+    CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed, true));
+    CHECK(landed == 0);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
