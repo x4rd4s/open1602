@@ -485,8 +485,23 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   them on land. They do so only when the party is big enough: the towers' fire, and that of the
   hostile soldiers on the island, kills one unit after the other, and the units fire on the
   towers (non-cannon shots do 51/128 on towers, as in the game) and on those soldiers until then.
-  The computer attacks such a city only when the soldiers at its home, as many as a ship of its
-  takes, are enough for that. A troop ship whose soldiers are too few calls the landing off and
+  A tower inland, out of the ships' reach, the party storms once the others fall, so a shelling
+  that leaves one goes, and the attack starts, only with a party big enough for it.
+  The computer attacks such a city only when the soldiers at its home are enough for that, as
+  many as its ships take, with those still aboard a ship back from a called-off landing: where
+  one ship's holds are too few it sends a convoy, as many ships (healthy and well armed, the
+  strongest first) as it takes. Only when these are too few does it take an armed supply ship
+  lying empty between two loads off its route, as a player would. Each boards at home, the ships wait
+  there for each other, and they sail to the beach together. Off the beach the first ship waits
+  for the others, up to its tries; when they run out it lands alone only if its own soldiers are
+  enough, and otherwise the whole convoy turns home: no ships one by one. The party's size counts
+  the walk through the towers' reach to its own, under their fire before it can shoot: the
+  shortest walk over open land from the beach (the straight line where none leads there, as
+  through a forest), at the land's `Wegspeed`, every unit after the first slowed by the crowd on
+  the way as the soldiers are.
+  A city with no market and no Kontor standing falls with its towers, which its soldiers go for
+  wherever they stand: then all its towers count as over the landing, whether or not they cover
+  the beach or a way. A troop ship whose soldiers are too few calls the landing off and
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
 

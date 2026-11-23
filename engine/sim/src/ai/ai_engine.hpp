@@ -329,6 +329,39 @@ public:
                                                                                      bool wall = false,
                                                                                      bool any = false) const;
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
+    /// Whether `p` would attack city `t` now (attack_ok); for tests.
+    [[nodiscard]] bool attack_ok_for(AiPlayer& p, const City& t) {
+        std::size_t convoy = 1;
+        return attack_ok(p, t, convoy);
+    }
+    /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
+    /// it: below its core army while its civil income carries that, beyond it within three
+    /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
+    /// on credit and the upkeep took half the civil income (gate f24, l3 g12-404-p3 P7).
+    [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
+                                           std::int32_t budget) noexcept;
+    /// The ships' missions of `p`, once (missions()); for tests.
+    void run_missions(AiPlayer& p) { missions(p); }
+    /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
+    bool run_attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<PlayerId>& enemies) {
+        return attack_orders(a, island, enemies);
+    }
+    /// Open1602: the fleet attack_ok weighs the shelling of a city's towers with: the one
+    /// shell_towers will have, the warships free then (free_warships) without the troop ship (the
+    /// first landing ship), or the troop ship alone when none is.
+    [[nodiscard]] std::vector<Ship*> attack_fleet(AiPlayer& p);
+    /// Open1602: the ids of the ships a convoy may take, in the order it takes them (landing_ships).
+    [[nodiscard]] std::vector<std::uint32_t> landing_ship_ids(AiPlayer& p) {
+        std::vector<std::uint32_t> out;
+        for (const Ship* s : landing_ships(p)) {
+            out.push_back(s->id);
+        }
+        return out;
+    }
+    /// Open1602: how many hostile towers lie in the way of a party from cell (cx, cy) to city `c`
+    /// (towers_over_way).
+    [[nodiscard]] std::size_t towers_in_the_way(const AiPlayer& p, const City& c, std::int32_t cx,
+                                                std::int32_t cy) const;
     /// Open1602 (3b): with `s`, a covering tower it can shell (shells_from_water) when a beach is free.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> breach_target(const AiPlayer& p, const City& c,
                                                                                      const Ship* s = nullptr) const;
@@ -1074,7 +1107,10 @@ private:
         std::uint32_t health = 0;  ///< what is left of the building
         std::uint32_t threat = 0;  ///< its fire, 1/32 HP per second
         std::uint64_t value = 0;   ///< its build value, gold
+        bool city_rule = false;    ///< counted only as its city has no market or Kontor (F15), logged
     };
+    /// Open1602: how many of `towers` count only by the no-market-or-Kontor rule, for the logs.
+    [[nodiscard]] static std::size_t by_city_rule(const std::vector<TowerCover>& towers);
     /// Open1602: the straight way of cells from (cx, cy) to the market or Kontor of `c`.
     [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> way_to(const City& c, std::int32_t cx,
                                                                             std::int32_t cy) const;
@@ -1095,6 +1131,8 @@ private:
         std::uint64_t gain = 0;           ///< gold, the towers and the soldiers aboard `troops`
         const char* refusal = nullptr;    ///< why not, or none
     };
+    /// The towers of `towers` that `plan` leaves standing: those out of the ships' reach.
+    [[nodiscard]] static std::vector<TowerCover> unshelled(const std::vector<TowerCover>& towers, const Shelling& plan);
     [[nodiscard]] Shelling plan_shelling(const AiPlayer& p, const City& t, const std::vector<TowerCover>& towers,
                                          const std::vector<Ship*>& fleet, const Ship* troops) const;
     /// Open1602 (3b): shells `towers` while troop ship `s` waits, waits for a warship, or calls the
@@ -1103,10 +1141,17 @@ private:
                       std::pair<std::int32_t, std::int32_t> beach);
     /// Open1602: how many of a party (red figure, health, 0 full) it takes to wreck `towers` of
     /// city `c` on land, against their fire and that of the hostile soldiers on the island: the
-    /// party loses a unit to that fire every unit's health in turn, and fires till then. SIZE_MAX
-    /// when the party does no harm.
+    /// party loses a unit to that fire every unit's health in turn, and fires till then, after its
+    /// walk from cell `from` (the beach) through their reach. SIZE_MAX when the party does no harm.
     [[nodiscard]] std::size_t storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
-                                          const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units) const;
+                                          const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units,
+                                          std::pair<std::int32_t, std::int32_t> from,
+                                          std::size_t* plain = nullptr) const;
+    /// Open1602: the half-tile cells (tile centres) of the soldiers' walk from cell `from` to the
+    /// nearest tile within `reach8` of `f`; empty when no walk leads there.
+    [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> walk_path(
+        const AiPlayer& p, std::uint16_t island, std::pair<std::int32_t, std::int32_t> from, const Fighter& f,
+        std::int32_t reach8) const;
     /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
     /// water nearest to it (water_near), within its Shotradius.
     [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;
@@ -1115,8 +1160,30 @@ private:
     /// Open1602: the first of free_warships() (breach).
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
-    bool attack_ok(AiPlayer& p, const City& t);
-    void start_attack(AiPlayer& p, const City& t);
+    /// `convoy`: how many ships take the party (1 but where towers no fleet wrecks are stormed).
+    bool attack_ok(AiPlayer& p, const City& t, std::size_t& convoy);
+    void start_attack(AiPlayer& p, const City& t, std::size_t convoy);
+    /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
+    /// armed), the strongest first.
+    [[nodiscard]] std::vector<Ship*> landing_ships(AiPlayer& p);
+    /// Open1602: whether a ware a supply ship's route brings to a city of the computer's runs out
+    /// there within kHomeFirstMinutes (supply_urgency), so that the ship stays on it.
+    [[nodiscard]] bool supply_run_urgent(const AiPlayer& p, const Ship& s) const;
+    /// Open1602: whether the soldiers aboard `s`, off an island of `owner`, are enough alone to
+    /// storm the towers over their way to a city there (storm_needs).
+    [[nodiscard]] bool storms_alone(const AiPlayer& p, const Ship& s, PlayerId owner);
+    /// Open1602: the fewest of `ships`, the first first, whose holds take a party from `home` big
+    /// enough to storm `towers` of `t` (storm_needs); `ships` 0 when none is, with the last needs
+    /// and party size.
+    struct Convoy {
+        std::size_t ships = 0;
+        std::size_t needs = SIZE_MAX;
+        std::size_t has = 0;
+        std::size_t plain = SIZE_MAX;  ///< `needs` without the walk under fire (logged)
+    };
+    [[nodiscard]] Convoy plan_convoy(const AiPlayer& p, const City& t, const City& home,
+                                     const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,
+                                     std::pair<std::int32_t, std::int32_t> from);
     void raid_outpost(AiPlayer& p, const City& t);
     void target_scan(AiPlayer& p);
     [[nodiscard]] std::vector<PlayerId> island_enemies(const AiPlayer& a, std::uint16_t island) const;

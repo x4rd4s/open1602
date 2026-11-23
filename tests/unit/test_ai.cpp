@@ -3211,8 +3211,10 @@ TEST_CASE("ai: an improved computer moves its ship to where the soldiers at the 
         const std::vector<std::uint32_t> soldiers{g.world.soldiers().back().id};
         sim::Ship& ship = g.world.ships().front();
         ship.x = static_cast<std::uint16_t>(static_cast<std::int32_t>(isl.x) + kx + 3);
-        ship.y = static_cast<std::uint16_t>(static_cast<std::int32_t>(isl.y) + quay + 5);
-        // A tile of the strip, touching the Kontor, is within boarding range of the ship.
+        ship.y = static_cast<std::uint16_t>(static_cast<std::int32_t>(isl.y) + quay + 4);
+        // A tile of the strip, touching the Kontor, is within boarding range of the ship: within
+        // the 7 cells a soldier's way to it ends at, not only the 9 it boards from (trace trX: a ship
+        // 8 cells from the soldiers' shore waited 80 tries, nobody walked to it).
         REQUIRE(sim::Military::boards_from(ship, 2 * (static_cast<std::int32_t>(isl.x) + kx + 1),
                                            2 * (static_cast<std::int32_t>(isl.y) + quay + 1)));
         sim::ai::State state;
@@ -3237,6 +3239,17 @@ TEST_CASE("ai: an improved computer moves its ship to where the soldiers at the 
             CHECK(boards);
         }
     }
+}
+
+TEST_CASE("ai: a soldier's way on board ends within 7 cells of the ship, so the computer counts no farther") {
+    // Trace trX: a ship lay 8 cells from the nearest cell its soldiers could walk to. They board
+    // from up to 9 cells (arrived()), but their way to the ship ends within kFriendlyGoal, 7, and
+    // no way ended there: each order failed, 80 tries long. boards_from, which boarding_water
+    // asks, holds to the way's end.
+    sim::Ship ship = sim::make_ship("Ship", 50, 50, 21, kComputer, 2);
+    CHECK(sim::Military::boards_from(ship, 2 * 50 + 1, 2 * 50 + 1 + 7));
+    CHECK(!sim::Military::boards_from(ship, 2 * 50 + 1, 2 * 50 + 1 + 8));
+    CHECK(!sim::Military::boards_from(ship, 2 * 50 - 8, 2 * 50));
 }
 
 TEST_CASE("ai: an improved computer's troop ship sails on to land its soldiers instead of chasing ships") {

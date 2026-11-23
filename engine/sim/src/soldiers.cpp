@@ -234,6 +234,14 @@ void Military::advance(Soldier& s, std::uint32_t budget_us) {
     }
 }
 
+std::uint32_t Military::crowded_ways(std::uint32_t ways) noexcept {
+    return std::min<std::uint32_t>(126, ways * 5 / 4);
+}
+
+std::uint64_t Military::cell_us(std::uint32_t speed, std::uint32_t ways, bool diagonal) noexcept {
+    return (diagonal ? kDiagonalCellUs : kStraightCellUs) * ways / std::max<std::uint32_t>(1, speed);
+}
+
 std::uint32_t Military::run_us(const Soldier& s, std::uint8_t direction, std::uint8_t cells) const {
     const assets::FigureType* type = type_of(s);
     const std::uint32_t speed = type != nullptr ? std::max<std::uint32_t>(1, type->speed) : 200U;
@@ -248,7 +256,7 @@ std::uint32_t Military::run_us(const Soldier& s, std::uint8_t direction, std::ui
         return crowded;
     });
     if (crowded) {
-        w = std::min<std::uint32_t>(126, w * 5 / 4);
+        w = crowded_ways(w);
     }
     const std::uint64_t per_cell = (direction & 1U) != 0 ? kDiagonalCellUs : kStraightCellUs;
     return static_cast<std::uint32_t>(std::max<std::uint64_t>(1, per_cell * w * cells / speed));
@@ -661,9 +669,11 @@ bool Military::boardable(const Soldier& s, const Target& t) const {
 }
 
 bool Military::boards_from(const Ship& ship, std::int32_t x, std::int32_t y) noexcept {
+    // A way to the ship ends within kFriendlyGoal of it (plan_to), and only then does the soldier
+    // board (arrived(), up to kBoardRange): a cell beyond the way's goal is no way on board.
     const std::int32_t sx = 2 * static_cast<std::int32_t>(ship.x);
     const std::int32_t sy = 2 * static_cast<std::int32_t>(ship.y);
-    return CellRect{sx, sy, sx + 1, sy + 1}.distance(x, y) <= kBoardRange;
+    return CellRect{sx, sy, sx + 1, sy + 1}.distance(x, y) <= std::min(kBoardRange, kFriendlyGoal);
 }
 
 bool Military::arrived(Soldier& s) {

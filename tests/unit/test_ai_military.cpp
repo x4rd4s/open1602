@@ -7,8 +7,10 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <vector>
 
+#include "../../engine/sim/src/ai/ai_engine.hpp"
 #include "../test_framework.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -31,6 +33,7 @@ constexpr std::uint32_t kWall = 20902;
 constexpr std::uint32_t kGate = 20904;
 constexpr std::uint32_t kTree = 20202;
 constexpr std::uint32_t kTower = 22601;
+constexpr std::uint32_t kRuin = 22602;
 constexpr std::uint16_t kSword = 1;
 
 constexpr sim::PlayerId kHuman = 0;
@@ -64,7 +67,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 8\n  Id: 20202\n  Kind: 10\n  Gfx: 90\n  Size: 1, 1\n  Maxenergy: 3\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"  // a tree
         "  @Nummer: 9\n  Id: 22601\n  Kind: 6\n  Gfx: 100\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
-        "  Ruinenr: 255\n"  // a stone tower
+        "  Ruinenr: 255\n"                                                    // a stone tower
+        "  @Nummer: 10\n  Id: 22602\n  Kind: 12\n  Gfx: 110\n  Size: 1, 1\n"  // a ruin
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -416,6 +420,18 @@ TEST_CASE("ai military: a computer with a castle and a sword smith trains swords
     }
 }
 
+TEST_CASE("ai military: an improved computer in debt adds no unit, by its budget neither") {
+    // Gate f24: P7 refilled its army after a lost landing, ten units, the first at gold -686 by its
+    // army budget, and slid into debt with its upkeep at half its civil income.
+    using sim::ai::Engine;
+    CHECK(Engine::may_add_unit(true, 100, 50, 60, 0));     // the core, carried by the civil income
+    CHECK(!Engine::may_add_unit(true, 100, 70, 60, 0));    // not carried
+    CHECK(Engine::may_add_unit(false, 100, 270, 0, 366));  // within the budget
+    CHECK(!Engine::may_add_unit(false, 100, 280, 0, 366));
+    CHECK(!Engine::may_add_unit(false, -686, 270, 0, 366));  // in debt
+    CHECK(!Engine::may_add_unit(true, 0, 50, 60, 0));
+}
+
 TEST_CASE("ai military: a computer trains soldiers of a package of the kind it wants too") {
     Island a;
     // Pikemen of a package: swordsmen by their kind, with more health.
@@ -545,6 +561,120 @@ TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved s
     CHECK(at_trees >= 4);
     CHECK(!play(true, at_trees));
     CHECK(at_trees == 0);
+}
+
+TEST_CASE("ai military: improved soldiers cutting their way to a tower do not wait on felled trees") {
+    // Trace trW: a party cut a forest ring under a tower's fire, four of seven at a time, and those
+    // whose tree was down stood with it as their target until the island's next order passed them
+    // by. All take the next tree, the moment theirs is felled.
+    Island a;
+    a.build(kKontor, 4, 8, kComputer, 0);
+    a.build(kTower, 70, 8, kHuman, 1);
+    for (std::int32_t y = 0; y < 20; ++y) {
+        for (std::int32_t x = 60; x <= 62; ++x) {
+            a.tree(x, y);
+        }
+    }
+    for (std::int32_t k = 0; k < 6; ++k) {
+        a.add(kComputer, 100, 24 + 2 * k);
+    }
+    a.war();
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    const sim::IslandMap& map = a.world.islands()[0].map;
+    std::size_t idle = 0;  // soldier-seconds with a felled tree as the target
+    std::size_t cutting = 0;
+    for (std::uint32_t t = 0; t < 180; ++t) {
+        run(s, 1'000);
+        for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
+            if (soldier->target.kind != sim::Target::Kind::Building || soldier->target.x < 60 ||
+                soldier->target.x > 62) {
+                continue;
+            }
+            const sim::MapCell& c = map.top(soldier->target.x, soldier->target.y);
+            const auto* b = c.empty() ? nullptr : a.buildings.by_sprite(c.sprite);
+            if (b == nullptr || b->id != kTree) {  // no tree there any more
+                ++idle;
+            } else {
+                ++cutting;
+            }
+        }
+    }
+    std::printf("felled-tree targets: idle %zu, cutting %zu\n", idle, cutting);
+    CHECK(cutting > 0);
+    CHECK(idle * 10 <= cutting);
+}
+
+TEST_CASE("ai military: an improved computer stops a soldier whose target is gone and gets no order") {
+    // Gate f24: a soldier whose target no longer stood was listed for the next order, but one
+    // enemy soldier takes one of ours, and the order went to an idle one: the soldier kept its
+    // gone target and was "re-ordered" every pass, every 16 s for 3 hours. Those no order takes
+    // now stop, as a player stops them.
+    Island a;
+    a.build(kKontor, 4, 8, kComputer, 0);
+    a.add(kComputer, 100, 24);  // idle
+    a.add(kComputer, 100, 26);  // its house wrecked
+    REQUIRE(a.world.island(0).map.place(*a.buildings.by_id(kRuin), 60, 5, 0, 0).ok());
+    a.world.soldiers().back().target = sim::Target::building(0, 60, 5);
+    const std::uint32_t id = a.world.soldiers().back().id;
+    a.add(kHuman, 150, 50);
+    a.war();
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    CHECK(engine.run_attack_orders(p, 0, {kHuman}));
+    const sim::Soldier* u = a.world.soldier(id);
+    REQUIRE(u != nullptr);
+    CHECK(u->target.empty());
+}
+
+TEST_CASE("ai military: an improved computer counts every tower of a city with no market or Kontor as in the way") {
+    // The F15 city: a house and a tower behind a forest, no market, no Kontor. Its soldiers go for
+    // the tower wherever they stand, so a landing is sized against it (towers_over_way), though
+    // it covers neither the beach nor a way. In a game a city comes to this when an earlier attack
+    // destroyed its markets and Kontor and left the tower.
+    const auto towers = [](bool classic) {
+        Island a;
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 1\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Shotradius: 0.75\n  Maxstepcnt: 1\n"
+            "  Rohstoff: 11\n  Rohmenge: 3\n  Worktime: 0.8\n  Shottime: 0.6\n  Maxenergy: 20\n  Hitpoint: 1.0\n"
+            "  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: 1.0\n  Worktime: 3.0\n"
+            "  Shotradius: 7.5\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        a.figures = std::move(figures).value();
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kTower, 70, 8, kHuman, 1);
+        sim::Tower tw;
+        tw.island = 0;
+        tw.x = 70;
+        tw.y = 8;
+        tw.owner = kHuman;
+        tw.figure = 38;  // KANONTURM
+        a.world.towers().push_back(tw);
+        a.build(kHouse, 40, 4, kHuman, 1);
+        for (std::int32_t y = 0; y < 20; ++y) {
+            for (std::int32_t x = 60; x <= 62; ++x) {
+                a.tree(x, y);
+            }
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        // From the far side of the island, out of the tower's reach.
+        return engine.towers_in_the_way(p, *a.world.city(0, 1), 2 * (10 + 20), 2 * (10 + 18));
+    };
+    CHECK(towers(false) == 1);
+    CHECK(towers(true) == 0);
 }
 
 TEST_CASE("ai military: improved soldiers go first for the tower that covers their way to the market") {
