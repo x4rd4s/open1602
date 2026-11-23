@@ -1052,11 +1052,18 @@ void Engine::board(AiPlayer& p, Ship& s, const City& at, std::uint32_t max) {
         if (order.soldiers.size() >= max) {
             break;
         }
-        // Open1602: not the soldiers on their way aboard another ship, as a convoy's ships board
-        // at once: each would call them over to itself in turn, and none got on.
+        // Open1602: not the soldiers on their way aboard another ship of the computer's that
+        // takes troops on board (missions 1 and 5), as a convoy's ships board at once: each would call
+        // them over to itself in turn, and none got on. A ship gone, sinking or on another
+        // mission frees them.
         if (const Soldier* u = m_world.soldier(id);
             rivals() && u != nullptr && u->target.kind == Target::Kind::Ship && u->target.ship != s.id) {
-            continue;
+            const Ship* other = m_world.ship(u->target.ship);
+            const auto on = std::ranges::find(p.ships, u->target.ship, &ShipNote::id);
+            if (other != nullptr && !other->sinking && other->owner == p.player && on != p.ships.end() &&
+                (on->mission == 1 || on->mission == 5)) {
+                continue;
+            }
         }
         order.soldiers.push_back(id);
     }
