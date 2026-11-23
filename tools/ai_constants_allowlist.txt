@@ -33,3 +33,4 @@ kLandingLogMs | engine/sim/src/ai/ai_military.cpp | derived from: one minute of 
 5 | engine/sim/src/ai/ai_military.cpp | derived from: ShipNote::mission 5, an attack's ship taking troops on board at home (missions(), case 5), which start_attack gives each ship of a convoy and shell_towers waits for
 6 | engine/sim/src/ai/ai_military.cpp | derived from: ShipNote::mission 6, an attack's ship with its troops aboard planning the landing (missions(), case 6), the convoy's ships waiting at home in shell_towers
 4.0 | engine/sim/src/ai/ai_military.cpp | derived from: the root of the quadratic a k^2 + b k + c = 0, (-b + sqrt(b^2 - 4 a c)) / (2 a), in storm_needs
+256 | engine/sim/src/ai/ai_military.cpp | derived from: the fixed-point scale of supply_urgency and stock_lasts (minutes x 256), as supply_destination compares kHomeFirstMinutes * 256
