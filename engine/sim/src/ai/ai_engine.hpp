@@ -586,6 +586,9 @@ private:
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
     /// colony for the crop has room there.
     [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;
+    /// Improved computers: `b` holds a city on an island that grows fully a crop whose good the
+    /// computer's cities lack now, with no free island open for it: a reason to conquer.
+    [[nodiscard]] bool holds_wanted_crop(const AiPlayer& p, PlayerId b) const;
     /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
     [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
