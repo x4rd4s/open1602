@@ -1143,9 +1143,10 @@ void Engine::missions(AiPlayer& p) {
                 break;
             }
             case 2: {
-                // Open1602 (F5): at a city whose landing cell is cut off, first to a beach of the city.
+                // Open1602 (F5): at a city whose landing cell is cut off, first to a beach of the city,
+                // with soldiers aboard to land there.
                 const City* at = target.kind == Target::Kind::City ? city(target.island, target.city) : nullptr;
-                if (rivals() && at != nullptr && at->owner == p.player) {
+                if (rivals() && at != nullptr && at->owner == p.player && soldiers_aboard(*s) != 0) {
                     if (const auto shore = landing_shore(p, *s, *at)) {
                         log(p, "ship %u lands off %u,%u: the landing cell is cut off from the city", s->id, shore->x,
                             shore->y);
