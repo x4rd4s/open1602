@@ -584,7 +584,7 @@ private:
     /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
     [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
-    /// colony for the crop has room there.
+    /// colony for the crop has room there, and its budget would found that colony now.
     [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;
     /// Improved computers: `b` holds a city on an island that grows fully a crop whose good the
     /// computer's cities lack now, with no free island open for it: a reason to conquer.

@@ -1028,7 +1028,15 @@ bool Engine::grows(std::uint16_t island, std::uint8_t crop) const {
 bool Engine::fertile_island_open(const AiPlayer& p, std::uint8_t crop) const {
     // Open1602 (Merlin, 2026-11-23): a player founds a colony where the crop grows fully before he
     // plants it on half-fertile land: an island it knows grows the crop fully and no city stands
-    // there yet, so there is room. Its gold does not count: it saves for the colony.
+    // there yet, so there is room, and its budget would found the colony now, as colony_plan
+    // weighs it. One it cannot afford is not open: it bridges on half-fertile land meanwhile.
+    Budget b = gold_budget(p);
+    if (p.settle.plan_crop != 0) {
+        b.reserved -= colony_money(p);
+    }
+    if (b.refusal(colony_commitment(p, crop)) != Refusal::None) {
+        return false;
+    }
     for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
         const auto island = static_cast<std::uint16_t>(i);
         if (!grows(island, crop) || !knows_crops(p, island)) {
