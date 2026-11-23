@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -223,6 +224,39 @@ TEST_CASE("ai landing: at war, a computer ships the soldiers beside its Kontor t
     REQUIRE(a.world.islands()[1].map.top(0, 14).owner == kHuman);
     run(s, 2 * 60'000);
     CHECK(a.world.islands()[1].map.top(0, 14).owner != kHuman);  // the Kontor has fallen
+}
+
+TEST_CASE("ai landing: an improved computer attacks alone only with a ship that takes more than three") {
+    // Probe p6: a ship alone sails on with more than kFewSoldiers aboard (missions(), case 5). The
+    // strongest ship had three holds: it boarded three, called the attack off, and was taken again
+    // seconds later, 14 times in a row. An improved computer takes the ship with room for more.
+    Coast a;
+    a.build(kKontor, 28, 14, kComputer, 0);
+    a.build(kMarket, 18, 14, kComputer, 0);
+    a.build(kKontor, 0, 14, kHuman, 1);
+    a.build(kMarket, 6, 6, kHuman, 1);
+    for (std::int32_t k = 0; k < 4; ++k) {
+        a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+    }
+    for (std::int32_t k = 0; k < 6; ++k) {
+        a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+    }
+    // The stronger ship has a hold of goods: room for three.
+    for (const auto& [y, goods, cannons] : {std::tuple{15, true, 6}, std::tuple{20, false, 4}}) {
+        sim::Ship ship = sim::make_ship("Ship", 41, static_cast<std::uint32_t>(y), kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        if (goods) {
+            ship.cargo[3].ware = 1;
+            ship.cargo[3].amount = 32;
+        }
+        ship.cannons = static_cast<std::uint8_t>(cannons);
+        a.world.add_ship(ship);
+    }
+    REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+    a.world.island(1).discover(kComputer);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    run(s, 75'000);
+    CHECK(a.soldiers_on(kComputer, 1) == 4);  // the party of the ship with room for four
 }
 
 TEST_CASE("ai landing: an improved computer lands nobody on an island it has not discovered, the original's does") {

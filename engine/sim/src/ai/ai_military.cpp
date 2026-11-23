@@ -2510,6 +2510,21 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
     if (ship == nullptr) {
         return;
     }
+    // Open1602: a ship alone sails on only with more than kFewSoldiers aboard (missions(), case 5),
+    // so one that takes no more never attacks alone: it boarded three, called it off and was taken
+    // again seconds later, 14 times in a row for one ship (probe p6). It goes in a convoy only.
+    if (rivals() && convoy <= 1 && free_holds(*ship) + soldiers_aboard(*ship) <= kFewSoldiers) {
+        Ship* bigger = nullptr;
+        for (Ship* o : landing_ships(p)) {
+            if (bigger == nullptr && free_holds(*o) + soldiers_aboard(*o) > kFewSoldiers) {
+                bigger = o;
+            }
+        }
+        if (bigger == nullptr) {
+            return;
+        }
+        ship = bigger;
+    }
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
     // Open1602: a convoy, as many ships as it takes to bring a party big enough to storm towers no
     // fleet wrecks (attack_ok): each boards at home, and they land together (shell_towers).
