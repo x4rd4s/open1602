@@ -753,7 +753,6 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         // carry the stock to where it is missing.
         const bool short_of = rivals() && b->ware != 0 && (feeds[b->ware] || goods_short(p.player, b->ware) != 0);
         const bool idle = saving && b->ware != 0 && !needed[b->ware];
-        selling += saving && b->ware != 0 && needed[b->ware] && !unsold[b->ware] && pr.enabled ? 1U : 0U;
         const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle;
         const auto set = [&](bool on) {
             if (on && hold) {
@@ -819,6 +818,8 @@ void Engine::production_switches(AiPlayer& p, City& c) {
             set(false);
             ++idled;
         }
+        // Counted as it ends the pass: one switched off for a full store is not kept running.
+        selling += saving && w != 0 && needed[w] && !unsold[w] && enabled ? 1U : 0U;
     }
     if (saved != 0) {
         log(p, "city %u/%u: switches %u full producers off in debt", c.island, c.index, saved);
