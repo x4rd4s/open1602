@@ -2047,6 +2047,7 @@ editor.nothing = Nichts rückgängig zu machen
 # Der Bildschirm „Updates“ des Hauptmenüs und seine Fragen (update_menu.cpp, viewer_updates.cpp)
 menu.updates = Updates
 menu.update_available = Update {1}
+menu.version = Open1602 {1}
 update.title = Updates
 update.hint = Open1602 sucht auf seiner GitHub-Seite nach neuen Versionen. Spielstände, Einstellungen und Mods bleiben, wie sie sind.
 update.installed = Installierte Version

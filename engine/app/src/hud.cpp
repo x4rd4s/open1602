@@ -299,6 +299,7 @@ Hud::Hud(SDL_Renderer* renderer, const assets::GameDirectory& game, const assets
         style.selected = ui::nearest_colour(palette, 112, 80, 30);
         m_multiplayer = std::make_unique<MultiplayerMenu>(style);
         m_menu->set_form_style(style);
+        m_menu->set_version(O1602_VERSION);
         // The preview of a new world: sea, surf, beach, ground, forest, mountains, villages, starts.
         constexpr std::array<std::array<std::uint8_t, 3>, sim::WorldPreview::kTiles + 1> kPreview = {{{30, 60, 110},
                                                                                                       {60, 105, 160},

@@ -218,6 +218,10 @@ public:
     [[nodiscard]] const ModsModel& mods() const noexcept { return m_mods_model; }
     /// What the screen "Updates" and the button "Updates" show (every frame, it changes while
     /// downloading).
+    /// This program's version, shown at the bottom right of the main menu beside the button
+    /// "Updates" (none: nothing shown).
+    void set_version(std::string version) { m_version = std::move(version); }
+    [[nodiscard]] const std::string& version() const noexcept { return m_version; }
     void set_updates(UpdateModel model) { m_update_model = std::move(model); }
     [[nodiscard]] const UpdateModel& updates() const noexcept { return m_update_model; }
     /// Opens the screen "Updates" (the question at the start was answered with yes).
@@ -329,6 +333,7 @@ private:
     ModsModel m_mods_model;
     UpdateMenu m_updates;
     UpdateModel m_update_model;
+    std::string m_version;
     /// Open1602's own button "Mods" on the main menu's screen.
     ui::Form m_base_form;
     EndlessSetup m_endless;

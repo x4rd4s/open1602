@@ -43,6 +43,8 @@ constexpr ui::Rect kEditorButtonRect{192, 714, 160, 38};
 /// Bottom right, below the picture frame (video_frame() ends at 726).
 constexpr std::int32_t kUpdatesButton = 3;
 constexpr ui::Rect kUpdatesButtonRect{840, 729, 160, 36};
+/// The version, right-aligned on the left of the button "Updates" and on its line.
+constexpr ui::Rect kVersionRect{560, 729, 276, 36};
 // HOST.GAD
 constexpr std::int32_t kNewGame = 31002;
 constexpr std::int32_t kLoadGame = 31003;
@@ -1124,6 +1126,9 @@ void MainMenu::layout_base_form() {
     const Updater::Status& update = m_update_model.status;
     const bool newer = update.phase == Updater::Phase::Available || update.phase == Updater::Phase::Downloading ||
                        update.phase == Updater::Phase::Installed;
+    if (!m_version.empty()) {
+        m_base_form.label(kVersionRect, ui::tr("menu.version", {m_version}), ui::Align::Right);
+    }
     m_base_form.button(kUpdatesButton, kUpdatesButtonRect,
                        newer ? ui::tr("menu.update_available", {update.latest}) : ui::tr("menu.updates"), true, newer);
 }
