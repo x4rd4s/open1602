@@ -478,9 +478,12 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   ships can spare outlasts the shelling. It goes only when that pays in gold, too: the towers'
   build value, and the soldiers aboard (their cost by the `Soldat:` line) when no covering tower
   is left, must be worth more than the price of the ships the towers' fire would sink. A ship
-  still sailing up to its tower spends no try. With no tower in reach, no warship free, no fleet
-  strong enough, when it does not pay, or after the tries, the troops land under the towers as
-  before.
+  still sailing up to its tower spends no try. With no warship free the troop ship shells them
+  itself, its soldiers counted with its price. Where no fleet of its ships can wreck the towers
+  (none in reach, or they would turn away first), it attacks no such city; and when a landing
+  comes to it anyway (it does not pay, or after the tries) it calls the landing off and takes the
+  troops home rather than land them under the towers: in the gate games every such party died
+  without taking the city.
 
 ## Ships, ways and colonies
 

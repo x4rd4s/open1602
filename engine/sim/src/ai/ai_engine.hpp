@@ -1084,7 +1084,19 @@ private:
                                                           std::pair<std::int32_t, std::int32_t> beach) const;
     /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that
     /// pays in gold; false when the troops land at once.
-    bool shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers);
+    /// Open1602 (3b): what shelling `towers` of `t` with `fleet` (the strongest first) would take.
+    struct Shelling {
+        std::vector<TowerCover> targets;  ///< those the ships reach from the water
+        std::size_t ships = 0;            ///< the first ships of the fleet it takes; 0: none suffices
+        std::uint64_t loss = 0;           ///< gold, the ships sunk
+        std::uint64_t gain = 0;           ///< gold, the towers and the soldiers aboard `troops`
+        const char* refusal = nullptr;    ///< why not, or none
+    };
+    [[nodiscard]] Shelling plan_shelling(const AiPlayer& p, const City& t, const std::vector<TowerCover>& towers,
+                                         const std::vector<Ship*>& fleet, const Ship* troops) const;
+    /// Open1602 (3b): shells `towers` while troop ship `s` waits, waits for a warship, or calls the
+    /// landing off; always handles the landing.
+    void shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers);
     /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
     /// water nearest to it (water_near), within its Shotradius.
     [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;
