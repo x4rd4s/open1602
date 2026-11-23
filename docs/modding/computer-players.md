@@ -485,8 +485,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   them on land. They do so only when the party is big enough: the towers' fire, and that of the
   hostile soldiers on the island, kills one unit after the other, and the units fire on the
   towers (non-cannon shots do 51/128 on towers, as in the game) and on those soldiers until then.
-  The computer attacks such a city only when the soldiers at its home, as many as a ship of its
-  takes, are enough for that. A troop ship whose soldiers are too few calls the landing off and
+  The computer attacks such a city only when the soldiers at its home are enough for that, as
+  many as its ships take: where one ship's holds are too few it sends a convoy, as many ships
+  (healthy and well armed, the strongest first) as it takes. Each boards at home, the ships wait
+  there for each other, and they sail to the beach together. A troop ship whose soldiers are too few calls the landing off and
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
 

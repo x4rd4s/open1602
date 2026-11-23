@@ -364,7 +364,8 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     // computer lands only a party big enough to storm them.
     const std::vector<std::pair<std::int32_t, std::int32_t>> on_beach = {{2, 5}, {2, 22}};
     const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole,
-                         const std::vector<std::pair<std::int32_t, std::int32_t>>& spots) {
+                         const std::vector<std::pair<std::int32_t, std::int32_t>>& spots, std::int32_t party = 6,
+                         std::uint32_t* landed = nullptr) {
         Coast a;
         a.figures = make_figures(true, tower_hit);
         a.build(kKontor, 28, 14, kComputer, 0);
@@ -396,7 +397,7 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
             }
             return n;
         };
-        for (std::int32_t k = 0; k < 6; ++k) {
+        for (std::int32_t k = 0; k < party; ++k) {
             a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
         }
         std::vector<std::pair<int, int>> at{{41, 15}};
@@ -418,9 +419,18 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
             run(s, 1'000);
         }
         towers_at_landing = towers();
+        const bool on = a.soldiers_on(kComputer, 1) > 0;
+        if (landed != nullptr) {
+            // The convoy's ships land one after the other.
+            *landed = 0;
+            for (std::uint32_t t = 0; t < 60; ++t) {
+                *landed = std::max(*landed, static_cast<std::uint32_t>(a.soldiers_on(kComputer, 1)));
+                run(s, 1'000);
+            }
+        }
         const sim::Ship* w = a.world.ship(2);
         warship_whole = w != nullptr && (w->health == 0 || w->health == 50 * 32);  // Maxenergy 50, 1/32
-        return a.soldiers_on(kComputer, 1) > 0;
+        return on;
     };
     std::uint32_t towers = 0;
     bool whole = false;
@@ -442,6 +452,12 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     CHECK(!play(true, "40.0", towers, whole, {{10, 10}}));
     CHECK(towers == 1);
     CHECK(whole);
+    // One that the soldiers of one ship (4 holds) are too few for, but those of two are enough:
+    // both ships take soldiers from home and land them together.
+    std::uint32_t landed = 0;
+    CHECK(play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed));
+    CHECK(landed > 4);
+    CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 4));
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

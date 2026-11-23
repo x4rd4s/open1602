@@ -1551,17 +1551,39 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
     }
     const Shelling plan = plan_shelling(p, t, towers, fleet, &s);
     if (plan.refusal != nullptr) {
+        // The soldiers aboard the convoy, the ships of this attack (start_attack) waiting at home;
+        // while one of them still boards, the others wait for it.
+        std::vector<Ship*> convoy;
+        bool boarding = false;
+        for (const ShipNote& o : p.ships) {
+            Ship* os = m_world.ship(o.id);
+            if (os == nullptr || o.param != param || (o.mission != 5 && o.mission != 6)) {
+                continue;
+            }
+            if (o.mission == 5) {
+                boarding = true;
+            } else if (os == &s || !ship_moving(*os)) {
+                convoy.push_back(os);
+            }
+        }
         std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
-        for (const CargoSlot& c : s.cargo) {
-            if (is_soldier_ware(c.ware)) {
-                party.emplace_back(hold_unit(c), 0U);
+        for (const Ship* o : convoy) {
+            for (const CargoSlot& c : o->cargo) {
+                if (is_soldier_ware(c.ware)) {
+                    party.emplace_back(hold_unit(c), 0U);
+                }
             }
         }
         const std::size_t needs = storm_needs(p, t, towers, party);
         if (needs <= party.size()) {
-            log(p, "ship %u storms the %zu towers of city %u/%u with %zu soldiers (needs %zu): %s", s.id, towers.size(),
-                t.island, t.index, party.size(), needs, plan.refusal);
-            ship_send(p, s, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
+            for (Ship* o : convoy) {
+                log(p, "ship %u storms the %zu towers of city %u/%u with %zu soldiers in %zu ships (needs %zu): %s",
+                    o->id, towers.size(), t.island, t.index, party.size(), convoy.size(), needs, plan.refusal);
+                ship_send(p, *o, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
+            }
+            return;
+        }
+        if (boarding && n.counter != 0) {
             return;
         }
         call_off(plan.refusal, plan.loss, plan.gain);
@@ -1961,6 +1983,55 @@ bool Engine::takes_landing(const AiPlayer& p, const Ship& s, const ShipNote& n) 
            free_holds(s) + soldiers_aboard(s) >= kLandingHolds && (classic() || healthy(s));
 }
 
+std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
+    // As best_armed_ship: strength above 8, equals in the order of the ships. Only notes the
+    // computer has: a ship without one is idle.
+    static const ShipNote idle{};
+    std::vector<std::pair<std::uint32_t, Ship*>> found;
+    for (Ship* s : own_ships(p)) {
+        const auto it = std::ranges::find(p.ships, s->id, &ShipNote::id);
+        if (!takes_landing(p, *s, it != p.ships.end() ? *it : idle)) {
+            continue;
+        }
+        const std::uint32_t score = ship_strength(health128(*s), s->cannons);
+        if (score > 8) {
+            found.emplace_back(score, s);
+        }
+    }
+    std::ranges::stable_sort(found, std::greater<>{}, &std::pair<std::uint32_t, Ship*>::first);
+    std::vector<Ship*> out;
+    for (const auto& [score, s] : found) {
+        out.push_back(s);
+    }
+    return out;
+}
+
+Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City& home,
+                                   const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships) {
+    // Ship by ship: their holds take the soldiers at home (as they board, soldiers_near), until
+    // these storm the towers, or no more soldiers are at home for another ship.
+    Convoy out;
+    std::uint32_t holds = 0;
+    for (std::size_t k = 0; k < ships.size(); ++k) {
+        holds += free_holds(*ships[k]);
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+        for (const Soldier* u : soldiers_near(p.player, home, 8, holds)) {
+            party.emplace_back(u->figure, u->health);
+        }
+        out.needs = storm_needs(p, t, towers, party);
+        out.has = party.size();
+        if (out.needs <= out.has) {
+            out.ships = k + 1;
+            return out;
+        }
+        if (party.size() < holds) {
+            break;
+        }
+    }
+    out.ships = 0;
+    return out;
+}
+
 Ship* Engine::best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same) {
     // An armed ship with room, well armed (and healthy, for an improved computer: takes_landing).
     (void)max_same;
@@ -2022,7 +2093,8 @@ bool Engine::defenceless(std::uint16_t island, std::uint8_t city) {
     return !d.defended[city];
 }
 
-bool Engine::attack_ok(AiPlayer& p, const City& t) {
+bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
+    convoy = 1;
     // The original's conditions, the cheap ones first: none has a side effect, so the
     // answer is the same, but most targets fail before the island or the world is walked (TB-9).
     for (const ShipNote& n : p.ships) {
@@ -2062,50 +2134,46 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
                     fleet.push_back(o);
                 }
                 const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
-                // Or the party a ship takes from home storms them on land (storm_needs). Logged when
-                // it begins and ends.
-                std::uint32_t holds = 0;
-                for (const Ship* o : fleet) {
-                    holds = std::max(holds, free_holds(*o));
-                }
-                std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
-                for (const Soldier* u : soldiers_near(p.player, *home, 8, holds)) {
-                    party.emplace_back(u->figure, u->health);
-                }
-                const std::size_t needs = plan.ships == 0 ? storm_needs(p, t, towers, party) : 0;
+                // Or the party that as many ships as it takes bring from home storms them on land
+                // (plan_convoy). Logged when it begins and ends.
+                const Convoy cv =
+                    plan.ships == 0 ? plan_convoy(p, t, *home, towers, landing_ships(p)) : Convoy{1, 0, 0};
+                const std::size_t needs = cv.needs;
+                const std::size_t has = cv.has;
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
                 const auto logged = std::ranges::find(m_skips_logged, key);
-                if (needs > party.size()) {
+                if (cv.ships == 0) {
                     if (logged == m_skips_logged.end()) {
                         m_skips_logged.push_back(key);
                         if (needs == SIZE_MAX) {
                             log(p,
                                 "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
                                 "no party at home that harms them (%zu soldiers)",
-                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "",
-                                party.size());
+                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", has);
                         } else {
                             log(p,
                                 "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
                                 "a party would need %zu soldiers, has %zu",
                                 t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", needs,
-                                party.size());
+                                has);
                         }
                     }
                     return false;
                 }
                 if (logged != m_skips_logged.end()) {
                     m_skips_logged.erase(logged);
-                    log(p, "skips city %u/%u no more: %s", t.island, t.index,
-                        plan.ships != 0 ? "its towers within the fleet's reach" : "a party big enough to storm them");
+                    log(p, "skips city %u/%u no more: %s (%zu ships)", t.island, t.index,
+                        plan.ships != 0 ? "its towers within the fleet's reach" : "a party big enough to storm them",
+                        cv.ships);
                 }
+                convoy = cv.ships;
             }
         }
     }
     return true;
 }
 
-void Engine::start_attack(AiPlayer& p, const City& t) {
+void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
     if (m_world.diplomacy().relation(p.player, t.owner).peace == Treaty::Signed) {
         return;
     }
@@ -2125,15 +2193,30 @@ void Engine::start_attack(AiPlayer& p, const City& t) {
         return;
     }
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
-    ship_send(p, *ship, ref, 5, city_param(t));
-    note(p, ship->id).counter = 80;
+    // Open1602: a convoy, as many ships as it takes to bring a party big enough to storm towers no
+    // fleet wrecks (attack_ok): each boards at home, and they land together (shell_towers).
+    std::vector<Ship*> ships{ship};
+    if (rivals() && convoy > 1) {
+        for (Ship* o : landing_ships(p)) {
+            if (ships.size() < convoy && o != ship) {
+                ships.push_back(o);
+                log(p, "ship %u joins the attack on city %u/%u (convoy of %zu)", o->id, t.island, t.index, convoy);
+            }
+        }
+    }
+    std::uint32_t holds = 0;
+    for (Ship* o : ships) {
+        ship_send(p, *o, ref, 5, city_param(t));
+        note(p, o->id).counter = 80;
+        holds += free_holds(*o);
+    }
     if (rivals() && home->warehouse_x && home->warehouse_y) {
         const WorldIsland& isl = island_of(home->island);
         SoldierOrder gather;
         gather.player = p.player;
         gather.target = Target::spot(2 * (isl.x + *home->warehouse_x) + 1, 2 * (isl.y + *home->warehouse_y) + 1);
         for (const Soldier& s : m_world.soldiers()) {
-            if (gather.soldiers.size() >= 8) {
+            if (gather.soldiers.size() >= std::max<std::size_t>(8, holds)) {
                 break;
             }
             if (s.owner == p.player && s.island == home->island && !s.away() &&
@@ -2188,6 +2271,7 @@ void Engine::target_scan(AiPlayer& p) {
     }
     const bool at_peace = m_world.diplomacy().relation(p.player, t.owner).peace == Treaty::Signed;
     bool ok = false;
+    std::size_t convoy = 1;
     if (o->role == PlayerRole::Human) {
         const City* own = nullptr;
         for (const City& c : cities) {
@@ -2206,17 +2290,17 @@ void Engine::target_scan(AiPlayer& p) {
         } else if (at_peace) {
             return;
         }
-        ok = attack_ok(p, t);
+        ok = attack_ok(p, t, convoy);
     } else if (m_world.behaviour(*o) == FactionBehaviour::Natives && !at_peace) {
-        ok = attack_ok(p, t);
+        ok = attack_ok(p, t, convoy);
     } else if (rivals() && o->role == PlayerRole::Computer && m_world.behaviour(*o) == FactionBehaviour::Settlers &&
                !at_peace && p.strategy.war_target == t.owner) {
         // Open1602: an improved computer attacks another computer it wages its war on, as a human;
         // after the war, while the peace is not signed yet, it leaves it alone.
-        ok = attack_ok(p, t);
+        ok = attack_ok(p, t, convoy);
     }
     if (ok) {
-        start_attack(p, t);
+        start_attack(p, t, convoy);
     }
 }
 

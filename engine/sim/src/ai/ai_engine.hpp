@@ -1115,8 +1115,22 @@ private:
     /// Open1602: the first of free_warships() (breach).
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
-    bool attack_ok(AiPlayer& p, const City& t);
-    void start_attack(AiPlayer& p, const City& t);
+    /// `convoy`: how many ships take the party (1 but where towers no fleet wrecks are stormed).
+    bool attack_ok(AiPlayer& p, const City& t, std::size_t& convoy);
+    void start_attack(AiPlayer& p, const City& t, std::size_t convoy);
+    /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
+    /// armed), the strongest first.
+    [[nodiscard]] std::vector<Ship*> landing_ships(AiPlayer& p);
+    /// Open1602: the fewest of `ships`, the first first, whose holds take a party from `home` big
+    /// enough to storm `towers` of `t` (storm_needs); `ships` 0 when none is, with the last needs
+    /// and party size.
+    struct Convoy {
+        std::size_t ships = 0;
+        std::size_t needs = SIZE_MAX;
+        std::size_t has = 0;
+    };
+    [[nodiscard]] Convoy plan_convoy(const AiPlayer& p, const City& t, const City& home,
+                                     const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships);
     void raid_outpost(AiPlayer& p, const City& t);
     void target_scan(AiPlayer& p);
     [[nodiscard]] std::vector<PlayerId> island_enemies(const AiPlayer& a, std::uint16_t island) const;
