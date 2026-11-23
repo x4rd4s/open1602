@@ -459,20 +459,17 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     CHECK(towers == 1);
     CHECK(whole);
     // One that the soldiers of one ship (4 holds) are too few for, but those of two are enough:
-    // both ships take soldiers from home and land them together.
+    // both ships take soldiers from home and land them together. Six soldiers: the second ship
+    // takes two, too few alone, but the convoy's six are enough, and the ships take them on board
+    // without calling each other's over.
     std::uint32_t landed = 0;
-    CHECK(play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed));
-    CHECK(landed > 4);
-    CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 4));
-    // The second ship of the convoy sails slowly: the first, off the beach long before it, lands
-    // no party too small alone, and the convoy turns home.
-    CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed, true));
-    CHECK(landed == 0);
-    // Six soldiers for two ships of four holds: the second takes two, too few alone, but the
-    // convoy's six are enough, and the ships take the soldiers on board without calling each
-    // other's over.
     CHECK(play(true, "6.0", towers, whole, {{10, 10}}, 6, &landed));
     CHECK(landed == 6);
+    CHECK(!play(true, "6.0", towers, whole, {{10, 10}}, 4));
+    // The second ship of the convoy sails slowly: the first, off the beach long before it, lands
+    // no party too small alone, and the convoy turns home.
+    CHECK(!play(true, "6.0", towers, whole, {{10, 10}}, 6, &landed, true));
+    CHECK(landed == 0);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

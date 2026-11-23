@@ -234,6 +234,10 @@ void Military::advance(Soldier& s, std::uint32_t budget_us) {
     }
 }
 
+std::uint32_t Military::crowded_ways(std::uint32_t ways) noexcept {
+    return std::min<std::uint32_t>(126, ways * 5 / 4);
+}
+
 std::uint64_t Military::cell_us(std::uint32_t speed, std::uint32_t ways, bool diagonal) noexcept {
     return (diagonal ? kDiagonalCellUs : kStraightCellUs) * ways / std::max<std::uint32_t>(1, speed);
 }
@@ -252,7 +256,7 @@ std::uint32_t Military::run_us(const Soldier& s, std::uint8_t direction, std::ui
         return crowded;
     });
     if (crowded) {
-        w = std::min<std::uint32_t>(126, w * 5 / 4);
+        w = crowded_ways(w);
     }
     const std::uint64_t per_cell = (direction & 1U) != 0 ? kDiagonalCellUs : kStraightCellUs;
     return static_cast<std::uint32_t>(std::max<std::uint64_t>(1, per_cell * w * cells / speed));

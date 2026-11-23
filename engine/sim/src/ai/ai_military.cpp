@@ -1769,12 +1769,15 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
                 if (d > f->range8 / 4) {
                     continue;
                 }
-                for (const Unit& u : party) {
+                for (std::size_t i = 0; i < party.size(); ++i) {
+                    const Unit& u = party[i];
                     if (d > u.range8 / 4) {
                         std::uint8_t ways = 0;
                         (void)m_sim.combat().land().cell(x, y, u.speed_type, &ways);
+                        // A party walks together: each but the first beside another (run_us).
+                        const std::uint32_t w = i == 0 ? ways : Military::crowded_ways(ways);
                         // a step of the tile way is two half tiles
-                        us += Military::cell_us(u.speed, ways, diagonal) * (tiles ? 2U : 1U);
+                        us += Military::cell_us(u.speed, w, diagonal) * (tiles ? 2U : 1U);
                     }
                 }
             }
