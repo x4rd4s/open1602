@@ -2710,9 +2710,22 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
     // A hostile city: the group with the most soldiers goes for its markets, its Kontor,
     // its houses. Without one: the soldiers meet the largest enemy group with a quarter more.
     std::vector<std::uint32_t> mine;
+    // Open1602: a soldier whose target is a building no longer standing (a tree felled, a house
+    // wrecked) stands idle with it, as a player sees: it gets the next order too. Trace trW: the
+    // party that cut a forest ring under a tower's fire waited on felled trees while two of seven
+    // fired at the tower.
+    const auto gone = [&](const Target& t) {
+        if (!rivals() || t.kind != Target::Kind::Building || t.island != island) {
+            return false;
+        }
+        const Tile b = tile(island, static_cast<std::int32_t>(t.x), static_cast<std::int32_t>(t.y));
+        return !b.valid() || b.type->destroyed || b.kind == kind::kGround || b.kind == kind::kRuin ||
+               b.kind == kind::kBeachRuin;
+    };
     for (const Soldier& s : m_world.soldiers()) {
         if (s.owner == a.player && s.island == island && !s.away() &&
-            (s.target.empty() || s.target.kind == Target::Kind::Position || s.target.kind == Target::Kind::Spot)) {
+            (s.target.empty() || s.target.kind == Target::Kind::Position || s.target.kind == Target::Kind::Spot ||
+             gone(s.target))) {
             mine.push_back(s.id);
         }
     }
@@ -2721,6 +2734,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
     }
     const City* hostile = nullptr;
     std::vector<std::pair<std::int32_t, std::int32_t>> goals;
+    bool for_tower = false;  // the goals are towers, or what stands on the way to one (way_in)
     for (const City& c : m_world.cities()) {
         if (c.island != island || std::find(enemies.begin(), enemies.end(), c.owner) == enemies.end()) {
             continue;
@@ -2760,6 +2774,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             if (!over.empty() && reachable_goals(a, island, c, mine, over)) {
                 goals = std::move(over);
                 hostile = &c;
+                for_tower = true;
                 break;
             }
         }
@@ -2773,6 +2788,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             // cutting their way to a tower behind a forest; the houses when no way leads to one.
             if (!goals.empty() && reachable_goals(a, island, c, mine, goals)) {
                 hostile = &c;
+                for_tower = true;
                 break;
             }
             goals.clear();
@@ -2798,9 +2814,10 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
     }
     if (hostile != nullptr) {
         // Open1602 (F15): a tower shoots back, and four soldiers fall one by one where all of them
-        // take it: all go for a tower.
-        const bool tower =
-            rivals() && !goals.empty() && is_tower(tile(island, goals.front().first, goals.front().second));
+        // take it: all go for a tower, and all cut the way to one together (trace trW: four of
+        // seven cut a forest ring under its fire, the others stood).
+        const bool tower = rivals() && !goals.empty() &&
+                           (for_tower || is_tower(tile(island, goals.front().first, goals.front().second)));
         std::size_t next = 0;
         for (std::size_t g = 0; g < goals.size() && next < mine.size(); ++g) {
             const std::size_t count = tower ? mine.size() : g == 0 ? 4 : 2;

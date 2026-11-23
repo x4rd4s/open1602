@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <vector>
 
 #include "../../engine/sim/src/ai/ai_engine.hpp"
@@ -546,6 +547,47 @@ TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved s
     CHECK(at_trees >= 4);
     CHECK(!play(true, at_trees));
     CHECK(at_trees == 0);
+}
+
+TEST_CASE("ai military: improved soldiers cutting their way to a tower do not wait on felled trees") {
+    // Trace trW: a party cut a forest ring under a tower's fire, four of seven at a time, and those
+    // whose tree was down stood with it as their target until the island's next order passed them
+    // by. All take the next tree, the moment theirs is felled.
+    Island a;
+    a.build(kKontor, 4, 8, kComputer, 0);
+    a.build(kTower, 70, 8, kHuman, 1);
+    for (std::int32_t y = 0; y < 20; ++y) {
+        for (std::int32_t x = 60; x <= 62; ++x) {
+            a.tree(x, y);
+        }
+    }
+    for (std::int32_t k = 0; k < 6; ++k) {
+        a.add(kComputer, 100, 24 + 2 * k);
+    }
+    a.war();
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    const sim::IslandMap& map = a.world.islands()[0].map;
+    std::size_t idle = 0;  // soldier-seconds with a felled tree as the target
+    std::size_t cutting = 0;
+    for (std::uint32_t t = 0; t < 180; ++t) {
+        run(s, 1'000);
+        for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
+            if (soldier->target.kind != sim::Target::Kind::Building || soldier->target.x < 60 ||
+                soldier->target.x > 62) {
+                continue;
+            }
+            const sim::MapCell& c = map.top(soldier->target.x, soldier->target.y);
+            const auto* b = c.empty() ? nullptr : a.buildings.by_sprite(c.sprite);
+            if (b == nullptr || b->id != kTree) {  // no tree there any more
+                ++idle;
+            } else {
+                ++cutting;
+            }
+        }
+    }
+    std::printf("felled-tree targets: idle %zu, cutting %zu\n", idle, cutting);
+    CHECK(cutting > 0);
+    CHECK(idle * 10 <= cutting);
 }
 
 TEST_CASE("ai military: an improved computer counts every tower of a city with no market or Kontor as in the way") {
