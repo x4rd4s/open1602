@@ -329,6 +329,10 @@ public:
                                                                                      bool wall = false,
                                                                                      bool any = false) const;
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
+    /// Open1602: how many hostile towers lie in the way of a party from cell (cx, cy) to city `c`
+    /// (towers_over_way).
+    [[nodiscard]] std::size_t towers_in_the_way(const AiPlayer& p, const City& c, std::int32_t cx,
+                                                std::int32_t cy) const;
     /// Open1602 (3b): with `s`, a covering tower it can shell (shells_from_water) when a beach is free.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> breach_target(const AiPlayer& p, const City& c,
                                                                                      const Ship* s = nullptr) const;

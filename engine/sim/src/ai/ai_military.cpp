@@ -1383,6 +1383,10 @@ std::vector<Engine::TowerCover> Engine::covering_towers(const AiPlayer& p, const
                            2 * (static_cast<std::int32_t>(isl.y) + beach.second));
 }
 
+std::size_t Engine::towers_in_the_way(const AiPlayer& p, const City& c, std::int32_t cx, std::int32_t cy) const {
+    return towers_over_way(p, c, cx, cy).size();
+}
+
 std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
                                                         std::int32_t cy) const {
     // covering_towers from cell (cx, cy).

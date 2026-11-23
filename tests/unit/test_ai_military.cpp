@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "../../engine/sim/src/ai/ai_engine.hpp"
 #include "../test_framework.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -545,6 +546,54 @@ TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved s
     CHECK(at_trees >= 4);
     CHECK(!play(true, at_trees));
     CHECK(at_trees == 0);
+}
+
+TEST_CASE("ai military: an improved computer counts every tower of a city with no market or Kontor as in the way") {
+    // The F15 city: a house and a tower behind a forest, no market, no Kontor. Its soldiers go for
+    // the tower wherever they stand, so a landing is sized against it (towers_over_way), though
+    // it covers neither the beach nor a way. In a game a city comes to this when an earlier attack
+    // destroyed its markets and Kontor and left the tower.
+    const auto towers = [](bool classic) {
+        Island a;
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 1\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Shotradius: 0.75\n  Maxstepcnt: 1\n"
+            "  Rohstoff: 11\n  Rohmenge: 3\n  Worktime: 0.8\n  Shottime: 0.6\n  Maxenergy: 20\n  Hitpoint: 1.0\n"
+            "  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: 1.0\n  Worktime: 3.0\n"
+            "  Shotradius: 7.5\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        a.figures = std::move(figures).value();
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kTower, 70, 8, kHuman, 1);
+        sim::Tower tw;
+        tw.island = 0;
+        tw.x = 70;
+        tw.y = 8;
+        tw.owner = kHuman;
+        tw.figure = 38;  // KANONTURM
+        a.world.towers().push_back(tw);
+        a.build(kHouse, 40, 4, kHuman, 1);
+        for (std::int32_t y = 0; y < 20; ++y) {
+            for (std::int32_t x = 60; x <= 62; ++x) {
+                a.tree(x, y);
+            }
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        // From the far side of the island, out of the tower's reach.
+        return engine.towers_in_the_way(p, *a.world.city(0, 1), 2 * (10 + 20), 2 * (10 + 18));
+    };
+    CHECK(towers(false) == 1);
+    CHECK(towers(true) == 0);
 }
 
 TEST_CASE("ai military: improved soldiers go first for the tower that covers their way to the market") {
