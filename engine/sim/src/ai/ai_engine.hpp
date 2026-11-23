@@ -1107,7 +1107,13 @@ private:
     /// walk from cell `from` (the beach) through their reach. SIZE_MAX when the party does no harm.
     [[nodiscard]] std::size_t storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
                                           const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units,
-                                          std::pair<std::int32_t, std::int32_t> from) const;
+                                          std::pair<std::int32_t, std::int32_t> from,
+                                          std::size_t* plain = nullptr) const;
+    /// Open1602: the half-tile cells (tile centres) of the soldiers' walk from cell `from` to the
+    /// nearest tile within `reach8` of `f`; empty when no walk leads there.
+    [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> walk_path(
+        const AiPlayer& p, std::uint16_t island, std::pair<std::int32_t, std::int32_t> from, const Fighter& f,
+        std::int32_t reach8) const;
     /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
     /// water nearest to it (water_near), within its Shotradius.
     [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;
@@ -1132,6 +1138,7 @@ private:
         std::size_t ships = 0;
         std::size_t needs = SIZE_MAX;
         std::size_t has = 0;
+        std::size_t plain = SIZE_MAX;  ///< `needs` without the walk under fire (logged)
     };
     [[nodiscard]] Convoy plan_convoy(const AiPlayer& p, const City& t, const City& home,
                                      const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,

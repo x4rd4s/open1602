@@ -491,8 +491,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   there for each other, and they sail to the beach together. Off the beach the first ship waits
   for the others, up to its tries; when they run out it lands alone only if its own soldiers are
   enough, and otherwise the whole convoy turns home: no ships one by one. The party's size counts
-  the walk through the towers' reach to its own, along the line from the beach at the land's
-  `Wegspeed`, under their fire before it can shoot. A troop ship whose soldiers are too few calls the landing off and
+  the walk through the towers' reach to its own, under their fire before it can shoot: the
+  shortest walk over open land from the beach (the straight line where none leads there, as
+  through a forest), at the land's `Wegspeed`. It does not count the units slowing each other
+  down, so it still expects the walk to be shorter than it is. A troop ship whose soldiers are too few calls the landing off and
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
 

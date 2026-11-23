@@ -1604,19 +1604,28 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
             }
         }
         const WorldIsland& bi = island_of(t.island);
+        std::size_t plain = 0;  // logged: what it needs without the walk
         const std::size_t needs = storm_needs(p, t, towers, party,
                                               {2 * (static_cast<std::int32_t>(bi.x) + beach.first) + 1,
-                                               2 * (static_cast<std::int32_t>(bi.y) + beach.second) + 1});
+                                               2 * (static_cast<std::int32_t>(bi.y) + beach.second) + 1},
+                                              &plain);
         if (needs <= party.size()) {
             for (Ship* o : convoy) {
-                log(p, "ship %u storms the %zu towers of city %u/%u with %zu soldiers in %zu ships (needs %zu): %s",
-                    o->id, towers.size(), t.island, t.index, party.size(), convoy.size(), needs, plan.refusal);
+                log(p,
+                    "ship %u storms the %zu towers of city %u/%u with %zu soldiers in %zu ships (needs %zu, %zu "
+                    "without the walk): %s",
+                    o->id, towers.size(), t.island, t.index, party.size(), convoy.size(), needs, plain, plan.refusal);
                 ship_send(p, *o, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
             }
             return;
         }
         if (boarding && n.counter != 0) {
             return;
+        }
+        if (plain <= party.size()) {
+            log(p,
+                "ship %u: the walk under the towers' fire keeps %zu soldiers from storming (needs %zu, %zu without it)",
+                s.id, party.size(), needs, plain);
         }
         call_off(plan.refusal, plan.loss, plan.gain);
         return;
@@ -1632,7 +1641,7 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
 
 std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
                                 const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units,
-                                std::pair<std::int32_t, std::int32_t> from) const {
+                                std::pair<std::int32_t, std::int32_t> from, std::size_t* plain) const {
     // In unit-seconds (ms): the work of wrecking the towers (their health by the party's mean fire
     // on them, Military::building_hit) and of beating the island's hostile soldiers, against what
     // k units give under the towers' and soldiers' fire E, which kills one of mean health h every
@@ -1640,6 +1649,9 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
     // on the straight line from `from` (Military::cell_us by the land's Wegspeed, the walk T):
     // unit i fires from T on until it falls at i D, so k give the sum of i D - T over the i whose
     // i D is past T.
+    if (plain != nullptr) {
+        *plain = SIZE_MAX;
+    }
     const assets::FigureTable* figures = m_sim.figures();
     if (figures == nullptr) {
         return SIZE_MAX;
@@ -1653,8 +1665,9 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
         std::uint8_t speed_type = 0;
     };
     std::vector<Unit> party;
-    std::uint64_t health = 0;  // 1/32 HP
-    std::uint64_t fire = 0;    // on soldiers, 1/32 HP per second
+    std::int32_t reach8 = std::numeric_limits<std::int32_t>::max();  // the shortest Shotradius
+    std::uint64_t health = 0;                                        // 1/32 HP
+    std::uint64_t fire = 0;                                          // on soldiers, 1/32 HP per second
     for (const auto& [figure, h] : units) {
         const assets::FigureType* ft = figures->get(figure);
         if (ft == nullptr || ft->work_time_ms == 0) {
@@ -1664,6 +1677,7 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
         const std::uint32_t now = h != 0 ? std::min(h, max) : max;
         Unit u;
         u.range8 = static_cast<std::int32_t>(ft->combat.range8);
+        reach8 = std::min(reach8, u.range8);
         u.speed = ft->speed;
         u.speed_type = ft->speed_type;
         u.damage = Combat::scaled_damage(ft->combat.hit, now, max);
@@ -1686,17 +1700,24 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
             continue;
         }
         if (const auto f = m_sim.combat().fighter(Target::building(c.island, tc.x, tc.y))) {
-            // The cells of the line from `from` to the tower within its reach, and not yet within
-            // the unit's own.
-            const std::int32_t tx = f->x8 / 4;
-            const std::int32_t ty = f->y8 / 4;
-            const std::int32_t steps = std::max(std::abs(tx - from.first), std::abs(ty - from.second));
+            // The way from `from` up to the tower (walk_path: the walk around what stands in the
+            // way; the straight line where none leads there), its cells within the tower's reach and
+            // not yet within the unit's own.
+            std::vector<std::pair<std::int32_t, std::int32_t>> way = walk_path(p, c.island, from, *f, reach8);
+            const bool tiles = !way.empty();
+            if (!tiles) {
+                const std::int32_t tx = f->x8 / 4;
+                const std::int32_t ty = f->y8 / 4;
+                const std::int32_t steps = std::max(std::abs(tx - from.first), std::abs(ty - from.second));
+                for (std::int32_t k = 1; k <= steps; ++k) {
+                    way.emplace_back(from.first + (tx - from.first) * k / steps,
+                                     from.second + (ty - from.second) * k / steps);
+                }
+            }
             std::uint64_t us = 0;  // the party's walks through its reach, summed
             std::int32_t px = from.first;
             std::int32_t py = from.second;
-            for (std::int32_t k = 1; k <= steps; ++k) {
-                const std::int32_t x = from.first + (tx - from.first) * k / steps;
-                const std::int32_t y = from.second + (ty - from.second) * k / steps;
+            for (const auto& [x, y] : way) {
                 const bool diagonal = x != px && y != py;
                 px = x;
                 py = y;
@@ -1708,7 +1729,8 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
                     if (d > u.range8 / 4) {
                         std::uint8_t ways = 0;
                         (void)m_sim.combat().land().cell(x, y, u.speed_type, &ways);
-                        us += Military::cell_us(u.speed, ways, diagonal);
+                        // a step of the tile way is two half tiles
+                        us += Military::cell_us(u.speed, ways, diagonal) * (tiles ? 2U : 1U);
                     }
                 }
             }
@@ -1738,30 +1760,89 @@ std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vec
         threat += std::uint64_t{Combat::scaled_damage(ft->combat.hit, now, max)} * 1000U / ft->work_time_ms;
     }
     if (threat == 0) {
+        if (plain != nullptr) {
+            *plain = 1;
+        }
         return 1;
     }
     // Times n E: f(k) = A (k (k + 1) / 2 - m (m + 1) / 2) - B (k - m) >= C, with A = health 1000
     // (n h 1000), B = n T E, C = n work E, and m = B / A the units that fall on the walk; the least
     // k from the root of the quadratic, set exact in whole numbers.
     const auto a = static_cast<std::int64_t>(health * 1000U);
-    const auto b = static_cast<std::int64_t>(n * walk * threat);
     const auto cc = static_cast<std::int64_t>(work * n * threat);
-    const std::int64_t m = b / a;
-    const auto f = [&](std::int64_t k) { return a * (k * (k + 1) / 2 - m * (m + 1) / 2) - b * (k - m); };
-    const double qa = static_cast<double>(a) / 2.0;
-    const double qb = static_cast<double>(a) / 2.0 - static_cast<double>(b);
-    const double qc = static_cast<double>(b) * static_cast<double>(m) -
-                      static_cast<double>(a) * static_cast<double>(m) * static_cast<double>(m + 1) / 2.0 -
-                      static_cast<double>(cc);
-    auto k = std::max<std::int64_t>(
-        m + 1, static_cast<std::int64_t>((-qb + std::sqrt(std::max(0.0, qb * qb - 4.0 * qa * qc))) / (2.0 * qa)));
-    while (f(k) < cc) {
-        ++k;
+    const auto least = [&](std::int64_t b) {
+        const std::int64_t m = b / a;
+        const auto f = [&](std::int64_t k) { return a * (k * (k + 1) / 2 - m * (m + 1) / 2) - b * (k - m); };
+        const double qa = static_cast<double>(a) / 2.0;
+        const double qb = static_cast<double>(a) / 2.0 - static_cast<double>(b);
+        const double qc = static_cast<double>(b) * static_cast<double>(m) -
+                          static_cast<double>(a) * static_cast<double>(m) * static_cast<double>(m + 1) / 2.0 -
+                          static_cast<double>(cc);
+        auto k = std::max<std::int64_t>(
+            m + 1, static_cast<std::int64_t>((-qb + std::sqrt(std::max(0.0, qb * qb - 4.0 * qa * qc))) / (2.0 * qa)));
+        while (f(k) < cc) {
+            ++k;
+        }
+        while (k > m + 1 && f(k - 1) >= cc) {
+            --k;
+        }
+        return static_cast<std::size_t>(std::max<std::int64_t>(k, 1));
+    };
+    if (plain != nullptr) {
+        *plain = least(0);
     }
-    while (k > m + 1 && f(k - 1) >= cc) {
-        --k;
+    return least(static_cast<std::int64_t>(n * walk * threat));
+}
+
+std::vector<std::pair<std::int32_t, std::int32_t>> Engine::walk_path(const AiPlayer& p, std::uint16_t island,
+                                                                     std::pair<std::int32_t, std::int32_t> from,
+                                                                     const Fighter& f, std::int32_t reach8) const {
+    // Breadth first over the tiles the soldiers walk on (walk_flood's), from the tile of `from` to
+    // the nearest within `reach8` of the fighter's cells.
+    const WorldIsland& isl = island_of(island);
+    const auto w = static_cast<std::int32_t>(isl.map.width());
+    const auto h = static_cast<std::int32_t>(isl.map.height());
+    const auto ox = static_cast<std::int32_t>(isl.x);
+    const auto oy = static_cast<std::int32_t>(isl.y);
+    const std::int32_t sx = from.first / 2 - ox;
+    const std::int32_t sy = from.second / 2 - oy;
+    std::vector<std::pair<std::int32_t, std::int32_t>> out;
+    if (sx < 0 || sy < 0 || sx >= w || sy >= h) {
+        return out;
     }
-    return static_cast<std::size_t>(std::max<std::int64_t>(k, 1));
+    const LandMap& land = m_sim.m_combat.land();
+    const auto at = [w](std::int32_t x, std::int32_t y) { return static_cast<std::size_t>(y * w + x); };
+    const auto goal = [&](std::int32_t x, std::int32_t y) {
+        return f.cells.distance(2 * (ox + x) + 1, 2 * (oy + y) + 1) <= reach8 / 4;
+    };
+    std::vector<std::int32_t> parent(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), -1);
+    std::vector<std::pair<std::int32_t, std::int32_t>> queue{{sx, sy}};
+    parent[at(sx, sy)] = static_cast<std::int32_t>(at(sx, sy));
+    constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kSteps = {{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const auto [x, y] = queue[head];
+        if (goal(x, y)) {
+            for (std::size_t i = at(x, y); static_cast<std::int32_t>(i) != parent[i];
+                 i = static_cast<std::size_t>(parent[i])) {
+                const auto ix = static_cast<std::int32_t>(i) % w;
+                const auto iy = static_cast<std::int32_t>(i) / w;
+                out.emplace_back(2 * (ox + ix) + 1, 2 * (oy + iy) + 1);
+            }
+            std::ranges::reverse(out);
+            return out;
+        }
+        for (const auto& [dx, dy] : kSteps) {
+            const std::int32_t nx = x + dx;
+            const std::int32_t ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h || parent[at(nx, ny)] != -1 ||
+                land.tile(ox + nx, oy + ny, 0, nullptr, p.player) != LandMap::Cell::Walk) {
+                continue;
+            }
+            parent[at(nx, ny)] = static_cast<std::int32_t>(at(x, y));
+            queue.emplace_back(nx, ny);
+        }
+    }
+    return out;
 }
 
 bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -2126,7 +2207,7 @@ Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City&
         for (const Soldier* u : soldiers_near(p.player, home, 8, holds)) {
             party.emplace_back(u->figure, u->health);
         }
-        out.needs = storm_needs(p, t, towers, party, from);
+        out.needs = storm_needs(p, t, towers, party, from, &out.plain);
         out.has = party.size();
         if (out.needs <= out.has) {
             out.ships = k + 1;
@@ -2249,7 +2330,7 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                         ? plan_convoy(p, t, *home, towers, landing_ships(p),
                                       {2 * (static_cast<std::int32_t>(island_of(t.island).x) + beach->first) + 1,
                                        2 * (static_cast<std::int32_t>(island_of(t.island).y) + beach->second) + 1})
-                        : Convoy{1, 0, 0};
+                        : Convoy{1, 0, 0, 0};
                 const std::size_t needs = cv.needs;
                 const std::size_t has = cv.has;
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
@@ -2265,9 +2346,9 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                         } else {
                             log(p,
                                 "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
-                                "a party would need %zu soldiers, has %zu",
+                                "a party would need %zu soldiers (%zu without the walk), has %zu",
                                 t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", needs,
-                                has);
+                                cv.plain, has);
                         }
                     }
                     return false;
