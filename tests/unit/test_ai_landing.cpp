@@ -371,7 +371,7 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     const std::vector<std::pair<std::int32_t, std::int32_t>> on_beach = {{2, 5}, {2, 22}};
     const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole,
                          const std::vector<std::pair<std::int32_t, std::int32_t>>& spots, std::int32_t party = 6,
-                         std::uint32_t* landed = nullptr, bool slow = false) {
+                         std::uint32_t* landed = nullptr, bool slow = false, std::uint32_t aboard = 0) {
         Coast a;
         a.figures = make_figures(true, tower_hit, slow);
         a.build(kKontor, 28, 14, kComputer, 0);
@@ -415,6 +415,12 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
                                             slow && y == 20 ? 22U : kShipFigure, kComputer, 2);
             ship.cargo.resize(4);
             ship.cannons = 4;
+            if (y == 15) {
+                for (std::uint32_t k = 0; k < aboard; ++k) {
+                    ship.cargo[k].ware = assets::unit_ware(kSword);  // back from a called-off landing
+                    ship.cargo[k].amount = sim::kHoldCapacity;
+                }
+            }
             a.world.add_ship(ship);
         }
         REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
@@ -470,6 +476,10 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     // no party too small alone, and the convoy turns home.
     CHECK(!play(true, "6.0", towers, whole, {{10, 10}}, 6, &landed, true));
     CHECK(landed == 0);
+    // Four soldiers still aboard the first ship and four at home, too few alone: the convoy counts
+    // both (trace trS: soldiers aboard were left out of the party).
+    CHECK(play(true, "6.0", towers, whole, {{10, 10}}, 4, &landed, false, 4));
+    CHECK(landed == 8);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {

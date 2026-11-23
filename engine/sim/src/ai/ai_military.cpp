@@ -2257,13 +2257,20 @@ std::vector<Ship*> Engine::landing_ships(AiPlayer& p) {
 Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City& home,
                                    const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,
                                    std::pair<std::int32_t, std::int32_t> from) {
-    // Ship by ship: their holds take the soldiers at home (as they board, soldiers_near), until
-    // these storm the towers, or no more soldiers are at home for another ship.
+    // Ship by ship: the soldiers aboard them and those at home their free holds take (as they
+    // board, soldiers_near), until these storm the towers, or no more soldiers are at home for
+    // another ship. A ship back from a called-off landing still has its party aboard (takes_landing).
     Convoy out;
     std::uint32_t holds = 0;
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> aboard;
     for (std::size_t k = 0; k < ships.size(); ++k) {
         holds += free_holds(*ships[k]);
-        std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+        for (const CargoSlot& h : ships[k]->cargo) {
+            if (is_soldier_ware(h.ware)) {
+                aboard.emplace_back(hold_unit(h), 0U);
+            }
+        }
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> party = aboard;
         for (const Soldier* u : soldiers_near(p.player, home, 8, holds)) {
             party.emplace_back(u->figure, u->health);
         }
@@ -2273,7 +2280,7 @@ Engine::Convoy Engine::plan_convoy(const AiPlayer& p, const City& t, const City&
             out.ships = k + 1;
             return out;
         }
-        if (party.size() < holds) {
+        if (party.size() < aboard.size() + holds) {
             break;
         }
     }
