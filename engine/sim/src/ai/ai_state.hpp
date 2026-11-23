@@ -7,9 +7,11 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "o1602/assets/resident_classes.hpp"
@@ -533,6 +535,15 @@ struct AiPlayer {
     /// Not saved: where Engine::note() last found a ship in `ships`, checked before it is used
     /// (`ships` may have been reordered or shortened since). Only looked up, never walked.
     std::unordered_map<std::uint32_t, std::uint32_t> ship_slots;
+    /// Not saved: by city (island, index), what the refresh last logged as kept in debt: producers
+    /// kept running because their ware sold (production_switches), kept standing because it sold,
+    /// farms with fields kept standing (shed_producers). Logged again only when it changes.
+    struct DebtKept {
+        std::uint32_t running = 0;   ///< kept running because their ware sold
+        std::uint32_t standing = 0;  ///< kept standing because their ware sold
+        std::uint32_t farms = 0;     ///< farms with fields kept standing
+    };
+    std::map<std::pair<std::uint16_t, std::uint8_t>, DebtKept> debt_kept;
     std::int32_t fleet_target = 0;  ///< pirates: the last new ship is armed
     std::int32_t ships_per_city = 1;
     /// Open1602, improved computers: game time the fleet target last held; it falls only ten

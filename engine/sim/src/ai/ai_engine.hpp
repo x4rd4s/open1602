@@ -340,6 +340,15 @@ public:
     /// on credit and the upkeep took half the civil income (gate f24, l3 g12-404-p3 P7).
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
+    using WareSet = std::array<bool, 256>;
+    /// The wares `player`'s cities sold in the last hour, by their goods statistics (GoodsLedger,
+    /// the window "Warenbilanz" a player reads): a buyer takes them, so in debt they earn gold.
+    [[nodiscard]] static WareSet sold_wares(const World& world, PlayerId player);
+    /// Whether a producer of type `b` may be torn down in debt when its ware is not in `keep`:
+    /// workshops, mines, pastures, hunters and fishers. A farm with fields only goes off
+    /// (production_switches): torn down, its fields would be swept with it and cost the whole
+    /// plantation again once the ware sells or is wanted (gate f25, g4-202 P1).
+    [[nodiscard]] static bool may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -592,8 +601,8 @@ private:
     /// Deep in debt: tears down the city's producers of wares none of the computer's cities needs.
     void shed_producers(AiPlayer& p, City& c);
     void shed_public(AiPlayer& p, City& c);
-    using WareSet = std::array<bool, 256>;
-    [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon) const;
+    /// With `sales` also the wares its cities sold in the last hour (sold_wares).
+    [[nodiscard]] WareSet needed_wares(const AiPlayer& p, bool soon, bool sales = true) const;
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
     [[nodiscard]] bool saving_costs(const AiPlayer& p) const;
     void tax_rates(AiPlayer& p, City& c);
