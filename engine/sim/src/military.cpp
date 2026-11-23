@@ -480,15 +480,17 @@ std::uint32_t Military::building_damage(std::uint16_t island, std::uint16_t x, s
     return 0;
 }
 
+std::uint32_t Military::building_hit(std::uint32_t damage, bool cannon, std::int32_t kind) noexcept {
+    return !cannon && sturdy(kind) ? damage * 51 / 128 : damage;
+}
+
 void Military::damage_building(std::uint16_t island, std::uint16_t x, std::uint16_t y, std::uint32_t damage,
                                bool cannon, PlayerId attacker, std::vector<ConstructionEvent>* construction) {
     const auto b = building_at(*m_world, *m_buildings, island, {x, y});
     if (!b) {
         return;
     }
-    if (!cannon && sturdy(b->type->kind)) {
-        damage = damage * 51 / 128;
-    }
+    damage = building_hit(damage, cannon, b->type->kind);
     const auto ox = static_cast<std::uint16_t>(b->origin.x);
     const auto oy = static_cast<std::uint16_t>(b->origin.y);
     auto& list = m_world->building_damage();

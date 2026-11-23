@@ -481,10 +481,14 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   is left, must be worth more than the price of the ships the towers' fire would sink. A ship
   still sailing up to its tower spends no try. With no warship free the troop ship shells them
   itself, its soldiers counted with its price. Where no fleet of its ships can wreck the towers
-  (none in reach, or they would turn away first), it attacks no such city (a stopgap: a party sized to take such towers on land is the step to come); and when a landing
-  comes to it anyway (it does not pay, or after the tries) it calls the landing off and takes the
-  troops home rather than land them under the towers: in the gate games every such party died
-  without taking the city.
+  (none in reach, or they would turn away first, or it does not pay), the soldiers may storm
+  them on land. They do so only when the party is big enough: the towers' fire, and that of the
+  hostile soldiers on the island, kills one unit after the other, and the units fire on the
+  towers (non-cannon shots do 51/128 on towers, as in the game) and on those soldiers until then.
+  The computer attacks such a city only when the soldiers at its home, as many as a ship of its
+  takes, are enough for that. A troop ship whose soldiers are too few calls the landing off and
+  takes them home rather than land them under the towers: in the gate games every party too small
+  for them died without taking the city. It does the same when its tries run out.
 
 ## Ships, ways and colonies
 

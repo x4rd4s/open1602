@@ -1307,7 +1307,7 @@ void Engine::plan_landing(AiPlayer& p, Ship& s, ShipNote& n) {
     // can, the landing is called off (shell_towers).
     if (rivals()) {
         if (const auto towers = covering_towers(p, *t, *beach); !towers.empty()) {
-            shell_towers(p, s, n, *t, towers);
+            shell_towers(p, s, n, *t, towers, *beach);
             return;
         }
     }
@@ -1519,11 +1519,13 @@ Engine::Shelling Engine::plan_shelling(const AiPlayer& p, const City& t, const s
     return out;
 }
 
-void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers) {
+void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers,
+                          std::pair<std::int32_t, std::int32_t> beach) {
     // The towers over the landing are shelled first (plan_shelling), while the troop ship waits at
     // home, out of their reach, or by the troop ship itself. Open1602:
-    // where no fleet can wreck them it calls the landing off rather than land under them, where every
-    // party died without taking a city (gate f17: 27 of 27).
+    // where no fleet can wreck them the soldiers aboard storm them on land when they are enough for
+    // it (storm_needs); else it calls the landing off rather than land under them, where every
+    // party too small for them died without taking a city (gate f17: 27 of 27).
     const std::uint32_t param = city_param(t);
     const auto call_off = [&](const char* why, std::uint64_t loss, std::uint64_t gain) {
         log(p, "ship %u calls the landing under %zu towers of city %u/%u off: %s (loss %llu, gain %llu)", s.id,
@@ -1548,6 +1550,19 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
     }
     const Shelling plan = plan_shelling(p, t, towers, fleet, &s);
     if (plan.refusal != nullptr) {
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+        for (const CargoSlot& c : s.cargo) {
+            if (is_soldier_ware(c.ware)) {
+                party.emplace_back(hold_unit(c), 0U);
+            }
+        }
+        const std::size_t needs = storm_needs(p, t, towers, party);
+        if (needs <= party.size()) {
+            log(p, "ship %u storms the %zu towers of city %u/%u with %zu soldiers (needs %zu): %s", s.id, towers.size(),
+                t.island, t.index, party.size(), needs, plan.refusal);
+            ship_send(p, s, water_near(t.island, beach.first, beach.second), kMissionLanding, t.owner);
+            return;
+        }
         call_off(plan.refusal, plan.loss, plan.gain);
         return;
     }
@@ -1558,6 +1573,85 @@ void Engine::shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, cons
             static_cast<unsigned long long>(plan.loss), static_cast<unsigned long long>(plan.gain));
         ship_send(p, *fleet[k], at, kMissionBreach, param);
     }
+}
+
+std::size_t Engine::storm_needs(const AiPlayer& p, const City& c, const std::vector<TowerCover>& towers,
+                                const std::vector<std::pair<std::uint32_t, std::uint32_t>>& units) const {
+    // In unit-seconds (ms): the work of wrecking the towers (their health by the party's mean fire
+    // on them, Military::building_hit) and of beating the island's hostile soldiers, against what
+    // k units give under the towers' and soldiers' fire E, which kills one of mean health h every
+    // h / E: k + (k - 1) + ... + 1 times h / E.
+    const assets::FigureTable* figures = m_sim.figures();
+    if (figures == nullptr) {
+        return SIZE_MAX;
+    }
+    struct Unit {
+        std::uint32_t damage = 0;  // 1/32 HP per shot
+        std::uint32_t work_time_ms = 1;
+        bool cannon = false;
+    };
+    std::vector<Unit> party;
+    std::uint64_t health = 0;  // 1/32 HP
+    std::uint64_t fire = 0;    // on soldiers, 1/32 HP per second
+    for (const auto& [figure, h] : units) {
+        const assets::FigureType* ft = figures->get(figure);
+        if (ft == nullptr || ft->work_time_ms == 0) {
+            continue;
+        }
+        const std::uint32_t max = std::max<std::uint32_t>(1, ft->combat.max_health);
+        const std::uint32_t now = h != 0 ? std::min(h, max) : max;
+        Unit u;
+        u.damage = Combat::scaled_damage(ft->combat.hit, now, max);
+        u.work_time_ms = ft->work_time_ms;
+        u.cannon = ft->kind == figtype::kGunner;
+        party.push_back(u);
+        health += now;
+        fire += std::uint64_t{u.damage} * 1000U / u.work_time_ms;
+    }
+    if (party.empty() || fire == 0) {
+        return SIZE_MAX;
+    }
+    const std::uint64_t n = party.size();
+    std::uint64_t work = 0;    // unit-ms
+    std::uint64_t threat = 0;  // 1/32 HP per second
+    for (const TowerCover& tc : towers) {
+        const Tile b = tile(c.island, tc.x, tc.y);
+        if (!b.valid()) {
+            continue;
+        }
+        std::uint64_t on = 0;
+        for (const Unit& u : party) {
+            on += std::uint64_t{Military::building_hit(u.damage, u.cannon, b.type->kind)} * 1000U / u.work_time_ms;
+        }
+        if (on == 0) {
+            return SIZE_MAX;
+        }
+        work += std::uint64_t{tc.health} * n * 1000U / on;
+        threat += tc.threat;
+    }
+    for (const Soldier& o : m_world.soldiers()) {
+        if (o.island != c.island || o.away() || !m_world.diplomacy().hostile(p.player, o.owner)) {
+            continue;
+        }
+        const assets::FigureType* ft = figures->get(o.figure);
+        if (ft == nullptr || ft->work_time_ms == 0) {
+            continue;
+        }
+        const std::uint32_t max = std::max<std::uint32_t>(1, ft->combat.max_health);
+        const std::uint32_t now = o.health != 0 ? std::min(o.health, max) : max;
+        work += std::uint64_t{now} * n * 1000U / fire;
+        threat += std::uint64_t{Combat::scaled_damage(ft->combat.hit, now, max)} * 1000U / ft->work_time_ms;
+    }
+    if (threat == 0) {
+        return 1;
+    }
+    // k (k + 1) / 2 * (health / n) * 1000 / threat >= work
+    const std::uint64_t need = work * n * threat;
+    std::uint64_t k = 1;
+    while (k * (k + 1) / 2 * health * 1000U < need) {
+        ++k;
+    }
+    return static_cast<std::size_t>(k);
 }
 
 bool Engine::shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const {
@@ -1962,21 +2056,34 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
                     fleet.push_back(o);
                 }
                 const Shelling plan = plan_shelling(p, t, towers, fleet, nullptr);
-                // A stopgap until parties are sized to take such towers on land. Logged when it begins
-                // and ends.
+                // Or the party a ship takes from home storms them on land (storm_needs). Logged when
+                // it begins and ends.
+                std::uint32_t holds = 0;
+                for (const Ship* o : fleet) {
+                    holds = std::max(holds, free_holds(*o));
+                }
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> party;
+                for (const Soldier* u : soldiers_near(p.player, *home, 8, holds)) {
+                    party.emplace_back(u->figure, u->health);
+                }
+                const std::size_t needs = plan.ships == 0 ? storm_needs(p, t, towers, party) : 0;
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
                 const auto logged = std::ranges::find(m_skips_logged, key);
-                if (plan.ships == 0) {
+                if (needs > party.size()) {
                     if (logged == m_skips_logged.end()) {
                         m_skips_logged.push_back(key);
-                        log(p, "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s)",
-                            t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "");
+                        log(p,
+                            "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
+                            "a party would need %zu soldiers, has %zu",
+                            t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "",
+                            needs == SIZE_MAX ? 0 : needs, party.size());
                     }
                     return false;
                 }
                 if (logged != m_skips_logged.end()) {
                     m_skips_logged.erase(logged);
-                    log(p, "skips city %u/%u no more: its towers within the fleet's reach", t.island, t.index);
+                    log(p, "skips city %u/%u no more: %s", t.island, t.index,
+                        plan.ships != 0 ? "its towers within the fleet's reach" : "a party big enough to storm them");
                 }
             }
         }
