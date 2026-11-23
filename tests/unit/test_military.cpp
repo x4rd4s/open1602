@@ -624,7 +624,7 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
 }
 
 TEST_CASE("military: soldiers board a ship lying 8 or 9 cells off the coast") {
-    // A soldier boards an own ship from up to 9 cells (Soldier_Board), but its way to the ship ended
+    // A soldier boards an own ship from up to 9 cells, but its way to the ship ended
     // within 7 cells of it: off a ship that lies farther from the nearest land no way was found,
     // and the order was dropped after the failures, a player's too. The way now ends within
     // boarding range when no cell within 7 is to be had.

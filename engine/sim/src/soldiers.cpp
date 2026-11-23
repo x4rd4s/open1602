@@ -551,7 +551,7 @@ bool Military::plan_to(Soldier& s, const Target& target, std::int32_t radius, bo
     }
     if (course.path.empty() && !course.reached_goal && !hostile_goal && !via && boardable(s, target)) {
         // An own ship farther from the land than kFriendlyGoal (Open1602): the soldier boards it from
-        // up to kBoardRange (Soldier_Board), so its way ends there when no cell nearer is to be had.
+        // up to kBoardRange, so its way ends there when no cell nearer is to be had.
         // With the way's goal alone at 7, a ship lying 8 or 9 cells off the coast was boarded by
         // nobody, by a player's order neither.
         r.goal_reach = kBoardRange;
