@@ -33,6 +33,7 @@ constexpr std::uint32_t kWall = 20902;
 constexpr std::uint32_t kGate = 20904;
 constexpr std::uint32_t kTree = 20202;
 constexpr std::uint32_t kTower = 22601;
+constexpr std::uint32_t kRuin = 22602;
 constexpr std::uint16_t kSword = 1;
 
 constexpr sim::PlayerId kHuman = 0;
@@ -66,7 +67,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 8\n  Id: 20202\n  Kind: 10\n  Gfx: 90\n  Size: 1, 1\n  Maxenergy: 3\n  NoShotFlg: 1\n"
         "  Ruinenr: 255\n"  // a tree
         "  @Nummer: 9\n  Id: 22601\n  Kind: 6\n  Gfx: 100\n  Size: 1, 1\n  Maxenergy: 55\n  NoShotFlg: 1\n"
-        "  Ruinenr: 255\n"  // a stone tower
+        "  Ruinenr: 255\n"                                                    // a stone tower
+        "  @Nummer: 10\n  Id: 22602\n  Kind: 12\n  Gfx: 110\n  Size: 1, 1\n"  // a ruin
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -588,6 +590,31 @@ TEST_CASE("ai military: improved soldiers cutting their way to a tower do not wa
     std::printf("felled-tree targets: idle %zu, cutting %zu\n", idle, cutting);
     CHECK(cutting > 0);
     CHECK(idle * 10 <= cutting);
+}
+
+TEST_CASE("ai military: an improved computer stops a soldier whose target is gone and gets no order") {
+    // Gate f24: a soldier whose target no longer stood was listed for the next order, but one
+    // enemy soldier takes one of ours, and the order went to an idle one: the soldier kept its
+    // gone target and was "re-ordered" every pass, every 16 s for 3 hours. Those no order takes
+    // now stop, as a player stops them.
+    Island a;
+    a.build(kKontor, 4, 8, kComputer, 0);
+    a.add(kComputer, 100, 24);  // idle
+    a.add(kComputer, 100, 26);  // its house wrecked
+    REQUIRE(a.world.island(0).map.place(*a.buildings.by_id(kRuin), 60, 5, 0, 0).ok());
+    a.world.soldiers().back().target = sim::Target::building(0, 60, 5);
+    const std::uint32_t id = a.world.soldiers().back().id;
+    a.add(kHuman, 150, 50);
+    a.war();
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    CHECK(engine.run_attack_orders(p, 0, {kHuman}));
+    const sim::Soldier* u = a.world.soldier(id);
+    REQUIRE(u != nullptr);
+    CHECK(u->target.empty());
 }
 
 TEST_CASE("ai military: an improved computer counts every tower of a city with no market or Kontor as in the way") {

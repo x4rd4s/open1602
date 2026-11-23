@@ -336,6 +336,10 @@ public:
     }
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
+    /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
+    bool run_attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<PlayerId>& enemies) {
+        return attack_orders(a, island, enemies);
+    }
     /// Open1602: the fleet attack_ok weighs the shelling of a city's towers with: the one
     /// shell_towers will have, the warships free then (free_warships) without the troop ship (the
     /// first landing ship), or the troop ship alone when none is.

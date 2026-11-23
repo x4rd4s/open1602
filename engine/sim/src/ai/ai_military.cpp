@@ -2810,17 +2810,36 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
         return !b.valid() || b.type->destroyed || b.kind == kind::kGround || b.kind == kind::kRuin ||
                b.kind == kind::kBeachRuin;
     };
-    std::size_t stale = 0;  // logged with the orders
+    std::vector<std::uint32_t> stale_ids;  // those with such a target
     for (const Soldier& s : m_world.soldiers()) {
         if (s.owner == a.player && s.island == island && !s.away()) {
             if (s.target.empty() || s.target.kind == Target::Kind::Position || s.target.kind == Target::Kind::Spot) {
                 mine.push_back(s.id);
             } else if (gone(s.target)) {
                 mine.push_back(s.id);
-                ++stale;
+                stale_ids.push_back(s.id);
             }
         }
     }
+    const std::size_t stale = stale_ids.size();  // logged with the orders
+    std::vector<std::uint32_t> given;            // the soldiers of the orders accepted
+    // Those left out of every order stop, as a player stops them: their gone target kept them
+    // listed as such, and they were "re-ordered" every pass with no order (gate f24: one soldier
+    // every 16 s for 3 hours, with no hostile soldier left to meet).
+    const auto stop_rest = [&] {
+        SoldierOrder stop;
+        stop.player = a.player;
+        for (const std::uint32_t id : stale_ids) {
+            if (std::ranges::find(given, id) == given.end()) {
+                stop.soldiers.push_back(id);
+            }
+        }
+        if (!stop.soldiers.empty()) {
+            log(a, "stops %zu soldiers on island %u whose target no longer stands: no order for them",
+                stop.soldiers.size(), island);
+            execute(stop);
+        }
+    };
     if (mine.empty()) {
         return false;
     }
@@ -2928,6 +2947,7 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             }
             if (execute(order).accepted) {
                 ordered = true;
+                given.insert(given.end(), order.soldiers.begin(), order.soldiers.end());
             }
         }
     } else {
@@ -2971,9 +2991,11 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             }
             if (execute(order).accepted) {
                 ordered = true;
+                given.insert(given.end(), order.soldiers.begin(), order.soldiers.end());
             }
         }
     }
+    stop_rest();
     return ordered;
 }
 
