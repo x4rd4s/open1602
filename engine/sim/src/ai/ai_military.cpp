@@ -1348,10 +1348,15 @@ std::vector<Engine::TowerCover> Engine::covering_towers(const AiPlayer& p, const
     // The hostile towers of the island whose own reach (their fighter's cells within range8 / 4,
     // as they shoot and as the landing log counts them) covers the landing at `beach` or a cell of
     // the way from it to the city; the nearest to the landing first.
-    const Combat& combat = m_sim.combat();
     const WorldIsland& isl = island_of(c.island);
-    const std::int32_t cx = 2 * (static_cast<std::int32_t>(isl.x) + beach.first);
-    const std::int32_t cy = 2 * (static_cast<std::int32_t>(isl.y) + beach.second);
+    return towers_over_way(p, c, 2 * (static_cast<std::int32_t>(isl.x) + beach.first),
+                           2 * (static_cast<std::int32_t>(isl.y) + beach.second));
+}
+
+std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
+                                                        std::int32_t cy) const {
+    // covering_towers from cell (cx, cy).
+    const Combat& combat = m_sim.combat();
     std::vector<std::pair<std::int32_t, std::int32_t>> way = way_to(c, cx, cy);
     if (way.empty()) {
         way.emplace_back(cx, cy);
@@ -2205,6 +2210,30 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
             if (t.valid() && t.city == c.index && (t.prod == prod::kMarket || t.prod == prod::kKontor) &&
                 !t.type->destroyed) {
                 goals.emplace_back(pr.x, pr.y);
+            }
+        }
+        if (rivals() && !goals.empty()) {
+            // Open1602: a tower whose reach covers the way from the soldiers to the market shoots
+            // them on the way, one by one, while they cannot hit back: those towers come first, as
+            // a player takes them, the nearest to the soldiers first (towers_over_way).
+            std::int64_t sx = 0;
+            std::int64_t sy = 0;
+            for (const std::uint32_t id : mine) {
+                if (const Soldier* u = m_world.soldier(id)) {
+                    sx += u->cell_x();
+                    sy += u->cell_y();
+                }
+            }
+            const auto n = static_cast<std::int64_t>(mine.size());
+            std::vector<std::pair<std::int32_t, std::int32_t>> over;
+            for (const TowerCover& tc :
+                 towers_over_way(a, c, static_cast<std::int32_t>(sx / n), static_cast<std::int32_t>(sy / n))) {
+                over.emplace_back(tc.x, tc.y);
+            }
+            if (!over.empty() && reachable_goals(a, island, c, mine, over)) {
+                goals = std::move(over);
+                hostile = &c;
+                break;
             }
         }
         if (rivals() && goals.empty()) {

@@ -547,6 +547,50 @@ TEST_CASE("ai military: with an enemy city's markets and Kontor gone, improved s
     CHECK(at_trees == 0);
 }
 
+TEST_CASE("ai military: improved soldiers go first for the tower that covers their way to the market") {
+    // A tower stands between the soldiers and the human's market, its fire over their way. The
+    // original's soldiers walk on to the market under it; Open1602's take the tower first.
+    const auto play = [](bool classic) {
+        Island a;
+        const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+        auto figures = assets::FigureTable::from_cod(assets::cod::parse(
+            "Objekt: FIGUR\n"
+            "  Nummer: 1\n  Kind: 1\n  Gfx: 0\n  Blocknr: 1\n  Speed: 260\n  Shotradius: 0.75\n  Maxstepcnt: 1\n"
+            "  Rohstoff: 11\n  Rohmenge: 3\n  Worktime: 0.8\n  Shottime: 0.6\n  Maxenergy: 20\n  Hitpoint: 1.0\n"
+            "  Nummer: 38\n  Gfx: 0\n  Blocknr: 3\n  Maxenergy: 55\n  Hitpoint: 1.0\n  Worktime: 3.0\n"
+            "  Shotradius: 7.5\n"
+            "EndObj\n",
+            types));
+        REQUIRE(figures.ok());
+        a.figures = std::move(figures).value();
+        a.build(kKontor, 4, 8, kComputer, 0);
+        a.build(kMarket, 20, 8, kHuman, 1);
+        a.build(kTower, 45, 10, kHuman, 1);
+        sim::Tower tw;
+        tw.island = 0;
+        tw.x = 45;
+        tw.y = 10;
+        tw.owner = kHuman;
+        tw.figure = 38;  // KANONTURM
+        a.world.towers().push_back(tw);
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 75), 2 * (10 + 4) + 2 * k);
+        }
+        a.war();
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 20'000);
+        std::size_t at_tower = 0;
+        for (const sim::Soldier* soldier : a.soldiers(kComputer)) {
+            at_tower += soldier->target.kind == sim::Target::Kind::Building && soldier->target.x == 45 ? 1U : 0U;
+        }
+        return at_tower;
+    };
+    CHECK(play(false) >= 4);
+    CHECK(play(true) == 0);
+}
+
 TEST_CASE("ai military: soldiers defend their own city before they go for an enemy city") {
     // The human has a city on the island too and sends two soldiers into the computer's city. The
     // original goes for the human city first; Open1602 meets the intruders.

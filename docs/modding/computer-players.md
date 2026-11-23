@@ -466,7 +466,8 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   An improved computer's go for those they can walk up to, and cut or break their way through
   trees and walls where they can reach none. With the markets and the Kontor gone, a city with a
   tower is still defended and cannot be taken over: they go for its towers then, all of them for
-  the nearest one, before its houses.
+  the nearest one, before its houses. A tower whose range covers their way to the market (or the
+  Kontor) they take first, all of them, rather than walk on under its fire.
 - **Towers over the beach.** A landing goes to the beach farthest from the city's towers, soldiers
   and ships. An improved computer then looks at the hostile towers whose own range (their
   `Shotradius`) covers the landing cell or the straight way from it to the market or Kontor. Those
