@@ -2078,11 +2078,19 @@ bool Engine::attack_ok(AiPlayer& p, const City& t) {
                 if (needs > party.size()) {
                     if (logged == m_skips_logged.end()) {
                         m_skips_logged.push_back(key);
-                        log(p,
-                            "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
-                            "a party would need %zu soldiers, has %zu",
-                            t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "",
-                            needs == SIZE_MAX ? 0 : needs, party.size());
+                        if (needs == SIZE_MAX) {
+                            log(p,
+                                "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
+                                "no party at home that harms them (%zu soldiers)",
+                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "",
+                                party.size());
+                        } else {
+                            log(p,
+                                "skips city %u/%u: its %zu towers over the landing out of the fleet's reach (%s), "
+                                "a party would need %zu soldiers, has %zu",
+                                t.island, t.index, towers.size(), plan.refusal != nullptr ? plan.refusal : "", needs,
+                                party.size());
+                        }
                     }
                     return false;
                 }
