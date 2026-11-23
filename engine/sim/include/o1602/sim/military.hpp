@@ -163,7 +163,10 @@ public:
     /// The same for a ship of `owner` on world tile (x, y).
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> landing_cell_at(std::int32_t x, std::int32_t y,
                                                                                        PlayerId owner) const;
-    /// Whether a soldier on cell (x, y) is near enough to `ship` to go on board (arrived()).
+    /// Whether soldier `s` goes on board `t`: an own ship, not a trade cart.
+    [[nodiscard]] bool boardable(const Soldier& s, const Target& t) const;
+    /// Whether a soldier's way to `ship` can end on cell (x, y) and the soldier go on board there
+    /// (plan_to's goal for an own ship, then arrived()).
     [[nodiscard]] static bool boards_from(const Ship& ship, std::int32_t x, std::int32_t y) noexcept;
     /// The cell next to castle (x, y) on `island` where a released unit steps out, if any.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> exit_cell(std::uint16_t island, std::uint16_t x,
@@ -222,6 +225,11 @@ public:
     /// What a shot of `damage` does to a building of HAUS kind `kind`: the shots that are not a
     /// cannon's do only 51/128 on gates, walls, towers and the other sturdy kinds.
     [[nodiscard]] static std::uint32_t building_hit(std::uint32_t damage, bool cannon, std::int32_t kind) noexcept;
+    /// The time a unit of Speed `speed` takes for a half tile of Wegspeed `ways`, straight or
+    /// diagonal, microseconds: run_us without the crowding.
+    [[nodiscard]] static std::uint64_t cell_us(std::uint32_t speed, std::uint32_t ways, bool diagonal) noexcept;
+    /// The Wegspeed `ways` for a soldier next to another of a lower number (run_us): slower.
+    [[nodiscard]] static std::uint32_t crowded_ways(std::uint32_t ways) noexcept;
     /// Applies damage to a building: destroyed at its Maxenergy.
     void damage_building(std::uint16_t island, std::uint16_t x, std::uint16_t y, std::uint32_t damage, bool cannon,
                          PlayerId attacker, std::vector<ConstructionEvent>* construction);
