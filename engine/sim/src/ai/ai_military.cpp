@@ -1052,6 +1052,12 @@ void Engine::board(AiPlayer& p, Ship& s, const City& at, std::uint32_t max) {
         if (order.soldiers.size() >= max) {
             break;
         }
+        // Open1602: not the soldiers on their way aboard another ship, as a convoy's ships board
+        // at once: each would call them over to itself in turn, and none got on.
+        if (const Soldier* u = m_world.soldier(id);
+            rivals() && u != nullptr && u->target.kind == Target::Kind::Ship && u->target.ship != s.id) {
+            continue;
+        }
         order.soldiers.push_back(id);
     }
     if (!order.soldiers.empty()) {
@@ -1165,7 +1171,13 @@ void Engine::missions(AiPlayer& p) {
                     }
                 }
                 const City* t = param_city(n.param);
-                if (aboard > kFewSoldiers && t != nullptr) {
+                // Open1602: a ship of a convoy (start_attack) is judged with the others: their
+                // soldiers together (shell_towers).
+                const bool convoy = rivals() && std::ranges::any_of(p.ships, [&](const ShipNote& o) {
+                                        return o.id != n.id && o.param == n.param &&
+                                               (o.mission == 5 || o.mission == 6) && m_world.ship(o.id) != nullptr;
+                                    });
+                if ((aboard > kFewSoldiers || (convoy && aboard != 0)) && t != nullptr) {
                     n.mission = 6;
                     plan_landing(p, *s, n);
                 } else if (aboard != 0 && home != nullptr) {

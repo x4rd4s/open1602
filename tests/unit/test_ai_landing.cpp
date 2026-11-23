@@ -468,6 +468,11 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     // no party too small alone, and the convoy turns home.
     CHECK(!play(true, "10.0", towers, whole, {{10, 10}}, 8, &landed, true));
     CHECK(landed == 0);
+    // Six soldiers for two ships of four holds: the second takes two, too few alone, but the
+    // convoy's six are enough, and the ships take the soldiers on board without calling each
+    // other's over.
+    CHECK(play(true, "6.0", towers, whole, {{10, 10}}, 6, &landed));
+    CHECK(landed == 6);
 }
 
 TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an attack") {
