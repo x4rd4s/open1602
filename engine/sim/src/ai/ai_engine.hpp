@@ -100,7 +100,8 @@ struct WarGold {
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
-struct Cheats;  // ai_tables.hpp
+struct Cheats;   // ai_tables.hpp
+struct NeedDef;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
@@ -351,8 +352,9 @@ public:
     [[nodiscard]] static bool may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept;
     /// Whether a luxury crop is planted on an island of `fertility` (island_fertility): where it
     /// grows fully; where it grows half only while the computer's cities lack its good (`lacking`)
-    /// and no partner offers it (`for_sale`), as a player plants it when the market runs dry.
-    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool for_sale) noexcept;
+    /// and no partner offers it (`for_sale`), as a player plants it when the market runs dry, and
+    /// only when it can pay for it now (`pays`): one it cannot afford would hold the planner.
+    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool for_sale, bool pays) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -639,6 +641,13 @@ private:
     [[nodiscard]] static std::uint32_t colony_fields(std::uint8_t max_stage) noexcept;
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
+    /// The gold a need's fields cost besides its building (64 fields' worth, as need() reserves).
+    [[nodiscard]] std::int64_t fields_money(const NeedDef& d) const;
+    /// Whether need() would pay for building `b` of need `d` now (affordable, and the fields).
+    [[nodiscard]] bool slot_affordable(const AiPlayer& p, const City& c, const NeedDef& d,
+                                       const assets::BuildingType& b) const;
+    /// slot_affordable for the building of slot `which` in the current city.
+    [[nodiscard]] bool slot_affordable_now(const AiPlayer& p, std::uint8_t which) const;
     /// Open1602: how many workshops of slot `k` the producers of their raw material in a city keep
     /// busy (no limit for a slot without such producers).
     [[nodiscard]] std::uint32_t processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const;
