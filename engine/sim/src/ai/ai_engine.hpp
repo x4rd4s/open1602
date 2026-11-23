@@ -329,8 +329,9 @@ public:
                                                                                      bool wall = false,
                                                                                      bool any = false) const;
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
-    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> breach_target(const AiPlayer& p,
-                                                                                     const City& c) const;
+    /// Open1602 (3b): with `s`, a covering tower it can shell (shells_from_water) when a beach is free.
+    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> breach_target(const AiPlayer& p, const City& c,
+                                                                                     const Ship* s = nullptr) const;
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> landing_blocker(const AiPlayer& p,
                                                                                        const City& c) const;
     void log_sealed(const AiPlayer& p, const City& c, std::uint32_t beaches) const;
@@ -881,6 +882,8 @@ private:
     [[nodiscard]] const assets::FigureType* ship_type(const Ship& s) const;
     /// Health of a ship, 128 = undamaged.
     [[nodiscard]] std::uint32_t health128(const Ship& s) const;
+    /// Open1602 (3b): the hull (1/32) a ship can lose before healthy() no longer takes it.
+    [[nodiscard]] std::uint32_t hull_to_spare(const Ship& s) const;
     /// Whether the ship is healthy enough for a job (kHealthy, as the logistics picks ships).
     [[nodiscard]] bool healthy(const Ship& s) const;
     [[nodiscard]] bool ship_at_city(const Ship& s, const City& c) const;
@@ -1082,6 +1085,9 @@ private:
     /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that
     /// pays in gold; false when the troops land at once.
     bool shell_towers(AiPlayer& p, Ship& s, ShipNote& n, const City& t, const std::vector<TowerCover>& towers);
+    /// Open1602 (3b): whether ship `s` can shell the building at (x, y) of `island` from the open
+    /// water nearest to it (water_near), within its Shotradius.
+    [[nodiscard]] bool shells_from_water(const Ship& s, std::uint16_t island, std::uint32_t x, std::uint32_t y) const;
     /// Open1602: the healthy armed ships without a mission or troops, the strongest first.
     std::vector<Ship*> free_warships(AiPlayer& p);
     /// Open1602: the first of free_warships() (breach).

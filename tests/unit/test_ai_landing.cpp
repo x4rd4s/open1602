@@ -361,7 +361,9 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     // Step 3b: the beach and the way inland lie within reach of the human's towers. With a warship
     // lying idle, it shells them while the troops wait aboard, when the towers' value is more than
     // the ship they would sink; with none, or towers that would sink it, the troops land under them.
-    const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole) {
+    const std::vector<std::pair<std::int32_t, std::int32_t>> on_beach = {{2, 5}, {2, 22}};
+    const auto play = [](bool warship, const char* tower_hit, std::uint32_t& towers_at_landing, bool& warship_whole,
+                         const std::vector<std::pair<std::int32_t, std::int32_t>>& spots) {
         Coast a;
         a.figures = make_figures(true, tower_hit);
         a.build(kKontor, 28, 14, kComputer, 0);
@@ -371,7 +373,6 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
         for (std::int32_t k = 0; k < 4; ++k) {
             a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
         }
-        const std::pair<std::int32_t, std::int32_t> spots[] = {{2, 5}, {2, 22}};
         for (const auto& [x, y] : spots) {
             REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
             sim::Tower tw;
@@ -411,7 +412,7 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
         REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
         a.world.island(1).discover(kComputer);
         sim::Simulation s(a.world, a.buildings, a.figures);
-        REQUIRE(towers() == 2);
+        REQUIRE(towers() == spots.size());
         for (std::uint32_t t = 0; t < 12 * 60 && a.soldiers_on(kComputer, 1) == 0 && a.world.ship(1) != nullptr; ++t) {
             run(s, 1'000);
         }
@@ -422,14 +423,19 @@ TEST_CASE("ai landing: an improved computer has a warship shell the tower over t
     };
     std::uint32_t towers = 0;
     bool whole = false;
-    CHECK(play(true, "1.0", towers, whole));
+    CHECK(play(true, "1.0", towers, whole, on_beach));
     CHECK(towers < 2);  // shelled first
-    CHECK(play(false, "1.0", towers, whole));
+    CHECK(play(false, "1.0", towers, whole, on_beach));
     CHECK(towers == 2);  // no warship: landed under the towers
-    // Towers that would sink the warship, worth less than it: it stays out of their reach, the
-    // troop ship goes in under them as before (and here is sunk).
-    play(true, "40.0", towers, whole);
+    // Towers whose fire would drive the warship off before they fall: it stays out of their reach,
+    // the troop ship goes in under them as before (and here is sunk).
+    play(true, "40.0", towers, whole, on_beach);
     CHECK(towers == 2);
+    CHECK(whole);
+    // A tower inland over the way to the market, beyond the ships' range from any water: no ship
+    // sails up to it, the troops land as before.
+    CHECK(play(true, "1.0", towers, whole, {{10, 10}}));
+    CHECK(towers == 1);
     CHECK(whole);
 }
 

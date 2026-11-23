@@ -83,6 +83,16 @@ bool Engine::healthy(const Ship& s) const {
     return health128(s) > kHealthy;
 }
 
+std::uint32_t Engine::hull_to_spare(const Ship& s) const {
+    // Open1602 (3b): the hull (1/32) a ship can lose before it is no longer healthy() and turns for
+    // the yard, leaving a fight.
+    const assets::FigureType* t = ship_type(s);
+    const std::uint32_t max = t != nullptr && t->ship.max_health != 0 ? t->ship.max_health : 1U;
+    const std::uint32_t health = s.health != 0 ? std::min(s.health, max) : max;
+    const std::uint32_t line = max * (kHealthy + 1) / 128U;  // the lowest health healthy() takes, about
+    return health > line ? health - line : 0U;
+}
+
 std::uint32_t Engine::health128(const Ship& s) const {
     const assets::FigureType* t = ship_type(s);
     const std::uint32_t max = t != nullptr && t->ship.max_health != 0 ? t->ship.max_health : 1U;
