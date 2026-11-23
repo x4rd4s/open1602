@@ -163,6 +163,8 @@ public:
     /// The same for a ship of `owner` on world tile (x, y).
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>> landing_cell_at(std::int32_t x, std::int32_t y,
                                                                                        PlayerId owner) const;
+    /// Whether soldier `s` goes on board `t`: an own ship, not a trade cart.
+    [[nodiscard]] bool boardable(const Soldier& s, const Target& t) const;
     /// Whether a soldier's way to `ship` can end on cell (x, y) and the soldier go on board there
     /// (plan_to's goal for an own ship, then arrived()).
     [[nodiscard]] static bool boards_from(const Ship& ship, std::int32_t x, std::int32_t y) noexcept;
