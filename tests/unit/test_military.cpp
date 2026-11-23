@@ -623,6 +623,26 @@ TEST_CASE("military: soldiers go on board a ship and land elsewhere") {
     CHECK(boat->cargo[0].ware == 0);
 }
 
+TEST_CASE("military: soldiers board a ship lying 8 or 9 cells off the coast") {
+    // A soldier boards an own ship from up to 9 cells (Soldier_Board), but its way to the ship ended
+    // within 7 cells of it: off a ship that lies farther from the nearest land no way was found,
+    // and the order was dropped after the failures, a player's too. The way now ends within
+    // boarding range when no cell within 7 is to be had.
+    for (const std::uint32_t x : {5U, 6U}) {  // 9 and 7 cells from the island's west coast
+        Field f;
+        f.start();
+        sim::Ship ship = sim::make_ship("Boat", x, 15, 21, 0);
+        ship.cargo.resize(4);
+        f.world.add_ship(ship);
+        const std::uint32_t ship_id = f.world.ships().back().id;
+        const std::uint32_t id = f.add(kSword, 0, 2 * 14, 2 * 15).id;
+        REQUIRE(f.military->order(sim::SoldierOrder{0, {id}, sim::Target::other_ship(ship_id)}));
+        f.run(10'000);
+        CHECK(f.world.soldier(id) == nullptr);
+        CHECK(f.world.ship(ship_id)->cargo[0].ware == 25);
+    }
+}
+
 TEST_CASE("military: a player's spearman (from a map) does not go on board") {
     Field f;
     f.start();

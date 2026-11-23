@@ -549,6 +549,15 @@ bool Military::plan_to(Soldier& s, const Target& target, std::int32_t radius, bo
         r.blocked.clear();
         course = m_planner.plan(land, r);
     }
+    if (course.path.empty() && !course.reached_goal && !hostile_goal && !via && boardable(s, target)) {
+        // An own ship farther from the land than kFriendlyGoal (Open1602): the soldier boards it from
+        // up to kBoardRange (Soldier_Board), so its way ends there when no cell nearer is to be had.
+        // With the way's goal alone at 7, a ship lying 8 or 9 cells off the coast was boarded by
+        // nobody, by a player's order neither.
+        r.goal_reach = kBoardRange;
+        r.goal = [rect](std::int32_t x, std::int32_t y) { return rect.distance(x, y) <= kBoardRange; };
+        course = m_planner.plan(land, r);
+    }
     m_stats.cells += taken;
     m_cells_left = m_cells_left > taken ? m_cells_left - taken : 0U;
     if (m_cells_left == 0) {
@@ -646,6 +655,11 @@ std::pair<std::int32_t, std::int32_t> Military::free_cell(std::int32_t x, std::i
     return best;
 }
 
+bool Military::boardable(const Soldier& s, const Target& t) const {
+    const Ship* ship = t.kind == Target::Kind::Ship ? m_world->ship(t.ship) : nullptr;
+    return ship != nullptr && ship->owner == s.owner && !ship->cart();  // nobody boards a trade cart
+}
+
 bool Military::boards_from(const Ship& ship, std::int32_t x, std::int32_t y) noexcept {
     const std::int32_t sx = 2 * static_cast<std::int32_t>(ship.x);
     const std::int32_t sy = 2 * static_cast<std::int32_t>(ship.y);
@@ -672,15 +686,12 @@ bool Military::arrived(Soldier& s) {
         s.motion.path_index = 0;
         return true;
     }
-    if (s.target.kind == Target::Kind::Ship) {
-        Ship* ship = m_world->ship(s.target.ship);
-        if (ship != nullptr && ship->owner == s.owner && !ship->cart()) {  // nobody boards a trade cart
-            if (d > kBoardRange) {
-                return false;
-            }
-            if (board(s, *ship)) {
-                return true;
-            }
+    if (boardable(s, s.target)) {
+        if (d > kBoardRange) {
+            return false;
+        }
+        if (board(s, *m_world->ship(s.target.ship))) {
+            return true;
         }
     }
     // friendly_goal() is 0 or kFriendlyGoal here (the doctor is handled above): farther away the
