@@ -1183,6 +1183,17 @@ void Engine::missions(AiPlayer& p) {
             case 8:
             case 9: {
                 const PlayerId owner = static_cast<PlayerId>(n.param & 0xFF);
+                // Open1602: a convoy's ships (shell_towers) unload together, once none of them is
+                // still under way to the beach, or after their tries (every 10 s).
+                if (rivals() && n.mission == kMissionLanding && n.counter != 0 &&
+                    std::ranges::any_of(p.ships, [&](const ShipNote& o) {
+                        const Ship* os = m_world.ship(o.id);
+                        return o.id != n.id && o.mission == kMissionLanding && o.param == n.param && os != nullptr &&
+                               !os->sinking && soldiers_aboard(*os) != 0 && ship_moving(*os);
+                    })) {
+                    --n.counter;
+                    break;
+                }
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
                     log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
                     if (p.strategy.war_target == owner) {
