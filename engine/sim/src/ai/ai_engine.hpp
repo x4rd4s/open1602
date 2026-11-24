@@ -357,6 +357,10 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
+    /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
+    /// city limit and the budget accepts it), and no free island grows the crop (`free`).
+    [[nodiscard]] static bool crop_war_motive(bool lacking, bool settles, bool free) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -586,8 +590,13 @@ private:
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
     /// colony for the crop has room there, and its budget would found that colony now.
     [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;
+    /// Improved computers: its budget would found a colony for `crop` now.
+    [[nodiscard]] bool colony_affordable(const AiPlayer& p, std::uint8_t crop) const;
+    /// Improved computers: an island it knows grows `crop` fully and has no city yet.
+    [[nodiscard]] bool fertile_island_free(const AiPlayer& p, std::uint8_t crop) const;
     /// Improved computers: `b` holds a city on an island that grows fully a crop whose good the
-    /// computer's cities lack now, with no free island open for it: a reason to conquer.
+    /// computer's cities lack now, with no free island for it, while it could settle the island
+    /// its war frees (below its city limit, budget accepts the colony): a reason to conquer.
     [[nodiscard]] bool holds_wanted_crop(const AiPlayer& p, PlayerId b) const;
     /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
     [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;

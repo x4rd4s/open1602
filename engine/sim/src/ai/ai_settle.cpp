@@ -1030,13 +1030,21 @@ bool Engine::fertile_island_open(const AiPlayer& p, std::uint8_t crop) const {
     // plants it on half-fertile land: an island it knows grows the crop fully and no city stands
     // there yet, so there is room, and its budget would found the colony now, as colony_plan
     // weighs it. One it cannot afford is not open: it bridges on half-fertile land meanwhile.
+    return colony_affordable(p, crop) && fertile_island_free(p, crop);
+}
+
+bool Engine::colony_affordable(const AiPlayer& p, std::uint8_t crop) const {
+    // Whether the budget would found a colony for the crop now, as colony_plan weighs it; the
+    // money a planned colony already holds back counts as free for it.
     Budget b = gold_budget(p);
     if (p.settle.plan_crop != 0) {
         b.reserved -= colony_money(p);
     }
-    if (b.refusal(colony_commitment(p, crop)) != Refusal::None) {
-        return false;
-    }
+    return b.refusal(colony_commitment(p, crop)) == Refusal::None;
+}
+
+bool Engine::fertile_island_free(const AiPlayer& p, std::uint8_t crop) const {
+    // An island the player knows grows the crop fully, and no city stands there yet.
     for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
         const auto island = static_cast<std::uint16_t>(i);
         if (!grows(island, crop) || !knows_crops(p, island)) {

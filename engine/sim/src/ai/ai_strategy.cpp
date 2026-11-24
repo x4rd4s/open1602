@@ -633,13 +633,13 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
 
 bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     // A city of `b` stands on an island that grows fully a crop whose good p's cities lack now
-    // (goods_short), while no free island that grows it is open to p (fertile_island_open): what
-    // a player conquers when he cannot found the colony. Not at its city limit: the island its war
-    // frees it could not settle (probe p16, x3 o4-505-p3: P2 at 4 of 4 cities razed P1's two
-    // fertile cities, and every colony check stopped at the limit).
-    if (own_city_count(p.player) >= city_limit()) {
-        return false;
-    }
+    // (goods_short), while no free island grows it (fertile_island_free): what a player conquers
+    // when there is no room for the colony. Only when it could found the colony on the island its
+    // war frees: not at its city limit (probe p16, x3 o4-505-p3: P2 at 4 of 4 cities razed P1's
+    // two fertile cities, and every colony check stopped at the limit), and not while its budget
+    // refuses the colony (gate f29b, x3 g4-404-p0: P0 razed P2's city, its budget refused the
+    // colony, and a third player took the island).
+    const bool room = own_city_count(p.player) < city_limit();
     const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
         {ware::kSpiceField, ware::kSpices},
         {ware::kTobaccoField, ware::kTobaccoGoods},
@@ -649,7 +649,8 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
         {ware::kCottonField, ware::kCloth},
     });
     for (const auto& [field, good] : crops) {
-        if (goods_short(p.player, good) == 0 || fertile_island_open(p, field)) {
+        if (!crop_war_motive(goods_short(p.player, good) != 0, room && colony_affordable(p, field),
+                             fertile_island_free(p, field))) {
             continue;
         }
         for (const City& c : m_world.cities()) {
@@ -659,6 +660,10 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
         }
     }
     return false;
+}
+
+bool Engine::crop_war_motive(bool lacking, bool settles, bool free) noexcept {
+    return lacking && settles && !free;
 }
 
 bool Engine::war_supplied(AiPlayer& p) {
