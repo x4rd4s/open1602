@@ -504,6 +504,14 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   the beach or a way. A troop ship whose soldiers are too few calls the landing off and
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
+  In a war of its own (its war plan), a city it passes over because the soldiers at home are too
+  few for its towers makes it arm for those lacking, as many as its landing ships take, within its
+  budget like any unit, until an attack starts or the war ends.
+- **Walled coasts.** Where every beach near the city is walled or sealed by trees behind it, a
+  warship shoots a gap into the wall on the beach, or into the trees or walls behind it. With no
+  beach within 24 tiles of the market an improved computer takes one farther away, the soldiers
+  walking the rest; and with no wall on a beach it shoots one standing on any other coast and
+  lands through that gap.
 
 ## Ships, ways and colonies
 

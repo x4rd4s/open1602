@@ -23,7 +23,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 16;
+inline constexpr std::uint32_t kStateVersion = 17;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -58,6 +58,9 @@ inline constexpr std::uint32_t kStateWithSightings = 15;
 /// Version 16: the islands an improved computer's war freed (Strategy::freed_islands). Written only
 /// once one was freed.
 inline constexpr std::uint32_t kStateWithFreedIslands = 16;
+/// Version 17: the soldiers an improved computer's war lacks for the next city it attacks
+/// (Strategy::war_party, war_party_city). Written only while it lacks some.
+inline constexpr std::uint32_t kStateWithWarParty = 17;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -483,6 +486,11 @@ struct Strategy {
     /// Open1602 (Merlin, 2026-11-24): the islands a city of which dissolved while the computer's
     /// soldiers fought there; it may settle them above its city limit (state 16).
     std::vector<std::uint16_t> freed_islands;
+    /// Open1602 (feedback 16, K5): the soldiers its war lacks at home to storm the towers of the
+    /// war target's city war_party_city (city_param) that no fleet of its wrecks; it arms for them
+    /// (army_target) until an attack starts or the war ends (state 17).
+    std::uint16_t war_party = 0;
+    std::uint32_t war_party_city = 0;
 };
 
 struct AiPlayer {
