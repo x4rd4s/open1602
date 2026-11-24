@@ -362,6 +362,9 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
+    /// (an improved computer) earns.
+    [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

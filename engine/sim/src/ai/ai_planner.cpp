@@ -1513,7 +1513,12 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kCitizens: {
-            if ((population(c, 2) >= at.ai_citizens2_citizens && has(at.ai_citizens2_money)) ||
+            // Open1602 (f39, x3 o4-707-p0 P1): an improved computer whose citizens are there, with an
+            // income, moves on without the gold in store, as from kMain2 (risen): a poor computer
+            // whose costs track its taxes never held the 6,001 gold and waited 3.6 hours here while
+            // its lists built nothing new; the budget still weighs every building of the next stage.
+            if (citizens_rise(population(c, 2) >= at.ai_citizens2_citizens, has(at.ai_citizens2_money),
+                              rivals() && net_income(p) > 0) ||
                 has(at.ai_citizens2_rich_money)) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
@@ -2939,6 +2944,10 @@ bool Engine::need_denkmal(AiPlayer& p) {
         reserve(p, *b);
     }
     return true;
+}
+
+bool Engine::citizens_rise(bool citizens, bool gold, bool earning) noexcept {
+    return citizens && (gold || earning);
 }
 
 bool Engine::need_castle(AiPlayer& p) {

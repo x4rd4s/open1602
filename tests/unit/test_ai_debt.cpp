@@ -182,3 +182,11 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 80, false) == 0);
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
+
+TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
+    // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
+    CHECK(Engine::citizens_rise(true, true, false));
+    CHECK(Engine::citizens_rise(true, false, true));    // earning: moves on
+    CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
+    CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
+}
