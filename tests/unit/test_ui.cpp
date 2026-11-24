@@ -236,6 +236,10 @@ TEST_CASE("ui: a panel draws by state and answers the mouse") {
     CHECK(items[0].gfx == 1);
     CHECK(items[0].x == 12);
     CHECK(items[0].y == 25);
+    // The point it is scaled from, for its far edges too (sprites that touch stay touching).
+    REQUIRE(items[0].layout_origin.has_value());
+    CHECK((*items[0].layout_origin)[0] == 12.5);
+    CHECK((*items[0].layout_origin)[1] == 25.5);
     CHECK(items[1].kind == ui::DrawItem::Kind::Text);
     CHECK(items[1].align == ui::Align::Centre);
     CHECK(items[1].colour == 5);
