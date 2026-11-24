@@ -496,6 +496,9 @@ private:
     /// A slot changed, added or taken away (EditorRequest SetPlayer, AddPlayer, RemovePlayer).
     void editor_players_request(const EditorRequest& request);
     /// The page "Rules": the scenario's game settings (editor_rules.cpp).
+    /// The rules a game started from the edited map takes: the map's own (page "Rules"), else the
+    /// player's settings for scenarios, as the start dialog begins from them.
+    [[nodiscard]] sim::Rules editor_game_rules() const;
     void editor_rules_model(EditorModel& m) const;
     void editor_rules_request(const EditorRequest& request);
     /// The dialog "Goals": the missions, and a request of it.
