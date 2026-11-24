@@ -92,7 +92,9 @@ void MapViewer::editor_players_model(EditorModel& m) const {
     }
     m.slot_factions = editor::slot_factions(world);
     m.can_add_player = m.player_slots.size() < sim::kMaxPlayers;
-    m.can_remove_player = !m.player_slots.empty() && m.player_slots.back().slot >= sim::kOriginalPlayers;
+    // The last player, as long as it owns nothing (else the refusal says so); any slot, an
+    // original's scenario's four too.
+    m.can_remove_player = !m.player_slots.empty();
 }
 
 void MapViewer::editor_players_request(const EditorRequest& request) {

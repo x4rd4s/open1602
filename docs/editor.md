@@ -214,7 +214,9 @@ buttons on the Selection page, each change one step of undo:
 | Trade | What the city's Kontor sells to and buys from other players' ships and the free trader, as its trade window in the game sets it. The list shows each trade good with what the Kontor does with it; a click on a good opens it: **Sell** or **Buy** (clicked again: not traded), the price per ton (from 300/1024 of the base price to the base price; + and - by 10 gold, with the right button by 1) and the tons the city keeps when selling or buys up to (by 10 t, with the right button by 1 t, up to its room). A player's Kontor trades in no more goods than its slots allow. A native village trades for goodwill instead of gold, so it has no prices; **Village goods** gives it the offer of a new game's villages again: tobacco goods in the north or spices in the south for sale, alcohol and cloth bought up to 10 t. A village founded in the editor starts with that offer. For any other city, **Trade nothing** switches all trade off. The pirates choose their offer anew during the game, so theirs holds only until then. |
 | Owner | Gives the city with all its land and buildings to the next human or computer, or to the natives or the pirates where the map has them (the right button: the one before), as when a player takes a city over; one with a city on the island already is passed over. The neutral buildings, which have no Kontor, keep their owner. |
 
-A selected ship has the button **Cargo**: a row for each of its holds with the ware in it (a click
+A selected ship has the button **Cargo**: a row for each hold it has in a game of the map (the
+rule "Large ships" of the page "Rules", else the player's own setting for scenarios: the large
+merchant ship 8 instead of 6, the large warship 6 instead of 8), with the ware in it (a click
 the next trade good, the right button the one before, and empty), and + and - for its tons, by
 10 t, with the right button by 1 t, up to the 50 t a hold takes. A ware chosen for an empty hold
 fills it. After the trade goods come the four land units of the castle (not on a trade cart): a
@@ -260,7 +262,7 @@ steps it back. Each change is one step of undo.
 | Monuments, Arches | How many monuments and triumphal arches the player may build (0 to 9). |
 | Name | A click on it renames the player; left empty, the game calls the player after its colour. |
 | Faction | Shown only when a content package brings factions of the settlers' behaviour ([factions.md](modding/factions.md)): the slot's faction, the settlers or one of the packages'. The scenario keeps it, as `slot.<n>` of a package's scenario does. |
-| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; a map without the free trader (a new one of open sea) gets him with it, as every new game has him, and a map saved without him gets him when it is opened; the last slot taken away again, as long as it owns no city, ship or soldier. The first four slots stay. |
+| Add, Remove | A computer player in the next slot (the fifth and those after it go behind the trader, the pirates and the natives), with the money of the first computer; a map without the free trader (a new one of open sea) gets him with it, as every new game has him, and a map saved without him gets him when it is opened; the last slot taken away again, as long as it owns no city, ship or soldier. One of the first four slots, which the trader, the pirates and the natives follow, stays empty in its place, as in a map of the original with fewer players; the next player added takes it again. |
 
 A player without a city and a ship is out of the game (defeated) as soon as it starts: give a new player a ship or a Kontor on the
 page **Place objects**.

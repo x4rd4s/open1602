@@ -102,6 +102,11 @@ struct DrawItem {
     /// Sprite: the same for the art's columns; cols 0: all of them.
     std::int32_t first_col = 0;
     std::int32_t cols = 0;
+    /// Sprite: the layout point its top left is scaled from (Pos + Posoffs + 0.5, in the layout's
+    /// pixels). The renderer scales the sprite's far edges from the same point, so that sprites
+    /// which touch in the layout (the main menu's buttons) touch on screen at every scale, without
+    /// a gap or an overlap of a pixel. Empty: the sprite's size is scaled on its own.
+    std::optional<std::array<double, 2>> layout_origin;
 };
 
 /// A text being typed in a text gadget: the caret stands before byte `caret` of the gadget's text,

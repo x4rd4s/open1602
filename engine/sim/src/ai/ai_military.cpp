@@ -1008,6 +1008,46 @@ City* Engine::param_city(std::uint32_t param) {
     return city(static_cast<std::uint16_t>(param >> 8), static_cast<std::uint8_t>(param & 0xFF));
 }
 
+bool Engine::lands_on_target(const AiPlayer& p, const Ship& s, PlayerId owner) const {
+    // Whether soldiers unloaded from `s` now (Military::landing_cell) stand on an island where
+    // `owner` has a city.
+    const auto cell =
+        m_sim.military().landing_cell_at(static_cast<std::int32_t>(s.x), static_cast<std::int32_t>(s.y), p.player);
+    if (!cell) {
+        return true;  // no landing at all: the unload refuses, as before
+    }
+    const std::uint16_t island = m_sim.combat().land().island_at(cell->first / 2, cell->second / 2);
+    return std::ranges::any_of(m_world.cities(), [&](const City& c) { return c.island == island && c.owner == owner; });
+}
+
+std::optional<Target> Engine::target_landing_water(const AiPlayer& p, const Ship& s, PlayerId owner) const {
+    // The open water nearest to the ship, within its unload range, from which soldiers land on an
+    // island where `owner` has a city.
+    const auto range = static_cast<std::int32_t>(m_world.balance().castle_unload_range);
+    const SeaMap& sea = m_sim.fleet().sea();
+    const auto x0 = static_cast<std::int32_t>(s.x);
+    const auto y0 = static_cast<std::int32_t>(s.y);
+    for (std::int32_t r = 1; r <= range; ++r) {
+        for (std::int32_t dy = -r; dy <= r; ++dy) {
+            for (std::int32_t dx = -r; dx <= r; ++dx) {
+                if (std::max(std::abs(dx), std::abs(dy)) != r || !sea.sailable(x0 + dx, y0 + dy)) {
+                    continue;
+                }
+                const auto cell = m_sim.military().landing_cell_at(x0 + dx, y0 + dy, p.player);
+                if (!cell) {
+                    continue;
+                }
+                const std::uint16_t island = m_sim.combat().land().island_at(cell->first / 2, cell->second / 2);
+                if (std::ranges::any_of(m_world.cities(),
+                                        [&](const City& c) { return c.island == island && c.owner == owner; })) {
+                    return Target::position(static_cast<std::uint32_t>(x0 + dx), static_cast<std::uint32_t>(y0 + dy));
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 void Engine::mission_end(AiPlayer& p, Ship& s, ShipNote& n) {
     // Home with the troops, or stop.
     if (n.mission == 3 || n.mission == 4) {
@@ -1090,9 +1130,33 @@ bool Engine::move_to_board(AiPlayer& p, Ship& s, ShipNote& n, const City& home) 
     return true;
 }
 
+void Engine::troops_home(AiPlayer& p, ShipNote& n) {
+    // Open1602 (feedback 16, K4): a ship left without a mission with soldiers aboard (a breach
+    // with too few, an unload that failed) takes them home and unloads them there; before, it was
+    // taken for supply runs with the soldiers aboard. Boarding happens only in missions 1 and 5.
+    Ship* s = m_world.ship(n.id);
+    const City* home = home_city(p);
+    if (s == nullptr || home == nullptr || s->held || s->repairing || ship_moving(*s) || s->id == p.settle.ship ||
+        s->id == p.settle.plan_ship || soldiers_aboard(*s) == 0) {
+        return;
+    }
+    if (!ship_at_city(*s, *home)) {
+        log(p, "ship %u has %u soldiers aboard and no mission: home to unload them", s->id, soldiers_aboard(*s));
+        ship_send(p, *s, Target::city_of(home->island, home->index), 2, 0);
+        return;
+    }
+    UnloadOrder order;
+    order.player = p.player;
+    order.ship = s->id;
+    execute(order);
+}
+
 void Engine::missions(AiPlayer& p) {
     for (ShipNote& n : p.ships) {
         if (n.mission == 0) {
+            if (rivals()) {
+                troops_home(p, n);
+            }
             continue;
         }
         Ship* s = m_world.ship(n.id);
@@ -1246,6 +1310,22 @@ void Engine::missions(AiPlayer& p) {
                         break;
                     }
                 }
+                if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed && rivals() &&
+                    !lands_on_target(p, *s, owner)) {
+                    // Open1602 (feedback 16, K3): the soldiers would land on the nearest walkable
+                    // cell, an islet in front of the beach; the ship moves to water from which they
+                    // land on an island of the target, or the landing is called off.
+                    if (const auto water = target_landing_water(p, *s, owner); water && n.counter != 0) {
+                        log(p, "ship %u moves to %u,%u: its landing cell lies on an island without a city of player %u",
+                            s->id, water->x, water->y, owner);
+                        const std::uint8_t counter = n.counter;
+                        ship_send(p, *s, *water, n.mission, n.param);
+                        n.counter = static_cast<std::uint8_t>(counter - 1);
+                    } else {
+                        mission_end(p, *s, n);
+                    }
+                    break;
+                }
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
                     log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
                     if (p.strategy.war_target == owner) {
@@ -1387,7 +1467,9 @@ std::vector<std::pair<std::int32_t, std::int32_t>> Engine::way_to(const City& c,
     for (const Production& pr : m_world.productions()) {
         if (!goal && pr.used && pr.island == c.island) {
             const Tile tt = tile(c.island, pr.x, pr.y);
-            if (tt.valid() && tt.city == c.index && tt.prod == prod::kMarket) {
+            // Open1602 (feedback 16, K1): an improved computer's way leads to a market still
+            // standing, not to one its soldiers destroyed.
+            if (tt.valid() && tt.city == c.index && tt.prod == prod::kMarket && !(rivals() && tt.type->destroyed)) {
                 goal = std::pair{static_cast<std::int32_t>(pr.x), static_cast<std::int32_t>(pr.y)};
             }
         }
@@ -1428,12 +1510,29 @@ std::size_t Engine::towers_in_the_way(const AiPlayer& p, const City& c, std::int
 }
 
 std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
-                                                        std::int32_t cy) const {
+                                                        std::int32_t cy, bool goals) const {
     // covering_towers from cell (cx, cy).
     const Combat& combat = m_sim.combat();
     std::vector<std::pair<std::int32_t, std::int32_t>> way = way_to(c, cx, cy);
     if (way.empty()) {
         way.emplace_back(cx, cy);
+    }
+    if (goals && rivals()) {
+        // Open1602 (feedback 16, K1): the party attacks every standing market and the Kontor
+        // (attack_orders), so a tower beside any of them shoots it too, not only one over the way
+        // to the first market.
+        const WorldIsland& isl = island_of(c.island);
+        for (const Production& pr : m_world.productions()) {
+            if (!pr.used || pr.island != c.island) {
+                continue;
+            }
+            const Tile tt = tile(c.island, pr.x, pr.y);
+            if (tt.valid() && tt.city == c.index && (tt.prod == prod::kMarket || tt.prod == prod::kKontor) &&
+                !tt.type->destroyed) {
+                way.emplace_back(2 * (static_cast<std::int32_t>(isl.x) + pr.x),
+                                 2 * (static_cast<std::int32_t>(isl.y) + pr.y));
+            }
+        }
     }
     // Open1602 (F15): a city with no market and no Kontor standing is taken by its towers
     // (tower_goals), so every tower of it lies in the way.
@@ -2892,9 +2991,9 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
                 }
             }
             std::vector<std::pair<std::int32_t, std::int32_t>> over;
-            for (const TowerCover& tc :
-                 n == 0 ? std::vector<TowerCover>{}
-                        : towers_over_way(a, c, static_cast<std::int32_t>(sx / n), static_cast<std::int32_t>(sy / n))) {
+            for (const TowerCover& tc : n == 0 ? std::vector<TowerCover>{}
+                                               : towers_over_way(a, c, static_cast<std::int32_t>(sx / n),
+                                                                 static_cast<std::int32_t>(sy / n), true)) {
                 over.emplace_back(tc.x, tc.y);
             }
             if (!over.empty() && reachable_goals(a, island, c, mine, over)) {

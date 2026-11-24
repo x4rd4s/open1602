@@ -357,14 +357,21 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
-    /// Improved computers: a war is started only when the computer could settle the island a razed
-    /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
+    /// Whether another player's city leaves room to found beside it: not an island the original keeps
+    /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
+    /// no people yet, unless the improved computer chose the island as contested (`contested`).
+    [[nodiscard]] static bool leaves_room(bool kept_off, bool contested, bool small_owner, bool room,
+                                          bool populated) noexcept;
+    /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
+    [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
     /// Improved computers: the island search may pick an island below the city limit, or above it
     /// one its war freed (`freed`: one is still free, `chosen_freed`: this one).
     /// Whether the scaled city limit has a cap (kCityLimitMost): always for the original's computers,
     /// for improved ones on the two easier levels only.
     [[nodiscard]] static bool limit_capped(bool improved, std::uint8_t level) noexcept;
     [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
+    /// Improved computers: a war is started only when the computer could settle the island a razed
+    /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
@@ -390,6 +397,10 @@ public:
     }
     /// Open1602: how many hostile towers lie in the way of a party from cell (cx, cy) to city `c`
     /// (towers_over_way).
+    /// Improved computers: soldiers unloaded from `s` now land on an island where `owner` has a city.
+    [[nodiscard]] bool lands_on_target(const AiPlayer& p, const Ship& s, PlayerId owner) const;
+    /// Improved computers: open water within the unload range from which soldiers land there.
+    [[nodiscard]] std::optional<Target> target_landing_water(const AiPlayer& p, const Ship& s, PlayerId owner) const;
     [[nodiscard]] std::size_t towers_in_the_way(const AiPlayer& p, const City& c, std::int32_t cx,
                                                 std::int32_t cy) const;
     /// Open1602 (3b): with `s`, a covering tower it can shell (shells_from_water) when a beach is free.
@@ -593,6 +604,9 @@ private:
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
     /// Improved computers: an island its war freed has no city yet.
     [[nodiscard]] bool freed_island(const AiPlayer& p) const;
+    /// The owner of another city on `island` that leaves no room to found beside it, or kNoPlayer;
+    /// `room`: enough free land.
+    [[nodiscard]] PlayerId blocker(const AiPlayer& p, std::uint16_t island, bool room) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     /// Improved computers: whether city `c`'s farm for `crop` found no site after repeated tries.
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
@@ -1130,6 +1144,8 @@ private:
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;
+    /// Improved computers: a ship without a mission and with soldiers aboard takes them home.
+    void troops_home(AiPlayer& p, ShipNote& n);
     [[nodiscard]] std::uint32_t free_holds(const Ship& s) const;
     bool queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
     bool guard_post(AiPlayer& p, City& c, CityPlan& r, std::int32_t& x, std::int32_t& y, bool& at_yard);
@@ -1167,9 +1183,10 @@ private:
                                                                             std::int32_t cy) const;
     /// Open1602 (3b): the hostile towers whose reach covers the landing at `beach` or the way
     /// from it to the city, the nearest first.
-    /// Open1602: covering_towers() for the way from cell (cx, cy).
+    /// Open1602: covering_towers() for the way from cell (cx, cy); with `goals`, also the towers
+    /// covering any standing market or Kontor of the city, which a party attacks all at once.
     [[nodiscard]] std::vector<TowerCover> towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
-                                                          std::int32_t cy) const;
+                                                          std::int32_t cy, bool goals = false) const;
     [[nodiscard]] std::vector<TowerCover> covering_towers(const AiPlayer& p, const City& c,
                                                           std::pair<std::int32_t, std::int32_t> beach) const;
     /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that

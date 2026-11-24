@@ -109,7 +109,17 @@ TEST_CASE("event presenter: city, disaster, drought and diplomacy messages for t
     CHECK(announcement(people[3])->message == 0x21);  // a rival's city passed 1000
     CHECK(announcement(people[3])->about == kRival);  // in the rival's colour
     CHECK(!announcement(people[2])->about);           // the own city in the own colour
-    CHECK(g.presenter.city_events(g.world, sim::kNoPlayer, {rival_big}).empty());
+    // A spectator hears it of every player, once per player and size, as a player of its rivals.
+    g.presenter.reset_game();
+    sim::CityEvent mine_big = rival_big;
+    mine_big.owner = kMe;
+    const auto watched = g.presenter.city_events(g.world, sim::kNoPlayer, {rival_big, mine_big, mine_big, grown});
+    REQUIRE(watched.size() == 2);
+    CHECK(announcement(watched[0])->about == kRival);
+    CHECK(announcement(watched[1])->about == kMe);
+    CHECK(announcement(watched[1])->message == 0x21);
+    g.presenter.reset_game();
+    CHECK(g.presenter.city_events(g.world, kMe, {rival_big}).size() == 1);
     // Another city of the same rival at the same size says nothing more, a larger size does (FB-30).
     sim::CityEvent rival_other = rival_big;
     rival_other.city = 3;
@@ -209,6 +219,8 @@ TEST_CASE("event presenter: war and peace between two others go to the status ba
     CHECK(a->tile.has_value());  // the rival's city
     CHECK(a->text == "War: Blue player against Yellow player");
     CHECK(announcement(told[1])->text == "Peace: Blue player and Yellow player");
+    // A spectator (no player of its own) hears of the same wars, not of the pirates'.
+    CHECK(g.presenter.diplomacy_notices(g.world, sim::kNoPlayer, {war, peace, offer, pirates}).size() == 2);
     // The war on the local player is the original's message.
     war.to = kMe;
     const auto mine = g.presenter.diplomacy_notices(g.world, kMe, {war});

@@ -14,6 +14,7 @@
 #include "o1602/assets/building_table.hpp"
 #include "o1602/assets/figure_table.hpp"
 #include "o1602/editor/operation.hpp"
+#include "o1602/sim/rules.hpp"
 #include "o1602/sim/ships.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -71,14 +72,25 @@ enum class UnitRefusal : std::uint8_t {
     const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable& figures,
     sim::PlayerId owner, std::uint16_t family, std::int64_t x, std::int64_t y, std::uint8_t direction);
 
+/// The holds a ship of `figure` has in a game started with `rules` (Rules::large_ship_holds: the
+/// large merchant ship 8 instead of 6, the large warship 6 instead of 8): those of `figures` (the
+/// map's own values, a package's applied), or the rule's where the map's balance leaves them, as
+/// MapViewer::make_state adds the rule's values under the packages'. The game fits a ship to them
+/// when it starts (sim::fit_holds).
+[[nodiscard]] std::size_t game_holds(const sim::World& world, const assets::FigureTable& figures,
+                                     const sim::Rules& rules, std::uint16_t figure);
+
 /// The hold `slot` of ship `id` loaded with `amount` (1/32 t, at most sim::hold_capacity) of the
 /// trade ware `ware`; 0 tons or ware 0: empty. A ship (not a trade cart) also takes a land unit
 /// (a soldier ware, sim::unit_ware of its figure) at full health, whatever `amount` says, as
-/// boarding puts it there. Fails (NotFound) without the ship or the hold, (OutOfRange) for a ware
-/// that is no trade ware or unit or too much.
+/// boarding puts it there. `holds` (game_holds), when not 0, is the number of holds the ship has
+/// in the game: a hold up to it the ship lacks is added, one beyond it only emptied (the game
+/// would drop what it held). Fails (NotFound) without the ship or the hold, (OutOfRange) for a
+/// ware that is no trade ware or unit, too much, or a load beyond `holds`.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world,
                                                                                std::uint32_t id, std::size_t slot,
-                                                                               std::uint8_t ware, std::uint32_t amount);
+                                                                               std::uint8_t ware, std::uint32_t amount,
+                                                                               std::size_t holds = 0);
 
 /// Ship or trade cart `id` named `name` (1 to sim::ShipCommand::kMaxNameLength bytes, Windows-1252),
 /// as its owner renames it in the game. Fails (NotFound) without it, (InvalidFormat) for a name the
