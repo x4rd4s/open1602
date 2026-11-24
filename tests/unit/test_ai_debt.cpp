@@ -138,3 +138,12 @@ TEST_CASE("ai war plan: a war only when the attacker could settle what it razes"
     CHECK(!Engine::war_settles(false, true));  // at its city limit
     CHECK(!Engine::war_settles(true, false));  // its budget refuses the colony
 }
+
+TEST_CASE("ai settle: improved pirates pass over an island they turned back from") {
+    // Gate f33: the pirates' search skipped left_islands and the blocker, so their ship sailed back
+    // to the same island every 510 s.
+    CHECK(Engine::pirate_island_skipped(true, true, false));
+    CHECK(Engine::pirate_island_skipped(true, false, true));
+    CHECK(!Engine::pirate_island_skipped(true, false, false));
+    CHECK(!Engine::pirate_island_skipped(false, true, true));  // the original's pirates: as before
+}

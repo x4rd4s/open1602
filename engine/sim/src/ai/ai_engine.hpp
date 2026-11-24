@@ -362,6 +362,9 @@ public:
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
     [[nodiscard]] static bool leaves_room(bool kept_off, bool contested, bool small_owner, bool room,
                                           bool populated) noexcept;
+    /// Whether improved pirates pass over an island in their search: one they turned back from
+    /// lately (`left`) or whose cities leave no room (`blocked`); the original's pirates never do.
+    [[nodiscard]] static bool pirate_island_skipped(bool improved, bool left, bool blocked) noexcept;
     /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
     [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
     /// Improved computers: a war is started only when the computer could settle the island a razed

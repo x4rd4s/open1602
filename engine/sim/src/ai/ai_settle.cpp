@@ -152,6 +152,12 @@ void Engine::pick_island(AiPlayer& p) {
                 (s.pass <= kPirateRegionPasses && region_has_nest[island_region(s.cursor, nests)])) {
                 continue;
             }
+            // Open1602 (gate f33): improved pirates pass over an island they turned back from, as
+            // the other computers do; they sailed back to it every 510 s (x3 o4-707-p1).
+            if (pirate_island_skipped(rivals(), left_lately(p, s.cursor),
+                                      rivals() && blocker(p, s.cursor, true) != kNoPlayer)) {
+                continue;
+            }
             if (island_size(s.cursor) <= std::max<std::uint32_t>(s.pass, 1)) {
                 s.island = s.cursor;
                 push(p, kSettleArea, true);
@@ -246,6 +252,10 @@ void Engine::pick_island(AiPlayer& p) {
         push(p, kSettleArea, true);
         return;
     }
+}
+
+bool Engine::pirate_island_skipped(bool improved, bool left, bool blocked) noexcept {
+    return improved && (left || blocked);
 }
 
 PlayerId Engine::blocker(const AiPlayer& p, std::uint16_t island, bool room) const {
