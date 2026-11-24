@@ -331,10 +331,14 @@ public:
                                                                                      bool any = false) const;
     /// What a breach shoots at: a wall on the beach, else the tree or wall that seals the landing.
     /// Whether `p` would attack city `t` now (attack_ok); for tests.
+    /// The strength `p` arms to (army_target); for tests.
+    [[nodiscard]] std::uint32_t army_target_for(const AiPlayer& p) const { return army_target(p); }
     [[nodiscard]] bool attack_ok_for(AiPlayer& p, const City& t) {
         std::size_t convoy = 1;
         return attack_ok(p, t, convoy);
     }
+    /// Sends `p`'s attack on city `t` (start_attack); for tests.
+    void start_attack_for(AiPlayer& p, const City& t, std::size_t convoy = 1) { start_attack(p, t, convoy); }
     /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
@@ -1114,6 +1118,9 @@ private:
     /// Open1602 (rivals): the army a computer keeps whoever else is armed, by its inhabitants, and
     /// the share of the strongest army of another computer, at peace with it or not.
     [[nodiscard]] std::uint32_t rival_army_target(const AiPlayer& p, bool whole = false) const;
+    /// Open1602 (feedback 16, K5): the soldiers the war lacks for its next city (Strategy::war_party)
+    /// while that city still stands and is the target's; 0 otherwise.
+    [[nodiscard]] std::uint32_t war_party_lacking(const AiPlayer& p) const;
     /// Whether a sees b at least as strong as itself: strength(a, a) against strength(a, b).
     [[nodiscard]] bool stronger(PlayerId a, PlayerId b) const;
     /// The original's computers and an improved one on the hardest level count every unit of
@@ -1248,6 +1255,9 @@ private:
         std::size_t has = 0;
         std::size_t plain = SIZE_MAX;  ///< `needs` without the walk under fire (logged)
     };
+    /// Open1602 (feedback 16, K5): what attack_ok's convoy `cv` for city `t` lacks, kept as
+    /// Strategy::war_party while `t` is of the war's target.
+    void note_war_party(AiPlayer& p, const City& t, const Convoy& cv);
     [[nodiscard]] Convoy plan_convoy(const AiPlayer& p, const City& t, const City& home,
                                      const std::vector<TowerCover>& towers, const std::vector<Ship*>& ships,
                                      std::pair<std::int32_t, std::int32_t> from);

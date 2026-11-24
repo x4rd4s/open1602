@@ -267,7 +267,27 @@ std::uint32_t Engine::army_target(const AiPlayer& p, bool whole) const {
             best *= 2;
             break;
     }
-    return rivals() ? std::max(best, rival_army_target(p, whole)) : best;
+    if (!rivals()) {
+        return best;
+    }
+    best = std::max(best, rival_army_target(p, whole));
+    // Open1602 (feedback 16, K5): its war lacks soldiers at home to storm the next city's towers
+    // (attack_ok): it arms for them too, a swordsman's strength each, within its budget as any unit
+    // (may_add_unit). Without, its soldiers waited at the Kontor until the war ended for no progress.
+    if (const std::uint32_t lacking = war_party_lacking(p); lacking != 0) {
+        best = std::max(best, weighted_army(p.player) + lacking * unit_weights()[0]);
+    }
+    return best;
+}
+
+std::uint32_t Engine::war_party_lacking(const AiPlayer& p) const {
+    const Strategy& st = p.strategy;
+    if (!rivals() || st.war_party == 0 || st.war_target == kNoPlayer) {
+        return 0;
+    }
+    const City* c =
+        city(static_cast<std::uint16_t>(st.war_party_city >> 8), static_cast<std::uint8_t>(st.war_party_city));
+    return c != nullptr && c->owner == st.war_target ? st.war_party : 0U;
 }
 
 std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
@@ -2291,51 +2311,110 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
     std::int32_t best = 10000;
     std::int32_t bx = 0;
     std::int32_t by = 0;
-    for (std::uint32_t y = 0; y < map.height(); ++y) {
-        for (std::uint32_t x = 0; x < map.width(); ++x) {
-            const Tile b = tile(island, static_cast<std::int32_t>(x), static_cast<std::int32_t>(y));
-            if (!b.valid()) {
-                continue;
+    // Open1602 (feedback 16, K4): with no such beach (or no wall on one), a beach farther away (the
+    // soldiers walk), a hostile wall or gate on any other coast, as a player shoots one, and a gap in
+    // such a wall (Military::landing_cell_at takes any cell to stand on), landed at from the water
+    // beside it.
+    const auto sea_beside = [&](std::uint32_t x,
+                                std::uint32_t y) -> std::optional<std::pair<std::int32_t, std::int32_t>> {
+        for (std::int32_t dy = -1; dy <= 1; ++dy) {
+            for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                const std::int32_t nx = static_cast<std::int32_t>(x) + dx;
+                const std::int32_t ny = static_cast<std::int32_t>(y) + dy;
+                const Tile n = tile(island, nx, ny);
+                if (!map.contains(nx, ny) ||
+                    (n.valid() && (n.kind == kind::kSea || n.kind == kind::kSurf || n.kind == kind::kSurfCorner))) {
+                    return std::pair{static_cast<std::int32_t>(isl.x) + nx, static_cast<std::int32_t>(isl.y) + ny};
+                }
             }
-            if (wall ? !(beach_wall(island, x, y) && m_world.diplomacy().hostile(p.player, b.owner))
-                     : !(b.kind == kind::kBeach || b.kind == kind::kBeachVariant ||
-                         (rivals() && beach_gap(island, x, y)))) {
-                continue;
-            }
-            std::int32_t near = 1000;
-            for (const auto& [tx, ty] : targets) {
-                near =
-                    std::min(near, sea_distance(static_cast<std::int32_t>(x) - tx, static_cast<std::int32_t>(y) - ty));
-            }
-            if (near > 24) {
-                continue;
-            }
-            std::int32_t score = 1000 + near * 4;
-            const std::int32_t wx = static_cast<std::int32_t>(isl.x + x);
-            const std::int32_t wy = static_cast<std::int32_t>(isl.y + y);
-            for (const auto& [ox, oy] : soldiers) {
-                score += sea_distance(ox - wx, oy - wy) <= 16 ? 10 : 0;
-            }
-            for (const auto& [tx, ty] : towers) {
-                score +=
-                    sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10 ? 100 : 0;
-            }
-            for (const auto& [ox, oy] : ships) {
-                score += sea_distance(ox - wx, oy - wy) <= 16 ? 30 : 0;
-            }
-            if (score >= best) {
-                continue;
-            }
-            // Open1602: a beach only with a cell within the unload range the soldiers can stand on
-            // (Military::landing_cell); trees or walls right behind the sand seal it.
-            if (!wall && !any && rivals() && !m_sim.military().landing_cell_at(wx, wy, p.player)) {
-                ++sealed;
-                continue;
-            }
-            best = score;
-            bx = static_cast<std::int32_t>(x);
-            by = static_cast<std::int32_t>(y);
         }
+        return std::nullopt;
+    };
+    // A gap in a coastal wall: hostile walls or gates on both sides of the cell, in a line.
+    const auto wall_at = [&](std::int32_t x, std::int32_t y) {
+        const Tile n = tile(island, x, y);
+        return n.valid() && (n.kind == kind::kWall || n.kind == kind::kWallBeach || n.kind == kind::kGate) &&
+               n.owner != kNoPlayer && m_world.diplomacy().hostile(p.player, n.owner);
+    };
+    const auto wall_beside = [&](std::uint32_t ux, std::uint32_t uy) {
+        const auto x = static_cast<std::int32_t>(ux);
+        const auto y = static_cast<std::int32_t>(uy);
+        return (wall_at(x - 1, y) && wall_at(x + 1, y)) || (wall_at(x, y - 1) && wall_at(x, y + 1)) ||
+               (wall_at(x - 1, y - 1) && wall_at(x + 1, y + 1)) || (wall_at(x - 1, y + 1) && wall_at(x + 1, y - 1));
+    };
+    bool found = false;
+    const auto scan = [&](bool coast) {
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const Tile b = tile(island, static_cast<std::int32_t>(x), static_cast<std::int32_t>(y));
+                if (!b.valid()) {
+                    continue;
+                }
+                std::optional<std::pair<std::int32_t, std::int32_t>> water;
+                if (coast) {
+                    const bool fits =
+                        wall ? (b.kind == kind::kWall || b.kind == kind::kWallBeach || b.kind == kind::kGate) &&
+                                   b.owner != kNoPlayer && m_world.diplomacy().hostile(p.player, b.owner)
+                             : (b.kind == kind::kRuin || b.kind == kind::kGround) && wall_beside(x, y);
+                    const bool sand =
+                        !wall && (b.kind == kind::kBeach || b.kind == kind::kBeachVariant || beach_gap(island, x, y));
+                    if (!sand) {
+                        if (fits) {
+                            water = sea_beside(x, y);
+                        }
+                        if (!water) {
+                            continue;
+                        }
+                    }
+                } else if (wall ? !(beach_wall(island, x, y) && m_world.diplomacy().hostile(p.player, b.owner))
+                                : !(b.kind == kind::kBeach || b.kind == kind::kBeachVariant ||
+                                    (rivals() && beach_gap(island, x, y)))) {
+                    continue;
+                }
+                std::int32_t near = 1000;
+                for (const auto& [tx, ty] : targets) {
+                    near = std::min(near,
+                                    sea_distance(static_cast<std::int32_t>(x) - tx, static_cast<std::int32_t>(y) - ty));
+                }
+                if (near > 24 && !coast) {
+                    continue;
+                }
+                std::int32_t score = 1000 + near * 4;
+                const std::int32_t wx = static_cast<std::int32_t>(isl.x + x);
+                const std::int32_t wy = static_cast<std::int32_t>(isl.y + y);
+                for (const auto& [ox, oy] : soldiers) {
+                    score += sea_distance(ox - wx, oy - wy) <= 16 ? 10 : 0;
+                }
+                for (const auto& [tx, ty] : towers) {
+                    score += sea_distance(tx - static_cast<std::int32_t>(x), ty - static_cast<std::int32_t>(y)) <= 10
+                                 ? 100
+                                 : 0;
+                }
+                for (const auto& [ox, oy] : ships) {
+                    score += sea_distance(ox - wx, oy - wy) <= 16 ? 30 : 0;
+                }
+                if (score >= best) {
+                    continue;
+                }
+                // Open1602: a beach only with a cell within the unload range the soldiers can stand on
+                // (Military::landing_cell); trees or walls right behind the sand seal it. A coast
+                // from the water beside it.
+                const std::int32_t lx = water ? water->first : wx;
+                const std::int32_t ly = water ? water->second : wy;
+                if (!wall && !any && rivals() && !m_sim.military().landing_cell_at(lx, ly, p.player)) {
+                    ++sealed;
+                    continue;
+                }
+                best = score;
+                found = true;
+                bx = static_cast<std::int32_t>(x);
+                by = static_cast<std::int32_t>(y);
+            }
+        }
+    };
+    scan(false);
+    if (!found && rivals()) {
+        scan(true);
     }
     if (best >= 10000) {
         if (sealed != 0) {
@@ -2552,6 +2631,32 @@ bool Engine::defenceless(std::uint16_t island, std::uint8_t city) {
     return !d.defended[city];
 }
 
+void Engine::note_war_party(AiPlayer& p, const City& t, const Convoy& cv) {
+    // Open1602 (feedback 16, K5): a city of its war's target it passes over for want of soldiers at
+    // home to storm the towers no fleet of its wrecks. What it lacks, if its landing ships hold that
+    // many: of several such cities the one that lacks the fewest, that one's anew each time.
+    Strategy& st = p.strategy;
+    if (!rivals() || t.owner != st.war_target || cv.needs == SIZE_MAX || cv.needs <= cv.has) {
+        return;
+    }
+    std::size_t holds = 0;
+    for (const Ship* s : landing_ships(p)) {
+        holds += free_holds(*s) + soldiers_aboard(*s);
+    }
+    const std::uint32_t key = city_param(t);
+    const std::size_t lacking = cv.needs - cv.has;
+    if (cv.needs > holds || (st.war_party != 0 && st.war_party_city != key && lacking >= st.war_party)) {
+        return;
+    }
+    const auto n = static_cast<std::uint16_t>(std::min<std::size_t>(lacking, UINT16_MAX));
+    if (n != st.war_party || key != st.war_party_city) {
+        log(p, "war on player %u: arms for %u more soldiers to storm city %u/%u (needs %zu, has %zu)", t.owner,
+            unsigned{n}, t.island, t.index, cv.needs, cv.has);
+    }
+    st.war_party = n;
+    st.war_party_city = key;
+}
+
 bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
     convoy = 1;
     // The original's conditions, the cheap ones first: none has a side effect, so the
@@ -2631,6 +2736,7 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
                 const std::pair<PlayerId, std::uint32_t> key{p.player, city_param(t)};
                 const auto logged = std::ranges::find(m_skips_logged, key);
                 if (cv.ships == 0) {
+                    note_war_party(p, t, cv);
                     if (logged == m_skips_logged.end()) {
                         m_skips_logged.push_back(key);
                         if (needs == SIZE_MAX) {
@@ -2696,6 +2802,16 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
         ship = bigger;
     }
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
+    // The party is for that one city: an attack on another city of the same target leaves it be
+    // (probe p27, where one on a nearer city cleared it before any soldier was raised).
+    if (rivals() && t.owner == p.strategy.war_target && p.strategy.war_party != 0 &&
+        p.strategy.war_party_city == city_param(t)) {
+        log(p, "war on player %u: arms no more for a party (%u soldiers lacked for city %u/%u)", t.owner,
+            unsigned{p.strategy.war_party}, p.strategy.war_party_city >> 8,
+            unsigned{static_cast<std::uint8_t>(p.strategy.war_party_city)});
+        p.strategy.war_party = 0;
+        p.strategy.war_party_city = 0;
+    }
     // Open1602: a convoy, as many ships as it takes to bring a party big enough to storm towers no
     // fleet wrecks (attack_ok): each boards at home, and they land together (shell_towers).
     std::vector<Ship*> ships{ship};

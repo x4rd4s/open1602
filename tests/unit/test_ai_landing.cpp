@@ -102,14 +102,15 @@ struct Coast {
     assets::FigureTable figures = make_figures();
     sim::World world{100, 50};
 
-    Coast() {
+    /// `human_beach`: the column of the human's beach, -1 for none.
+    explicit Coast(std::int32_t human_beach = 0) {
         std::vector<sim::Player> players(2);
         players[kHuman].role = sim::PlayerRole::Human;
         players[kComputer].role = sim::PlayerRole::Computer;
         players[kComputer].money = 20000;
         world.set_players(players);
         add_island(10, 10, 29);
-        add_island(60, 10, 0);
+        add_island(60, 10, human_beach);
     }
 
     void add_island(std::uint32_t at_x, std::uint32_t at_y, std::int32_t beach) {
@@ -952,4 +953,123 @@ TEST_CASE("ai landing: an improved computer lands soldiers on the target's islan
     const auto water = engine.target_landing_water(p, at, kHuman);
     REQUIRE(water.has_value());
     CHECK(water->x > 57);  // toward the target's beach (column 60)
+}
+
+TEST_CASE("ai landing: an improved computer arms for the party its war lacks against towers, only in its own war") {
+    // Feedback 16, K5: after a city of its war's target fell, the next one stood under towers that
+    // no fleet of the attacker wrecked and its six soldiers at home could not storm. It passed the
+    // city over, its soldiers waited at the Kontor, and its army never grew for it, until the war
+    // ended for no progress. Now it arms for the soldiers lacking, in its own war only.
+    const auto play = [](bool own_war, std::uint32_t& lacking, std::uint32_t& more) {
+        Coast a;
+        a.figures = make_figures(true, "8.0");
+        a.world.player(kHuman)->role = sim::PlayerRole::Computer;  // a second computer
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (const auto& [x, y] : std::vector<std::pair<int, int>>{{2, 5}, {10, 9}}) {
+            REQUIRE(a.world.island(1).map.place(*a.buildings.by_id(kTower), x, y, 0, 0, kHuman, 1).ok());
+            sim::Tower tw;
+            tw.island = 1;
+            tw.x = static_cast<std::uint16_t>(x);
+            tw.y = static_cast<std::uint16_t>(y);
+            tw.owner = kHuman;
+            tw.figure = 38;  // KANONTURM
+            a.world.towers().push_back(tw);
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        for (std::uint32_t k = 0; k < 8; ++k) {  // holds for 32 soldiers
+            sim::Ship ship = sim::make_ship("Ship", 41, 15 + 4 * k, kShipFigure, kComputer, 2);
+            ship.cargo.resize(4);
+            ship.cannons = 4;
+            a.world.add_ship(ship);
+        }
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        sim::Simulation s(a.world, a.buildings, a.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        p.strategy.war_target = own_war ? kHuman : sim::kNoPlayer;
+        for (const sim::Ship& ship : a.world.ships()) {
+            sim::ai::ShipNote n;
+            n.id = ship.id;
+            p.ships.push_back(n);
+        }
+        const std::uint32_t before = engine.army_target_for(p);
+        CHECK(!engine.attack_ok_for(p, *a.world.city(1, 1)));
+        lacking = p.strategy.war_party;
+        const std::uint32_t after = engine.army_target_for(p);
+        more = after > before ? after - before : 0;
+        if (own_war && lacking > 0) {
+            // An attack on another city of the same target keeps the party (probe p27); one on
+            // the party's own city ends it.
+            const std::uint32_t key = p.strategy.war_party_city;
+            p.strategy.war_party_city = key + 1;
+            engine.start_attack_for(p, *a.world.city(1, 1), 2);
+            CHECK(p.strategy.war_party == lacking);
+            p.strategy.war_party_city = key;
+            for (sim::ai::ShipNote& n : p.ships) {
+                n.mission = 0;
+            }
+            engine.start_attack_for(p, *a.world.city(1, 1), 2);
+            CHECK(p.strategy.war_party == 0);
+            p.strategy.war_party = static_cast<std::uint16_t>(lacking);
+        }
+        if (own_war) {
+            // The city falls to another: it arms for it no more.
+            a.world.city(1, 1)->owner = kComputer;
+            CHECK(engine.army_target_for(p) == before);
+        }
+    };
+    std::uint32_t lacking = 0;
+    std::uint32_t more = 0;
+    play(true, lacking, more);
+    CHECK(lacking > 0);
+    CHECK(more > 0);
+    play(false, lacking, more);
+    CHECK(lacking == 0);
+    CHECK(more == 0);
+}
+
+TEST_CASE("ai landing: an improved computer shoots a gap into a wall on a coast without beach and lands through it") {
+    // Feedback 16, K4 (b): the target's coast had no beach, and the wall stood on the ground along
+    // the water. A breach took only walls on the beach: the ship found nothing to shoot, waited and
+    // turned home. Now it shoots the wall on that coast too and lands through the gap.
+    Coast a(-1);
+    a.build(kMarket, 6, 6, kHuman, 1);
+    for (std::int32_t k = 0; k < 4; ++k) {
+        a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+    }
+    sim::IslandMap& map = a.world.island(1).map;
+    for (std::int32_t y = 0; y < 30; ++y) {  // the west coast walled all along
+        REQUIRE(map.place(*a.buildings.by_id(kWall), 0, y, 0, 0, kHuman, 1).ok());
+    }
+    REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::City& t = *a.world.city(1, 1);
+    CHECK(!engine.landing_beach(p, t).has_value());  // no beach at all
+    const auto wall = engine.landing_beach(p, t, true);
+    REQUIRE(wall.has_value());
+    CHECK(wall->first == 0);  // on the west coast
+    // Shot down: the gap is the landing.
+    map.restore_ground(0, static_cast<std::uint32_t>(wall->second));
+    const auto gap = engine.landing_beach(p, t);
+    REQUIRE(gap.has_value());
+    CHECK(gap->first == 0);
+    CHECK(gap->second == wall->second);
 }
