@@ -1476,8 +1476,10 @@ void Engine::update_fleet_target(AiPlayer& p) {
     const auto ships = static_cast<std::int32_t>(own_ships(p).size());
     const auto n = static_cast<std::int32_t>(p.cities);
     p.ships_per_city = n > 1 ? std::max(1, ships / n + 1) : ships;
-    // At most four as in the original, or as many as the computer may found (Rules::computer_cities).
-    std::int32_t t = std::min(n, static_cast<std::int32_t>(city_limit()));
+    // At most four as in the original, or as many as the computer may found (Rules::computer_cities),
+    // with the cap the harder levels drop for founding: the cities beyond it are plantations, and
+    // their guard ships took the gold their home cities grew with (p24, o4-606-p0 and -p3).
+    std::int32_t t = std::min(n, static_cast<std::int32_t>(guarded_city_limit()));
     std::int32_t supply = 0;
     if (rivals()) {
         // Open1602: an improved computer keeps one ship to guard each city and as many more as its

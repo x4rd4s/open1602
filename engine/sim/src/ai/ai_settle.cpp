@@ -1570,6 +1570,14 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
 }
 
 std::uint32_t Engine::city_limit() const {
+    return scaled_city_limit(limit_capped(rivals(), difficulty()));
+}
+
+std::uint32_t Engine::guarded_city_limit() const {
+    return scaled_city_limit(true);
+}
+
+std::uint32_t Engine::scaled_city_limit(bool capped) const {
     if (m_sim.rules().computer_cities == ComputerCities::Original) {
         return kOriginalCityLimit;
     }
@@ -1584,7 +1592,7 @@ std::uint32_t Engine::city_limit() const {
     // Merlin (2026-11-24): on the two harder levels an improved computer has no cap, only its
     // budget decides (wants_room, colony_plan); it has at most one city on an island, so the
     // islands bound it. The easier levels keep the cap as part of their ease.
-    if (!limit_capped(rivals(), difficulty())) {
+    if (!capped) {
         return std::max(islands, kOriginalCityLimit);
     }
     const std::uint32_t most = kCityLimitMost[std::min<std::size_t>(difficulty(), kCityLimitMost.size() - 1)];

@@ -269,6 +269,9 @@ public:
     /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
     /// or the world's islands shared among its players, by the difficulty.
     [[nodiscard]] std::uint32_t city_limit() const;
+    /// How many of its cities a computer keeps a guard ship for: the city limit with its cap
+    /// (kCityLimitMost) on every level, so cities beyond the cap add no ships (p24).
+    [[nodiscard]] std::uint32_t guarded_city_limit() const;
     /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing (ai_settle.cpp).
     [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
 
@@ -366,10 +369,10 @@ public:
     [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
     /// Improved computers: the island search may pick an island below the city limit, or above it
     /// one its war freed (`freed`: one is still free, `chosen_freed`: this one).
+    [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
     /// Whether the scaled city limit has a cap (kCityLimitMost): always for the original's computers,
     /// for improved ones on the two easier levels only.
     [[nodiscard]] static bool limit_capped(bool improved, std::uint8_t level) noexcept;
-    [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
     /// Improved computers: a war is started only when the computer could settle the island a razed
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
@@ -602,6 +605,8 @@ private:
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
+    /// The scaled city limit (city_limit), with or without its cap (`capped`).
+    [[nodiscard]] std::uint32_t scaled_city_limit(bool capped) const;
     /// Improved computers: an island its war freed has no city yet.
     [[nodiscard]] bool freed_island(const AiPlayer& p) const;
     /// The owner of another city on `island` that leaves no room to found beside it, or kNoPlayer;

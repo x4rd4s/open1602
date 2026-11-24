@@ -1072,6 +1072,10 @@ std::uint32_t ComputerPlayers::city_limit() const {
     return m_engine->city_limit();
 }
 
+std::uint32_t ComputerPlayers::guarded_city_limit() const {
+    return m_engine->guarded_city_limit();
+}
+
 void ComputerPlayers::city_founded(std::uint16_t island, std::uint8_t city) {
     m_engine->city_founded(island, city);
 }

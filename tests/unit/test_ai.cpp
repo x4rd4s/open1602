@@ -2199,6 +2199,22 @@ TEST_CASE("ai: how many cities a computer founds, four as in the original or sca
         sim::Simulation s(g.world, g.buildings, g.figures, rules);
         return s.computers().city_limit();
     };
+    const auto guarded = [](std::uint32_t islands, std::uint8_t difficulty) {
+        Game g(false);
+        for (std::uint32_t i = 1; i < islands; ++i) {
+            sim::IslandMap map(1, 1);
+            sim::WorldIsland island{assets::IslandHeader{}, std::move(map), i, 85};
+            island.header.number = static_cast<std::uint8_t>(g.world.islands().size());
+            island.header.width = 31;
+            island.header.height = 31;
+            REQUIRE(g.world.add_island(std::move(island)).ok());
+        }
+        sim::World::GameSettings settings = g.world.game_settings();
+        settings.difficulty = difficulty;
+        g.world.set_game_settings(settings);
+        sim::Simulation s(g.world, g.buildings, g.figures, sim::Rules{});
+        return s.computers().guarded_city_limit();
+    };
     const sim::Rules scaled;
     CHECK(scaled.computer_cities == sim::ComputerCities::Scaled);
     CHECK(limit(1, 3, scaled) == 4);   // few islands: as many as the original's
@@ -2209,6 +2225,10 @@ TEST_CASE("ai: how many cities a computer founds, four as in the original or sca
     CHECK(limit(30, 2, scaled) == 30);
     CHECK(limit(30, 3, scaled) == 30);
     CHECK(limit(20, 3, scaled) == 20);
+    // The guard ships keep the cap there: the cities beyond it add no ships (p24).
+    CHECK(guarded(30, 2) == 10);
+    CHECK(guarded(30, 3) == 12);
+    CHECK(guarded(30, 1) == 8);
     sim::Rules classic_ai;
     classic_ai.bugs.classic_ai = true;
     CHECK(limit(30, 2, classic_ai) == 10);
