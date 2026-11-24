@@ -212,11 +212,11 @@ std::vector<Notice> EventPresenter::city_events(const sim::World& world, sim::Pl
                                                 const std::vector<sim::CityEvent>& events) {
     std::vector<Notice> out;
     for (const sim::CityEvent& e : events) {
-        if (e.kind == sim::CityEvent::Kind::Population && e.owner != local && local != sim::kNoPlayer &&
-            e.message >= 0x13 && e.message <= 0x1D) {
+        if (e.kind == sim::CityEvent::Kind::Population && e.owner != local && e.message >= 0x13 && e.message <= 0x1D) {
             // Another player's city: „Eine Stadt des Konkurrenten hat nun mehr als …“ from 300 on.
             // The original has three rivals and tells each city; with up to eleven,
-            // only the first city of each rival at each size.
+            // only the first city of each rival at each size. Open1602: a spectator (no player of
+            // its own) hears it of every player.
             const std::uint32_t key = std::uint32_t{e.owner} << 8 | e.message;
             if (std::find(m_rival_sizes.begin(), m_rival_sizes.end(), key) == m_rival_sizes.end()) {
                 m_rival_sizes.push_back(key);
@@ -523,10 +523,11 @@ std::vector<Notice> EventPresenter::diplomacy_notices(const sim::World& world, s
                 announce(kMessages[static_cast<std::size_t>(n.kind)],
                          founding ? city_spot(world, world.city(n.island, n.city)) : player_spot(world, n.from),
                          n.from != sim::kNoPlayer ? std::optional<sim::PlayerId>(n.from) : std::nullopt));
-        } else if (m_rival_wars && local != sim::kNoPlayer && n.from != local &&
+        } else if (m_rival_wars && n.from != local &&
                    (n.kind == sim::DiplomacyNotice::Kind::PeaceBroken ||
                     n.kind == sim::DiplomacyNotice::Kind::PeaceSigned)) {
-            // Open1602: war or peace between two others, without voice, under the icon of who acted.
+            // Open1602: war or peace between two others, without voice, under the icon of who acted;
+            // a spectator hears of every war and peace.
             const sim::Player* from = world.player(n.from);
             const sim::Player* to = world.player(n.to);
             if (from == nullptr || to == nullptr || from->role == sim::PlayerRole::Neutral ||
