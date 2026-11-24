@@ -274,6 +274,47 @@ TEST_CASE("end screen: the view during the game shows the own sheet only, as the
     CHECK(screen.shown_row() == 0);
 }
 
+TEST_CASE("end screen: a spectator's sheets during the game show every player, the leader first") {
+    // Feedback 16, V3: a spectator, or anyone in a multiplayer game, chooses every player's sheet
+    // while the game goes on; a spectator has none of its own and starts with the leader.
+    ui::set_language(ui::kFallbackLanguage);
+    EndScreen screen = make_screen();
+    sim::EndScreenSummary s = summary({500, 800, 100, 700, 900});
+    s.local = sim::kNoPlayer;
+    screen.open(s, true, true);
+    REQUIRE(screen.strip());
+    CHECK(screen.choosing());
+    CHECK(screen.shown_row() == 4);  // 900 points
+    const auto items = screen.draw(kNoFonts);
+    CHECK(has_text(items, "Rank 1 of 5"));
+    CHECK(!sprites_at(items, kSlotX, kSlotY).empty());
+    screen.step(1);
+    CHECK(screen.shown_row() == 1);  // 800, the next by points
+    // A player in a multiplayer game starts with their own sheet.
+    sim::EndScreenSummary own = summary({500, 800, 100, 700, 900});
+    own.local = own.rows[0].player;
+    screen.open(own, true, true);
+    CHECK(screen.shown_row() == 0);
+    CHECK(screen.choosing());
+}
+
+TEST_CASE("end screen: new figures keep the player shown and the strip where it was") {
+    EndScreen screen = make_screen();
+    sim::EndScreenSummary s = summary({500, 800, 100, 700, 900, 300});
+    s.local = sim::kNoPlayer;
+    screen.open(s, true, true);
+    screen.step(1);
+    REQUIRE(screen.shown_row() == 1);  // 800
+    // Player 1 falls behind everyone, player 2 leads: still player 1's sheet, at its new rank.
+    sim::EndScreenSummary later = summary({500, 50, 1000, 700, 900, 300});
+    later.local = sim::kNoPlayer;
+    screen.refresh(later);
+    CHECK(screen.shown_row() == 1);
+    CHECK(screen.rank(1) == 6);
+    CHECK(screen.rank(2) == 1);
+    CHECK(screen.choosing());
+}
+
 TEST_CASE("end screen: without TRANSFER.GAD the strip still pages with the keys") {
     EndScreen screen = make_screen(false);
     screen.open(summary({1, 2, 3, 4, 5, 6}), false);

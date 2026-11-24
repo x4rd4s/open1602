@@ -44,8 +44,14 @@ public:
     explicit EndScreen(std::optional<assets::GadgetLayout> ende, const assets::GadgetLayout* transfer = nullptr);
 
     /// Shows a decided game (`view_only` false: the buttons, no way back) or the sheets of a
-    /// running one (Escape goes back). Starts with the local player's sheet.
-    void open(sim::EndScreenSummary summary, bool view_only);
+    /// running one (Escape goes back). Starts with the local player's sheet. A running game's
+    /// sheets show only the local player's, as in the original; with `every_player` (Open1602: a
+    /// spectator, a multiplayer game) every player's can be chosen too, and a spectator starts with
+    /// the leader's.
+    void open(sim::EndScreenSummary summary, bool view_only, bool every_player = false);
+    /// New figures of the same game while the sheets are open (a running game that does not stand
+    /// still for them): the same player's sheet, the strip where it was.
+    void refresh(sim::EndScreenSummary summary);
     void set_scale(double scale);
     /// How players are shown (their coats of arms); kept, not copied. Without: the white arms.
     void set_banners(const render::BannerTable* banners) noexcept { m_banners = banners; }
@@ -66,6 +72,8 @@ public:
 
     [[nodiscard]] const sim::EndScreenSummary& summary() const noexcept { return m_summary; }
     [[nodiscard]] bool view_only() const noexcept { return m_view_only; }
+    /// Whether other players' sheets can be chosen.
+    [[nodiscard]] bool choosing() const noexcept { return !m_view_only || m_every_player; }
     /// The row whose sheet is shown.
     [[nodiscard]] std::size_t shown_row() const noexcept { return m_row; }
     /// Whether the coats of arms are the strip of all players rather than one per colour.
@@ -78,6 +86,10 @@ public:
     [[nodiscard]] std::size_t rank(std::size_t row) const noexcept { return row < m_rank.size() ? m_rank[row] : 0; }
 
 private:
+    /// Takes the figures: the rows by colour, the order and the ranks, whether a strip.
+    void take(sim::EndScreenSummary summary);
+    /// The buttons and coats of arms for the figures taken, showing `row`.
+    void lay_out(std::size_t row);
     void show(std::size_t row);
     /// Scrolls the strip so that its first gadget shows place `first` (clamped).
     void scroll_strip(std::size_t first);
@@ -99,6 +111,7 @@ private:
     sim::EndScreenSummary m_summary;
     std::size_t m_row = 0;  ///< the row shown
     bool m_view_only = false;
+    bool m_every_player = false;  ///< a running game's sheets, every player's to choose
     /// The row of each colour's button, nothing for a colour nobody plays.
     std::array<std::optional<std::size_t>, 4> m_by_colour{};
     bool m_strip = false;
