@@ -1090,9 +1090,33 @@ bool Engine::move_to_board(AiPlayer& p, Ship& s, ShipNote& n, const City& home) 
     return true;
 }
 
+void Engine::troops_home(AiPlayer& p, ShipNote& n) {
+    // Open1602 (feedback 16, K4): a ship left without a mission with soldiers aboard (a breach
+    // with too few, an unload that failed) takes them home and unloads them there; before, it was
+    // taken for supply runs with the soldiers aboard. Boarding happens only in missions 1 and 5.
+    Ship* s = m_world.ship(n.id);
+    const City* home = home_city(p);
+    if (s == nullptr || home == nullptr || s->held || s->repairing || ship_moving(*s) || s->id == p.settle.ship ||
+        s->id == p.settle.plan_ship || soldiers_aboard(*s) == 0) {
+        return;
+    }
+    if (!ship_at_city(*s, *home)) {
+        log(p, "ship %u has %u soldiers aboard and no mission: home to unload them", s->id, soldiers_aboard(*s));
+        ship_send(p, *s, Target::city_of(home->island, home->index), 2, 0);
+        return;
+    }
+    UnloadOrder order;
+    order.player = p.player;
+    order.ship = s->id;
+    execute(order);
+}
+
 void Engine::missions(AiPlayer& p) {
     for (ShipNote& n : p.ships) {
         if (n.mission == 0) {
+            if (rivals()) {
+                troops_home(p, n);
+            }
             continue;
         }
         Ship* s = m_world.ship(n.id);

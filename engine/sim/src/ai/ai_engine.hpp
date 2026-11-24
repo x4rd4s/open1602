@@ -357,6 +357,8 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
+    [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
@@ -1119,6 +1121,8 @@ private:
     [[nodiscard]] std::uint32_t soldiers_on_island(PlayerId owner, std::uint16_t island) const;
     std::vector<Soldier*> soldiers_near(PlayerId owner, const City& c, std::int32_t range, std::size_t max);
     [[nodiscard]] std::uint32_t soldiers_aboard(const Ship& s) const;
+    /// Improved computers: a ship without a mission and with soldiers aboard takes them home.
+    void troops_home(AiPlayer& p, ShipNote& n);
     [[nodiscard]] std::uint32_t free_holds(const Ship& s) const;
     bool queue_unit(AiPlayer& p, const CastleEntry& castle, std::uint32_t family);
     bool guard_post(AiPlayer& p, City& c, CityPlan& r, std::int32_t& x, std::int32_t& y, bool& at_yard);

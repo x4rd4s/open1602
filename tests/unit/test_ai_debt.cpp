@@ -113,3 +113,10 @@ TEST_CASE("ai war plan: a crop island is a war motive only when the freed island
     // Gate f29b, x3 g4-404-p0: the budget refused the colony, so the island went to a third player.
     CHECK(!Engine::crop_war_motive(true, false, false));
 }
+
+TEST_CASE("ai ships: a ship with soldiers aboard is not free for supply runs") {
+    // Feedback 16, K4: a ship sailed ore to a Kontor with its troops aboard.
+    CHECK(Engine::troops_aboard_idle(true, 4));
+    CHECK(!Engine::troops_aboard_idle(true, 0));
+    CHECK(!Engine::troops_aboard_idle(false, 4));  // the original's computers: as before
+}
