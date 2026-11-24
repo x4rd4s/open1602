@@ -269,6 +269,13 @@ public:
     /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
     /// or the world's islands shared among its players, by the difficulty.
     [[nodiscard]] std::uint32_t city_limit() const;
+    /// How many cities `p` founds at most: the city limit, for an improved computer raised to what
+    /// the game's victory asks (goal_city_count).
+    [[nodiscard]] std::uint32_t city_room(const AiPlayer& p) const;
+    /// The cities a victory asks of a player: the islands share (`percent` of `islands`, only when
+    /// computers can win) or a mission's count (`mission_min`), whichever is more.
+    [[nodiscard]] static std::uint32_t goal_city_count(std::uint32_t islands, std::uint8_t percent, bool computers_win,
+                                                       std::int32_t mission_min) noexcept;
     /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing (ai_settle.cpp).
     [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
 
@@ -373,6 +380,11 @@ public:
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
     [[nodiscard]] static bool leaves_room(bool kept_off, bool contested, bool small_owner, bool room,
                                           bool populated) noexcept;
+    /// Whether an island's `free` land leaves room to found beside another city (blocker).
+    [[nodiscard]] static bool room_beside(std::uint32_t free) noexcept;
+    /// Whether improved pirates pass over an island in their search: one they turned back from
+    /// lately (`left`) or whose cities leave no room (`blocked`); the original's pirates never do.
+    [[nodiscard]] static bool pirate_island_skipped(bool improved, bool left, bool blocked) noexcept;
     /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
     [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
     /// Improved computers: the island search may pick an island below the city limit, or above it
@@ -553,6 +565,9 @@ private:
     [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: the computer gave a city up on the island in the last 45 minutes.
     [[nodiscard]] bool left_lately(AiPlayer& p, std::uint16_t island);
+    /// An island `p` turned back from or gave a city up on within kLeftIslandMs, with or without a
+    /// home city (left_lately asks for one).
+    [[nodiscard]] bool left_recently(AiPlayer& p, std::uint16_t island);
     [[nodiscard]] bool knows_crops(const AiPlayer& p, std::uint16_t island) const;
     [[nodiscard]] Ship* explorer(AiPlayer& p);
     [[nodiscard]] bool exploring(AiPlayer& p);

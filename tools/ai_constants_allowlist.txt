@@ -40,3 +40,5 @@ kLandingLogMs | engine/sim/src/ai/ai_military.cpp | derived from: one minute of 
 256 | engine/sim/src/ai/ai_military.cpp | derived from: the fixed-point scale of supply_urgency and stock_lasts (minutes x 256), as supply_destination compares kHomeFirstMinutes * 256
 kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarCheckMs times kWarFails (three looks of ten minutes without progress end a war), the time a war party's upkeep is paid for from the gold above kBrokeCash
 30 | engine/sim/src/ai/ai_strategy.cpp | derived from: kPartyRunwayMinutes, kWarCheckMs (ten minutes) times kWarFails (three) in minutes
+100 | engine/sim/src/ai/ai_settle.cpp | derived from: the percent scale of VictoryConditions::islands_percent, as victory.cpp's islands test (own cities * 100 >= islands * percent) counts it, in goal_city_count
+99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met

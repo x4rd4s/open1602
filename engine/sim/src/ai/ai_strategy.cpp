@@ -349,7 +349,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         g = goal::kMilitary;
     } else if (aristocrats_near && !p.present[kSlotGoldMine]) {
         g = goal::kGold;
-    } else if (p.cities < city_limit() && (st.character == character::kSettler || (money >= 8000 && p.cities < 3)) &&
+    } else if (p.cities < city_room(p) && (st.character == character::kSettler || (money >= 8000 && p.cities < 3)) &&
                p.max_stage >= stage::kMain2) {
         g = goal::kLand;
     }
@@ -610,7 +610,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     // Merlin (2026-11-24): an island its war frees it may settle above its city limit, so with the
     // scaled limit the limit no longer stops the war.
     const bool room =
-        own_city_count(p.player) < city_limit() || m_sim.rules().computer_cities == ComputerCities::Scaled;
+        own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
     if (rivals() && !war_settles(room, colony_affordable(p, kAnyCrop))) {
         return;
     }
@@ -670,7 +670,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     // refuses the colony (gate f29b, x3 g4-404-p0: P0 razed P2's city, its budget refused the
     // colony, and a third player took the island).
     const bool room =
-        own_city_count(p.player) < city_limit() || m_sim.rules().computer_cities == ComputerCities::Scaled;
+        own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
     const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
         {ware::kSpiceField, ware::kSpices},
         {ware::kTobaccoField, ware::kTobaccoGoods},

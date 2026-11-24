@@ -501,8 +501,14 @@ int cmd_bench(const Args& args) {
         const auto ai = args.options.find("--ai");
         const auto reveal = args.options.find("--reveal");
         const bool reveal_resources = args.flag("--reveal-resources");
+        // --victory-islands N, --victory-computers 0|1, --victory-all 0|1: a new world's victory
+        // conditions of an endless game (the islands share), to measure the computers against them.
+        const auto victory_islands = args.number("--victory-islands");
+        const auto victory_computers = args.number("--victory-computers");
+        const auto victory_all = args.number("--victory-all");
+        const bool victory = victory_islands || victory_computers || victory_all;
         if ((cities != args.options.end() || ai != args.options.end() || reveal != args.options.end() ||
-             reveal_resources) &&
+             reveal_resources || victory) &&
             !world->saved_rules()) {
             sim::Rules r;
             if (cities != args.options.end()) {
@@ -518,6 +524,15 @@ int cmd_bench(const Args& args) {
                                                      : sim::Reveal::Original;
             }
             r.reveal_resources = reveal_resources;
+            if (victory_islands) {
+                r.victory.islands_percent = static_cast<std::uint8_t>(std::min<std::size_t>(*victory_islands, 100));
+            }
+            if (victory_computers) {
+                r.victory.computers = *victory_computers != 0;
+            }
+            if (victory_all) {
+                r.victory.all = *victory_all != 0;
+            }
             world->set_saved_rules(r);
         }
         simulation.emplace(*world, *buildings, *figures);
@@ -583,6 +598,7 @@ int cmd_bench(const Args& args) {
         Period period;
         period.ticks.reserve(period_minutes * ticks_per_minute);
         std::size_t tick = 0;
+        std::vector<bool> reported_wins(world->players().size(), false);
         for (std::size_t minute = 1; minute <= minutes; ++minute) {
             for (std::uint64_t t = 0; t < ticks_per_minute; ++t, ++tick) {
                 std::fill(step_ns.begin(), step_ns.end(), 0);
@@ -605,6 +621,13 @@ int cmd_bench(const Args& args) {
                         step_total_ns[i] += step_ns[i];
                         step_max_ns[i] = std::max(step_max_ns[i], step_ns[i]);
                     }
+                }
+            }
+            // Each player's win, once, with its minute (victory conditions or a mission).
+            for (std::size_t i = 0; last && i < world->players().size(); ++i) {
+                if (world->players()[i].won && !reported_wins[i]) {
+                    reported_wins[i] = true;
+                    std::printf("won: player %zu at minute %zu\n", i, minute);
                 }
             }
             if (last && reload_at && minute == *reload_at) {
