@@ -58,6 +58,9 @@ inline constexpr std::int32_t kMinVolume = -4000;
 
 /// Volume in the original's unit, 1/100 dB of attenuation (kMinVolume .. 0), as a gain.
 [[nodiscard]] float gain_of(std::int32_t centibel) noexcept;
+/// A volume of the settings as a gain: as gain_of, but the slider's lowest step is silent.
+/// Open1602: the original's lowest step is -40 dB, quiet but still heard.
+[[nodiscard]] float setting_gain(std::int32_t centibel) noexcept;
 
 /// The kinds of messages the voice and video options switch: 0 (all) and the original's seven of
 /// [SPEECHKIND], then Open1602's own.
@@ -106,7 +109,7 @@ public:
         : m_mixer(&mixer), m_bank(&bank), m_limit(per_frame) {}
 
     void set_enabled(bool on) noexcept { m_enabled = on; }
-    void set_volume(std::int32_t centibel) noexcept { m_gain = gain_of(centibel); }
+    void set_volume(std::int32_t centibel) noexcept { m_gain = setting_gain(centibel); }
     /// The sounds of the packages by their numbers from assets::kFirstPackageSound
     /// (package_sounds.hpp); nullptr for one that could not be decoded.
     void set_package_sounds(std::vector<std::shared_ptr<const annokit::audio::Pcm>> sounds) {
