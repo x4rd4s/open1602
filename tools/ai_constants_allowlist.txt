@@ -42,5 +42,6 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 30 | engine/sim/src/ai/ai_strategy.cpp | derived from: kPartyRunwayMinutes, kWarCheckMs (ten minutes) times kWarFails (three) in minutes
 100 | engine/sim/src/ai/ai_settle.cpp | derived from: the percent scale of VictoryConditions::islands_percent, as victory.cpp's islands test (own cities * 100 >= islands * percent) counts it, in goal_city_count
 99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met
-4 | engine/sim/src/ai/ai_planner.cpp | derived from: the luxury count of the Main2 order (computer_orders.cpp kMain2Order, luxury(4, kAlways)) that luxury_first asks ahead of the list; also the size of kCrops
-kCrops | engine/sim/src/ai/ai_planner.cpp | derived from: the always eligible crops of luxury()'s crop table (spices, tobacco, wine, sugar), by field and good
+4 | engine/sim/src/ai/ai_planner.cpp | derived from: the luxury count of the Main2 order (computer_orders.cpp kMain2Order, luxury(4, kAlways)) that luxury_first asks ahead of the list
+kLuxuryCrops | engine/sim/src/ai/ai_planner.cpp | derived from: luxury()'s own crop table, moved out so that luxury_short_here reads the same one
+LuxuryCrop | engine/sim/src/ai/ai_planner.cpp | derived from: the row type of luxury()'s crop table

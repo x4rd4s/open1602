@@ -28,6 +28,20 @@ constexpr std::int64_t kShedMoney = -5000;      // ... and below this tear down 
 constexpr std::size_t kShedPerVisit = 4;        // ... a few per visit of the city
 constexpr std::int64_t kShedFarMoney = -10000;  // ... and below this whatever they refund
 
+/// The luxury crops of luxury(), in the order it plants them: slot, field and the good the home
+/// city must lack.
+struct LuxuryCrop {
+    std::uint8_t slot;
+    std::uint8_t field;
+    std::uint8_t good;
+};
+constexpr std::array<LuxuryCrop, 6> kLuxuryCrops{{{kSlotSpices, ware::kSpiceField, ware::kSpices},
+                                                  {kSlotTobacco, ware::kTobaccoField, ware::kTobaccoGoods},
+                                                  {kSlotWine, ware::kWineField, ware::kAlcohol},
+                                                  {kSlotCocoa, ware::kCocoaField, ware::kCocoa},
+                                                  {kSlotCotton, ware::kCottonField, ware::kCloth},
+                                                  {kSlotSugar, ware::kSugarField, ware::kAlcohol}}};
+
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------
@@ -3125,18 +3139,20 @@ bool Engine::luxury_short_here(const AiPlayer& p) const {
     if (c == nullptr) {
         return false;
     }
-    struct Crop {
-        std::uint8_t field;
-        std::uint8_t good;
-    };
-    static constexpr std::array<Crop, 4> kCrops{{{ware::kWineField, ware::kAlcohol},
-                                                 {ware::kSugarField, ware::kAlcohol},
-                                                 {ware::kSpiceField, ware::kSpices},
-                                                 {ware::kTobaccoField, ware::kTobaccoGoods}}};
-    return std::ranges::any_of(kCrops, [&](const Crop& crop) {
-        return plants_on(fertility(c->island, crop.field), false, true, true, false) &&
+    return std::ranges::any_of(kLuxuryCrops, [&](const LuxuryCrop& crop) {
+        return luxury_eligible(p, crop.slot) && plants_on(fertility(c->island, crop.field), false, true, true, false) &&
                goods_short(p.player, crop.good) != 0;
     });
+}
+
+bool Engine::luxury_eligible(const AiPlayer& p, std::uint8_t slot) const {
+    if (slot == kSlotCocoa) {
+        return p.score >= 3 || m_state.max_score >= 3;
+    }
+    if (slot == kSlotCotton) {
+        return p.max_stage >= stage::kCitizens;
+    }
+    return true;
 }
 
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
@@ -3183,22 +3199,28 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         bool eligible;
     };
     bool wine_island = false;
-    const std::array<Crop, 6> crops{{
-        {kSlotSpices, ware::kSpiceField, ware::kSpices, upkeep(ware::kSpices, ware::kSpiceField), true},
-        {kSlotTobacco, ware::kTobaccoField, ware::kTobaccoGoods,
-         upkeep(ware::kTobacco, ware::kTobaccoField) + upkeep(ware::kTobaccoGoods, ware::kTobacco), true},
-        {kSlotWine, ware::kWineField, ware::kAlcohol, upkeep(ware::kAlcohol, ware::kWineField), true},
-        {kSlotCocoa, ware::kCocoaField, ware::kCocoa, upkeep(ware::kCocoa, ware::kCocoaField),
-         p.score >= 3 || m_state.max_score >= 3},
-        {kSlotCotton, ware::kCottonField, ware::kCloth,
-         upkeep(ware::kWool, ware::kCottonField) + upkeep(ware::kCloth, ware::kWool), p.max_stage >= stage::kCitizens},
-        {kSlotSugar, ware::kSugarField, ware::kAlcohol,
-         upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
-    }};
+    // The running costs of a crop's chain: tobacco, cotton and sugar take a second workshop.
+    const auto chain_upkeep = [&](const LuxuryCrop& crop) -> std::int64_t {
+        switch (crop.slot) {
+            case kSlotTobacco:
+                return upkeep(ware::kTobacco, ware::kTobaccoField) + upkeep(ware::kTobaccoGoods, ware::kTobacco);
+            case kSlotCotton:
+                return upkeep(ware::kWool, ware::kCottonField) + upkeep(ware::kCloth, ware::kWool);
+            case kSlotSugar:
+                return upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar);
+            default:
+                return upkeep(crop.good, crop.field);
+        }
+    };
+    std::array<Crop, kLuxuryCrops.size()> crops{};
+    for (std::size_t i = 0; i < kLuxuryCrops.size(); ++i) {
+        const LuxuryCrop& k = kLuxuryCrops[i];
+        crops[i] = Crop{k.slot, k.field, k.good, chain_upkeep(k), luxury_eligible(p, k.slot)};
+    }
     // Open1602: an improved computer plants first what its people go without (critical_short),
     // then what its home city's people run out of soonest; for a critical good as many fields as
     // make up what its cities lack, beyond the order's number.
-    std::array<Crop, 6> order = crops;
+    std::array<Crop, kLuxuryCrops.size()> order = crops;
     if (rivals()) {
         wine_island = fertility(c->island, ware::kWineField) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {

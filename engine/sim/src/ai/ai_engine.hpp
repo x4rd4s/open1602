@@ -836,9 +836,12 @@ private:
     bool iron_tools(AiPlayer& p);
     bool weapons(AiPlayer& p);
     bool luxury(AiPlayer& p, std::uint32_t n, bool exclusive);
-    /// Whether the current city's island grows fully a luxury crop whose good the computer's people
-    /// go without now (goods_short): wine, sugar, spices or tobacco.
+    /// Whether the current city's island grows fully a luxury crop luxury() plants whose good the
+    /// computer's people go without now (goods_short).
     [[nodiscard]] bool luxury_short_here(const AiPlayer& p) const;
+    /// Whether luxury() plants the crop of `slot` yet: cocoa from the third score, cotton from the
+    /// citizens, the others always.
+    [[nodiscard]] bool luxury_eligible(const AiPlayer& p, std::uint8_t slot) const;
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;
