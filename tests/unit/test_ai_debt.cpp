@@ -105,3 +105,11 @@ TEST_CASE("ai luxury: a crop on half-fertile land only as the last resort") {
     // Gate f27: one it cannot pay now waited in need() on every planner step, for hours.
     CHECK(!Engine::plants_on(64, true, false, false, false));
 }
+
+TEST_CASE("ai war plan: a crop island is a war motive only when the freed island can be settled") {
+    CHECK(Engine::crop_war_motive(true, true, false));    // lacking, could settle, no free island
+    CHECK(!Engine::crop_war_motive(false, true, false));  // not lacking
+    CHECK(!Engine::crop_war_motive(true, true, true));    // a free island grows it: found there
+    // Gate f29b, x3 g4-404-p0: the budget refused the colony, so the island went to a third player.
+    CHECK(!Engine::crop_war_motive(true, false, false));
+}
