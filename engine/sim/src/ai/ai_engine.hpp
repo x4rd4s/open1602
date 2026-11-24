@@ -362,6 +362,9 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// Whether a main city asks for its luxury crops ahead of its list: an improved computer whose
+    /// people go without a good that grows fully on the city's island.
+    [[nodiscard]] static bool luxury_first(bool improved, bool short_here) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;
@@ -833,6 +836,9 @@ private:
     bool iron_tools(AiPlayer& p);
     bool weapons(AiPlayer& p);
     bool luxury(AiPlayer& p, std::uint32_t n, bool exclusive);
+    /// Whether the current city's island grows fully a luxury crop whose good the computer's people
+    /// go without now (goods_short): wine, sugar, spices or tobacco.
+    [[nodiscard]] bool luxury_short_here(const AiPlayer& p) const;
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;

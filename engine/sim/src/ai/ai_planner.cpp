@@ -1486,6 +1486,13 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kMain2);
                 return;
             }
+            // Open1602 (read p39): an improved computer builds the vineyard once its settlers go
+            // without alcohol and the island grows the vines, as a player does: the luxury of the
+            // lists came only with 4,000 gold or at the end of the next stage, a median 85 minutes
+            // after the city ran dry, while nobody sold alcohol in 97 % of those minutes.
+            if (luxury_first(rivals(), luxury_short_here(p)) && luxury(p, 4, true)) {
+                return;
+            }
             if (needs(ComputerList::Main) || needs(ComputerList::MainRich)) {
                 return;
             }
@@ -1504,6 +1511,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
                  (luxury_in_stock(p, c, r, 2) > at.ai_citizens_luxury || kontor_level(c) > at.ai_citizens_kontor))) {
                 set_stage(p, r, stage::kCitizens);
+                return;
+            }
+            if (luxury_first(rivals(), luxury_short_here(p)) && luxury(p, 4, true)) {
                 return;
             }
             if (needs(ComputerList::Main2)) {
@@ -3104,6 +3114,29 @@ bool Engine::weapons(AiPlayer& p) {
         return true;
     }
     return need(p, kSlotCannons, 1);
+}
+
+bool Engine::luxury_first(bool improved, bool short_here) noexcept {
+    return improved && short_here;
+}
+
+bool Engine::luxury_short_here(const AiPlayer& p) const {
+    const City* c = current_city(p);
+    if (c == nullptr) {
+        return false;
+    }
+    struct Crop {
+        std::uint8_t field;
+        std::uint8_t good;
+    };
+    static constexpr std::array<Crop, 4> kCrops{{{ware::kWineField, ware::kAlcohol},
+                                                 {ware::kSugarField, ware::kAlcohol},
+                                                 {ware::kSpiceField, ware::kSpices},
+                                                 {ware::kTobaccoField, ware::kTobaccoGoods}}};
+    return std::ranges::any_of(kCrops, [&](const Crop& crop) {
+        return plants_on(fertility(c->island, crop.field), false, true, true, false) &&
+               goods_short(p.player, crop.good) != 0;
+    });
 }
 
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {

@@ -182,3 +182,10 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 80, false) == 0);
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
+
+TEST_CASE("ai stage: a main city asks for its luxury crop first while its people go without") {
+    // Read p39: the first vineyard came a median 85 minutes after the city ran dry of alcohol.
+    CHECK(Engine::luxury_first(true, true));
+    CHECK(!Engine::luxury_first(true, false));
+    CHECK(!Engine::luxury_first(false, true));  // the original's computers keep their lists
+}
