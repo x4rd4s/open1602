@@ -505,8 +505,10 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   takes them home rather than land them under the towers: in the gate games every party too small
   for them died without taking the city. It does the same when its tries run out.
   In a war of its own (its war plan), a city it passes over because the soldiers at home are too
-  few for its towers makes it arm for those lacking, as many as its landing ships take, within its
-  budget like any unit, until an attack starts or the war ends.
+  few for its towers makes it arm for those lacking, as many as its landing ships take, until an
+  attack on that city starts or the war ends. While its gold above the broke line (2000) pays
+  their upkeep and its cities' deficit for half an hour, it trains them beyond its budget, several
+  at once; otherwise within its budget like any unit.
 - **Walled coasts.** Where every beach near the city is walled or sealed by trees behind it, a
   warship shoots a gap into the wall on the beach, or into the trees or walls behind it. With no
   beach within 24 tiles of the market an improved computer takes one farther away, the soldiers

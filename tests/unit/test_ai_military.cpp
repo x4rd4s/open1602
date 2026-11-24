@@ -432,6 +432,20 @@ TEST_CASE("ai military: an improved computer in debt adds no unit, by its budget
     CHECK(!Engine::may_add_unit(true, 0, 50, 60, 0));
 }
 
+TEST_CASE("ai military: an improved computer raises a war party beyond its budget while its gold pays for it") {
+    // Feedback 16, K5 (probe p30): the party its war lacked against towers was raised at the
+    // budget's pace, one unit at a time, and the war ended before it was there. Its gold above the
+    // broke line (2000) now pays for the party's upkeep and its cities' deficit for half an hour.
+    using sim::ai::Engine;
+    CHECK(Engine::party_paid(3800, 10, 5, 0));     // 10 x 5 x 30 = 1500 of 1800 spare
+    CHECK(!Engine::party_paid(3200, 10, 5, 0));    // 1500 of 1200
+    CHECK(!Engine::party_paid(3800, 10, 5, -20));  // with a deficit of 20 a minute: 2100 of 1800
+    CHECK(Engine::party_paid(4200, 10, 5, -20));
+    CHECK(Engine::party_paid(3800, 10, 5, 50));  // an income does not add to it
+    CHECK(!Engine::party_paid(3800, 0, 5, 0));   // no party
+    CHECK(!Engine::party_paid(1900, 1, 0, 0));   // below the broke line
+}
+
 TEST_CASE("ai military: a computer trains soldiers of a package of the kind it wants too") {
     Island a;
     // Pikemen of a package: swordsmen by their kind, with more health.

@@ -55,6 +55,9 @@ constexpr std::int64_t kWarDebt = -2000;
 // Below this, with its gold falling, a computer is broke: outside its war economy, which at war
 // holds only until the first look without progress, it ends its war here ("out of gold").
 constexpr std::int32_t kBrokeCash = 2000;
+// Merlin (2026-11-24, feedback 16 K5): what a war party is paid for, in minutes of its upkeep: the
+// three looks of ten minutes a war gets without progress before it ends.
+constexpr std::int64_t kPartyRunwayMinutes = 30;
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -476,6 +479,19 @@ std::int32_t Engine::army_budget(const AiPlayer& p) const {
     const std::int64_t minutes = st.war_target != kNoPlayer ? kWarRunwayMinutes : kThreatRunwayMinutes;
     const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / minutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
+}
+
+bool Engine::party_paid(std::int64_t money, std::uint32_t lacking, std::int32_t unit_upkeep,
+                        std::int32_t net) noexcept {
+    // The soldiers a war party lacks, and the deficit its cities run already, for the time its war
+    // has left without progress, from the gold above the broke line.
+    const std::int64_t spare = money - kBrokeCash;
+    const std::int64_t per_minute = std::int64_t{lacking} * unit_upkeep - std::min<std::int32_t>(0, net);
+    return lacking != 0 && spare > 0 && per_minute * kPartyRunwayMinutes <= spare;
+}
+
+bool Engine::party_paid(const AiPlayer& p) const {
+    return party_paid(player(p).money, war_party_lacking(p), unit_upkeep_estimate(p), net_income(p));
 }
 
 std::int32_t Engine::arming_budget(const AiPlayer& p) const {
