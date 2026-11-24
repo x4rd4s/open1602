@@ -128,3 +128,12 @@ TEST_CASE("ai settle: above its city limit a computer settles only an island its
     CHECK(!Engine::beyond_limit(false, true, false));  // but no other
     CHECK(!Engine::beyond_limit(false, false, false));
 }
+
+TEST_CASE("ai settle: on the two harder levels an improved computer's cities have no cap") {
+    // Merlin (2026-11-24): only the budget decides there; the easier levels keep the cap.
+    CHECK(Engine::limit_capped(true, 0));
+    CHECK(Engine::limit_capped(true, 1));
+    CHECK(!Engine::limit_capped(true, 2));
+    CHECK(!Engine::limit_capped(true, 3));
+    CHECK(Engine::limit_capped(false, 3));  // the original's computers: as before
+}

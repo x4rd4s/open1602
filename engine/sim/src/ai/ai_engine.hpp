@@ -361,6 +361,9 @@ public:
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     /// Improved computers: the island search may pick an island below the city limit, or above it
     /// one its war freed (`freed`: one is still free, `chosen_freed`: this one).
+    /// Whether the scaled city limit has a cap (kCityLimitMost): always for the original's computers,
+    /// for improved ones on the two easier levels only.
+    [[nodiscard]] static bool limit_capped(bool improved, std::uint8_t level) noexcept;
     [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good

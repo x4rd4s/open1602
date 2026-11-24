@@ -1553,8 +1553,18 @@ std::uint32_t Engine::city_limit() const {
     for (const Player& pl : m_world.players()) {
         players += (pl.role == PlayerRole::Human || pl.role == PlayerRole::Computer) && pl.active() ? 1U : 0U;
     }
+    // Merlin (2026-11-24): on the two harder levels an improved computer has no cap, only its
+    // budget decides (wants_room, colony_plan); it has at most one city on an island, so the
+    // islands bound it. The easier levels keep the cap as part of their ease.
+    if (!limit_capped(rivals(), difficulty())) {
+        return std::max(islands, kOriginalCityLimit);
+    }
     const std::uint32_t most = kCityLimitMost[std::min<std::size_t>(difficulty(), kCityLimitMost.size() - 1)];
     return std::clamp(islands / std::max(players, 1U), kOriginalCityLimit, most);
+}
+
+bool Engine::limit_capped(bool improved, std::uint8_t level) noexcept {
+    return !improved || level < kCityLimitMost.size() / 2;
 }
 
 bool Engine::freed_island(const AiPlayer& p) const {

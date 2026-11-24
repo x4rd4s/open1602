@@ -2179,7 +2179,8 @@ TEST_CASE("ai: a computer short of ships buys one a player at peace offers (Rule
 
 TEST_CASE("ai: how many cities a computer founds, four as in the original or scaled to the world") {
     // Scaled (Open1602's default): the islands of more than the smallest size for each player who
-    // plays, at least four, at most 6, 8, 10 or 12 by the difficulty.
+    // plays, at least four, at most 6, 8, 10 or 12 by the difficulty (for improved computers on the
+    // two easier levels only).
     const auto limit = [](std::uint32_t islands, std::uint8_t difficulty, const sim::Rules& rules) {
         Game g(false);  // a big island and a rock: one island counts
         for (std::uint32_t i = 1; i < islands; ++i) {
@@ -2204,9 +2205,15 @@ TEST_CASE("ai: how many cities a computer founds, four as in the original or sca
     CHECK(limit(10, 1, scaled) == 5);  // ten islands for two players
     CHECK(limit(30, 0, scaled) == 6);  // easy: six at most
     CHECK(limit(30, 1, scaled) == 8);
-    CHECK(limit(30, 2, scaled) == 10);
-    CHECK(limit(30, 3, scaled) == 12);  // hard: twelve
-    CHECK(limit(20, 3, scaled) == 10);
+    // The two harder levels: no cap for improved computers, only the islands (Merlin, 2026-11-24).
+    CHECK(limit(30, 2, scaled) == 30);
+    CHECK(limit(30, 3, scaled) == 30);
+    CHECK(limit(20, 3, scaled) == 20);
+    sim::Rules classic_ai;
+    classic_ai.bugs.classic_ai = true;
+    CHECK(limit(30, 2, classic_ai) == 10);
+    CHECK(limit(30, 3, classic_ai) == 12);  // hard: twelve
+    CHECK(limit(20, 3, classic_ai) == 10);
     CHECK(sim::Rules::original().computer_cities == sim::ComputerCities::Original);
     CHECK(limit(30, 3, sim::Rules::original()) == 4);
 }
