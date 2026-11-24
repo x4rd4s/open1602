@@ -2941,6 +2941,11 @@ bool Engine::need_denkmal(AiPlayer& p) {
     return true;
 }
 
+bool Engine::castle_due(std::uint64_t inhabitants, std::uint32_t per_castle, std::uint32_t castles,
+                        bool military) noexcept {
+    return inhabitants >= std::uint64_t{per_castle} * (castles + 1U) || (castles == 0 && military);
+}
+
 bool Engine::need_castle(AiPlayer& p) {
     // A castle in the home city while the computer trails the leading human. Open1602 (rivals): also
     // as the home city grows, a castle for every so many inhabitants while the army is short of its
@@ -2960,8 +2965,12 @@ bool Engine::need_castle(AiPlayer& p) {
     const auto castles = static_cast<std::uint32_t>(p.castles.size());
     // Rivals: grown enough for one more castle, and the army short of its target (the first castle
     // in any case, so that the computer can recruit at all).
+    // Open1602 (gate f38): the first castle also while its goal is military (a threat or a war),
+    // whatever the home city's size: in f38, 23 of the 93 wars fell on a computer without a castle,
+    // whose military goal could recruit no one.
     const bool grown = rivals() && bal.ai_castle_inhabitants != 0 &&
-                       population(*c) >= std::uint64_t{bal.ai_castle_inhabitants} * (castles + 1U) &&
+                       castle_due(population(*c), bal.ai_castle_inhabitants, castles,
+                                  p.strategy.goal == goal::kMilitary || p.strategy.war_target != kNoPlayer) &&
                        (castles == 0 || weighted_army(p.player) < army_target(p));
     if (!p.castles.empty() && !grown) {
         bool war = false;

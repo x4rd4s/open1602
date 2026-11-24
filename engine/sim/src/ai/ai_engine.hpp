@@ -359,6 +359,10 @@ public:
                                          std::int32_t net) noexcept;
     /// party_paid for `p`'s war party (war_party_lacking).
     [[nodiscard]] bool party_paid(const AiPlayer& p) const;
+    /// Whether the home city is due another castle: one per `per_castle` inhabitants, and the first
+    /// also while the computer's goal is military.
+    [[nodiscard]] static bool castle_due(std::uint64_t inhabitants, std::uint32_t per_castle, std::uint32_t castles,
+                                         bool military) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

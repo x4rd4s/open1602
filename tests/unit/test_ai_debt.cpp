@@ -173,3 +173,12 @@ TEST_CASE("ai settle: more cities than the limit only where the victory asks for
     CHECK(Engine::goal_city_count(18, 50, true, 7) == 9);   // whichever is more
     CHECK(Engine::goal_city_count(18, 0, true, -1) == 0);
 }
+
+TEST_CASE("ai castle: the first castle comes with a military goal, whatever the city's size") {
+    // Gate f38: 23 of 93 wars fell on a computer without a castle, whose military goal recruited no one.
+    CHECK(Engine::castle_due(350, 350, 0, false));   // grown enough
+    CHECK(!Engine::castle_due(349, 350, 0, false));  // not yet
+    CHECK(Engine::castle_due(100, 350, 0, true));    // threatened or at war: the first castle
+    CHECK(!Engine::castle_due(400, 350, 1, true));   // a second one only as the city grows
+    CHECK(Engine::castle_due(700, 350, 1, false));
+}
