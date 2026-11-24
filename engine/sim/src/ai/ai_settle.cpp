@@ -158,8 +158,8 @@ void Engine::pick_island(AiPlayer& p) {
             // free land as the landing does (task_settle_land).
             if (pirate_island_skipped(
                     rivals(), rivals() && left_recently(p, s.cursor),
-                    rivals() &&
-                        blocker(p, s.cursor, free_land(s.cursor, MapCell::kNoCity, nullptr) >= 300) != kNoPlayer)) {
+                    rivals() && blocker(p, s.cursor, room_beside(free_land(s.cursor, MapCell::kNoCity, nullptr))) !=
+                                    kNoPlayer)) {
                 continue;
             }
             if (island_size(s.cursor) <= std::max<std::uint32_t>(s.pass, 1)) {
@@ -256,6 +256,11 @@ void Engine::pick_island(AiPlayer& p) {
         push(p, kSettleArea, true);
         return;
     }
+}
+
+bool Engine::room_beside(std::uint32_t free) noexcept {
+    // The free land at which another city leaves room to found beside it (blocker).
+    return free >= 300;
 }
 
 bool Engine::pirate_island_skipped(bool improved, bool left, bool blocked) noexcept {
@@ -920,7 +925,7 @@ void Engine::task_settle_land(AiPlayer& p) {
         return;  // the search goes on with the next island
     }
     // Other cities on the island must leave room (blocker).
-    if (const PlayerId owner = blocker(p, island, free >= 300); owner != kNoPlayer) {
+    if (const PlayerId owner = blocker(p, island, room_beside(free)); owner != kNoPlayer) {
         if (rivals()) {
             // Passed over like an island it gave a city up on (left_lately), so the search does
             // not send the ship straight back.

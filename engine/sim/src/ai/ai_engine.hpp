@@ -362,6 +362,8 @@ public:
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
     [[nodiscard]] static bool leaves_room(bool kept_off, bool contested, bool small_owner, bool room,
                                           bool populated) noexcept;
+    /// Whether an island's `free` land leaves room to found beside another city (blocker).
+    [[nodiscard]] static bool room_beside(std::uint32_t free) noexcept;
     /// Whether improved pirates pass over an island in their search: one they turned back from
     /// lately (`left`) or whose cities leave no room (`blocked`); the original's pirates never do.
     [[nodiscard]] static bool pirate_island_skipped(bool improved, bool left, bool blocked) noexcept;
