@@ -113,3 +113,14 @@ TEST_CASE("ai war plan: a crop island is a war motive only when the freed island
     // Gate f29b, x3 g4-404-p0: the budget refused the colony, so the island went to a third player.
     CHECK(!Engine::crop_war_motive(true, false, false));
 }
+
+TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
+    // The original: beside a city of a player with two cities or more that has no people yet.
+    CHECK(Engine::leaves_room(false, false, false, true, false));
+    CHECK(!Engine::leaves_room(false, false, true, true, false));  // a small owner
+    CHECK(!Engine::leaves_room(false, false, false, true, true));  // the city has people
+    CHECK(!Engine::leaves_room(true, false, false, true, false));  // an island the original keeps off
+    // Feedback 16, K2: the ship turned back at a contested island and came back again and again.
+    CHECK(Engine::leaves_room(false, true, true, true, true));
+    CHECK(!Engine::leaves_room(false, true, true, false, true));  // too little free land
+}

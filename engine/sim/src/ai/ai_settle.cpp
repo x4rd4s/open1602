@@ -243,6 +243,10 @@ void Engine::pick_island(AiPlayer& p) {
     }
 }
 
+bool Engine::leaves_room(bool kept_off, bool contested, bool small_owner, bool room, bool populated) noexcept {
+    return !kept_off && room && (contested || (!small_owner && !populated));
+}
+
 bool Engine::left_lately(AiPlayer& p, std::uint16_t island) {
     // Open1602: an island an improved computer gave a city up on is passed over for 45 minutes;
     // before, it founded there again at once and gave the city up again.
@@ -867,7 +871,11 @@ void Engine::task_settle_land(AiPlayer& p) {
     if (!p.pirates && p.cities == 0 && free <= 600) {
         return;  // the search goes on with the next island
     }
-    // Other cities on the island must leave room.
+    // Other cities on the island must leave room. Open1602: an island an improved computer chose as
+    // contested (island_contested: a small rival's city beside a free vein) is landed on by the
+    // same rule it was chosen by, so the room is all that counts there; before, the ship turned
+    // back at every such island and the search sent it to the same one again (feedback 16, K2).
+    const bool contested_pick = rivals() && island_contested(p, island);
     for (const City& c : m_world.cities()) {
         if (c.island != island || c.owner == p.player) {
             continue;
@@ -879,8 +887,14 @@ void Engine::task_settle_land(AiPlayer& p) {
         // The original's computers keep off the largest islands where another computer has a
         // city, though not where a human has one; improved, a computer's city counts as a human's.
         const bool human = o != nullptr && o->role == PlayerRole::Human;
-        if ((classic() && !human && island_size(island) > 3) || own_city_count(c.owner) < 2 || free < 300 ||
-            has_population(c, 0, 50)) {
+        if (!leaves_room(classic() && !human && island_size(island) > 3, contested_pick, own_city_count(c.owner) < 2,
+                         free >= 300, has_population(c, 0, 50))) {
+            if (rivals()) {
+                // Passed over like an island it gave a city up on (left_lately), so the search
+                // does not send the ship straight back.
+                log(p, "turns back from island %u: player %u's city leaves no room", island, c.owner);
+                p.left_islands.emplace_back(island, std::max<std::uint64_t>(now_ms(), 1));
+            }
             return;
         }
     }

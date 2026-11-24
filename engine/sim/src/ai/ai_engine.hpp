@@ -357,6 +357,11 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Whether another player's city leaves room to found beside it: not an island the original keeps
+    /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
+    /// no people yet, unless the improved computer chose the island as contested (`contested`).
+    [[nodiscard]] static bool leaves_room(bool kept_off, bool contested, bool small_owner, bool room,
+                                          bool populated) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
