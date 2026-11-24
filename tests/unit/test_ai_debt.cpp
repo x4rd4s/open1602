@@ -138,3 +138,11 @@ TEST_CASE("ai war plan: a war only when the attacker could settle what it razes"
     CHECK(!Engine::war_settles(false, true));  // at its city limit
     CHECK(!Engine::war_settles(true, false));  // its budget refuses the colony
 }
+
+TEST_CASE("ai settle: above its city limit a computer settles only an island its war freed") {
+    // Merlin (2026-11-24): a player does not leave the island his war freed to the others.
+    CHECK(Engine::beyond_limit(true, false, false));   // below the limit: any island
+    CHECK(Engine::beyond_limit(false, true, true));    // above it: the freed island
+    CHECK(!Engine::beyond_limit(false, true, false));  // but no other
+    CHECK(!Engine::beyond_limit(false, false, false));
+}

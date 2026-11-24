@@ -8,6 +8,8 @@ kStateWithArming | engine/sim/src/ai/ai_state.hpp | derived from: the name of AI
 kStateWithColonyPlan | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 14, which saves Settlement::plan_crop, plan_ms and plan_ship
 15 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithColonyPlan = 14
 kStateWithSightings | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 15, which saves State::sightings
+16 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithSightings = 15
+kStateWithFreedIslands | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 16, which saves Strategy::freed_islands
 kAnyCrop | engine/sim/src/ai/ai_state.hpp | derived from: a crop id no ware has (the largest std::uint8_t), for a colony on any island
 2 | engine/sim/src/ai/ai_military.cpp | derived from: rounding to the nearest whole cannon (adding half the divisor, most / 2) in guessed_cannons
 kFarms | engine/sim/src/ai/ai_settle.cpp | derived from: the colony crops and their farms' plan slots, the pairs of colony_candidates' kPairs and the planner's crop table
