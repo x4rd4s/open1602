@@ -13,6 +13,7 @@
 #include "o1602/editor/objects.hpp"
 #include "o1602/editor/units.hpp"
 #include "o1602/script/game_scripts.hpp"
+#include "o1602/sim/balance.hpp"
 #include "o1602/sim/blueprints.hpp"
 #include "o1602/sim/construction.hpp"
 #include "o1602/sim/game_data.hpp"
@@ -1912,6 +1913,33 @@ TEST_CASE("construction: the editor sets what a Kontor sells and buys, and a vil
     CHECK(island.world.city(0, city)->trade_of(assets::ware::kAlcohol)->buy);
 }
 
+TEST_CASE("construction: the editor counts the holds a ship has in the game by its rules") {
+    const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
+    const auto doc = assets::cod::parse(
+        "Objekt: FIGUR\n"
+        "  Nummer: 23\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 6\n  Speed: 500\n  Maxenergy: 50\n"
+        "  Nummer: 27\n  Gfx: 0\n  Blocknr: 2\n  Rotate: 1\n  Maxware: 8\n  Speed: 500\n  Maxenergy: 50\n"
+        "EndObj\n",
+        types);
+    auto figures = assets::FigureTable::from_cod(doc);
+    REQUIRE(figures.ok());
+    sim::World world;
+    sim::Rules original = sim::Rules::original();
+    sim::Rules swapped = original;
+    swapped.large_ship_holds = true;
+    // The large merchant ship (23) gets 8 with the rule "Large ships", the large warship (27) 6.
+    CHECK(editor::game_holds(world, *figures, original, 23) == 6);
+    CHECK(editor::game_holds(world, *figures, swapped, 23) == 8);
+    CHECK(editor::game_holds(world, *figures, original, 27) == 8);
+    CHECK(editor::game_holds(world, *figures, swapped, 27) == 6);
+    // A package's value for the map wins over the rule's.
+    sim::Balance balance;
+    balance.figures.push_back(sim::FigureValue{23, sim::FigureField::Holds, 5});
+    world.set_balance(balance);
+    CHECK(editor::game_holds(world, *figures, swapped, 23) == 6);  // the table holds the map's values
+    CHECK(editor::game_holds(world, *figures, swapped, 27) == 6);
+}
+
 TEST_CASE("construction: the editor puts ships on the water and units on land, and takes them away") {
     Island island;
     const assets::CodPredefinedSymbol types[] = {{"FIGUR", 1}};
@@ -2042,6 +2070,20 @@ TEST_CASE("construction: the editor puts ships on the water and units on land, a
         (*emptied)->revert(island.world);
         (*loaded)->revert(island.world);
         CHECK(island.world.ship(id)->cargo[1].ware == 0);
+
+        // The holds the ship has in the game (editor::game_holds): those it lacks are added, one
+        // beyond them only emptied.
+        const std::size_t own = island.world.ship(id)->cargo.size();
+        CHECK(!editor::set_ship_cargo(island.world, id, own + 2, ware, 32, own + 2).ok());
+        auto more = editor::set_ship_cargo(island.world, id, own + 1, ware, 32, own + 2);
+        REQUIRE(more.ok());
+        (*more)->apply(island.world);
+        CHECK(island.world.ship(id)->cargo.size() == own + 2);
+        CHECK(island.world.ship(id)->cargo[own + 1].ware == ware);
+        (*more)->revert(island.world);
+        CHECK(island.world.ship(id)->cargo.size() == own);
+        CHECK(!editor::set_ship_cargo(island.world, id, own - 1, ware, 32, own - 1).ok());
+        CHECK(editor::set_ship_cargo(island.world, id, own - 1, 0, 0, own - 1).ok());
     }
 
     // A land unit on board, at full health whatever the amount; a name, cannons and a sale.

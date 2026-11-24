@@ -1902,6 +1902,7 @@ editor.objects.owner = Owner
 editor.objects.owner_neutral = Neutral
 editor.objects.owner_natives = Natives
 editor.objects.owner_pirates = Pirates
+editor.objects.owner_trader = Free trader
 editor.objects.no_owner = nobody
 editor.objects.left_button = Left button
 editor.objects.left_button.give = Paints land
