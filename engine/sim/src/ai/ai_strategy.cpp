@@ -584,6 +584,14 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         player(p).scenario.has(scenario_flag::kPassive)) {
         return;
     }
+    // Open1602: an improved computer starts a war only when it could found a colony on the island
+    // a razed city frees: below its city limit and with a colony its budget accepts now. In gate
+    // f30, 13 of the 16 cities razed in wars gained the attacker nothing: a third player took the
+    // island or it stayed empty, while the attacker's budget refused the colony or it stood at the
+    // limit.
+    if (rivals() && !war_settles(own_city_count(p.player) < city_limit(), colony_affordable(p, kAnyCrop))) {
+        return;
+    }
     const Balance& bal = m_world.balance();
     const std::uint32_t own = strength(p.player, p.player);
     PlayerId best = kNoPlayer;
@@ -660,6 +668,10 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
         }
     }
     return false;
+}
+
+bool Engine::war_settles(bool room, bool affordable) noexcept {
+    return room && affordable;
 }
 
 bool Engine::crop_war_motive(bool lacking, bool settles, bool free) noexcept {

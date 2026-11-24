@@ -364,6 +364,9 @@ public:
                                           bool populated) noexcept;
     /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
     [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
+    /// Improved computers: a war is started only when the computer could settle the island a razed
+    /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
+    [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).

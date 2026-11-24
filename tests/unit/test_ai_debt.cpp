@@ -131,3 +131,10 @@ TEST_CASE("ai ships: a ship with soldiers aboard is not free for supply runs") {
     CHECK(!Engine::troops_aboard_idle(true, 0));
     CHECK(!Engine::troops_aboard_idle(false, 4));  // the original's computers: as before
 }
+
+TEST_CASE("ai war plan: a war only when the attacker could settle what it razes") {
+    CHECK(Engine::war_settles(true, true));
+    // Gate f30: 13 of 16 razed cities gained the attacker nothing.
+    CHECK(!Engine::war_settles(false, true));  // at its city limit
+    CHECK(!Engine::war_settles(true, false));  // its budget refuses the colony
+}
