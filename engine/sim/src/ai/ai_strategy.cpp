@@ -588,6 +588,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     const std::uint32_t own = strength(p.player, p.player);
     PlayerId best = kNoPlayer;
     std::uint64_t best_ratio = 0;
+    bool best_motive = false;
     for (std::size_t bi = 0; bi < st.stances.size(); ++bi) {
         const auto b = static_cast<PlayerId>(bi);
         const Player* pl = m_world.player(b);
@@ -595,9 +596,14 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
             continue;
         }
         const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, threat_of(p.player, b));
-        if (ratio > best_ratio) {
+        // Open1602 (Merlin, 2026-11-23): an improved computer that has to plant a good on
+        // half-fertile land, with no free island to grow it fully, turns its war on a rival that
+        // holds such an island (holds_wanted_crop) before any other it presses.
+        const bool motive = rivals() && holds_wanted_crop(p, b);
+        if ((motive && !best_motive) || (motive == best_motive && ratio > best_ratio)) {
             best = b;
             best_ratio = ratio;
+            best_motive = motive;
         }
     }
     if (best == kNoPlayer) {
@@ -620,9 +626,39 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     if (!war_carried(p)) {
         return;
     }
-    log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u)", best, units, own,
-        threat_of(p.player, best));
+    log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u%s)", best, units, own,
+        threat_of(p.player, best), best_motive ? ", for an island that grows a crop it lacks" : "");
     start_war(p, best);
+}
+
+bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
+    // A city of `b` stands on an island that grows fully a crop whose good p's cities lack now
+    // (goods_short), while no free island that grows it is open to p (fertile_island_open): what
+    // a player conquers when he cannot found the colony. Not at its city limit: the island its war
+    // frees it could not settle (probe p16, x3 o4-505-p3: P2 at 4 of 4 cities razed P1's two
+    // fertile cities, and every colony check stopped at the limit).
+    if (own_city_count(p.player) >= city_limit()) {
+        return false;
+    }
+    const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
+        {ware::kSpiceField, ware::kSpices},
+        {ware::kTobaccoField, ware::kTobaccoGoods},
+        {ware::kWineField, ware::kAlcohol},
+        {ware::kSugarField, ware::kAlcohol},
+        {ware::kCocoaField, ware::kCocoa},
+        {ware::kCottonField, ware::kCloth},
+    });
+    for (const auto& [field, good] : crops) {
+        if (goods_short(p.player, good) == 0 || fertile_island_open(p, field)) {
+            continue;
+        }
+        for (const City& c : m_world.cities()) {
+            if (c.owner == b && grows(c.island, field) && knows_crops(p, c.island)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 bool Engine::war_supplied(AiPlayer& p) {

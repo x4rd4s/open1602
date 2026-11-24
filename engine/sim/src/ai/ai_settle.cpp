@@ -1025,6 +1025,30 @@ bool Engine::grows(std::uint16_t island, std::uint8_t crop) const {
     return crop == ware::kOre ? f >= 64 : f == 128;
 }
 
+bool Engine::fertile_island_open(const AiPlayer& p, std::uint8_t crop) const {
+    // Open1602 (Merlin, 2026-11-23): a player founds a colony where the crop grows fully before he
+    // plants it on half-fertile land: an island it knows grows the crop fully and no city stands
+    // there yet, so there is room, and its budget would found the colony now, as colony_plan
+    // weighs it. One it cannot afford is not open: it bridges on half-fertile land meanwhile.
+    Budget b = gold_budget(p);
+    if (p.settle.plan_crop != 0) {
+        b.reserved -= colony_money(p);
+    }
+    if (b.refusal(colony_commitment(p, crop)) != Refusal::None) {
+        return false;
+    }
+    for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
+        const auto island = static_cast<std::uint16_t>(i);
+        if (!grows(island, crop) || !knows_crops(p, island)) {
+            continue;
+        }
+        if (std::ranges::none_of(m_world.cities(), [&](const City& c) { return c.island == island; })) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
     // Some city of any computer player lies on an island that grows the crop fully
     // (ore: a big or small vein; gold: a big one). Shared by all the original's computers; an

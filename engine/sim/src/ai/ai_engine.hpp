@@ -100,7 +100,8 @@ struct WarGold {
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
-struct Cheats;  // ai_tables.hpp
+struct Cheats;   // ai_tables.hpp
+struct NeedDef;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
@@ -349,6 +350,13 @@ public:
     /// (production_switches): torn down, its fields would be swept with it and cost the whole
     /// plantation again once the ware sells or is wanted (gate f25, g4-202 P1).
     [[nodiscard]] static bool may_shed(const assets::BuildingType& b, const WareSet& keep) noexcept;
+    /// Whether a luxury crop is planted on an island of `fertility` (island_fertility): where it
+    /// grows fully; where it grows half only as a last resort: while the computer's cities lack
+    /// its good now (`lacking`, goods_short), trade does not cover it (`traded`: a partner offers
+    /// it and the city has not run dry), no island that grows it fully is open for a colony
+    /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
+    [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
+                                        bool pays) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -575,6 +583,12 @@ private:
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
     /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
     [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
+    /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
+    /// colony for the crop has room there, and its budget would found that colony now.
+    [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;
+    /// Improved computers: `b` holds a city on an island that grows fully a crop whose good the
+    /// computer's cities lack now, with no free island open for it: a reason to conquer.
+    [[nodiscard]] bool holds_wanted_crop(const AiPlayer& p, PlayerId b) const;
     /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
     [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
@@ -635,6 +649,13 @@ private:
     [[nodiscard]] static std::uint32_t colony_fields(std::uint8_t max_stage) noexcept;
     bool farm_animals(AiPlayer& p, const CityPlan& r);
     bool need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov = false);
+    /// The gold a need's fields cost besides its building (64 fields' worth, as need() reserves).
+    [[nodiscard]] std::int64_t fields_money(const NeedDef& d) const;
+    /// Whether need() would pay for building `b` of need `d` now (affordable, and the fields).
+    [[nodiscard]] bool slot_affordable(const AiPlayer& p, const City& c, const NeedDef& d,
+                                       const assets::BuildingType& b) const;
+    /// slot_affordable for the building of slot `which` in the current city.
+    [[nodiscard]] bool slot_affordable_now(const AiPlayer& p, std::uint8_t which) const;
     /// Open1602: how many workshops of slot `k` the producers of their raw material in a city keep
     /// busy (no limit for a slot without such producers).
     [[nodiscard]] std::uint32_t processors_fed(const City& c, const CityPlan& r, const ComputerSlot& k) const;
