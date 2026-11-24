@@ -123,6 +123,8 @@ TEST_CASE("ai settle: an island chosen as contested is landed on by the same rul
     // Feedback 16, K2: the ship turned back at a contested island and came back again and again.
     CHECK(Engine::leaves_room(false, true, true, true, true));
     CHECK(!Engine::leaves_room(false, true, true, false, true));  // too little free land
+}
+
 TEST_CASE("ai ships: a ship with soldiers aboard is not free for supply runs") {
     // Feedback 16, K4: a ship sailed ore to a Kontor with its troops aboard.
     CHECK(Engine::troops_aboard_idle(true, 4));
