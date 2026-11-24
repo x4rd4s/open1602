@@ -333,6 +333,8 @@ public:
     /// Whether `p` would attack city `t` now (attack_ok); for tests.
     /// The strength `p` arms to (army_target); for tests.
     [[nodiscard]] std::uint32_t army_target_for(const AiPlayer& p) const { return army_target(p); }
+    /// The war plan's step for tests (war_plan).
+    void war_plan_for(AiPlayer& p) { war_plan(p, false); }
     [[nodiscard]] bool attack_ok_for(AiPlayer& p, const City& t) {
         std::size_t convoy = 1;
         return attack_ok(p, t, convoy);
@@ -727,6 +729,8 @@ private:
     [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
     /// Improved computers: its supply and gold carry a war it would start or join.
     [[nodiscard]] bool war_supplied(AiPlayer& p);
+    /// Whether `p` has room to settle an island its war frees (war_settles' `room`).
+    [[nodiscard]] bool settle_room(const AiPlayer& p) const;
     /// Open1602: whether its income carries the army at war (civil income, upkeep within arming_budget).
     [[nodiscard]] bool war_carried(const AiPlayer& p) const;
     [[nodiscard]] WarGold war_gold_input(const AiPlayer& p) const;
