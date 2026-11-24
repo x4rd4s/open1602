@@ -1505,7 +1505,11 @@ void Engine::update_fleet_target(AiPlayer& p) {
                 ++supply;
             }
         }
-        t = std::min(t + supply, std::max(n, 1) + static_cast<std::int32_t>(kMaxSupplyShips));
+        // Open1602 (supply read on f40): no fixed cap on the supply ships; the yard's gold test, the
+        // debt rule above and the income test beyond the old cap (fleet_may_grow) limit them. With a
+        // cap of eight, the fleet stood at it in 45 % of the minutes no ship was free, rich
+        // computers among them.
+        t += supply;
     }
     if (p.present[kSlotCannons]) {
         std::int32_t h = 0;
@@ -1592,10 +1596,20 @@ std::uint32_t Engine::supply_buffer(std::uint32_t target, std::uint32_t seconds)
     return target + static_cast<std::uint32_t>(std::uint64_t{target} * std::min<std::uint32_t>(seconds, 1800) / 600);
 }
 
+std::int32_t Engine::supply_ships_from_runs(std::uint64_t runs) noexcept {
+    return static_cast<std::int32_t>(std::min<std::uint64_t>((runs + 1) / 2, std::numeric_limits<std::int32_t>::max()));
+}
+
+bool Engine::fleet_may_grow(std::int32_t ships, std::int32_t cities, std::int32_t net) noexcept {
+    // Ships cost no upkeep (only the soldiers aboard, in military_cost), so a ship beyond the old
+    // cap is bought only while the computer earns, not from its savings alone.
+    return ships < std::max(cities, 1) + static_cast<std::int32_t>(kMaxSupplyShips) || net >= 0;
+}
+
 std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
     // A ship brings two wares. Open1602: an improved computer counts for each ware the runs it
     // takes at a time (supply_ships_for: what the city lacks a minute against the way there and
-    // back), for a ware it lacks for good as well as for one low in store. At most kMaxSupplyShips.
+    // back), for a ware it lacks for good as well as for one low in store.
     std::uint64_t runs = 0;
     const auto count = [&](const City& to, bool all) {
         std::uint32_t target = 0;
@@ -1624,7 +1638,7 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
             count(c, false);
         }
     }
-    return static_cast<std::int32_t>(std::min<std::uint64_t>((runs + 1) / 2, kMaxSupplyShips));
+    return supply_ships_from_runs(runs);
 }
 
 void Engine::order_ship(AiPlayer& p) {
@@ -1706,7 +1720,10 @@ void Engine::order_ship(AiPlayer& p) {
         // (gold_budget): three ships ordered within half an hour took a computer to −16,706 gold.
         Commitment plan;
         plan.cost = price;
-        const bool budget = !rivals() || p.pirates || can_commit(p, plan, Spend::Ship);
+        const bool budget =
+            !rivals() || p.pirates ||
+            (can_commit(p, plan, Spend::Ship) && fleet_may_grow(static_cast<std::int32_t>(ships.size()),
+                                                                static_cast<std::int32_t>(p.cities), net_income(p)));
         const std::int64_t needed = classic() ? price / 2 : price;
         if (!budget || std::int64_t{player(p).money} <= needed) {
             log_yard(p, YardWait::Money);

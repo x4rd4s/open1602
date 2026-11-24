@@ -182,3 +182,19 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 80, false) == 0);
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
+
+TEST_CASE("ai fleet: the supply ships follow the runs, without a cap of eight") {
+    // Supply read on f40: the fleet stood at the cap in 45 % of the minutes no ship was free.
+    CHECK(Engine::supply_ships_from_runs(0) == 0);
+    CHECK(Engine::supply_ships_from_runs(3) == 2);  // two wares a ship, rounded up
+    CHECK(Engine::supply_ships_from_runs(16) == 8);
+    CHECK(Engine::supply_ships_from_runs(24) == 12);  // beyond the old cap
+}
+
+TEST_CASE("ai fleet: beyond the old cap a ship is bought only on an income") {
+    CHECK(Engine::fleet_may_grow(8, 1, -50));  // below one ship a city plus eight
+    CHECK(!Engine::fleet_may_grow(9, 1, -1));
+    CHECK(Engine::fleet_may_grow(9, 1, 0));
+    CHECK(!Engine::fleet_may_grow(10, 0, -1));  // no city counts as one
+    CHECK(Engine::fleet_may_grow(10, 3, -1));
+}

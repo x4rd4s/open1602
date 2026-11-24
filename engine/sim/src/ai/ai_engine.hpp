@@ -362,6 +362,11 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// The supply ships `runs` supply runs take at a time: a ship brings two wares.
+    [[nodiscard]] static std::int32_t supply_ships_from_runs(std::uint64_t runs) noexcept;
+    /// Whether a computer with `ships` and `cities` may buy one more on its `net` income a minute:
+    /// beyond kMaxSupplyShips over one ship a city only while it earns.
+    [[nodiscard]] static bool fleet_may_grow(std::int32_t ships, std::int32_t cities, std::int32_t net) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;
@@ -1108,6 +1113,7 @@ private:
     [[nodiscard]] std::uint32_t supply_ships_for(AiPlayer& p, const City& to, std::uint8_t w, std::size_t src,
                                                  std::uint32_t seconds);
     static constexpr std::uint32_t kMaxRunsPerWare = 4;
+    /// The supply ships beyond the guards bought on the price alone; more only on an income.
     static constexpr std::uint32_t kMaxSupplyShips = 8;
     static constexpr std::uint32_t kMinSupplyRun = 10 * kTon;  ///< the least a supply run loads
     static constexpr std::uint64_t kNoUrgency = std::numeric_limits<std::uint64_t>::max();
