@@ -239,16 +239,19 @@ annokit::core::Result<std::unique_ptr<Operation>> add_player(const sim::World& w
 
 annokit::core::Result<std::unique_ptr<Operation>> remove_last_player(const sim::World& world) {
     const std::vector<sim::PlayerId> slots = player_slots(world);
-    if (slots.empty() || slots.back() < sim::kOriginalPlayers) {
-        return make_error(ErrorCode::Unsupported, "the first four slots stay");
+    if (slots.empty()) {
+        return make_error(ErrorCode::NotFound, "no player to remove");
     }
     const sim::PlayerId last = slots.back();
     if (owns_anything(world, last)) {
         return make_error(ErrorCode::Unsupported, "the player still owns a city, ship or soldier");
     }
     std::vector<sim::Player> players = world.players();
-    if (const sim::PlayerId neutral = neutral_player(world); neutral != sim::kNoPlayer && neutral > last) {
-        // The neutral buildings' player behind it stays where it is: the slot is empty now.
+    const sim::PlayerId neutral = neutral_player(world);
+    if (last < sim::kOriginalPlayers || (neutral != sim::kNoPlayer && neutral > last)) {
+        // One of the original's four slots, which the trader, the pirates and the natives follow,
+        // or a slot the neutral buildings' player stands behind: it stays, empty, as a slot of a
+        // map of fewer players (a file of the original marks it so, and so does its writer).
         sim::Player absent;
         absent.status = sim::PlayerStatus::Absent;
         players[last] = std::move(absent);
