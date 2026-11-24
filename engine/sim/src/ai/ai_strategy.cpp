@@ -506,6 +506,8 @@ void Engine::end_war(AiPlayer& p, const char* why) {
     log(p, "ends the war on player %u: %s", b, why);
     st.war_target = kNoPlayer;
     st.war_ended_ms = now_ms();
+    st.war_party = 0;
+    st.war_party_city = 0;
     // Ships on their way against it are called back.
     for (ShipNote& n : p.ships) {
         if (n.mission < 5 || n.mission > 9) {
