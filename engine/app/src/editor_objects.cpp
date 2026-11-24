@@ -648,7 +648,18 @@ void MapViewer::editor_ship_model(EditorModel& m) const {
     EditorShip ship;
     ship.name = ship_name(*s);
     ship.room = sim::hold_capacity(*s);
-    for (const sim::CargoSlot& slot : s->cargo) {
+    // The holds the ship has in the game (the rule "Large ships" adds two to the large merchant
+    // ship): those it lacks yet are shown empty, and a hold the game drops only while it holds something.
+    std::vector<sim::CargoSlot> cargo = s->cargo;
+    if (!s->cart()) {
+        const std::size_t holds = editor::game_holds(world, m_figures, editor_game_rules(), s->figure);
+        std::size_t used = 0;
+        for (std::size_t i = 0; i < cargo.size(); ++i) {
+            used = cargo[i].ware != 0 ? i + 1 : used;
+        }
+        cargo.resize(std::max(holds, used));
+    }
+    for (const sim::CargoSlot& slot : cargo) {
         const std::string name = slot.ware == 0 ? std::string()
                                  : sim::is_soldier_ware(slot.ware)
                                      ? editor_unit_name(static_cast<std::uint16_t>(sim::hold_unit(slot)))
@@ -847,7 +858,11 @@ void MapViewer::editor_ship_request(const EditorRequest& request) {
         }
         return;
     }
-    auto op = editor::set_ship_cargo(world, m_editor->pick.id, request.index, request.ware, request.amount);
+    const sim::Ship* loaded = world.ship(m_editor->pick.id);
+    const std::size_t holds = loaded != nullptr && !loaded->cart()
+                                  ? editor::game_holds(world, m_figures, editor_game_rules(), loaded->figure)
+                                  : 0U;
+    auto op = editor::set_ship_cargo(world, m_editor->pick.id, request.index, request.ware, request.amount, holds);
     if (!op) {
         editor_notice(op.error().message, true, op.error().message);
         return;

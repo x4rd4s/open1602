@@ -10,6 +10,7 @@
 
 #include "o1602/editor/islands.hpp"
 #include "o1602/editor/scenario_rules.hpp"
+#include "o1602/sim/balance.hpp"
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/land_paths.hpp"
 #include "o1602/sim/sea_paths.hpp"
@@ -337,12 +338,34 @@ annokit::core::Result<std::unique_ptr<Operation>> place_unit(const sim::World& w
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "unit_place"));
 }
 
+std::size_t game_holds(const sim::World& world, const assets::FigureTable& figures, const sim::Rules& rules,
+                       std::uint16_t figure) {
+    const assets::FigureType* type = figures.get(figure);
+    std::size_t holds = type != nullptr ? type->ship.cargo_slots : 0U;
+    // The map's own value (a package's) wins over the rule's.
+    const auto sets = [figure](const sim::FigureValue& v) {
+        return v.number == figure && v.field == sim::FigureField::Holds;
+    };
+    if (std::any_of(world.balance().figures.begin(), world.balance().figures.end(), sets)) {
+        return holds;
+    }
+    for (const sim::FigureValue& v : sim::rule_figure_values(rules)) {
+        if (sets(v)) {
+            holds = v.value;
+        }
+    }
+    return holds;
+}
+
 annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::World& world, std::uint32_t id,
                                                                  std::size_t slot, std::uint8_t ware,
-                                                                 std::uint32_t amount) {
+                                                                 std::uint32_t amount, std::size_t holds) {
     const sim::Ship* ship = world.ship(id);
-    if (ship == nullptr || slot >= ship->cargo.size()) {
+    if (ship == nullptr || slot >= std::max(ship->cargo.size(), holds)) {
         return make_error(ErrorCode::NotFound, "no such ship or hold");
+    }
+    if (holds != 0 && slot >= holds && ware != 0 && amount != 0) {
+        return make_error(ErrorCode::OutOfRange, "the ship has " + std::to_string(holds) + " holds in the game");
     }
     // A land unit in the hold of a ship (not a cart): at full health it fills the hold, as boarding
     // puts it there.
@@ -355,7 +378,11 @@ annokit::core::Result<std::unique_ptr<Operation>> set_ship_cargo(const sim::Worl
         return make_error(ErrorCode::OutOfRange, "more than a hold takes");
     }
     sim::World after = world;
-    sim::CargoSlot& hold = after.ship(id)->cargo[slot];
+    std::vector<sim::CargoSlot>& cargo = after.ship(id)->cargo;
+    if (cargo.size() <= slot) {
+        cargo.resize(std::max(slot + 1, holds));  // the holds the rule of the game adds (game_holds)
+    }
+    sim::CargoSlot& hold = cargo[slot];
     hold = sim::CargoSlot{};  // no price paid, no unit of a package
     if (unit) {
         hold.ware = ware;
