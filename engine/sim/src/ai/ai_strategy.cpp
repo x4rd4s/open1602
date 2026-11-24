@@ -730,8 +730,9 @@ bool Engine::war_supplied(AiPlayer& p) {
     }
     const std::uint8_t food = m_buildings.food_ware();
     // Open1602 (lever S): a shortfall of alcohol or cloth the cities' stock covers for a war's
-    // shortest span (kPartyRunwayMinutes, its kWarFails looks), does not hold the war back; each look weighs it anew.
-    // Of the long passive stretches in gate f32, every one was held back here with full warehouses.
+    // shortest span (kPartyRunwayMinutes, its kWarFails looks) does not hold the war back; each
+    // look weighs it anew. Of the long passive stretches in gate f32, every one was held back here
+    // with full warehouses.
     const auto war_minutes = static_cast<std::uint64_t>(kPartyRunwayMinutes);
     for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
         std::uint64_t held = 0;
