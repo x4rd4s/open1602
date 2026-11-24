@@ -397,6 +397,9 @@ void Panel::draw_gadget(std::vector<DrawItem>& out, std::size_t index, std::uint
             item.rows = s.rows;
             item.first_col = s.first_col;
             item.cols = s.cols;
+            if (!g.slider_x && !g.slider_y) {
+                item.layout_origin = std::array<double, 2>{g.pos[0] + g.offset[0] + 0.5, g.pos[1] + g.offset[1] + 0.5};
+            }
             const assets::PackageIcon* icon = assets::package_icon_at(package_icons(), gfx);
             if (icon == nullptr) {
                 icon = interface_icon(g.block, gfx);  // a sprite of the original a package draws anew
