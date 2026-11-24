@@ -675,6 +675,10 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     return false;
 }
 
+bool Engine::stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept {
+    return held >= std::uint64_t{shortfall} * minutes;
+}
+
 bool Engine::war_settles(bool room, bool affordable) noexcept {
     return room && affordable;
 }
@@ -696,8 +700,20 @@ bool Engine::war_supplied(AiPlayer& p) {
         return false;
     }
     const std::uint8_t food = m_buildings.food_ware();
-    if (critical_short(p.player, ware::kAlcohol) != 0 || critical_short(p.player, ware::kCloth) != 0 ||
-        supply(*home, food) < demand(*home, food)) {
+    // Open1602 (lever S): a shortfall of alcohol or cloth the cities' stock covers for a war's
+    // shortest span, kWarFails looks, does not hold the war back; each look weighs it anew. Of the
+    // long passive stretches in gate f32, every one was held back here with full warehouses.
+    const std::uint64_t war_minutes = kWarFails * kWarCheckMs / 60'000;
+    for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
+        std::uint64_t held = 0;
+        for (const City& c : m_world.cities()) {
+            held += c.owner == p.player ? c.stock(w) : 0;
+        }
+        if (!stock_covers(critical_short(p.player, w), held, war_minutes)) {
+            return false;
+        }
+    }
+    if (supply(*home, food) < demand(*home, food)) {
         return false;
     }
     const WarGold g = war_gold_input(p);

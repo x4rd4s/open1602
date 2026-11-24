@@ -146,3 +146,10 @@ TEST_CASE("ai settle: above its city limit a computer settles only an island its
     CHECK(!Engine::beyond_limit(false, true, false));  // but no other
     CHECK(!Engine::beyond_limit(false, false, false));
 }
+
+TEST_CASE("ai war plan: a shortfall the stock covers for the war's span does not hold a war back") {
+    // Lever S: war_supplied counted only the rates; full warehouses held wars back.
+    CHECK(Engine::stock_covers(0, 0, 30));          // no shortfall
+    CHECK(Engine::stock_covers(32, 32 * 30, 30));   // a ton a minute, thirty tons held
+    CHECK(!Engine::stock_covers(32, 32 * 29, 30));  // a ton short
+}

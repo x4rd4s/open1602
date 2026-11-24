@@ -370,6 +370,8 @@ public:
     /// Improved computers: a war is started only when the computer could settle the island a razed
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
+    /// Whether `held` of a good (1/32 t) covers a `shortfall` (1/32 t a minute) for `minutes`.
+    [[nodiscard]] static bool stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
