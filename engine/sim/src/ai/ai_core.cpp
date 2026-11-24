@@ -648,6 +648,10 @@ void Engine::city_founded(std::uint16_t island, std::uint8_t index) {
     }
     const PlayerId founder = founded->owner;
     for (AiPlayer& p : m_state.players) {
+        // A city stands on an island a war freed: it is no longer its gain (freed_island).
+        std::erase(p.strategy.freed_islands, island);
+    }
+    for (AiPlayer& p : m_state.players) {
         if (p.pirates || p.player == founder || !p.home_valid || p.home_island == island) {
             continue;
         }
@@ -679,6 +683,16 @@ void Engine::land_freed(std::uint16_t island) {
     for (AiPlayer& p : m_state.players) {
         if (p.pirates) {
             continue;
+        }
+        // Open1602 (Merlin, 2026-11-24): an island freed while the computer's soldiers fought
+        // there is its war's gain; it may settle it above its city limit (beyond_limit).
+        if (rivals() &&
+            std::ranges::any_of(
+                m_world.soldiers(),
+                [&](const Soldier& u) { return u.owner == p.player && u.island == island && !u.away(); }) &&
+            std::ranges::find(p.strategy.freed_islands, island) == p.strategy.freed_islands.end()) {
+            p.strategy.freed_islands.push_back(island);
+            log(p, "its war freed island %u", island);
         }
         for (CityPlan& r : p.plans) {
             if (r.island != island) {
@@ -963,6 +977,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (!p.strategy.freed_islands.empty()) {
+            return static_cast<std::uint16_t>(ai::kStateWithFreedIslands);
+        }
+    }
     if (!m_state->sightings.empty()) {
         return static_cast<std::uint16_t>(ai::kStateWithSightings);
     }

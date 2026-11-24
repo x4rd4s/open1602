@@ -589,7 +589,11 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     // f30, 13 of the 16 cities razed in wars gained the attacker nothing: a third player took the
     // island or it stayed empty, while the attacker's budget refused the colony or it stood at the
     // limit.
-    if (rivals() && !war_settles(own_city_count(p.player) < city_limit(), colony_affordable(p, kAnyCrop))) {
+    // Merlin (2026-11-24): an island its war frees it may settle above its city limit, so with the
+    // scaled limit the limit no longer stops the war.
+    const bool room =
+        own_city_count(p.player) < city_limit() || m_sim.rules().computer_cities == ComputerCities::Scaled;
+    if (rivals() && !war_settles(room, colony_affordable(p, kAnyCrop))) {
         return;
     }
     const Balance& bal = m_world.balance();
@@ -647,7 +651,8 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     // two fertile cities, and every colony check stopped at the limit), and not while its budget
     // refuses the colony (gate f29b, x3 g4-404-p0: P0 razed P2's city, its budget refused the
     // colony, and a third player took the island).
-    const bool room = own_city_count(p.player) < city_limit();
+    const bool room =
+        own_city_count(p.player) < city_limit() || m_sim.rules().computer_cities == ComputerCities::Scaled;
     const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
         {ware::kSpiceField, ware::kSpices},
         {ware::kTobaccoField, ware::kTobaccoGoods},

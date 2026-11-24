@@ -359,6 +359,9 @@ public:
                                         bool pays) noexcept;
     /// Improved computers: a war is started only when the computer could settle the island a razed
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
+    /// Improved computers: the island search may pick an island below the city limit, or above it
+    /// one its war freed (`freed`: one is still free, `chosen_freed`: this one).
+    [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
@@ -585,6 +588,8 @@ private:
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
+    /// Improved computers: an island its war freed has no city yet.
+    [[nodiscard]] bool freed_island(const AiPlayer& p) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     /// Improved computers: whether city `c`'s farm for `crop` found no site after repeated tries.
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
