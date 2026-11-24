@@ -321,6 +321,9 @@ struct EditorPlayer {
     std::int32_t money = 0;
     std::uint16_t monuments_allowed = 0;
     std::uint16_t arches_allowed = 0;
+    /// The stage its buildings are open to from the start (editor::unlock_stage), -1 its own choice
+    /// (a saved game's, an original scenario's).
+    std::int8_t unlock_stage = 0;
     std::string colour;        ///< the banner's colour, Windows-1252
     std::uint8_t faction = 0;  ///< sim::FactionId
     std::string faction_name;  ///< as the page shows it, Windows-1252
@@ -630,7 +633,8 @@ struct EditorRequest {
         ShipRoute,
         UnitPatrol,     ///< the map's next click sets where the selected unit patrols to
         UnitPatrolOff,  ///< the selected unit patrols no more
-        /// The slot `player.slot` with the values of `player`; `index` 1 or 2: its colour the next
+        /// The slot `player.slot` with the values of `player`; `index` 7: its unlock stage
+        /// (`player.unlock_stage`) only; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is; 4: its faction; 5: its attitude (the thresholds of
         /// `player`); 6: the slot the page shows with the starting money typed in `name`.

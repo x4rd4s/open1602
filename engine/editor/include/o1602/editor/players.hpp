@@ -8,11 +8,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "annokit/core/result.hpp"
 
+#include "o1602/assets/building_table.hpp"
 #include "o1602/editor/operation.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -75,6 +78,24 @@ struct PlayerValues {
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world,
                                                                            sim::PlayerId player,
                                                                            const PlayerValues& values);
+
+/// The stages a player's buildings can be open from the start (Open1602, feedback 16 V1): 0 none
+/// beyond what the game opens itself, 1 to kMaxUnlockStage the unlock levels the inhabitants of the
+/// first that many resident classes reach (assets::InfraLevel::resident_class below it; the last
+/// stage every level). The levels of the triumphal arch and the monument stay apart: an allowance
+/// opens them (PlayerValues::arches_allowed, monuments_allowed).
+inline constexpr std::uint8_t kMaxUnlockStage = 5;
+
+/// The stage `player`'s unlocked levels are, of `levels` (assets::BuildingTable::infra_levels()):
+/// nothing if they are none of them (a saved game's, or an original scenario's own choice).
+[[nodiscard]] std::optional<std::uint8_t> unlock_stage(const sim::Player& player,
+                                                       std::span<const assets::InfraLevel> levels);
+
+/// The slot `player` with the unlock levels of `stage` open from the start, the others shut (the
+/// triumphal arch's and the monument's as they are). Fails (NotFound) for no human or computer,
+/// (InvalidFormat) for a stage above kMaxUnlockStage.
+[[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_unlock_stage(
+    const sim::World& world, sim::PlayerId player, std::span<const assets::InfraLevel> levels, std::uint8_t stage);
 
 /// A new computer player in the next slot (sim::player_slot), with the first free banner, the money
 /// of the first computer and nothing else: without a city or a ship it is out of the game (defeated)
