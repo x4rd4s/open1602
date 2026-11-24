@@ -596,6 +596,9 @@ private:
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
+    /// The owner of another city on `island` that leaves no room to found beside it, or kNoPlayer;
+    /// `room`: enough free land.
+    [[nodiscard]] PlayerId blocker(const AiPlayer& p, std::uint16_t island, bool room) const;
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     /// Improved computers: whether city `c`'s farm for `crop` found no site after repeated tries.
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
