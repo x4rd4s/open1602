@@ -1112,6 +1112,10 @@ std::uint64_t Engine::kontor_offer(const City& c, std::uint8_t w) const {
     return offer;
 }
 
+std::uint32_t Engine::still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept {
+    return passed || amount <= aboard ? 0U : amount - aboard;
+}
+
 std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
     // Open1602: what an improved computer can still buy of a ware at a partner's Kontor: what it
     // sells beyond what it keeps (and 5 t), less what the computer's own runs are already on their
@@ -1131,24 +1135,33 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
         const std::uint32_t per_ton = std::max<std::uint32_t>(1, m_world.goods().price(w) * 42U / 128U);
         spare = std::min<std::uint64_t>(spare, std::uint64_t{goodwill} / per_ton * kTon);
     }
-    // Every ship's route that loads there, the computer's own and other buyers' (the trade routes
-    // sail in plain sight): bought on its own runs alone, every other purchase at a computer's
-    // Kontor still came back empty.
+    // Every ship's route that loads there, the computer's own and other buyers': bought on its own
+    // runs alone, every other purchase at a computer's Kontor still came back empty. Open1602 (C2):
+    // a player sees only the Kontor's offer, not where others' ships are bound or what they carry,
+    // so below the hardest level a computer counts its own runs alone.
+    // A stop loads up to its amount on board (Fleet::route_city_stop): a ship books there only what
+    // it can still take, and a one-way run nothing at a stop it has passed. Counted at the full
+    // amount, runs that had loaded and sailed on kept a Kontor's spare booked to the end of their
+    // way, and a computer whose luxury ran out found no seller among Kontors that held it.
+    const bool all = sees_all();
     const Target at = Target::city_of(c.island, c.index);
     std::uint64_t booked = 0;
     for (const Ship& o : m_world.ships()) {
-        if (!o.route.active || o.sinking) {
+        if (!o.route.active || o.sinking || (!all && o.owner != p.player)) {
             continue;
         }
-        for (const RouteStop& stop : o.route.stops) {
+        for (std::size_t i = 0; i < o.route.stops.size(); ++i) {
+            const RouteStop& stop = o.route.stops[i];
             if (!(stop.target == at)) {
                 continue;
             }
+            std::uint32_t amount = 0;
             for (const RouteEntry& e : stop.entries) {
                 if (e.ware == w && !e.unload) {
-                    booked += e.amount;
+                    amount += e.amount;
                 }
             }
+            booked += still_loads(amount, o.load(w), o.route.one_way && i < o.route.current);
         }
     }
     return spare >= booked + kMinSupplyRun ? static_cast<std::uint32_t>(spare - booked) : 0;
