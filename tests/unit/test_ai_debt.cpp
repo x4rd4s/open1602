@@ -162,3 +162,14 @@ TEST_CASE("ai war plan: a shortfall the stock covers for the war's span does not
     CHECK(Engine::stock_covers(32, 32 * 30, 30));   // a ton a minute, thirty tons held
     CHECK(!Engine::stock_covers(32, 32 * 29, 30));  // a ton short
 }
+
+TEST_CASE("ai settle: more cities than the limit only where the victory asks for them") {
+    // Merlin (2026-11-24): the islands share counts as victory.cpp does (rounded up), and only when
+    // computers can win; a mission's city count counts for its player.
+    CHECK(Engine::goal_city_count(18, 30, true, 0) == 6);   // 5.4 islands: six cities
+    CHECK(Engine::goal_city_count(20, 30, true, 0) == 6);   // exactly six
+    CHECK(Engine::goal_city_count(18, 30, false, 0) == 0);  // computers cannot win: no goal
+    CHECK(Engine::goal_city_count(18, 0, true, 7) == 7);    // a mission's count
+    CHECK(Engine::goal_city_count(18, 50, true, 7) == 9);   // whichever is more
+    CHECK(Engine::goal_city_count(18, 0, true, -1) == 0);
+}

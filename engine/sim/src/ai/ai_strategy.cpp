@@ -55,6 +55,9 @@ constexpr std::int64_t kWarDebt = -2000;
 // Below this, with its gold falling, a computer is broke: outside its war economy, which at war
 // holds only until the first look without progress, it ends its war here ("out of gold").
 constexpr std::int32_t kBrokeCash = 2000;
+// Merlin (2026-11-24, feedback 16 K5): what a war party is paid for, in minutes of its upkeep: the
+// three looks of ten minutes a war gets without progress before it ends.
+constexpr std::int64_t kPartyRunwayMinutes = 30;
 
 const char* goal_name(std::uint8_t g) {
     switch (g) {
@@ -346,7 +349,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         g = goal::kMilitary;
     } else if (aristocrats_near && !p.present[kSlotGoldMine]) {
         g = goal::kGold;
-    } else if (p.cities < city_limit() && (st.character == character::kSettler || (money >= 8000 && p.cities < 3)) &&
+    } else if (p.cities < city_room(p) && (st.character == character::kSettler || (money >= 8000 && p.cities < 3)) &&
                p.max_stage >= stage::kMain2) {
         g = goal::kLand;
     }
@@ -476,6 +479,19 @@ std::int32_t Engine::army_budget(const AiPlayer& p) const {
     const std::int64_t minutes = st.war_target != kNoPlayer ? kWarRunwayMinutes : kThreatRunwayMinutes;
     const std::int64_t runway = std::max<std::int64_t>(0, player(p).money - kWarReserve) / minutes;
     return static_cast<std::int32_t>(std::min<std::int64_t>(civil + runway, std::numeric_limits<std::int32_t>::max()));
+}
+
+bool Engine::party_paid(std::int64_t money, std::uint32_t lacking, std::int32_t unit_upkeep,
+                        std::int32_t net) noexcept {
+    // The soldiers a war party lacks, and the deficit its cities run already, for the time its war
+    // has left without progress, from the gold above the broke line.
+    const std::int64_t spare = money - kBrokeCash;
+    const std::int64_t per_minute = std::int64_t{lacking} * unit_upkeep - std::min<std::int32_t>(0, net);
+    return lacking != 0 && spare > 0 && per_minute * kPartyRunwayMinutes <= spare;
+}
+
+bool Engine::party_paid(const AiPlayer& p) const {
+    return party_paid(player(p).money, war_party_lacking(p), unit_upkeep_estimate(p), net_income(p));
 }
 
 std::int32_t Engine::arming_budget(const AiPlayer& p) const {
@@ -685,7 +701,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
 bool Engine::settle_room(const AiPlayer& p) const {
     // Below the city limit, or (Merlin, 2026-11-24) with the scaled limit, where the island a war
     // frees may be settled above it.
-    return own_city_count(p.player) < city_limit() || m_sim.rules().computer_cities == ComputerCities::Scaled;
+    return own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
 }
 
 bool Engine::stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept {
@@ -714,9 +730,9 @@ bool Engine::war_supplied(AiPlayer& p) {
     }
     const std::uint8_t food = m_buildings.food_ware();
     // Open1602 (lever S): a shortfall of alcohol or cloth the cities' stock covers for a war's
-    // shortest span, kWarFails looks, does not hold the war back; each look weighs it anew. Of the
-    // long passive stretches in gate f32, every one was held back here with full warehouses.
-    const std::uint64_t war_minutes = kWarFails * kWarCheckMs / 60'000;
+    // shortest span (kPartyRunwayMinutes, its kWarFails looks), does not hold the war back; each look weighs it anew.
+    // Of the long passive stretches in gate f32, every one was held back here with full warehouses.
+    const auto war_minutes = static_cast<std::uint64_t>(kPartyRunwayMinutes);
     for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
         std::uint64_t held = 0;
         for (const City& c : m_world.cities()) {

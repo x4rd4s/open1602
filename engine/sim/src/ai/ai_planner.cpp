@@ -2704,7 +2704,7 @@ bool Engine::grow_for_home(AiPlayer& p, const City& c, const CityPlan& r) {
 }
 
 bool Engine::colony_crop_missing(AiPlayer& p) {
-    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_limit() ||
+    if (!rivals() || p.pirates || p.settle.active || p.settle.failed || p.cities >= city_room(p) ||
         player(p).scenario.has(scenario_flag::kNoColonies)) {
         return false;
     }

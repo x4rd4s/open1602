@@ -13,6 +13,8 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
+#include "o1602/sim/mission.hpp"
+
 namespace o1602::sim::ai {
 
 namespace {
@@ -232,7 +234,7 @@ void Engine::pick_island(AiPlayer& p) {
         }
         // Above its city limit, only an island its war freed (Merlin, 2026-11-24).
         if (rivals() &&
-            !beyond_limit(p.cities < city_limit(), freed_island(p),
+            !beyond_limit(p.cities < city_room(p), freed_island(p),
                           std::ranges::find(p.strategy.freed_islands, i) != p.strategy.freed_islands.end())) {
             continue;
         }
@@ -1591,6 +1593,29 @@ std::uint32_t Engine::colony_ship_candidate(AiPlayer& p) {
     return best;
 }
 
+std::uint32_t Engine::city_room(const AiPlayer& p) const {
+    // Merlin (2026-11-24): more cities than the limit only where the game's victory needs them.
+    if (!rivals()) {
+        return city_limit();
+    }
+    const VictoryConditions& v = m_sim.rules().victory;
+    std::int32_t mission = 0;
+    if (const MissionId m = player(p).mission; m < m_world.missions().size()) {
+        const Mission& ms = m_world.missions()[m];
+        mission = (ms.goals & sim::goal::kCityCount) != 0 ? ms.min_cities : 0;
+    }
+    return std::max(city_limit(), goal_city_count(static_cast<std::uint32_t>(m_world.islands().size()),
+                                                  v.islands_percent, v.computers, mission));
+}
+
+std::uint32_t Engine::goal_city_count(std::uint32_t islands, std::uint8_t percent, bool computers_win,
+                                      std::int32_t mission_min) noexcept {
+    // The islands share as victory.cpp counts it (own cities * 100 >= islands * percent), only where
+    // computers can win; a mission's own count wins for its player.
+    const std::uint32_t share = computers_win ? (islands * percent + 99) / 100 : 0;
+    return std::max(share, static_cast<std::uint32_t>(std::max(mission_min, 0)));
+}
+
 std::uint32_t Engine::city_limit() const {
     if (m_sim.rules().computer_cities == ComputerCities::Original) {
         return kOriginalCityLimit;
@@ -1627,7 +1652,7 @@ bool Engine::wants_room(const AiPlayer& p) const {
     if (p.cities == 0 || p.max_stage < stage::kCitizens || p.settle.active) {
         return false;
     }
-    if (now_ms() - p.settle.last_ms < kRoomPauseMs || (p.cities >= city_limit() && !freed_island(p))) {
+    if (now_ms() - p.settle.last_ms < kRoomPauseMs || (p.cities >= city_room(p) && !freed_island(p))) {
         return false;
     }
     if (p.settle.ship != 0) {
@@ -1677,7 +1702,7 @@ bool Engine::want_colony(AiPlayer& p, std::uint8_t mode, bool force, bool food) 
         pick_island(p);
         return p.stack.size() > before;
     }
-    if (p.settle.active || n >= city_limit()) {
+    if (p.settle.active || n >= city_room(p)) {
         return false;
     }
     // Open1602: an improved computer founds one colony after the other: the next only once the
