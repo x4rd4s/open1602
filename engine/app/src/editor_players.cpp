@@ -53,6 +53,8 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         e.money = p.money;
         e.monuments_allowed = p.monuments_allowed;
         e.arches_allowed = p.arches_allowed;
+        const auto stage = editor::unlock_stage(p, m_buildings.infra_levels());
+        e.unlock_stage = stage ? static_cast<std::int8_t>(*stage) : std::int8_t{-1};
         e.colour = colour_name(p.banner);
         e.faction = p.faction;
         e.attitude_flags = p.scenario.flags & editor::kAttitudeFlags;
@@ -160,6 +162,20 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
     }
     const sim::Player* p = world.player(slot);
     if (p == nullptr) {
+        return;
+    }
+    if (request.index == 7) {
+        // Open1602 (feedback 16, V1): the buildings open from the start, up to a stage.
+        auto op = editor::set_unlock_stage(world, slot, m_buildings.infra_levels(),
+                                           static_cast<std::uint8_t>(std::max<int>(request.player.unlock_stage, 0)));
+        if (!op) {
+            editor_notice(ui::tr("editor.players.refused.change"), true, op.error().message);
+            return;
+        }
+        m_editor->document.perform(std::move(op).value());
+        m_editor->notice.clear();
+        std::fprintf(stderr, "editor: buildings of player %u open to stage %d\n", static_cast<unsigned>(slot),
+                     static_cast<int>(request.player.unlock_stage));
         return;
     }
     editor::PlayerValues v = editor::player_values(*p);

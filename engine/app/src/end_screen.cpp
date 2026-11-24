@@ -103,9 +103,31 @@ EndScreen::EndScreen(std::optional<assets::GadgetLayout> ende, const assets::Gad
     }
 }
 
-void EndScreen::open(sim::EndScreenSummary summary, bool view_only) {
-    m_summary = std::move(summary);
+void EndScreen::open(sim::EndScreenSummary summary, bool view_only, bool every_player) {
     m_view_only = view_only;
+    m_every_player = view_only && every_player;
+    take(std::move(summary));
+    m_first = 0;
+    // A spectator (no local player) starts with the leader, everyone else with themselves.
+    const bool spectator = m_every_player && m_summary.local == sim::kNoPlayer && !m_order.empty();
+    lay_out(spectator ? m_order.front() : 0);
+}
+
+void EndScreen::refresh(sim::EndScreenSummary summary) {
+    // The same player again, wherever the new figures put them; the strip where it was.
+    const sim::PlayerId shown = m_row < m_summary.rows.size() ? m_summary.rows[m_row].player : sim::kNoPlayer;
+    take(std::move(summary));
+    std::size_t row = 0;
+    for (std::size_t i = 0; i < m_summary.rows.size(); ++i) {
+        if (m_summary.rows[i].player == shown) {
+            row = i;
+        }
+    }
+    lay_out(row);
+}
+
+void EndScreen::take(sim::EndScreenSummary summary) {
+    m_summary = std::move(summary);
     m_by_colour = {};
     const std::vector<sim::EndScreenRow>& rows = m_summary.rows;
     bool other_colours = false;
@@ -130,15 +152,18 @@ void EndScreen::open(sim::EndScreenSummary summary, bool view_only) {
     }
     // Open1602: the strip when the colours' coats of arms cannot show every player.
     m_strip = rows.size() > m_slots || other_colours;
-    m_first = 0;
+}
+
+void EndScreen::lay_out(std::size_t row) {
     if (!m_panel) {
-        m_row = 0;
+        m_row = row < m_summary.rows.size() ? row : 0;
         return;
     }
+    const std::vector<sim::EndScreenRow>& rows = m_summary.rows;
     ui::Panel& p = *m_panel;
-    p.set_visible(kMainMenu, !view_only);
-    p.set_visible(kNewGame, !view_only);
-    p.set_visible(kBack, view_only);
+    p.set_visible(kMainMenu, !m_view_only);
+    p.set_visible(kNewGame, !m_view_only);
+    p.set_visible(kBack, m_view_only);
     if (m_strip) {
         update_strip();
     } else {
@@ -146,14 +171,14 @@ void EndScreen::open(sim::EndScreenSummary summary, bool view_only) {
         for (std::size_t c = 0; c < m_slots; ++c) {
             p.set_graphic(slot_id(c), m_button_arms + static_cast<std::int32_t>(c), m_button_press);
             p.set_visible(slot_id(c),
-                          !view_only && c < m_by_colour.size() && m_by_colour[c].has_value() && rows.size() >= 2);
+                          choosing() && c < m_by_colour.size() && m_by_colour[c].has_value() && rows.size() >= 2);
         }
         if (m_arrows) {
             p.set_visible(kStripLeft, false);
             p.set_visible(kStripRight, false);
         }
     }
-    show(0);  // the local player is the first row
+    show(row);
 }
 
 void EndScreen::scroll_strip(std::size_t first) {
@@ -167,7 +192,7 @@ void EndScreen::update_strip() {
         return;
     }
     ui::Panel& p = *m_panel;
-    const bool shown = !m_view_only && m_order.size() >= 2;
+    const bool shown = choosing() && m_order.size() >= 2;
     for (std::size_t s = 0; s < m_slots; ++s) {
         const std::size_t place = m_first + s;
         const bool used = shown && place < m_order.size();
@@ -234,7 +259,7 @@ void EndScreen::show(std::size_t row) {
 
 void EndScreen::step(int direction) {
     const std::size_t n = m_summary.rows.size();
-    if (n < 2 || m_view_only) {
+    if (n < 2 || !choosing()) {
         return;
     }
     if (m_strip) {
@@ -290,7 +315,7 @@ std::int32_t EndScreen::hint_bottom() const {
 }
 
 void EndScreen::draw_ranks(std::vector<ui::DrawItem>& out) const {
-    if (!m_strip || m_view_only || m_order.size() < 2 || !m_panel) {
+    if (!m_strip || !choosing() || m_order.size() < 2 || !m_panel) {
         return;
     }
     const auto text = [&](std::int32_t cx, std::int32_t bottom, std::string s) {

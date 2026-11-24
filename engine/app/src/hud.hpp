@@ -606,7 +606,10 @@ public:
     /// The score sheets over the whole window, like the menu (menu_active() holds meanwhile, so
     /// the game stands still behind them, as in the original). The player's choice comes back
     /// through take_end_choice().
-    void open_end_screen(sim::EndScreenSummary summary, bool view_only);
+    void open_end_screen(sim::EndScreenSummary summary, bool view_only, bool every_player = false);
+    /// New figures for the open sheets of a running game (EndScreen::refresh).
+    void refresh_end_screen(sim::EndScreenSummary summary) { m_end.refresh(std::move(summary)); }
+    [[nodiscard]] const EndScreen& end_screen() const noexcept { return m_end; }
     [[nodiscard]] bool end_screen_active() const noexcept { return m_end_active; }
     void end_screen_step(int direction) { m_end.step(direction); }
     [[nodiscard]] std::optional<EndScreen::Choice> take_end_choice() { return std::exchange(m_end_choice, {}); }

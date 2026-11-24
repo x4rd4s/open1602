@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <optional>
 #include <vector>
 
 #include "../test_framework.hpp"
 
+#include "o1602/assets/building_table.hpp"
+#include "o1602/assets/game_data.hpp"
 #include "o1602/editor/original_check.hpp"
 #include "o1602/editor/players.hpp"
 #include "o1602/editor/scenario_rules.hpp"
@@ -495,4 +498,43 @@ TEST_CASE("editor players: a map of open sea gets the free trader with its first
     sim::World full = seven_slots();
     CHECK(!editor::add_missing_trader(full));
     CHECK(full.players().size() == 7);
+}
+
+TEST_CASE("editor players: a player's buildings open from the start up to a stage") {
+    // Feedback 16, V1: the unlock levels a player starts with, by the classes whose inhabitants
+    // reach them; the triumphal arch's and the monument's stay as their allowances set them.
+    sim::World world = seven_slots();
+    std::vector<assets::InfraLevel> levels(33);
+    for (std::size_t n = 1; n < levels.size(); ++n) {
+        levels[n].resident_class = static_cast<std::uint8_t>(n < 15 ? (n - 1) % 5 : (n - 15) * 5 / 18);
+        levels[n].min_inhabitants = 10;
+    }
+    CHECK(editor::unlock_stage(world.players()[1], levels) == std::optional<std::uint8_t>{0});
+    world.player(1)->set_unlocked(assets::infra::kArch, true);  // an allowance
+    auto op = editor::set_unlock_stage(world, 1, levels, 2);
+    REQUIRE(op.ok());
+    (*op)->apply(world);
+    const sim::Player& p = world.players()[1];
+    for (std::size_t n = 1; n < levels.size(); ++n) {
+        if (n != assets::infra::kArch && n != assets::infra::kMonument) {
+            CHECK(p.unlocked(static_cast<std::uint32_t>(n)) == (levels[n].resident_class < 2));
+        }
+    }
+    CHECK(p.unlocked(assets::infra::kArch));
+    CHECK(!p.unlocked(assets::infra::kMonument));
+    CHECK(editor::unlock_stage(p, levels) == std::optional<std::uint8_t>{2});
+    // All of them, and back.
+    auto all = editor::set_unlock_stage(world, 1, levels, editor::kMaxUnlockStage);
+    REQUIRE(all.ok());
+    (*all)->apply(world);
+    CHECK(world.players()[1].unlocked(assets::infra::kLevel5B));
+    CHECK(editor::unlock_stage(world.players()[1], levels) == std::optional<std::uint8_t>{editor::kMaxUnlockStage});
+    (*all)->revert(world);
+    (*op)->revert(world);
+    CHECK(editor::unlock_stage(world.players()[1], levels) == std::optional<std::uint8_t>{0});
+    // A choice of the scenario's own is none of the stages; a stage beyond the last is refused.
+    world.player(1)->set_unlocked(assets::infra::kLevel4A, true);
+    CHECK(!editor::unlock_stage(world.players()[1], levels).has_value());
+    CHECK(!editor::set_unlock_stage(world, 1, levels, editor::kMaxUnlockStage + 1).ok());
+    CHECK(!editor::set_unlock_stage(world, 4, levels, 1).ok());  // the trader
 }

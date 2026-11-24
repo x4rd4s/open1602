@@ -1273,8 +1273,8 @@ void Hud::draw_menu() {
     draw_help();
 }
 
-void Hud::open_end_screen(sim::EndScreenSummary summary, bool view_only) {
-    m_end.open(std::move(summary), view_only);
+void Hud::open_end_screen(sim::EndScreenSummary summary, bool view_only, bool every_player) {
+    m_end.open(std::move(summary), view_only, every_player);
     m_end_choice.reset();
     m_end_active = true;
     m_menu_active = true;
