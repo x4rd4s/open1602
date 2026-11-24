@@ -313,7 +313,12 @@ private:
     void preview_move(const BuildTool::Spot& spot,
                       const std::function<void(std::uint16_t island, std::uint32_t x, std::uint32_t y)>& keep);
     /// The score sheets: the final screen of a decided game, or the "Bewertung" of a running one.
-    void show_end_screen(sim::GameOutcome outcome, bool view_only);
+    void show_end_screen(sim::GameOutcome outcome, bool view_only, bool every_player = false);
+    /// The score sheets of a running game are open, every player's to choose: the game goes on
+    /// behind them (Open1602, V3).
+    [[nodiscard]] bool live_rating() const;
+    /// Their figures anew, once a second while live_rating().
+    void refresh_rating(std::uint64_t now);
     /// The high score list takes every human still playing, and `defeated` (who is
     /// out at this moment), enters the scenario's high score list.
     void update_high_scores(sim::PlayerId defeated);
@@ -862,6 +867,7 @@ private:
     EventPresenter m_events;
     /// A multiplayer game: drives the simulation in place of Simulation::advance().
     std::unique_ptr<net::Session> m_session;
+    std::uint64_t m_rating_ms = 0;                  ///< when the open score sheets were last refreshed (refresh_rating)
     bool m_host_game_loaded = false;                ///< this client runs the game its host sent
     std::vector<sim::PlayerRole> m_session_roles;   ///< who steered each player last frame (empty: not yet)
     std::string m_host_address;                     ///< of the host joined

@@ -7,6 +7,8 @@
 #include <string>
 #include <utility>
 
+#include "o1602/assets/game_data.hpp"
+#include "o1602/assets/unlock_levels.hpp"
 #include "o1602/editor/islands.hpp"
 #include "o1602/sim/new_game.hpp"
 
@@ -119,6 +121,57 @@ PlayerValues player_values(const sim::Player& player) {
     v.attitude = player.scenario;
     v.attitude.flags &= kAttitudeFlags;
     return v;
+}
+
+namespace {
+
+/// Whether level `n` is open at `stage` (unlock_stage); the allowances' levels are none of them.
+bool stage_opens(const assets::InfraLevel& level, std::size_t n, std::uint8_t stage) {
+    if (n == assets::infra::kArch || n == assets::infra::kMonument) {
+        return false;
+    }
+    return stage >= kMaxUnlockStage || level.resident_class < stage;
+}
+
+bool stage_level(std::size_t n) {
+    return n != assets::infra::kNone && n != assets::infra::kArch && n != assets::infra::kMonument &&
+           n <= assets::kMaxUnlockLevel;
+}
+
+}  // namespace
+
+std::optional<std::uint8_t> unlock_stage(const sim::Player& player, std::span<const assets::InfraLevel> levels) {
+    for (std::uint8_t stage = 0; stage <= kMaxUnlockStage; ++stage) {
+        bool same = true;
+        for (std::size_t n = 0; n < levels.size() && same; ++n) {
+            same =
+                !stage_level(n) || player.unlocked(static_cast<std::uint32_t>(n)) == stage_opens(levels[n], n, stage);
+        }
+        if (same) {
+            return stage;
+        }
+    }
+    return std::nullopt;
+}
+
+annokit::core::Result<std::unique_ptr<Operation>> set_unlock_stage(const sim::World& world, sim::PlayerId player,
+                                                                   std::span<const assets::InfraLevel> levels,
+                                                                   std::uint8_t stage) {
+    const sim::Player* p = world.player(player);
+    if (p == nullptr || (p->role != sim::PlayerRole::Human && p->role != sim::PlayerRole::Computer)) {
+        return make_error(ErrorCode::NotFound, "no human or computer in slot " + std::to_string(player));
+    }
+    if (stage > kMaxUnlockStage) {
+        return make_error(ErrorCode::InvalidFormat, "no unlock stage " + std::to_string(stage));
+    }
+    sim::World after = world;
+    sim::Player& q = *after.player(player);
+    for (std::size_t n = 0; n < levels.size(); ++n) {
+        if (stage_level(n)) {
+            q.set_unlocked(static_cast<std::uint32_t>(n), stage_opens(levels[n], n, stage));
+        }
+    }
+    return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_change"));
 }
 
 annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world, sim::PlayerId player,

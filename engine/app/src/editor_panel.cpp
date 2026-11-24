@@ -184,36 +184,39 @@ constexpr Id kSoundTest = 298;
 constexpr Id kRandomFertility = 299;  ///< the selected island's crops rolled at the start, or not
 /// A click on "-" or "+" beside a volume: a twentieth of the slider.
 constexpr std::uint32_t kVolumeStep = EditorModel::kVolumeRange / 20;
-constexpr Id kCheckLine = 800;                  ///< + the line of the check list (a line that leads somewhere)
-constexpr Id kRecent = 190;                     ///< + the object placed lately (the page "Objects")
-constexpr Id kShipCargoPage = 1000;             ///< the selected ship's holds
-constexpr Id kFirstHoldWare = 1010;             ///< + the hold on the page "Cargo": its ware
-constexpr Id kFirstHoldLess = 1030;             ///< + the hold: fewer tons
-constexpr Id kFirstHoldMore = 1050;             ///< + the hold: more tons
-constexpr std::size_t kHoldRows = 20;           ///< holds the page "Cargo" shows at most
-constexpr Id kShipRoutePage = 1070;             ///< the selected ship's trade route
-constexpr Id kRouteActive = 1071;               ///< the route runs from the start, or not
-constexpr Id kRouteStop = 1072;                 ///< the stop the page "Route" shows
-constexpr Id kRouteTarget = 1073;               ///< the stop's city
-constexpr Id kFirstRouteWare = 1080;            ///< + the entry of the stop: its ware
-constexpr Id kFirstRouteMode = 1090;            ///< + the entry: loads or unloads
-constexpr Id kFirstRouteLess = 1100;            ///< + the entry: fewer tons
-constexpr Id kFirstRouteMore = 1110;            ///< + the entry: more tons
-constexpr std::size_t kRouteEntries = 8;        ///< entries of a stop the page shows at most
-constexpr Id kUnitPatrol = 1130;                ///< the selected unit's patrol: where to, on the map
-constexpr Id kUnitPatrolOff = 1131;             ///< the selected unit's patrol ended
-constexpr Id kShipNamePage = 1132;              ///< the selected ship's or cart's name
-constexpr Id kShipSale = 1133;                  ///< the selected ship offered for sale, or no longer
-constexpr Id kShipCannonsLess = 1134;           ///< one mounted cannon fewer
-constexpr Id kShipCannonsMore = 1135;           ///< one mounted cannon more
-constexpr Id kPlayerMoneyPage = 1136;           ///< the page that types a player's starting money
-constexpr Id kTabAttitude = 1137;               ///< the players dialog's tab of the computers' attitude
-constexpr Id kAttitudePage = 1138;              ///< the page of the computers' attitude (column)
-constexpr Id kCampaignOrder = 1139;             ///< the campaign's parts all open, or one after the other
-constexpr Id kAttitudeCell = 1140;              ///< + the AttitudeColumn of the slot shown (column)
-constexpr Id kAttitudeTable = 1150;             ///< + kAttitudeColumns * the row + the column of the table
-constexpr Id kShipPriceLess = 1240;             ///< the offer's price 10 % lower (right button: the type's own)
-constexpr Id kShipPriceMore = 1241;             ///< the offer's price 10 % higher (right button: the type's own)
+constexpr Id kCheckLine = 800;            ///< + the line of the check list (a line that leads somewhere)
+constexpr Id kRecent = 190;               ///< + the object placed lately (the page "Objects")
+constexpr Id kShipCargoPage = 1000;       ///< the selected ship's holds
+constexpr Id kFirstHoldWare = 1010;       ///< + the hold on the page "Cargo": its ware
+constexpr Id kFirstHoldLess = 1030;       ///< + the hold: fewer tons
+constexpr Id kFirstHoldMore = 1050;       ///< + the hold: more tons
+constexpr std::size_t kHoldRows = 20;     ///< holds the page "Cargo" shows at most
+constexpr Id kShipRoutePage = 1070;       ///< the selected ship's trade route
+constexpr Id kRouteActive = 1071;         ///< the route runs from the start, or not
+constexpr Id kRouteStop = 1072;           ///< the stop the page "Route" shows
+constexpr Id kRouteTarget = 1073;         ///< the stop's city
+constexpr Id kFirstRouteWare = 1080;      ///< + the entry of the stop: its ware
+constexpr Id kFirstRouteMode = 1090;      ///< + the entry: loads or unloads
+constexpr Id kFirstRouteLess = 1100;      ///< + the entry: fewer tons
+constexpr Id kFirstRouteMore = 1110;      ///< + the entry: more tons
+constexpr std::size_t kRouteEntries = 8;  ///< entries of a stop the page shows at most
+constexpr Id kUnitPatrol = 1130;          ///< the selected unit's patrol: where to, on the map
+constexpr Id kUnitPatrolOff = 1131;       ///< the selected unit's patrol ended
+constexpr Id kShipNamePage = 1132;        ///< the selected ship's or cart's name
+constexpr Id kShipSale = 1133;            ///< the selected ship offered for sale, or no longer
+constexpr Id kShipCannonsLess = 1134;     ///< one mounted cannon fewer
+constexpr Id kShipCannonsMore = 1135;     ///< one mounted cannon more
+constexpr Id kPlayerMoneyPage = 1136;     ///< the page that types a player's starting money
+constexpr Id kTabAttitude = 1137;         ///< the players dialog's tab of the computers' attitude
+constexpr Id kAttitudePage = 1138;        ///< the page of the computers' attitude (column)
+constexpr Id kCampaignOrder = 1139;       ///< the campaign's parts all open, or one after the other
+constexpr Id kAttitudeCell = 1140;        ///< + the AttitudeColumn of the slot shown (column)
+constexpr Id kAttitudeTable = 1150;       ///< + kAttitudeColumns * the row + the column of the table
+constexpr Id kShipPriceLess = 1240;       ///< the offer's price 10 % lower (right button: the type's own)
+constexpr Id kShipPriceMore = 1241;
+constexpr Id kPlayerUnlock = 1242;       ///< the stage a player's buildings are open to from the start
+constexpr Id kPlayerUnlockTable = 1250;  ///< + the row of the players' table: its unlock stage             ///< the
+                                         ///< offer's price 10 % higher (right button: the type's own)
 constexpr std::uint32_t kPriceStep = 128 / 10;  ///< 10 % of the price, in 1/128
 constexpr Id kPlayerTable = 300;                ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
@@ -329,6 +332,17 @@ std::size_t file_lines(const std::vector<EditorFile>& files) {
 
 std::string count(std::size_t n) {
     return std::to_string(n);
+}
+
+/// The unlock stages a player's buildings can be open to from the start (editor::kMaxUnlockStage + 1).
+constexpr std::size_t kUnlockStages = 6;
+
+/// A player's unlock stage (EditorPlayer::unlock_stage) as the page shows it.
+std::string unlock_text(std::int8_t stage) {
+    if (stage < 0 || static_cast<std::size_t>(stage) >= kUnlockStages) {
+        return ui::tr("editor.players.unlock.own");
+    }
+    return ui::tr("editor.players.unlock." + std::to_string(stage));
 }
 
 /// The climates a new island may take: north, south and the packages' (not a placeholder's,
@@ -1474,6 +1488,11 @@ void EditorPanel::layout_players(const EditorModel& model) {
     }
     pair("editor.players.monuments", kPlayerMonuments, on ? count(p->monuments_allowed) : "-", "editor.players.arches",
          kPlayerArches, on ? count(p->arches_allowed) : "-");
+    f.label(Rect{m_x, y, m_w, 18}, ui::tr("editor.players.unlock"), Align::Left, tone);
+    y += 18;
+    f.cycle_button(kPlayerUnlock, Rect{m_x, y, m_w, kButtonH}, on ? unlock_text(p->unlock_stage) : std::string("-"),
+                   on);
+    y += kButtonH + 2;
     y += kGap - 2;
     f.button(kPlayerNamePage, Rect{m_x, y, half, kButtonH}, ui::tr("editor.players.rename"), on);
     f.button(kRelationsPage, Rect{right, y, rest, kButtonH}, ui::tr("editor.players.relations"), n > 1);
@@ -2444,14 +2463,14 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
     constexpr std::int32_t kNumber = 40;
     // With packages' factions to choose, a column of them takes room from the name and the colour.
     const bool factions = model.slot_factions.size() > 1;
-    const std::array<std::int32_t, 7> shares = factions ? std::array<std::int32_t, 7>{22, 12, 11, 19, 13, 11, 12}
-                                                        : std::array<std::int32_t, 7>{25, 12, 14, 21, 14, 14, 0};
-    constexpr std::array<const char*, 7> kHeads = {
-        "editor.players.name",      "editor.players.role",   "editor.players.colour", "editor.players.money",
-        "editor.players.monuments", "editor.players.arches", "editor.players.faction"};
-    const std::size_t columns = factions ? 7 : 6;
+    const std::array<std::int32_t, 8> shares = factions ? std::array<std::int32_t, 8>{18, 11, 10, 17, 10, 10, 12, 12}
+                                                        : std::array<std::int32_t, 8>{21, 11, 12, 19, 12, 12, 13, 0};
+    constexpr std::array<const char*, 8> kHeads = {
+        "editor.players.name",      "editor.players.role",   "editor.players.colour",       "editor.players.money",
+        "editor.players.monuments", "editor.players.arches", "editor.players.unlock_short", "editor.players.faction"};
+    const std::size_t columns = factions ? 8 : 7;
     const std::int32_t room = m_w - kNumber - static_cast<std::int32_t>(columns) * kGap;
-    std::array<std::int32_t, 8> x{};
+    std::array<std::int32_t, 9> x{};
     x[0] = m_x + kNumber + kGap;
     for (std::size_t c = 0; c < columns; ++c) {
         x[c + 1] = x[c] + room * shares[c] / 100 + kGap;
@@ -2484,8 +2503,9 @@ void EditorPanel::layout_players_table(const EditorModel& model) {
         f.button(base + 7, Rect{money.x + money.w - kType, money.y, kType, money.h}, "...");
         f.cycle_button(base + 4, cell(4), count(p.monuments_allowed));
         f.cycle_button(base + 5, cell(5), count(p.arches_allowed));
+        f.cycle_button(kPlayerUnlockTable + static_cast<Id>(row), cell(6), unlock_text(p.unlock_stage));
         if (factions) {
-            f.cycle_button(base + 6, cell(6), p.faction_name);
+            f.cycle_button(base + 6, cell(7), p.faction_name);
         }
         y += kRow;
     }
@@ -3928,6 +3948,7 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kPlayerMoney:
         case kPlayerMonuments:
         case kPlayerArches:
+        case kPlayerUnlock:
         case kPlayerFaction: {
             if (model.player_slots.empty()) {
                 return std::nullopt;
@@ -3954,6 +3975,12 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
                 const std::size_t at = it == all.end() ? 0 : static_cast<std::size_t>(it - all.begin());
                 p.faction = all[step(at, all.size(), forward)];
                 r.index = 4;
+            } else if (*id == kPlayerUnlock) {
+                // The stages in turn; its own choice is left on the first click.
+                p.unlock_stage = static_cast<std::int8_t>(
+                    p.unlock_stage < 0 ? (forward ? 0 : kUnlockStages - 1)
+                                       : step(static_cast<std::size_t>(p.unlock_stage), kUnlockStages, forward));
+                r.index = 7;
             } else if (*id == kPlayerMonuments) {
                 p.monuments_allowed = static_cast<std::uint16_t>(step(p.monuments_allowed, 10, forward));
             } else {
@@ -4195,6 +4222,14 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         constexpr std::array<Id, 8> kCells = {kPlayerNamePage,  kPlayerRole,   kPlayerColour,  kPlayerMoney,
                                               kPlayerMonuments, kPlayerArches, kPlayerFaction, kPlayerMoneyPage};
         return press(kCells[static_cast<std::size_t>(column)], model, forward);
+    }
+    if (*id >= kPlayerUnlockTable && *id < kPlayerUnlockTable + static_cast<Id>(kTableRows)) {
+        const auto row = static_cast<std::size_t>(*id - kPlayerUnlockTable);
+        if (m_first + row >= model.player_slots.size()) {
+            return std::nullopt;
+        }
+        m_player = m_first + row;
+        return press(kPlayerUnlock, model, forward);
     }
     if (*id >= kAttitudeTable && *id < kAttitudeTable + static_cast<Id>(kNeutralRows * kAttitudeColumns)) {
         const auto cell = static_cast<std::size_t>(*id - kAttitudeTable);
