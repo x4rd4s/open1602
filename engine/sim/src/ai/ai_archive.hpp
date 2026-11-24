@@ -430,6 +430,10 @@ void io(A& a, AiPlayer& p) {
     if (a.version() >= kStateWithFreedIslands) {
         a(p.strategy.freed_islands);
     }
+    if (a.version() >= kStateWithWarParty) {
+        a(p.strategy.war_party);
+        a(p.strategy.war_party_city);
+    }
 }
 
 template <class A>
