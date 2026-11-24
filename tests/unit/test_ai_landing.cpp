@@ -921,3 +921,35 @@ TEST_CASE("ai landing: an improved computer sends no badly damaged ship to an at
     CHECK(landed(true) == 0);
     CHECK(landed(false) > 0);
 }
+
+TEST_CASE("ai landing: an improved computer lands soldiers on the target's island, not an islet in front") {
+    // Feedback 16, K3: the soldiers land on the walkable cell nearest the ship, which lay on an
+    // islet in front of the beach; there they stood for good.
+    Coast a;
+    a.build(kKontor, 0, 14, kHuman, 1);
+    a.build(kMarket, 6, 6, kHuman, 1);
+    sim::IslandMap map(2, 2);
+    for (std::int32_t y = 0; y < 2; ++y) {
+        for (std::int32_t x = 0; x < 2; ++x) {
+            REQUIRE(map.place(*a.buildings.by_id(kGround), x, y, 0, 0).ok());
+        }
+    }
+    map.capture_ground();
+    sim::WorldIsland islet{assets::IslandHeader{}, std::move(map), 55, 20};
+    islet.header.number = 2;
+    islet.header.width = 2;
+    islet.header.height = 2;
+    REQUIRE(a.world.add_island(std::move(islet)).ok());
+    sim::Ship ship = sim::make_ship("Ship", 57, 21, kShipFigure, kComputer, 2);
+    a.world.add_ship(ship);
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::Ship& at = a.world.ships().back();
+    CHECK(!engine.lands_on_target(p, at, kHuman));
+    const auto water = engine.target_landing_water(p, at, kHuman);
+    REQUIRE(water.has_value());
+    CHECK(water->x > 57);  // toward the target's beach (column 60)
+}
