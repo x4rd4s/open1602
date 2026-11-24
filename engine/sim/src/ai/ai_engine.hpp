@@ -269,6 +269,13 @@ public:
     /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
     /// or the world's islands shared among its players, by the difficulty.
     [[nodiscard]] std::uint32_t city_limit() const;
+    /// How many cities `p` founds at most: the city limit, for an improved computer raised to what
+    /// the game's victory asks (goal_city_count).
+    [[nodiscard]] std::uint32_t city_room(const AiPlayer& p) const;
+    /// The cities a victory asks of a player: the islands share (`percent` of `islands`, only when
+    /// computers can win) or a mission's count (`mission_min`), whichever is more.
+    [[nodiscard]] static std::uint32_t goal_city_count(std::uint32_t islands, std::uint8_t percent, bool computers_win,
+                                                       std::int32_t mission_min) noexcept;
     /// What an improved computer's goal asks a colony for (gold, ore), 0 for nothing (ai_settle.cpp).
     [[nodiscard]] std::uint8_t goal_crop(const AiPlayer& p) const;
 
