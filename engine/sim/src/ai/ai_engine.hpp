@@ -542,6 +542,9 @@ private:
     [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: the computer gave a city up on the island in the last 45 minutes.
     [[nodiscard]] bool left_lately(AiPlayer& p, std::uint16_t island);
+    /// An island `p` turned back from or gave a city up on within kLeftIslandMs, with or without a
+    /// home city (left_lately asks for one).
+    [[nodiscard]] bool left_recently(AiPlayer& p, std::uint16_t island);
     [[nodiscard]] bool knows_crops(const AiPlayer& p, std::uint16_t island) const;
     [[nodiscard]] Ship* explorer(AiPlayer& p);
     [[nodiscard]] bool exploring(AiPlayer& p);

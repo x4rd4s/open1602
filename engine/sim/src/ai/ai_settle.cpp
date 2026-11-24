@@ -153,9 +153,13 @@ void Engine::pick_island(AiPlayer& p) {
                 continue;
             }
             // Open1602 (gate f33): improved pirates pass over an island they turned back from, as
-            // the other computers do; they sailed back to it every 510 s (x3 o4-707-p1).
-            if (pirate_island_skipped(rivals(), left_lately(p, s.cursor),
-                                      rivals() && blocker(p, s.cursor, true) != kNoPlayer)) {
+            // the other computers do; they sailed back to it every 510 s (x3 o4-707-p1). Without a
+            // nest they have no home city, which left_lately asks for, and the blocker takes the
+            // free land as the landing does (task_settle_land).
+            if (pirate_island_skipped(
+                    rivals(), rivals() && left_recently(p, s.cursor),
+                    rivals() &&
+                        blocker(p, s.cursor, free_land(s.cursor, MapCell::kNoCity, nullptr) >= 300) != kNoPlayer)) {
                 continue;
             }
             if (island_size(s.cursor) <= std::max<std::uint32_t>(s.pass, 1)) {
@@ -292,9 +296,12 @@ bool Engine::left_lately(AiPlayer& p, std::uint16_t island) {
     // Open1602: an island an improved computer gave a city up on is passed over for 45 minutes;
     // before, it founded there again at once and gave the city up again.
     // A computer without a city founds where it can.
+    return home_city(p) != nullptr && left_recently(p, island);
+}
+
+bool Engine::left_recently(AiPlayer& p, std::uint16_t island) {
     std::erase_if(p.left_islands, [&](const auto& e) { return now_ms() - e.second >= kLeftIslandMs; });
-    return home_city(p) != nullptr &&
-           std::any_of(p.left_islands.begin(), p.left_islands.end(), [&](const auto& e) { return e.first == island; });
+    return std::any_of(p.left_islands.begin(), p.left_islands.end(), [&](const auto& e) { return e.first == island; });
 }
 
 bool Engine::knows_island(const AiPlayer& p, std::uint16_t island) const {
