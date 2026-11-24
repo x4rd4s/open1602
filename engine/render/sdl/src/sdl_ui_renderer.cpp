@@ -612,6 +612,17 @@ void SdlUiRenderer::draw(const std::vector<ui::DrawItem>& items, std::int32_t ox
                                         static_cast<float>(std::round(width * stretch)),
                                         static_cast<float>(std::round(count * stretch))};
                     SDL_RenderTexture(m_renderer, t.texture, &src, &dst);
+                } else if (d.layout_origin && t.texture != nullptr) {
+                    // Its far edges scaled from the layout like its top left: a sprite that ends
+                    // where the next begins (the main menu's buttons) meets it without a gap.
+                    const auto [lx, ly] = *d.layout_origin;
+                    const auto span = [&](double at, int size) {
+                        return std::trunc((at + size / art_scale()) * scale) - std::trunc(at * scale);
+                    };
+                    SDL_SetTextureAlphaMod(t.texture, d.half ? 127 : 255);  // as blit()
+                    const SDL_FRect dst{static_cast<float>(ox + d.x), static_cast<float>(oy + d.y),
+                                        static_cast<float>(span(lx, t.w)), static_cast<float>(span(ly, t.h))};
+                    SDL_RenderTexture(m_renderer, t.texture, nullptr, &dst);
                 } else {
                     blit(t, d.x, d.y, d.half);
                 }

@@ -1832,6 +1832,7 @@ editor.objects.owner = Besitzer
 editor.objects.owner_neutral = Neutral
 editor.objects.owner_natives = Eingeborene
 editor.objects.owner_pirates = Piraten
+editor.objects.owner_trader = Freier Händler
 editor.objects.no_owner = keiner
 editor.objects.left_button = Linke Taste
 editor.objects.left_button.give = Malt Land

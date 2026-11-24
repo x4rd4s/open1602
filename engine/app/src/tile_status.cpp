@@ -83,8 +83,10 @@ std::string raw_material(const assets::BuildingType& ripe, const sim::WorldIslan
     const std::uint8_t w = ripe.ware;
     if (w == sim::ware::kGrass || w == sim::ware::kTree) {
         // Only who has explored the island learns what it grows; nothing to say otherwise.
+        // Open1602: a spectator (no player of its own) knows every island.
         const bool known = island.header.climate < sim::climate::kCount || island.climate != 0;
-        return island.explored_by(local) && known ? crops_line(island, climates, texts) : std::string();
+        return (island.explored_by(local) || local == sim::kNoPlayer) && known ? crops_line(island, climates, texts)
+                                                                               : std::string();
     }
     if (w == 0) {
         // The record after a withered field is the next crop's growing one, without a ware.

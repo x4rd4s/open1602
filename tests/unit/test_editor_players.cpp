@@ -99,8 +99,6 @@ TEST_CASE("editor players: a computer's attitude towards a player who grows past
 
 TEST_CASE("editor players: slots added behind the neutral ones up to twelve, and the last taken away") {
     sim::World world = seven_slots();
-    // The first four stay.
-    CHECK(!editor::remove_last_player(world).ok());
     for (std::size_t n = 4; n < sim::kMaxPlayers; ++n) {
         auto op = editor::add_player(world);
         REQUIRE(op.ok());
@@ -123,6 +121,30 @@ TEST_CASE("editor players: slots added behind the neutral ones up to twelve, and
     (*gone)->apply(world);
     CHECK(editor::player_slots(world).size() == sim::kMaxPlayers - 1);
     CHECK(world.players().size() == std::size_t{sim::player_slot(sim::kMaxPlayers - 2)} + 1);
+}
+
+TEST_CASE("editor players: the original's four slots can go too, and stay empty in their place") {
+    // An original's scenario: four players, the trader, the pirates and the natives behind them.
+    sim::World world = seven_slots();
+    world.add_ship(sim::make_ship("", 3, 3, 21, 3));
+    CHECK(!editor::remove_last_player(world).ok());  // the fourth still owns a ship
+    world.ships().clear();
+    for (std::size_t left = 4; left > 0; --left) {
+        auto gone = editor::remove_last_player(world);
+        REQUIRE(gone.ok());
+        (*gone)->apply(world);
+        CHECK(editor::player_slots(world).size() == left - 1);
+    }
+    CHECK(!editor::remove_last_player(world).ok());  // nobody left
+    REQUIRE(world.players().size() == 7);            // the trader, the pirates and the natives keep their slots
+    CHECK(world.players()[0].status == sim::PlayerStatus::Absent);
+    CHECK(world.acts_as(4, sim::FactionBehaviour::Trader));
+    CHECK(world.acts_as(6, sim::FactionBehaviour::Natives));
+    // A new player takes the first slot again.
+    auto back = editor::add_player(world);
+    REQUIRE(back.ok());
+    (*back)->apply(world);
+    CHECK((editor::player_slots(world) == std::vector<sim::PlayerId>{0}));
 }
 
 TEST_CASE("editor players: a map of four slots gets its fifth player behind three empty ones") {

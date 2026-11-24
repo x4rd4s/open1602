@@ -158,6 +158,10 @@ float gain_of(std::int32_t centibel) noexcept {
     return std::pow(10.0F, static_cast<float>(centibel) / 2000.0F);
 }
 
+float setting_gain(std::int32_t centibel) noexcept {
+    return centibel <= kMinVolume ? 0.0F : gain_of(centibel);
+}
+
 AudioSettings parse_audio_settings(std::string_view text) {
     AudioSettings s;
     for (const auto& v : lines_of(text, "Musik")) {
@@ -365,7 +369,9 @@ void Voices::update() {
             annokit::audio::PlayOptions o;
             o.group = annokit::audio::Group::Speech;
             // Voices are a quarter less attenuated than the effects.
-            o.volume = gain_of(m_settings.effect_volume - m_settings.effect_volume / 4);
+            o.volume = m_settings.effect_volume <= kMinVolume
+                           ? 0.0F
+                           : gain_of(m_settings.effect_volume - m_settings.effect_volume / 4);
             m_voice = m_mixer->play(std::move(pcm), o);
             return;
         }
@@ -454,7 +460,7 @@ void Music::set_settings(const AudioSettings& s) {
         m_voice = annokit::audio::Mixer::kNoVoice;
         m_title.clear();
     } else if (!m_fading) {
-        m_mixer->set_volume(m_voice, gain_of(s.music_volume), 0.0F);
+        m_mixer->set_volume(m_voice, setting_gain(s.music_volume), 0.0F);
     }
 }
 
@@ -596,7 +602,7 @@ void Music::take_loaded(bool wait) {
     }
     annokit::audio::PlayOptions o;
     o.group = annokit::audio::Group::Music;
-    o.volume = gain_of(m_settings.music_volume);
+    o.volume = setting_gain(m_settings.music_volume);
     m_voice = m_mixer->play(std::make_shared<const annokit::audio::Pcm>(std::move(pcm).value()), o);
     m_title = loading.title;
 }
@@ -628,7 +634,7 @@ void Music::update(std::uint64_t game_ms, std::uint32_t real_ms) {
             m_fading = false;
             m_title.clear();
         } else {
-            m_mixer->set_volume(m_voice, gain_of(static_cast<std::int32_t>(now)), 0.0F);
+            m_mixer->set_volume(m_voice, v <= kMinVolume ? 0.0F : gain_of(static_cast<std::int32_t>(now)), 0.0F);
             return;
         }
     }
