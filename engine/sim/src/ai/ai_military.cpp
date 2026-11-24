@@ -1008,6 +1008,46 @@ City* Engine::param_city(std::uint32_t param) {
     return city(static_cast<std::uint16_t>(param >> 8), static_cast<std::uint8_t>(param & 0xFF));
 }
 
+bool Engine::lands_on_target(const AiPlayer& p, const Ship& s, PlayerId owner) const {
+    // Whether soldiers unloaded from `s` now (Military::landing_cell) stand on an island where
+    // `owner` has a city.
+    const auto cell =
+        m_sim.military().landing_cell_at(static_cast<std::int32_t>(s.x), static_cast<std::int32_t>(s.y), p.player);
+    if (!cell) {
+        return true;  // no landing at all: the unload refuses, as before
+    }
+    const std::uint16_t island = m_sim.combat().land().island_at(cell->first / 2, cell->second / 2);
+    return std::ranges::any_of(m_world.cities(), [&](const City& c) { return c.island == island && c.owner == owner; });
+}
+
+std::optional<Target> Engine::target_landing_water(const AiPlayer& p, const Ship& s, PlayerId owner) const {
+    // The open water nearest to the ship, within its unload range, from which soldiers land on an
+    // island where `owner` has a city.
+    const auto range = static_cast<std::int32_t>(m_world.balance().castle_unload_range);
+    const SeaMap& sea = m_sim.fleet().sea();
+    const auto x0 = static_cast<std::int32_t>(s.x);
+    const auto y0 = static_cast<std::int32_t>(s.y);
+    for (std::int32_t r = 1; r <= range; ++r) {
+        for (std::int32_t dy = -r; dy <= r; ++dy) {
+            for (std::int32_t dx = -r; dx <= r; ++dx) {
+                if (std::max(std::abs(dx), std::abs(dy)) != r || !sea.sailable(x0 + dx, y0 + dy)) {
+                    continue;
+                }
+                const auto cell = m_sim.military().landing_cell_at(x0 + dx, y0 + dy, p.player);
+                if (!cell) {
+                    continue;
+                }
+                const std::uint16_t island = m_sim.combat().land().island_at(cell->first / 2, cell->second / 2);
+                if (std::ranges::any_of(m_world.cities(),
+                                        [&](const City& c) { return c.island == island && c.owner == owner; })) {
+                    return Target::position(static_cast<std::uint32_t>(x0 + dx), static_cast<std::uint32_t>(y0 + dy));
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 void Engine::mission_end(AiPlayer& p, Ship& s, ShipNote& n) {
     // Home with the troops, or stop.
     if (n.mission == 3 || n.mission == 4) {
@@ -1245,6 +1285,22 @@ void Engine::missions(AiPlayer& p) {
                         }
                         break;
                     }
+                }
+                if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed && rivals() &&
+                    !lands_on_target(p, *s, owner)) {
+                    // Open1602 (feedback 16, K3): the soldiers would land on the nearest walkable
+                    // cell, an islet in front of the beach; the ship moves to water from which they
+                    // land on an island of the target, or the landing is called off.
+                    if (const auto water = target_landing_water(p, *s, owner); water && n.counter != 0) {
+                        log(p, "ship %u moves to %u,%u: its landing cell lies on an island without a city of player %u",
+                            s->id, water->x, water->y, owner);
+                        const std::uint8_t counter = n.counter;
+                        ship_send(p, *s, *water, n.mission, n.param);
+                        n.counter = static_cast<std::uint8_t>(counter - 1);
+                    } else {
+                        mission_end(p, *s, n);
+                    }
+                    break;
                 }
                 if (m_world.diplomacy().relation(p.player, owner).peace != Treaty::Signed) {
                     log(p, "ship %u lands %u soldiers against player %u", s->id, soldiers_aboard(*s), owner);
