@@ -212,6 +212,15 @@ TEST_CASE("audio: sound files and the settings of Game.dat") {
     CHECK(audio::gain_of(0) == 1.0F);
 }
 
+TEST_CASE("audio: the volume slider's lowest step is silent") {
+    // The original's lowest step is -40 dB, quiet but heard; Open1602 mutes it.
+    CHECK(audio::gain_of(audio::kMinVolume) > 0.0F);
+    CHECK(audio::setting_gain(audio::kMinVolume) == 0.0F);
+    CHECK(audio::setting_gain(audio::kMinVolume - 1) == 0.0F);
+    CHECK(audio::setting_gain(audio::kMinVolume + 100) == audio::gain_of(audio::kMinVolume + 100));
+    CHECK(audio::setting_gain(0) == 1.0F);
+}
+
 TEST_CASE("audio: effects play inside the view only, pan with x, and ten per frame") {
     CHECK(!audio::Effects::placement(1.0F, 0.0F));
     CHECK(!audio::Effects::placement(0.0F, -1.0F));

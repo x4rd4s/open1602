@@ -302,6 +302,9 @@ std::string owner_label(const sim::World& world, sim::PlayerId owner) {
     if (world.acts_as(owner, sim::FactionBehaviour::Pirates) || missing == editor::Neutral::Pirates) {
         return ui::tr("editor.objects.owner_pirates");
     }
+    if (world.acts_as(owner, sim::FactionBehaviour::Trader)) {
+        return ui::tr("editor.objects.owner_trader");  // not by his colour: "Player 7"
+    }
     const sim::Player* p = world.player(owner);
     return p != nullptr ? MapViewer::editor_player_label(*p) : std::string("-");
 }

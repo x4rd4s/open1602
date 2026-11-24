@@ -567,7 +567,7 @@ void GameSound::start_video(const std::vector<std::shared_ptr<const annokit::aud
         // The sample volume, for every track (the original leaves track 2 at full volume, U-019).
         annokit::audio::PlayOptions o;
         o.group = annokit::audio::Group::Speech;
-        o.volume = audio::gain_of(m_settings.effect_volume);
+        o.volume = audio::setting_gain(m_settings.effect_volume);
         m_video_voices.push_back(m_mixer.play(pcm, o));
     }
 }
