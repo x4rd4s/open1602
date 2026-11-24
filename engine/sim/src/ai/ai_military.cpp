@@ -1411,7 +1411,9 @@ std::vector<std::pair<std::int32_t, std::int32_t>> Engine::way_to(const City& c,
     for (const Production& pr : m_world.productions()) {
         if (!goal && pr.used && pr.island == c.island) {
             const Tile tt = tile(c.island, pr.x, pr.y);
-            if (tt.valid() && tt.city == c.index && tt.prod == prod::kMarket) {
+            // Open1602 (feedback 16, K1): an improved computer's way leads to a market still
+            // standing, not to one its soldiers destroyed.
+            if (tt.valid() && tt.city == c.index && tt.prod == prod::kMarket && !(rivals() && tt.type->destroyed)) {
                 goal = std::pair{static_cast<std::int32_t>(pr.x), static_cast<std::int32_t>(pr.y)};
             }
         }
@@ -1452,12 +1454,29 @@ std::size_t Engine::towers_in_the_way(const AiPlayer& p, const City& c, std::int
 }
 
 std::vector<Engine::TowerCover> Engine::towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
-                                                        std::int32_t cy) const {
+                                                        std::int32_t cy, bool goals) const {
     // covering_towers from cell (cx, cy).
     const Combat& combat = m_sim.combat();
     std::vector<std::pair<std::int32_t, std::int32_t>> way = way_to(c, cx, cy);
     if (way.empty()) {
         way.emplace_back(cx, cy);
+    }
+    if (goals && rivals()) {
+        // Open1602 (feedback 16, K1): the party attacks every standing market and the Kontor
+        // (attack_orders), so a tower beside any of them shoots it too, not only one over the way
+        // to the first market.
+        const WorldIsland& isl = island_of(c.island);
+        for (const Production& pr : m_world.productions()) {
+            if (!pr.used || pr.island != c.island) {
+                continue;
+            }
+            const Tile tt = tile(c.island, pr.x, pr.y);
+            if (tt.valid() && tt.city == c.index && (tt.prod == prod::kMarket || tt.prod == prod::kKontor) &&
+                !tt.type->destroyed) {
+                way.emplace_back(2 * (static_cast<std::int32_t>(isl.x) + pr.x),
+                                 2 * (static_cast<std::int32_t>(isl.y) + pr.y));
+            }
+        }
     }
     // Open1602 (F15): a city with no market and no Kontor standing is taken by its towers
     // (tower_goals), so every tower of it lies in the way.
@@ -2916,9 +2935,9 @@ bool Engine::attack_orders(AiPlayer& a, std::uint16_t island, const std::vector<
                 }
             }
             std::vector<std::pair<std::int32_t, std::int32_t>> over;
-            for (const TowerCover& tc :
-                 n == 0 ? std::vector<TowerCover>{}
-                        : towers_over_way(a, c, static_cast<std::int32_t>(sx / n), static_cast<std::int32_t>(sy / n))) {
+            for (const TowerCover& tc : n == 0 ? std::vector<TowerCover>{}
+                                               : towers_over_way(a, c, static_cast<std::int32_t>(sx / n),
+                                                                 static_cast<std::int32_t>(sy / n), true)) {
                 over.emplace_back(tc.x, tc.y);
             }
             if (!over.empty() && reachable_goals(a, island, c, mine, over)) {

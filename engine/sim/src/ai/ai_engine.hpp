@@ -1165,9 +1165,10 @@ private:
                                                                             std::int32_t cy) const;
     /// Open1602 (3b): the hostile towers whose reach covers the landing at `beach` or the way
     /// from it to the city, the nearest first.
-    /// Open1602: covering_towers() for the way from cell (cx, cy).
+    /// Open1602: covering_towers() for the way from cell (cx, cy); with `goals`, also the towers
+    /// covering any standing market or Kontor of the city, which a party attacks all at once.
     [[nodiscard]] std::vector<TowerCover> towers_over_way(const AiPlayer& p, const City& c, std::int32_t cx,
-                                                          std::int32_t cy) const;
+                                                          std::int32_t cy, bool goals = false) const;
     [[nodiscard]] std::vector<TowerCover> covering_towers(const AiPlayer& p, const City& c,
                                                           std::pair<std::int32_t, std::int32_t> beach) const;
     /// Open1602 (3b): enough free warships shell `towers` while troop ship `s` waits, when that
