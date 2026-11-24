@@ -369,6 +369,9 @@ public:
     [[nodiscard]] static bool pirate_island_skipped(bool improved, bool left, bool blocked) noexcept;
     /// Whether a ship with `soldiers` aboard is kept out of the idle ships (improved computers).
     [[nodiscard]] static bool troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept;
+    /// Improved computers: the island search may pick an island below the city limit, or above it
+    /// one its war freed (`freed`: one is still free, `chosen_freed`: this one).
+    [[nodiscard]] static bool beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept;
     /// Improved computers: a war is started only when the computer could settle the island a razed
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
@@ -604,6 +607,8 @@ private:
     /// Open1602 (Rules::computer_cities scaled): a computer whose cities run well wants a further
     /// island for room to grow, though every crop it asks for grows already.
     [[nodiscard]] bool wants_room(const AiPlayer& p) const;
+    /// Improved computers: an island its war freed has no city yet.
+    [[nodiscard]] bool freed_island(const AiPlayer& p) const;
     /// The owner of another city on `island` that leaves no room to found beside it, or kNoPlayer;
     /// `room`: enough free land.
     [[nodiscard]] PlayerId blocker(const AiPlayer& p, std::uint16_t island, bool room) const;

@@ -230,6 +230,12 @@ void Engine::pick_island(AiPlayer& p) {
         if (!(island_allowed(p, i) || island_contested(p, i)) || !knows_island(p, i) || left_lately(p, i)) {
             continue;
         }
+        // Above its city limit, only an island its war freed (Merlin, 2026-11-24).
+        if (rivals() &&
+            !beyond_limit(p.cities < city_limit(), freed_island(p),
+                          std::ranges::find(p.strategy.freed_islands, i) != p.strategy.freed_islands.end())) {
+            continue;
+        }
         // Open1602 (gate f32): an improved computer picks no island whose cities would make its ship
         // turn back at landing (blocker); it came back to the same one after every pause.
         if (rivals() && blocker(p, i, true) != kNoPlayer) {
@@ -1601,6 +1607,17 @@ std::uint32_t Engine::city_limit() const {
     return std::clamp(islands / std::max(players, 1U), kOriginalCityLimit, most);
 }
 
+bool Engine::freed_island(const AiPlayer& p) const {
+    // An island its war freed (Strategy::freed_islands) that no city stands on yet.
+    return rivals() && std::ranges::any_of(p.strategy.freed_islands, [&](std::uint16_t island) {
+               return std::ranges::none_of(m_world.cities(), [&](const City& c) { return c.island == island; });
+           });
+}
+
+bool Engine::beyond_limit(bool below_limit, bool freed, bool chosen_freed) noexcept {
+    return below_limit || (freed && chosen_freed);
+}
+
 bool Engine::wants_room(const AiPlayer& p) const {
     // Not in the original: its computers found cities only for crops. Scaled, one whose towns
     // reached the citizens and earn well settles on, a city at a time with a pause between.
@@ -1610,7 +1627,7 @@ bool Engine::wants_room(const AiPlayer& p) const {
     if (p.cities == 0 || p.max_stage < stage::kCitizens || p.settle.active) {
         return false;
     }
-    if (now_ms() - p.settle.last_ms < kRoomPauseMs || p.cities >= city_limit()) {
+    if (now_ms() - p.settle.last_ms < kRoomPauseMs || (p.cities >= city_limit() && !freed_island(p))) {
         return false;
     }
     if (p.settle.ship != 0) {
