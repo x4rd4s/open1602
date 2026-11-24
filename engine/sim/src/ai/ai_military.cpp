@@ -286,7 +286,7 @@ std::uint32_t Engine::war_party_lacking(const AiPlayer& p) const {
         return 0;
     }
     const City* c =
-        city(static_cast<std::uint16_t>(st.war_party_city >> 8), static_cast<std::uint8_t>(st.war_party_city & 0xFFU));
+        city(static_cast<std::uint16_t>(st.war_party_city >> 8), static_cast<std::uint8_t>(st.war_party_city));
     return c != nullptr && c->owner == st.war_target ? st.war_party : 0U;
 }
 
@@ -2342,6 +2342,7 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
         return (wall_at(x - 1, y) && wall_at(x + 1, y)) || (wall_at(x, y - 1) && wall_at(x, y + 1)) ||
                (wall_at(x - 1, y - 1) && wall_at(x + 1, y + 1)) || (wall_at(x - 1, y + 1) && wall_at(x + 1, y - 1));
     };
+    bool found = false;
     const auto scan = [&](bool coast) {
         for (std::uint32_t y = 0; y < map.height(); ++y) {
             for (std::uint32_t x = 0; x < map.width(); ++x) {
@@ -2400,13 +2401,14 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
                     continue;
                 }
                 best = score;
+                found = true;
                 bx = static_cast<std::int32_t>(x);
                 by = static_cast<std::int32_t>(y);
             }
         }
     };
     scan(false);
-    if (best >= 10000 && rivals()) {
+    if (!found && rivals()) {
         scan(true);
     }
     if (best >= 10000) {
@@ -2797,7 +2799,8 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
     if (rivals() && t.owner == p.strategy.war_target && p.strategy.war_party != 0) {
         log(p, "war on player %u: arms no more for a party (%u soldiers lacked for city %u/%u)", t.owner,
-            unsigned{p.strategy.war_party}, p.strategy.war_party_city >> 8, p.strategy.war_party_city & 0xFFU);
+            unsigned{p.strategy.war_party}, p.strategy.war_party_city >> 8,
+            unsigned{static_cast<std::uint8_t>(p.strategy.war_party_city)});
         p.strategy.war_party = 0;
         p.strategy.war_party_city = 0;
     }
