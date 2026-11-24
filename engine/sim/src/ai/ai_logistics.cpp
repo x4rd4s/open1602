@@ -1325,6 +1325,8 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
         bool own = false;
         std::uint32_t seconds = 0;  ///< improved computers: the way there
     };
+    // Read only (L2 read): why a run gets no second ware; counts per ware passed over.
+    std::array<std::uint32_t, 4> passed{};  // calm (other city), no source, stocked, runs enough
     const auto choose = [&](std::uint8_t exclude) -> std::optional<Pick> {
         for (const std::uint8_t w : wares) {
             const auto on_way = static_cast<std::uint32_t>(std::ranges::count(routed, w));
@@ -1335,11 +1337,13 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 continue;
             }
             if (!own_home && supply_urgency(home, w, target) == kNoUrgency) {
+                ++passed[0];
                 break;  // another city gets only what runs out there (the wares come most urgent first)
             }
             std::uint16_t price = 0;
             const auto src = supply_source(p, home.island, w, &price, &home);
             if (!src) {
+                ++passed[1];
                 continue;
             }
             std::uint32_t keep = target;
@@ -1357,6 +1361,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                         keep, static_cast<std::uint32_t>(std::min<std::uint64_t>(eaten, home.capacity / 2)));
                 }
                 if (home.stock(w) >= keep || on_way >= supply_ships_for(p, home, w, *src, seconds)) {
+                    ++passed[home.stock(w) >= keep ? 2 : 3];
                     continue;
                 }
             }
@@ -1385,12 +1390,28 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     if (!first) {
         return false;
     }
+    passed = {};
     auto second = choose(first->ware);
+    if (rivals() && logging() && !second) {
+        log(p,
+            "supply read: no second ware (wares %zu, calm %u, no source %u, stocked %u, runs enough %u, first %u t of "
+            "%u, own %d)",
+            wares.size(), passed[0], passed[1], passed[2], passed[3], first->amount / kTon, unsigned{first->ware},
+            first->own ? 1 : 0);
+    }
     // Food the city runs out of soon waits for no second ware from elsewhere: the ship sails home
     // with it straight from where it loads.
     if (second && rivals() && first->ware == m_buildings.food_ware() && second->source != first->source &&
         supply_urgency(home, first->ware, target) < std::uint64_t{kHomeFirstMinutes} * 256) {
+        if (logging()) {
+            log(p, "supply read: second ware dropped for food");
+        }
         second.reset();
+    }
+    if (rivals() && logging() && second) {
+        log(p, "supply read: two wares (%u t of %u, %u t of %u, same source %d)", first->amount / kTon,
+            unsigned{first->ware}, second->amount / kTon, unsigned{second->ware},
+            second->source == first->source ? 1 : 0);
     }
     struct Stop {
         Target target;
