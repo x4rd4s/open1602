@@ -91,6 +91,10 @@ std::string random_label(const editor::RandomElement& e) {
 
 }  // namespace
 
+sim::Rules MapViewer::editor_game_rules() const {
+    return editor::scenario_rules(m_editor->document.world()).value_or(m_app_settings.scenario.rules);
+}
+
 void MapViewer::editor_rules_model(EditorModel& m) const {
     const std::optional<sim::Rules> own = editor::scenario_rules(m_editor->document.world());
     m.rules_own = own.has_value();

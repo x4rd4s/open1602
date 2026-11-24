@@ -114,6 +114,12 @@ TEST_CASE("tile status: the crops of grass and trees only once the island is exp
     CHECK(i.at(3) == "Geeignet für: Tabak: 50% - Weintrauben: 50% - Zuckerrohr: 100%");
 }
 
+TEST_CASE("tile status: a spectator knows the crops of every island") {
+    Island i;
+    CHECK(app::tile_status(i.island, 3, 0, sim::kNoPlayer, i.buildings, i.texts) ==
+          "Geeignet für: Tabak: 50% - Weintrauben: 50% - Zuckerrohr: 100%");
+}
+
 TEST_CASE("tile status: an island of a package's climate names it and the crops it grows") {
     Island i;
     i.island.explore(kMe);

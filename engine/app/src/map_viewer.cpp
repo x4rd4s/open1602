@@ -2226,7 +2226,9 @@ void MapViewer::add_fertility_marks() {
         island = spot->island;
     }
     if (island) {
-        fertility_marks(m_state->world, m_buildings, m_local_player, *island, crop, m_tile_marks);
+        // A spectator (no player of its own) knows every island, and every player's fields.
+        fertility_marks(m_state->world, m_buildings, m_local_player, *island, crop, m_tile_marks,
+                        m_local_player == sim::kNoPlayer);
     }
 }
 
@@ -2969,7 +2971,7 @@ std::string MapViewer::debug_title(double fps) {
     // Over an island its player has explored: the crops, as in the original's help bar.
     if (const auto spot = m_input->spot_at_mouse()) {
         const sim::WorldIsland& isl = m_state->world.islands()[spot->island];
-        if (isl.explored_by(m_local_player)) {
+        if (isl.explored_by(m_local_player) || m_local_player == sim::kNoPlayer) {  // a spectator: every island
             title += " | " + crops_text(isl, m_state->world.balance().climates);
         }
     }
