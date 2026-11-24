@@ -359,6 +359,9 @@ public:
                                          std::int32_t net) noexcept;
     /// party_paid for `p`'s war party (war_party_lacking).
     [[nodiscard]] bool party_paid(const AiPlayer& p) const;
+    /// Whether an improved computer signs a peace another computer offers it: not while its own
+    /// war plan is on that computer, and either not angry (`calm`) or the weaker (`outmatched`).
+    [[nodiscard]] static bool signs_offered_peace(bool waging, bool calm, bool outmatched) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

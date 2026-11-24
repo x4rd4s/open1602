@@ -321,6 +321,10 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     return std::max(own, rival);
 }
 
+bool Engine::signs_offered_peace(bool waging, bool calm, bool outmatched) noexcept {
+    return !waging && (calm || outmatched);
+}
+
 bool Engine::stronger(PlayerId a, PlayerId b) const {
     // The original compares the armies and the cannons of the fleets. The original takes b's fleet
     // on both sides, so only the armies count (S-102).
@@ -3830,6 +3834,10 @@ void Engine::diplomacy(AiPlayer& p) {
             // below 0 and not falling) and sign one unless they are angry (war among computers
             // comes with their war plans).
             // Improved computers at war trade only once the war is over.
+            // Open1602 (f39): a peace its attacker offers it also signs while angry when the
+            // attacker is the stronger, as a player does who cannot win the war back: of the 37
+            // wars that ended without peace, the victims armed on (twice the recruits, five times
+            // the military goal of the victims that signed) and grew less, with no fighting after.
             const bool at_war = rivals() && rel.peace == Treaty::None;
             if (rel.trade == Treaty::None && !at_war) {
                 order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
@@ -3845,7 +3853,8 @@ void Engine::diplomacy(AiPlayer& p) {
                     st != stance::kHostile) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Offered);
                     log(p, "offers peace to computer %u (mood %d)", b, m);
-                } else if (!waging && rel.peace == Treaty::Received && m > -20) {
+                } else if (rel.peace == Treaty::Received &&
+                           signs_offered_peace(waging, m > -20, !stronger(p.player, b))) {
                     order(DiplomacyOrder::Kind::Peace, Treaty::Signed);
                     log(p, "signs peace with computer %u (mood %d)", b, m);
                 }

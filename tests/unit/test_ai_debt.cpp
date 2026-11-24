@@ -173,3 +173,11 @@ TEST_CASE("ai settle: more cities than the limit only where the victory asks for
     CHECK(Engine::goal_city_count(18, 50, true, 7) == 9);   // whichever is more
     CHECK(Engine::goal_city_count(18, 0, true, -1) == 0);
 }
+
+TEST_CASE("ai peace: an outmatched computer signs the peace its attacker offers") {
+    // f39: victims that never signed armed on and grew less, with no fighting after.
+    CHECK(Engine::signs_offered_peace(false, true, false));    // not angry
+    CHECK(Engine::signs_offered_peace(false, false, true));    // angry, but the weaker
+    CHECK(!Engine::signs_offered_peace(false, false, false));  // angry and as strong: holds out
+    CHECK(!Engine::signs_offered_peace(true, true, true));     // its own war plan
+}
