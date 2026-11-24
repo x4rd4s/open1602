@@ -173,3 +173,12 @@ TEST_CASE("ai settle: more cities than the limit only where the victory asks for
     CHECK(Engine::goal_city_count(18, 50, true, 7) == 9);   // whichever is more
     CHECK(Engine::goal_city_count(18, 0, true, -1) == 0);
 }
+
+TEST_CASE("ai supply: a route stop books only what it can still load") {
+    // C2: counted at the full amount, runs that had loaded kept a Kontor's spare booked.
+    CHECK(Engine::still_loads(64, 0, false) == 64);
+    CHECK(Engine::still_loads(64, 40, false) == 24);  // partly loaded
+    CHECK(Engine::still_loads(64, 64, false) == 0);   // full
+    CHECK(Engine::still_loads(64, 80, false) == 0);
+    CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
+}

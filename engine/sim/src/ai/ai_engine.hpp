@@ -359,6 +359,9 @@ public:
                                          std::int32_t net) noexcept;
     /// party_paid for `p`'s war party (war_party_lacking).
     [[nodiscard]] bool party_paid(const AiPlayer& p) const;
+    /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
+    /// stop a one-way run has `passed`.
+    [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

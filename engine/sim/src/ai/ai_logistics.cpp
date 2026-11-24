@@ -1112,6 +1112,10 @@ std::uint64_t Engine::kontor_offer(const City& c, std::uint8_t w) const {
     return offer;
 }
 
+std::uint32_t Engine::still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept {
+    return passed || amount <= aboard ? 0U : amount - aboard;
+}
+
 std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) {
     // Open1602: what an improved computer can still buy of a ware at a partner's Kontor: what it
     // sells beyond what it keeps (and 5 t), less what the computer's own runs are already on their
@@ -1148,7 +1152,7 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
         }
         for (std::size_t i = 0; i < o.route.stops.size(); ++i) {
             const RouteStop& stop = o.route.stops[i];
-            if (!(stop.target == at) || (o.route.one_way && i < o.route.current)) {
+            if (!(stop.target == at)) {
                 continue;
             }
             std::uint32_t amount = 0;
@@ -1157,8 +1161,7 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
                     amount += e.amount;
                 }
             }
-            const std::uint32_t have = o.load(w);
-            booked += amount > have ? amount - have : 0U;
+            booked += still_loads(amount, o.load(w), o.route.one_way && i < o.route.current);
         }
     }
     return spare >= booked + kMinSupplyRun ? static_cast<std::uint32_t>(spare - booked) : 0;
