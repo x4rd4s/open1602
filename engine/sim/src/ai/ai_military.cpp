@@ -858,7 +858,7 @@ void Engine::recruit(AiPlayer& p) {
     // to spare, as the income it is counted from moves. One unit in training at a time, so that a
     // goal or war does not order a dozen within minutes before the income shows their cost.
     const bool pays = rivals() && pays_upkeep(m_world, player(p));
-    bool training = false;
+    std::uint32_t training = 0;
     if (pays) {
         for (const CostBuilding& b : m_world.cost_buildings()) {
             if (b.kind != CostBuilding::Kind::Castle || b.island >= m_world.islands().size() ||
@@ -866,13 +866,20 @@ void Engine::recruit(AiPlayer& p) {
                 continue;
             }
             for (const CastleSlot& slot : b.slots) {
-                training = training || (slot.figure != 0 && slot.training);
+                training += slot.figure != 0 && slot.training ? 1U : 0U;
             }
         }
     }
     const std::int32_t next = upkeep + unit_upkeep_estimate(p);
-    const bool can_add = !pays || (!training && may_add_unit(weighted_army(p.player) < core, player(p).money, next,
-                                                             civil_income(p), army_budget(p)));
+    // Merlin (2026-11-24, feedback 16 K5): for the party its war lacks against towers, soldiers as
+    // fast as its castles train them while its gold pays their upkeep (party_paid), beyond the
+    // budget and several in training at once. Probe p30: at the budget's pace the war ended before
+    // the party was there.
+    const std::uint32_t lacking = pays ? war_party_lacking(p) : 0;
+    const bool party = lacking != 0 && training < lacking && party_paid(p);
+    const bool can_add = !pays || party ||
+                         (training == 0 && may_add_unit(weighted_army(p.player) < core, player(p).money, next,
+                                                        civil_income(p), army_budget(p)));
     // A tower beside the market (cannons from the city: 2 t in the home city, 1 t elsewhere).
     const bool home = p.home_valid && p.home_island == c->island && p.home_city == c->index;
     const std::uint32_t cannons_needed = home ? 0x41U : 0x20U;
@@ -919,6 +926,10 @@ void Engine::recruit(AiPlayer& p) {
                             family, upkeep, unit_upkeep_estimate(p), army_budget(p), civil_income(p),
                             trade_balance(player(p)), player(p).money, unsigned{p.strategy.goal},
                             unsigned{p.strategy.war_target}, weighted_army(p.player), core);
+                        if (party) {
+                            log(p, "recruits for the war party (%u lacked, %u in training, gold %d)", lacking, training,
+                                player(p).money);
+                        }
                     }
                 }
             };

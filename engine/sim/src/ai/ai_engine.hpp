@@ -343,6 +343,13 @@ public:
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
     /// on credit and the upkeep took half the civil income (gate f24, l3 g12-404-p3 P7).
+    /// Open1602 (Merlin, 2026-11-24): whether a computer whose war lacks `lacking` soldiers for a
+    /// party may raise them beyond its army budget: its gold above the broke line pays their upkeep
+    /// (`unit_upkeep` each a minute) and its cities' deficit (`net` below zero) for half an hour.
+    [[nodiscard]] static bool party_paid(std::int64_t money, std::uint32_t lacking, std::int32_t unit_upkeep,
+                                         std::int32_t net) noexcept;
+    /// party_paid for `p`'s war party (war_party_lacking).
+    [[nodiscard]] bool party_paid(const AiPlayer& p) const;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;
