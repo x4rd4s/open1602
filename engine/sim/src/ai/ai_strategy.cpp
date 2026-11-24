@@ -588,6 +588,14 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
             st.war_check_ms = now_ms() + kWarCheckMs;
             if (st.war_fails >= kWarFails) {
                 end_war(p, "no progress");
+                return;
+            }
+            // Open1602 (gate f36): the test the war was started with holds at each look. Once the
+            // computer could no longer settle what it razes, it stops: of the wars that razed and
+            // gained nothing, the attackers' budgets refused a colony within ten minutes of the
+            // razing in 21 of 28 razings.
+            if (rivals() && !war_settles(settle_room(p), colony_affordable(p, kAnyCrop))) {
+                end_war(p, "could not settle what it razes");
             }
         }
         return;
@@ -609,9 +617,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
     // limit.
     // Merlin (2026-11-24): an island its war frees it may settle above its city limit, so with the
     // scaled limit the limit no longer stops the war.
-    const bool room =
-        own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
-    if (rivals() && !war_settles(room, colony_affordable(p, kAnyCrop))) {
+    if (rivals() && !war_settles(settle_room(p), colony_affordable(p, kAnyCrop))) {
         return;
     }
     const Balance& bal = m_world.balance();
@@ -669,8 +675,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
     // two fertile cities, and every colony check stopped at the limit), and not while its budget
     // refuses the colony (gate f29b, x3 g4-404-p0: P0 razed P2's city, its budget refused the
     // colony, and a third player took the island).
-    const bool room =
-        own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
+    const bool room = settle_room(p);
     const auto crops = std::to_array<std::pair<std::uint8_t, std::uint8_t>>({
         {ware::kSpiceField, ware::kSpices},
         {ware::kTobaccoField, ware::kTobaccoGoods},
@@ -691,6 +696,16 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
         }
     }
     return false;
+}
+
+bool Engine::settle_room(const AiPlayer& p) const {
+    // Below the city limit, or (Merlin, 2026-11-24) with the scaled limit, where the island a war
+    // frees may be settled above it.
+    return own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
+}
+
+bool Engine::stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept {
+    return held >= std::uint64_t{shortfall} * minutes;
 }
 
 bool Engine::war_settles(bool room, bool affordable) noexcept {
@@ -714,8 +729,21 @@ bool Engine::war_supplied(AiPlayer& p) {
         return false;
     }
     const std::uint8_t food = m_buildings.food_ware();
-    if (critical_short(p.player, ware::kAlcohol) != 0 || critical_short(p.player, ware::kCloth) != 0 ||
-        supply(*home, food) < demand(*home, food)) {
+    // Open1602 (lever S): a shortfall of alcohol or cloth the cities' stock covers for a war's
+    // shortest span (kPartyRunwayMinutes, its kWarFails looks) does not hold the war back; each
+    // look weighs it anew. Of the long passive stretches in gate f32, every one was held back here
+    // with full warehouses.
+    const auto war_minutes = static_cast<std::uint64_t>(kPartyRunwayMinutes);
+    for (const std::uint8_t w : {ware::kAlcohol, ware::kCloth}) {
+        std::uint64_t held = 0;
+        for (const City& c : m_world.cities()) {
+            held += c.owner == p.player ? c.stock(w) : 0;
+        }
+        if (!stock_covers(critical_short(p.player, w), held, war_minutes)) {
+            return false;
+        }
+    }
+    if (supply(*home, food) < demand(*home, food)) {
         return false;
     }
     const WarGold g = war_gold_input(p);

@@ -1073,3 +1073,32 @@ TEST_CASE("ai landing: an improved computer shoots a gap into a wall on a coast 
     CHECK(gap->first == 0);
     CHECK(gap->second == wall->second);
 }
+
+TEST_CASE("ai war plan: an improved computer ends its war once it could not settle what it razes") {
+    // Gate f36: wars started with a colony the budget accepted razed on after the budget refused
+    // it; 18 wars razed and gained nothing. The test the war started with holds at each look.
+    const auto war_left = [](std::int32_t money, bool classic) {
+        Coast a;
+        a.world.player(kComputer)->money = money;
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        p.strategy.war_target = kHuman;
+        p.strategy.war_check_ms = 0;        // a look is due
+        p.strategy.war_measure = 1U << 30;  // the target lost much: progress
+        engine.war_plan_for(p);
+        return p.strategy.war_target == kHuman;
+    };
+    CHECK(!war_left(0, false));  // broke for a colony: the war ends
+    CHECK(war_left(0, true));    // the original's computers: as before
+}

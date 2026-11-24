@@ -340,6 +340,8 @@ public:
     /// Whether `p` would attack city `t` now (attack_ok); for tests.
     /// The strength `p` arms to (army_target); for tests.
     [[nodiscard]] std::uint32_t army_target_for(const AiPlayer& p) const { return army_target(p); }
+    /// The war plan's step for tests (war_plan).
+    void war_plan_for(AiPlayer& p) { war_plan(p, false); }
     [[nodiscard]] bool attack_ok_for(AiPlayer& p, const City& t) {
         std::size_t convoy = 1;
         return attack_ok(p, t, convoy);
@@ -393,6 +395,8 @@ public:
     /// Improved computers: a war is started only when the computer could settle the island a razed
     /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
     [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
+    /// Whether `held` of a good (1/32 t) covers a `shortfall` (1/32 t a minute) for `minutes`.
+    [[nodiscard]] static bool stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
@@ -747,6 +751,8 @@ private:
     [[nodiscard]] std::int64_t colony_savings(AiPlayer& p);
     /// Improved computers: its supply and gold carry a war it would start or join.
     [[nodiscard]] bool war_supplied(AiPlayer& p);
+    /// Whether `p` has room to settle an island its war frees (war_settles' `room`).
+    [[nodiscard]] bool settle_room(const AiPlayer& p) const;
     /// Open1602: whether its income carries the army at war (civil income, upkeep within arming_budget).
     [[nodiscard]] bool war_carried(const AiPlayer& p) const;
     [[nodiscard]] WarGold war_gold_input(const AiPlayer& p) const;
