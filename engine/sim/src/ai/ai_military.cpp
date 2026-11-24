@@ -2797,7 +2797,10 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
         ship = bigger;
     }
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
-    if (rivals() && t.owner == p.strategy.war_target && p.strategy.war_party != 0) {
+    // The party is for that one city: an attack on another city of the same target leaves it be
+    // (probe p27, where one on a nearer city cleared it before any soldier was raised).
+    if (rivals() && t.owner == p.strategy.war_target && p.strategy.war_party != 0 &&
+        p.strategy.war_party_city == city_param(t)) {
         log(p, "war on player %u: arms no more for a party (%u soldiers lacked for city %u/%u)", t.owner,
             unsigned{p.strategy.war_party}, p.strategy.war_party_city >> 8,
             unsigned{static_cast<std::uint8_t>(p.strategy.war_party_city)});

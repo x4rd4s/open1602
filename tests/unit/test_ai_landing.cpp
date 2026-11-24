@@ -1011,6 +1011,21 @@ TEST_CASE("ai landing: an improved computer arms for the party its war lacks aga
         lacking = p.strategy.war_party;
         const std::uint32_t after = engine.army_target_for(p);
         more = after > before ? after - before : 0;
+        if (own_war && lacking > 0) {
+            // An attack on another city of the same target keeps the party (probe p27); one on
+            // the party's own city ends it.
+            const std::uint32_t key = p.strategy.war_party_city;
+            p.strategy.war_party_city = key + 1;
+            engine.start_attack_for(p, *a.world.city(1, 1), 2);
+            CHECK(p.strategy.war_party == lacking);
+            p.strategy.war_party_city = key;
+            for (sim::ai::ShipNote& n : p.ships) {
+                n.mission = 0;
+            }
+            engine.start_attack_for(p, *a.world.city(1, 1), 2);
+            CHECK(p.strategy.war_party == 0);
+            p.strategy.war_party = static_cast<std::uint16_t>(lacking);
+        }
         if (own_war) {
             // The city falls to another: it arms for it no more.
             a.world.city(1, 1)->owner = kComputer;

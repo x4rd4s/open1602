@@ -337,6 +337,8 @@ public:
         std::size_t convoy = 1;
         return attack_ok(p, t, convoy);
     }
+    /// Sends `p`'s attack on city `t` (start_attack); for tests.
+    void start_attack_for(AiPlayer& p, const City& t, std::size_t convoy = 1) { start_attack(p, t, convoy); }
     /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
