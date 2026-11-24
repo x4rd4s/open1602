@@ -357,6 +357,9 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Improved computers: a war is started only when the computer could settle the island a razed
+    /// city frees: `room` below its city limit and a colony its budget accepts (`affordable`).
+    [[nodiscard]] static bool war_settles(bool room, bool affordable) noexcept;
     /// Improved computers: a war for a crop island makes sense when the cities lack the crop's good
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).

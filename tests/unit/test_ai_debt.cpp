@@ -113,3 +113,10 @@ TEST_CASE("ai war plan: a crop island is a war motive only when the freed island
     // Gate f29b, x3 g4-404-p0: the budget refused the colony, so the island went to a third player.
     CHECK(!Engine::crop_war_motive(true, false, false));
 }
+
+TEST_CASE("ai war plan: a war only when the attacker could settle what it razes") {
+    CHECK(Engine::war_settles(true, true));
+    // Gate f30: 13 of 16 razed cities gained the attacker nothing.
+    CHECK(!Engine::war_settles(false, true));  // at its city limit
+    CHECK(!Engine::war_settles(true, false));  // its budget refuses the colony
+}
