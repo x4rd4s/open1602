@@ -42,3 +42,4 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 30 | engine/sim/src/ai/ai_strategy.cpp | derived from: kPartyRunwayMinutes, kWarCheckMs (ten minutes) times kWarFails (three) in minutes
 100 | engine/sim/src/ai/ai_settle.cpp | derived from: the percent scale of VictoryConditions::islands_percent, as victory.cpp's islands test (own cities * 100 >= islands * percent) counts it, in goal_city_count
 99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met
+8 | engine/sim/src/ai/ai_engine.hpp | derived from: the former fleet cap kMaxSupplyShips (supply ships over one a city); above it an improved computer's yard needs net income >= 0 (fleet_may_grow), no longer a cap
