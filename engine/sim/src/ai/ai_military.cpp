@@ -2358,8 +2358,13 @@ std::optional<std::pair<std::int32_t, std::int32_t>> Engine::landing_beach(const
                              : (b.kind == kind::kRuin || b.kind == kind::kGround) && wall_beside(x, y);
                     const bool sand =
                         !wall && (b.kind == kind::kBeach || b.kind == kind::kBeachVariant || beach_gap(island, x, y));
-                    if (!sand && (!fits || !(water = sea_beside(x, y)))) {
-                        continue;
+                    if (!sand) {
+                        if (fits) {
+                            water = sea_beside(x, y);
+                        }
+                        if (!water) {
+                            continue;
+                        }
                     }
                 } else if (wall ? !(beach_wall(island, x, y) && m_world.diplomacy().hostile(p.player, b.owner))
                                 : !(b.kind == kind::kBeach || b.kind == kind::kBeachVariant ||
