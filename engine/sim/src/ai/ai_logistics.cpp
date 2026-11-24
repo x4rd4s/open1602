@@ -110,7 +110,13 @@ bool Engine::ship_idle(AiPlayer& p, const Ship& s) {
     // a plundered ship gets its next job, and the job strikes the flag.
     const ShipNote& n = note(p, s.id);
     return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.explore_steps == 0 &&
-           s.id != p.settle.ship && s.id != p.settle.plan_ship;
+           s.id != p.settle.ship && s.id != p.settle.plan_ship && !troops_aboard_idle(rivals(), soldiers_aboard(s));
+}
+
+bool Engine::troops_aboard_idle(bool improved, std::uint32_t soldiers) noexcept {
+    // Open1602 (feedback 16, K4): an improved computer's ship with soldiers aboard is never free
+    // for a supply run; troops_home takes them home first.
+    return improved && soldiers != 0;
 }
 
 void Engine::send_to_city(AiPlayer& p, Ship& s, const City& c) {
