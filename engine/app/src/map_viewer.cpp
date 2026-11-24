@@ -857,9 +857,11 @@ int MapViewer::run() {
             m_input->sync_text_input();
             if (m_hud && m_hud->menu_active()) {
                 apply_menu();  // no game runs behind the menu, but for a multiplayer game
-                if (m_session) {
+                // Open1602: nor behind a spectator's score sheets, which follow the game (V3).
+                if (m_session || live_rating()) {
                     update(delta);
                 }
+                refresh_rating(now);
                 render();
             } else {
                 // Leaving the menu: the game waits for the sprites of the zoom level if the
@@ -1970,9 +1972,10 @@ void MapViewer::render() {
         }
         const sim::Player* local = m_state->world.player(m_local_player);
         m_hud->set_resources(resources());
-        // "Bewertung" would stop the game on one computer only: alone only, as in the original.
-        // Never in the tutorial.
-        m_hud->set_points(m_player_points, humans() <= 1 && !m_state->world.game_settings().tutorial);
+        // "Bewertung" stops the game alone, as in the original. Open1602: in a multiplayer game
+        // it shows the sheets while the game goes on (V3). Never in the tutorial.
+        m_hud->set_points(m_player_points,
+                          (humans() <= 1 || m_session != nullptr) && !m_state->world.game_settings().tutorial);
         m_hud->draw(m_state->world, m_buildings, m_banners, corners, now, m_player_figures,
                     static_cast<std::uint8_t>(local != nullptr ? std::min<int>(local->banner, 255) : 0));
         if (m_video->in_minimap()) {
@@ -2674,8 +2677,10 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                                                static_cast<std::uint32_t>(std::max(0.0, action.tile_y))});
             break;
         case Hud::Action::Kind::Rating:
-            // "Bewertung" (INFO.GAD 57028): the score sheets while the game stands still.
-            show_end_screen(local_outcome(), true);
+            // "Bewertung" (INFO.GAD 57028): the score sheets while the game stands still. Open1602:
+            // a spectator's and a multiplayer game's go on behind them, every player's to choose.
+            show_end_screen(local_outcome(), true, m_session != nullptr || m_local_player == sim::kNoPlayer);
+            m_rating_ms = annokit::platform::ticks_ms();
             break;
         case Hud::Action::Kind::SelectShip:
             // The ship list: look at the ship and select it.
@@ -4749,14 +4754,31 @@ void MapViewer::check_end_screen(std::uint64_t now) {
     show_end_screen(*outcome, false);
 }
 
-void MapViewer::show_end_screen(sim::GameOutcome outcome, bool view_only) {
+void MapViewer::show_end_screen(sim::GameOutcome outcome, bool view_only, bool every_player) {
     if (!m_hud) {
         return;
     }
     if (!view_only) {
         m_events.end_screen_shown();
     }
-    m_hud->open_end_screen(sim::end_screen_summary(m_state->world, m_buildings, m_local_player, outcome), view_only);
+    m_hud->open_end_screen(sim::end_screen_summary(m_state->world, m_buildings, m_local_player, outcome), view_only,
+                           every_player);
+}
+
+bool MapViewer::live_rating() const {
+    // The sheets of a running game whose every player can be chosen go on with the game
+    // (EndScreen::choosing): a spectator's alone too, a multiplayer game's always.
+    return m_hud && m_hud->end_screen_active() && m_hud->end_screen().view_only() && m_hud->end_screen().choosing();
+}
+
+void MapViewer::refresh_rating(std::uint64_t now) {
+    // Once a second, as the info panel's figures.
+    if (!live_rating() || (now < m_rating_ms + 1000 && now >= m_rating_ms)) {
+        return;
+    }
+    m_rating_ms = now;
+    m_hud->refresh_end_screen(
+        sim::end_screen_summary(m_state->world, m_buildings, m_local_player, m_hud->end_screen().summary().outcome));
 }
 
 sim::GameIdentity MapViewer::game_identity() const {
