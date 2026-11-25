@@ -362,6 +362,9 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// Whether a producer of a city without inhabitants goes off (`off` false: it runs) or stays off
+    /// (`off` true) with `stock` of its ware in a Kontor of `capacity`.
+    [[nodiscard]] static bool colony_glut(std::uint32_t stock, std::uint32_t capacity, bool off) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

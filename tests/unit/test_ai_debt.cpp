@@ -182,3 +182,12 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 80, false) == 0);
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
+
+TEST_CASE("ai colony: a producer goes off while its ware piles up in a city without people") {
+    // Colony read on f42: farms of unpeopled colonies kept running while 50 to 290 t piled up.
+    constexpr std::uint32_t t = 32;  // a ton in the stock's units
+    CHECK(!Engine::colony_glut(99 * t, 200 * t, false));
+    CHECK(Engine::colony_glut(100 * t, 200 * t, false));  // half the Kontor: off
+    CHECK(Engine::colony_glut(97 * t, 200 * t, true));    // stays off within 4 t below it
+    CHECK(!Engine::colony_glut(95 * t, 200 * t, true));   // on again below that
+}

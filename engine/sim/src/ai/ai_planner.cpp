@@ -693,6 +693,13 @@ void Engine::shed_public(AiPlayer& p, City& c) {
     }
 }
 
+bool Engine::colony_glut(std::uint32_t stock, std::uint32_t capacity, bool off) noexcept {
+    // Half the Kontor is luxury()'s "enough in store"; one that is off stays off until the stock
+    // is down by raw()'s step of 4 t below it.
+    const std::uint32_t enough = capacity / 2;
+    return off ? stock + static_cast<std::uint32_t>(4 * kTon) >= enough : stock >= enough;
+}
+
 void Engine::production_switches(AiPlayer& p, City& c) {
     // Every producer of the current city, by the ware it makes. Each check looks at the
     // building's switch first: one that is on can only go off, one that is off only on.
@@ -713,6 +720,7 @@ void Engine::production_switches(AiPlayer& p, City& c) {
     const WareSet needed = saving ? needed_wares(p, false, false) : WareSet{};
     std::uint32_t saved = 0;
     std::uint32_t idled = 0;
+    std::uint32_t glutted = 0;
     // Open1602: the food of the city and what its producers work into food (cattle, grain, flour)
     // keep running in debt; without it the people leave faster than any saving pays back.
     WareSet feeds{};
@@ -758,7 +766,12 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         // carry the stock to where it is missing.
         const bool short_of = rivals() && b->ware != 0 && (feeds[b->ware] || goods_short(p.player, b->ware) != 0);
         const bool idle = saving && b->ware != 0 && !needed[b->ware];
-        const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle;
+        // Open1602 (colony read on f42): in a city without inhabitants an improved computer switches
+        // a producer off while its ware piles up there, as a player does, and on again once the
+        // ships have taken it down (colony_glut); its cities' shortages keep it running.
+        const bool glut = rivals() && b->ware != 0 && !short_of && population(c) == 0;
+        const bool hold = (lean && !short_of && c.stock(b->ware) >= 4 * kTon) || idle ||
+                          (glut && colony_glut(c.stock(b->ware), cap, true));
         const auto set = [&](bool on) {
             if (on && hold) {
                 return;
@@ -822,7 +835,13 @@ void Engine::production_switches(AiPlayer& p, City& c) {
         } else if (idle && enabled) {
             set(false);
             ++idled;
+        } else if (glut && enabled && colony_glut(c.stock(w), cap, false)) {
+            set(false);
+            ++glutted;
         }
+    }
+    if (glutted != 0) {
+        log(p, "city %u/%u: switches %u producers off whose ware piles up there", c.island, c.index, glutted);
     }
     if (saved != 0) {
         log(p, "city %u/%u: switches %u full producers off in debt", c.island, c.index, saved);
