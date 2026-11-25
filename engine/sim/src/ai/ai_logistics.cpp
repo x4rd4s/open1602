@@ -108,7 +108,12 @@ bool Engine::ship_at_city(const Ship& s, const City& c) const {
 bool Engine::ship_idle(AiPlayer& p, const Ship& s) {
     // The white flag does not count (the original tests the wrong bit):
     // a plundered ship gets its next job, and the job strikes the flag.
+    // Open1602: an improved computer's ship under the white flag gets none while a pirate is near:
+    // every order strikes the flag.
     const ShipNote& n = note(p, s.id);
+    if (rivals() && s.held && pirate_near(s)) {
+        return false;
+    }
     return !ship_moving(s) && !s.route.active && n.mission == 0 && !s.repairing && s.explore_steps == 0 &&
            s.id != p.settle.ship && s.id != p.settle.plan_ship && !troops_aboard_idle(rivals(), soldiers_aboard(s));
 }
@@ -272,11 +277,11 @@ void Engine::logistics(AiPlayer& p) {
             n.supply = false;
         }
         // Open1602: an improved computer's ship on a route that struck its white flag sails on once
-        // the pirates plundered it or none lies within kPirateNear tiles. The flag stays up until
-        // the ship gets its next job, and a ship on a route gets none: a supply ship lay at its
-        // own Kontor under the white flag for four hours, its route active and its hold empty.
-        if (s != nullptr && rivals() && s->held && s->route.active && !s->sinking &&
-            (s->plundered || !pirate_near(*s))) {
+        // no pirate lies within kPirateNear tiles, as a player waits for them to sail off. The flag
+        // stays up until the ship gets its next job, and a ship on a route gets none: a supply ship
+        // lay at its own Kontor under the white flag for four hours, its route active and its hold
+        // empty. Not at once once plundered: beside the pirate it was shot at again (probe p55).
+        if (s != nullptr && rivals() && s->held && s->route.active && !s->sinking && !pirate_near(*s)) {
             RouteEdit go;
             go.player = p.player;
             go.ship = s->id;

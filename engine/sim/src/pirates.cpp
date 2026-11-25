@@ -419,7 +419,14 @@ bool Fleet::plunder(Ship& pirate, Ship& victim) {
     victim.plundered = true;  // once per surrender: the pirates leave the ship alone now
     if (!any) {
         const Player* owner = m_world->player(victim.owner);
-        if (owner != nullptr && owner->role != PlayerRole::Human) {
+        // Open1602 (Merlin, 2026-11-25): an improved computer's ship (Rules::bugs.classic_ai off)
+        // keeps its white flag as a player's does, and its owner strikes it once the pirates have
+        // gone. Sailing on at once beside the pirate, it was shot at again within seconds, struck
+        // its flag twenty times and sank (probe p55, x3 g4-404-p0 P3: its only ship).
+        const bool improved = owner != nullptr && owner->role == PlayerRole::Computer &&
+                              m_world->behaviour(*owner) == FactionBehaviour::Settlers && m_rules != nullptr &&
+                              !m_rules->bugs.classic_ai;
+        if (owner != nullptr && owner->role != PlayerRole::Human && !improved) {
             victim.held = false;  // a computer's ship sails on
         } else {
             victim.target = {};
