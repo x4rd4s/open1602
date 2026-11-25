@@ -77,9 +77,10 @@ void remind_material_lock(const World& world, City& city, std::vector<CityEvent>
 [[nodiscard]] std::vector<std::uint8_t> consumer_goods(const assets::BuildingTable& buildings);
 
 /// Satisfaction of a class (0..128) from the supply levels of the goods it wants: their sum
-/// against curve[tax] * Prozent * number of goods / 128. 128 for classes that want nothing.
+/// against curve[tax] * Prozent * number of goods / 128. 128 for classes that want nothing. With
+/// `full_ware` (not 0), that good counts as fully supplied whatever its level.
 [[nodiscard]] std::uint8_t satisfaction_of(const City& city, const assets::ResidentClass& resident_class,
-                                           std::uint8_t tax_rate);
+                                           std::uint8_t tax_rate, std::uint8_t full_ware = 0);
 
 /// One tick of a city of settlers (human or computer player): consumption, supply levels,
 /// satisfaction, new demand, decay.

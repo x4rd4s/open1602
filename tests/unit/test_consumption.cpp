@@ -119,6 +119,24 @@ TEST_CASE("consumption: satisfaction against Prozent and the tax rate") {
     CHECK(sim::satisfaction_of(city, b.resident_classes()[2], 192) == 256 * 128 / (352 * 360 / 128));
 }
 
+TEST_CASE("consumption: one good counted as fully supplied adds its own share, not the others'") {
+    // Lever V (t61): a colony for one short good is weighed by what that good alone brings.
+    const auto b = make_buildings();
+    sim::City city = make_city(14, 76);
+    city.supply.resize(city.goods.size());
+    city.supply[kCloth].ratio = 128;
+    city.supply[kAlcohol].ratio = 128;
+    city.supply[kTobacco].ratio = 0;
+    city.supply[kSpices].ratio = 0;
+    const auto& citizens = b.resident_classes()[2];
+    CHECK(sim::satisfaction_of(city, citizens, 192, kTobacco) == 384 * 128 / (352 * 360 / 128));
+    CHECK(sim::satisfaction_of(city, citizens, 192, kSpices) == 384 * 128 / (352 * 360 / 128));
+    city.supply[kTobacco].ratio = 128;
+    city.supply[kSpices].ratio = 128;
+    CHECK(sim::satisfaction_of(city, citizens, 192) == 512 * 128 / (352 * 360 / 128));
+    CHECK(sim::satisfaction_of(city, citizens, 192, kCloth) == 512 * 128 / (352 * 360 / 128));  // already full
+}
+
 TEST_CASE("consumption: a castle or cathedral lowers the taxes satisfaction is measured against") {
     const auto b = make_buildings();
     sim::City city = make_city(14, 76);

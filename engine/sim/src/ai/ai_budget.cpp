@@ -113,9 +113,10 @@ std::int64_t Engine::reliable_income(const AiPlayer& p) const {
     return sum;
 }
 
-std::int64_t Engine::class_taxes(const City& city, std::size_t k, std::uint64_t people) const {
+std::int64_t Engine::class_taxes(const City& city, std::size_t k, std::uint64_t people,
+                                 std::optional<std::uint32_t> at) const {
     const auto& classes = m_buildings.resident_classes();
-    const std::int64_t rate = k < city.tax_rate.size() ? city.tax_rate[k] : kFullSupply;
+    const std::int64_t rate = at ? std::int64_t{*at} : k < city.tax_rate.size() ? city.tax_rate[k] : kFullSupply;
     return static_cast<std::int64_t>(std::uint64_t{classes[k].tax} * people * 6 / 32) * rate / kFullSupply;
 }
 
@@ -261,6 +262,66 @@ std::uint8_t crop_good(std::uint8_t crop) {
 
 }  // namespace
 
+std::uint64_t Engine::chain_yield(const AiPlayer& p, std::uint8_t crop) const {
+    // The fields at full rate, worked by the chain's workshop where it has one, as far as it keeps up.
+    const Chain chain = colony_chain(p, crop);
+    if (chain.parts.empty() || chain.parts.front().first == nullptr || chain.parts.front().first->interval == 0) {
+        return 0;
+    }
+    const auto rate = [](const assets::BuildingType& b, std::uint32_t amount) -> std::uint64_t {
+        return per_minute(amount, b.interval);
+    };
+    const auto& [field, n] = chain.parts.front();
+    std::uint64_t made = std::uint64_t{n} * rate(*field, field->produce_amount);
+    for (std::size_t i = 1; i < chain.parts.size(); ++i) {
+        const auto& [shop, m] = chain.parts[i];
+        if (shop == nullptr || shop->interval == 0 || shop->raw_amount == 0) {
+            return 0;
+        }
+        made = std::min(made * shop->produce_amount / shop->raw_amount,
+                        std::uint64_t{m} * rate(*shop, shop->produce_amount));
+    }
+    return made;
+}
+
+std::int64_t Engine::shortage_value(const AiPlayer& p, std::uint8_t crop) const {
+    const std::uint8_t good = crop_good(crop);
+    if (!rivals() || good == 0) {
+        return 0;
+    }
+    const std::uint32_t short_by = goods_short(p.player, good);
+    const std::uint64_t yield = chain_yield(p, crop);
+    if (short_by == 0 || yield == 0) {
+        return 0;
+    }
+    const auto& classes = m_buildings.resident_classes();
+    std::int64_t step = 0;
+    for (const City& c : m_world.cities()) {
+        if (c.owner != p.player || good >= c.supply.size() || c.supply[good].ratio >= kFullSupply) {
+            continue;
+        }
+        for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
+            const bool wants = std::ranges::any_of(classes[k].needs, [&](const auto& n) { return n.ware == good; });
+            if (!wants || c.inhabitants[k] == 0) {
+                continue;
+            }
+            // Only this good full: its rise is its own, not that of the class's other short goods.
+            const std::int64_t gain = class_taxes(c, k, c.inhabitants[k], chosen_tax(p, c, k, good)) -
+                                      class_taxes(c, k, c.inhabitants[k], chosen_tax(p, c, k, 0));
+            step += std::max<std::int64_t>(0, gain);
+        }
+    }
+    return shortage_share(step, yield, short_by);
+}
+
+std::int64_t Engine::shortage_share(std::int64_t step, std::uint64_t yield, std::uint32_t short_by) noexcept {
+    // A colony that makes a fifth of what the cities go short of earns a fifth of the step.
+    if (short_by == 0) {
+        return 0;
+    }
+    return step * static_cast<std::int64_t>(std::min<std::uint64_t>(yield, short_by)) / short_by;
+}
+
 Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const {
     // A colony costs its gold now and, a minute, what one of the computer's colonies costs beyond
     // its taxes (at least its Kontor's running costs); it brings what its crop's good opens in the
@@ -272,7 +333,10 @@ Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const
         kontor = b->running_cost;
     }
     c.upkeep = std::max(colony_deficit(p), kontor);
-    c.value = gate_value(p, crop_good(crop));
+    // Open1602 (t61, l2 L-909-m430 P8): and what it brings to the classes that go without its good
+    // now; with the rise alone a cocoa colony weighed -30..+4 gold a minute while the city went 91
+    // to 127 minutes without cocoa, and it was dropped whenever the gold dipped.
+    c.value = gate_value(p, crop_good(crop)) + shortage_value(p, crop);
     // Interim: half the horizon. When a colony delivers follows from its Kontor's and fields' build
     // time, the crop's cycle and the sail home, which are not known before the island is chosen.
     c.delay = m_world.balance().ai_budget_horizon_minutes / 2;
