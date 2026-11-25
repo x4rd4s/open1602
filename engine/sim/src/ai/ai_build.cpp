@@ -634,7 +634,8 @@ bool Engine::doctor_swap(AiPlayer& p, const PublicTask& def) {
     // costs fewer people. In p49b, 560 doctor searches found no site and 1,201 too few houses.
     const assets::BuildingType* b = by_id(def.id);
     const City* c = current_city(p);
-    if (b == nullptr || c == nullptr) {
+    // Only what it can pay now: the house is not pulled down for a doctor it then cannot build.
+    if (b == nullptr || c == nullptr || !affordable(p, *c, *b)) {
         return false;
     }
     const IslandMap& map = island_of(p.island).map;
@@ -768,12 +769,20 @@ bool Engine::doctor_swap(AiPlayer& p, const PublicTask& def) {
     }
     log(p, "city %u/%u: pulls down the house at %d,%d for a doctor that reaches %d houses", p.island, p.city, best.x,
         best.y, best.houses);
+    // Pulling down and building are one step (the demolition clears the tiles at once): nothing
+    // else spends the gold in between.
     if (demolish_tile(p, best.x, best.y) == 0) {
         return false;
     }
-    if (build(p, {BuildItem{def.id, best.x, best.y, 0, 0}}, false) == 0) {
-        log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, def.id, best.x, best.y);
-        return false;
+    if (!can_place(p, *b, best.x, best.y, w, h) || build(p, {BuildItem{def.id, best.x, best.y, 0, 0}}, false) == 0) {
+        // An error, not a choice: no second house goes until the slot's searches start anew.
+        log(p, "error: city %u/%u: no doctor at %d,%d after its house was pulled down", p.island, p.city, best.x,
+            best.y);
+        if (CityPlan* r = current_plan(p)) {
+            r->slots[def.slot].attempts = 2;
+            r->slots[def.slot].fail_level = 2;
+        }
+        return true;
     }
     slot_built(p, def.slot);
     slot_ok(p, def.slot);
