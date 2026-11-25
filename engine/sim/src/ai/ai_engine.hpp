@@ -362,6 +362,10 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// Whether a main city asks for its luxury crops ahead of its list: an improved computer whose
+    /// people go without a good that grows fully on the city's island, unless a colony for a good
+    /// none of its islands grows waits for that gold (luxury_waits).
+    [[nodiscard]] static bool luxury_first(bool improved, bool short_here, bool colony_waits) noexcept;
     /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
     /// (an improved computer) earns.
     [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
@@ -835,7 +839,19 @@ private:
     bool processing(AiPlayer& p);
     bool iron_tools(AiPlayer& p);
     bool weapons(AiPlayer& p);
-    bool luxury(AiPlayer& p, std::uint32_t n, bool exclusive);
+    /// `first`: ahead of the city's list, only the crops of luxury_short_crop and no mines.
+    bool luxury(AiPlayer& p, std::uint32_t n, bool exclusive, bool first = false);
+    /// Whether an improved computer's colony for a crop none of its islands grows
+    /// (colony_crop_missing) waits for its gold, with no plan keeping it yet.
+    [[nodiscard]] bool luxury_waits(AiPlayer& p);
+    /// Whether `field` grows fully on the island of `c` and its people go without `good` now.
+    [[nodiscard]] bool luxury_short_crop(const AiPlayer& p, const City& c, std::uint8_t field, std::uint8_t good) const;
+    /// Whether the current city's island grows fully a luxury crop luxury() plants whose good the
+    /// computer's people go without now (goods_short).
+    [[nodiscard]] bool luxury_short_here(const AiPlayer& p) const;
+    /// Whether luxury() plants the crop of `slot` yet: cocoa from the third score, cotton from the
+    /// citizens, the others always.
+    [[nodiscard]] bool luxury_eligible(const AiPlayer& p, std::uint8_t slot) const;
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;
