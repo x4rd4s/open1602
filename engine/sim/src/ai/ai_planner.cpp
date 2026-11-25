@@ -1287,6 +1287,8 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
     const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
+    // Main2's count of citizens begun to come, which an improved computer's rich exits also wait for.
+    const bool citizens_come = population(c, 2) >= at.ai_citizens2_citizens / 2;
     // The stage's own Needs first, then the producers of the packages' goods its inhabitants want.
     // The lists this visit went through; once there is nothing to do, Open1602 goes through them
     // again with their numbers grown by the city's land, so that a large island fills up without
@@ -1498,7 +1500,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // Open1602: an improved computer whose houses rose to citizens already, with an income,
             // moves on with them: before, the stage could trail the houses by hours, waiting for gold
             // or a luxury good in store while its lists built nothing new.
-            const bool risen = rivals() && population(c, 2) >= at.ai_citizens2_citizens / 2 && net_income(p) > 0 &&
+            const bool risen = rivals() && citizens_come && net_income(p) > 0 &&
                                std::int64_t{money} >= stage_gold(at.ai_citizens_money) / 4;
             if (risen ||
                 (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
@@ -1519,7 +1521,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // its lists built nothing new; the budget still weighs every building of the next stage.
             if (citizens_rise(population(c, 2) >= at.ai_citizens2_citizens, has(at.ai_citizens2_money),
                               rivals() && net_income(p) > 0) ||
-                has(at.ai_citizens2_rich_money)) {
+                gold_exit(rivals(), has(at.ai_citizens2_rich_money), citizens_come)) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
             }
@@ -1531,7 +1533,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kCitizens2: {
             if ((population(c, 2) >= at.ai_merchants_citizens && has(at.ai_merchants_money)) ||
-                has(at.ai_merchants_rich_money)) {
+                gold_exit(rivals(), has(at.ai_merchants_rich_money), citizens_come)) {
                 set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
@@ -2944,6 +2946,16 @@ bool Engine::need_denkmal(AiPlayer& p) {
         reserve(p, *b);
     }
     return true;
+}
+
+bool Engine::gold_exit(bool improved, bool rich, bool risen) noexcept {
+    // Open1602 (p52 and p59, x3 g4-404-p1/p3 P1): an improved computer's city leaves the citizens'
+    // stages on gold alone only once its citizens have begun to come (risen, as Main2's own exit
+    // counts them). Its rich thresholds are a quarter of the original's: with 5,700 to 7,000 gold a
+    // city went from citizens to merchants within seconds with no citizen, and its houses stood at
+    // settlers for 300 minutes. Holding the exit behind the stage's list instead (p59) delayed the
+    // early stages and lost more than it gained.
+    return rich && (!improved || risen);
 }
 
 bool Engine::citizens_rise(bool citizens, bool gold, bool earning) noexcept {
