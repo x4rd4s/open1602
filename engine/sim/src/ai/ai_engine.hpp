@@ -365,6 +365,9 @@ public:
     /// Whether a yard works on the ship it builds: an improved computer pauses it while it calls a
     /// damaged ship in (`calling`) and no repair runs, so that the build leaves the wood to the repair.
     [[nodiscard]] static bool yard_builds(bool improved, bool order, bool repairing, bool calling) noexcept;
+    /// Whether a yard starts a repair or calls a damaged ship in: after a stall without material
+    /// (`stalled`) an improved computer waits until the yard itself holds it (`in_yard`).
+    [[nodiscard]] static bool repair_may_start(bool improved, bool stalled, bool in_yard) noexcept;
     /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
     /// (an improved computer) earns.
     [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;

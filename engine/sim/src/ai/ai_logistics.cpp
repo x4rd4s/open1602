@@ -445,6 +445,10 @@ void Engine::scout(AiPlayer& p) {
     log(p, "scouting island %u with ship %u", target, ship->id);
 }
 
+bool Engine::repair_may_start(bool improved, bool stalled, bool in_yard) noexcept {
+    return !improved || !stalled || in_yard;
+}
+
 bool Engine::yard_builds(bool improved, bool order, bool repairing, bool calling) noexcept {
     return !improved || !order || repairing || !calling;
 }
@@ -496,7 +500,13 @@ bool Engine::yard_service(AiPlayer& p) {
             stopped != nullptr ? health128(*stopped) : 0U);
         return false;
     }
-    if (!repairs) {
+    // After such a stall a repair starts only once the yard itself holds the material: with the
+    // Kontor's stock alone a called ship started and was released again ten seconds later, when
+    // that stock went elsewhere (f43, eight empty calls).
+    const auto in_yard = [&] {
+        return (t.type->raw_ware == 0 || yard->wood != 0) && (t.type->raw2_ware == 0 || yard->cloth != 0);
+    };
+    if (!repairs || !repair_may_start(rivals(), yard->idle_cycles >= kYardStalled, in_yard())) {
         return false;
     }
     for (Ship* s : own_ships(p)) {

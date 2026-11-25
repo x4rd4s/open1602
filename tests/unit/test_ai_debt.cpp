@@ -192,6 +192,14 @@ TEST_CASE("ai yard: the build waits while a damaged ship is called in") {
     CHECK(Engine::yard_builds(false, true, false, true));  // the original's computers
 }
 
+TEST_CASE("ai yard: after a stall a repair waits for material in the yard itself") {
+    // f43: with only the Kontor's stock a called ship started and was released ten seconds later.
+    CHECK(Engine::repair_may_start(true, false, false));  // no stall yet
+    CHECK(!Engine::repair_may_start(true, true, false));  // stalled, the yard holds nothing
+    CHECK(Engine::repair_may_start(true, true, true));    // the material has arrived
+    CHECK(Engine::repair_may_start(false, true, false));  // the original's computers
+}
+
 TEST_CASE("ai doctor: an improved computer builds the next doctor where houses the plague can reach lack one") {
     // p48: 92 % of the plague losses fell in cities with one doctor that never got the next.
     CHECK(Engine::checks_coverage(true, sim::ai::kSlotKlinik, false));
