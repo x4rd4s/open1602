@@ -476,6 +476,28 @@ inline constexpr std::uint32_t kSheepFarm = 21515;
 inline constexpr std::uint32_t kBigOreMountain = 21108;  ///< IDFELS+7: the mountain a volcano is
 inline constexpr std::uint32_t kRuin = 22601;            ///< IDRUINE: the first ruin record
 inline constexpr std::uint32_t kMeadow = 22722;          ///< IDWEIDE+21: what demolished forest becomes
+/// A ground record and the Randwachs (percent) Open1602 gives it.
+struct GroundGrowth {
+    std::uint32_t id = 0;
+    std::uint8_t percent = 100;
+};
+/// The sand floor among the meadows: haeuser.cod gives these records no Randwachs, so they would
+/// carry a crop in full although they look like the desert floor (25 %). Open1602 rates them by
+/// their picture: bare sand like the desert, the sand fraying into grass at 50 or 75 %. Only
+/// records whose Randwachs the file leaves open are rated; Rules::fertile_fields still lets every
+/// tile carry in full.
+inline constexpr std::array<GroundGrowth, 10> kSandFloor{{
+    {22707, 25},
+    {22708, 25},
+    {20107, 25},
+    {20108, 25},
+    {20121, 25},
+    {20122, 50},
+    {20123, 50},
+    {20124, 75},
+    {20125, 25},
+    {20126, 25},
+}};
 /// The ruin slots (Ruinenr) of the original (filled): land and
 /// beach ruins of wooden houses, brick houses, plantations, field paths, roads and mines (IDRUINE
 /// + offset), the destroyed Kontors I-IV ("Kontor zerstört"), the destroyed native buildings and

@@ -91,7 +91,7 @@ takes back.
 The terrain tools of the tool bar paint the islands' terrain from a palette of the game's own: ground,
 forest, rock and ore mountains, slopes, rivers, beach, surf and sea. The column shows the tool's name
 and only the settings it uses. **Kind** picks a group of the palette, **Piece** goes through its pieces
-(a right click goes back; a ground piece names the share of the island's fertility it leaves a field, from 25 to 100 percent, as the game data gives it) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
+(a right click goes back; a ground piece names the share of the island's fertility it leaves a field, from 25 to 100 percent, as the game data gives it; the sand floor among the meadows, which the game data leaves at 100 percent, counts like the desert floor: bare sand 25, sand fraying into grass 50 or 75 percent) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
 from 1 to 17 tiles: with the buttons - and +, the slider between them, the keys + and -, or Ctrl and
 the mouse wheel. **Shape** makes the brush round, square or a diamond (Land, Water, Tidy coast, Random
 fill and the brush of a one-tile piece). A white dotted outline on the map shows the tiles the tool

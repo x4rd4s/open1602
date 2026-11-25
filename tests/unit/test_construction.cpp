@@ -1128,6 +1128,31 @@ TEST_CASE(
     CHECK(slow->by_id(20101)->edge_growth == 0);
 }
 
+TEST_CASE("construction: sand floor among the meadows counts as poor ground unless the file rates it") {
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
+    const auto table = [&](const char* sand_extra) {
+        return assets::BuildingTable::from_cod(
+            assets::cod::parse(std::string("Objekt: HAUS\n"
+                                           "  @Nummer: 0\n  Id: 22702\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
+                                           "  @Nummer: 1\n  Id: 22708\n  Kind: 11\n  Gfx: 1\n  Size: 1, 1\n") +
+                                   sand_extra +
+                                   "  @Nummer: 2\n  Id: 20122\n  Kind: 11\n  Gfx: 2\n  Size: 1, 1\n"
+                                   "  @Nummer: 3\n  Id: 20124\n  Kind: 11\n  Gfx: 3\n  Size: 1, 1\n"
+                                   "EndObj\n",
+                               types));
+    };
+    auto plain = table("");
+    REQUIRE(plain.ok());
+    CHECK(plain->by_id(22702)->edge_growth == 128);  // grass keeps the full Randwachs
+    CHECK(plain->by_id(22708)->edge_growth == 32);   // bare sand like the desert floor, 25 %
+    CHECK(plain->by_id(20122)->edge_growth == 64);   // half sand, 50 %
+    CHECK(plain->by_id(20124)->edge_growth == 96);   // mostly grass, 75 %
+    // A file (a mod) that gives the sand a Randwachs of its own keeps it.
+    auto rated = table("  Randwachs: 100\n");
+    REQUIRE(rated.ok());
+    CHECK(rated->by_id(22708)->edge_growth == 128);
+}
+
 TEST_CASE("construction: \"plant all farm fields\" at a forester mixes the trees' variants like the build tool") {
     Island island;
     island.found();
