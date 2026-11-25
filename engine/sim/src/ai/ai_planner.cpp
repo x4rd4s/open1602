@@ -1479,14 +1479,22 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMain: {
-            if ((population(c, 1) >= at.ai_main2_settlers && has(at.ai_main2_money)) || has(at.ai_main2_rich_money)) {
+            const auto to_main2 = [&] {
                 if (kontor_level(c) < 3 && p.cities < 3 && want_colony(p, 2, false, true)) {
                     return;
                 }
                 set_stage(p, r, stage::kMain2);
+            };
+            if ((population(c, 1) >= at.ai_main2_settlers && has(at.ai_main2_money)) ||
+                rich_exit(rivals(), has(at.ai_main2_rich_money), true)) {
+                to_main2();
                 return;
             }
             if (needs(ComputerList::Main) || needs(ComputerList::MainRich)) {
+                return;
+            }
+            if (rich_exit(rivals(), has(at.ai_main2_rich_money), false)) {
+                to_main2();
                 return;
             }
             if (has(at.ai_main_idle_money)) {
@@ -1519,11 +1527,15 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // its lists built nothing new; the budget still weighs every building of the next stage.
             if (citizens_rise(population(c, 2) >= at.ai_citizens2_citizens, has(at.ai_citizens2_money),
                               rivals() && net_income(p) > 0) ||
-                has(at.ai_citizens2_rich_money)) {
+                rich_exit(rivals(), has(at.ai_citizens2_rich_money), true)) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
             }
             if (needs(ComputerList::Citizens)) {
+                return;
+            }
+            if (rich_exit(rivals(), has(at.ai_citizens2_rich_money), false)) {
+                set_stage(p, r, stage::kCitizens2);
                 return;
             }
             idle();
@@ -1531,11 +1543,15 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kCitizens2: {
             if ((population(c, 2) >= at.ai_merchants_citizens && has(at.ai_merchants_money)) ||
-                has(at.ai_merchants_rich_money)) {
+                rich_exit(rivals(), has(at.ai_merchants_rich_money), true)) {
                 set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
             if (needs(ComputerList::Citizens2)) {
+                return;
+            }
+            if (rich_exit(rivals(), has(at.ai_merchants_rich_money), false)) {
+                set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
             idle();
@@ -2944,6 +2960,14 @@ bool Engine::need_denkmal(AiPlayer& p) {
         reserve(p, *b);
     }
     return true;
+}
+
+bool Engine::rich_exit(bool improved, bool rich, bool list_pending) noexcept {
+    // Open1602 (p52, x3 g4-404-p3 P1): an improved computer leaves a stage on gold alone only once
+    // the stage's own list has nothing left to build. Its rich thresholds are a quarter of the
+    // original's, and with 6,992 gold a city went from main to merchants within one second,
+    // skipping the tavern and school of the citizens' lists; it kept 0 citizens for 300 minutes.
+    return rich && (!improved || !list_pending);
 }
 
 bool Engine::citizens_rise(bool citizens, bool gold, bool earning) noexcept {

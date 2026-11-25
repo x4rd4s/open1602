@@ -190,3 +190,14 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
 }
+
+TEST_CASE("ai stage: an improved computer leaves a stage on gold alone only after the stage's list") {
+    // The original's computers move on before their list (classic order).
+    CHECK(Engine::rich_exit(false, true, true));
+    CHECK(Engine::rich_exit(false, true, false));
+    // p52, x3 g4-404-p3 P1: from main to merchants within one second, no tavern, no school.
+    CHECK(!Engine::rich_exit(true, true, true));
+    CHECK(Engine::rich_exit(true, true, false));
+    CHECK(!Engine::rich_exit(true, false, false));
+    CHECK(!Engine::rich_exit(false, false, true));
+}
