@@ -94,8 +94,8 @@ Not covered headless: a real HiDPI screen (the dummy driver has a pixel density 
 
 ## Tests against the original data
 
-Set `ANNO1602_DIR` to the folder of an installation of *Anno 1602* (see the
-[README](../README.md#original-game-data)). The tests read it and never write into it. Without the
+Set `ANNO1602_DIR` to the folder of an installation of *Anno 1602* (see
+[install.md](../docs/install.md#original-game-data)). The tests read it and never write into it. Without the
 variable every data test skips. With it, a test still skips (and says why) when what it needs is not
 there, for example:
 

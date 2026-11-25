@@ -1,7 +1,7 @@
 # engine/app
 
 The game executable `open1602` (`Open1602.app` on macOS) and the wiring of all modules. Built by the
-`release` and `vcpkg` presets or with `-DO1602_BUILD_GAME=ON`, into `bin/` (see the [README](../../README.md#running)).
+`release` and `vcpkg` presets or with `-DO1602_BUILD_GAME=ON`, into `bin/` (see [playing.md](../../docs/playing.md#running)).
 
 - `main.cpp`: command line (an unknown option such as `--help` prints every option and the default
   keys), start in the main menu or directly in a game.
