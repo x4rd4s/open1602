@@ -207,3 +207,15 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
 }
+
+TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone only once citizens come") {
+    // The rich exits citizens -> citizens2 and citizens2 -> merchants. The original's computers
+    // leave on the gold alone.
+    CHECK(Engine::gold_exit(false, true, false));
+    CHECK(Engine::gold_exit(false, true, true));
+    // p59, x3 g4-404-p1 P1: citizens to merchants within seconds at 5,700 gold, no citizen.
+    CHECK(!Engine::gold_exit(true, true, false));
+    CHECK(Engine::gold_exit(true, true, true));
+    CHECK(!Engine::gold_exit(true, false, true));  // not rich
+    CHECK(!Engine::gold_exit(false, false, true));
+}
