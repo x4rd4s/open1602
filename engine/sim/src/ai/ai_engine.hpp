@@ -362,9 +362,9 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
-    /// Whether a city leaves its stage on gold alone (`rich`): the original's computers before
-    /// their list, an improved computer only after it (`list_pending` false).
-    [[nodiscard]] static bool rich_exit(bool improved, bool rich, bool list_pending) noexcept;
+    /// Whether a city leaves its stage on gold, or gold and goods in store (`rich`): the original's
+    /// computers before their list, an improved computer only after it (`list_pending` false).
+    [[nodiscard]] static bool gold_exit(bool improved, bool rich, bool list_pending) noexcept;
     /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
     /// (an improved computer) earns.
     [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
