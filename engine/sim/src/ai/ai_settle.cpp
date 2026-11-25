@@ -13,6 +13,7 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
@@ -1037,6 +1038,22 @@ void Engine::task_settle_land(AiPlayer& p) {
         pl.money =
             money_plus(pl.money, std::int64_t{cheats().founding_money});  // the original's founding money (cheat)
     }
+    // Open1602 (probe p58, x3 o4-505-p1 P3: 52 tries in a minute at -7,865 gold, the site searched
+    // afresh after each): an improved computer's ship waits at the site with its load until the gold
+    // for the Kontor is there, as a player does, while its cities go on.
+    if (const assets::BuildingType* kontor = by_id(id::kKontor1);
+        kontor != nullptr && founding_waits(rivals(), p.pirates, pl.money, kontor->build_cost.money)) {
+        if (m_found_wait_logged.size() <= p.player) {
+            m_found_wait_logged.resize(std::size_t{p.player} + 1);
+        }
+        if (const std::uint64_t minute = now_ms() / kGoodsMinuteMs + 1; m_found_wait_logged[p.player] != minute) {
+            m_found_wait_logged[p.player] = minute;
+            log(p, "the ship waits at the site on island %u for the gold (%d of %d)", island, pl.money,
+                kontor->build_cost.money);
+        }
+        s.sailing = true;  // the root task lands again when it looks next
+        return;
+    }
     BuildOrder order;
     order.player = p.player;
     order.island = island;
@@ -1091,6 +1108,10 @@ void Engine::task_settle_land(AiPlayer& p) {
     push(p, kSurvey, true);
     push(p, kLayout, true);
     end_settlement(p);
+}
+
+bool Engine::founding_waits(bool improved, bool pirates, std::int64_t money, std::int64_t cost) noexcept {
+    return improved && !pirates && money < cost;
 }
 
 void Engine::site_unreachable(AiPlayer& p) {

@@ -411,6 +411,9 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers: the colony ship at its site waits for the Kontor's gold instead of trying.
+    [[nodiscard]] static bool founding_waits(bool improved, bool pirates, std::int64_t money,
+                                             std::int64_t cost) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -1488,6 +1491,8 @@ private:
     std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
+    /// The game minute (+1) each player's ship last logged its wait for the founding's gold.
+    std::vector<std::uint64_t> m_found_wait_logged;
     /// Why need_shipyard() builds no yard: the last reason logged per player (only the log).
     enum class YardWait : std::uint8_t {
         Unlogged,
