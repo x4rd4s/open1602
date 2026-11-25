@@ -208,6 +208,14 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
 }
 
+TEST_CASE("ai defence: a first castle when a near rival not at peace shows the stronger army") {
+    // t64: 69 landings on improved computers without a soldier; behind() looks only at humans.
+    CHECK(Engine::outmatched_by(true, false, 12, 0));
+    CHECK(!Engine::outmatched_by(false, false, 12, 0));  // far away
+    CHECK(!Engine::outmatched_by(true, true, 12, 0));    // at peace
+    CHECK(!Engine::outmatched_by(true, false, 4, 4));    // not stronger
+}
+
 TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone only once citizens come") {
     // The rich exits citizens -> citizens2 and citizens2 -> merchants. The original's computers
     // leave on the gold alone.

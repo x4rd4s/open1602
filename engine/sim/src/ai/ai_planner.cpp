@@ -3007,13 +3007,19 @@ bool Engine::need_castle(AiPlayer& p) {
     if (b == nullptr || !affordable(p, *c, *b)) {
         return false;
     }
-    if (grown) {
-        // Gold to spare after the castle, as a player keeps some for running costs.
-        if (player(p).money < std::int64_t{b->build_cost.money} + std::int64_t{bal.ai_castle_reserve}) {
+    // Open1602 (t64): an improved computer's first castle also while a near rival not at peace
+    // shows the stronger army, without the reserve, as the behind() one: in a game without humans
+    // behind() never held, and pressed computers were landed on with no soldier.
+    const bool first_castle = rivals() && !p.pirates && castles == 0 && outmatched(p);
+    if (!first_castle) {
+        if (grown) {
+            // Gold to spare after the castle, as a player keeps some for running costs.
+            if (player(p).money < std::int64_t{b->build_cost.money} + std::int64_t{bal.ai_castle_reserve}) {
+                return false;
+            }
+        } else if (!behind(p)) {
             return false;
         }
-    } else if (!behind(p)) {
-        return false;
     }
     const assets::BuildingType* square = by_id(id::kSquare);
     const std::uint32_t ring = square != nullptr ? (b->size_x + b->size_y + 2) * 2 * square->build_cost.bricks : 0;
@@ -3022,6 +3028,9 @@ bool Engine::need_castle(AiPlayer& p) {
         return false;
     }
     if (plan_building(p, kCastle, *b, kSlotCastle, false)) {
+        if (first_castle) {
+            log(p, "plans its first castle: a near rival shows the stronger army (gold %d)", player(p).money);
+        }
         reserve(p, *b);
         p.reserved.bricks += remove_goods(*c, m.bricks, ring);
     }
