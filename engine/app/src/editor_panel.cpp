@@ -1068,8 +1068,12 @@ void EditorPanel::layout_markers(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.markers.title"), Align::Left, Tone::Heading);
     y += 30;
-    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, ui::tr("editor.markers.note"), Tone::Dim, 20);
-    y += 3 * 20 + 4;
+    // The note as tall as it wraps (at least three lines, so that the list stays in place).
+    const std::string& note = ui::tr("editor.markers.note");
+    const auto note_lines =
+        std::max<std::int32_t>(3, static_cast<std::int32_t>(ui::paragraph_lines(m_font, note, m_w).size()));
+    f.paragraph(Rect{m_x, y, m_w, note_lines * 20}, note, Tone::Dim, 20);
+    y += note_lines * 20 + 4;
     const std::size_t n = model.markers.size();
     if (n == 0) {
         f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.markers.none"), Align::Left, Tone::Dim);
@@ -2998,14 +3002,22 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
         f.paragraph(Rect{m_x, y + 4, m_w, std::min(room, 5 * 20)}, ui::tr("editor.scenario.note"), Tone::Dim, 20,
                     ui::tr("editor.scenario.note_short"));
     }
-    const std::int32_t quarter = (m_w - 3 * kGap) / 4;
-    // The packages and saving to one share what closing leaves, so that "Packages (n)" fits.
-    const std::int32_t half = (m_w - quarter - 3 * kGap) / 2;
-    f.button(kPackagesPage, Rect{m_x, foot, half, kButtonH},
-             ui::tr("editor.packages.button", {count(model.packages.size())}));
-    offer_tip(Rect{m_x, foot, half, kButtonH}, ui::tr("editor.packages.button.tip"));
-    f.button(kPackageSavePage, Rect{m_x + half + kGap, foot, half, kButtonH}, ui::tr("editor.package_save.button"));
-    f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+    // The packages, saving to one and closing share the foot, each as wide as its text wants.
+    const std::string packages = ui::tr("editor.packages.button", {count(model.packages.size())});
+    const std::array<const std::string*, 3> texts = {&packages, &ui::tr("editor.package_save.button"),
+                                                     &ui::tr("editor.dialog.close")};
+    std::array<double, 3> want{};
+    for (std::size_t i = 0; i < texts.size(); ++i) {
+        want[i] = std::max(120.0, ui::text_width(m_font, *texts[i]) + 32.0);
+    }
+    const double all = want[0] + want[1] + want[2];
+    const std::int32_t width = m_w - 2 * kGap;
+    const auto w0 = static_cast<std::int32_t>(width * want[0] / all);
+    const auto w1 = static_cast<std::int32_t>(width * want[1] / all);
+    f.button(kPackagesPage, Rect{m_x, foot, w0, kButtonH}, packages);
+    offer_tip(Rect{m_x, foot, w0, kButtonH}, ui::tr("editor.packages.button.tip"));
+    f.button(kPackageSavePage, Rect{m_x + w0 + kGap, foot, w1, kButtonH}, *texts[1]);
+    f.button(kBack, Rect{m_x + w0 + w1 + 2 * kGap, foot, width - w0 - w1, kButtonH}, *texts[2]);
 }
 
 void EditorPanel::layout_packages(const EditorModel& model) {
