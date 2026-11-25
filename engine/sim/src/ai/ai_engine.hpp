@@ -365,6 +365,9 @@ public:
     /// Whether a yard works on the ship it builds: an improved computer pauses it while it calls a
     /// damaged ship in (`calling`) and no repair runs, so that the build leaves the wood to the repair.
     [[nodiscard]] static bool yard_builds(bool improved, bool order, bool repairing, bool calling) noexcept;
+    /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
+    /// (an improved computer) earns.
+    [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;
