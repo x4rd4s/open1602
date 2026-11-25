@@ -407,6 +407,12 @@ public:
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
     [[nodiscard]] static bool crop_war_motive(bool lacking, bool settles, bool free) noexcept;
+    /// Whether need_public builds the public building of slot `which` also where houses lack it:
+    /// `cov` from its order, always for the chapel, the gallows and the fire brigade, and for an
+    /// improved computer's doctor (p48).
+    [[nodiscard]] static bool checks_coverage(bool improved, std::uint8_t which, bool cov) noexcept;
+    /// Whether house `h` of city `c` is one the plague can break out in and no doctor covers (p48).
+    [[nodiscard]] static bool lacks_doctor(const House& h, const City& c) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -678,6 +684,8 @@ private:
     void refresh_city(AiPlayer& p);
     /// Logs the fires and plagues of the city when they change (only the log).
     void log_disasters(const AiPlayer& p, const City& c);
+    /// Open1602 (p48): opens the doctor again while a house the plague can break out in lacks one.
+    void doctor_gaps(AiPlayer& p, const City& c, CityPlan& r);
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);

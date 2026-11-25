@@ -10,6 +10,7 @@
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/goods_ledger.hpp"
+#include "o1602/sim/houses.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -189,4 +190,28 @@ TEST_CASE("ai yard: the build waits while a damaged ship is called in") {
     CHECK(Engine::yard_builds(true, true, true, true));    // a repair runs: the yard is on anyway
     CHECK(Engine::yard_builds(true, true, false, false));  // nobody called: the build goes on
     CHECK(Engine::yard_builds(false, true, false, true));  // the original's computers
+}
+
+TEST_CASE("ai doctor: an improved computer builds the next doctor where houses the plague can reach lack one") {
+    // p48: 92 % of the plague losses fell in cities with one doctor that never got the next.
+    CHECK(Engine::checks_coverage(true, sim::ai::kSlotKlinik, false));
+    CHECK(!Engine::checks_coverage(false, sim::ai::kSlotKlinik, false));  // the original's gold flag
+    CHECK(Engine::checks_coverage(false, sim::ai::kSlotKapelle, false));
+    CHECK(!Engine::checks_coverage(true, sim::ai::kSlotBadehaus, false));
+    sim::City c;
+    c.island = 2;
+    c.index = 1;
+    sim::House h;
+    h.island = 2;
+    h.city = 1;
+    h.resident_class = 2;  // citizens
+    CHECK(Engine::lacks_doctor(h, c));
+    h.services = sim::house_service::kKlinik;
+    CHECK(!Engine::lacks_doctor(h, c));
+    h.services = 0;
+    h.resident_class = 1;  // settlers: no plague breaks out there
+    CHECK(!Engine::lacks_doctor(h, c));
+    h.resident_class = 2;
+    h.city = 0;  // another city's
+    CHECK(!Engine::lacks_doctor(h, c));
 }

@@ -12,6 +12,7 @@
 #include "ai_tables.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/disasters.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 
@@ -141,6 +142,7 @@ void Engine::refresh_city(AiPlayer& p) {
         tax_rates(p, *c);
         material_lock(p, *c);
         log_disasters(p, *c);
+        doctor_gaps(p, *c, *r);
     }
     p.refresh_ms = now_ms();
     // The original's steady money and subsidy (cheats), on every difficulty; improved computers
@@ -3044,6 +3046,32 @@ bool Engine::need_castle(AiPlayer& p) {
     return true;
 }
 
+bool Engine::checks_coverage(bool improved, std::uint8_t which, bool cov) noexcept {
+    return cov || which == kSlotKapelle || which == kSlotGalgen || which == kSlotBrunnen ||
+           (improved && which == kSlotKlinik);
+}
+
+bool Engine::lacks_doctor(const House& h, const City& c) noexcept {
+    return h.island == c.island && h.city == c.index && plague_prone(h) && (h.services & house_service::kKlinik) == 0;
+}
+
+void Engine::doctor_gaps(AiPlayer& p, const City& c, CityPlan& r) {
+    // Open1602 (p48): the original opens the doctor again only for a new house built without one;
+    // houses that never had one, or lost it, kept the city "covered" for good, and 92 % of the
+    // plague losses fell in cities with one doctor that never got the next. An improved computer
+    // looks at its houses the plague can break out in, as a player sees the gap on the map.
+    if (!rivals() || (r.flags & city_flag::kKlinik) == 0) {
+        return;
+    }
+    for (const House& h : m_world.houses()) {
+        if (lacks_doctor(h, c)) {
+            r.flags &= ~city_flag::kKlinik;
+            log(p, "city %u/%u: a house at %u,%u has no doctor", c.island, c.index, unsigned{h.x}, unsigned{h.y});
+            return;
+        }
+    }
+}
+
 bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     // A public building while fewer than n stand or houses lack it.
     City* c = current_city(p);
@@ -3056,10 +3084,10 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
     if (def == nullptr || def->kind != ComputerSlot::Kind::Public) {
         return false;
     }
-    // The Kapelle always checks its flag; gallows and fountains ignore `cov`.
-    if (which == kSlotKapelle || which == kSlotGalgen || which == kSlotBrunnen) {
-        cov = true;
-    }
+    // The Kapelle always checks its flag; gallows and fountains ignore `cov`. Open1602 (p48): an
+    // improved computer builds its doctors where houses lack one too, as it does chapels, whatever
+    // its gold: affordable() weighs the cost and the running cost against its budget.
+    cov = checks_coverage(rivals(), which, cov);
     if (!cov) {
         r->flags |= def->flag;  // count only
     }
