@@ -39,6 +39,7 @@
 #include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/island_templates.hpp"
 #include "o1602/sim/save_game.hpp"
+#include "o1602/sim/start_places.hpp"
 #include "o1602/sim/validate.hpp"
 #include "o1602/ui/build_menu.hpp"
 #include "o1602/ui/font.hpp"
@@ -251,6 +252,10 @@ std::string limit_text(const editor::LimitProblem& p) {
             return ui::tr("editor.limit.script");
         case Kind::PiratePeace:
             return ui::tr("editor.limit.pirate_peace");
+        case Kind::FirstIsland:
+            return ui::tr("editor.limit.first_island");
+        case Kind::StartPlaces:
+            return ui::tr("editor.limit.start_places");
     }
     return {};
 }
@@ -1203,6 +1208,7 @@ void MapViewer::editor_request(const EditorRequest& request, bool confirmed) {
         case Kind::MarkerSelect:
         case Kind::MarkerRename:
         case Kind::MarkerRemove:
+        case Kind::MarkerShipStart:
         case Kind::ListScripts:
         case Kind::ScriptLoad:
         case Kind::ScriptReload:
@@ -1930,6 +1936,10 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
             }
         }
     }
+    // Start places at random need two places at least, else every player starts where it is.
+    if (const auto& info = world.scenario_info(); info && info->shuffle_starts && sim::start_places(world).size() < 2) {
+        lines.push_back(Line{ui::tr("editor.check.start_places"), Line::Kind::Warning, Line::Target::Scenario});
+    }
     if (lines.size() == first) {
         lines.push_back(Line{ui::tr("editor.check.fine"), Line::Kind::Fine});
     }
@@ -2003,10 +2013,12 @@ std::vector<EditorCheckLine> MapViewer::editor_check() const {
     for (const editor::LimitProblem& p : problems) {
         using LK = editor::LimitProblem::Kind;
         const bool on_island = p.kind == LK::IslandSize || p.kind == LK::Deposits || p.kind == LK::IslandCities;
-        const Line::Target target = on_island                                            ? Line::Target::Island
-                                    : p.kind == LK::MapSize                              ? Line::Target::WorldSize
-                                    : p.kind == LK::Players || p.kind == LK::PiratePeace ? Line::Target::Players
-                                                                                         : Line::Target::None;
+        const bool of_players = p.kind == LK::Players || p.kind == LK::PiratePeace || p.kind == LK::FirstIsland;
+        const Line::Target target = on_island                   ? Line::Target::Island
+                                    : p.kind == LK::MapSize     ? Line::Target::WorldSize
+                                    : of_players                ? Line::Target::Players
+                                    : p.kind == LK::StartPlaces ? Line::Target::Scenario
+                                                                : Line::Target::None;
         lines.push_back(Line{limit_text(p), keep ? Line::Kind::Warning : Line::Kind::Note, target, p.island});
     }
     if (problems.empty()) {

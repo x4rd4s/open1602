@@ -187,7 +187,9 @@ struct EditorPick {
 /// A marker of the scenario as the page "Markers" lists it (Windows-1252).
 struct EditorMarkerRow {
     std::string name;
-    std::string place;  ///< where it lies: "point 41, 32", "area 40, 30, 8 x 6"
+    std::string place;        ///< where it lies: "point 41, 32", "area 40, 30, 8 x 6"
+    bool point = false;       ///< a point, not an area
+    bool ship_start = false;  ///< a further start place of ships (sim::ship_start_marker)
 };
 
 /// A file the editor can open, as the list shows it.
@@ -334,6 +336,10 @@ struct EditorPlayer {
     std::uint8_t rival_development = 0;
     std::uint16_t own_inhabitants = 0;
     std::uint16_t rival_inhabitants = 0;
+    /// Where a computer without a city founds its first one (sim::FirstIsland), and for a fixed
+    /// island its index into the world's islands (-1: the map no longer has it).
+    std::uint8_t first_island = 0;
+    std::int32_t first_island_index = -1;
     /// How it stands at the start with each slot of EditorModel::player_slots, in that order
     /// (its own entry unused).
     struct Standing {
@@ -375,15 +381,17 @@ enum class EditorScenarioRow : std::uint8_t {
     Author,
     Version,
     OriginalLimits,
-    NeutralPeace,  ///< the neutral buildings hostile or peaceful (editor::set_neutral_peace)
-    ChooseBanner,  ///< the human chooses the banner at the start (sim::ScenarioInfo::choose_banner)
+    NeutralPeace,   ///< the neutral buildings hostile or peaceful (editor::set_neutral_peace)
+    ChooseBanner,   ///< the human chooses the banner at the start (sim::ScenarioInfo::choose_banner)
+    ShuffleStarts,  ///< the start places drawn at random (sim::ScenarioInfo::shuffle_starts)
     Count
 };
 inline constexpr std::size_t kEditorScenarioRows = static_cast<std::size_t>(EditorScenarioRow::Count);
 /// Whether a row of the page "Scenario" is a text to type.
 [[nodiscard]] constexpr bool scenario_row_is_text(EditorScenarioRow row) noexcept {
     return row != EditorScenarioRow::Stars && row != EditorScenarioRow::OriginalLimits &&
-           row != EditorScenarioRow::NeutralPeace && row != EditorScenarioRow::ChooseBanner;
+           row != EditorScenarioRow::NeutralPeace && row != EditorScenarioRow::ChooseBanner &&
+           row != EditorScenarioRow::ShuffleStarts;
 }
 /// The longest text a row takes, in characters.
 [[nodiscard]] constexpr std::size_t scenario_row_length(EditorScenarioRow row) noexcept {
@@ -637,7 +645,8 @@ struct EditorRequest {
         /// (`player.unlock_stage`) only; `index` 1 or 2: its colour the next
         /// or the one before instead; 3: the slot the page shows (EditorPanel::chosen_player) named
         /// `name`, the rest as it is; 4: its faction; 5: its attitude (the thresholds of
-        /// `player`); 6: the slot the page shows with the starting money typed in `name`.
+        /// `player`); 6: the slot the page shows with the starting money typed in `name`; 8: its
+        /// first island (`player.first_island`, `first_island_index`).
         SetPlayer,
         AddPlayer,     ///< a computer player in the next slot
         RemovePlayer,  ///< the last slot taken away
@@ -679,6 +688,7 @@ struct EditorRequest {
         MarkerSelect,  ///< the marker `index` selected and in the view's middle
         MarkerRename,  ///< the marker `index` named `name`
         MarkerRemove,  ///< the marker `index` taken away
+        MarkerShipStart,  ///< the point marker `index` renamed a start place of ships ("ship_start_<n>")
         /// The page "Load script" opens: the model's list of files is due, the scripts.
         ListScripts,
         ScriptLoad,      ///< the script of file `index` of the model's list as the scenario's

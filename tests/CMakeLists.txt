@@ -21,6 +21,7 @@ add_executable(o1602_tests
     unit/test_editor_goals.cpp
     unit/test_editor_islands.cpp
     unit/test_editor_players.cpp
+    unit/test_start_places.cpp
     unit/test_editor_random.cpp
     unit/test_editor_resources.cpp
     unit/test_editor_special.cpp

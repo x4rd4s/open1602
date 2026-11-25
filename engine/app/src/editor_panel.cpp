@@ -217,6 +217,7 @@ constexpr Id kShipPriceMore = 1241;
 constexpr Id kPlayerUnlock = 1242;       ///< the stage a player's buildings are open to from the start
 constexpr Id kPlayerUnlockTable = 1250;  ///< + the row of the players' table: its unlock stage             ///< the
                                          ///< offer's price 10 % higher (right button: the type's own)
+constexpr Id kMarkerShipStart = 1270;    ///< the selected point marker made a further start place of ships
 constexpr std::uint32_t kPriceStep = 128 / 10;  ///< 10 % of the price, in 1/128
 constexpr Id kPlayerTable = 300;                ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
@@ -431,16 +432,17 @@ enum AttitudeColumn : std::size_t {
     kRivalDevelopmentColumn,  ///< cross with a human whose best city is beyond a level
     kOwnSizeColumn,           ///< cross with the humans while it has fewer inhabitants
     kRivalSizeColumn,         ///< cross with a human who has more inhabitants
+    kFirstIslandColumn,       ///< Open1602: where it founds its first city (sim::FirstIsland)
     kAttitudeColumns
 };
 
 constexpr std::array<const char*, kAttitudeColumns> kAttitudeHeads = {
     "editor.attitude.own_level", "editor.attitude.rival_level", "editor.attitude.own_people",
-    "editor.attitude.rival_people"};
+    "editor.attitude.rival_people", "editor.attitude.first_island"};
 
 constexpr std::array<std::uint32_t, kAttitudeColumns> kAttitudeFlag = {
     sim::scenario_flag::kOwnDevelopment, sim::scenario_flag::kRivalDevelopment, sim::scenario_flag::kOwnSize,
-    sim::scenario_flag::kRivalSize};
+    sim::scenario_flag::kRivalSize, 0};
 
 /// The development thresholds a click steps through: each class and its half (32 a class).
 constexpr std::array<std::uint8_t, 10> kDevelopmentSteps = {0, 16, 32, 48, 64, 80, 96, 112, 128, 144};
@@ -480,6 +482,18 @@ std::string attitude_text(const EditorPlayer& p, std::size_t column, bool& enabl
     enabled = !p.human;
     if (!enabled) {
         return ui::tr("editor.players.human");
+    }
+    if (column == kFirstIslandColumn) {
+        switch (static_cast<sim::FirstIsland>(p.first_island)) {
+            case sim::FirstIsland::Original:
+                return ui::tr("editor.attitude.first_original");
+            case sim::FirstIsland::AtRandom:
+                return ui::tr("editor.attitude.first_random");
+            default:
+                return p.first_island_index < 0
+                           ? ui::tr("editor.attitude.first_gone")
+                           : ui::tr("editor.attitude.first_fixed", {count(std::size_t(p.first_island_index) + 1)});
+        }
     }
     if ((p.attitude_flags & kAttitudeFlag[column]) == 0) {
         return ui::tr("editor.attitude.off");
@@ -1072,6 +1086,13 @@ void EditorPanel::layout_markers(const EditorModel& model) {
     y += kButtonH + kGap;
     f.button(kMarkerRemove, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.remove"), chosen);
     y += kButtonH + kGap;
+    // Open1602: a point a player's ships may start at, when the scenario draws its start places.
+    const bool point = chosen && model.markers[*model.marker].point;
+    f.button(kMarkerShipStart, Rect{m_x, y, m_w, kButtonH},
+             ui::tr(point && model.markers[*model.marker].ship_start ? "editor.markers.ship_start_is"
+                                                                     : "editor.markers.ship_start"),
+             point && !model.markers[*model.marker].ship_start);
+    y += kButtonH + kGap;
     const std::int32_t bottom = m_top + m_height - 4;
     if (!model.notice.empty() && bottom - y - 2 >= 2 * 20) {
         f.paragraph(Rect{m_x, y + 2, m_w, std::max(0, bottom - y - 2)}, model.notice,
@@ -1660,6 +1681,23 @@ std::optional<EditorRequest> EditorPanel::press_attitude(const EditorModel& mode
     r.name = r.player.own_name;
     r.index = 5;  // the attitude
     EditorPlayer& p = r.player;
+    if (column == kFirstIslandColumn) {
+        // As the original, at random, then each island of the map, round (the right button back).
+        r.index = 8;
+        const std::size_t positions = model.islands + 2;
+        std::size_t at = 0;
+        if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::AtRandom)) {
+            at = 1;
+        } else if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Fixed)) {
+            at = p.first_island_index < 0 ? (forward ? 1 : 2) : static_cast<std::size_t>(p.first_island_index) + 2;
+        }
+        const std::size_t next = step(at, positions, forward);
+        p.first_island = static_cast<std::uint8_t>(next == 0   ? sim::FirstIsland::Original
+                                                   : next == 1 ? sim::FirstIsland::AtRandom
+                                                               : sim::FirstIsland::Fixed);
+        p.first_island_index = next >= 2 ? static_cast<std::int32_t>(next - 2) : -1;
+        return r;
+    }
     // Off, then the steps, round (the right button back). A threshold between two steps goes on
     // to the next one or back to the one before.
     const bool on = (p.attitude_flags & kAttitudeFlag[column]) != 0;
@@ -4150,6 +4188,11 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kMarkerRemove:
             if (model.marker && *model.marker < model.markers.size()) {
                 return EditorRequest{EditorRequest::Kind::MarkerRemove, *model.marker};
+            }
+            return std::nullopt;
+        case kMarkerShipStart:
+            if (model.marker && *model.marker < model.markers.size()) {
+                return EditorRequest{EditorRequest::Kind::MarkerShipStart, *model.marker};
             }
             return std::nullopt;
         case kMarkerBack:

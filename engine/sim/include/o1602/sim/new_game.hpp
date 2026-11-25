@@ -132,7 +132,8 @@ void roll_random_fertility(World& world, std::uint64_t seed);
 
 /// A scenario's world as a game of it starts: the islands of its plan made
 /// (roll_planned_islands) when it plans any, a plan without islands dropped, then the random
-/// fertilities rolled (roll_random_fertility) from `start.seed`.
+/// fertilities rolled (roll_random_fertility) and, if the scenario asks for it
+/// (ScenarioInfo::shuffle_starts), the start places drawn (shuffle_start_places), from `start.seed`.
 [[nodiscard]] annokit::core::Result<World> start_scenario(World world, const assets::GameDirectory& game,
                                                           const assets::BuildingTable& buildings,
                                                           const WorldStart& start,

@@ -173,6 +173,30 @@ struct Game {
         REQUIRE(world.add_island(std::move(islet)).ok());
     }
 
+    /// An island of `w` x `h` tiles at (x, y): ground with a forest, a beach at its east and sea
+    /// beyond it, as the large one; its index.
+    std::uint16_t add_coast_island(std::uint32_t x, std::uint32_t y, std::int32_t w, std::int32_t h) {
+        sim::IslandMap map(static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h));
+        for (std::int32_t ty = 0; ty < h; ++ty) {
+            for (std::int32_t tx = 0; tx < w; ++tx) {
+                const std::uint32_t id = tx > w - 4                     ? kSea
+                                         : tx == w - 4                  ? kBeach
+                                         : tx >= w - 24 && tx <= w - 10 ? kTree
+                                                                        : kGround;
+                REQUIRE(map.place(*buildings.by_id(id), tx, ty, id == kBeach ? 3 : 0, 0).ok());
+            }
+        }
+        map.capture_ground();
+        sim::WorldIsland island{assets::IslandHeader{}, std::move(map), x, y};
+        const auto index = static_cast<std::uint16_t>(world.islands().size());
+        island.header.number = static_cast<std::uint8_t>(index);
+        island.header.width = static_cast<std::uint8_t>(w);
+        island.header.height = static_cast<std::uint8_t>(h);
+        island.header.fertility = 0xFFFFFFFFU;
+        REQUIRE(world.add_island(std::move(island)).ok());
+        return index;
+    }
+
     sim::Ship& add_ship(sim::PlayerId owner, std::uint32_t x, std::uint32_t y) {
         sim::Ship s = sim::make_ship("Ship", x, y, kShipFigure, owner, 2);
         s.cargo.resize(4);
@@ -295,6 +319,50 @@ TEST_CASE("ai: a computer with a ship founds a city through a build order") {
     CHECK(view[0].player == kComputer);
     CHECK(view[0].cities == 1);
     CHECK(!view[0].settling);
+}
+
+TEST_CASE("ai: a computer founds its first city on the island the scenario chose, the search passes it over") {
+    // A small island of some 800 tiles of land: the search wants 1800 and takes the large one;
+    // chosen by the scenario, the computer founds on it. The choice is spent then.
+    for (const bool improved : {false, true}) {
+        for (const bool chosen : {false, true}) {
+            Game g;
+            const std::uint16_t small = g.add_coast_island(40, 72, 50, 17);
+            if (chosen) {
+                g.world.player(kComputer)->first_island = sim::FirstIsland::Fixed;
+                g.world.player(kComputer)->first_island_number = g.world.islands()[small].header.number;
+            }
+            sim::Rules rules;
+            rules.bugs.classic_ai = !improved;
+            rules.reveal_resources = true;
+            sim::Simulation s(g.world, g.buildings, g.figures, rules);
+            REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+            for (const sim::City& c : g.world.cities()) {
+                if (c.owner == kComputer) {
+                    CHECK(c.island == (chosen ? small : 1));
+                }
+            }
+            CHECK(g.world.players()[kComputer].first_island == sim::FirstIsland::Original);
+        }
+    }
+}
+
+TEST_CASE("ai: a first island chosen that cannot take a city, or drawn at random, still ends in a city") {
+    // The islet (25 tiles) is too small even for the least the search ends with: the computer
+    // searches as always. At random it draws among the islands free for a first city.
+    for (const sim::FirstIsland choice : {sim::FirstIsland::Fixed, sim::FirstIsland::AtRandom}) {
+        Game g;
+        g.world.player(kComputer)->first_island = choice;
+        g.world.player(kComputer)->first_island_number = g.world.islands()[0].header.number;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        REQUIRE(run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; }));
+        for (const sim::City& c : g.world.cities()) {
+            if (c.owner == kComputer) {
+                CHECK(c.island == 1);
+            }
+        }
+        CHECK(g.world.players()[kComputer].first_island == sim::FirstIsland::Original);
+    }
 }
 
 TEST_CASE("ai: an improved computer sails out to explore before it founds, the original's knows every island") {

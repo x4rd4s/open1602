@@ -532,7 +532,14 @@ void Engine::root(AiPlayer& p) {
             p.settle.floor = 300;
             p.settle.crop = p.pirates ? 0 : first_crop(m_world.balance().computer_orders, p.player);
             p.settle.active = true;
-            pick_island(p);
+            if (const auto first = first_island_choice(p)) {
+                // Open1602: the island the scenario chose for its first city is looked at first.
+                p.settle.island = *first;
+                log(p, "first island %u, as the scenario chose", unsigned{*first});
+                push(p, kSettleArea, true);
+            } else {
+                pick_island(p);
+            }
         }
         // A computer whose search failed for good gives its ship to the pirates (ship op 5 value 5)
         // and leaves the game with the players' next check. Open1602 kept it until 2026-10-28.

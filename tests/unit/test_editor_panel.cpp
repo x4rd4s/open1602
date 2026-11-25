@@ -12,6 +12,7 @@
 #include "editor_panel.hpp"
 
 #include "o1602/sim/climates.hpp"
+#include "o1602/sim/player.hpp"
 #include "o1602/ui/localization.hpp"
 
 using namespace o1602;
@@ -79,14 +80,15 @@ std::optional<EditorRequest> click(EditorPanel& panel, const EditorModel& model,
     return panel.mouse((*at)[0], (*at)[1], false, model, button);
 }
 
-std::optional<EditorRequest> click_id(EditorPanel& panel, const EditorModel& model, ui::Form::Id id) {
+std::optional<EditorRequest> click_id(EditorPanel& panel, const EditorModel& model, ui::Form::Id id,
+                                      ui::MouseButton button = ui::MouseButton::Left) {
     panel.layout(model);
     for (const ui::Form::Widget& w : panel.form().widgets()) {
         if (w.id == id) {
             const std::int32_t x = w.rect.x + w.rect.w / 2;
             const std::int32_t y = w.rect.y + w.rect.h / 2;
-            (void)panel.mouse(x, y, true, model, ui::MouseButton::Left);
-            return panel.mouse(x, y, false, model, ui::MouseButton::Left);
+            (void)panel.mouse(x, y, true, model, button);
+            return panel.mouse(x, y, false, model, button);
         }
     }
     REQUIRE(false);
@@ -1999,13 +2001,13 @@ TEST_CASE("editor panel: the starting money is typed to the gold, a debt with a 
     CHECK(panel.page() == EditorPanel::Page::Players);
 }
 
-TEST_CASE("editor panel: the page Attitude steps when a computer grows cross, off between") {
+TEST_CASE("editor panel: the page Computers steps when a computer grows cross, off between") {
     ui::set_language("en");
     EditorPanel panel;
     panel.set_room(200, 560);
     EditorModel m = four_players();
     CHECK(!panel.command(app::EditorCommand::Players, m).has_value());
-    CHECK(!click(panel, m, "Attitude").has_value());
+    CHECK(!click(panel, m, "Computers").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::Attitude);
     (void)panel.draw(m, kNoFonts);
     for (const ui::Form::Widget& w : panel.form().widgets()) {
@@ -2038,6 +2040,25 @@ TEST_CASE("editor panel: the page Attitude steps when a computer grows cross, of
     r = click_id(panel, m, ui::Form::Id{1143});  // past the last step: off
     REQUIRE(r.has_value());
     CHECK(r->player.attitude_flags == 0x100);
+
+    // The first island: as the original, at random, each island of the map, round.
+    m.islands = 2;
+    CHECK(says(panel, "as original"));
+    r = click_id(panel, m, ui::Form::Id{1144});
+    REQUIRE(r.has_value());
+    CHECK(r->index == 8);
+    CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::AtRandom));
+    m.player_slots[1].first_island = static_cast<std::uint8_t>(sim::FirstIsland::Fixed);
+    m.player_slots[1].first_island_index = 1;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Island 2"));
+    r = click_id(panel, m, ui::Form::Id{1144});  // after the last island: as the original again
+    REQUIRE(r.has_value());
+    CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Original));
+    r = click_id(panel, m, ui::Form::Id{1144}, ui::MouseButton::Right);  // back: the first island
+    REQUIRE(r.has_value());
+    CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Fixed));
+    CHECK(r->player.first_island_index == 0);
 }
 
 TEST_CASE("editor panel: in the column, the page Others shows the slot of the page Players") {
@@ -2194,9 +2215,17 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     panel.set_room(184, 564);
     panel.set_screen(1024, 768, 1024 - EditorPanel::kWidth);
     EditorModel m = document();
-    const std::vector<std::string> values = {
-        "Two Coasts", "Zwei Kuesten", "Found a city.",           "(none)", "3 of 5 stars", "Merlin",
-        "1.0",        "No",           "Peaceful, taken by land", "No"};
+    const std::vector<std::string> values = {"Two Coasts",
+                                             "Zwei Kuesten",
+                                             "Found a city.",
+                                             "(none)",
+                                             "3 of 5 stars",
+                                             "Merlin",
+                                             "1.0",
+                                             "No",
+                                             "Peaceful, taken by land",
+                                             "No",
+                                             "yes, 3 places for 2 players"};
     for (std::size_t i = 0; i < app::kEditorScenarioRows; ++i) {
         m.scenario_rows.push_back(app::EditorRule{"Row " + std::to_string(i), values[i], true});
         m.scenario_texts.push_back(app::scenario_row_is_text(static_cast<app::EditorScenarioRow>(i)) ? values[i] : "");
@@ -2217,6 +2246,11 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::ScenarioStep);
     CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::NeutralPeace));
+    // And the start places at random.
+    r = click(panel, m, "yes, 3 places for 2 players");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::ScenarioStep);
+    CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::ShuffleStarts));
 
     // A text opens the field with the text as it is; Esc leaves it unchanged.
     r = click(panel, m, "Merlin");
@@ -2301,7 +2335,7 @@ TEST_CASE("editor panel: the page Markers lists the markers, renames and deletes
     CHECK(panel.active_tool(m) == app::EditorTool::Marker);
     (void)panel.draw(m, kNoFonts);
     CHECK(says(panel, "No markers yet."));
-    m.markers = {{"harbour", "point 41, 32"}, {"coast", "area 40, 30, 8 \xd7 6"}};
+    m.markers = {{"harbour", "point 41, 32", true}, {"coast", "area 40, 30, 8 \xd7 6"}};
     (void)panel.draw(m, kNoFonts);
     auto r = click(panel, m, "coast");
     REQUIRE(r.has_value());
@@ -2313,6 +2347,17 @@ TEST_CASE("editor panel: the page Markers lists the markers, renames and deletes
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::MarkerRemove);
     CHECK(r->index == 1);
+    // Only a point can be a start place of ships; one that is shows so.
+    CHECK(!click(panel, m, "Make ship start place").has_value());
+    m.marker = 0;
+    r = click(panel, m, "Make ship start place");
+    REQUIRE(r.has_value());
+    CHECK(r->kind == EditorRequest::Kind::MarkerShipStart);
+    CHECK(r->index == 0);
+    m.markers[0].ship_start = true;
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "Ship start place"));
+    m.marker = 1;
     CHECK(!click(panel, m, "Rename").has_value());
     REQUIRE(panel.page() == EditorPanel::Page::MarkerName);
     CHECK(panel.typing());
