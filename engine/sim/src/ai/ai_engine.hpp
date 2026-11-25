@@ -844,7 +844,8 @@ private:
     /// Whether an improved computer's colony for a crop none of its islands grows
     /// (colony_crop_missing) waits for its gold, with no plan keeping it yet.
     [[nodiscard]] bool luxury_waits(AiPlayer& p);
-    /// Whether `field` grows fully on the island of `c` and its people go without `good` now.
+    /// Whether `field` grows fully on the island of `c` and its people go without `good` now: used
+    /// beyond what is made (goods_short), more than the stock covers while the chain delivers.
     [[nodiscard]] bool luxury_short_crop(const AiPlayer& p, const City& c, std::uint8_t field, std::uint8_t good) const;
     /// Whether the current city's island grows fully a luxury crop luxury() plants whose good the
     /// computer's people go without now (goods_short).

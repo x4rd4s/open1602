@@ -23,10 +23,11 @@ constexpr std::uint64_t kRefreshMs = 5100;  // a refresh every 5.1 s
 constexpr std::size_t kLockFromClass = 2;   // the citizens
 constexpr std::int64_t kLockMoney = 0;      // improved computers lock the material only in debt
 constexpr std::int64_t kUnlockMoney = 3000;
-constexpr std::int64_t kLeanMoney = -1000;      // improved computers below this cut running costs
-constexpr std::int64_t kShedMoney = -5000;      // ... and below this tear down producers nobody needs,
-constexpr std::size_t kShedPerVisit = 4;        // ... a few per visit of the city
-constexpr std::int64_t kShedFarMoney = -10000;  // ... and below this whatever they refund
+constexpr std::int64_t kLeanMoney = -1000;       // improved computers below this cut running costs
+constexpr std::int64_t kShedMoney = -5000;       // ... and below this tear down producers nobody needs,
+constexpr std::uint64_t kSecondsPerMinute = 60;  // game seconds of a building's cycle per minute
+constexpr std::size_t kShedPerVisit = 4;         // ... a few per visit of the city
+constexpr std::int64_t kShedFarMoney = -10000;   // ... and below this whatever they refund
 
 /// The luxury crops of luxury(), in the order it plants them: slot, field and the good the home
 /// city must lack.
@@ -3161,7 +3162,39 @@ bool Engine::luxury_short_here(const AiPlayer& p) const {
 }
 
 bool Engine::luxury_short_crop(const AiPlayer& p, const City& c, std::uint8_t field, std::uint8_t good) const {
-    return plants_on(fertility(c.island, field), false, true, true, false) && goods_short(p.player, good) != 0;
+    if (!plants_on(fertility(c.island, field), false, true, true, false)) {
+        return false;
+    }
+    const std::uint32_t short_of = goods_short(p.player, good);
+    if (short_of == 0) {
+        return false;
+    }
+    // Open1602 (p52, lever S's stock_covers): gone without once the cities' stock no longer covers
+    // what they use beyond what they make for as long as the crop's chain takes to deliver (its
+    // producers' cycles). Not before: spices and cocoa were planted with 138 t and 35 t in store
+    // (x3 o4-707-p1 P1). Not only once dry: the vineyards then came too late (l3 g8-101-p1 P1).
+    std::uint8_t mid = 0;  // the raw material of a two-step chain
+    if (field == ware::kTobaccoField) {
+        mid = ware::kTobacco;
+    } else if (field == ware::kCottonField) {
+        mid = ware::kWool;
+    } else if (field == ware::kSugarField) {
+        mid = ware::kSugar;
+    }
+    std::uint64_t seconds = 0;
+    if (const assets::BuildingType* b = producer(mid != 0 ? mid : good, field)) {
+        seconds += b->interval;
+    }
+    if (mid != 0) {
+        if (const assets::BuildingType* b = producer(good, mid)) {
+            seconds += b->interval;
+        }
+    }
+    std::uint64_t held = 0;
+    for (const City& o : m_world.cities()) {
+        held += o.owner == p.player ? o.stock(good) : 0;
+    }
+    return !stock_covers(short_of, held, (seconds + kSecondsPerMinute - 1) / kSecondsPerMinute);
 }
 
 bool Engine::luxury_eligible(const AiPlayer& p, std::uint8_t slot) const {

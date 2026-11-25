@@ -45,3 +45,5 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 4 | engine/sim/src/ai/ai_planner.cpp | derived from: the luxury count of the Main2 order (computer_orders.cpp kMain2Order, luxury(4, kAlways)) that luxury_first asks ahead of the list
 kLuxuryCrops | engine/sim/src/ai/ai_planner.cpp | derived from: luxury()'s own crop table, moved out so that luxury_short_here reads the same one
 LuxuryCrop | engine/sim/src/ai/ai_planner.cpp | derived from: the row type of luxury()'s crop table
+60 | engine/sim/src/ai/ai_planner.cpp | derived from: kSecondsPerMinute, the seconds of a game minute, to turn a producer's Interval (game seconds) into minutes for stock_covers
+kSecondsPerMinute | engine/sim/src/ai/ai_planner.cpp | derived from: the name of the seconds of a game minute (unit conversion only)
