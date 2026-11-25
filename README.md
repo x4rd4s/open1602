@@ -9,6 +9,12 @@ opponents, in the original's menus and side panel. Original savegames load and c
 On top of that Open1602 brings:
 
 - **Fixes** for the original's bugs; where they change the game, the original's behaviour is a setting.
+- **Game settings** to tailor each game: economy, limits, disasters, the world and its islands, the
+  opponents, with presets for the original's rules and Open1602's defaults.
+- **New balancing** that keeps long games and big worlds playable, with the original's values one
+  click away.
+- **Detailed statistics:** a goods balance with production, trade and consumption per good, city and
+  island over time, and how long each stock lasts.
 - **Multiplayer** for up to 12 players over the network, with a lobby, a search for games on the local
   network and host migration.
 - **Modern display:** any window size, full screen, free zoom, a scalable interface, freely assignable
