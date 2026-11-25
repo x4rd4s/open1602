@@ -124,6 +124,9 @@ TEST_CASE("ai budget: the flows carry a plan the gold in hand alone refuses") {
     CHECK(poor.flows_carry(colony));
     // A loss a minute is not carried, whatever the gold.
     CHECK(!budget(731, -40, 22).flows_carry(colony));
+    // Nor a debt: the gold owed is not carried with the cost.
+    CHECK(!budget(-20000, 47, 22).flows_carry(colony));
+    CHECK(!budget(-1, 47, 22).flows_carry(colony));
 }
 
 }  // namespace o1602::sim::ai

@@ -37,8 +37,10 @@ Refusal Budget::refusal(const Commitment& c) const noexcept {
 }
 
 bool Budget::flows_carry(const Commitment& c) const noexcept {
+    // The flows carry the plan's cost, not a debt: gold owed stays owed and must be earned back
+    // as well (p64: a ship set out with the cash at -20,000).
     Budget held = *this;
-    held.cash = reserved + c.cost + cushion();
+    held.cash = reserved + c.cost + cushion() + std::min<std::int64_t>(cash, 0);
     return held.refusal(c) == Refusal::None;
 }
 
