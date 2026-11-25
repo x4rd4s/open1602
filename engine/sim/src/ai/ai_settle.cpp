@@ -1161,6 +1161,11 @@ bool Engine::crop_dry(const AiPlayer& p, std::uint8_t field) const {
             return false;
         }
     }
+    return good_dry(p, good);
+}
+
+bool Engine::good_dry(const AiPlayer& p, std::uint8_t good) const {
+    // A city of the computer uses the good and holds none of it.
     return std::ranges::any_of(m_world.cities(), [&](const City& c) {
         return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
     });

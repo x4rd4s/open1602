@@ -227,6 +227,10 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
     const auto taxes = [&](std::size_t k, std::uint64_t people) -> std::int64_t {
         return class_taxes(*home, k, people);
     };
+    // Open1602 (p62): for a good a city goes without (good_dry), the colony is for the shortage,
+    // not for the rise: the risers' other goods are not counted against it. Counted, a colony for
+    // a dry good weighed -700 a minute, and its flows never carried it.
+    const bool dry = rivals() && good_dry(p, good);
     std::int64_t value = 0;
     for (std::size_t k = 1; k < classes.size() && k - 1 < home->inhabitants.size(); ++k) {
         if (ascent_extra(*home, k, good) == 0) {
@@ -235,7 +239,7 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
         const std::uint64_t risers = home->inhabitants[k - 1] / 2;
         value += taxes(k, risers) - taxes(k - 1, risers);
         for (const assets::ResidentClass::Need& n : classes[k].needs) {
-            if (n.ware == good) {
+            if (dry || n.ware == good) {
                 continue;
             }
             const std::uint32_t more = ascent_extra(*home, k, n.ware);
