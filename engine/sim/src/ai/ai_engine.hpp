@@ -411,7 +411,7 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
-    /// Improved computers (t67): the good a crop's fields give, 0 for none of the luxury crops.
+    /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
     [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
     /// Whether it saves for a crop's colony: its good is `dry` in a city and the budget's flows
     /// would carry the colony with the gold in hand (Budget::flows_carry).

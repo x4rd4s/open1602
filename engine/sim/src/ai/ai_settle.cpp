@@ -1597,8 +1597,8 @@ bool Engine::crop_dry(const AiPlayer& p, std::uint8_t field) const {
     if (good == 0) {
         return false;
     }
-    for (const std::uint8_t other : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kSugarField,
-                                     ware::kCocoaField, ware::kCottonField}) {
+    for (const std::uint8_t other :
+         {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kSugarField, ware::kCocoaField}) {
         if (crop_good(other) == good && crop_available(p, other)) {
             return false;
         }
@@ -1619,8 +1619,6 @@ std::uint8_t Engine::crop_good(std::uint8_t field) noexcept {
             return ware::kAlcohol;
         case ware::kCocoaField:
             return ware::kCocoa;
-        case ware::kCottonField:
-            return ware::kCloth;
         default:
             return 0;
     }

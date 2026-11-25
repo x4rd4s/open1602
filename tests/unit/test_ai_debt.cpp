@@ -217,4 +217,5 @@ TEST_CASE("ai colony: a computer saves from its surplus for a lacking crop its f
     CHECK(Engine::saved_after(400, 10, -20, 3000) == 400);   // a loss saves nothing
     CHECK(Engine::crop_good(assets::ware::kSugarField) == assets::ware::kAlcohol);
     CHECK(Engine::crop_good(0) == 0);
+    CHECK(Engine::crop_good(assets::ware::kCottonField) == 0);  // opens no class
 }
