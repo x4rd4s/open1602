@@ -2999,10 +2999,12 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
                     ui::tr("editor.scenario.note_short"));
     }
     const std::int32_t quarter = (m_w - 3 * kGap) / 4;
-    f.button(kPackagesPage, Rect{m_x, foot, quarter, kButtonH},
+    // The packages and saving to one share what closing leaves, so that "Packages (n)" fits.
+    const std::int32_t half = (m_w - quarter - 3 * kGap) / 2;
+    f.button(kPackagesPage, Rect{m_x, foot, half, kButtonH},
              ui::tr("editor.packages.button", {count(model.packages.size())}));
-    f.button(kPackageSavePage, Rect{m_x + quarter + kGap, foot, 2 * quarter + kGap, kButtonH},
-             ui::tr("editor.package_save.button"));
+    offer_tip(Rect{m_x, foot, half, kButtonH}, ui::tr("editor.packages.button.tip"));
+    f.button(kPackageSavePage, Rect{m_x + half + kGap, foot, half, kButtonH}, ui::tr("editor.package_save.button"));
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
 }
 

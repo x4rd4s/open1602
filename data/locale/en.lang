@@ -1617,6 +1617,7 @@ editor.attitude.first_random = at random
 editor.attitude.first_fixed = Island {1}
 editor.attitude.first_gone = island gone
 editor.packages.button = Packages ({1})
+editor.packages.button.tip = The packages (mods) this scenario needs, and whether they are installed here. A click lists them.
 editor.packages.title = Packages of the scenario
 editor.packages.note = The scenario needs the packages that were turned on when it was made. Turn packages on or off under Mods in the main menu, then open the map again.
 editor.packages.none = None: the scenario plays with the packages turned on at the time.
