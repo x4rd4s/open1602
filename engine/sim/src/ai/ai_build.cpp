@@ -195,12 +195,9 @@ std::int32_t Engine::road_three(AiPlayer& p, std::int32_t x, std::int32_t y, std
     if (placed >= 7) {
         if (CityPlan* r = current_plan(p)) {
             for (std::size_t i = 0; i < r->slots.size(); ++i) {
-                // Open1602: roads open no beach for a tower; a tower given up stays given up.
-                if (!classic() && (i == kSlotWoodTower || i == kSlotStoneTower || i == kSlotPirateTower ||
-                                   (i == kSlotIronMine && r->slots[i].fail_level >= 2))) {
-                    continue;  // nor a site at a vein whose search failed through and through
+                if (road_resets(!classic(), i, r->slots[i].fail_level)) {
+                    r->slots[i].attempts = 0;
                 }
-                r->slots[i].attempts = 0;
             }
             r->flags &= ~city_flag::kMarket;
         }
@@ -614,6 +611,19 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
     }
 }
 
+bool Engine::road_resets(bool improved, std::size_t slot, std::uint16_t fail_level) noexcept {
+    // Open1602: roads open no beach for a tower; a tower given up stays given up. Nor a site at a
+    // vein whose search failed through and through, nor a doctor's after a house pulled down for
+    // it could not take it (t70: the road reset the slot 5 s later and a second house went).
+    if (!improved) {
+        return true;
+    }
+    if (slot == kSlotWoodTower || slot == kSlotStoneTower || slot == kSlotPirateTower) {
+        return false;
+    }
+    return !((slot == kSlotIronMine || slot == kSlotKlinik) && fail_level >= 2);
+}
+
 bool Engine::swap_pays(std::int32_t houses, std::uint64_t covered, std::uint32_t lost,
                        std::int32_t min_houses) noexcept {
     return houses >= min_houses && covered > lost;
@@ -760,7 +770,9 @@ bool Engine::doctor_swap(AiPlayer& p, const PublicTask& def) {
         if (!swap_pays(count, covered, lost, def.min_houses)) {
             continue;
         }
-        if (best.x < 0 || swap_prefers(count, lost, best.houses, best.lost)) {
+        // Only where the doctor fits once the house is gone, tested as the build will test it
+        // (t70: a soldier stood on the footprint, and the house went for no doctor).
+        if ((best.x < 0 || swap_prefers(count, lost, best.houses, best.lost)) && can_replace(p, *b, x0, y0, w, h)) {
             best = Best{x0, y0, count, lost};
         }
     }

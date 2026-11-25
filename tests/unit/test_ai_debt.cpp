@@ -259,6 +259,17 @@ TEST_CASE("ai doctor: with no site, a house makes way for a doctor where it reac
     CHECK(!Engine::swap_prefers(10, 40 * 64, 10, 5 * 64));
 }
 
+TEST_CASE("ai doctor: a long road does not open the doctor again after a house went for none") {
+    // t70: the road reset the slot 5 s after the error, and a second house went.
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotKlinik, 2));
+    CHECK(Engine::road_resets(true, sim::ai::kSlotKlinik, 1));
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotIronMine, 2));
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotWoodTower, 0));
+    CHECK(Engine::road_resets(true, sim::ai::kSlotHouses, 2));
+    CHECK(Engine::road_resets(false, sim::ai::kSlotKlinik, 2));  // the original resets every slot
+    CHECK(Engine::road_resets(false, sim::ai::kSlotWoodTower, 0));
+}
+
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
     // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
     CHECK(Engine::citizens_rise(true, true, false));

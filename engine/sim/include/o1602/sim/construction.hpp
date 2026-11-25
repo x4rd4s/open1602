@@ -312,6 +312,13 @@ struct MovablePiece {
 [[nodiscard]] BuildPlan plan_move(World& world, const assets::BuildingTable& buildings, const MoveOrder& order,
                                   bool pay);
 
+/// plan_build() of an order as if the building with its origin at `gone` were pulled down first
+/// (its tiles show their ground, as after a demolition): whether a building fits in its place
+/// before the old one goes. The world is changed while planning and put back exactly as it was.
+/// Without a building there it is plan_build().
+[[nodiscard]] BuildPlan plan_replace(World& world, const assets::BuildingTable& buildings, const BuildOrder& order,
+                                     TilePos gone);
+
 struct MoveResult {
     bool moved = false;
     BuildBill paid;    ///< Moving::Rebuild: the costs at the new place

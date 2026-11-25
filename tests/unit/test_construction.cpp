@@ -1196,6 +1196,34 @@ TEST_CASE("construction: a soldier on the footprint stops a building, one beside
     CHECK(plan.placed == 1);
 }
 
+TEST_CASE("construction: a building planned in another's place sees its ground, and the map stays as it was") {
+    // t70: a house was pulled down for a doctor a soldier then stood in the way of.
+    Island island;
+    island.found();
+    REQUIRE(island.build({{kHouse, 8, 13, 0, 0}}).placed == 1);
+    const assets::BuildingType* house = island.at(8, 13);
+    sim::BuildOrder order;
+    order.player = 0;
+    order.island = 0;
+    order.items.assign(1, sim::BuildItem{kHouse, 8, 13, 0, 0});
+    CHECK(sim::plan_build(island.world, island.buildings, order).items[0].refusal == sim::BuildRefusal::Terrain);
+    CHECK(sim::plan_replace(island.world, island.buildings, order, {8, 13}).items[0].refusal ==
+          sim::BuildRefusal::None);
+    CHECK(island.at(8, 13) == house);
+    CHECK(island.at(9, 14) == house);
+    sim::Soldier s;
+    s.place_cell(2 * (10 + 9), 2 * (10 + 14));  // the island lies at world tile (10, 10)
+    s.owner = 1;
+    island.world.add_soldier(s);
+    CHECK(sim::plan_replace(island.world, island.buildings, order, {8, 13}).items[0].refusal ==
+          sim::BuildRefusal::UnitInTheWay);
+    CHECK(island.at(8, 13) == house);
+    // No building there: as plan_build.
+    order.items[0].x = 12;
+    CHECK(sim::plan_replace(island.world, island.buildings, order, {12, 13}).items[0].refusal ==
+          sim::BuildRefusal::None);
+}
+
 TEST_CASE("construction: no watchtower within its range and two tiles of an enemy soldier") {
     Island island;
     island.found();

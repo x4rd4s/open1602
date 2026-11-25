@@ -432,6 +432,10 @@ public:
     /// Of two such houses, the one whose doctor reaches more houses, of as many the one with fewer people.
     [[nodiscard]] static bool swap_prefers(std::int32_t houses, std::uint32_t lost, std::int32_t best_houses,
                                            std::uint32_t best_lost) noexcept;
+    /// Whether a long new road (road_three) lets a slot search its sites again. Improved
+    /// computers: not a tower, nor an iron mine or a doctor whose search failed through (a doctor
+    /// fails through after a house pulled down for it could not take it, doctor_swap).
+    [[nodiscard]] static bool road_resets(bool improved, std::size_t slot, std::uint16_t fail_level) noexcept;
     /// Improved computers: whether its cities lack a crop's good for a war: used beyond what they
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
@@ -918,6 +922,9 @@ private:
     bool advance_cursor(AiPlayer& p, std::int32_t limit);
     [[nodiscard]] bool can_place(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
                                  std::int32_t w, std::int32_t h) const;
+    /// can_place() as if the building with its origin at (x, y) were pulled down first.
+    [[nodiscard]] bool can_replace(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                   std::int32_t w, std::int32_t h);
     bool search_houses(AiPlayer& p);
     bool search_workshop(AiPlayer& p, bool cannons);
     bool search_stonemason(AiPlayer& p);
