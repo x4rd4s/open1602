@@ -657,7 +657,6 @@ private:
     /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
     [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
     [[nodiscard]] bool crop_dry(const AiPlayer& p, std::uint8_t field) const;
-    [[nodiscard]] bool good_dry(const AiPlayer& p, std::uint8_t good) const;
     /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
     /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
     /// home city's houses rise into. Ranks only; it refuses nothing.
