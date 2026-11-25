@@ -100,8 +100,9 @@ struct WarGold {
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
-struct Cheats;   // ai_tables.hpp
-struct NeedDef;  // ai_tables.hpp
+struct Cheats;      // ai_tables.hpp
+struct NeedDef;     // ai_tables.hpp
+struct PublicTask;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
@@ -421,6 +422,13 @@ public:
     [[nodiscard]] static bool lacks_doctor(const House& h, const City& c) noexcept;
     /// Whether `lacking` such houses open the doctor again: as many as its site must newly cover.
     [[nodiscard]] static bool doctor_gap(std::int32_t lacking, std::int32_t min_houses) noexcept;
+    /// Whether a doctor in a house's place pays: it reaches `houses` without one, at least the
+    /// `min_houses` of its site, whose people (`covered`) outnumber the house's (`lost`).
+    [[nodiscard]] static bool swap_pays(std::int32_t houses, std::uint64_t covered, std::uint32_t lost,
+                                        std::int32_t min_houses) noexcept;
+    /// Of two such houses, the one whose doctor reaches more houses, of as many the one with fewer people.
+    [[nodiscard]] static bool swap_prefers(std::int32_t houses, std::uint32_t lost, std::int32_t best_houses,
+                                           std::uint32_t best_lost) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -1443,6 +1451,10 @@ private:
     std::uint16_t slot_fail(AiPlayer& p, std::uint8_t slot);
     [[nodiscard]] std::int32_t slot_present(const AiPlayer& p, std::uint8_t slot) const;
     std::size_t demolish_tile(AiPlayer& p, std::int32_t x, std::int32_t y);  ///< buildings removed
+    /// Open1602: with no site for a doctor (task_public), pull down the city's house in whose place
+    /// it reaches the most houses without one, the doctor walking to them, and build it there;
+    /// true if it did.
+    bool doctor_swap(AiPlayer& p, const PublicTask& def);
 
     Simulation& m_sim;
     World& m_world;

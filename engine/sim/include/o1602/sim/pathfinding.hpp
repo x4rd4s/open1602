@@ -16,6 +16,7 @@
 // original's.
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -77,6 +78,16 @@ namespace building_kind = kind;
 
 /// Whether a figure of `walk` class may walk on this tile (without a building it enters).
 [[nodiscard]] bool walkable(const assets::BuildingType& building, const MapCell& cell, WalkClass walk) noexcept;
+
+/// The building of tile (x, y) of `map` if a figure of `walk` class may walk on it, as
+/// PathFinder::begin sets the tiles of a land or road search; nothing off the map or blocked.
+[[nodiscard]] const assets::BuildingType* walk_tile(const IslandMap& map, const assets::BuildingTable& buildings,
+                                                    std::int32_t x, std::int32_t y, WalkClass walk) noexcept;
+
+/// The four tiles a figure can enter a target building from. PathFinder::expand allows a
+/// diagonal step only between two walkable tiles, and a target's tiles are goals, not walkable:
+/// the corner tiles never lead in.
+inline constexpr std::array<TilePos, 4> kEntrySteps{{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
 
 /// Search state for one figure; keep one and reuse it, it allocates only while it grows.
 class PathFinder {

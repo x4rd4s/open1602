@@ -231,6 +231,17 @@ TEST_CASE("ai doctor: the doctor opens again only for as many houses as its site
     CHECK(!Engine::doctor_gap(0, 0));
 }
 
+TEST_CASE("ai doctor: with no site, a house makes way for a doctor where it reaches the most houses") {
+    // Merlin, 2026-11-25: the people of the house pulled down are soon made up by the doctor.
+    CHECK(Engine::swap_pays(8, 8 * 20 * 64, 40 * 64, 8));
+    CHECK(!Engine::swap_pays(7, 7 * 20 * 64, 40 * 64, 8));  // fewer than its site must cover
+    CHECK(!Engine::swap_pays(8, 40 * 64, 40 * 64, 8));      // no more people covered than lost
+    // Coverage first, then the fewer people lost; no class is spared (a noble's house may go).
+    CHECK(Engine::swap_prefers(12, 40 * 64, 10, 5 * 64));
+    CHECK(Engine::swap_prefers(10, 5 * 64, 10, 40 * 64));
+    CHECK(!Engine::swap_prefers(10, 40 * 64, 10, 5 * 64));
+}
+
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
     // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
     CHECK(Engine::citizens_rise(true, true, false));

@@ -7,6 +7,7 @@
 #include <array>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
@@ -591,6 +592,9 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
     r->flags |= def->flag;
     const Search s = p.search;
     if (s.best < 1 || s.extra < def->min_houses) {
+        if (rivals() && def->slot == kSlotKlinik && doctor_swap(p, *def)) {
+            return;
+        }
         if (s.best == 0 && slot_fail(p, def->slot) == 0 && def->roads_on_fail) {
             push(p, kRoads, true);
         } else if (s.best != 0 && !classic()) {
@@ -608,6 +612,172 @@ void Engine::task_public(AiPlayer& p, std::uint8_t task) {
         log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, def->id, s.best_x0, s.best_y0);
         slot_fail(p, def->slot);
     }
+}
+
+bool Engine::swap_pays(std::int32_t houses, std::uint64_t covered, std::uint32_t lost,
+                       std::int32_t min_houses) noexcept {
+    return houses >= min_houses && covered > lost;
+}
+
+bool Engine::swap_prefers(std::int32_t houses, std::uint32_t lost, std::int32_t best_houses,
+                          std::uint32_t best_lost) noexcept {
+    return houses > best_houses || (houses == best_houses && lost < best_lost);
+}
+
+bool Engine::doctor_swap(AiPlayer& p, const PublicTask& def) {
+    // Open1602 (Merlin, 2026-11-25): with no site for a doctor that serves enough houses, an improved
+    // computer pulls down one of its houses and builds the doctor in its place, where it covers the
+    // most houses without one: a doctor is the size of a house, and the people lost are soon made
+    // up by the plague it stops. A house counts only where the doctor can walk to one of its sides
+    // (p46: houses shut in by others stayed sick under a doctor in reach), and the houses it covers
+    // must hold more people than the one it replaces. Of two sites that cover as many, the one that
+    // costs fewer people. In p49b, 560 doctor searches found no site and 1,201 too few houses.
+    const assets::BuildingType* b = by_id(def.id);
+    const City* c = current_city(p);
+    if (b == nullptr || c == nullptr) {
+        return false;
+    }
+    const IslandMap& map = island_of(p.island).map;
+    const auto& houses = m_world.houses();
+    const std::vector<std::uint8_t>& circle = circle_table(b->radius);
+    const auto radius = static_cast<std::int32_t>(b->radius);
+    const auto gap = [](std::int32_t origin, std::int32_t size, std::int32_t house) {
+        const std::int32_t w = size - 1;
+        const std::int32_t first = origin + w / 2;
+        const std::int32_t last = first + (w & 1);
+        const std::int32_t house_last = house + 1;
+        if (house_last < first) {
+            return first - house_last;
+        }
+        if (house > last) {
+            return house - last;
+        }
+        return 0;
+    };
+    const auto w = static_cast<std::int32_t>(b->size_x);
+    const auto h = static_cast<std::int32_t>(b->size_y);
+    // The tiles the doctor walks to from a site at (x0, y0): a flood over the land figures' tiles
+    // from the site's sides, within its reach.
+    const std::int32_t span = 2 * (radius + 2) + std::max(w, h);
+    std::vector<std::uint8_t> reached(static_cast<std::size_t>(span) * static_cast<std::size_t>(span));
+    std::vector<TilePos> open;
+    std::int32_t bx = 0;
+    std::int32_t by = 0;
+    const auto index = [&](std::int32_t x, std::int32_t y) -> std::optional<std::size_t> {
+        const std::int32_t i = x - bx;
+        const std::int32_t j = y - by;
+        if (i < 0 || j < 0 || i >= span || j >= span) {
+            return std::nullopt;
+        }
+        return static_cast<std::size_t>(j) * static_cast<std::size_t>(span) + static_cast<std::size_t>(i);
+    };
+    const auto inside = [&](std::int32_t x, std::int32_t y, std::int32_t x0, std::int32_t y0) {
+        return x >= x0 && x < x0 + w && y >= y0 && y < y0 + h;
+    };
+    const auto flood = [&](std::int32_t x0, std::int32_t y0) {
+        bx = x0 - radius - 2;
+        by = y0 - radius - 2;
+        std::ranges::fill(reached, std::uint8_t{0});
+        open.clear();
+        const auto visit = [&](std::int32_t x, std::int32_t y) {
+            const auto k = index(x, y);
+            if (!k || reached[*k] != 0 || inside(x, y, x0, y0) ||
+                walk_tile(map, m_buildings, x, y, WalkClass::Land) == nullptr) {
+                return;
+            }
+            reached[*k] = 1;
+            open.push_back(TilePos{x, y});
+        };
+        for (std::int32_t y = y0; y < y0 + h; ++y) {
+            for (std::int32_t x = x0; x < x0 + w; ++x) {
+                for (const TilePos d : kEntrySteps) {
+                    visit(x + d.x, y + d.y);
+                }
+            }
+        }
+        while (!open.empty()) {
+            const TilePos t = open.back();
+            open.pop_back();
+            for (const TilePos d : kEntrySteps) {
+                visit(t.x + d.x, t.y + d.y);
+            }
+        }
+    };
+    const auto walked_to = [&](const House& o) {
+        for (std::int32_t y = o.y; y < o.y + 2; ++y) {
+            for (std::int32_t x = o.x; x < o.x + 2; ++x) {
+                for (const TilePos d : kEntrySteps) {
+                    const auto k = index(x + d.x, y + d.y);
+                    if (k && reached[*k] != 0) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+    struct Best {
+        std::int32_t x = -1;
+        std::int32_t y = -1;
+        std::int32_t houses = 0;
+        std::uint32_t lost = 0;
+    } best;
+    for (const House& cand : houses) {
+        if (cand.island != p.island || cand.city != p.city) {
+            continue;
+        }
+        const MapCell& cell = map.top(cand.x, cand.y);
+        const assets::BuildingType* type = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
+        // In the house's place exactly: of the house's size.
+        if (type == nullptr || type->size_x != b->size_x || type->size_y != b->size_y) {
+            continue;
+        }
+        const std::int32_t x0 = cand.x;
+        const std::int32_t y0 = cand.y;
+        std::int32_t count = 0;
+        std::uint64_t covered = 0;
+        bool flooded = false;
+        for (const House& o : houses) {
+            if (&o == &cand || !lacks_doctor(o, *c)) {
+                continue;
+            }
+            const std::int32_t dx = gap(x0, w, o.x);
+            const std::int32_t dy = gap(y0, h, o.y);
+            if (dy > radius || dx > circle[static_cast<std::size_t>(dy)]) {
+                continue;
+            }
+            if (!flooded) {
+                flood(x0, y0);
+                flooded = true;
+            }
+            if (walked_to(o)) {
+                ++count;
+                covered += o.inhabitants64;
+            }
+        }
+        const std::uint32_t lost = cand.inhabitants64;
+        if (!swap_pays(count, covered, lost, def.min_houses)) {
+            continue;
+        }
+        if (best.x < 0 || swap_prefers(count, lost, best.houses, best.lost)) {
+            best = Best{x0, y0, count, lost};
+        }
+    }
+    if (best.x < 0) {
+        return false;
+    }
+    log(p, "city %u/%u: pulls down the house at %d,%d for a doctor that reaches %d houses", p.island, p.city, best.x,
+        best.y, best.houses);
+    if (demolish_tile(p, best.x, best.y) == 0) {
+        return false;
+    }
+    if (build(p, {BuildItem{def.id, best.x, best.y, 0, 0}}, false) == 0) {
+        log(p, "city %u/%u: building %u at %d,%d could not be built", p.island, p.city, def.id, best.x, best.y);
+        return false;
+    }
+    slot_built(p, def.slot);
+    slot_ok(p, def.slot);
+    return true;
 }
 
 void Engine::task_market(AiPlayer& p) {
