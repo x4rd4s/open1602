@@ -369,6 +369,8 @@ struct Settlement {
     std::uint8_t plan_crop = 0;
     std::uint64_t plan_ms = 0;    ///< game time the plan was made
     std::uint32_t plan_ship = 0;  ///< the ship kept for it (no supply runs), 0 none yet
+    /// Open1602: game time its ship began to wait at the site for the Kontor's gold, 0 none.
+    std::uint64_t wait_ms = 0;
 };
 
 /// Settlement::plan_crop of a colony for food or cloth its home island has no room for.

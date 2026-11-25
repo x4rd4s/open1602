@@ -414,6 +414,15 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
+    [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
+    /// Improved computers (p62): a colony for a crop whose good is `dry` in a city sets out when
+    /// the budget's flows carry it (Budget::flows_carry), without the gold in hand now; its ship
+    /// waits at the site for the Kontor's gold.
+    [[nodiscard]] static bool sails_for(bool improved, bool dry, bool carried) noexcept;
+    /// Whether a ship that waited at a site for the Kontor's gold gives up: after `waited` ms, more
+    /// than the budget's `horizon` minutes.
+    [[nodiscard]] static bool wait_ends(std::uint64_t waited, std::uint32_t horizon) noexcept;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
@@ -647,6 +656,7 @@ private:
     [[nodiscard]] std::int64_t chain_upkeep(const AiPlayer& p, std::uint8_t crop) const;
     /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
     [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
+    [[nodiscard]] bool crop_dry(const AiPlayer& p, std::uint8_t field) const;
     /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
     /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
     /// home city's houses rise into. Ranks only; it refuses nothing.

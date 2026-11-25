@@ -103,6 +103,9 @@ struct Budget {
     [[nodiscard]] bool allows(const Commitment& c) const noexcept;
     /// The first check that refuses the plan.
     [[nodiscard]] Refusal refusal(const Commitment& c) const noexcept;
+    /// Whether its flows carry the plan once the gold for it is in hand: refusal() with the cost
+    /// and the cushion beside what is reserved, so that only the gold now is left out.
+    [[nodiscard]] bool flows_carry(const Commitment& c) const noexcept;
 };
 
 /// G4b: a crop a colony may be founded for, in the original's order of motives.

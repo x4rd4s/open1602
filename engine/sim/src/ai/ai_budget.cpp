@@ -36,6 +36,12 @@ Refusal Budget::refusal(const Commitment& c) const noexcept {
     return at(c, horizon) < keep ? Refusal::Horizon : Refusal::None;
 }
 
+bool Budget::flows_carry(const Commitment& c) const noexcept {
+    Budget held = *this;
+    held.cash = reserved + c.cost + cushion();
+    return held.refusal(c) == Refusal::None;
+}
+
 bool Budget::allows(const Commitment& c) const noexcept {
     return refusal(c) == Refusal::None;
 }
@@ -239,27 +245,6 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
     }
     return value;
 }
-
-namespace {
-
-/// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
-std::uint8_t crop_good(std::uint8_t crop) {
-    switch (crop) {
-        case ware::kWineField:
-        case ware::kSugarField:
-            return ware::kAlcohol;
-        case ware::kTobaccoField:
-            return ware::kTobaccoGoods;
-        case ware::kSpiceField:
-            return ware::kSpices;
-        case ware::kCocoaField:
-            return ware::kCocoa;
-        default:
-            return 0;
-    }
-}
-
-}  // namespace
 
 Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const {
     // A colony costs its gold now and, a minute, what one of the computer's colonies costs beyond

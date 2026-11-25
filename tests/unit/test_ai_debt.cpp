@@ -236,3 +236,15 @@ TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone
     CHECK(!Engine::gold_exit(true, false, true));  // not rich
     CHECK(!Engine::gold_exit(false, false, true));
 }
+
+TEST_CASE("ai colony: a colony for a dry good sets out on its flows, and its ship waits no longer than the horizon") {
+    // p62: saved gold never stayed in hand; a player sails and builds the Kontor once the gold is there.
+    CHECK(Engine::sails_for(true, true, true));
+    CHECK(!Engine::sails_for(true, false, true));  // not dry
+    CHECK(!Engine::sails_for(true, true, false));  // the flows would not carry it
+    CHECK(!Engine::sails_for(false, true, true));  // the original's computers: as before
+    CHECK(!Engine::wait_ends(30 * 60'000, 30));
+    CHECK(Engine::wait_ends(30 * 60'000 + 1, 30));
+    CHECK(Engine::crop_good(assets::ware::kSugarField) == assets::ware::kAlcohol);
+    CHECK(Engine::crop_good(assets::ware::kCottonField) == 0);  // opens no class
+}
