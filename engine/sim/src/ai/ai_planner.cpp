@@ -93,6 +93,42 @@ bool Engine::peaceful(AiPlayer& p) {
     return true;
 }
 
+void Engine::log_disasters(const AiPlayer& p, const City& c) {
+    // Only the log: the fires and plagues burning in the city, and its inhabitants, whenever their
+    // number changes, so that a measurement can count what they cost.
+    if (!rivals() || !logging()) {
+        return;
+    }
+    std::uint32_t fires = 0;
+    std::uint32_t plagues = 0;
+    const IslandMap& map = island_of(c.island).map;
+    for (const Disaster& d : m_world.disasters()) {
+        if (d.island == c.island && map.contains(d.x, d.y) && map.top(d.x, d.y).city == c.index) {
+            (d.kind == Disaster::Kind::Fire ? fires : plagues) += 1;
+        }
+    }
+    const std::uint32_t key = (std::uint32_t{c.island} << 8U) | c.index;
+    auto it = std::ranges::find(m_disaster_logged, key, &std::pair<std::uint32_t, std::uint32_t>::first);
+    const std::uint32_t now = (fires << 16U) | plagues;
+    if (it == m_disaster_logged.end()) {
+        if (now == 0) {
+            return;
+        }
+        m_disaster_logged.emplace_back(key, 0);
+        it = std::prev(m_disaster_logged.end());
+    }
+    if (it->second != now) {
+        it->second = now;
+        // With the fire brigades (Brunnen) and doctors (Klinik) its plan counts.
+        const auto plan =
+            std::ranges::find_if(p.plans, [&](const CityPlan& r) { return r.island == c.island && r.city == c.index; });
+        const std::uint32_t brigades = plan != p.plans.end() ? plan->slots[kSlotBrunnen].count : 0U;
+        const std::uint32_t doctors = plan != p.plans.end() ? plan->slots[kSlotKlinik].count : 0U;
+        log(p, "city %u/%u: disasters: %u fires, %u plagues (inhabitants %llu, fire brigades %u, doctors %u)", c.island,
+            c.index, fires, plagues, static_cast<unsigned long long>(population(c)), brigades, doctors);
+    }
+}
+
 void Engine::refresh_city(AiPlayer& p) {
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
@@ -104,6 +140,7 @@ void Engine::refresh_city(AiPlayer& p) {
         shed_public(p, *c);
         tax_rates(p, *c);
         material_lock(p, *c);
+        log_disasters(p, *c);
     }
     p.refresh_ms = now_ms();
     // The original's steady money and subsidy (cheats), on every difficulty; improved computers

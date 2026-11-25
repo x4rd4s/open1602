@@ -676,6 +676,8 @@ private:
     // ---- ai_planner.cpp ----
     void task_develop(AiPlayer& p);
     void refresh_city(AiPlayer& p);
+    /// Logs the fires and plagues of the city when they change (only the log).
+    void log_disasters(const AiPlayer& p, const City& c);
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);
@@ -1505,6 +1507,8 @@ private:
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
+    /// Per island and city: the fires and plagues logged at the last look (only the log).
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> m_disaster_logged;
     /// Per player, the yard sites of the running search refused because the yard's carriers would
     /// reach no store (only the log).
     std::vector<std::uint32_t> m_yard_unreached;
