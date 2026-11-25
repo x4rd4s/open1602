@@ -365,6 +365,9 @@ public:
     /// Whether a main city asks for its luxury crops ahead of its list: an improved computer whose
     /// people go without a good that grows fully on the city's island.
     [[nodiscard]] static bool luxury_first(bool improved, bool short_here) noexcept;
+    /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
+    /// (an improved computer) earns.
+    [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
     [[nodiscard]] static bool may_add_unit(bool below_core, std::int64_t money, std::int32_t next, std::int32_t civil,
                                            std::int32_t budget) noexcept;
     using WareSet = std::array<bool, 256>;

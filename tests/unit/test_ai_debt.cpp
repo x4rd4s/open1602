@@ -189,3 +189,11 @@ TEST_CASE("ai stage: a main city asks for its luxury crop first while its people
     CHECK(!Engine::luxury_first(true, false));
     CHECK(!Engine::luxury_first(false, true));  // the original's computers keep their lists
 }
+
+TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
+    // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
+    CHECK(Engine::citizens_rise(true, true, false));
+    CHECK(Engine::citizens_rise(true, false, true));    // earning: moves on
+    CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
+    CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
+}
