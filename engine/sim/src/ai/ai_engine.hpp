@@ -414,6 +414,12 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
+    [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
+    /// Whether `farms` standing count (or one being sited): while the cities use more of the good
+    /// than they make (`short_of`), only while their slot can still add one (attempts, fail_level).
+    [[nodiscard]] static bool farm_counts(bool siting, std::uint16_t farms, bool short_of, std::uint16_t attempts,
+                                          std::uint16_t fail_level) noexcept;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
@@ -663,6 +669,9 @@ private:
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     /// Improved computers: whether city `c`'s farm for `crop` found no site after repeated tries.
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
+    /// Improved computers: whether a city on an island that grows the crop counts as growing it
+    /// (its farm stands, or is being sited); see farm_counts.
+    [[nodiscard]] bool crop_grower(const AiPlayer& p, const City& c, std::uint8_t crop) const;
     /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
     [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a

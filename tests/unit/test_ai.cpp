@@ -1559,10 +1559,15 @@ TEST_CASE("ai: a crop counts as grown by a computer only where its farm finds a 
         REQUIRE(p != nullptr);
         REQUIRE(!p->plans.empty());
         sim::ai::Engine engine(s, state);
+        // Open1602 (t73): an improved computer counts a crop its island could grow only once its
+        // farm stands there; the original counts the island's fertility alone.
+        CHECK(engine.crop_available(*p, assets::ware::kTobaccoField) == original);
+        p->plans.front().slots[sim::ai::kSlotTobacco].count = 1;
         CHECK(engine.crop_available(*p, assets::ware::kTobaccoField));
         p->plans.front().slots[sim::ai::kSlotTobacco].fail_level = 2;
         CHECK(engine.crop_available(*p, assets::ware::kTobaccoField) == original);
-        // Another crop of the island still counts.
+        // Another crop of the island counts by its own farm.
+        p->plans.front().slots[sim::ai::kSlotSpices].count = 1;
         CHECK(engine.crop_available(*p, assets::ware::kSpiceField));
     }
 }

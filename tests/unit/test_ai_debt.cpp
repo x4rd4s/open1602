@@ -200,6 +200,16 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
 
+TEST_CASE("ai colony: a crop counts as grown only where its farm stands or is being sited") {
+    // t73: a city that never planted tobacco hid it from the colony plans for three hours.
+    CHECK(!Engine::farm_counts(false, 0, false, 0, 0));  // its island could grow it, nothing planted
+    CHECK(Engine::farm_counts(true, 0, true, 0, 0));     // the first farm is being sited
+    CHECK(Engine::farm_counts(false, 6, false, 2, 2));   // the farms make what the cities use
+    CHECK(Engine::farm_counts(false, 6, true, 1, 0));    // short, and the slot can still add one
+    CHECK(!Engine::farm_counts(false, 6, true, 2, 0));   // short, and no site left: the colony
+    CHECK(!Engine::farm_counts(false, 6, true, 0, 2));
+}
+
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
     // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
     CHECK(Engine::citizens_rise(true, true, false));
