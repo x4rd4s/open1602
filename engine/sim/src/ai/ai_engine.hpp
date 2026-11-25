@@ -1508,7 +1508,13 @@ private:
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
     /// Per island and city: the fires and plagues logged at the last look (only the log).
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> m_disaster_logged;
+    struct DisasterLog {
+        std::uint16_t island = 0;
+        std::uint8_t city = 0;
+        std::uint32_t fires = 0;
+        std::uint32_t plagues = 0;
+    };
+    std::vector<DisasterLog> m_disaster_logged;
     /// Per player, the yard sites of the running search refused because the yard's carriers would
     /// reach no store (only the log).
     std::vector<std::uint32_t> m_yard_unreached;

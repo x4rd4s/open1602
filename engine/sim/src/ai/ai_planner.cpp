@@ -107,18 +107,18 @@ void Engine::log_disasters(const AiPlayer& p, const City& c) {
             (d.kind == Disaster::Kind::Fire ? fires : plagues) += 1;
         }
     }
-    const std::uint32_t key = (std::uint32_t{c.island} << 8U) | c.index;
-    auto it = std::ranges::find(m_disaster_logged, key, &std::pair<std::uint32_t, std::uint32_t>::first);
-    const std::uint32_t now = (fires << 16U) | plagues;
+    auto it = std::ranges::find_if(m_disaster_logged,
+                                   [&](const DisasterLog& d) { return d.island == c.island && d.city == c.index; });
     if (it == m_disaster_logged.end()) {
-        if (now == 0) {
+        if (fires == 0 && plagues == 0) {
             return;
         }
-        m_disaster_logged.emplace_back(key, 0);
+        m_disaster_logged.push_back(DisasterLog{c.island, c.index, 0, 0});
         it = std::prev(m_disaster_logged.end());
     }
-    if (it->second != now) {
-        it->second = now;
+    if (it->fires != fires || it->plagues != plagues) {
+        it->fires = fires;
+        it->plagues = plagues;
         // With the fire brigades (Brunnen) and doctors (Klinik) its plan counts.
         const auto plan =
             std::ranges::find_if(p.plans, [&](const CityPlan& r) { return r.island == c.island && r.city == c.index; });
