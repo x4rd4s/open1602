@@ -91,7 +91,7 @@ takes back.
 The terrain tools of the tool bar paint the islands' terrain from a palette of the game's own: ground,
 forest, rock and ore mountains, slopes, rivers, beach, surf and sea. The column shows the tool's name
 and only the settings it uses. **Kind** picks a group of the palette, **Piece** goes through its pieces
-(a right click goes back; a ground piece names the share of the island's fertility it leaves a field, from 25 to 100 percent, as the game data gives it) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
+(a right click goes back; a ground piece names the share of the island's fertility it leaves a field, from 25 to 100 percent, as the game data gives it; the sand floor among the meadows, which the game data leaves at 100 percent, counts like the desert floor: bare sand 25, sand fraying into grass 50 or 75 percent) and **Turn** turns a piece that can turn. **Size** sets the brush's side,
 from 1 to 17 tiles: with the buttons - and +, the slider between them, the keys + and -, or Ctrl and
 the mouse wheel. **Shape** makes the brush round, square or a diamond (Land, Water, Tidy coast, Random
 fill and the brush of a one-tile piece). A white dotted outline on the map shows the tiles the tool
@@ -288,10 +288,12 @@ remember of each other.
 | Trade at nests | Whether the player's ships may trade at the pirates' nests; they do at war too. |
 | Trader calls | Whether the free trader calls at the player's Kontors: a scenario switch the original's scenario files have as well. |
 
-The tab **Attitude** (in a narrow window the button of that name on the page Players) sets when a
-computer grows cross, as the original's editor does with the bounds of a computer's mood. Each
-threshold is off or a value; a click steps it from off through the values and back to off, the
-right button the other way. A cross computer ends peace and treaties sooner. Humans have none.
+The tab **Computers** (in a narrow window the button of that name on the page Players) sets when a
+computer grows cross, as the original's editor does with the bounds of a computer's mood, and where
+it founds its first city. Each threshold is off or a value; a click steps it from off through the
+values and back to off, the right button the other way. A cross computer ends peace and treaties
+sooner. Humans have none. Resting the mouse on a column's head, or on a first island, explains it
+in a tooltip; so do **Start places at random** (Description) and **Make ship start place** (Markers).
 
 | Column | What it does |
 |---|---|
@@ -299,6 +301,7 @@ right button the other way. A cross computer ends peace and treaties sooner. Hum
 | Human above level | Cross with a human whose best city is beyond a level. |
 | Itself below people | Cross with the humans while it has fewer inhabitants than this (50 to 10 000). |
 | Human above people | Cross with a human who has more inhabitants than this. |
+| First island | Where a computer that starts with ships but without a city founds its first one: **original** (it searches the islands in the order of their numbers, from one of the first sixteen at random, for one large enough that grows its first crop, so on a map of fixed islands it often takes the same one), **at random** (an island without a city drawn when the game starts, the medium and larger ones first, none another computer goes to), or **Island n**, one of the map's islands (a click steps through them). The computer looks at that island first and founds its city there if it finds a site with room for it, even on an island the search would pass over; else it searches as always. It does so only for its first city, and not on an island that already has its city or one of a small rival. A fixed island goes by its number, so it stays chosen when islands before it are taken out; one deleted shows "island gone", and the computer searches as always. This does not exist in the original. |
 
 The original's scenario files hold the same thresholds, so a scenario keeps them when it is
 converted.
@@ -317,6 +320,14 @@ and taken without a fight by a city whose land comes to cover them; see
 [the neutral buildings](modding/factions.md#the-neutral-buildings)). **Player picks the flag**
 (off by default) shows the player the colour screen of the endless game, with the name the scenario gives its human offered, before the
 scenario starts; the human takes the colour chosen, and the player who had it gets the human's.
+**Start places at random** (off by default; this does not exist in the original) makes the players
+who start with ships but without a city (humans and computers alike) draw their start places when
+the game starts: each takes one place of the map at random, its ships going there together, as they
+lie to each other. The places are where the first ship of each of these players lies, and every
+point marker made a ship start place (page Markers), so that more places than players give more
+variety. A ship whose tile there is land or lies beside another ship goes to the nearest free water.
+The row shows how many places there are for how many players; the check list warns when there are
+fewer than two. A game saved of the scenario keeps the places it drew.
 
 The introduction is the page shown before the scenario starts; the missions' own texts are set
 under Goals.
@@ -357,8 +368,10 @@ the package.
 column: named points and areas the scenario's script finds by their names (`game.marker`,
 [scripts.md](modding/scripts.md)). A click on the open map sets a point, a drag an area; a click on
 a marker, or on its row, selects it. A new marker is named `marker_1`, `marker_2`, ...; **Rename**
-gives it a name of lower case letters, digits and `_`, **Delete** takes it away. Each is a step of
-undo.
+gives it a name of lower case letters, digits and `_`, **Delete** takes it away. **Make ship start
+place** renames a point `ship_start_1`, `ship_start_2`, ...: every point whose name begins with
+`ship_start` is a further start place for **Start places at random** (Description). Each is a step
+of undo.
 
 ## Script
 

@@ -369,6 +369,8 @@ annokit::core::Status apply_decoded(World& world, Decoded& d) {
             p.gates_closed = from.gates_closed;
             p.owner = from.owner;
             p.cheats = from.cheats;
+            p.first_island = from.first_island;
+            p.first_island_number = from.first_island_number;
             if (d.player_switches) {
                 p.scenario = from.scenario;
             } else if (i < kept_switches.size()) {

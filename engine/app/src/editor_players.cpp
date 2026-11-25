@@ -62,6 +62,13 @@ void MapViewer::editor_players_model(EditorModel& m) const {
         e.rival_development = p.scenario.rival_development;
         e.own_inhabitants = p.scenario.own_inhabitants;
         e.rival_inhabitants = p.scenario.rival_inhabitants;
+        e.first_island = static_cast<std::uint8_t>(p.first_island);
+        for (std::size_t i = 0; i < world.islands().size(); ++i) {
+            if (p.first_island == sim::FirstIsland::Fixed &&
+                world.islands()[i].header.number == p.first_island_number) {
+                e.first_island_index = static_cast<std::int32_t>(i);
+            }
+        }
         // A package's faction by the name its package gives it, else by its own id ("league" of
         // "example:league"): the table has little room. A saved game's factions have no names: the
         // installed packages' have.
@@ -196,6 +203,18 @@ void MapViewer::editor_players_request(const EditorRequest& request) {
         v.attitude.rival_development = request.player.rival_development;
         v.attitude.own_inhabitants = request.player.own_inhabitants;
         v.attitude.rival_inhabitants = request.player.rival_inhabitants;
+    } else if (request.index == 8) {
+        // Open1602: where a computer founds its first city; an island by its number, which stays
+        // when islands before it are taken out.
+        v.first_island = static_cast<sim::FirstIsland>(
+            std::min<std::uint8_t>(request.player.first_island, static_cast<std::uint8_t>(sim::FirstIsland::Last)));
+        const auto i = static_cast<std::size_t>(std::max(request.player.first_island_index, 0));
+        if (v.first_island == sim::FirstIsland::Fixed) {
+            if (i >= world.islands().size()) {
+                return;
+            }
+            v.first_island_number = world.islands()[i].header.number;
+        }
     } else if (request.index == 1 || request.index == 2) {
         // The next colour, or the one before; one another player has is exchanged with it.
         const auto banners = editor::player_banners();

@@ -236,6 +236,7 @@ TEST_CASE("naval: ships at peace and unarmed ships do not fight") {
 
 TEST_CASE("naval: a computer's ship hit by pirates surrenders; the pirates plunder it and make peace") {
     Sea s;
+    s.rules.bugs.classic_ai = true;  // the original's computers
     s.start();
     // Pirates are at war with everyone from the start in a real game; here by hand.
     s.world.diplomacy().set_peace(s.world, 2, 1, sim::Treaty::None, 0);
@@ -251,6 +252,29 @@ TEST_CASE("naval: a computer's ship hit by pirates surrenders; the pirates plund
     // the pirates are at peace with its owner all the same (original).
     CHECK(!m->held);
     CHECK(!s.world.diplomacy().hostile(2, 1));
+}
+
+TEST_CASE("naval: an improved computer's ship keeps its white flag after the plunder, as a player's does") {
+    // Merlin, 2026-11-25; probe p55, x3 g4-404-p0 P3: sailing on beside the pirate, the ship was shot
+    // at again within seconds, struck its flag twenty times and sank.
+    Sea s;
+    s.start();
+    s.world.diplomacy().set_peace(s.world, 2, 1, sim::Treaty::None, 0);
+    s.add(10, 40, kWarship, 2, 8);
+    const std::uint32_t merchant = s.add(14, 40, kTrade, 1, 0);
+    s.world.ship(merchant)->cargo[0] = sim::CargoSlot{21, 20 * 32, 0};
+    s.run(10'000);
+    const sim::Ship* m = s.world.ship(merchant);
+    REQUIRE(m != nullptr);
+    CHECK(s.count(sim::ShipEvent::Kind::WhiteFlag) == 1);
+    CHECK(s.count(sim::ShipEvent::Kind::Plundered) == 1);
+    CHECK(m->held);  // its owner strikes it once the pirates have gone (Engine::logistics)
+    const std::uint32_t health = m->health;
+    s.run(60'000);
+    m = s.world.ship(merchant);
+    REQUIRE(m != nullptr);
+    CHECK(s.count(sim::ShipEvent::Kind::WhiteFlag) == 1);  // not shot at again
+    CHECK(m->health == health);
 }
 
 TEST_CASE("naval: an improved computer's ship fights pirates off when it is their match; else it surrenders") {

@@ -50,8 +50,22 @@ Engine::Engine(Simulation& sim, State& state)
 }
 
 CommandResult Engine::execute(const Command& command) {
+    // Open1602 (gate f45: 3 ships sunk by pirates 2 to 33 s after a new order struck the white flag
+    // with the pirate 6 to 22 tiles off): an improved computer's ship under the flag takes no order
+    // while a pirate is near, whichever task gives it, as a player waits for the pirates to sail off.
+    if (const auto* o = std::get_if<ShipOrder>(&command); o != nullptr) {
+        const Ship* s = m_world.ship(o->ship);
+        if (s != nullptr && s->owner == o->player &&
+            flag_keeps(rivals(), s->held && !s->sinking, s->held && pirate_near(*s))) {
+            return CommandResult{};
+        }
+    }
     m_census.valid = false;  // a command may add, move or remove units
     return m_sim.execute(command);
+}
+
+bool Engine::flag_keeps(bool improved, bool held, bool pirate_near) noexcept {
+    return improved && held && pirate_near;
 }
 
 bool Engine::logging() noexcept {
@@ -532,7 +546,14 @@ void Engine::root(AiPlayer& p) {
             p.settle.floor = 300;
             p.settle.crop = p.pirates ? 0 : first_crop(m_world.balance().computer_orders, p.player);
             p.settle.active = true;
-            pick_island(p);
+            if (const auto first = first_island_choice(p)) {
+                // Open1602: the island the scenario chose for its first city is looked at first.
+                p.settle.island = *first;
+                log(p, "first island %u, as the scenario chose", unsigned{*first});
+                push(p, kSettleArea, true);
+            } else {
+                pick_island(p);
+            }
         }
         // A computer whose search failed for good gives its ship to the pirates (ship op 5 value 5)
         // and leaves the game with the players' next check. Open1602 kept it until 2026-10-28.

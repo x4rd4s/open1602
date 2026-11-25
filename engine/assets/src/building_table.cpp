@@ -122,6 +122,14 @@ annokit::core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document
         // Stored as value * 128 / 100 (record +0x40).
         b.edge_growth = static_cast<std::uint8_t>(
             std::clamp(std::clamp(r.integer("Randwachs", 0, 100), 0, 200) * 128 / 100, 0, 255));
+        if (r.field("Randwachs") == nullptr && b.kind == kind::kGround) {
+            // Sand that the file leaves at the full Randwachs (id::kSandFloor).
+            for (const id::GroundGrowth& sand : id::kSandFloor) {
+                if (sand.id == b.id) {
+                    b.edge_growth = static_cast<std::uint8_t>(std::uint32_t{sand.percent} * 128U / 100U);
+                }
+            }
+        }
         b.build_gfx = non_negative(r.integer("Baugfx"));
         b.kreuz_base = r.integer("KreuzBase");
         b.rand_count = static_cast<std::uint16_t>(std::min(non_negative(r.integer("RandAnz")), 0xFFFFU));

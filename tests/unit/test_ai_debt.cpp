@@ -115,6 +115,23 @@ TEST_CASE("ai war plan: a crop island is a war motive only when the freed island
     CHECK(!Engine::crop_war_motive(true, false, false));
 }
 
+TEST_CASE("ai war plan: a crop counts as lacking only where none of its islands grows it and a city has none") {
+    CHECK(Engine::crop_lacking(true, false, true));
+    CHECK(!Engine::crop_lacking(false, false, true));  // it makes what it uses
+    // Gate f43: 6 of 14 crop wars for crops its own islands grew already.
+    CHECK(!Engine::crop_lacking(true, true, true));
+    // Gate f43, x3 o4-808-p0: P0 declared with 68 t of alcohol in store, and P3 fell.
+    CHECK(!Engine::crop_lacking(true, false, false));
+}
+
+TEST_CASE("ai ships: a ship under the white flag takes no order while a pirate is near") {
+    // Gate f45: three ships sunk 2 to 33 s after a new order struck the flag beside the pirate.
+    CHECK(Engine::flag_keeps(true, true, true));
+    CHECK(!Engine::flag_keeps(true, true, false));  // the pirate has sailed off
+    CHECK(!Engine::flag_keeps(true, false, true));  // no flag up
+    CHECK(!Engine::flag_keeps(false, true, true));  // the original's computers: as before
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));
@@ -248,4 +265,24 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(Engine::citizens_rise(true, false, true));    // earning: moves on
     CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
+}
+
+TEST_CASE("ai defence: a first castle when a near rival not at peace shows the stronger army") {
+    // t64: 69 landings on improved computers without a soldier; behind() looks only at humans.
+    CHECK(Engine::outmatched_by(true, false, 12, 0));
+    CHECK(!Engine::outmatched_by(false, false, 12, 0));  // far away
+    CHECK(!Engine::outmatched_by(true, true, 12, 0));    // at peace
+    CHECK(!Engine::outmatched_by(true, false, 4, 4));    // not stronger
+}
+
+TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone only once citizens come") {
+    // The rich exits citizens -> citizens2 and citizens2 -> merchants. The original's computers
+    // leave on the gold alone.
+    CHECK(Engine::gold_exit(false, true, false));
+    CHECK(Engine::gold_exit(false, true, true));
+    // p59, x3 g4-404-p1 P1: citizens to merchants within seconds at 5,700 gold, no citizen.
+    CHECK(!Engine::gold_exit(true, true, false));
+    CHECK(Engine::gold_exit(true, true, true));
+    CHECK(!Engine::gold_exit(true, false, true));  // not rich
+    CHECK(!Engine::gold_exit(false, false, true));
 }

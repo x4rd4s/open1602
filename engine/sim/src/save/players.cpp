@@ -78,6 +78,10 @@ void io_player_state(A& a, P& p, std::uint16_t version) {
     if (version >= kPlayerCheats) {
         a.u8(p.cheats);
     }
+    if (version >= kFirstIsland) {
+        a.enum8(p.first_island, FirstIsland::Last);
+        a.u16(p.first_island_number);
+    }
 }
 
 template <class A, class S>
@@ -295,6 +299,10 @@ Decoded::FactionPart read_factions(Reader& in, std::uint16_t version) {
 std::uint16_t player_state_version(const World& w) {
     const bool any = std::any_of(w.players().begin(), w.players().end(),
                                  [](const Player& p) { return p.scenario != ScenarioSwitches{}; });
+    if (std::any_of(w.players().begin(), w.players().end(),
+                    [](const Player& p) { return p.first_island != FirstIsland::Original; })) {
+        return kFirstIsland;
+    }
     if (std::any_of(w.players().begin(), w.players().end(), [](const Player& p) { return p.cheats != 0; })) {
         return kPlayerCheats;
     }
@@ -310,6 +318,9 @@ std::uint16_t player_state_version(const World& w) {
 namespace {
 
 std::size_t player_state_size(std::uint16_t version) {
+    if (version >= kFirstIsland) {
+        return 46;
+    }
     if (version >= kPlayerCheats) {
         return 43;
     }

@@ -79,6 +79,15 @@ struct ScenarioSwitches {
     friend bool operator==(const ScenarioSwitches&, const ScenarioSwitches&) = default;
 };
 
+/// Where a computer that starts without a city founds its first one (Open1602: the editor's
+/// "First island"; the original always searches by the islands' numbers).
+enum class FirstIsland : std::uint8_t {
+    Original,  ///< as the original: the search by the islands' numbers
+    AtRandom,  ///< an island drawn at random among those free for a first city
+    Fixed,     ///< the island with the number Player::first_island_number
+    Last = Fixed,
+};
+
 /// Index into World::missions().
 using MissionId = std::uint8_t;
 inline constexpr MissionId kNoMission = 0xFF;
@@ -150,6 +159,13 @@ struct Player {
     /// (net::player_verifier), so that they get the slot back when they join again or load the
     /// game alone. 0: nobody known (a computer player, or a game from before).
     std::uint64_t owner = 0;
+    /// Computers only: where the first city goes (FirstIsland). The computer tries it once, when
+    /// it starts searching for its first island, and then searches as it always does; the choice
+    /// is spent then (back to Original), so a saved game does not try it again.
+    FirstIsland first_island = FirstIsland::Original;
+    /// The island's number (IslandHeader::number) for FirstIsland::Fixed; an island the map no
+    /// longer has falls back to the search.
+    std::uint16_t first_island_number = 0;
 
     [[nodiscard]] bool active() const noexcept { return status == PlayerStatus::Playing; }
 

@@ -18,6 +18,7 @@
 
 #include "o1602/editor/operations.hpp"
 #include "o1602/sim/scenario_data.hpp"
+#include "o1602/sim/start_places.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -31,10 +32,10 @@ std::string number(std::int64_t n) {
     return std::to_string(n);
 }
 
-/// A name for a new marker that no other has: marker_1, marker_2, ...
-std::string free_marker_name(const std::vector<sim::ScenarioMarker>& markers) {
+/// A name for a new marker that no other has: marker_1, marker_2, ... (`stem` "marker").
+std::string free_marker_name(const std::vector<sim::ScenarioMarker>& markers, std::string_view stem = "marker") {
     for (std::size_t n = 1;; ++n) {
-        std::string name = "marker_" + std::to_string(n);
+        std::string name = std::string(stem) + "_" + std::to_string(n);
         if (std::none_of(markers.begin(), markers.end(),
                          [&](const sim::ScenarioMarker& m) { return m.name == name; })) {
             return name;
@@ -80,7 +81,9 @@ void MapViewer::editor_markers_model(EditorModel& m) const {
                                       ? ui::tr("editor.markers.point", {number(marker.x), number(marker.y)})
                                       : ui::tr("editor.markers.area", {number(marker.x), number(marker.y),
                                                                        number(marker.width), number(marker.height)});
-        m.markers.push_back(EditorMarkerRow{annokit::core::utf8_to_cp1252(marker.name), place});
+        m.markers.push_back(EditorMarkerRow{annokit::core::utf8_to_cp1252(marker.name), place,
+                                            marker.shape == sim::ScenarioMarker::Shape::Point,
+                                            sim::ship_start_marker(marker)});
     }
     if (m_editor->marker && *m_editor->marker < world.markers().size()) {
         m.marker = m_editor->marker;
@@ -167,6 +170,19 @@ void MapViewer::editor_markers_request(const EditorRequest& request) {
             m_editor->document.perform(std::make_unique<editor::MarkersEdit>(markers, std::move(after)));
             m_editor->marker.reset();
             editor_notice(ui::tr("editor.markers.removed", {name}), false, "marker removed");
+            break;
+        }
+        case Kind::MarkerShipStart: {
+            // Open1602: a further start place of ships is a point named "ship_start_<n>".
+            if (request.index >= markers.size() || markers[request.index].shape != sim::ScenarioMarker::Shape::Point ||
+                sim::ship_start_marker(markers[request.index])) {
+                break;
+            }
+            std::vector<sim::ScenarioMarker> after = markers;
+            after[request.index].name = free_marker_name(markers, sim::kShipStartMarker);
+            const std::string name = annokit::core::utf8_to_cp1252(after[request.index].name);
+            m_editor->document.perform(std::make_unique<editor::MarkersEdit>(markers, std::move(after)));
+            editor_notice(ui::tr("editor.markers.ship_start_made", {name}), false, "marker made a ship start");
             break;
         }
         case Kind::ListScripts: {

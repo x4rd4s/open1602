@@ -369,6 +369,9 @@ public:
     /// Whether a yard starts a repair or calls a damaged ship in: after a stall without material
     /// (`stalled`) an improved computer waits until the yard itself holds it (`in_yard`).
     [[nodiscard]] static bool repair_may_start(bool improved, bool stalled, bool in_yard) noexcept;
+    /// Whether a city leaves a citizens' stage on gold alone (`rich`): the original's computers at
+    /// once, an improved computer's once its citizens have begun to come (`risen`).
+    [[nodiscard]] static bool gold_exit(bool improved, bool rich, bool risen) noexcept;
     /// Whether a city at stage citizens moves on: its citizens are there, and it holds the gold or
     /// (an improved computer) earns.
     [[nodiscard]] static bool citizens_rise(bool citizens, bool gold, bool earning) noexcept;
@@ -429,6 +432,15 @@ public:
     /// Of two such houses, the one whose doctor reaches more houses, of as many the one with fewer people.
     [[nodiscard]] static bool swap_prefers(std::int32_t houses, std::uint32_t lost, std::int32_t best_houses,
                                            std::uint32_t best_lost) noexcept;
+    /// Improved computers: whether its cities lack a crop's good for a war: used beyond what they
+    /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
+    /// city that uses it has none (`dry`).
+    [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
+    /// army (`theirs`, as seen) than its `own`.
+    [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
+    /// Improved computers: a ship under the white flag takes no order while a pirate is near.
+    [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -581,6 +593,7 @@ private:
     std::uint32_t remove_goods(City& c, std::uint8_t ware, std::uint32_t amount);
     /// Behind the leading human, threatened.
     [[nodiscard]] bool behind(const AiPlayer& p) const;
+    [[nodiscard]] bool outmatched(const AiPlayer& p);
     [[nodiscard]] bool threatened(const AiPlayer& p) const;
     /// A scenario keeps the computer from building while it is at peace with every human;
     /// ends the switch when it is not.
@@ -594,6 +607,13 @@ private:
 
     // ---- ai_settle.cpp ----
     void pick_island(AiPlayer& p);
+    /// The island the scenario chose for the first city of `p` (Player::first_island), if it may
+    /// still have one there; a random choice is drawn now. Nothing: the search as always.
+    [[nodiscard]] std::optional<std::uint16_t> first_island_choice(AiPlayer& p);
+    /// Whether another computer goes to `island` or the scenario chose it for one.
+    [[nodiscard]] bool first_island_aimed(const AiPlayer& p, std::uint16_t island) const;
+    /// Whether `island` is the one the scenario chose for `p`; the choice is spent then.
+    bool spend_first_island(AiPlayer& p, std::uint16_t island);
     [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: the computer gave a city up on the island in the last 45 minutes.
     [[nodiscard]] bool left_lately(AiPlayer& p, std::uint16_t island);

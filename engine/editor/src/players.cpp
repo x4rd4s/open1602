@@ -120,6 +120,8 @@ PlayerValues player_values(const sim::Player& player) {
     v.faction = player.faction;
     v.attitude = player.scenario;
     v.attitude.flags &= kAttitudeFlags;
+    v.first_island = player.first_island;
+    v.first_island_number = player.first_island_number;
     return v;
 }
 
@@ -203,6 +205,12 @@ annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& w
         values.attitude.rival_development > kMaxDevelopment) {
         return make_error(ErrorCode::InvalidFormat, "an attitude out of range");
     }
+    if (values.first_island > sim::FirstIsland::Last ||
+        (values.first_island == sim::FirstIsland::Fixed &&
+         std::none_of(world.islands().begin(), world.islands().end(),
+                      [&](const sim::WorldIsland& i) { return i.header.number == values.first_island_number; }))) {
+        return make_error(ErrorCode::InvalidFormat, "no island " + std::to_string(values.first_island_number));
+    }
     sim::World after = world;
     (void)sim::take_banner(after, player, values.banner);
     sim::Player* changed = after.player(player);
@@ -221,6 +229,8 @@ annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& w
     q.scenario.rival_development = values.attitude.rival_development;
     q.scenario.own_inhabitants = values.attitude.own_inhabitants;
     q.scenario.rival_inhabitants = values.attitude.rival_inhabitants;
+    q.first_island = values.first_island;
+    q.first_island_number = values.first_island == sim::FirstIsland::Fixed ? values.first_island_number : 0;
     return std::unique_ptr<Operation>(std::make_unique<WorldEdit>(std::move(after), "player_change"));
 }
 

@@ -283,7 +283,6 @@ menu in `engine/app` (`multiplayer_menu.hpp`, `multiplayer.cpp`).
 
 ## Open
 
-- The endless game's own world settings over the network.
 - Host migration beyond the local network: the successor is reached at the address the host saw,
   on the old host's port, so on the internet only when that port is open at the successor too.
   Players who had left before the host and want to come back still look for the old host; the
