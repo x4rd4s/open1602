@@ -369,6 +369,11 @@ struct Settlement {
     std::uint8_t plan_crop = 0;
     std::uint64_t plan_ms = 0;    ///< game time the plan was made
     std::uint32_t plan_ship = 0;  ///< the ship kept for it (no supply runs), 0 none yet
+    /// Open1602 (t67): the crop an improved computer saves for while no colony passes its budget,
+    /// 0 none (colony_saving); what it has put by from its surplus, and when it last did.
+    std::uint8_t saving_crop = 0;
+    std::int64_t saved = 0;
+    std::uint64_t saved_ms = 0;
 };
 
 /// Settlement::plan_crop of a colony for food or cloth its home island has no room for.

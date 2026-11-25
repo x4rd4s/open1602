@@ -13,6 +13,7 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
@@ -1512,6 +1513,7 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         weighed.push_back(c);
     }
     const std::optional<std::size_t> pick = pick_colony(weighed);
+    colony_saving(p, crops, b, pick.has_value());
     const std::optional<std::uint8_t> best = pick ? std::optional<std::uint8_t>{weighed[*pick].crop} : std::nullopt;
     const std::int64_t best_rank = pick ? weighed[*pick].rank : 0;
     if (!best || (!asked && !plan_holds)) {
@@ -1551,6 +1553,87 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
             log(p, "colony plan: ship %u kept", ship);
         }
     }
+}
+
+void Engine::colony_saving(AiPlayer& p, const std::vector<std::uint8_t>& crops, const Budget& b, bool picked) {
+    // Open1602 (t67): an improved computer whose cities lack a crop's good, and whose budget refuses
+    // the colony only for the gold it holds now, saves for it from its surplus, as a player puts
+    // money by for an investment: 39 of 58 such shortages on main were refused only on the gold.
+    Settlement& s = p.settle;
+    std::uint8_t crop = 0;
+    if (rivals() && !p.pirates && !picked) {
+        for (const std::uint8_t c : crops) {
+            if (c != kAnyCrop && saves_for(crop_dry(p, c), b.flows_carry(colony_commitment(p, c)))) {
+                crop = c;
+                break;
+            }
+        }
+    }
+    const std::uint64_t now = now_ms();
+    if (crop != s.saving_crop) {
+        if (crop != 0) {
+            log(p, "saves for a colony (crop %u, gold %d, net %lld)", unsigned{crop}, player(p).money,
+                static_cast<long long>(b.net));
+        } else if (s.saving_crop != 0) {
+            log(p, "stops saving for a colony (crop %u, saved %lld)", unsigned{s.saving_crop},
+                static_cast<long long>(s.saved));
+        }
+        s.saving_crop = crop;
+        s.saved = 0;
+        s.saved_ms = now;
+    }
+    if (crop == 0) {
+        return;
+    }
+    const std::uint64_t minutes = (now - s.saved_ms) / kGoodsMinuteMs;
+    s.saved = saved_after(s.saved, minutes, b.net, colony_money(p));
+    s.saved_ms += minutes * kGoodsMinuteMs;
+}
+
+bool Engine::crop_dry(const AiPlayer& p, std::uint8_t field) const {
+    // The crop's good is used in a city of the computer that holds none of it, and none of its
+    // islands grows a crop for it: lacking by the stock, as a player sees it.
+    const std::uint8_t good = crop_good(field);
+    if (good == 0) {
+        return false;
+    }
+    for (const std::uint8_t other : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kSugarField,
+                                     ware::kCocoaField, ware::kCottonField}) {
+        if (crop_good(other) == good && crop_available(p, other)) {
+            return false;
+        }
+    }
+    return std::ranges::any_of(m_world.cities(), [&](const City& c) {
+        return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
+    });
+}
+
+std::uint8_t Engine::crop_good(std::uint8_t field) noexcept {
+    switch (field) {
+        case ware::kSpiceField:
+            return ware::kSpices;
+        case ware::kTobaccoField:
+            return ware::kTobaccoGoods;
+        case ware::kWineField:
+        case ware::kSugarField:
+            return ware::kAlcohol;
+        case ware::kCocoaField:
+            return ware::kCocoa;
+        case ware::kCottonField:
+            return ware::kCloth;
+        default:
+            return 0;
+    }
+}
+
+bool Engine::saves_for(bool dry, bool carried) noexcept {
+    return dry && carried;
+}
+
+std::int64_t Engine::saved_after(std::int64_t saved, std::uint64_t minutes, std::int64_t net,
+                                 std::int64_t goal) noexcept {
+    const auto m = static_cast<std::int64_t>(minutes);
+    return std::min(goal, saved + m * std::max<std::int64_t>(0, net));
 }
 
 namespace {}  // namespace

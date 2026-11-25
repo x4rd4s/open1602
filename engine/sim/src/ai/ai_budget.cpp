@@ -36,6 +36,12 @@ Refusal Budget::refusal(const Commitment& c) const noexcept {
     return at(c, horizon) < keep ? Refusal::Horizon : Refusal::None;
 }
 
+bool Budget::flows_carry(const Commitment& c) const noexcept {
+    Budget held = *this;
+    held.cash = reserved + c.cost + cushion();
+    return held.refusal(c) == Refusal::None;
+}
+
 bool Budget::allows(const Commitment& c) const noexcept {
     return refusal(c) == Refusal::None;
 }
@@ -167,6 +173,11 @@ std::int64_t Engine::planned_colony_gold(const AiPlayer& p) const {
 bool Engine::can_commit(const AiPlayer& p, const Commitment& c, Spend what, std::int64_t own) const {
     Budget b = gold_budget(p);
     b.reserved -= own;
+    // Open1602 (t67): what it put by for a lacking crop's colony is not spent on other plans; a
+    // building, which the houses, the food and the stages ask for, may still take it.
+    if (what != Spend::Building && p.settle.saving_crop != 0) {
+        b.reserved += p.settle.saved;
+    }
     const Refusal r = b.refusal(c);
     if (r != Refusal::None && logging()) {
         // Logged once a game minute per kind of plan, to measure which check refuses what.

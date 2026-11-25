@@ -411,6 +411,14 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers (t67): the good a crop's fields give, 0 for none of the luxury crops.
+    [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
+    /// Whether it saves for a crop's colony: its good is `dry` in a city and the budget's flows
+    /// would carry the colony with the gold in hand (Budget::flows_carry).
+    [[nodiscard]] static bool saves_for(bool dry, bool carried) noexcept;
+    /// What it has put by after `minutes` more of a surplus `net` (none from a loss), up to `goal`.
+    [[nodiscard]] static std::int64_t saved_after(std::int64_t saved, std::uint64_t minutes, std::int64_t net,
+                                                  std::int64_t goal) noexcept;
     /// Improved computers: a ship under the white flag takes no order while a pirate is near.
     [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
@@ -637,6 +645,8 @@ private:
     [[nodiscard]] std::int64_t chain_upkeep(const AiPlayer& p, std::uint8_t crop) const;
     /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
     [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
+    void colony_saving(AiPlayer& p, const std::vector<std::uint8_t>& crops, const Budget& b, bool picked);
+    [[nodiscard]] bool crop_dry(const AiPlayer& p, std::uint8_t field) const;
     /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
     /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
     /// home city's houses rise into. Ranks only; it refuses nothing.

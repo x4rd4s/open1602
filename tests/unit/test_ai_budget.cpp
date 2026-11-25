@@ -112,4 +112,18 @@ TEST_CASE("ai budget: the colony plan takes the passing candidate of the highest
     CHECK(!pick_colony({}).has_value());
 }
 
+TEST_CASE("ai budget: the flows carry a plan the gold in hand alone refuses") {
+    // t67: P1 with cash 731 and net 47 never held a colony's 3000 at the moment it weighed.
+    Commitment colony;
+    colony.cost = 3000;
+    colony.upkeep = 15;
+    colony.value = 16;
+    colony.delay = 10;
+    const Budget poor = budget(731, 47, 22);
+    CHECK(poor.refusal(colony) == Refusal::Now);
+    CHECK(poor.flows_carry(colony));
+    // A loss a minute is not carried, whatever the gold.
+    CHECK(!budget(731, -40, 22).flows_carry(colony));
+}
+
 }  // namespace o1602::sim::ai

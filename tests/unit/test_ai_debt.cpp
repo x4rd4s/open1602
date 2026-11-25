@@ -207,3 +207,14 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(!Engine::citizens_rise(true, false, false));  // neither gold nor income
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
 }
+
+TEST_CASE("ai colony: a computer saves from its surplus for a lacking crop its flows carry") {
+    CHECK(Engine::saves_for(true, true));
+    CHECK(!Engine::saves_for(false, true));  // not lacking
+    CHECK(!Engine::saves_for(true, false));  // the flows would not carry it
+    CHECK(Engine::saved_after(0, 10, 47, 3000) == 470);
+    CHECK(Engine::saved_after(2900, 10, 47, 3000) == 3000);  // up to the colony's gold
+    CHECK(Engine::saved_after(400, 10, -20, 3000) == 400);   // a loss saves nothing
+    CHECK(Engine::crop_good(assets::ware::kSugarField) == assets::ware::kAlcohol);
+    CHECK(Engine::crop_good(0) == 0);
+}
