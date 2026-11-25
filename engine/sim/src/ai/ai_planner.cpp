@@ -3161,7 +3161,11 @@ bool Engine::luxury_short_here(const AiPlayer& p) const {
 }
 
 bool Engine::luxury_short_crop(const AiPlayer& p, const City& c, std::uint8_t field, std::uint8_t good) const {
-    return plants_on(fertility(c.island, field), false, true, true, false) && goods_short(p.player, good) != 0;
+    // Gone without: the city has run dry of it (p50 logs, x3 o4-707-p1 P1: used beyond what was
+    // made, spices and cocoa were planted ahead of the list with 138 t and 35 t in store while
+    // alcohol ran out).
+    return plants_on(fertility(c.island, field), false, true, true, false) && goods_short(p.player, good) != 0 &&
+           c.stock(good) == 0;
 }
 
 bool Engine::luxury_eligible(const AiPlayer& p, std::uint8_t slot) const {
