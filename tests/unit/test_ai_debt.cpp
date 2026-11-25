@@ -200,19 +200,14 @@ TEST_CASE("ai stage: citizens move on with an income, without the gold in store"
     CHECK(!Engine::citizens_rise(false, true, true));   // the citizens first
 }
 
-TEST_CASE("ai stage: an improved computer leaves a stage on gold alone only after the stage's list") {
-    // The exits on gold: main2, citizens2 and merchants rich money; and on gold with goods in store:
-    // main2 to citizens (luxury or Kontor) and aristocrats to aristocrats2 (luxury), all one rule.
-    // The original's computers move on before their list (classic order).
-    CHECK(Engine::gold_exit(false, true, true));
+TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone only once citizens come") {
+    // The rich exits citizens -> citizens2 and citizens2 -> merchants. The original's computers
+    // leave on the gold alone.
     CHECK(Engine::gold_exit(false, true, false));
-    // p52, x3 g4-404-p3 P1: from main to merchants within one second, no tavern, no school.
-    CHECK(!Engine::gold_exit(true, true, true));
-    CHECK(Engine::gold_exit(true, true, false));
-    CHECK(!Engine::gold_exit(true, false, false));
+    CHECK(Engine::gold_exit(false, true, true));
+    // p59, x3 g4-404-p1 P1: citizens to merchants within seconds at 5,700 gold, no citizen.
+    CHECK(!Engine::gold_exit(true, true, false));
+    CHECK(Engine::gold_exit(true, true, true));
+    CHECK(!Engine::gold_exit(true, false, true));  // not rich
     CHECK(!Engine::gold_exit(false, false, true));
-    // Gate f43 base: main2 to citizens on gold and luxury (0x1E -> 0x20 within a minute) ...
-    CHECK(!Engine::gold_exit(true, true, true));
-    // ... and aristocrats to aristocrats2 on gold and luxury (0x29 -> 0x33) wait for the list.
-    CHECK(Engine::gold_exit(true, true, false));
 }

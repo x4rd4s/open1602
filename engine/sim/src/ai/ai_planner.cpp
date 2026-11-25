@@ -1479,22 +1479,14 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             return;
         }
         case stage::kMain: {
-            const auto to_main2 = [&] {
+            if ((population(c, 1) >= at.ai_main2_settlers && has(at.ai_main2_money)) || has(at.ai_main2_rich_money)) {
                 if (kontor_level(c) < 3 && p.cities < 3 && want_colony(p, 2, false, true)) {
                     return;
                 }
                 set_stage(p, r, stage::kMain2);
-            };
-            if ((population(c, 1) >= at.ai_main2_settlers && has(at.ai_main2_money)) ||
-                gold_exit(rivals(), has(at.ai_main2_rich_money), true)) {
-                to_main2();
                 return;
             }
             if (needs(ComputerList::Main) || needs(ComputerList::MainRich)) {
-                return;
-            }
-            if (gold_exit(rivals(), has(at.ai_main2_rich_money), false)) {
-                to_main2();
                 return;
             }
             if (has(at.ai_main_idle_money)) {
@@ -1508,19 +1500,13 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // or a luxury good in store while its lists built nothing new.
             const bool risen = rivals() && population(c, 2) >= at.ai_citizens2_citizens / 2 && net_income(p) > 0 &&
                                std::int64_t{money} >= stage_gold(at.ai_citizens_money) / 4;
-            const auto stocked = [&] {
-                return has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
-                       (luxury_in_stock(p, c, r, 2) > at.ai_citizens_luxury || kontor_level(c) > at.ai_citizens_kontor);
-            };
-            if (risen || (!rivals() && stocked())) {
+            if (risen ||
+                (has(at.ai_citizens_money) && !want_colony(p, 2, false, true) &&
+                 (luxury_in_stock(p, c, r, 2) > at.ai_citizens_luxury || kontor_level(c) > at.ai_citizens_kontor))) {
                 set_stage(p, r, stage::kCitizens);
                 return;
             }
             if (needs(ComputerList::Main2)) {
-                return;
-            }
-            if (gold_exit(rivals(), rivals() && stocked(), false)) {
-                set_stage(p, r, stage::kCitizens);
                 return;
             }
             idle();
@@ -1533,15 +1519,12 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // its lists built nothing new; the budget still weighs every building of the next stage.
             if (citizens_rise(population(c, 2) >= at.ai_citizens2_citizens, has(at.ai_citizens2_money),
                               rivals() && net_income(p) > 0) ||
-                gold_exit(rivals(), has(at.ai_citizens2_rich_money), true)) {
+                gold_exit(rivals(), has(at.ai_citizens2_rich_money),
+                          population(c, 2) >= at.ai_citizens2_citizens / 2)) {
                 set_stage(p, r, stage::kCitizens2);
                 return;
             }
             if (needs(ComputerList::Citizens)) {
-                return;
-            }
-            if (gold_exit(rivals(), has(at.ai_citizens2_rich_money), false)) {
-                set_stage(p, r, stage::kCitizens2);
                 return;
             }
             idle();
@@ -1549,15 +1532,12 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
         }
         case stage::kCitizens2: {
             if ((population(c, 2) >= at.ai_merchants_citizens && has(at.ai_merchants_money)) ||
-                gold_exit(rivals(), has(at.ai_merchants_rich_money), true)) {
+                gold_exit(rivals(), has(at.ai_merchants_rich_money),
+                          population(c, 2) >= at.ai_citizens2_citizens / 2)) {
                 set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
             if (needs(ComputerList::Citizens2)) {
-                return;
-            }
-            if (gold_exit(rivals(), has(at.ai_merchants_rich_money), false)) {
-                set_stage(p, r, r.land < at.ai_merchants_land ? stage::kCitizensSmall : stage::kMerchants);
                 return;
             }
             idle();
@@ -1605,17 +1585,11 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (want_colony(p, 4, false, false)) {
                 return;
             }
-            const bool stocked =
-                luxury_in_stock(p, c, r, 4) > at.ai_aristocrats2_luxury && has(at.ai_aristocrats2_money);
-            if (gold_exit(rivals(), stocked, true)) {
+            if (luxury_in_stock(p, c, r, 4) > at.ai_aristocrats2_luxury && has(at.ai_aristocrats2_money)) {
                 set_stage(p, r, stage::kAristocrats2);
                 return;
             }
             if (needs(ComputerList::Aristocrats)) {
-                return;
-            }
-            if (gold_exit(rivals(), stocked, false)) {
-                set_stage(p, r, stage::kAristocrats2);
                 return;
             }
             idle();
@@ -2974,14 +2948,14 @@ bool Engine::need_denkmal(AiPlayer& p) {
     return true;
 }
 
-bool Engine::gold_exit(bool improved, bool rich, bool list_pending) noexcept {
-    // Open1602 (p52, x3 g4-404-p3 P1): an improved computer leaves a stage on gold, or on gold and
-    // goods in store, only once the stage's own list has nothing left to build; on its people
-    // (settlers, citizens, merchants risen) it still moves on at once. In gate f43's base, 961
-    // cities went through two or more stages within a game minute, a quarter then stood still. Its rich thresholds are
-    // a quarter of the original's, and with 6,992 gold a city went from main to merchants within one second, skipping
-    // the tavern and school of the citizens' lists; it kept 0 citizens for 300 minutes.
-    return rich && (!improved || !list_pending);
+bool Engine::gold_exit(bool improved, bool rich, bool risen) noexcept {
+    // Open1602 (p52 and p59, x3 g4-404-p1/p3 P1): an improved computer's city leaves the citizens'
+    // stages on gold alone only once its citizens have begun to come (risen, as Main2's own exit
+    // counts them). Its rich thresholds are a quarter of the original's: with 5,700 to 7,000 gold a
+    // city went from citizens to merchants within seconds with no citizen, and its houses stood at
+    // settlers for 300 minutes. Holding the exit behind the stage's list instead (p59) delayed the
+    // early stages and lost more than it gained.
+    return rich && (!improved || risen);
 }
 
 bool Engine::citizens_rise(bool citizens, bool gold, bool earning) noexcept {
