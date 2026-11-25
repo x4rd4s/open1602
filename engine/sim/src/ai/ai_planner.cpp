@@ -380,6 +380,25 @@ void Engine::tax_rates(AiPlayer& p, City& c) {
     if (!rivals()) {
         return;
     }
+    const auto& classes = m_buildings.resident_classes();
+    for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
+        if (c.inhabitants[k] == 0) {
+            continue;
+        }
+        const auto chosen = static_cast<std::uint8_t>(chosen_tax(p, c, k, 0));
+        if (c.tax_rate[k] != chosen) {
+            c.tax_rate[k] = chosen;
+            if (k < c.satisfaction.size()) {
+                c.satisfaction[k] = satisfaction_of(c, classes[k], chosen);
+            }
+            log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
+        }
+    }
+}
+
+std::uint32_t Engine::chosen_tax(const AiPlayer& p, const City& c, std::size_t k, std::uint8_t full_ware) const {
+    // The rate tax_rates sets for class k; with `full_ware`, the rate it would set were that good
+    // fully supplied.
     constexpr std::uint8_t kNormal = 128;
     constexpr std::uint8_t kStep = 8;
     constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
@@ -388,38 +407,26 @@ void Engine::tax_rates(AiPlayer& p, City& c) {
     // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
     // and with little gold but no debt it kept that rate for hours.
     const bool broke = money < 0 && net_income(p) < 0;
-    for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
-        if (c.inhabitants[k] == 0) {
-            continue;
+    const auto content = [&](std::uint32_t rate) {
+        return satisfaction_of(c, classes[k], static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)), full_ware);
+    };
+    std::uint32_t rate = CityOrder::kMinTax;
+    for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
+        if (content(r + kStep) >= kFullSupply) {
+            rate = r;
         }
-        const auto content = [&](std::uint32_t rate) {
-            return satisfaction_of(c, classes[k], static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
-        };
-        std::uint32_t rate = CityOrder::kMinTax;
-        for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
-            if (content(r + kStep) >= kFullSupply) {
+    }
+    if (rate < kNormal) {
+        rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
+    }
+    if (broke) {
+        for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
+            if (content(r) >= kStable) {
                 rate = r;
             }
         }
-        if (rate < kNormal) {
-            rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
-        }
-        if (broke) {
-            for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
-                if (content(r) >= kStable) {
-                    rate = r;
-                }
-            }
-        }
-        const auto chosen = static_cast<std::uint8_t>(rate);
-        if (c.tax_rate[k] != chosen) {
-            c.tax_rate[k] = chosen;
-            if (k < c.satisfaction.size()) {
-                c.satisfaction[k] = content(chosen);
-            }
-            log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
-        }
     }
+    return rate;
 }
 
 void Engine::material_lock(AiPlayer& p, City& c) {

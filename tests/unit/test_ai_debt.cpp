@@ -131,6 +131,14 @@ TEST_CASE("ai ships: a ship under the white flag takes no order while a pirate i
     CHECK(!Engine::flag_keeps(false, true, true));  // the original's computers: as before
 }
 
+TEST_CASE("ai budget: a colony earns the taxes a short good costs by the share of the shortfall it makes") {
+    // t61, l2 L-909-m430 P8: a cocoa colony weighed -30..+4 a minute while its city went without cocoa.
+    CHECK(Engine::shortage_share(500, 1000, 1000) == 500);
+    CHECK(Engine::shortage_share(500, 4000, 1000) == 500);  // more than the gap earns no more
+    CHECK(Engine::shortage_share(500, 200, 1000) == 100);   // a fifth of the gap, a fifth of the step
+    CHECK(Engine::shortage_share(500, 1000, 0) == 0);       // nothing short
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));

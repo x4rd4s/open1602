@@ -54,4 +54,7 @@ std::uint8_t original_need_slot(std::uint8_t w);
 std::vector<std::uint32_t> package_wanted(const std::vector<PackageNeed>& needs,
                                           const std::vector<std::uint32_t>& demand);
 
+/// What `amount` per cycle of `interval` game seconds comes to a minute.
+[[nodiscard]] std::uint32_t per_minute(std::uint32_t amount, std::uint32_t interval);
+
 }  // namespace o1602::sim::ai

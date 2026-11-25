@@ -89,10 +89,12 @@ std::vector<std::uint8_t> consumer_goods(const assets::BuildingTable& buildings)
     return goods;
 }
 
-std::uint8_t satisfaction_of(const City& city, const assets::ResidentClass& rc, std::uint8_t tax_rate) {
+std::uint8_t satisfaction_of(const City& city, const assets::ResidentClass& rc, std::uint8_t tax_rate,
+                             std::uint8_t full_ware) {
     std::uint64_t sum = 0;
     for (const assets::ResidentClass::Need& n : rc.needs) {
-        sum += n.ware < city.supply.size() ? city.supply[n.ware].ratio : kFull;
+        const bool full = n.ware >= city.supply.size() || (full_ware != 0 && n.ware == full_ware);
+        sum += full ? kFull : city.supply[n.ware].ratio;
     }
     // Curve[tax'] * Prozent * goods / 128, the tax lowered by the bonus of a castle or
     // cathedral: tax' = (128 - bonus / 32) * tax / 128. The original goes below the curve for a bonus

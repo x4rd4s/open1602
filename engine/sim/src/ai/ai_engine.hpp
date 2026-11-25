@@ -421,6 +421,9 @@ public:
                                                   std::int64_t goal) noexcept;
     /// Improved computers: a ship under the white flag takes no order while a pirate is near.
     [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
+    /// The part of the tax `step` a colony earns that makes `yield` of a shortfall `short_by`.
+    [[nodiscard]] static std::int64_t shortage_share(std::int64_t step, std::uint64_t yield,
+                                                     std::uint32_t short_by) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -679,8 +682,10 @@ private:
     /// computer's cities lack now, with no free island for it, while it could settle the island
     /// its war frees (below its city limit, budget accepts the colony): a reason to conquer.
     [[nodiscard]] bool holds_wanted_crop(const AiPlayer& p, PlayerId b) const;
-    /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income).
-    [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people) const;
+    /// The taxes a minute of `people` of class k in `city`, at its tax rate (consumption.hpp, tax_income),
+    /// or at `rate`.
+    [[nodiscard]] std::int64_t class_taxes(const City& city, std::size_t k, std::uint64_t people,
+                                           std::optional<std::uint32_t> rate = std::nullopt) const;
     bool prepare_colony_ship(AiPlayer& p, std::uint8_t crop, bool food);
     /// Loads the colony ship in city `c`; true once it holds its whole load, the settlement then starts.
     bool load_colony_ship(AiPlayer& p, City& c, Ship& ship, bool food, std::uint8_t crop);
@@ -711,6 +716,10 @@ private:
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
     [[nodiscard]] bool saving_costs(const AiPlayer& p) const;
     void tax_rates(AiPlayer& p, City& c);
+    /// The rate tax_rates sets for class `k` of `c`; with `full_ware` (not 0), the rate it would set
+    /// were that good fully supplied.
+    [[nodiscard]] std::uint32_t chosen_tax(const AiPlayer& p, const City& c, std::size_t k,
+                                           std::uint8_t full_ware) const;
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.
     void material_lock(AiPlayer& p, City& c);
@@ -1105,6 +1114,12 @@ private:
     /// What the home city gains a minute once it has `good`: the taxes of the inhabitants it lets
     /// rise, less the other goods they then buy.
     [[nodiscard]] std::int64_t gate_value(const AiPlayer& p, std::uint8_t good) const;
+    /// What the computer's cities gain a minute once a colony for `crop` delivers to classes that
+    /// go short of its good now: the taxes the computer would ask with the good fully supplied
+    /// (chosen_tax) beyond those it asks now, by the share of the shortfall the colony's fields make.
+    [[nodiscard]] std::int64_t shortage_value(const AiPlayer& p, std::uint8_t crop) const;
+    /// What a colony's chain for `crop` (colony_chain) makes of its good a minute at full rate, 1/32 t.
+    [[nodiscard]] std::uint64_t chain_yield(const AiPlayer& p, std::uint8_t crop) const;
     /// A colony for `crop` as a plan of the budget (0: for room or ore, it opens no class).
     [[nodiscard]] Commitment colony_commitment(const AiPlayer& p, std::uint8_t crop) const;
     /// Improved computers: what one of their cities beyond the home city costs a minute beyond its

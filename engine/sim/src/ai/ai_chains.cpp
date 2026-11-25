@@ -19,10 +19,6 @@ bool crop(std::uint8_t w) {
     return w >= ware::kCornField && w <= ware::kCocoaField;
 }
 
-std::uint32_t per_minute(std::uint32_t amount, std::uint32_t interval) {
-    return static_cast<std::uint32_t>(std::uint64_t{amount} * 60 / interval);
-}
-
 /// How the computers place `b`, as `need`; false if no task of theirs can.
 bool placement(const assets::BuildingType& b, PackageNeed& need) {
     const bool two_by_two = b.size_x == 2 && b.size_y == 2;
@@ -172,6 +168,10 @@ std::vector<std::uint32_t> package_wanted(const std::vector<PackageNeed>& needs,
         }
     }
     return wanted;
+}
+
+std::uint32_t per_minute(std::uint32_t amount, std::uint32_t interval) {
+    return static_cast<std::uint32_t>(std::uint64_t{amount} * 60 / interval);
 }
 
 }  // namespace o1602::sim::ai
