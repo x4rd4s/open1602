@@ -210,6 +210,14 @@ TEST_CASE("ai colony: a crop counts as grown only where its farm stands or is be
     CHECK(!Engine::farm_counts(false, 6, true, 0, 2));
 }
 
+TEST_CASE("ai colony: a city that grows a crop plants it for another city that has none") {
+    // t73: the home city's store held the grower's fields back while another city went dry.
+    CHECK(Engine::home_stocked(true, 50, 40, false));
+    CHECK(!Engine::home_stocked(true, 50, 40, true));
+    CHECK(!Engine::home_stocked(true, 30, 40, false));
+    CHECK(Engine::home_stocked(false, 50, 40, true));  // the original looks at the home city only
+}
+
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
     // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
     CHECK(Engine::citizens_rise(true, true, false));

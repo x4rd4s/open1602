@@ -416,6 +416,9 @@ public:
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
     /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
     [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
+    /// luxury(): whether the home city's store of a good (`stock` against `cap`) holds its fields
+    /// back; for an improved computer not while one of its cities is `dry` of it (good_dry).
+    [[nodiscard]] static bool home_stocked(bool improved, std::uint32_t stock, std::uint32_t cap, bool dry) noexcept;
     /// Whether `farms` standing count (or one being sited): while the cities use more of the good
     /// than they make (`short_of`), only while their slot can still add one (attempts, fail_level).
     [[nodiscard]] static bool farm_counts(bool siting, std::uint16_t farms, bool short_of, std::uint16_t attempts,
@@ -672,6 +675,9 @@ private:
     /// Improved computers: whether a city on an island that grows the crop counts as growing it
     /// (its farm stands, or is being sited); see farm_counts.
     [[nodiscard]] bool crop_grower(const AiPlayer& p, const City& c, std::uint8_t crop) const;
+    /// Whether one of the computer's cities uses the good and holds none of it: dry by the stock,
+    /// as a player sees it.
+    [[nodiscard]] bool good_dry(const AiPlayer& p, std::uint8_t good) const;
     /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
     [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a

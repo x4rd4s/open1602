@@ -1270,6 +1270,12 @@ bool Engine::crop_grower(const AiPlayer& p, const City& c, std::uint8_t crop) co
     return farm_counts(siting, s.count, goods_ahead(p.player, good) != 0, s.attempts, s.fail_level);
 }
 
+bool Engine::good_dry(const AiPlayer& p, std::uint8_t good) const {
+    return good != 0 && std::ranges::any_of(m_world.cities(), [&](const City& c) {
+               return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
+           });
+}
+
 bool Engine::farm_counts(bool siting, std::uint16_t farms, bool short_of, std::uint16_t attempts,
                          std::uint16_t fail_level) noexcept {
     if (siting) {

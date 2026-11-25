@@ -3136,6 +3136,10 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
+bool Engine::home_stocked(bool improved, std::uint32_t stock, std::uint32_t cap, bool dry) noexcept {
+    return stock >= cap && !(improved && dry);
+}
+
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
@@ -3249,7 +3253,11 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
                 want = std::max(want, std::min(r->slots[crop.slot].count + (lacking + per - 1) / per, n + 2));
             }
         }
-        if (r->slots[crop.slot].count >= want || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
+        // Open1602 (t73): the home city's store stands for all the cities only while none of them
+        // runs dry of the good (good_dry): a city whose island grows the crop plants it for another
+        // that has none, as a player would, before a colony is founded for it.
+        const bool stocked = home_stocked(rivals(), home->stock(crop.good), cap, rivals() && good_dry(p, crop.good));
+        if (r->slots[crop.slot].count >= want || stocked || crop.upkeep >= budget) {
             continue;
         }
         if (need(p, crop.slot, want)) {
