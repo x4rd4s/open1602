@@ -131,6 +131,15 @@ TEST_CASE("ai ships: a ship under the white flag takes no order while a pirate i
     CHECK(!Engine::flag_keeps(false, true, true));  // the original's computers: as before
 }
 
+TEST_CASE("ai settle: a colony ship short of the Kontor's gold waits at the site") {
+    // p58, x3 o4-505-p1 P3: 52 founding tries in a minute at -7,865 gold.
+    CHECK(Engine::founding_waits(true, false, -7865, 2000));
+    CHECK(Engine::founding_waits(true, false, 1999, 2000));
+    CHECK(!Engine::founding_waits(true, false, 2000, 2000));
+    CHECK(!Engine::founding_waits(false, false, -7865, 2000));  // the original's computers try on
+    CHECK(!Engine::founding_waits(true, true, -7865, 2000));    // the pirates found their nest as before
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));
