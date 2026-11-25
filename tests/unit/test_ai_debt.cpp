@@ -215,3 +215,10 @@ TEST_CASE("ai doctor: an improved computer builds the next doctor where houses t
     h.city = 0;  // another city's
     CHECK(!Engine::lacks_doctor(h, c));
 }
+
+TEST_CASE("ai doctor: the doctor opens again only for as many houses as its site must cover") {
+    // p49: gaps of one to seven houses had the search fail again and again (min_houses 8).
+    CHECK(!Engine::doctor_gap(7, 8));
+    CHECK(Engine::doctor_gap(8, 8));
+    CHECK(!Engine::doctor_gap(0, 0));
+}

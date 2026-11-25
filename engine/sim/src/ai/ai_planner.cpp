@@ -3051,6 +3051,10 @@ bool Engine::checks_coverage(bool improved, std::uint8_t which, bool cov) noexce
            (improved && which == kSlotKlinik);
 }
 
+bool Engine::doctor_gap(std::int32_t lacking, std::int32_t min_houses) noexcept {
+    return lacking > 0 && lacking >= min_houses;
+}
+
 bool Engine::lacks_doctor(const House& h, const City& c) noexcept {
     return h.island == c.island && h.city == c.index && plague_prone(h) && (h.services & house_service::kKlinik) == 0;
 }
@@ -3063,12 +3067,17 @@ void Engine::doctor_gaps(AiPlayer& p, const City& c, CityPlan& r) {
     if (!rivals() || (r.flags & city_flag::kKlinik) == 0) {
         return;
     }
-    for (const House& h : m_world.houses()) {
-        if (lacks_doctor(h, c)) {
-            r.flags &= ~city_flag::kKlinik;
-            log(p, "city %u/%u: a house at %u,%u has no doctor", c.island, c.index, unsigned{h.x}, unsigned{h.y});
-            return;
-        }
+    // Only once as many houses lack one as a doctor's site must newly cover (min_houses, p49): a
+    // gap of a few houses had the search fail again and again.
+    const ComputerSlot* def = computer_slot(slots(), kSlotKlinik);
+    if (def == nullptr) {
+        return;
+    }
+    const auto lacking = static_cast<std::int32_t>(
+        std::ranges::count_if(m_world.houses(), [&](const House& h) { return lacks_doctor(h, c); }));
+    if (doctor_gap(lacking, def->min_houses)) {
+        r.flags &= ~city_flag::kKlinik;
+        log(p, "city %u/%u: %d houses have no doctor", c.island, c.index, lacking);
     }
 }
 

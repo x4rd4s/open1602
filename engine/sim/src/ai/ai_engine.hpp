@@ -413,6 +413,8 @@ public:
     [[nodiscard]] static bool checks_coverage(bool improved, std::uint8_t which, bool cov) noexcept;
     /// Whether house `h` of city `c` is one the plague can break out in and no doctor covers (p48).
     [[nodiscard]] static bool lacks_doctor(const House& h, const City& c) noexcept;
+    /// Whether `lacking` such houses open the doctor again: as many as its site must newly cover.
+    [[nodiscard]] static bool doctor_gap(std::int32_t lacking, std::int32_t min_houses) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
