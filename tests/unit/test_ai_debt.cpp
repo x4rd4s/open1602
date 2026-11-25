@@ -182,3 +182,11 @@ TEST_CASE("ai supply: a route stop books only what it can still load") {
     CHECK(Engine::still_loads(64, 80, false) == 0);
     CHECK(Engine::still_loads(64, 0, true) == 0);  // a one-way run past the stop
 }
+
+TEST_CASE("ai yard: the build waits while a damaged ship is called in") {
+    // P1: the yard's build and the city's construction used up the wood, and the repairs stopped.
+    CHECK(!Engine::yard_builds(true, true, false, true));  // paused for the ship on its way
+    CHECK(Engine::yard_builds(true, true, true, true));    // a repair runs: the yard is on anyway
+    CHECK(Engine::yard_builds(true, true, false, false));  // nobody called: the build goes on
+    CHECK(Engine::yard_builds(false, true, false, true));  // the original's computers
+}
