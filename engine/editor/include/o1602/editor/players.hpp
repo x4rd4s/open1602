@@ -52,6 +52,10 @@ struct PlayerValues {
     /// The computer's attitude: only the kAttitudeFlags of `attitude.flags` and their thresholds
     /// count; the player's other switches stay as they are.
     sim::ScenarioSwitches attitude{};
+    /// Where a computer founds its first city if it starts without one (Open1602): as the
+    /// original, an island drawn at random, or the island with the number `first_island_number`.
+    sim::FirstIsland first_island = sim::FirstIsland::Original;
+    std::uint16_t first_island_number = 0;
     friend bool operator==(const PlayerValues&, const PlayerValues&) = default;
 };
 
@@ -74,7 +78,8 @@ struct PlayerValues {
 /// one, as on the colour screen. Fails (NotFound) for no human or computer, (InvalidFormat) for a
 /// name a player could not give, a role that is neither, a banner no player can have, money out
 /// of range, a faction not of slot_factions() (other than the one it has), an attitude switch
-/// other than kAttitudeFlags or a development threshold above kMaxDevelopment.
+/// other than kAttitudeFlags, a development threshold above kMaxDevelopment, or a fixed first
+/// island the map has no island of.
 [[nodiscard]] annokit::core::Result<std::unique_ptr<Operation>> set_player(const sim::World& world,
                                                                            sim::PlayerId player,
                                                                            const PlayerValues& values);

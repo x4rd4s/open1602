@@ -19,6 +19,7 @@
 #include "o1602/sim/game_data.hpp"
 #include "o1602/sim/savegame_extension.hpp"
 #include "o1602/sim/savegame_writer.hpp"
+#include "o1602/sim/start_places.hpp"
 
 namespace o1602::sim {
 
@@ -605,6 +606,13 @@ annokit::core::Result<World> roll_planned_islands(const World& world, const asse
     rolled->set_scenario_info(world.scenario_info());
     rolled->set_markers(world.markers());
     rolled->set_scenario_script(world.scenario_script());
+    for (std::size_t slot = 0; slot < world.players().size(); ++slot) {
+        // The computers' first islands, by number: the islands of the world keep theirs.
+        if (Player* after = rolled->player(static_cast<PlayerId>(slot)); after != nullptr) {
+            after->first_island = world.players()[slot].first_island;
+            after->first_island_number = world.players()[slot].first_island_number;
+        }
+    }
     for (const WorldIsland& before : world.islands()) {
         if (!before.random_fertility) {
             continue;
@@ -679,6 +687,12 @@ annokit::core::Result<World> start_scenario(World world, const assets::GameDirec
         world.set_planned_islands(std::nullopt);  // nothing to make: the game needs no plan
     }
     roll_random_fertility(world, start.seed);
+    if (std::optional<ScenarioInfo> info = world.scenario_info(); info && info->shuffle_starts) {
+        // Once, as the game starts: a game saved of it keeps its places.
+        shuffle_start_places(world, buildings, start.seed);
+        info->shuffle_starts = false;
+        world.set_scenario_info(std::move(info));
+    }
     return world;
 }
 

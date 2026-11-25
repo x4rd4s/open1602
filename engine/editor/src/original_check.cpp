@@ -90,6 +90,14 @@ std::vector<LimitProblem> original_limit_problems(const sim::World& world) {
                     [](const sim::Player& p) { return p.scenario.has(sim::scenario_flag::kPiratePeace); })) {
         problems.push_back(LimitProblem{Kind::PiratePeace});
     }
+    if (std::any_of(world.players().begin(), world.players().end(), [](const sim::Player& p) {
+            return p.role == sim::PlayerRole::Computer && p.first_island != sim::FirstIsland::Original;
+        })) {
+        problems.push_back(LimitProblem{Kind::FirstIsland});
+    }
+    if (const auto& info = world.scenario_info(); info && info->shuffle_starts) {
+        problems.push_back(LimitProblem{Kind::StartPlaces});
+    }
     return problems;
 }
 
@@ -136,6 +144,10 @@ std::string describe(const LimitProblem& p, const sim::World& world) {
             return "a script";
         case Kind::PiratePeace:
             return "a lasting peace with the pirates";
+        case Kind::FirstIsland:
+            return "a computer's first island chosen";
+        case Kind::StartPlaces:
+            return "start places at random";
     }
     return {};
 }

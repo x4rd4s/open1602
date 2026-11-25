@@ -410,6 +410,10 @@ public:
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
     [[nodiscard]] static bool crop_war_motive(bool lacking, bool settles, bool free) noexcept;
+    /// Improved computers: whether its cities lack a crop's good for a war: used beyond what they
+    /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
+    /// city that uses it has none (`dry`).
+    [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -575,6 +579,13 @@ private:
 
     // ---- ai_settle.cpp ----
     void pick_island(AiPlayer& p);
+    /// The island the scenario chose for the first city of `p` (Player::first_island), if it may
+    /// still have one there; a random choice is drawn now. Nothing: the search as always.
+    [[nodiscard]] std::optional<std::uint16_t> first_island_choice(AiPlayer& p);
+    /// Whether another computer goes to `island` or the scenario chose it for one.
+    [[nodiscard]] bool first_island_aimed(const AiPlayer& p, std::uint16_t island) const;
+    /// Whether `island` is the one the scenario chose for `p`; the choice is spent then.
+    bool spend_first_island(AiPlayer& p, std::uint16_t island);
     [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: the computer gave a city up on the island in the last 45 minutes.
     [[nodiscard]] bool left_lately(AiPlayer& p, std::uint16_t island);

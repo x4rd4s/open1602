@@ -313,6 +313,9 @@ inline constexpr std::uint16_t kPlayerOwners = 4;
 /// Version 5 of PSTA: each player also has the cheats it unlocked (Player::cheats). The writer
 /// takes it only when a player has unlocked them.
 inline constexpr std::uint16_t kPlayerCheats = 5;
+/// Version 6 of PSTA: each player also has where a computer founds its first city
+/// (Player::first_island, first_island_number). The writer takes it only when a player has a choice.
+inline constexpr std::uint16_t kFirstIsland = 6;
 /// FLEE version 2: every ship's route with TradeRoute::kStops stops, not the original's four.
 inline constexpr std::uint16_t kLongRoutes = 2;
 /// FLEE version 3: every stop with RouteStop::kEntries wares, not the original's three.

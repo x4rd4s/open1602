@@ -217,6 +217,7 @@ constexpr Id kShipPriceMore = 1241;
 constexpr Id kPlayerUnlock = 1242;       ///< the stage a player's buildings are open to from the start
 constexpr Id kPlayerUnlockTable = 1250;  ///< + the row of the players' table: its unlock stage             ///< the
                                          ///< offer's price 10 % higher (right button: the type's own)
+constexpr Id kMarkerShipStart = 1270;    ///< the selected point marker made a further start place of ships
 constexpr std::uint32_t kPriceStep = 128 / 10;  ///< 10 % of the price, in 1/128
 constexpr Id kPlayerTable = 300;                ///< + 8 * the row + the column of the players' table
 constexpr std::size_t kTableRows = 16;
@@ -431,16 +432,17 @@ enum AttitudeColumn : std::size_t {
     kRivalDevelopmentColumn,  ///< cross with a human whose best city is beyond a level
     kOwnSizeColumn,           ///< cross with the humans while it has fewer inhabitants
     kRivalSizeColumn,         ///< cross with a human who has more inhabitants
+    kFirstIslandColumn,       ///< Open1602: where it founds its first city (sim::FirstIsland)
     kAttitudeColumns
 };
 
 constexpr std::array<const char*, kAttitudeColumns> kAttitudeHeads = {
     "editor.attitude.own_level", "editor.attitude.rival_level", "editor.attitude.own_people",
-    "editor.attitude.rival_people"};
+    "editor.attitude.rival_people", "editor.attitude.first_island"};
 
 constexpr std::array<std::uint32_t, kAttitudeColumns> kAttitudeFlag = {
     sim::scenario_flag::kOwnDevelopment, sim::scenario_flag::kRivalDevelopment, sim::scenario_flag::kOwnSize,
-    sim::scenario_flag::kRivalSize};
+    sim::scenario_flag::kRivalSize, 0};
 
 /// The development thresholds a click steps through: each class and its half (32 a class).
 constexpr std::array<std::uint8_t, 10> kDevelopmentSteps = {0, 16, 32, 48, 64, 80, 96, 112, 128, 144};
@@ -480,6 +482,18 @@ std::string attitude_text(const EditorPlayer& p, std::size_t column, bool& enabl
     enabled = !p.human;
     if (!enabled) {
         return ui::tr("editor.players.human");
+    }
+    if (column == kFirstIslandColumn) {
+        switch (static_cast<sim::FirstIsland>(p.first_island)) {
+            case sim::FirstIsland::Original:
+                return ui::tr("editor.attitude.first_original");
+            case sim::FirstIsland::AtRandom:
+                return ui::tr("editor.attitude.first_random");
+            default:
+                return p.first_island_index < 0
+                           ? ui::tr("editor.attitude.first_gone")
+                           : ui::tr("editor.attitude.first_fixed", {count(std::size_t(p.first_island_index) + 1)});
+        }
     }
     if ((p.attitude_flags & kAttitudeFlag[column]) == 0) {
         return ui::tr("editor.attitude.off");
@@ -826,8 +840,28 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
     return Rect{kToolBar + 8 + (room_w - w) / 2 - m_column_x, 26 + 8 + (room_h - h) / 2, w, h};
 }
 
+void EditorPanel::offer_tip(Rect area, std::string_view text) {
+    if (!text.empty() && m_mouse && area.contains((*m_mouse)[0], (*m_mouse)[1])) {
+        m_tip_offered = std::string(text);
+        m_tip_area = area;
+    }
+}
+
+void EditorPanel::show_tip() {
+    const auto now = std::chrono::steady_clock::now();
+    if (m_tip_offered != m_tip) {
+        m_tip = m_tip_offered;
+        m_tip_since = now;
+        m_tip_dismissed = false;
+    }
+    if (!m_tip.empty() && !m_tip_dismissed && now - m_tip_since >= kTipDelay) {
+        m_form.tooltip(m_tip_area, m_tip);
+    }
+}
+
 void EditorPanel::layout(const EditorModel& model) {
     m_form.clear();
+    m_tip_offered.clear();
     // The column starts m_column_x into the window: the dialogs left of it, and their tooltips,
     // are kept within the window, not within a screen from the column's edge.
     if (m_screen_w > 0) {
@@ -843,6 +877,7 @@ void EditorPanel::layout(const EditorModel& model) {
         // The plan waits: nothing but another roll or the way back to it.
         m_form.panel(Rect{m_x - 6, m_top, kWidth - 2 * (m_x - 6), m_height});
         layout_preview(model);
+        show_tip();
         return;
     }
     if (m_page == Page::Check) {
@@ -890,10 +925,12 @@ void EditorPanel::layout(const EditorModel& model) {
         m_w = column[1];
         m_top = column[2];
         m_height = column[3];
+        show_tip();
         return;
     }
     m_form.panel(Rect{m_x - 6, m_top, kWidth - 2 * (m_x - 6), m_height});
     layout_page(model);
+    show_tip();
 }
 
 void EditorPanel::layout_page(const EditorModel& model) {
@@ -1031,8 +1068,12 @@ void EditorPanel::layout_markers(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     f.label(Rect{m_x, y, m_w, 28}, ui::tr("editor.markers.title"), Align::Left, Tone::Heading);
     y += 30;
-    f.paragraph(Rect{m_x, y, m_w, 3 * 20}, ui::tr("editor.markers.note"), Tone::Dim, 20);
-    y += 3 * 20 + 4;
+    // The note as tall as it wraps (at least three lines, so that the list stays in place).
+    const std::string& note = ui::tr("editor.markers.note");
+    const auto note_lines =
+        std::max<std::int32_t>(3, static_cast<std::int32_t>(ui::paragraph_lines(m_font, note, m_w).size()));
+    f.paragraph(Rect{m_x, y, m_w, note_lines * 20}, note, Tone::Dim, 20);
+    y += note_lines * 20 + 4;
     const std::size_t n = model.markers.size();
     if (n == 0) {
         f.label(Rect{m_x, y, m_w, kLine}, ui::tr("editor.markers.none"), Align::Left, Tone::Dim);
@@ -1071,6 +1112,14 @@ void EditorPanel::layout_markers(const EditorModel& model) {
     f.button(kMarkerRename, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.rename"), chosen);
     y += kButtonH + kGap;
     f.button(kMarkerRemove, Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.remove"), chosen);
+    y += kButtonH + kGap;
+    // Open1602: a point a player's ships may start at, when the scenario draws its start places.
+    const bool point = chosen && model.markers[*model.marker].point;
+    f.button(kMarkerShipStart, Rect{m_x, y, m_w, kButtonH},
+             ui::tr(point && model.markers[*model.marker].ship_start ? "editor.markers.ship_start_is"
+                                                                     : "editor.markers.ship_start"),
+             point && !model.markers[*model.marker].ship_start);
+    offer_tip(Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.ship_start.tip"));
     y += kButtonH + kGap;
     const std::int32_t bottom = m_top + m_height - 4;
     if (!model.notice.empty() && bottom - y - 2 >= 2 * 20) {
@@ -1610,13 +1659,15 @@ void EditorPanel::layout_attitude_table(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     dialog_tabs(model, "editor.attitude.title", Page::Attitude);
     y += kButtonH + kGap + 4;
-    // The players down the left; a column for each threshold, its head on two lines.
-    constexpr std::int32_t kNames = 180;
+    // The players down the left, as wide as the columns leave; a column for each threshold and
+    // the first island, its head on two lines.
     const auto shown = static_cast<std::int32_t>(kAttitudeColumns);
-    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - kNames) / shown - kGap);
+    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - 230) / shown - kGap);
+    const std::int32_t kNames = m_w - shown * (cell + kGap) + kGap;
     const auto column_x = [&](std::size_t i) { return m_x + kNames + static_cast<std::int32_t>(i) * (cell + kGap); };
     for (std::size_t i = 0; i < kAttitudeColumns; ++i) {
         f.paragraph(Rect{column_x(i), y, cell, 2 * 18}, ui::tr(kAttitudeHeads[i]), Tone::Dim, 18);
+        offer_tip(Rect{column_x(i), y, cell, 2 * 18}, ui::tr(std::string(kAttitudeHeads[i]) + ".tip"));
     }
     y += 2 * 18 + 2;
     constexpr std::int32_t kRow = kButtonH + 2;
@@ -1633,6 +1684,9 @@ void EditorPanel::layout_attitude_table(const EditorModel& model) {
             std::string text = attitude_text(p, i, enabled);
             const Id id = kAttitudeTable + static_cast<Id>(row * kAttitudeColumns + i);
             f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+            if (i == kFirstIslandColumn) {
+                offer_tip(Rect{column_x(i), y, cell, kButtonH}, ui::tr("editor.attitude.first_island.tip"));
+            }
         }
         y += kRow;
     }
@@ -1660,6 +1714,23 @@ std::optional<EditorRequest> EditorPanel::press_attitude(const EditorModel& mode
     r.name = r.player.own_name;
     r.index = 5;  // the attitude
     EditorPlayer& p = r.player;
+    if (column == kFirstIslandColumn) {
+        // As the original, at random, then each island of the map, round (the right button back).
+        r.index = 8;
+        const std::size_t positions = model.islands + 2;
+        std::size_t at = 0;
+        if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::AtRandom)) {
+            at = 1;
+        } else if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Fixed)) {
+            at = p.first_island_index < 0 ? (forward ? 1 : 2) : static_cast<std::size_t>(p.first_island_index) + 2;
+        }
+        const std::size_t next = step(at, positions, forward);
+        p.first_island = static_cast<std::uint8_t>(next == 0   ? sim::FirstIsland::Original
+                                                   : next == 1 ? sim::FirstIsland::AtRandom
+                                                               : sim::FirstIsland::Fixed);
+        p.first_island_index = next >= 2 ? static_cast<std::int32_t>(next - 2) : -1;
+        return r;
+    }
     // Off, then the steps, round (the right button back). A threshold between two steps goes on
     // to the next one or back to the one before.
     const bool on = (p.attitude_flags & kAttitudeFlag[column]) != 0;
@@ -2609,6 +2680,9 @@ void EditorPanel::layout_neutrals_table(const EditorModel& model) {
             std::string text = neutral_text(model, p, columns[i], enabled);
             const Id id = kNeutralTable + static_cast<Id>(row * kNeutralColumns + columns[i]);
             f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+            if (i == kFirstIslandColumn) {
+                offer_tip(Rect{column_x(i), y, cell, kButtonH}, ui::tr("editor.attitude.first_island.tip"));
+            }
         }
         y += kRow;
     }
@@ -2782,8 +2856,6 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
     m_page_rows = std::min<std::size_t>(2 * per_column, 20);
     m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
     const std::size_t rows = (m_page_rows + 1) / 2;
-    const std::string* tip = nullptr;  // the explanation of the setting under the mouse
-    Rect tip_at{};
     for (std::size_t k = 0; k < m_page_rows && m_first + k < n; ++k) {
         const std::int32_t cx = m_x + static_cast<std::int32_t>(k / rows) * (column + 2 * kGap);
         const std::int32_t cy = y + static_cast<std::int32_t>(k % rows) * kRow;
@@ -2793,11 +2865,7 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
             const bool on = model.rules_own && r.enabled;
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label, Align::Left, on ? Tone::Normal : Tone::Dim);
             f.cycle_button(id, Rect{cx + label, cy, column - label, kButtonH}, r.value, on);
-            const Rect row{cx, cy, column, kButtonH};
-            if (m_mouse && row.contains((*m_mouse)[0], (*m_mouse)[1]) && !r.tip.empty()) {
-                tip = &r.tip;
-                tip_at = row;
-            }
+            offer_tip(Rect{cx, cy, column, kButtonH}, r.tip);
         } else {
             const EditorRandom& r = model.randoms[m_first + k];
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label);
@@ -2817,18 +2885,6 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
         f.button(kRandomRoll, Rect{m_x + 2 * (quarter + kGap), foot, quarter, kButtonH}, ui::tr("editor.random.roll"));
     }
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
-    // The setting's tooltip, as the start dialog shows it, once the mouse rested on it; laid out
-    // last, over everything.
-    const std::string under = tip != nullptr ? *tip : std::string();
-    const auto now = std::chrono::steady_clock::now();
-    if (under != m_tip) {
-        m_tip = under;
-        m_tip_since = now;
-        m_tip_dismissed = false;
-    }
-    if (tip != nullptr && !m_tip_dismissed && now - m_tip_since >= kTipDelay) {
-        f.tooltip(tip_at, *tip);
-    }
 }
 
 void EditorPanel::layout_goals(const EditorModel& model) {
@@ -2937,6 +2993,7 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
         } else {
             f.cycle_button(id, Rect{m_x + label, y, m_w - label, kButtonH}, r.value, r.enabled);
         }
+        offer_tip(Rect{m_x, y, m_w, kButtonH}, r.tip);
         y += kRow;
     }
     const std::int32_t foot = m_top + m_height - kButtonH - 4;
@@ -2945,12 +3002,22 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
         f.paragraph(Rect{m_x, y + 4, m_w, std::min(room, 5 * 20)}, ui::tr("editor.scenario.note"), Tone::Dim, 20,
                     ui::tr("editor.scenario.note_short"));
     }
-    const std::int32_t quarter = (m_w - 3 * kGap) / 4;
-    f.button(kPackagesPage, Rect{m_x, foot, quarter, kButtonH},
-             ui::tr("editor.packages.button", {count(model.packages.size())}));
-    f.button(kPackageSavePage, Rect{m_x + quarter + kGap, foot, 2 * quarter + kGap, kButtonH},
-             ui::tr("editor.package_save.button"));
-    f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
+    // The packages, saving to one and closing share the foot, each as wide as its text wants.
+    const std::string packages = ui::tr("editor.packages.button", {count(model.packages.size())});
+    const std::array<const std::string*, 3> texts = {&packages, &ui::tr("editor.package_save.button"),
+                                                     &ui::tr("editor.dialog.close")};
+    std::array<double, 3> want{};
+    for (std::size_t i = 0; i < texts.size(); ++i) {
+        want[i] = std::max(120.0, ui::text_width(m_font, *texts[i]) + 32.0);
+    }
+    const double all = want[0] + want[1] + want[2];
+    const std::int32_t width = m_w - 2 * kGap;
+    const auto w0 = static_cast<std::int32_t>(width * want[0] / all);
+    const auto w1 = static_cast<std::int32_t>(width * want[1] / all);
+    f.button(kPackagesPage, Rect{m_x, foot, w0, kButtonH}, packages);
+    offer_tip(Rect{m_x, foot, w0, kButtonH}, ui::tr("editor.packages.button.tip"));
+    f.button(kPackageSavePage, Rect{m_x + w0 + kGap, foot, w1, kButtonH}, *texts[1]);
+    f.button(kBack, Rect{m_x + w0 + w1 + 2 * kGap, foot, width - w0 - w1, kButtonH}, *texts[2]);
 }
 
 void EditorPanel::layout_packages(const EditorModel& model) {
@@ -4150,6 +4217,11 @@ std::optional<EditorRequest> EditorPanel::press(Id pressed, const EditorModel& m
         case kMarkerRemove:
             if (model.marker && *model.marker < model.markers.size()) {
                 return EditorRequest{EditorRequest::Kind::MarkerRemove, *model.marker};
+            }
+            return std::nullopt;
+        case kMarkerShipStart:
+            if (model.marker && *model.marker < model.markers.size()) {
+                return EditorRequest{EditorRequest::Kind::MarkerShipStart, *model.marker};
             }
             return std::nullopt;
         case kMarkerBack:

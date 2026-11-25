@@ -50,6 +50,9 @@ struct ScenarioInfo {
     /// The human chooses the banner when the game starts, as in the endless game; the player who
     /// had it takes the human's. False: the colours stay as the map sets them.
     bool choose_banner = false;
+    /// Open1602: the players who start with ships only draw their start places at random from
+    /// those of the map and its markers "ship_start..." (shuffle_start_places, start_places.hpp).
+    bool shuffle_starts = false;
     /// The game settings the author made the scenario for (section SRUL): the start dialog begins
     /// from them, the player can still change them. Nothing: the player's own, as for any scenario.
     std::optional<Rules> rules;

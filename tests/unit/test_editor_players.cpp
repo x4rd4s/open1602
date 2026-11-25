@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -537,4 +538,47 @@ TEST_CASE("editor players: a player's buildings open from the start up to a stag
     CHECK(!editor::unlock_stage(world.players()[1], levels).has_value());
     CHECK(!editor::set_unlock_stage(world, 1, levels, editor::kMaxUnlockStage + 1).ok());
     CHECK(!editor::set_unlock_stage(world, 4, levels, 1).ok());  // the trader
+}
+
+TEST_CASE("editor players: a computer's first island, kept by the island's number and in the saved scenario") {
+    sim::World world = seven_slots();
+    // Two islands of open sea, numbered 4 and 9 (an island's number, not its place in the list).
+    for (const std::uint8_t number : {std::uint8_t{4}, std::uint8_t{9}}) {
+        sim::WorldIsland island{assets::IslandHeader{}, sim::IslandMap(4, 4), number == 4 ? 2U : 20U, 2};
+        island.header.number = number;
+        island.header.width = 4;
+        island.header.height = 4;
+        REQUIRE(world.add_island(std::move(island)).ok());
+    }
+    editor::PlayerValues v = editor::player_values(world.players()[1]);
+    CHECK(v.first_island == sim::FirstIsland::Original);
+    v.first_island = sim::FirstIsland::Fixed;
+    v.first_island_number = 9;
+    auto op = editor::set_player(world, 1, v);
+    REQUIRE(op.ok());
+    (*op)->apply(world);
+    CHECK(world.players()[1].first_island == sim::FirstIsland::Fixed);
+    CHECK(world.players()[1].first_island_number == 9);
+    // The original cannot have it: the check lists it.
+    const auto limits = editor::original_limit_problems(world);
+    CHECK(std::any_of(limits.begin(), limits.end(),
+                      [](const editor::LimitProblem& p) { return p.kind == editor::LimitProblem::Kind::FirstIsland; }));
+
+    // A scenario saved with it gives it back; one without a choice writes the section as before.
+    auto bytes = sim::write_game(world, assets::BuildingTable{});
+    REQUIRE(bytes.ok());
+    auto loaded = sim::read_game(*bytes, assets::BuildingTable{});
+    REQUIRE(loaded.ok());
+    CHECK(loaded->players()[1].first_island == sim::FirstIsland::Fixed);
+    CHECK(loaded->players()[1].first_island_number == 9);
+    CHECK(loaded->players()[2].first_island == sim::FirstIsland::Original);
+
+    // At random needs no island; an island the map does not have is refused.
+    v.first_island = sim::FirstIsland::AtRandom;
+    REQUIRE(editor::set_player(world, 1, v).ok());
+    v.first_island = sim::FirstIsland::Fixed;
+    v.first_island_number = 5;
+    CHECK(!editor::set_player(world, 1, v).ok());
+    (*op)->revert(world);
+    CHECK(world.players()[1].first_island == sim::FirstIsland::Original);
 }
