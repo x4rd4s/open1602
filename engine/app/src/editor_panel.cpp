@@ -1658,7 +1658,7 @@ void EditorPanel::layout_attitude_table(const EditorModel& model) {
     // The players down the left, as wide as the columns leave; a column for each threshold and
     // the first island, its head on two lines.
     const auto shown = static_cast<std::int32_t>(kAttitudeColumns);
-    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - 180) / shown - kGap);
+    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - 230) / shown - kGap);
     const std::int32_t kNames = m_w - shown * (cell + kGap) + kGap;
     const auto column_x = [&](std::size_t i) { return m_x + kNames + static_cast<std::int32_t>(i) * (cell + kGap); };
     for (std::size_t i = 0; i < kAttitudeColumns; ++i) {
