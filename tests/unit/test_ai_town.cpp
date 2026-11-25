@@ -121,8 +121,8 @@ TEST_CASE("ai town: an improved computer builds no house its doctor cannot come 
     four.houses(5, 8);
     CHECK(!four.keeps(8, 5));
 
-    // Behind a single row a free tile beside the next road's free tile is a way in.
-    Town two({2, 8});
+    // Behind a single row the open ground leads to the next road, however far it is (p47b).
+    Town two({2, 12});
     two.houses(3);
     two.houses(5, 8);
     CHECK(two.keeps(8, 5));
@@ -130,6 +130,7 @@ TEST_CASE("ai town: an improved computer builds no house its doctor cannot come 
     // A house that would close the last way in to the one behind it is not built either.
     Town seal({2, 9});
     seal.houses(3);
-    seal.house(8, 5);
+    seal.houses(5);
+    seal.houses(7, 8);
     CHECK(!seal.keeps(8, 7));
 }

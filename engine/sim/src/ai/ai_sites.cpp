@@ -1410,28 +1410,55 @@ const Engine::CartReach& Engine::cart_reach(const AiPlayer& p) const {
     return r;
 }
 
+const Engine::RoadReach& Engine::road_reach(std::uint16_t island) const {
+    const IslandMap& map = m_world.islands()[island].map;
+    const std::uint64_t revisions = island_revision(island);
+    RoadReach& r = m_road_reach;
+    if (r.island == island && r.revisions == revisions && !r.reached.empty()) {
+        return r;
+    }
+    r.island = island;
+    r.revisions = revisions;
+    r.width = static_cast<std::int32_t>(map.width());
+    r.reached.assign(std::size_t{map.width()} * map.height(), false);
+    const auto index = [&](std::int32_t x, std::int32_t y) {
+        return static_cast<std::size_t>(y) * map.width() + static_cast<std::size_t>(x);
+    };
+    std::vector<TilePos> open;
+    for (std::int32_t y = 0; y < static_cast<std::int32_t>(map.height()); ++y) {
+        for (std::int32_t x = 0; x < r.width; ++x) {
+            if (walk_tile(map, m_buildings, x, y, WalkClass::Roads) != nullptr) {
+                r.reached[index(x, y)] = true;
+                open.push_back({x, y});
+            }
+        }
+    }
+    while (!open.empty()) {
+        const TilePos t = open.back();
+        open.pop_back();
+        for (const TilePos s : kEntrySteps) {
+            const std::int32_t x = t.x + s.x;
+            const std::int32_t y = t.y + s.y;
+            if (map.contains(x, y) && !r.reached[index(x, y)] &&
+                walk_tile(map, m_buildings, x, y, WalkClass::Land) != nullptr) {
+                r.reached[index(x, y)] = true;
+                open.push_back({x, y});
+            }
+        }
+    }
+    return r;
+}
+
 bool Engine::house_keeps_entry(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                std::int32_t y1) const {
     const IslandMap& map = m_world.islands()[p.island].map;
+    const RoadReach& reach = road_reach(p.island);
     const auto in_site = [&](std::int32_t x, std::int32_t y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; };
-    const auto walks = [&](std::int32_t x, std::int32_t y, bool built, WalkClass walk) {
-        return !(built && in_site(x, y)) && walk_tile(map, m_buildings, x, y, walk) != nullptr;
-    };
-    const auto by_road = [&](std::int32_t x, std::int32_t y, bool built) {
-        return walks(x, y, built, WalkClass::Roads) || std::ranges::any_of(kEntrySteps, [&](TilePos s) {
-                   return walks(x + s.x, y + s.y, built, WalkClass::Roads);
-               });
-    };
-    // A tile the doctor walks on (the finder's rule), outside the new house once it is built, that
-    // is a road, touches one or touches such a tile beside one: a free tile shut in by buildings is
-    // no way in.
+    // A tile the doctor reaches from a road, outside the new house once it is built. Taken without
+    // the house: a site that cuts a free strip in two is not seen.
     const auto door = [&](std::int32_t x, std::int32_t y, bool built) {
-        if (!walks(x, y, built, WalkClass::Land)) {
-            return false;
-        }
-        return by_road(x, y, built) || std::ranges::any_of(kEntrySteps, [&](TilePos s) {
-                   return walks(x + s.x, y + s.y, built, WalkClass::Land) && by_road(x + s.x, y + s.y, built);
-               });
+        return !(built && in_site(x, y)) && map.contains(x, y) &&
+               reach.reached[static_cast<std::size_t>(y) * map.width() + static_cast<std::size_t>(x)];
     };
     // Whether a building on ox..ox1, oy..oy1 has such a tile on one of its four sides.
     const auto entered = [&](std::int32_t ox, std::int32_t oy, std::int32_t ox1, std::int32_t oy1, bool built) {

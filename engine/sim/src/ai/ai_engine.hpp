@@ -454,7 +454,8 @@ public:
     /// cell they step out on to the city's Kontor (true too where the check does not apply).
     [[nodiscard]] bool way_out(const AiPlayer& p, std::uint16_t island, const CastleEntry& e) const;
     /// Open1602 (p46b): whether a house on x0..x1, y0..y1 leaves itself and every house of the city
-    /// touching it a tile a doctor can come in by, unless that house had none before.
+    /// touching it a side tile the doctor reaches from a road (road_reach), unless that house had
+    /// none before.
     [[nodiscard]] bool house_keeps_entry(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                          std::int32_t y1) const;
 
@@ -962,6 +963,16 @@ private:
         std::vector<std::uint64_t> inside;
     };
     [[nodiscard]] const CartReach& cart_reach(const AiPlayer& p) const;
+    /// Open1602 (p47b): the tiles of an island the land figures reach from a road, by the finder's
+    /// tile rule and its side steps (a diagonal needs both straight tiles walkable, so it joins no
+    /// region of its own). Taken again when a tile of the island changed.
+    struct RoadReach {
+        std::uint16_t island = 0;
+        std::uint64_t revisions = 0;
+        std::int32_t width = 0;
+        std::vector<bool> reached;
+    };
+    [[nodiscard]] const RoadReach& road_reach(std::uint16_t island) const;
     /// Whether the carriers of a shipyard `b` placed at (x, y) with `rotation` reach a market or
     /// the Kontor of p's city (Logistics::send_yard_carrier's search).
     [[nodiscard]] bool yard_reaches(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
@@ -1478,6 +1489,7 @@ private:
     mutable std::vector<BudgetCache> m_budgets;
     /// cart_reach() of the last city asked, and its finder.
     mutable CartReach m_cart_reach;
+    mutable RoadReach m_road_reach;
     mutable PathFinder m_reach_finder;
     /// The step colony_plan last ran in, per player.
     std::vector<std::uint64_t> m_colony_plan_ms;
