@@ -10,7 +10,8 @@ On top of that Open1602 brings:
 
 - **Fixes** for the original's bugs; where they change the game, the original's behaviour is a setting.
 - **Game settings** to tailor each game: economy, limits, disasters, the world and its islands, the
-  opponents, with presets for the original's rules and Open1602's defaults.
+  opponents and optional victory conditions, with presets for the original's rules and Open1602's
+  defaults.
 - **New balancing** that keeps long games and big worlds playable, with the original's values one
   click away.
 - **Detailed statistics:** a goods balance with production, trade and consumption per good, city and
