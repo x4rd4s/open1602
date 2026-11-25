@@ -158,8 +158,8 @@ std::int64_t Engine::young_colonies_gap(const AiPlayer& p) const {
 std::int64_t Engine::reserved(const AiPlayer& p) const {
     // A founding under way keeps the colony's gold until its Kontor stands (colony_savings): the
     // ship that is called home to load or sails with the load.
-    if (!rivals() || p.pirates) {
-        return 0;
+    if (!rivals() || p.pirates || p.settle.plan_sails) {
+        return 0;  // Open1602 (p62): a colony set out on its flows alone keeps no gold
     }
     // G4b: and from when the colony is planned (colony_plan).
     return p.settle.active || p.settle.ship != 0 || p.settle.plan_crop != 0 ? std::int64_t{colony_money(p)} : 0;
