@@ -411,6 +411,9 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
+    /// army (`theirs`, as seen) than its `own`.
+    [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
     /// Improved computers: a ship under the white flag takes no order while a pirate is near.
     [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
@@ -565,6 +568,7 @@ private:
     std::uint32_t remove_goods(City& c, std::uint8_t ware, std::uint32_t amount);
     /// Behind the leading human, threatened.
     [[nodiscard]] bool behind(const AiPlayer& p) const;
+    [[nodiscard]] bool outmatched(const AiPlayer& p);
     [[nodiscard]] bool threatened(const AiPlayer& p) const;
     /// A scenario keeps the computer from building while it is at peace with every human;
     /// ends the switch when it is not.

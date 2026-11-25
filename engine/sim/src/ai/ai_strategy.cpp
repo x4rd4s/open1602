@@ -127,6 +127,31 @@ std::uint32_t Engine::threat_of(PlayerId viewer, PlayerId owner) const {
     return s;
 }
 
+bool Engine::outmatched(const AiPlayer& p) {
+    // A rival that could attack it (as plan_strategy weighs them: a settling human or computer,
+    // near) and is not at peace with it shows a stronger army than its own, as both are seen.
+    const Diplomacy& d = m_world.diplomacy();
+    const std::uint32_t own = strength(p.player, p.player);
+    for (std::size_t bi = 0; bi < m_world.players().size(); ++bi) {
+        const auto b = static_cast<PlayerId>(bi);
+        const Player& pl = m_world.players()[bi];
+        if (b == p.player || pl.status != PlayerStatus::Playing ||
+            (pl.role != PlayerRole::Human && pl.role != PlayerRole::Computer) ||
+            m_world.behaviour(pl) != FactionBehaviour::Settlers) {
+            continue;
+        }
+        const bool peace = d.allied(p.player, b) || d.relation(p.player, b).peace == Treaty::Signed;
+        if (outmatched_by(rival_near(p, b, nullptr), peace, threat_of(p.player, b), own)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Engine::outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept {
+    return near && !peace && theirs > own;
+}
+
 std::uint8_t Engine::stance_of(const AiPlayer& p, PlayerId other) const {
     return other < p.strategy.stances.size() ? p.strategy.stances[other] : stance::kNeutral;
 }
