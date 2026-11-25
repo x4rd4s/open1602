@@ -407,6 +407,10 @@ public:
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
     [[nodiscard]] static bool crop_war_motive(bool lacking, bool settles, bool free) noexcept;
+    /// Improved computers: whether its cities lack a crop's good for a war: used beyond what they
+    /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
+    /// city that uses it has none (`dry`).
+    [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.

@@ -684,9 +684,21 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
         {ware::kCocoaField, ware::kCocoa},
         {ware::kCottonField, ware::kCloth},
     });
+    // Open1602 (gate f43 read): lacking as a player sees it. Of 14 crop wars, 6 were declared for
+    // crops the attacker's own islands grew already and 3 with 68 t or more of the good in store
+    // (x3 o4-808-p0: P3 fell to such a war): used beyond what is made (goods_short) is not enough.
+    const auto grown = [&](std::uint8_t good) {
+        return std::ranges::any_of(crops,
+                                   [&](const auto& k) { return k.second == good && crop_available(p, k.first); });
+    };
+    const auto dry = [&](std::uint8_t good) {
+        return std::ranges::any_of(m_world.cities(), [&](const City& c) {
+            return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
+        });
+    };
     for (const auto& [field, good] : crops) {
-        if (!crop_war_motive(goods_short(p.player, good) != 0, room && colony_affordable(p, field),
-                             fertile_island_free(p, field))) {
+        if (!crop_war_motive(crop_lacking(goods_short(p.player, good) != 0, grown(good), dry(good)),
+                             room && colony_affordable(p, field), fertile_island_free(p, field))) {
             continue;
         }
         for (const City& c : m_world.cities()) {
@@ -710,6 +722,10 @@ bool Engine::stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint
 
 bool Engine::war_settles(bool room, bool affordable) noexcept {
     return room && affordable;
+}
+
+bool Engine::crop_lacking(bool short_of, bool grown, bool dry) noexcept {
+    return short_of && !grown && dry;
 }
 
 bool Engine::crop_war_motive(bool lacking, bool settles, bool free) noexcept {
