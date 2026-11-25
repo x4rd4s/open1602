@@ -114,6 +114,15 @@ TEST_CASE("ai war plan: a crop island is a war motive only when the freed island
     CHECK(!Engine::crop_war_motive(true, false, false));
 }
 
+TEST_CASE("ai war plan: a crop counts as lacking only where none of its islands grows it and a city has none") {
+    CHECK(Engine::crop_lacking(true, false, true));
+    CHECK(!Engine::crop_lacking(false, false, true));  // it makes what it uses
+    // Gate f43: 6 of 14 crop wars for crops its own islands grew already.
+    CHECK(!Engine::crop_lacking(true, true, true));
+    // Gate f43, x3 o4-808-p0: P0 declared with 68 t of alcohol in store, and P3 fell.
+    CHECK(!Engine::crop_lacking(true, false, false));
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));
