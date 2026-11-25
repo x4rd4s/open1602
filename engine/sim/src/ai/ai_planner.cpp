@@ -1504,7 +1504,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             // without alcohol and the island grows the vines, as a player does: the luxury of the
             // lists came only with 4,000 gold or at the end of the next stage, a median 85 minutes
             // after the city ran dry, while nobody sold alcohol in 97 % of those minutes.
-            if (luxury_first(rivals(), luxury_short_here(p)) && luxury(p, 4, true)) {
+            if (luxury_first(rivals(), luxury_short_here(p), luxury_waits(p)) && luxury(p, 4, true, true)) {
                 return;
             }
             if (needs(ComputerList::Main) || needs(ComputerList::MainRich)) {
@@ -1527,7 +1527,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                 set_stage(p, r, stage::kCitizens);
                 return;
             }
-            if (luxury_first(rivals(), luxury_short_here(p)) && luxury(p, 4, true)) {
+            if (luxury_first(rivals(), luxury_short_here(p), luxury_waits(p)) && luxury(p, 4, true, true)) {
                 return;
             }
             if (needs(ComputerList::Main2)) {
@@ -3139,8 +3139,15 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
-bool Engine::luxury_first(bool improved, bool short_here) noexcept {
-    return improved && short_here;
+bool Engine::luxury_first(bool improved, bool short_here, bool colony_waits) noexcept {
+    return improved && short_here && !colony_waits;
+}
+
+bool Engine::luxury_waits(AiPlayer& p) {
+    // Open1602 (p50, x3 o4-707-p1 P1): a colony for a good none of its islands grows waits for its
+    // gold (want_colony) while no plan keeps it yet; the fields planted first took that gold 388
+    // times, the alcohol it could not grow ran out and its citizens left.
+    return p.settle.plan_crop == 0 && colony_crop_missing(p) && player(p).money < colony_money(p);
 }
 
 bool Engine::luxury_short_here(const AiPlayer& p) const {
@@ -3149,9 +3156,12 @@ bool Engine::luxury_short_here(const AiPlayer& p) const {
         return false;
     }
     return std::ranges::any_of(kLuxuryCrops, [&](const LuxuryCrop& crop) {
-        return luxury_eligible(p, crop.slot) && plants_on(fertility(c->island, crop.field), false, true, true, false) &&
-               goods_short(p.player, crop.good) != 0;
+        return luxury_eligible(p, crop.slot) && luxury_short_crop(p, *c, crop.field, crop.good);
     });
+}
+
+bool Engine::luxury_short_crop(const AiPlayer& p, const City& c, std::uint8_t field, std::uint8_t good) const {
+    return plants_on(fertility(c.island, field), false, true, true, false) && goods_short(p.player, good) != 0;
 }
 
 bool Engine::luxury_eligible(const AiPlayer& p, std::uint8_t slot) const {
@@ -3164,7 +3174,7 @@ bool Engine::luxury_eligible(const AiPlayer& p, std::uint8_t slot) const {
     return true;
 }
 
-bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
+bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive, bool first) {
     // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
     City* c = current_city(p);
@@ -3186,14 +3196,15 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         return b != nullptr ? b->running_cost : 0;
     };
     // 1. Iron
-    if (p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
+    // Ahead of its list (first) only the crops whose goods its people go without (luxury_short_here).
+    if (!first && p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
         static constexpr std::array<std::uint32_t, 4> kMines{1, 2, 2, 3};
         if (need_iron_mine(p, kMines[std::min<std::uint32_t>(difficulty(), 3)])) {
             return true;
         }
     }
     // 2. Gold
-    if (p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
+    if (!first && p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
         const auto gold = need_def(slots(), kSlotGoldMine, m_world.balance().computer_producers);
         const assets::BuildingType* mine = gold ? by_id(gold->fixed) : nullptr;
         if (mine != nullptr && mine->running_cost < budget && need_gold_mine(p)) {
@@ -3240,7 +3251,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         });
     }
     for (const Crop& crop : order) {
-        if (!crop.eligible) {
+        if (!crop.eligible || (first && !luxury_short_crop(p, *c, crop.field, crop.good))) {
             continue;
         }
         bool half = false;  // grows half here, planted for a dry market
