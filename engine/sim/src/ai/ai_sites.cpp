@@ -18,6 +18,7 @@
 #include "ai_tables.hpp"
 
 #include "o1602/sim/houses.hpp"
+#include "o1602/sim/logistics.hpp"
 
 namespace o1602::sim::ai {
 
@@ -620,6 +621,11 @@ bool Engine::search_houses(AiPlayer& p) {
         for (const std::int32_t side : {0, 1, -1, -2}) {
             Site c = gen_double_row(g, s.x, s.y, side);
             if (!can_place(p, *b, c.x0, c.y0, c.w(), c.h())) {
+                continue;
+            }
+            // Open1602 (p46b): an improved computer keeps a way in for the doctor to every house; the
+            // fourth row of a block between two roads has none, and its plague is never cured.
+            if (rivals() && !house_keeps_entry(p, c.x0, c.y0, c.x1, c.y1)) {
                 continue;
             }
             any = true;
@@ -1402,6 +1408,71 @@ const Engine::CartReach& Engine::cart_reach(const AiPlayer& p) const {
         }
     }
     return r;
+}
+
+bool Engine::house_keeps_entry(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                               std::int32_t y1) const {
+    const IslandMap& map = m_world.islands()[p.island].map;
+    const auto in_site = [&](std::int32_t x, std::int32_t y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; };
+    const auto walks = [&](std::int32_t x, std::int32_t y, bool built, WalkClass walk) {
+        return !(built && in_site(x, y)) && walk_tile(map, m_buildings, x, y, walk) != nullptr;
+    };
+    const auto by_road = [&](std::int32_t x, std::int32_t y, bool built) {
+        return walks(x, y, built, WalkClass::Roads) || std::ranges::any_of(kEntrySteps, [&](TilePos s) {
+                   return walks(x + s.x, y + s.y, built, WalkClass::Roads);
+               });
+    };
+    // A tile the doctor walks on (the finder's rule), outside the new house once it is built, that
+    // is a road, touches one or touches such a tile beside one: a free tile shut in by buildings is
+    // no way in.
+    const auto door = [&](std::int32_t x, std::int32_t y, bool built) {
+        if (!walks(x, y, built, WalkClass::Land)) {
+            return false;
+        }
+        return by_road(x, y, built) || std::ranges::any_of(kEntrySteps, [&](TilePos s) {
+                   return walks(x + s.x, y + s.y, built, WalkClass::Land) && by_road(x + s.x, y + s.y, built);
+               });
+    };
+    // Whether a building on ox..ox1, oy..oy1 has such a tile on one of its four sides.
+    const auto entered = [&](std::int32_t ox, std::int32_t oy, std::int32_t ox1, std::int32_t oy1, bool built) {
+        for (std::int32_t y = oy; y <= oy1; ++y) {
+            for (std::int32_t x = ox; x <= ox1; ++x) {
+                for (const TilePos s : kEntrySteps) {
+                    const std::int32_t nx = x + s.x;
+                    const std::int32_t ny = y + s.y;
+                    if ((nx < ox || nx > ox1 || ny < oy || ny > oy1) && door(nx, ny, built)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+    if (!entered(x0, y0, x1, y1, true)) {
+        return false;
+    }
+    std::vector<TilePos> seen;
+    for (std::int32_t y = y0 - 1; y <= y1 + 1; ++y) {
+        for (std::int32_t x = x0 - 1; x <= x1 + 1; ++x) {
+            const bool side = (x >= x0 && x <= x1) != (y >= y0 && y <= y1);  // beside an edge, not a corner
+            if (!side) {
+                continue;
+            }
+            const auto at = building_at(m_world, m_buildings, p.island, TilePos{x, y});
+            if (!at || at->type->prod_kind != prod::kHouse || at->city != p.city ||
+                std::ranges::find(seen, at->origin) != seen.end()) {
+                continue;
+            }
+            seen.push_back(at->origin);
+            const std::int32_t ax1 = at->origin.x + static_cast<std::int32_t>(at->width) - 1;
+            const std::int32_t ay1 = at->origin.y + static_cast<std::int32_t>(at->height) - 1;
+            if (entered(at->origin.x, at->origin.y, ax1, ay1, false) &&
+                !entered(at->origin.x, at->origin.y, ax1, ay1, true)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 bool Engine::cart_reaches(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,

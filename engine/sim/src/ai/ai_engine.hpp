@@ -453,6 +453,10 @@ public:
     /// Open1602 (F4): whether units released from `p`'s castle `e` on `island` can walk from the
     /// cell they step out on to the city's Kontor (true too where the check does not apply).
     [[nodiscard]] bool way_out(const AiPlayer& p, std::uint16_t island, const CastleEntry& e) const;
+    /// Open1602 (p46b): whether a house on x0..x1, y0..y1 leaves itself and every house of the city
+    /// touching it a tile a doctor can come in by, unless that house had none before.
+    [[nodiscard]] bool house_keeps_entry(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                         std::int32_t y1) const;
 
 private:
     // ---- ai_core.cpp ----

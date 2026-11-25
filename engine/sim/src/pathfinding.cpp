@@ -133,6 +133,16 @@ bool walkable(const assets::BuildingType& building, const MapCell& cell, WalkCla
     }
 }
 
+const assets::BuildingType* walk_tile(const IslandMap& map, const assets::BuildingTable& buildings, std::int32_t x,
+                                      std::int32_t y, WalkClass walk) noexcept {
+    if (!map.contains(x, y)) {
+        return nullptr;
+    }
+    const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+    const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+    return b != nullptr && walkable(*b, cell, walk) ? b : nullptr;
+}
+
 void PathFinder::begin(const IslandMap& map, const assets::BuildingTable& buildings, const Catchment& area,
                        WalkClass walk, std::uint8_t speed_type, bool circle) {
     m_map = &map;
@@ -196,9 +206,8 @@ void PathFinder::begin(const IslandMap& map, const assets::BuildingTable& buildi
                 m_cells[k] = Cell::Walkable;
                 continue;
             }
-            const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
-            const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
-            if (b == nullptr || !walkable(*b, cell, walk)) {
+            const assets::BuildingType* b = walk_tile(map, buildings, x, y, walk);
+            if (b == nullptr) {
                 continue;
             }
             m_cells[k] = Cell::Walkable;
