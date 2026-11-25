@@ -822,6 +822,12 @@ public:
     [[nodiscard]] bool dialog() const noexcept;
     /// The dialog's frame, design units from the column's top left (left of it: negative).
     [[nodiscard]] ui::Rect dialog_rect() const noexcept;
+    /// Offers a tooltip for an area of the page being laid out: shown once the mouse rested on
+    /// it, as in the start dialog. An empty text offers none.
+    void offer_tip(ui::Rect area, std::string_view text);
+    /// Lays out the tooltip offered under the mouse, if it rested there long enough; last, over
+    /// everything.
+    void show_tip();
 
     [[nodiscard]] Page page() const noexcept { return m_page; }
     /// Back to the document's page (a new document, or Escape).
@@ -1004,9 +1010,11 @@ private:
     std::int32_t m_packages_h = 0;           ///< the height the dialog of the packages needs
     std::int32_t m_campaign_h = 480;         ///< the height the dialog of the campaigns needs
     bool m_previewing = false;               ///< the dice preview, as laid out last (its page is the column's)
-    /// The mouse in design units, as it moved last; for the tooltips of the page "Rules".
+    /// The mouse in design units, as it moved last; for the tooltips.
     std::optional<std::array<std::int32_t, 2>> m_mouse;
     std::string m_tip;                                  ///< the tooltip's text under the mouse, empty: none
+    std::string m_tip_offered;                          ///< the tooltip offered under the mouse in this layout
+    ui::Rect m_tip_area{};                              ///< where it was offered
     std::chrono::steady_clock::time_point m_tip_since;  ///< since when it is under the mouse
     bool m_tip_dismissed = false;                       ///< a press hid it until the mouse moves to another
     /// How long the mouse rests on a setting before its tooltip shows, as in the start dialog.

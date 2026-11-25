@@ -840,8 +840,28 @@ ui::Rect EditorPanel::dialog_rect() const noexcept {
     return Rect{kToolBar + 8 + (room_w - w) / 2 - m_column_x, 26 + 8 + (room_h - h) / 2, w, h};
 }
 
+void EditorPanel::offer_tip(Rect area, std::string_view text) {
+    if (!text.empty() && m_mouse && area.contains((*m_mouse)[0], (*m_mouse)[1])) {
+        m_tip_offered = std::string(text);
+        m_tip_area = area;
+    }
+}
+
+void EditorPanel::show_tip() {
+    const auto now = std::chrono::steady_clock::now();
+    if (m_tip_offered != m_tip) {
+        m_tip = m_tip_offered;
+        m_tip_since = now;
+        m_tip_dismissed = false;
+    }
+    if (!m_tip.empty() && !m_tip_dismissed && now - m_tip_since >= kTipDelay) {
+        m_form.tooltip(m_tip_area, m_tip);
+    }
+}
+
 void EditorPanel::layout(const EditorModel& model) {
     m_form.clear();
+    m_tip_offered.clear();
     // The column starts m_column_x into the window: the dialogs left of it, and their tooltips,
     // are kept within the window, not within a screen from the column's edge.
     if (m_screen_w > 0) {
@@ -857,6 +877,7 @@ void EditorPanel::layout(const EditorModel& model) {
         // The plan waits: nothing but another roll or the way back to it.
         m_form.panel(Rect{m_x - 6, m_top, kWidth - 2 * (m_x - 6), m_height});
         layout_preview(model);
+        show_tip();
         return;
     }
     if (m_page == Page::Check) {
@@ -904,10 +925,12 @@ void EditorPanel::layout(const EditorModel& model) {
         m_w = column[1];
         m_top = column[2];
         m_height = column[3];
+        show_tip();
         return;
     }
     m_form.panel(Rect{m_x - 6, m_top, kWidth - 2 * (m_x - 6), m_height});
     layout_page(model);
+    show_tip();
 }
 
 void EditorPanel::layout_page(const EditorModel& model) {
@@ -1092,6 +1115,7 @@ void EditorPanel::layout_markers(const EditorModel& model) {
              ui::tr(point && model.markers[*model.marker].ship_start ? "editor.markers.ship_start_is"
                                                                      : "editor.markers.ship_start"),
              point && !model.markers[*model.marker].ship_start);
+    offer_tip(Rect{m_x, y, m_w, kButtonH}, ui::tr("editor.markers.ship_start.tip"));
     y += kButtonH + kGap;
     const std::int32_t bottom = m_top + m_height - 4;
     if (!model.notice.empty() && bottom - y - 2 >= 2 * 20) {
@@ -1631,13 +1655,15 @@ void EditorPanel::layout_attitude_table(const EditorModel& model) {
     std::int32_t y = m_top + 6;
     dialog_tabs(model, "editor.attitude.title", Page::Attitude);
     y += kButtonH + kGap + 4;
-    // The players down the left; a column for each threshold, its head on two lines.
-    constexpr std::int32_t kNames = 180;
+    // The players down the left, as wide as the columns leave; a column for each threshold and
+    // the first island, its head on two lines.
     const auto shown = static_cast<std::int32_t>(kAttitudeColumns);
-    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - kNames) / shown - kGap);
+    const std::int32_t cell = std::min<std::int32_t>(200, (m_w - 180) / shown - kGap);
+    const std::int32_t kNames = m_w - shown * (cell + kGap) + kGap;
     const auto column_x = [&](std::size_t i) { return m_x + kNames + static_cast<std::int32_t>(i) * (cell + kGap); };
     for (std::size_t i = 0; i < kAttitudeColumns; ++i) {
         f.paragraph(Rect{column_x(i), y, cell, 2 * 18}, ui::tr(kAttitudeHeads[i]), Tone::Dim, 18);
+        offer_tip(Rect{column_x(i), y, cell, 2 * 18}, ui::tr(std::string(kAttitudeHeads[i]) + ".tip"));
     }
     y += 2 * 18 + 2;
     constexpr std::int32_t kRow = kButtonH + 2;
@@ -1654,6 +1680,9 @@ void EditorPanel::layout_attitude_table(const EditorModel& model) {
             std::string text = attitude_text(p, i, enabled);
             const Id id = kAttitudeTable + static_cast<Id>(row * kAttitudeColumns + i);
             f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+            if (i == kFirstIslandColumn) {
+                offer_tip(Rect{column_x(i), y, cell, kButtonH}, ui::tr("editor.attitude.first_island.tip"));
+            }
         }
         y += kRow;
     }
@@ -2647,6 +2676,9 @@ void EditorPanel::layout_neutrals_table(const EditorModel& model) {
             std::string text = neutral_text(model, p, columns[i], enabled);
             const Id id = kNeutralTable + static_cast<Id>(row * kNeutralColumns + columns[i]);
             f.cycle_button(id, Rect{column_x(i), y, cell, kButtonH}, std::move(text), enabled);
+            if (i == kFirstIslandColumn) {
+                offer_tip(Rect{column_x(i), y, cell, kButtonH}, ui::tr("editor.attitude.first_island.tip"));
+            }
         }
         y += kRow;
     }
@@ -2820,8 +2852,6 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
     m_page_rows = std::min<std::size_t>(2 * per_column, 20);
     m_first = n == 0 ? 0 : std::min(m_first, (n - 1) / m_page_rows * m_page_rows);
     const std::size_t rows = (m_page_rows + 1) / 2;
-    const std::string* tip = nullptr;  // the explanation of the setting under the mouse
-    Rect tip_at{};
     for (std::size_t k = 0; k < m_page_rows && m_first + k < n; ++k) {
         const std::int32_t cx = m_x + static_cast<std::int32_t>(k / rows) * (column + 2 * kGap);
         const std::int32_t cy = y + static_cast<std::int32_t>(k % rows) * kRow;
@@ -2831,11 +2861,7 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
             const bool on = model.rules_own && r.enabled;
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label, Align::Left, on ? Tone::Normal : Tone::Dim);
             f.cycle_button(id, Rect{cx + label, cy, column - label, kButtonH}, r.value, on);
-            const Rect row{cx, cy, column, kButtonH};
-            if (m_mouse && row.contains((*m_mouse)[0], (*m_mouse)[1]) && !r.tip.empty()) {
-                tip = &r.tip;
-                tip_at = row;
-            }
+            offer_tip(Rect{cx, cy, column, kButtonH}, r.tip);
         } else {
             const EditorRandom& r = model.randoms[m_first + k];
             f.label(Rect{cx, cy, label - kGap, kButtonH}, r.label);
@@ -2855,18 +2881,6 @@ void EditorPanel::layout_settings_grid(const EditorModel& model, bool rules) {
         f.button(kRandomRoll, Rect{m_x + 2 * (quarter + kGap), foot, quarter, kButtonH}, ui::tr("editor.random.roll"));
     }
     f.button(kBack, Rect{m_x + m_w - quarter, foot, quarter, kButtonH}, ui::tr("editor.dialog.close"));
-    // The setting's tooltip, as the start dialog shows it, once the mouse rested on it; laid out
-    // last, over everything.
-    const std::string under = tip != nullptr ? *tip : std::string();
-    const auto now = std::chrono::steady_clock::now();
-    if (under != m_tip) {
-        m_tip = under;
-        m_tip_since = now;
-        m_tip_dismissed = false;
-    }
-    if (tip != nullptr && !m_tip_dismissed && now - m_tip_since >= kTipDelay) {
-        f.tooltip(tip_at, *tip);
-    }
 }
 
 void EditorPanel::layout_goals(const EditorModel& model) {
@@ -2975,6 +2989,7 @@ void EditorPanel::layout_scenario(const EditorModel& model) {
         } else {
             f.cycle_button(id, Rect{m_x + label, y, m_w - label, kButtonH}, r.value, r.enabled);
         }
+        offer_tip(Rect{m_x, y, m_w, kButtonH}, r.tip);
         y += kRow;
     }
     const std::int32_t foot = m_top + m_height - kButtonH - 4;

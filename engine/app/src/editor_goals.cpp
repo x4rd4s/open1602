@@ -280,7 +280,7 @@ void MapViewer::editor_scenario_model(EditorModel& m) const {
             ? ui::tr("editor.scenario.shuffle_starts_on", {std::to_string(sim::start_places(world).size()),
                                                            std::to_string(sim::players_starting_at_sea(world).size())})
             : ui::tr("editor.goals.no"),
-        true};
+        true, ui::tr("editor.scenario.shuffle_starts.tip")};
 }
 
 void MapViewer::editor_scenario_request(const EditorRequest& request) {

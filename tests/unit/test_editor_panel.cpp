@@ -2043,7 +2043,7 @@ TEST_CASE("editor panel: the page Computers steps when a computer grows cross, o
 
     // The first island: as the original, at random, each island of the map, round.
     m.islands = 2;
-    CHECK(says(panel, "as original"));
+    CHECK(says(panel, "original"));
     r = click_id(panel, m, ui::Form::Id{1144});
     REQUIRE(r.has_value());
     CHECK(r->index == 8);
@@ -2225,7 +2225,7 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
                                              "No",
                                              "Peaceful, taken by land",
                                              "No",
-                                             "yes, 3 places for 2 players"};
+                                             "Yes, 3 places for 2 players"};
     for (std::size_t i = 0; i < app::kEditorScenarioRows; ++i) {
         m.scenario_rows.push_back(app::EditorRule{"Row " + std::to_string(i), values[i], true});
         m.scenario_texts.push_back(app::scenario_row_is_text(static_cast<app::EditorScenarioRow>(i)) ? values[i] : "");
@@ -2247,7 +2247,7 @@ TEST_CASE("editor panel: the description dialog steps the stars and types the te
     CHECK(r->kind == EditorRequest::Kind::ScenarioStep);
     CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::NeutralPeace));
     // And the start places at random.
-    r = click(panel, m, "yes, 3 places for 2 players");
+    r = click(panel, m, "Yes, 3 places for 2 players");
     REQUIRE(r.has_value());
     CHECK(r->kind == EditorRequest::Kind::ScenarioStep);
     CHECK(r->index == static_cast<std::size_t>(app::EditorScenarioRow::ShuffleStarts));

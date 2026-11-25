@@ -292,7 +292,8 @@ The tab **Computers** (in a narrow window the button of that name on the page Pl
 computer grows cross, as the original's editor does with the bounds of a computer's mood, and where
 it founds its first city. Each threshold is off or a value; a click steps it from off through the
 values and back to off, the right button the other way. A cross computer ends peace and treaties
-sooner. Humans have none.
+sooner. Humans have none. Resting the mouse on a column's head, or on a first island, explains it
+in a tooltip; so do **Start places at random** (Description) and **Make ship start place** (Markers).
 
 | Column | What it does |
 |---|---|
@@ -300,7 +301,7 @@ sooner. Humans have none.
 | Human above level | Cross with a human whose best city is beyond a level. |
 | Itself below people | Cross with the humans while it has fewer inhabitants than this (50 to 10 000). |
 | Human above people | Cross with a human who has more inhabitants than this. |
-| First island | Where a computer that starts with ships but without a city founds its first one: **as original** (it searches the islands in the order of their numbers, from one of the first sixteen at random, for one large enough that grows its first crop, so on a map of fixed islands it often takes the same one), **at random** (an island without a city drawn when the game starts, the medium and larger ones first, none another computer goes to), or **Island n**, one of the map's islands (a click steps through them). The computer looks at that island first and founds its city there if it finds a site with room for it, even on an island the search would pass over; else it searches as always. It does so only for its first city, and not on an island that already has its city or one of a small rival. A fixed island goes by its number, so it stays chosen when islands before it are taken out; one deleted shows "island gone", and the computer searches as always. This does not exist in the original. |
+| First island | Where a computer that starts with ships but without a city founds its first one: **original** (it searches the islands in the order of their numbers, from one of the first sixteen at random, for one large enough that grows its first crop, so on a map of fixed islands it often takes the same one), **at random** (an island without a city drawn when the game starts, the medium and larger ones first, none another computer goes to), or **Island n**, one of the map's islands (a click steps through them). The computer looks at that island first and founds its city there if it finds a site with room for it, even on an island the search would pass over; else it searches as always. It does so only for its first city, and not on an island that already has its city or one of a small rival. A fixed island goes by its number, so it stays chosen when islands before it are taken out; one deleted shows "island gone", and the computer searches as always. This does not exist in the original. |
 
 The original's scenario files hold the same thresholds, so a scenario keeps them when it is
 converted.
