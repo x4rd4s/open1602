@@ -266,6 +266,78 @@ void Engine::pick_island(AiPlayer& p) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// The first island a scenario chose (Open1602, Player::first_island)
+
+bool Engine::first_island_aimed(const AiPlayer& p, std::uint16_t island) const {
+    // Another computer sails to the island, or the scenario chose it for one.
+    for (const AiPlayer& other : m_state.players) {
+        if (other.player != p.player && other.settle.active && other.settle.island == island) {
+            return true;
+        }
+    }
+    const std::uint16_t number = island_of(island).header.number;
+    for (std::size_t slot = 0; slot < m_world.players().size(); ++slot) {
+        const Player& other = m_world.players()[slot];
+        if (static_cast<PlayerId>(slot) != p.player && other.first_island == FirstIsland::Fixed &&
+            other.first_island_number == number) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<std::uint16_t> Engine::first_island_choice(AiPlayer& p) {
+    Player* player = m_world.player(p.player);
+    if (player == nullptr || p.pirates || player->first_island == FirstIsland::Original) {
+        return std::nullopt;
+    }
+    const auto n = static_cast<std::uint16_t>(m_world.islands().size());
+    if (player->first_island == FirstIsland::AtRandom) {
+        // Drawn among the islands free for a first city, the medium and larger ones first, and
+        // none another computer goes to; it is then this computer's own choice.
+        std::vector<std::uint16_t> free;
+        for (const std::uint32_t least : {2U, 0U}) {
+            for (std::uint16_t i = 0; i < n; ++i) {
+                if (island_size(i) >= least && island_allowed(p, i) && !first_island_aimed(p, i)) {
+                    free.push_back(i);
+                }
+            }
+            if (!free.empty()) {
+                break;
+            }
+        }
+        if (free.empty()) {
+            player->first_island = FirstIsland::Original;
+            return std::nullopt;
+        }
+        const std::uint16_t i = free[rng().below(static_cast<std::uint32_t>(free.size()))];
+        player->first_island = FirstIsland::Fixed;
+        player->first_island_number = island_of(i).header.number;
+        return i;
+    }
+    for (std::uint16_t i = 0; i < n; ++i) {
+        if (island_of(i).header.number == player->first_island_number) {
+            if (island_allowed(p, i)) {
+                return i;
+            }
+            break;
+        }
+    }
+    player->first_island = FirstIsland::Original;  // gone, or taken already: the search as always
+    return std::nullopt;
+}
+
+bool Engine::spend_first_island(AiPlayer& p, std::uint16_t island) {
+    Player* player = m_world.player(p.player);
+    if (player == nullptr || player->first_island != FirstIsland::Fixed ||
+        player->first_island_number != island_of(island).header.number) {
+        return false;
+    }
+    player->first_island = FirstIsland::Original;
+    return true;
+}
+
 bool Engine::room_beside(std::uint32_t free) noexcept {
     // The free land at which another city leaves room to found beside it (blocker).
     return free >= 300;
@@ -443,7 +515,9 @@ void Engine::task_settle_area(AiPlayer& p) {
     }
     const AreaScan& scan = area_scan(static_cast<std::uint16_t>(s.island));
     s.regions = scan.regions;
-    if (scan.total >= s.need) {
+    // The island the scenario chose takes a city with the least free land any search ends with.
+    const bool chosen = spend_first_island(p, static_cast<std::uint16_t>(s.island));
+    if (scan.total >= (chosen ? s.floor : s.need)) {
         push(p, kSettleSite, true);
     }
 }

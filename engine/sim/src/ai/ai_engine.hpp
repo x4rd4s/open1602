@@ -572,6 +572,13 @@ private:
 
     // ---- ai_settle.cpp ----
     void pick_island(AiPlayer& p);
+    /// The island the scenario chose for the first city of `p` (Player::first_island), if it may
+    /// still have one there; a random choice is drawn now. Nothing: the search as always.
+    [[nodiscard]] std::optional<std::uint16_t> first_island_choice(AiPlayer& p);
+    /// Whether another computer goes to `island` or the scenario chose it for one.
+    [[nodiscard]] bool first_island_aimed(const AiPlayer& p, std::uint16_t island) const;
+    /// Whether `island` is the one the scenario chose for `p`; the choice is spent then.
+    bool spend_first_island(AiPlayer& p, std::uint16_t island);
     [[nodiscard]] bool knows_island(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: the computer gave a city up on the island in the last 45 minutes.
     [[nodiscard]] bool left_lately(AiPlayer& p, std::uint16_t island);

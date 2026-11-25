@@ -19,6 +19,7 @@
 #include "o1602/editor/goals.hpp"
 #include "o1602/editor/operations.hpp"
 #include "o1602/editor/players.hpp"
+#include "o1602/sim/start_places.hpp"
 #include "o1602/ui/localization.hpp"
 
 namespace o1602::app {
@@ -272,6 +273,14 @@ void MapViewer::editor_scenario_model(EditorModel& m) const {
     m.scenario_rows[static_cast<std::size_t>(Row::ChooseBanner)] =
         EditorRule{ui::tr("editor.scenario.choose_banner"),
                    ui::tr(info.choose_banner ? "editor.goals.yes" : "editor.goals.no"), true};
+    // Open1602: the start places at random, with how many there are for how many players.
+    m.scenario_rows[static_cast<std::size_t>(Row::ShuffleStarts)] = EditorRule{
+        ui::tr("editor.scenario.shuffle_starts"),
+        info.shuffle_starts
+            ? ui::tr("editor.scenario.shuffle_starts_on", {std::to_string(sim::start_places(world).size()),
+                                                           std::to_string(sim::players_starting_at_sea(world).size())})
+            : ui::tr("editor.goals.no"),
+        true, ui::tr("editor.scenario.shuffle_starts.tip")};
 }
 
 void MapViewer::editor_scenario_request(const EditorRequest& request) {
@@ -302,6 +311,8 @@ void MapViewer::editor_scenario_request(const EditorRequest& request) {
             info.original_limits = !info.original_limits;
         } else if (row == Row::ChooseBanner) {
             info.choose_banner = !info.choose_banner;
+        } else if (row == Row::ShuffleStarts) {
+            info.shuffle_starts = !info.shuffle_starts;
         } else {
             return;
         }

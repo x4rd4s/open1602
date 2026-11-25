@@ -307,7 +307,7 @@ enum class Need : std::uint8_t { Required, Optional };
 /// The highest version of a section this version reads.
 constexpr std::uint16_t max_version(std::uint32_t id) noexcept {
     if (id == kPlayerState) {
-        return kPlayerCheats;
+        return kFirstIsland;
     }
     if (id == kFleet) {
         return kPackageShips;
@@ -432,7 +432,8 @@ annokit::core::Status for_each_section(std::span<const std::uint8_t> data, std::
     return annokit::core::Ok{};
 }
 
-/// SCNI: stars, flags (bit 0 the original's limits), the names, author, version and the briefings
+/// SCNI: stars, flags (bit 0 the original's limits, bit 1 the banner chosen, bit 2 the start places
+/// at random), the names, author, version and the briefings
 /// (names and briefings each a list of language and text, UTF-8). Stars and names come first, so
 /// that the head of a file read for a list (read_meta) holds them.
 void write_scenario_info(Writer& o, const ScenarioInfo& info) {
@@ -443,7 +444,8 @@ void write_scenario_info(Writer& o, const ScenarioInfo& info) {
         });
     };
     o.u8(info.stars);
-    o.u8(static_cast<std::uint8_t>((info.original_limits ? 1U : 0U) | (info.choose_banner ? 2U : 0U)));
+    o.u8(static_cast<std::uint8_t>((info.original_limits ? 1U : 0U) | (info.choose_banner ? 2U : 0U) |
+                                   (info.shuffle_starts ? 4U : 0U)));
     texts(info.names);
     o.string(info.author);
     o.string(info.version);
@@ -466,7 +468,8 @@ void read_scenario_info(Reader& in, ScenarioInfo& info) {
     texts(info.briefings);
     info.original_limits = (flags & 1U) != 0;
     info.choose_banner = (flags & 2U) != 0;
-    if ((flags & ~3U) != 0 || !check_scenario_info(info).empty()) {
+    info.shuffle_starts = (flags & 4U) != 0;
+    if ((flags & ~7U) != 0 || !check_scenario_info(info).empty()) {
         in.fail();
     }
 }
@@ -1242,6 +1245,7 @@ std::optional<SaveMeta> read_meta(std::span<const std::uint8_t> sections) {
         }
         summary.original_limits = (flags & 1U) != 0;
         summary.choose_banner = (flags & 2U) != 0;
+        summary.shuffle_starts = (flags & 4U) != 0;
         summary.stars = std::min(summary.stars, ScenarioInfo::kMaxStars);
         summary.rules = rules;
         meta.scenario = std::move(summary);
