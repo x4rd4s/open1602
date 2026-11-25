@@ -123,6 +123,14 @@ TEST_CASE("ai war plan: a crop counts as lacking only where none of its islands 
     CHECK(!Engine::crop_lacking(true, false, false));
 }
 
+TEST_CASE("ai ships: a ship under the white flag takes no order while a pirate is near") {
+    // Gate f45: three ships sunk 2 to 33 s after a new order struck the flag beside the pirate.
+    CHECK(Engine::flag_keeps(true, true, true));
+    CHECK(!Engine::flag_keeps(true, true, false));  // the pirate has sailed off
+    CHECK(!Engine::flag_keeps(true, false, true));  // no flag up
+    CHECK(!Engine::flag_keeps(false, true, true));  // the original's computers: as before
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));

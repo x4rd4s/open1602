@@ -411,6 +411,8 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers: a ship under the white flag takes no order while a pirate is near.
+    [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.

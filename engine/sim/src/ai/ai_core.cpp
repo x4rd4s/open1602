@@ -50,8 +50,22 @@ Engine::Engine(Simulation& sim, State& state)
 }
 
 CommandResult Engine::execute(const Command& command) {
+    // Open1602 (gate f45: 3 ships sunk by pirates 2 to 33 s after a new order struck the white flag
+    // with the pirate 6 to 22 tiles off): an improved computer's ship under the flag takes no order
+    // while a pirate is near, whichever task gives it, as a player waits for the pirates to sail off.
+    if (const auto* o = std::get_if<ShipOrder>(&command); o != nullptr) {
+        const Ship* s = m_world.ship(o->ship);
+        if (s != nullptr && s->owner == o->player &&
+            flag_keeps(rivals(), s->held && !s->sinking, s->held && pirate_near(*s))) {
+            return CommandResult{};
+        }
+    }
     m_census.valid = false;  // a command may add, move or remove units
     return m_sim.execute(command);
+}
+
+bool Engine::flag_keeps(bool improved, bool held, bool pirate_near) noexcept {
+    return improved && held && pirate_near;
 }
 
 bool Engine::logging() noexcept {
