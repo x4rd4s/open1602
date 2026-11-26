@@ -559,6 +559,28 @@ bool Engine::advance_cursor(AiPlayer& p, std::int32_t limit) {
     return true;
 }
 
+namespace {
+
+/// Whether a planned site takes the building: only the gold or goods may be missing.
+bool placeable(const BuildPlan& plan, std::uint8_t city) {
+    if (plan.city != city) {
+        return false;
+    }
+    switch (plan.items.front().refusal) {
+        case BuildRefusal::None:
+        case BuildRefusal::Money:
+        case BuildRefusal::Tools:
+        case BuildRefusal::Wood:
+        case BuildRefusal::Bricks:
+        case BuildRefusal::Cannons:
+            return true;
+        default:
+            return false;
+    }
+}
+
+}  // namespace
+
 bool Engine::can_place(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y, std::int32_t w,
                        std::int32_t h) const {
     if (!inside(p.island, x, y) || !inside(p.island, x + w - 1, y + h - 1)) {
@@ -573,20 +595,21 @@ bool Engine::can_place(const AiPlayer& p, const assets::BuildingType& b, std::in
     const std::uint8_t rotation = (static_cast<std::uint32_t>(w) != b.size_x) ? 1 : 0;
     order.items.assign(1, BuildItem{b.id, x, y, rotation, 0});
     plan_build(m_world, m_buildings, order, plan);
-    if (plan.city != p.city) {
+    return placeable(plan, p.city);
+}
+
+bool Engine::can_replace(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                         std::int32_t w, std::int32_t h) {
+    if (!inside(p.island, x, y) || !inside(p.island, x + w - 1, y + h - 1)) {
         return false;
     }
-    switch (plan.items.front().refusal) {
-        case BuildRefusal::None:
-        case BuildRefusal::Money:
-        case BuildRefusal::Tools:
-        case BuildRefusal::Wood:
-        case BuildRefusal::Bricks:
-        case BuildRefusal::Cannons:
-            return true;
-        default:
-            return false;
-    }
+    BuildOrder order;
+    order.player = p.player;
+    order.island = p.island;
+    order.orient_to_road = false;
+    const std::uint8_t rotation = (static_cast<std::uint32_t>(w) != b.size_x) ? 1 : 0;
+    order.items.assign(1, BuildItem{b.id, x, y, rotation, 0});
+    return placeable(plan_replace(m_world, m_buildings, order, TilePos{x, y}), p.city);
 }
 
 // ---------------------------------------------------------------------------------------------

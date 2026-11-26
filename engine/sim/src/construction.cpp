@@ -2808,6 +2808,32 @@ BuildOrder move_build_order(const MovablePiece& piece, const MoveOrder& order) {
     return build;
 }
 
+namespace {
+
+/// Runs `plan` with the tiles of `f` showing their ground, and puts the tiles back as they were.
+template <typename Plan>
+void lifted_while(World& world, std::uint16_t island, const Footprint& f, Plan&& plan) {
+    IslandMap& map = world.island(island).map;
+    std::vector<MapCell> lifted;
+    lifted.reserve(std::size_t{f.w} * f.h);
+    const auto each_tile = [&](auto&& g) {
+        for (std::uint32_t j = 0; j < f.h; ++j) {
+            for (std::uint32_t i = 0; i < f.w; ++i) {
+                g(static_cast<std::uint32_t>(f.x) + i, static_cast<std::uint32_t>(f.y) + j);
+            }
+        }
+    };
+    each_tile([&](std::uint32_t x, std::uint32_t y) {
+        lifted.push_back(map.top(x, y));
+        map.restore_ground(x, y);
+    });
+    plan();
+    std::size_t next = 0;
+    each_tile([&](std::uint32_t x, std::uint32_t y) { map.set_top_cell(x, y, lifted[next++]); });
+}
+
+}  // namespace
+
 BuildPlan plan_move(World& world, const assets::BuildingTable& buildings, const MoveOrder& order, bool pay) {
     BuildPlan plan;
     const MovablePiece piece = movable_at(world, buildings, order.player, order.island, order.from);
@@ -2822,29 +2848,27 @@ BuildPlan plan_move(World& world, const assets::BuildingTable& buildings, const 
     }
     // The building is lifted off its tiles while planning, so that it may go where it stands now,
     // and put back as it was.
-    IslandMap& map = world.island(order.island).map;
-    std::vector<MapCell> lifted;
-    lifted.reserve(std::size_t{piece.width} * piece.height);
-    const auto each_tile = [&](auto&& f) {
-        for (std::uint32_t j = 0; j < piece.height; ++j) {
-            for (std::uint32_t i = 0; i < piece.width; ++i) {
-                f(static_cast<std::uint32_t>(piece.origin.x) + i, static_cast<std::uint32_t>(piece.origin.y) + j);
-            }
-        }
-    };
-    each_tile([&](std::uint32_t x, std::uint32_t y) {
-        lifted.push_back(map.top(x, y));
-        map.restore_ground(x, y);
+    lifted_while(world, order.island, Footprint{piece.origin.x, piece.origin.y, piece.width, piece.height}, [&] {
+        plan_order(world, buildings, move_build_order(piece, order), plan, PlanOptions{.pay = pay, .move = true});
     });
-    plan_order(world, buildings, move_build_order(piece, order), plan, PlanOptions{.pay = pay, .move = true});
-    std::size_t next = 0;
-    each_tile([&](std::uint32_t x, std::uint32_t y) { map.set_top_cell(x, y, lifted[next++]); });
     // Only within its own city: its people, goods and roads are there.
     if (!plan.items.empty() && plan.items[0].ok() && plan.city != piece.city) {
         plan.items[0].refusal = BuildRefusal::Territory;
         plan.placed = 0;
         plan.bill = BuildBill{};
     }
+    return plan;
+}
+
+BuildPlan plan_replace(World& world, const assets::BuildingTable& buildings, const BuildOrder& order, TilePos gone) {
+    BuildPlan plan;
+    const auto old = building_at(world, buildings, order.island, gone);
+    if (!old || old->origin.x != gone.x || old->origin.y != gone.y) {
+        plan_build(world, buildings, order, plan);
+        return plan;
+    }
+    lifted_while(world, order.island, Footprint{gone.x, gone.y, old->width, old->height},
+                 [&] { plan_build(world, buildings, order, plan); });
     return plan;
 }
 

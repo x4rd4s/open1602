@@ -59,6 +59,11 @@ struct RobberSpawn {
     std::uint8_t city = MapCell::kNoCity;
 };
 
+/// Whether the plague can break out in house `h`: its people are citizens or of a higher class.
+[[nodiscard]] inline bool plague_prone(const House& h) noexcept {
+    return h.resident_class >= 2;
+}
+
 /// The disaster on the building with origin (x, y), if any.
 [[nodiscard]] const Disaster* disaster_at(const World& world, std::uint16_t island, std::uint16_t x, std::uint16_t y);
 

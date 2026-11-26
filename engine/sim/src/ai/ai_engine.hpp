@@ -100,8 +100,9 @@ struct WarGold {
 
 /// What the survey of a city (task 8) found to clear away: exhausted mines, and sheep farms and
 /// small weavers for when cotton grows on the island.
-struct Cheats;   // ai_tables.hpp
-struct NeedDef;  // ai_tables.hpp
+struct Cheats;      // ai_tables.hpp
+struct NeedDef;     // ai_tables.hpp
+struct PublicTask;  // ai_tables.hpp
 
 struct SurveyFinds {
     std::vector<std::pair<std::int32_t, std::int32_t>> starved_mines;
@@ -362,6 +363,12 @@ public:
     /// What a route stop still loads of a ware: its `amount` less what is `aboard`, nothing at a
     /// stop a one-way run has `passed`.
     [[nodiscard]] static std::uint32_t still_loads(std::uint32_t amount, std::uint32_t aboard, bool passed) noexcept;
+    /// Whether a yard works on the ship it builds: an improved computer pauses it while it calls a
+    /// damaged ship in (`calling`) and no repair runs, so that the build leaves the wood to the repair.
+    [[nodiscard]] static bool yard_builds(bool improved, bool order, bool repairing, bool calling) noexcept;
+    /// Whether a yard starts a repair or calls a damaged ship in: after a stall without material
+    /// (`stalled`) an improved computer waits until the yard itself holds it (`in_yard`).
+    [[nodiscard]] static bool repair_may_start(bool improved, bool stalled, bool in_yard) noexcept;
     /// Whether a city leaves a citizens' stage on gold alone (`rich`): the original's computers at
     /// once, an improved computer's once its citizens have begun to come (`risen`).
     [[nodiscard]] static bool gold_exit(bool improved, bool rich, bool risen) noexcept;
@@ -410,6 +417,25 @@ public:
     /// (`lacking`), the computer could found the colony on the freed island (`settles`: below its
     /// city limit and the budget accepts it), and no free island grows the crop (`free`).
     [[nodiscard]] static bool crop_war_motive(bool lacking, bool settles, bool free) noexcept;
+    /// Whether need_public builds the public building of slot `which` also where houses lack it:
+    /// `cov` from its order, always for the chapel, the gallows and the fire brigade, and for an
+    /// improved computer's doctor (p48).
+    [[nodiscard]] static bool checks_coverage(bool improved, std::uint8_t which, bool cov) noexcept;
+    /// Whether house `h` of city `c` is one the plague can break out in and no doctor covers (p48).
+    [[nodiscard]] static bool lacks_doctor(const House& h, const City& c) noexcept;
+    /// Whether `lacking` such houses open the doctor again: as many as its site must newly cover.
+    [[nodiscard]] static bool doctor_gap(std::int32_t lacking, std::int32_t min_houses) noexcept;
+    /// Whether a doctor in a house's place pays: it reaches `houses` without one, at least the
+    /// `min_houses` of its site, whose people (`covered`) outnumber the house's (`lost`).
+    [[nodiscard]] static bool swap_pays(std::int32_t houses, std::uint64_t covered, std::uint32_t lost,
+                                        std::int32_t min_houses) noexcept;
+    /// Of two such houses, the one whose doctor reaches more houses, of as many the one with fewer people.
+    [[nodiscard]] static bool swap_prefers(std::int32_t houses, std::uint32_t lost, std::int32_t best_houses,
+                                           std::uint32_t best_lost) noexcept;
+    /// Whether a long new road (road_three) lets a slot search its sites again. Improved
+    /// computers: not a tower, nor an iron mine or a doctor whose search failed through (a doctor
+    /// fails through after a house pulled down for it could not take it, doctor_swap).
+    [[nodiscard]] static bool road_resets(bool improved, std::size_t slot, std::uint16_t fail_level) noexcept;
     /// Improved computers: whether its cities lack a crop's good for a war: used beyond what they
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
@@ -726,6 +752,10 @@ private:
     // ---- ai_planner.cpp ----
     void task_develop(AiPlayer& p);
     void refresh_city(AiPlayer& p);
+    /// Logs the fires and plagues of the city when they change (only the log).
+    void log_disasters(const AiPlayer& p, const City& c);
+    /// Open1602 (p48): opens the doctor again while a house the plague can break out in lacks one.
+    void doctor_gaps(AiPlayer& p, const City& c, CityPlan& r);
     void buy_settings(AiPlayer& p, City& c, CityPlan& r);
     void sell_settings(AiPlayer& p, City& c, CityPlan& r);
     void production_switches(AiPlayer& p, City& c);
@@ -922,6 +952,9 @@ private:
     bool advance_cursor(AiPlayer& p, std::int32_t limit);
     [[nodiscard]] bool can_place(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
                                  std::int32_t w, std::int32_t h) const;
+    /// can_place() as if the building with its origin at (x, y) were pulled down first.
+    [[nodiscard]] bool can_replace(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x, std::int32_t y,
+                                   std::int32_t w, std::int32_t h);
     bool search_houses(AiPlayer& p);
     bool search_workshop(AiPlayer& p, bool cannons);
     bool search_stonemason(AiPlayer& p);
@@ -1481,6 +1514,10 @@ private:
     std::uint16_t slot_fail(AiPlayer& p, std::uint8_t slot);
     [[nodiscard]] std::int32_t slot_present(const AiPlayer& p, std::uint8_t slot) const;
     std::size_t demolish_tile(AiPlayer& p, std::int32_t x, std::int32_t y);  ///< buildings removed
+    /// Open1602: with no site for a doctor (task_public), pull down the city's house in whose place
+    /// it reaches the most houses without one, the doctor walking to them, and build it there;
+    /// true if it did.
+    bool doctor_swap(AiPlayer& p, const PublicTask& def);
 
     Simulation& m_sim;
     World& m_world;
@@ -1563,6 +1600,14 @@ private:
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
+    /// Per island and city: the fires and plagues logged at the last look (only the log).
+    struct DisasterLog {
+        std::uint16_t island = 0;
+        std::uint8_t city = 0;
+        std::uint32_t fires = 0;
+        std::uint32_t plagues = 0;
+    };
+    std::vector<DisasterLog> m_disaster_logged;
     /// Per player, the yard sites of the running search refused because the yard's carriers would
     /// reach no store (only the log).
     std::vector<std::uint32_t> m_yard_unreached;

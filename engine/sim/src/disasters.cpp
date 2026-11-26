@@ -303,7 +303,7 @@ std::vector<House*> houses_of(World& world, const City& city, bool upper) {
     std::vector<House*> out;
     for (House& h : world.houses()) {
         if (h.island == city.island && h.city == city.index && (h.services & hs::kDisasterMask) == 0 &&
-            (h.resident_class >= 2) == upper) {
+            plague_prone(h) == upper) {
             out.push_back(&h);
         }
     }

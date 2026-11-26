@@ -10,6 +10,7 @@
 
 #include "o1602/assets/game_data.hpp"
 #include "o1602/sim/goods_ledger.hpp"
+#include "o1602/sim/houses.hpp"
 #include "o1602/sim/world.hpp"
 
 using namespace o1602;
@@ -236,6 +237,75 @@ TEST_CASE("ai supply: the runs count what a run brings, not a full load") {
     CHECK(Engine::runs_for(300, 428, 17 * kT) == 4);  // at most kMaxRunsPerWare
     CHECK(Engine::runs_for(0, 428, 17 * kT) == 1);    // at least one
     CHECK(Engine::runs_for(300, 428, 0) >= 1);        // no carry known: no division by zero
+}
+
+TEST_CASE("ai yard: the build waits while a damaged ship is called in") {
+    // P1: the yard's build and the city's construction used up the wood, and the repairs stopped.
+    CHECK(!Engine::yard_builds(true, true, false, true));  // paused for the ship on its way
+    CHECK(Engine::yard_builds(true, true, true, true));    // a repair runs: the yard is on anyway
+    CHECK(Engine::yard_builds(true, true, false, false));  // nobody called: the build goes on
+    CHECK(Engine::yard_builds(false, true, false, true));  // the original's computers
+}
+
+TEST_CASE("ai yard: after a stall a repair waits for material in the yard itself") {
+    // f43: with only the Kontor's stock a called ship started and was released ten seconds later.
+    CHECK(Engine::repair_may_start(true, false, false));  // no stall yet
+    CHECK(!Engine::repair_may_start(true, true, false));  // stalled, the yard holds nothing
+    CHECK(Engine::repair_may_start(true, true, true));    // the material has arrived
+    CHECK(Engine::repair_may_start(false, true, false));  // the original's computers
+}
+
+TEST_CASE("ai doctor: an improved computer builds the next doctor where houses the plague can reach lack one") {
+    // p48: 92 % of the plague losses fell in cities with one doctor that never got the next.
+    CHECK(Engine::checks_coverage(true, sim::ai::kSlotKlinik, false));
+    CHECK(!Engine::checks_coverage(false, sim::ai::kSlotKlinik, false));  // the original's gold flag
+    CHECK(Engine::checks_coverage(false, sim::ai::kSlotKapelle, false));
+    CHECK(!Engine::checks_coverage(true, sim::ai::kSlotBadehaus, false));
+    sim::City c;
+    c.island = 2;
+    c.index = 1;
+    sim::House h;
+    h.island = 2;
+    h.city = 1;
+    h.resident_class = 2;  // citizens
+    CHECK(Engine::lacks_doctor(h, c));
+    h.services = sim::house_service::kKlinik;
+    CHECK(!Engine::lacks_doctor(h, c));
+    h.services = 0;
+    h.resident_class = 1;  // settlers: no plague breaks out there
+    CHECK(!Engine::lacks_doctor(h, c));
+    h.resident_class = 2;
+    h.city = 0;  // another city's
+    CHECK(!Engine::lacks_doctor(h, c));
+}
+
+TEST_CASE("ai doctor: the doctor opens again only for as many houses as its site must cover") {
+    // p49: gaps of one to seven houses had the search fail again and again (min_houses 8).
+    CHECK(!Engine::doctor_gap(7, 8));
+    CHECK(Engine::doctor_gap(8, 8));
+    CHECK(!Engine::doctor_gap(0, 0));
+}
+
+TEST_CASE("ai doctor: with no site, a house makes way for a doctor where it reaches the most houses") {
+    // Merlin, 2026-11-25: the people of the house pulled down are soon made up by the doctor.
+    CHECK(Engine::swap_pays(8, 8 * 20 * 64, 40 * 64, 8));
+    CHECK(!Engine::swap_pays(7, 7 * 20 * 64, 40 * 64, 8));  // fewer than its site must cover
+    CHECK(!Engine::swap_pays(8, 40 * 64, 40 * 64, 8));      // no more people covered than lost
+    // Coverage first, then the fewer people lost; no class is spared (a noble's house may go).
+    CHECK(Engine::swap_prefers(12, 40 * 64, 10, 5 * 64));
+    CHECK(Engine::swap_prefers(10, 5 * 64, 10, 40 * 64));
+    CHECK(!Engine::swap_prefers(10, 40 * 64, 10, 5 * 64));
+}
+
+TEST_CASE("ai doctor: a long road does not open the doctor again after a house went for none") {
+    // t70: the road reset the slot 5 s after the error, and a second house went.
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotKlinik, 2));
+    CHECK(Engine::road_resets(true, sim::ai::kSlotKlinik, 1));
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotIronMine, 2));
+    CHECK(!Engine::road_resets(true, sim::ai::kSlotWoodTower, 0));
+    CHECK(Engine::road_resets(true, sim::ai::kSlotHouses, 2));
+    CHECK(Engine::road_resets(false, sim::ai::kSlotKlinik, 2));  // the original resets every slot
+    CHECK(Engine::road_resets(false, sim::ai::kSlotWoodTower, 0));
 }
 
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
