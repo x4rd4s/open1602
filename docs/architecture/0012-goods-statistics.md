@@ -111,7 +111,9 @@ before a good the people need runs out.
      window and selects the ship and looks at it.
    - "Finanzen": tax income, running costs, sales, purchases and the balance now (as the city
      window computes them) and on average over the time chosen, and their chart; the military
-     costs only for all islands together, since soldiers and ships belong to no island.
+     costs only for all islands together, since soldiers and ships belong to no island. Below the
+     balance the gold in the player's treasury, and with a negative balance how many minutes it
+     lasts at the balance of now.
 
    The history of the last two comes from `sim::CityHistory` (`City::history`): every game minute,
    for the cities of human players only, the city window's figures and the inhabitants of each

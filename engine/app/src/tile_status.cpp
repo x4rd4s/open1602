@@ -159,10 +159,12 @@ std::string tile_status(const sim::WorldIsland& island, std::int32_t x, std::int
     if (!island.map.contains(x, y)) {
         return {};
     }
-    // Who has not discovered the island sees its terrain only.
+    // Who has not discovered the island sees its terrain only. Open1602: a spectator (no player of
+    // its own) has discovered every island.
     const auto ux = static_cast<std::uint32_t>(x);
     const auto uy = static_cast<std::uint32_t>(y);
-    const sim::MapCell& cell = island.discovered_by(local) ? island.map.top(ux, uy) : island.map.ground(ux, uy);
+    const bool discovered = local == sim::kNoPlayer || island.discovered_by(local);
+    const sim::MapCell& cell = discovered ? island.map.top(ux, uy) : island.map.ground(ux, uy);
     const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
     if (b == nullptr) {
         return {};

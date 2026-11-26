@@ -751,15 +751,15 @@ bool building_figure_sprites(const BuildingFigure& figure, const sim::World& wor
         }
         case BuildingFigureRole::Deposit: {
             // Drawn only for the local player who knows this deposit (byte 3), also on an island
-            // they have not discovered (see above).
-            if (figure.island >= world.islands().size() || layers.local_player == sim::kNoPlayer) {
+            // they have not discovered (see above). A spectator (kNoPlayer) knows every deposit.
+            if (figure.island >= world.islands().size()) {
                 return false;
             }
             const sim::WorldIsland& island = world.islands()[figure.island];
             const auto& deposits = island.header.deposits;
             const bool known = std::any_of(deposits.begin(), deposits.end(), [&](const auto& d) {
                 return d.x == figure.origin_x && d.y == figure.origin_y && d.ware != 0 &&
-                       sim::deposit_known(d, layers.local_player);
+                       (layers.local_player == sim::kNoPlayer || sim::deposit_known(d, layers.local_player));
             });
             // Kind 0x1B draws from EFFEKTE.BSH like the other symbols (SHOWEISEN has no Blocknr).
             const auto base = layers.sheet_base[static_cast<std::size_t>(assets::FigureSheet::Effekte)];

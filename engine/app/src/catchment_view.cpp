@@ -45,12 +45,17 @@ std::optional<CatchmentCircles> catchment_circles(const sim::World& world, const
     }
     const sim::MapCell& cell = map.top(x, y);
     const sim::SubTile t = map.sub_tile(buildings, x, y);
-    if (t.building == nullptr || cell.owner != player || !shows_catchment(*t.building)) {
+    if (player == sim::kNoPlayer) {
+        player = cell.owner;  // a spectator: as the building's owner sees it
+    }
+    if (t.building == nullptr || cell.empty() || player == sim::kNoPlayer || cell.owner != player ||
+        !shows_catchment(*t.building)) {
         return std::nullopt;
     }
     const assets::BuildingType& type = *t.building;
     CatchmentCircles out;
     out.type = &type;
+    out.owner = player;
     out.circles.push_back(sim::catchment_of(type, cell.rotation, sim::TilePos{x, y}));
     out.origins.push_back(sim::TilePos{x, y});
     if (!same_type) {
