@@ -1090,6 +1090,9 @@ void Engine::task_settle_land(AiPlayer& p) {
         end_settlement(p);
         return;
     }
+    if (logging()) {
+        log_decision(p, "found", s.crop, island, c->index, logged_commitment(p, s.crop));
+    }
     p.has_city = true;
     p.island = island;
     p.city = c->index;
@@ -1569,6 +1572,11 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         }
         s.plan_crop = *best;
         s.plan_ms = step;
+        if (logging()) {
+            Commitment c = logged_commitment(p, *best == kAnyCrop ? std::uint8_t{0} : *best);
+            c.value = best_rank;  // the plan is chosen by its rank, gold a minute
+            log_decision(p, "colony plan", *best, -1, -1, c);
+        }
     }
     // A ship is kept for it once the home city holds the load, so that the supply runs do not take
     // it while it is called home; before, kept from the plan on, it lay idle for most of an hour.

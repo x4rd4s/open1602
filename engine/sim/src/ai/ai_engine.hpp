@@ -516,6 +516,15 @@ private:
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
     [[nodiscard]] static bool logging() noexcept;
+    /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
+    /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
+    /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
+    /// (1/32 t) for a run of goods. Logging only: it changes nothing.
+    void log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
+                      std::int32_t city, const Commitment& c, std::uint32_t amount = 0) const;
+    /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
+    /// that a later check in the same step works them out as it would have without the log.
+    [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
     /// The computer log only: a report of each city every half hour of game time.
     void report(AiPlayer& p);
 

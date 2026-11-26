@@ -1656,6 +1656,14 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         return false;
     }
     start_search(p, b, slot, from_start);
+    if (logging()) {
+        // What the building is weighed with today: its price and running costs; no value of its own.
+        Commitment c;
+        c.cost = b.build_cost.money;
+        c.upkeep = b.running_cost;
+        const City* at = current_city(p);
+        log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c);
+    }
     return true;
 }
 
