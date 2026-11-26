@@ -631,6 +631,8 @@ bool Engine::search_houses(AiPlayer& p) {
         return true;
     }
     const TownZone* zone = classic() ? nullptr : &town_zone(p);
+    // Open1602 (PB.4): the land the city's producers work, kept free of houses where others are.
+    const std::vector<Catchment> work = classic() ? std::vector<Catchment>{} : work_circles(p);
     if (zone != nullptr && !zone->valid) {
         zone = nullptr;
     }
@@ -707,7 +709,9 @@ bool Engine::search_houses(AiPlayer& p) {
                               acc.score += (12 - d) * 8;
                           }
                       }
-                      if (raw_producer(t.ware) && d < 2) {
+                      // Open1602: off the original's computers, the work land below takes the place
+                      // of the tiles next to a raw producer.
+                      if (classic() && raw_producer(t.ware) && d < 2) {
                           acc.score -= 8 << (2 - d);
                       }
                       if (t.ware == ware::kGrain && d == 0) {
@@ -721,6 +725,7 @@ bool Engine::search_houses(AiPlayer& p) {
                 const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
                 score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
             }
+            score = off_work_land(score, work_land_under(p, work, c.x0, c.y0, c.x1, c.y1));
             tally_site(p, true, acc.market, score);
             if (acc.market && score > s.best) {
                 s.best = score;

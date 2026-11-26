@@ -3787,3 +3787,51 @@ TEST_CASE("ai view: only the hardest level and the original's computers see what
         }
     }
 }
+
+TEST_CASE("ai: an improved computer keeps its houses off the land its producers work (PB.4)") {
+    // A woodcutter's circle holds the trees it fells; a house on its open ground takes that land.
+    // A stonemason fetches stone that does not grow: its circle is no work land.
+    Game g;
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 22407\n  Kind: 11\n  Gfx: 13\n  Size: 1, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 11\n    Ware: 54\n  EndObj\n"
+        "  @Nummer: 14\n  Id: 20901\n  Kind: 14\n  Gfx: 30\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 2\n    Ware: 9\n    Rohstoff: 54\n    Interval: 20\n    Radius: 4\n"
+        "  EndObj\n"
+        "  @Nummer: 15\n  Id: 20903\n  Kind: 14\n  Gfx: 34\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 2\n    Ware: 23\n    Rohstoff: 53\n    Interval: 20\n    Radius: 4\n"
+        "  EndObj\n");
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s, 5'000);  // the Kontor at 44,16, a road west along row 17
+    const sim::City* city = computer_city(g);
+    REQUIRE(city != nullptr);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    p.island = city->island;
+    p.city = city->index;
+    CHECK(engine.work_circles(p).empty());
+    sim::BuildOrder order;
+    order.player = kComputer;
+    order.island = city->island;
+    order.items = {{20901, 37, 18, 0, 0}};
+    REQUIRE(sim::execute_build(g.world, g.buildings, order, {}, nullptr).placed == 1);
+    CHECK(engine.work_circles(p).empty());  // the mason's stone grows nowhere
+    order.items = {{20903, 40, 18, 0, 0}};
+    REQUIRE(sim::execute_build(g.world, g.buildings, order, {}, nullptr).placed == 1);
+    const std::vector<sim::Catchment> circles = engine.work_circles(p);
+    REQUIRE(circles.size() == 1);
+    // The circle of radius 4 about the woodcutter's 2 x 2 tiles (40..41, 18..19): rows 14..23.
+    CHECK(engine.work_land_under(p, circles, 40, 22, 41, 23) == 4);
+    CHECK(engine.work_land_under(p, circles, 40, 23, 41, 24) == 2);
+    CHECK(engine.work_land_under(p, circles, 40, 26, 41, 27) == 0);
+    CHECK(engine.work_land_under(p, {}, 40, 22, 41, 23) == 0);
+    // The score: divided by one more than the tiles taken, as outside the town zone, and a site that
+    // scored still does; nothing changes without work land under it.
+    CHECK(sim::ai::off_work_land(100, 0) == 100);
+    CHECK(sim::ai::off_work_land(100, 3) == 25);
+    CHECK(sim::ai::off_work_land(2, 4) == 1);
+    CHECK(sim::ai::off_work_land(0, 4) == 0);
+    CHECK(sim::ai::off_work_land(-5, 2) == -5);
+}

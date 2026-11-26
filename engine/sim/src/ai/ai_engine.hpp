@@ -193,6 +193,14 @@ struct TownZone {
     std::int32_t cy = 0;
     std::int32_t radius = 0;  ///< houses within it, fields outside
 };
+/// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
+[[nodiscard]] bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y);
+/// Open1602 (PB.4): a house site's score with `reserved` of its tiles on the work land of a
+/// producer: divided as zone_excess divides one outside the town zone, and a site that scored
+/// keeps scoring, so a house goes there rather than nowhere.
+[[nodiscard]] constexpr std::int32_t off_work_land(std::int32_t score, std::int32_t reserved) noexcept {
+    return score > 0 && reserved > 0 ? std::max(1, score / (1 + reserved)) : score;
+}
 /// How far the middle of a site lies outside the town zone (negative: inside, by so much).
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                        std::int32_t y1);
@@ -324,6 +332,14 @@ public:
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
+    /// Open1602 (PB.4): the circles of the producers of `p`'s city that work land: a production
+    /// cycle, a radius and a raw material that grows on the map (a growing record of the table
+    /// carries it), unless their catchment is water.
+    [[nodiscard]] std::vector<Catchment> work_circles(const AiPlayer& p) const;
+    /// How many tiles of the site (x0, y0)-(x1, y1) lie in one of `circles` where a raw material
+    /// could grow: open ground, forest or a growing record, as the city metrics count work land.
+    [[nodiscard]] std::int32_t work_land_under(const AiPlayer& p, std::span<const Catchment> circles, std::int32_t x0,
+                                               std::int32_t y0, std::int32_t x1, std::int32_t y1) const;
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;

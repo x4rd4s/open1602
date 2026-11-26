@@ -911,9 +911,47 @@ std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
     return circles;
 }
 
-namespace {
+std::vector<Catchment> Engine::work_circles(const AiPlayer& p) const {
+    std::vector<Catchment> circles;
+    const auto grown = [](const assets::BuildingType& b) {
+        return b.prod_kind == prod::kRipe || b.prod_kind == prod::kGrowing;
+    };
+    const IslandMap& map = m_world.islands()[p.island].map;
+    for (const Production& pr : m_world.productions()) {
+        if (!pr.used || pr.island != p.island || !map.contains(pr.x, pr.y)) {
+            continue;
+        }
+        const MapCell& cell = map.top(pr.x, pr.y);
+        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
+        if (cell.city != p.city || b == nullptr || b->destroyed || b->interval == 0 || grown(*b) || b->radius == 0 ||
+            b->raw_ware == 0 || catchment_covers_water(*b)) {
+            continue;
+        }
+        const bool grows = std::ranges::any_of(
+            m_buildings.types(), [&](const assets::BuildingType& t) { return grown(t) && t.ware == b->raw_ware; });
+        if (grows) {
+            circles.push_back(catchment_of(*b, cell.rotation, TilePos{pr.x, pr.y}));
+        }
+    }
+    return circles;
+}
 
-/// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
+std::int32_t Engine::work_land_under(const AiPlayer& p, std::span<const Catchment> circles, std::int32_t x0,
+                                     std::int32_t y0, std::int32_t x1, std::int32_t y1) const {
+    std::int32_t n = 0;
+    for (std::int32_t y = y0; y <= y1 && !circles.empty(); ++y) {
+        for (std::int32_t x = x0; x <= x1; ++x) {
+            const Tile t = tile(p.island, x, y);
+            const bool land = !t.valid() || t.kind == kind::kGround || t.kind == kind::kForest ||
+                              t.prod == prod::kRipe || t.prod == prod::kGrowing;
+            if (land && std::ranges::any_of(circles, [&](const Catchment& a) { return in_circle(a, x, y); })) {
+                ++n;
+            }
+        }
+    }
+    return n;
+}
+
 bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y) {
     std::int32_t dx = x - a.centre.x;
     std::int32_t dy = y - a.centre.y;
@@ -922,8 +960,6 @@ bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y) {
     return dy <= a.radius && dx <= a.radius &&
            (a.radius <= 1 || dx <= circle_table(a.radius)[static_cast<std::size_t>(dy)]);
 }
-
-}  // namespace
 
 bool Engine::masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry, std::int32_t x0,
                           std::int32_t y0, std::uint8_t rotation) const {
