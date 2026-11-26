@@ -34,6 +34,7 @@
 #include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/computer_slots.hpp"
 #include "o1602/sim/construction.hpp"
+#include "o1602/sim/new_game.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/simulation.hpp"
@@ -3709,5 +3710,48 @@ TEST_CASE("ai view: a partner's Kontor offer only while known, and the hardest l
         CHECK(!v.kontor_offer(*city, assets::ware::kTools).has_value());
         city->owner = kComputer;
         CHECK(!v.kontor_offer(*city, kWare).has_value());
+    }
+}
+
+TEST_CASE("ai view: only the hardest level and the original's computers see what a human does not (P1.7)") {
+    // One human city, two soldiers and nothing else on an island the computer has not discovered:
+    // every level below the hardest sees none of it, the hardest and the original's computers all.
+    for (const bool classic : {false, true}) {
+        for (std::uint8_t difficulty = 0; difficulty < sim::NewGameOptions::kDifficulties; ++difficulty) {
+            Game g;
+            sim::World::GameSettings settings = g.world.game_settings();
+            settings.difficulty = difficulty;
+            g.world.set_game_settings(settings);
+            sim::City c;
+            c.island = 1;
+            c.owner = kHuman;
+            c.inhabitants = {40};
+            g.world.add_city(c);
+            for (const std::uint32_t x : {40U, 41U}) {
+                g.world.add_soldier(sim::make_soldier(
+                    x, 30, static_cast<std::uint16_t>(assets::FigureTable::kUnitFamilies[0]), kHuman, 1));
+            }
+            sim::Rules rules;
+            rules.bugs.classic_ai = classic;
+            sim::Simulation s(g.world, g.buildings, g.figures, rules);
+            sim::ai::State state;
+            sim::ai::Engine engine(s, state);
+            sim::ai::AiPlayer p;
+            p.player = kComputer;
+            sim::ai::AiPlayer h;
+            h.player = kHuman;
+            const sim::ai::View v = engine.view(p);
+            const sim::ai::View self = engine.view(h);
+            const bool all = classic || difficulty + 1 == sim::NewGameOptions::kDifficulties;
+            REQUIRE(!g.world.islands()[1].discovered_by(kComputer));
+            CHECK(v.omniscient_level() == all);
+            CHECK(v.seen_city_count(kHuman) == (all ? 1U : 0U));
+            CHECK(v.seen_soldiers_on(kHuman, 1) == (all ? 2U : 0U));
+            CHECK(v.seen_army(kHuman) == (all ? self.seen_army(kHuman) : 0U));
+            CHECK(v.knows_crops(1) == classic);  // crops: every island for the original's, by exploring else
+            // The human itself sees all of its own on every level.
+            CHECK(self.seen_city_count(kHuman) == 1);
+            CHECK(self.seen_soldiers_on(kHuman, 1) == 2);
+        }
     }
 }
