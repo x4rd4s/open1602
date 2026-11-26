@@ -1163,6 +1163,8 @@ stats.fin.sales = Sales
 stats.fin.purchases = Purchases
 stats.fin.balance = Balance
 stats.fin.balance_short = Balance
+stats.fin.treasury = Treasury
+stats.fin.lasts = lasts ~{1} min
 stats.fin.hint = Gold per minute as in the city window. Military costs belong to all islands together and have no history.
 
 # The early warning of a shortage, in the status bar (in the voice of "Es fehlt an ..."): {1} the

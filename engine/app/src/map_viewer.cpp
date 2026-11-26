@@ -1259,8 +1259,7 @@ std::optional<render::TileLighting> MapViewer::building_lighting(const Selection
         return std::nullopt;
     }
     const CatchmentCircles& c = *cache.circles;
-    render::TileLighting l =
-        render::TileLighting::circle(m_local_player, world_catchment(clicked.island, c.circles[0]));
+    render::TileLighting l = render::TileLighting::circle(c.owner, world_catchment(clicked.island, c.circles[0]));
     for (std::size_t i = 1; i < c.circles.size(); ++i) {
         l.add_circle(world_catchment(clicked.island, c.circles[i]));
     }
@@ -2626,7 +2625,16 @@ Hud::Resources MapViewer::resources() const {
     if (city == nullptr || (m_local_player != sim::kNoPlayer && !island.discovered_by(m_local_player))) {
         return r;
     }
-    if (city->owner == m_local_player) {
+    const sim::Player* owner = m_state->world.player(city->owner);
+    const bool player_owner =
+        owner != nullptr && (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer);
+    // Open1602: a spectator reads the top line of the player whose city is under the mouse, as that
+    // player sees it: the gold in the treasury and the city's building materials.
+    const bool watching = m_local_player == sim::kNoPlayer && player_owner;
+    if (watching) {
+        r.money = owner->money;
+    }
+    if (city->owner == m_local_player || watching) {
         constexpr std::array<std::uint8_t, 3> kWares{sim::ware::kTools, sim::ware::kWood, sim::ware::kBricks};
         std::array<std::int64_t, 3> goods{};
         for (std::size_t i = 0; i < 3; ++i) {
@@ -2646,8 +2654,7 @@ Hud::Resources MapViewer::resources() const {
     // The owner's coat of arms for humans and computer opponents alike: the original tests the
     // player kind for 0 or 0x0C and draws the plain shield only
     // for the other factions.
-    const sim::Player* owner = m_state->world.player(city->owner);
-    if (owner != nullptr && (owner->role == sim::PlayerRole::Human || owner->role == sim::PlayerRole::Computer)) {
+    if (player_owner) {
         r.shield = owner->banner;
     }
     r.natives = owner != nullptr && m_state->world.behaviour(*owner) == sim::FactionBehaviour::Natives;

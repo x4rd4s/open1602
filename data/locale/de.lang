@@ -1102,6 +1102,8 @@ stats.fin.sales = Verkaufserlöse
 stats.fin.purchases = Einkaufskosten
 stats.fin.balance = Bilanz
 stats.fin.balance_short = Bilanz
+stats.fin.treasury = Schatzkammer
+stats.fin.lasts = reicht ca. {1} Min
 stats.fin.hint = Gold pro Minute wie im Stadtfenster. Heereskosten gelten für alle Inseln zusammen und haben keinen Verlauf.
 
 message.running_low = {1} wird knapp in {2}: reicht noch etwa {3} Min
