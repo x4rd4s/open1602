@@ -400,6 +400,13 @@ public:
                                           bool populated) noexcept;
     /// Whether an island's `free` land leaves room to found beside another city (blocker).
     [[nodiscard]] static bool room_beside(std::uint32_t free) noexcept;
+    /// The least size class of an island the search takes for a computer with `cities` cities.
+    [[nodiscard]] static std::uint32_t colony_size_class(std::uint32_t cities) noexcept;
+    /// Whether a computer takes an island below colony_size_class for its gold (gold_islet): an
+    /// improved computer, not the pirates, with a city (`cities`) to found a colony from, and a free
+    /// gold vein there it knows of (`gold`).
+    [[nodiscard]] static bool islet_for_gold(bool improved, bool pirates, std::uint32_t cities,
+                                             std::uint32_t size_class, bool gold) noexcept;
     /// Whether improved pirates pass over an island in their search: one they turned back from
     /// lately (`left`) or whose cities leave no room (`blocked`); the original's pirates never do.
     [[nodiscard]] static bool pirate_island_skipped(bool improved, bool left, bool blocked) noexcept;
@@ -642,6 +649,9 @@ private:
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
     /// A vein of the ware (ore, gold) on the island outside every city's land.
     [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t w) const;
+    /// Improved computers with a city: an island below the colonies' size class that carries a free
+    /// gold vein the computer knows of; such an island is settled for its gold.
+    [[nodiscard]] bool gold_islet(const AiPlayer& p, std::uint16_t island) const;
     /// Whether the ore veins of its own islands run low while it mines iron (improved computers).
     [[nodiscard]] bool ore_running_out(const AiPlayer& p) const;
     void task_settle_area(AiPlayer& p);

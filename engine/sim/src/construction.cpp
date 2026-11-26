@@ -101,6 +101,13 @@ bool watery(const assets::BuildingType& b) noexcept {
     }
 }
 
+/// A building that only ever stands on land (roads, fields, houses, workshops, ...): every tile
+/// it covered showed land when it was built, whatever the ground layer below holds. Walls and
+/// towers may stand on the beach where the data has no beach variant, a water mill on its river.
+bool on_land_only(const assets::BuildingType& b) noexcept {
+    return !watery(b) && b.kind != kind::kMill && b.kind != kind::kWall && b.kind != kind::kTower;
+}
+
 const assets::BuildingType* type_at(const IslandMap& map, const assets::BuildingTable& buildings, std::int32_t x,
                                     std::int32_t y) {
     if (!map.contains(x, y)) {
@@ -1963,15 +1970,18 @@ public:
 
     /// Restores the original ground under a removed building: the ground layer, or
     /// meadow where it was forest (the forest ground itself when the data has no meadow).
-    void restore_ground(const Footprint& f, std::uint8_t city) {
+    void restore_ground(const Footprint& f, std::uint8_t city, const assets::BuildingType& removed) {
         IslandMap& m = map();
         const assets::BuildingType* meadow = m_buildings.by_id(kMeadowId);
-        // Water in the ground layer that no water, shore or building on water borders any more
-        // comes back as meadow (F18): the ground can hold water where the island showed grass (the
-        // island template's water under grass of a city), and the old water would stand amid land
-        // with no shore. A river or the sea under a bridge or pier still borders its water.
+        // Water in the ground layer comes back as meadow (F18) under a building that stands on land
+        // only, and under any other where no water, shore or building on water borders it any
+        // more: the ground can hold water or shore where the island showed grass (the island
+        // template's water under grass of a city), and the old water would stand amid land with no
+        // shore, a hole in the island even beside the beach. A river or the sea under a bridge,
+        // pier or water mill still borders its water.
+        const bool land_only = on_land_only(removed);
         bool by_water = false;
-        for (std::int32_t ty = f.y - 1; !by_water && ty <= f.y + static_cast<std::int32_t>(f.h); ++ty) {
+        for (std::int32_t ty = f.y - 1; !land_only && !by_water && ty <= f.y + static_cast<std::int32_t>(f.h); ++ty) {
             for (std::int32_t tx = f.x - 1; !by_water && tx <= f.x + static_cast<std::int32_t>(f.w); ++tx) {
                 if (f.contains(tx, ty)) {
                     continue;
@@ -2029,7 +2039,7 @@ public:
         const assets::BuildingType* ruin =
             b.type->ruin != 0xFF ? m_buildings.ruin_record(b.type->ruin, false) : nullptr;
         if (ruin == nullptr) {
-            restore_ground(f, city);
+            restore_ground(f, city, *b.type);
             return;
         }
         const auto variant = [&](const assets::BuildingType& r) {
@@ -2731,7 +2741,7 @@ DemolishResult execute_demolish(World& world, const assets::BuildingTable& build
         }
         const Footprint f{o.x, o.y, b->width, b->height};
         builder.remove(*b);
-        builder.restore_ground(f, b->city);
+        builder.restore_ground(f, b->city, *b->type);
         ++result.removed;
     }
     builder.finish();
@@ -2907,7 +2917,7 @@ MoveResult execute_move(World& world, const assets::BuildingTable& buildings, co
     }
     Builder builder(world, buildings, order.island, events);
     const std::optional<Production> kept = builder.remove(*old);
-    builder.restore_ground(Footprint{piece.origin.x, piece.origin.y, piece.width, piece.height}, city);
+    builder.restore_ground(Footprint{piece.origin.x, piece.origin.y, piece.width, piece.height}, city, *old->type);
     (void)builder.unregister(footprint_of(*item.type, item.x, item.y, item.rotation));
     const std::uint32_t rnd = world.random(RandomStream::Construction).below(32);
     // Its production state goes along as with an upgrade (stock, raw material, the running cycle).

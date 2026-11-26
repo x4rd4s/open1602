@@ -91,6 +91,24 @@ bool Engine::free_deposit(std::uint16_t island, std::uint8_t w) const {
     return false;
 }
 
+bool Engine::gold_islet(const AiPlayer& p, std::uint16_t island) const {
+    // Open1602 (Merlin, 2026-11-26): the search leaves islands below colony_size_class alone, and
+    // with them the gold that often lies there; an improved computer that has a city takes such an
+    // island for a colony when it knows of a free gold vein on it.
+    return islet_for_gold(!classic(), p.pirates, p.cities, island_size(island),
+                          knows_crops(p, island) && free_deposit(island, ware::kGold));
+}
+
+std::uint32_t Engine::colony_size_class(std::uint32_t cities) noexcept {
+    // The first city and the first colony on islands of size class 2 and up, later colonies from 1 on.
+    return cities <= 1 ? 2U : 1U;
+}
+
+bool Engine::islet_for_gold(bool improved, bool pirates, std::uint32_t cities, std::uint32_t size_class,
+                            bool gold) noexcept {
+    return improved && !pirates && cities >= 1 && size_class < colony_size_class(cities) && gold;
+}
+
 bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     // Open1602, improved computers: an island with a city of a small rival (two cities at most),
     // that the original's computers never settle, when it has a free vein of the ore or gold its
@@ -252,12 +270,13 @@ void Engine::pick_island(AiPlayer& p) {
         if (for_goal && !free_deposit(i, s.crop)) {
             continue;  // every vein lies in someone's land already
         }
-        if (island_size(i) < (p.cities <= 1 ? 2U : 1U)) {
+        const bool islet = gold_islet(p, i);
+        if (island_size(i) < colony_size_class(p.cities) && !islet) {
             continue;
         }
         // The free land task 2 counts never exceeds the island's rectangle (TB-13).
         const IslandMap& map = island_of(i).map;
-        if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need}) {
+        if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need} && !islet) {
             continue;
         }
         s.island = i;
@@ -461,7 +480,9 @@ bool Engine::explore_next(AiPlayer& p) {
         const auto island = static_cast<std::uint16_t>(i);
         const bool unknown = !knows_island(p, island) || (s.crop != 0 && !knows_crops(p, island));
         // Its shape is on the map; who lives there only once it is discovered.
-        if (!unknown || island_size(island) < (p.cities <= 1 ? 2U : 1U) ||
+        // A small island only while gold is sought (gold_islet), with a city to found a colony from.
+        const bool small_ok = !classic() && p.cities >= 1 && s.crop == ware::kGold;
+        if (!unknown || (island_size(island) < colony_size_class(p.cities) && !small_ok) ||
             (knows_island(p, island) && !island_allowed(p, island))) {
             continue;
         }
@@ -517,7 +538,9 @@ void Engine::task_settle_area(AiPlayer& p) {
     s.regions = scan.regions;
     // The island the scenario chose takes a city with the least free land any search ends with.
     const bool chosen = spend_first_island(p, static_cast<std::uint16_t>(s.island));
-    if (scan.total >= (chosen ? s.floor : s.need)) {
+    const bool islet = gold_islet(p, static_cast<std::uint16_t>(s.island));
+    // A gold islet takes a city with any free block of the scan.
+    if (islet ? scan.total > 0 : scan.total >= (chosen ? s.floor : s.need)) {
         push(p, kSettleSite, true);
     }
 }
@@ -711,7 +734,9 @@ void Engine::task_settle_site(AiPlayer& p) {
     // The largest region left; too small ends the test of this island.
     auto best_region = std::max_element(s.regions.begin(), s.regions.end(),
                                         [](const Region& a, const Region& b) { return a.area < b.area; });
-    if (best_region->area <= s.need / 4) {
+    const bool islet = gold_islet(p, island);
+    // A gold islet's regions all count, down to one block (a tried region keeps an area of 1).
+    if (islet ? best_region->area <= 1 : best_region->area <= s.need / 4) {
         return;
     }
     const Region region = *best_region;
@@ -740,12 +765,14 @@ void Engine::task_settle_site(AiPlayer& p) {
     if (kontor == nullptr) {
         return;
     }
-    const bool vein = s.crop != 0 && s.crop == goal_crop(p);
+    // A gold islet's Kontor stands by its gold, whatever the colony was sought for.
+    const bool vein = islet || (s.crop != 0 && s.crop == goal_crop(p));
+    const std::uint8_t vein_ware = islet ? ware::kGold : s.crop;
     constexpr std::int32_t kVeinReach = 24;
     constexpr std::int32_t kVeinBonus = 1 << 16;
     const auto near_vein = [&](std::int32_t cx, std::int32_t cy) {
         for (const auto& d : isl.header.deposits) {
-            if (d.ware == s.crop && d.amount > 0 && tile(island, d.x, d.y).city == MapCell::kNoCity &&
+            if (d.ware == vein_ware && d.amount > 0 && tile(island, d.x, d.y).city == MapCell::kNoCity &&
                 std::max(std::abs(std::int32_t{d.x} - cx), std::abs(std::int32_t{d.y} - cy)) <= kVeinReach) {
                 return true;
             }
@@ -761,7 +788,10 @@ void Engine::task_settle_site(AiPlayer& p) {
         std::int32_t green = -1;
     } best;
     std::vector<std::uint8_t> tried(std::size_t(w) * std::size_t(h), 0);
-    const std::int32_t min_depth = experienced ? 12 : 21;
+    // A gold islet has little land behind any beach: room for one more building of the Kontor's size.
+    const std::int32_t min_depth = islet         ? static_cast<std::int32_t>(std::max(kontor->size_x, kontor->size_y))
+                                   : experienced ? 12
+                                                 : 21;
     // The free beach tiles around the region, row by row as the island's scan keeps them.
     const std::int32_t bx0 = std::max(region.x0 - 1, 0);
     const std::int32_t by0 = std::max(region.y0 - 1, 0);
@@ -828,10 +858,10 @@ void Engine::task_settle_site(AiPlayer& p) {
                 if (depth <= min_depth) {
                     continue;
                 }
-                if (!experienced && trees.count(cx - 12, cy - 12, cx + 12, cy + 12) <= 60) {
+                if (!experienced && !islet && trees.count(cx - 12, cy - 12, cx + 12, cy + 12) <= 60) {
                     continue;
                 }
-                if (fish_first && !fisher_room(island, counts, cx, cy)) {
+                if (fish_first && !islet && !fisher_room(island, counts, cx, cy)) {
                     continue;
                 }
                 std::int32_t g = green.count(cx - 32, cy - 32, cx + 32, cy + 32);
