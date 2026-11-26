@@ -23,7 +23,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 17;
+inline constexpr std::uint32_t kStateVersion = 18;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -61,6 +61,9 @@ inline constexpr std::uint32_t kStateWithFreedIslands = 16;
 /// Version 17: the soldiers an improved computer's war lacks for the next city it attacks
 /// (Strategy::war_party, war_party_city). Written only while it lacks some.
 inline constexpr std::uint32_t kStateWithWarParty = 17;
+/// Version 18: the building an improved computer's city waits on for its wood, tools or bricks
+/// (CityPlan::held_build). Written only while a city waits on one.
+inline constexpr std::uint32_t kStateWithHeldBuild = 18;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -271,6 +274,9 @@ struct CityPlan {
     /// its next building (relocate_farm), its tile; -1 none.
     std::int32_t move_x = -1;
     std::int32_t move_y = -1;
+    /// Open1602: the building (its id) an improved computer's city waits on for want of wood, tools
+    /// or bricks in store, which its supply brings (supply_urgency); 0 none.
+    std::uint32_t held_build = 0;
 };
 
 /// A straight run of road of the current city (task 7).

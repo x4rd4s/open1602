@@ -42,3 +42,5 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 30 | engine/sim/src/ai/ai_strategy.cpp | derived from: kPartyRunwayMinutes, kWarCheckMs (ten minutes) times kWarFails (three) in minutes
 100 | engine/sim/src/ai/ai_settle.cpp | derived from: the percent scale of VictoryConditions::islands_percent, as victory.cpp's islands test (own cities * 100 >= islands * percent) counts it, in goal_city_count
 99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met
+18 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithWarParty = 17
+kStateWithHeldBuild | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 18, which saves CityPlan::held_build

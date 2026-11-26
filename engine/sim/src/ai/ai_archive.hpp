@@ -198,6 +198,9 @@ void io(A& a, CityPlan& r) {
         a(r.move_x);
         a(r.move_y);
     }
+    if (a.version() >= kStateWithHeldBuild) {
+        a(r.held_build);
+    }
 }
 
 template <class A>

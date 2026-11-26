@@ -1323,6 +1323,8 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
+    // What the city waited on at its last look; need() sets it again if it still waits.
+    r.held_build = 0;
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
     const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
@@ -1801,11 +1803,18 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     }
     const std::int64_t field_money = fields_money(*d);
     if (!slot_affordable(p, *c, *d, *b)) {
-        return d->type == NeedType::B || d->type == NeedType::C;
+        const bool holds = d->type == NeedType::B || d->type == NeedType::C;
+        // Open1602: an improved computer's city that waits for the building's materials has them
+        // brought (held_need); run_stage forgets it at the city's next look.
+        if (holds && rivals() && !p.pirates && materials_missing(*c, *b)) {
+            r->held_build = b->id;
+        }
+        return holds;
     }
     const bool pushed = plan_building(p, d->task, *b, which, false, d->from_start);
     if (pushed) {
         reserve(p, *b, field_money);
+        r->held_build = 0;
     }
     return d->type == NeedType::D ? pushed : true;
 }

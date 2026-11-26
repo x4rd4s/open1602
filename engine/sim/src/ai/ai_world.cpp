@@ -283,6 +283,12 @@ bool Engine::unlocked(const AiPlayer& p, const assets::BuildingType& b) const {
     return player(p).unlocked(b.infra);
 }
 
+bool Engine::materials_missing(const City& c, const assets::BuildingType& b) const {
+    const auto& m = m_buildings.materials();
+    const auto& cost = b.build_cost;
+    return c.stock(m.wood) < cost.wood || c.stock(m.bricks) < cost.bricks || c.stock(m.tools) < cost.tools;
+}
+
 bool Engine::affordable(const AiPlayer& p, const City& c, const assets::BuildingType& b) const {
     // The original compares the gold unsigned, so a debt passes (S-096); Open1602 does not.
     const auto& m = m_buildings.materials();
