@@ -894,7 +894,8 @@ bool Engine::mine_reached(const AiPlayer& p, const assets::BuildingType& mine, s
     return cart_reaches(p, x0, y0, x0 + static_cast<std::int32_t>(w) - 1, y0 + static_cast<std::int32_t>(h) - 1, road);
 }
 
-std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
+std::vector<Catchment> Engine::own_circles(const AiPlayer& p,
+                                           const std::function<bool(const assets::BuildingType&)>& keep) const {
     std::vector<Catchment> circles;
     const IslandMap& map = m_world.islands()[p.island].map;
     for (const Production& pr : m_world.productions()) {
@@ -903,7 +904,7 @@ std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
         }
         const MapCell& cell = map.top(pr.x, pr.y);
         const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
-        if (cell.city != p.city || b == nullptr || b->destroyed || b->raw_ware != ware::kStone) {
+        if (cell.city != p.city || b == nullptr || b->destroyed || !keep(*b)) {
             continue;
         }
         circles.push_back(catchment_of(*b, cell.rotation, TilePos{pr.x, pr.y}));
@@ -911,29 +912,19 @@ std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
     return circles;
 }
 
+std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
+    return own_circles(p, [](const assets::BuildingType& b) { return b.raw_ware == ware::kStone; });
+}
+
 std::vector<Catchment> Engine::work_circles(const AiPlayer& p) const {
-    std::vector<Catchment> circles;
     const auto grown = [](const assets::BuildingType& b) {
         return b.prod_kind == prod::kRipe || b.prod_kind == prod::kGrowing;
     };
-    const IslandMap& map = m_world.islands()[p.island].map;
-    for (const Production& pr : m_world.productions()) {
-        if (!pr.used || pr.island != p.island || !map.contains(pr.x, pr.y)) {
-            continue;
-        }
-        const MapCell& cell = map.top(pr.x, pr.y);
-        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
-        if (cell.city != p.city || b == nullptr || b->destroyed || b->interval == 0 || grown(*b) || b->radius == 0 ||
-            b->raw_ware == 0 || catchment_covers_water(*b)) {
-            continue;
-        }
-        const bool grows = std::ranges::any_of(
-            m_buildings.types(), [&](const assets::BuildingType& t) { return grown(t) && t.ware == b->raw_ware; });
-        if (grows) {
-            circles.push_back(catchment_of(*b, cell.rotation, TilePos{pr.x, pr.y}));
-        }
-    }
-    return circles;
+    return own_circles(p, [&](const assets::BuildingType& b) {
+        return b.interval != 0 && !grown(b) && b.radius != 0 && b.raw_ware != 0 && !catchment_covers_water(b) &&
+               std::ranges::any_of(m_buildings.types(),
+                                   [&](const assets::BuildingType& t) { return grown(t) && t.ware == b.raw_ware; });
+    });
 }
 
 std::int32_t Engine::work_land_under(const AiPlayer& p, std::span<const Catchment> circles, std::int32_t x0,

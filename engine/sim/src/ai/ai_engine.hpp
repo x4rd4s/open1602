@@ -332,6 +332,9 @@ public:
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
+    /// The circles of the standing productions of `p`'s city whose type `keep` takes.
+    [[nodiscard]] std::vector<Catchment> own_circles(
+        const AiPlayer& p, const std::function<bool(const assets::BuildingType&)>& keep) const;
     /// Open1602 (PB.4): the circles of the producers of `p`'s city that work land: a production
     /// cycle, a radius and a raw material that grows on the map (a growing record of the table
     /// carries it), unless their catchment is water.
