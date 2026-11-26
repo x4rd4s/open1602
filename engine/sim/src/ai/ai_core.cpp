@@ -9,6 +9,7 @@
 #include "ai_archive.hpp"
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "annokit/core/file.hpp"
 
@@ -471,7 +472,7 @@ bool Engine::city_valid(AiPlayer& p, bool clear) {
 
 void Engine::check_city_loss(AiPlayer& p) {
     // Fewer cities than at the last init -> start over.
-    if (own_city_count(p.player) < p.cities) {
+    if (view(p).own_city_count() < p.cities) {
         init_player(p);
     }
 }

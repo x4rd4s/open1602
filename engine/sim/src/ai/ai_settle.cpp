@@ -12,6 +12,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/mission.hpp"
 
@@ -1655,8 +1656,9 @@ bool Engine::ore_running_out(const AiPlayer& p) const {
     const bool endless = m_sim.rules().endless_veins(game_endless);
     std::vector<std::uint16_t> islands;
     std::uint64_t left = 0;
-    for (const City& c : m_world.cities()) {
-        if (c.owner != p.player || std::find(islands.begin(), islands.end(), c.island) != islands.end()) {
+    for (const City* own_c : view(p).own_cities()) {
+        const City& c = *own_c;
+        if (std::find(islands.begin(), islands.end(), c.island) != islands.end()) {
             continue;
         }
         islands.push_back(c.island);

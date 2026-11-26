@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "ai_engine.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/goods_statistics.hpp"
@@ -82,8 +83,9 @@ Overview Engine::build_overview(const AiPlayer& p) const {
     const auto area = [&](std::optional<std::uint16_t> island) {
         AreaView a;
         a.island = island;
-        for (const City& c : m_world.cities()) {
-            if (c.owner != p.player || (island && c.island != *island)) {
+        for (const City* own_c : view(p).own_cities()) {
+            const City& c = *own_c;
+            if ((island && c.island != *island)) {
                 continue;
             }
             ++a.cities;

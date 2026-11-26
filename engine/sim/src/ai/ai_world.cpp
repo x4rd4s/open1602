@@ -5,6 +5,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/growth.hpp"
 
@@ -412,7 +413,7 @@ bool Engine::behind(const AiPlayer& p) const {
             threshold = best_pop + best_pop / 2;
             break;
     }
-    return total_population(p.player) < threshold || army_strength(p.player) < best_army;
+    return view(p).own_population() < threshold || army_strength(p.player) < best_army;
 }
 
 bool Engine::threatened(const AiPlayer& p) const {

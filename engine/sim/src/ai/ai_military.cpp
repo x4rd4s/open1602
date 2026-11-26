@@ -17,6 +17,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/combat.hpp"
 #include "o1602/sim/mission.hpp"
@@ -297,7 +298,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     const Balance& bal = m_world.balance();
     std::uint32_t own = 0;
     if (bal.ai_inhabitants_per_unit != 0) {
-        own = static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * total_population(p.player) /
+        own = static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * view(p).own_population() /
                                          bal.ai_inhabitants_per_unit);
     }
     std::uint32_t rival = 0;
@@ -744,7 +745,7 @@ void Engine::recruit(AiPlayer& p) {
         const std::uint32_t units = counts[0] + counts[1] + counts[2] + counts[3];
         const Balance& bal = m_world.balance();
         const std::uint32_t keep =
-            bal.ai_inhabitants_per_unit != 0 ? total_population(p.player) / bal.ai_inhabitants_per_unit / 2 : 0;
+            bal.ai_inhabitants_per_unit != 0 ? view(p).own_population() / bal.ai_inhabitants_per_unit / 2 : 0;
         // Disbanding costs gold (the third value of the Soldat: line): only a soldier whose upkeep
         // pays that back within half an hour goes; one that costs nothing to keep stays.
         const assets::FigureTable* f = m_sim.figures();
@@ -791,7 +792,7 @@ void Engine::recruit(AiPlayer& p) {
         return;
     }
     const std::uint32_t army = m_sim.military().army_size(p.player);
-    const std::uint32_t pop = total_population(p.player);
+    const std::uint32_t pop = view(p).own_population();
     const std::uint32_t cap = m_sim.rules().max_army;
     // Castles that still stand.
     std::erase_if(p.castles, [&](const CastleEntry& e) {
@@ -851,7 +852,7 @@ void Engine::recruit(AiPlayer& p) {
     const Balance& mb = m_world.balance();
     const std::uint32_t core =
         mb.ai_inhabitants_per_unit != 0
-            ? static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * total_population(p.player) /
+            ? static_cast<std::uint32_t>(std::uint64_t{unit_weights()[0]} * view(p).own_population() /
                                          mb.ai_inhabitants_per_unit / 2)
             : 0;
     // The core only with gold in hand and cities that pay for it; beyond it the budget with a quarter
@@ -3952,7 +3953,7 @@ void Engine::pirate_step(AiPlayer& p) {
         return;
     }
     // A nest, and with Rules::pirate_nests one for every four players (the original founds one).
-    if (own_city_count(p.player) < pirate_nests(m_world, m_sim.rules())) {
+    if (view(p).own_city_count() < pirate_nests(m_world, m_sim.rules())) {
         if (!p.settle.active && p.stack.empty() && now_ms() - p.settle.last_ms > 36'000) {
             free_colony_cargo(p, *ships.front(), false);
             p.settle.ship = ships.front()->id;

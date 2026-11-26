@@ -10,6 +10,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/disasters.hpp"
@@ -544,10 +545,8 @@ Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) c
         needed[w] = true;
     }
     const auto& classes = m_buildings.resident_classes();
-    for (const City& o : m_world.cities()) {
-        if (o.owner != p.player) {
-            continue;
-        }
+    for (const City* own_o : view(p).own_cities()) {
+        const City& o = *own_o;
         std::size_t top = 0;
         for (std::size_t k = 0; k < classes.size() && k < o.inhabitants.size(); ++k) {
             if (o.inhabitants[k] != 0) {
@@ -2720,8 +2719,9 @@ std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
     }
     std::uint64_t missing = wanted - made;
     // What the other cities make beyond their own use comes by ship (home_supply_route).
-    for (const City& o : m_world.cities()) {
-        if (o.owner != p.player || &o == home) {
+    for (const City* own_o : view(p).own_cities()) {
+        const City& o = *own_o;
+        if (&o == home) {
             continue;
         }
         const std::uint32_t own = supply(o, w);
