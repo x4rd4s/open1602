@@ -78,17 +78,29 @@ class ReportTest(unittest.TestCase):
         d = pathlib.Path(self.tmp.name) / "x3"
         with open(d / "A-g4-1-p0.err", "a") as f:
             f.write("[ai 2 1400s] lever X holds farm\n[ai 3 1400s] lever X holds farm\n")
-        linked = report.report_set(d, "A", "B", human=False, change=("lever X",))
+        linked = report.report_set(d, "A", "B", human=False, change=report.re.compile("lever X"))
         self.assertEqual(linked["slides"][0]["change_lines"], 1)
         self.assertEqual(linked["slides"][0]["cause"], "change")
-        war = report.report_set(d, "A", "B", human=False, change=("lever X",), war_change=True)
+        war = report.report_set(d, "A", "B", human=False, change=report.re.compile("lever X"), war_change=True)
         self.assertEqual(war["slides"][0]["cause"], "intended conquest")
-        free = report.report_set(d, "A", "B", human=False, change=("other lever",))
+        free = report.report_set(d, "A", "B", human=False, change=report.re.compile("other lever"))
         self.assertEqual(free["slides"][0]["cause"], "conquest")
         r = report.rules({"x3": linked})
         self.assertTrue(r["1"]["passes"] and r["2"]["passes"] and r["4"]["passes"])
         self.assertEqual(r["3"]["why"], ["x3 g4-1-p0 P2 (change)"])
         self.assertTrue(report.rules({"x3": free})["3"]["passes"])
+
+    def test_watch_keys_are_their_own_set(self):
+        import contextlib
+        import io
+        import json
+        out = pathlib.Path(self.tmp.name) / "r.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = report.main([self.tmp.name, "--arm", "A", "--ref", "B", "--sets", "x3", "--watch", "-p1",
+                              "--change", r"city \d+/\d+: holds", "--json", str(out)])
+        self.assertEqual(rc, 0)
+        sets = json.loads(out.read_text())["sets"]
+        self.assertEqual((sets["x3"]["runs"], sets["x3 watch"]["runs"]), (1, 1))
 
     def test_rules_two_and_four(self):
         slide = lambda key, p, cause: {"key": key, "player": p, "cause": cause}  # noqa: E731

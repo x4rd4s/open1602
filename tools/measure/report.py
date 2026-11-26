@@ -4,7 +4,7 @@
 
 Usage:
   python3 tools/measure/report.py RUNDIR --arm ARM --ref REF [--sets l2,l3,x3] [--human-sets l2] [--json OUT]
-      [--change 'PREFIX|PREFIX'] [--war-change]
+      [--change REGEX] [--war-change] [--watch TEXT]
 
 RUNDIR holds one folder per set, and in it per run ARM-KEY.txt (o1602-tool bench --per-player), ARM-KEY.rc
 and, for a logged run, ARM-KEY.err (the computer log, O1602_AI_LOG). A key is a map and a phase,
@@ -34,8 +34,9 @@ From the log, where the arm and the reference have one with main's standard line
                and its stock was 0: dry minutes, episodes of 10 minutes or more, and how many of
                them ended before the run did (covered); beside it the flow deficit (used less than
                asked for in the sample), which counts more cases.
-Then rules 1 to 4 of the gate (rules(), cause()): --change names the change's own log lines by how
-they begin, --war-change marks a change that acts on war (its conquests are intended).
+Then rules 1 to 4 of the gate (rules(), cause()): --change is a regular expression that finds the
+change's own log lines, --war-change marks a change that acts on war (its conquests are intended).
+--watch TEXT reports the keys of a set that contain TEXT as a set of their own ("SET watch").
 Exit code 0, 2 on wrong use.
 """
 from __future__ import annotations
@@ -95,9 +96,9 @@ def save_offset(key: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def parse_log(text: str, change: tuple[str, ...] = ()) -> dict:
-    """The log's standard lines; with `change`, also the seconds of each player's lines that begin
-    with one of those prefixes (the change's own lines, for rules 3 and 4)."""
+def parse_log(text: str, change: re.Pattern | None = None) -> dict:
+    """The log's standard lines; with `change`, also the seconds of each player's lines in which it
+    is found (the change's own lines, for rules 3 and 4)."""
     landings = []  # (second, attacker, defender)
     own: dict[int, list[int]] = {}
     foundings = 0
@@ -108,7 +109,7 @@ def parse_log(text: str, change: tuple[str, ...] = ()) -> dict:
         if not m:
             continue
         player, second, rest = int(m.group(1)), int(m.group(2)), m.group(3)
-        if change and rest.startswith(change):
+        if change is not None and change.search(rest):
             own.setdefault(player, []).append(second)
         if rest.startswith("decision found "):
             foundings += 1
@@ -152,7 +153,7 @@ def debt_summary(gold: dict) -> dict:
     return {"debt_minutes": negative * TRACK_MINUTES, "players_in_debt": players}
 
 
-def read_run(folder: pathlib.Path, arm: str, key: str, change: tuple[str, ...] = ()) -> dict:
+def read_run(folder: pathlib.Path, arm: str, key: str, change: re.Pattern | None = None) -> dict:
     run = parse_bench((folder / f"{arm}-{key}.txt").read_text(encoding="utf-8", errors="replace"))
     err = folder / f"{arm}-{key}.err"
     run["log"] = parse_log(err.read_text(encoding="utf-8", errors="replace"), change) if err.is_file() else None
@@ -228,9 +229,9 @@ def rules(sets: dict) -> dict:
     return {r: {"passes": not v, "why": v} for r, v in out.items()}
 
 
-def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: tuple[str, ...] = (),
-               war_change: bool = False) -> dict:
-    keys = keys_of(folder, arm, ref)
+def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: re.Pattern | None = None,
+               war_change: bool = False, keys: list[str] | None = None) -> dict:
+    keys = keys_of(folder, arm, ref) if keys is None else keys
     A = {k: read_run(folder, arm, k, change) for k in keys}
     B = {k: read_run(folder, ref, k) for k in keys}
     out: dict = {"runs": len(keys)}
@@ -259,7 +260,7 @@ def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: tu
                 lo, hi = (peak - 30 + save_offset(k)) * 60, (below + save_offset(k)) * 60
                 entry["landings"] = sum(1 for s, att, dfn in log["landings"] if lo <= s <= hi and p in (att, dfn))
                 entry["change_lines"] = sum(1 for s in log["change"].get(p, []) if lo <= s <= hi)
-                entry["cause"] = cause(entry, bool(change), war_change)
+                entry["cause"] = cause(entry, change is not None, war_change)
             slides.append(entry)
     out["slides"] = slides
     for name, f in (("gold", gold), ("cities", cities)):
@@ -327,7 +328,7 @@ def print_report(rep: dict) -> None:
 def main(argv: list[str]) -> int:
     args = list(argv)
     opts = {"--arm": None, "--ref": None, "--sets": "l2,l3,x3", "--human-sets": "l2", "--json": None,
-            "--change": "", "--war-change": None}
+            "--change": None, "--war-change": None, "--watch": None}
     if "--war-change" in args:
         args.remove("--war-change")
         opts["--war-change"] = True
@@ -345,13 +346,23 @@ def main(argv: list[str]) -> int:
         return 2
     rundir = pathlib.Path(args[0])
     human = set(opts["--human-sets"].split(",")) if opts["--human-sets"] else set()
-    # The change's own log lines, as the text after "[ai P Ts] " begins (rule 3); one or more,
-    # separated by "|", so that no change's names are built in.
-    change = tuple(x for x in opts["--change"].split("|") if x)
+    # The change's own log lines: a regular expression searched in the text after "[ai P Ts] "
+    # (rule 3), so that no change's names are built in.
+    try:
+        change = re.compile(opts["--change"]) if opts["--change"] else None
+    except re.error as e:
+        print(f"--change: {e}", file=sys.stderr)
+        return 2
     rep = {"arm": opts["--arm"], "ref": opts["--ref"], "sets": {}}
     for name in opts["--sets"].split(","):
-        rep["sets"][name] = report_set(rundir / name, opts["--arm"], opts["--ref"], name in human, change,
-                                       bool(opts["--war-change"]))
+        folder = rundir / name
+        keys = keys_of(folder, opts["--arm"], opts["--ref"])
+        # A watch set: the keys of a set that contain --watch, reported on their own.
+        watch = [k for k in keys if opts["--watch"] and opts["--watch"] in k]
+        groups = [(name, [k for k in keys if k not in watch])] + ([(f"{name} watch", watch)] if watch else [])
+        for label, ks in groups:
+            rep["sets"][label] = report_set(folder, opts["--arm"], opts["--ref"], name in human, change,
+                                            bool(opts["--war-change"]), ks)
     rep["rules"] = rules(rep["sets"])
     print_report(rep)
     print("\nrules: " + "; ".join(f"{r} {'passes' if v['passes'] else 'fails: ' + ', '.join(v['why'])}"
