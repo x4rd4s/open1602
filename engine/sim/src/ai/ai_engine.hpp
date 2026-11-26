@@ -528,10 +528,19 @@ private:
     /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
     /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
     /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
-    /// (1/32 t) for a run of goods. Each line carries an id, game ms and a count within that ms,
-    /// that a later step pairs with what came of it (P0.3). Logging only: it changes nothing.
+    /// (1/32 t) for a run of goods of `ware` (for a building: the good it makes), and the city `to`
+    /// whose people it is for, when that is another city (a colony's: the home city colony_rank
+    /// weighs it for). Each line carries an id, game ms and
+    /// a count within that ms, that a later step pairs with what came of it (P0.3). Logging only: it changes nothing.
     void log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
-                      std::int32_t city, const Commitment& c, std::uint32_t amount = 0) const;
+                      std::int32_t city, const Commitment& c, std::uint8_t ware = 0, std::uint32_t amount = 0,
+                      const City* to = nullptr) const;
+    /// P0.3: every ten minutes of game time, for the log, what came of a player's decisions so far:
+    /// its gold, and for each own city its people, taxes and running costs a minute and, for each
+    /// good, what was made, shipped in or bought, used by its people and asked for by them in the
+    /// last ten minutes, and its stock now.
+    /// tools/measure/outcomes.py pairs these with the decision lines. Logging only.
+    void track(const AiPlayer& p) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
@@ -1585,6 +1594,8 @@ private:
     /// it (only the log).
     mutable std::uint64_t m_decision_ms = 0;
     mutable std::uint32_t m_decision_seq = 0;
+    /// Per player: the game time of track's next lines (only the log).
+    mutable std::vector<std::uint64_t> m_track_ms;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
     /// Per island and city: the fires and plagues logged at the last look (only the log).

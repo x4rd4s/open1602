@@ -1661,7 +1661,7 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         c.cost = b.build_cost.money;
         c.upkeep = b.running_cost;
         const City* at = current_city(p);
-        log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c);
+        log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c, b.ware);
     }
     return true;
 }
