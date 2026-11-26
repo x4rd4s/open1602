@@ -66,6 +66,11 @@ Ship* Engine::settle_ship(AiPlayer& p) {
 // ---------------------------------------------------------------------------------------------
 // The island search
 
+void Engine::log_seen_cities(const AiPlayer& p, PlayerId owner, std::uint16_t island, const char* where) const {
+    log(p, "seen cities: player %u has %u (all %u), %s island %u", unsigned{owner}, view(p).seen_city_count(owner),
+        own_city_count(owner), where, unsigned{island});
+}
+
 bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
     // No own city there, and no city of a human or computer with at most two cities.
     for (const City& c : m_world.cities()) {
@@ -76,6 +81,9 @@ bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
             return false;
         }
         if (is_settler(c.owner) && view(p).seen_city_count(c.owner) <= 2) {
+            if (logging() && own_city_count(c.owner) > 2) {
+                log_seen_cities(p, c.owner, island, "keeps off");
+            }
             return false;
         }
     }
@@ -120,6 +128,9 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
         }
         if (!is_settler(c.owner) || view(p).seen_city_count(c.owner) > 2) {
             continue;
+        }
+        if (logging() && own_city_count(c.owner) > 2) {
+            log_seen_cities(p, c.owner, island, "contests");
         }
         if (stance_of(p, c.owner) == stance::kPartner || m_world.diplomacy().allied(p.player, c.owner) ||
             view(p).threat(c.owner) > own) {
@@ -376,8 +387,14 @@ PlayerId Engine::blocker(const AiPlayer& p, std::uint16_t island, bool room) con
         // The original's computers keep off the largest islands where another computer has a
         // city, though not where a human has one; improved, a computer's city counts as a human's.
         const bool human = o != nullptr && o->role == PlayerRole::Human;
-        if (!leaves_room(classic() && !human && island_size(island) > 3, contested,
-                         view(p).seen_city_count(c.owner) < 2, room, has_population(c, 0, 50))) {
+        const bool kept_off = classic() && !human && island_size(island) > 3;
+        const bool leaves =
+            leaves_room(kept_off, contested, view(p).seen_city_count(c.owner) < 2, room, has_population(c, 0, 50));
+        if (logging() &&
+            leaves != leaves_room(kept_off, contested, own_city_count(c.owner) < 2, room, has_population(c, 0, 50))) {
+            log_seen_cities(p, c.owner, island, leaves ? "lands beside" : "turns back from");
+        }
+        if (!leaves) {
             return c.owner;
         }
     }

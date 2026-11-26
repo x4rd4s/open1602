@@ -352,9 +352,19 @@ std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
     }
     const auto w = unit_weights();
     std::uint32_t s = 0;
+    std::uint32_t flagged = 0;  // for the log: on discovered islands only, as before P1.5b
     for (const Soldier& u : m_world.soldiers()) {
         if (u.owner == owner && !u.away() && u.island < known.size() && known[u.island]) {
-            s += w[family_index(m_sim.m_figures, u.figure)];
+            const std::uint32_t k = w[family_index(m_sim.m_figures, u.figure)];
+            s += k;
+            flagged += island_of(u.island).discovered_by(viewer) ? k : 0U;
+        }
+    }
+    if (logging() && flagged != s) {
+        for (const AiPlayer& a : m_state.players) {
+            if (a.player == viewer) {
+                log(a, "seen army: player %u %u (discovered islands only %u)", unsigned{owner}, s, flagged);
+            }
         }
     }
     return s;
@@ -3931,6 +3941,16 @@ void Engine::diplomacy(AiPlayer& p) {
                     largest = std::max(largest, population(*c));
                 }
                 const std::uint32_t roll = (rng().next() & 63U) + 40U;
+                if (logging() && !sees_all()) {
+                    std::uint32_t all = 0;
+                    for (const City& c : m_world.cities()) {
+                        all = c.owner == b ? std::max(all, population(c)) : all;
+                    }
+                    if ((largest > roll) != (all > roll)) {
+                        log(p, "seen cities: partner %u largest %u (all %u), trade offer %d", unsigned{b}, largest, all,
+                            largest > roll ? 1 : 0);
+                    }
+                }
                 if (m >= prev && m > -10 && largest > roll) {
                     order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
                 }

@@ -522,6 +522,9 @@ private:
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
     [[nodiscard]] static bool logging() noexcept;
+    /// For the log (P1.5b): a choice that counts another player's cities as seen and would have gone
+    /// the other way with all of them.
+    void log_seen_cities(const AiPlayer& p, PlayerId owner, std::uint16_t island, const char* where) const;
     /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
     /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
     /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
