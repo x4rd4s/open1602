@@ -47,3 +47,4 @@ kTrackMinutes | engine/sim/src/ai/ai_core.cpp | derived from: P0.3's shortest ho
 kTrackMs | engine/sim/src/ai/ai_core.cpp | derived from: kTrackMinutes in game milliseconds (only the log)
 60 | engine/sim/src/ai/ai_core.cpp | derived from: seconds per minute, kTrackMinutes in game milliseconds (only the log)
 1000 | engine/sim/src/ai/ai_core.cpp | derived from: milliseconds per second, kTrackMinutes in game milliseconds (only the log)
+2 | engine/sim/src/ai/ai_world.cpp | derived from: half of the sheet's full rate, the guess produce_amount * 30 / interval had before P2.1 (P2.4's flow model replaces it)

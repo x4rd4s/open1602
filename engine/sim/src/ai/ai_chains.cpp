@@ -19,10 +19,6 @@ bool crop(std::uint8_t w) {
     return w >= ware::kCornField && w <= ware::kCocoaField;
 }
 
-std::uint32_t per_minute(std::uint32_t amount, std::uint32_t interval) {
-    return static_cast<std::uint32_t>(std::uint64_t{amount} * 60 / interval);
-}
-
 /// How the computers place `b`, as `need`; false if no task of theirs can.
 bool placement(const assets::BuildingType& b, PackageNeed& need) {
     const bool two_by_two = b.size_x == 2 && b.size_y == 2;
@@ -82,6 +78,10 @@ std::uint8_t original_need_slot(std::uint8_t w) {
 }
 
 std::vector<PackageNeed> package_needs(const assets::BuildingTable& table) {
+    return package_needs(table, Sheet(table));
+}
+
+std::vector<PackageNeed> package_needs(const assets::BuildingTable& table, const Sheet& sheet) {
     std::vector<PackageNeed> needs;
     std::vector<std::uint8_t> slot_of(256, kNoSlot);  // by ware: the slot of its Need
     std::vector<bool> tried(256, false);
@@ -116,8 +116,9 @@ std::vector<PackageNeed> package_needs(const assets::BuildingTable& table) {
             need.slot = static_cast<std::uint8_t>(kSlots + needs.size());
             need.building = b.id;
             need.ware = w;
-            need.output = std::max<std::uint32_t>(1, per_minute(b.produce_amount, b.interval));
-            need.input = per_minute(b.raw_amount, b.interval);
+            const Sheet::Producer* rates = sheet.producer(b);
+            need.output = std::max<std::uint32_t>(1, rates != nullptr ? static_cast<std::uint32_t>(rates->output) : 0);
+            need.input = rates != nullptr ? static_cast<std::uint32_t>(rates->raw_use) : 0;
             slot_of[w] = need.slot;
             if (b.prod_kind == prod::kWorkshop && b.raw_ware != 0) {
                 raws.emplace_back(needs.size(), b.raw_ware);

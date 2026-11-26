@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "ai_sheet.hpp"
 #include "ai_state.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -43,6 +44,8 @@ struct PackageNeed {
 /// materials, in the order they are found: a good first, then its raw material. A good the
 /// original's Needs make and a producer no task can place end the chain; in a chain that comes
 /// round to itself, the first Need waits for no raw material.
+std::vector<PackageNeed> package_needs(const assets::BuildingTable& table, const Sheet& sheet);
+/// The same with the sheet of `table`.
 std::vector<PackageNeed> package_needs(const assets::BuildingTable& table);
 
 /// The slot of the original's Need that makes ware `w` (ai_tables.hpp), kNoSlot for none.

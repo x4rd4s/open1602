@@ -128,6 +128,7 @@ add_executable(o1602_tests
     unit/test_ai_military.cpp
     unit/test_ai_landing.cpp
     unit/test_ai_chains.cpp
+    unit/test_ai_sheet.cpp
     unit/test_ai_budget.cpp
     unit/test_ai_debt.cpp
     unit/test_ai_tables.cpp

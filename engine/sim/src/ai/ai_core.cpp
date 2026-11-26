@@ -30,7 +30,7 @@ constexpr std::uint32_t kDiplomacyMs = 30'000;  // six phases of 5 s
 }  // namespace
 
 Engine::Engine(Simulation& sim, State& state)
-    : m_sim(sim), m_world(*sim.m_world), m_buildings(*sim.m_buildings), m_state(state) {
+    : m_sim(sim), m_world(*sim.m_world), m_buildings(*sim.m_buildings), m_sheet(m_buildings), m_state(state) {
     // The producer table of AI_Init: per ware up to four records in file order; a
     // record without raw material takes only the first place (the original's quirk, kept: it decides
     // which record a Need picks).
@@ -48,7 +48,7 @@ Engine::Engine(Simulation& sim, State& state)
             list.push_back(&b);
         }
     }
-    m_package_needs = ai::package_needs(m_buildings);
+    m_package_needs = ai::package_needs(m_buildings, m_sheet);
 }
 
 CommandResult Engine::execute(const Command& command) {
