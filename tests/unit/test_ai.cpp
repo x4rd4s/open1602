@@ -3830,7 +3830,7 @@ TEST_CASE("ai: an improved computer keeps its houses off the land its producers 
     // The order: fewer tiles on work land first, the score second. A site with a far higher score
     // loses to one off the work land; the only site that scored still wins on it; a site that did
     // not score stays out.
-    constexpr std::int32_t tier = 1 << 17;
+    constexpr std::int32_t tier = (1 << 16) / (2 * 4);  // half the zone tier over a 2 x 2 site
     CHECK(sim::ai::work_order(5'000, 1, 4, tier) < sim::ai::work_order(10, 0, 4, tier));
     CHECK(sim::ai::work_order(5'000, 2, 4, tier) < sim::ai::work_order(10, 1, 4, tier));
     CHECK(sim::ai::work_order(10, 2, 4, tier) < sim::ai::work_order(20, 2, 4, tier));

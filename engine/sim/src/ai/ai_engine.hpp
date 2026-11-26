@@ -198,7 +198,7 @@ struct TownZone {
 /// Open1602 (PB.4): a house site's score ordered first by its tiles off a producer's work land
 /// (`area` of them, `reserved` on it) and only then by `score`: each free tile adds `tier`, more than
 /// any score reaches, so a site on work land wins only where every site that scored takes as much.
-/// A site that did not score stays out, as before.
+/// A site that did not score stays out, as before; the town zone's tier stays above all of it.
 [[nodiscard]] constexpr std::int32_t work_order(std::int32_t score, std::int32_t reserved, std::int32_t area,
                                                 std::int32_t tier) noexcept {
     return score > 0 ? score + (area - reserved) * tier : score;

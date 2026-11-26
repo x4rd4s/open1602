@@ -674,7 +674,7 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // cities keep the figures of the statistics windows (their overview). One colony decision a
         // step, among the original's motives, with the ship kept for it. Houses kept off the land
         // their producers work, fewer tiles on it before the score.
-        test::check_golden("arena after an hour", s.state_hash(), 0x78a7a57dc0d7434dULL);
+        test::check_golden("arena after an hour", s.state_hash(), 0x42f82698dd52e566ULL);
     }
 }
 
