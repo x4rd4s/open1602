@@ -12,6 +12,8 @@ Usage:
       by the plan's evaluation) and writes RUNDIR/results.jsonl, each record bound to the plan's hash.
   python3 tools/measure/measure.py verdict PLAN.toml RESULTS.jsonl [--report OUT.json]
       The verdict by the plan's stage; refuses results of another plan or with runs missing.
+  python3 tools/measure/measure.py report RUNDIR --arm ARM --ref REF [--sets ...] [--human-sets ...] [--json OUT]
+      The standard report of a probe or gate, set by set (report.py, which says what it counts).
 
 A game may start from a save of its own (`save` and its `sha256`), and with `human_seat` a seat of that
 save is a human who gives no commands (o1602-tool bench --human-seat); a final run starts with the
@@ -368,6 +370,9 @@ def verdict(plan: dict, results: pathlib.Path) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[1] == "report":
+        import report  # the standard report of a probe or gate (report.py)
+        return report.main(argv[2:])
     if len(argv) < 3 or argv[1] not in ("check", "jobs", "collect", "verdict"):
         print(__doc__, file=sys.stderr)
         return 2
