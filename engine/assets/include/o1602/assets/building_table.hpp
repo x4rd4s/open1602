@@ -237,7 +237,8 @@ public:
     /// The first record of id::kRequired the table lacks.
     [[nodiscard]] std::optional<std::uint32_t> missing() const noexcept;
 
-    [[nodiscard]] const std::vector<BuildingType>& types() const noexcept { return m_types; }
+    [[nodiscard]] const std::vector<BuildingType>& types() const& noexcept { return m_types; }
+    const std::vector<BuildingType>& types() const&& = delete;
     /// How many of types() come from haeuser.cod: they come first, the packages' own (add) after them.
     [[nodiscard]] std::size_t original_count() const noexcept { return m_original_count; }
     [[nodiscard]] const BuildingType* by_id(std::uint32_t id) const noexcept;
@@ -267,7 +268,9 @@ public:
     }
 
     /// Classes of inhabitants by BGRUPPE Nummer.
-    [[nodiscard]] const std::vector<ResidentClass>& resident_classes() const noexcept { return m_classes; }
+    [[nodiscard]] const std::vector<ResidentClass>& resident_classes() const& noexcept { return m_classes; }
+    /// Not of a temporary table: the list would die with it.
+    const std::vector<ResidentClass>& resident_classes() const&& = delete;
     /// Puts the classes of a game in place of these (resident_classes.hpp): the original's as
     /// packages changed them and those they added.
     void set_resident_classes(std::vector<ResidentClass> classes) { m_classes = std::move(classes); }
