@@ -19,7 +19,7 @@ using o1602::sim::ai::Sheet;
 namespace {
 
 /// Three classes of haeuser.cod's kind and a fourth as a package adds one (another Maxwohn, a good
-/// past the original's, a good listed twice); a workshop from a raw material, a farm from two, a
+/// past the original's, a good listed twice, as the table keeps it); a workshop from a raw material, a farm from two, a
 /// package's producer with an id of its own, and a building without a cycle.
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"BGRUPPE", 5}, {"BGRUPPE_WARE", 6}};
@@ -68,10 +68,22 @@ TEST_CASE("ai sheet: every class of the table, with its room and the goods it as
     }
     CHECK(sheet.max_per_house(3) == 23);
     CHECK(sheet.max_per_house(4) == 0);  // no such class
-    // A good listed twice counts twice; a good of a package as any other.
-    const auto& top = b.resident_classes()[3].needs;
-    CHECK(sheet.need_amount(3, 19) == std::uint64_t{top[1].amount} + top[2].amount);
-    CHECK(sheet.need_amount(3, 59) == top[0].amount);
+    // Every entry of a good counts; a good of a package as any other.
+    const auto listed = [&](std::size_t k, std::uint8_t w) {
+        std::uint64_t sum = 0;
+        for (const assets::ResidentClass::Need& n : b.resident_classes()[k].needs) {
+            sum += n.ware == w ? n.amount : 0U;
+        }
+        return sum;
+    };
+    for (std::size_t k = 0; k < b.resident_classes().size(); ++k) {
+        for (const std::uint8_t w :
+             {std::uint8_t{15}, std::uint8_t{16}, std::uint8_t{18}, std::uint8_t{19}, std::uint8_t{59}}) {
+            CHECK(sheet.need_amount(k, w) == listed(k, w));
+        }
+    }
+    CHECK(sheet.need_amount(3, 59) != 0);
+    CHECK(sheet.need_amount(3, 19) != 0);
     CHECK(sheet.need_amount(0, 19) == 0);
     CHECK(sheet.need_amount(9, 19) == 0);
     CHECK(sheet.food_ware() == b.food_ware());
