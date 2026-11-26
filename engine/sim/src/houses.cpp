@@ -637,7 +637,7 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
             continue;
         }
         // A public building of a kind of its own gives its own service (own_buildings.toml).
-        const assets::ServiceBits bit = b->own_service != 0 ? b->own_service : service_bit(b->prod_kind);
+        const assets::ServiceBits bit = service_of(*b);
         if (bit == 0 && b->prod_kind != prod::kMarket) {
             continue;
         }
@@ -692,6 +692,10 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
 std::span<const assets::ServiceBits> class_needs(const assets::BuildingTable& buildings,
                                                  std::uint8_t resident_class) noexcept {
     return needs_of(buildings, resident_class);
+}
+
+assets::ServiceBits service_of(const assets::BuildingType& building) noexcept {
+    return building.own_service != 0 ? building.own_service : service_bit(building.prod_kind);
 }
 
 bool reaches(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, std::uint8_t radius, std::int32_t hx,

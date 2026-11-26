@@ -104,6 +104,10 @@ struct HouseEvent {
 [[nodiscard]] std::span<const assets::ServiceBits> class_needs(const assets::BuildingTable& buildings,
                                                                std::uint8_t resident_class) noexcept;
 
+/// The service bits a building gives the houses it reaches (House::services); 0 for a market,
+/// which sets House::market instead, and for a building that gives none.
+[[nodiscard]] assets::ServiceBits service_of(const assets::BuildingType& building) noexcept;
+
 /// Whether a building of `w` x `h` tiles at (`x`, `y`) with `radius` reaches a house of `hw` x `hh`
 /// tiles at (`hx`, `hy`), as update_services decides it: the gap from the building's centre
 /// column(s) and row(s) to the nearest tile of the house lies within the radius's circle.

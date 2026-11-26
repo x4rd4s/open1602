@@ -573,4 +573,6 @@ TEST_CASE("houses: reaches() says which houses a building's radius covers, as up
     }
     CHECK(in_reach > 0);
     CHECK(in_reach < spots.size());
+    CHECK(sim::service_of(chapel) == sim::house_service::kKapelle);
+    CHECK(sim::service_of(*town.buildings.by_id(kMarket)) == 0);  // sets House::market instead
 }

@@ -26,6 +26,7 @@
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/island.hpp"
+#include "o1602/assets/original_names.hpp"
 #include "o1602/assets/savegame.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/text_table.hpp"
@@ -394,6 +395,15 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
             grown_wares.insert(b.ware);
         }
     }
+    // The readable name of a building of the original (original_names.hpp), "-" for another.
+    const auto name_of = [](std::uint32_t id) {
+        for (const assets::OriginalName& n : assets::original_building_names()) {
+            if (id >= n.first && id < n.first + n.count) {
+                return std::string(n.name);
+            }
+        }
+        return std::string("-");
+    };
     struct Instance {
         const assets::BuildingType* type;
         std::int32_t x;
@@ -510,9 +520,15 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
                         ? 1U
                         : 0U;
             }
-            std::printf("  reach %u (radius %u): %zu built, %zu of %zu houses in reach, %.1f houses each\n", id,
-                        static_cast<unsigned>(list.front()->type->radius), list.size(), covered, houses.size(),
-                        static_cast<double>(covered) / static_cast<double>(list.size()));
+            const assets::BuildingType& t = *list.front()->type;
+            // The bits of the needs it serves: its service, and the market's need for a market.
+            const assets::ServiceBits serves =
+                sim::service_of(t) | (t.prod_kind == prod::kMarket ? assets::public_building::kMarket : 0U);
+            std::printf(
+                "  reach %u %s (radius %u, serves 0x%X): %zu built, %zu of %zu houses in reach, %.1f houses "
+                "each\n",
+                id, name_of(id).c_str(), static_cast<unsigned>(t.radius), static_cast<unsigned>(serves), list.size(),
+                covered, houses.size(), static_cast<double>(covered) / static_cast<double>(list.size()));
         }
         // 3. The needs of each class, as its houses have them.
         for (std::size_t k = 0; k < buildings.resident_classes().size(); ++k) {
@@ -616,11 +632,11 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
         };
         for (const auto& [id, s] : work) {
             std::printf(
-                "  work area %u: %zu built, %zu land tiles, %zu of its raw material (%.1f each); blocked by houses "
+                "  work area %u %s: %zu built, %zu land tiles, %zu of its raw material (%.1f each); blocked by houses "
                 "%zu (%.1f%%), producers %zu (%.1f%%), roads and public %zu (%.1f%%), worst %.1f%%\n",
-                id, s.built, s.land, s.fields, static_cast<double>(s.fields) / static_cast<double>(s.built),
-                s.by_houses, share(s.by_houses, s.land), s.by_producers, share(s.by_producers, s.land), s.by_ways,
-                share(s.by_ways, s.land), 100.0 * s.worst);
+                id, name_of(id).c_str(), s.built, s.land, s.fields,
+                static_cast<double>(s.fields) / static_cast<double>(s.built), s.by_houses, share(s.by_houses, s.land),
+                s.by_producers, share(s.by_producers, s.land), s.by_ways, share(s.by_ways, s.land), 100.0 * s.worst);
         }
         // 6. Suppliers per processor, next to what the table's rates ask: the processor's raw use
         // over the supplier's output (both per second of their cycles).
@@ -648,8 +664,8 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
             const double asks =
                 (static_cast<double>(b.raw_amount) / static_cast<double>(b.interval)) /
                 (static_cast<double>(supplier->produce_amount) / static_cast<double>(supplier->interval));
-            std::printf("  supply %u (raw %u): %zu built, %zu suppliers, %.2f each; the table's rates ask %.2f\n", id,
-                        static_cast<unsigned>(b.raw_ware), n, suppliers,
+            std::printf("  supply %u %s (raw %u): %zu built, %zu suppliers, %.2f each; the table's rates ask %.2f\n",
+                        id, name_of(id).c_str(), static_cast<unsigned>(b.raw_ware), n, suppliers,
                         static_cast<double>(suppliers) / static_cast<double>(n), asks);
         }
         // 7. What each producer type made against its full speed, the measure of the building window.
@@ -680,7 +696,7 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
             s.lowest = std::min(s.lowest, u);
         }
         for (const auto& [id, s] : use) {
-            std::printf("  use %u: %zu built, %.0f%% mean, %lld%% lowest\n", id, s.n,
+            std::printf("  use %u %s: %zu built, %.0f%% mean, %lld%% lowest\n", id, name_of(id).c_str(), s.n,
                         static_cast<double>(s.sum) / static_cast<double>(s.n), static_cast<long long>(s.lowest));
         }
     }
