@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <set>
+#include <span>
 #include <vector>
 
 #include "o1602/assets/building_table.hpp"
@@ -97,6 +98,17 @@ struct HouseEvent {
 /// required_panel_services for class `resident_class` of `buildings`, as has_services reads it.
 [[nodiscard]] std::uint32_t required_panel_services(const assets::BuildingTable& buildings,
                                                     std::uint8_t resident_class) noexcept;
+
+/// The needs of class `resident_class` of `buildings` as has_services reads them: one entry per
+/// need, each the service bits of which any one satisfies it (0: none needed).
+[[nodiscard]] std::span<const assets::ServiceBits> class_needs(const assets::BuildingTable& buildings,
+                                                               std::uint8_t resident_class) noexcept;
+
+/// Whether a building of `w` x `h` tiles at (`x`, `y`) with `radius` reaches a house of `hw` x `hh`
+/// tiles at (`hx`, `hy`), as update_services decides it: the gap from the building's centre
+/// column(s) and row(s) to the nearest tile of the house lies within the radius's circle.
+[[nodiscard]] bool reaches(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, std::uint8_t radius,
+                           std::int32_t hx, std::int32_t hy, std::uint32_t hw, std::uint32_t hh);
 
 /// Recomputes which markets, Kontors and public buildings reach each house of island `island`:
 /// buildings of the same city whose Radius covers the house from their centre.

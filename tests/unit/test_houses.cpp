@@ -454,3 +454,33 @@ TEST_CASE("houses: a public building of a kind of its own gives its service, whi
     CHECK(more.size() == assets::kMaxOwnServices + 1);
     CHECK(warnings.size() == 1);
 }
+
+TEST_CASE("houses: reaches() says which houses a building's radius covers, as update_services does") {
+    Town town;
+    town.place(kChapel, 16, 11);
+    std::vector<std::pair<std::uint16_t, std::uint16_t>> spots;
+    for (std::uint16_t y = 0; y + 1 < 30; y += 2) {
+        for (std::uint16_t x = 0; x + 1 < 40; x += 2) {
+            if (y != 10) {  // rows 10 and 11 hold the road and the chapel
+                spots.emplace_back(x, y);
+            }
+        }
+    }
+    for (const auto& [x, y] : spots) {
+        town.place(kPioneerHouse, x, y);
+    }
+    town.finish({{16, 11}});
+    for (const auto& [x, y] : spots) {
+        town.add_house(x, y, 0, 64);
+    }
+    sim::update_services(town.world, town.buildings);
+    const assets::BuildingType& chapel = *town.buildings.by_id(kChapel);
+    std::size_t in_reach = 0;
+    for (const auto& [x, y] : spots) {
+        const bool reached = sim::reaches(16, 11, chapel.size_x, chapel.size_y, chapel.radius, x, y, 2, 2);
+        CHECK(((town.world.house(0, x, y)->services & sim::house_service::kKapelle) != 0) == reached);
+        in_reach += reached ? 1U : 0U;
+    }
+    CHECK(in_reach > 0);
+    CHECK(in_reach < spots.size());
+}

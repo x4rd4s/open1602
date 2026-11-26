@@ -685,6 +685,19 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
 
 }  // namespace
 
+std::span<const assets::ServiceBits> class_needs(const assets::BuildingTable& buildings,
+                                                 std::uint8_t resident_class) noexcept {
+    return needs_of(buildings, resident_class);
+}
+
+bool reaches(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, std::uint8_t radius, std::int32_t hx,
+             std::int32_t hy, std::uint32_t hw, std::uint32_t hh) {
+    const std::int32_t dx = gap(x, w, hx, hw);
+    const std::int32_t dy = gap(y, h, hy, hh);
+    const auto r = static_cast<std::int32_t>(radius);
+    return dx <= r && dy <= r && dx <= circle_table(radius)[static_cast<std::size_t>(dy)];
+}
+
 void update_services(World& world, const assets::BuildingTable& buildings, std::uint16_t island) {
     services_on(world, buildings, island, nullptr);
 }
