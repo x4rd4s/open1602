@@ -124,6 +124,22 @@ std::uint32_t View::seen_cannons(PlayerId owner) const {
     return m_engine.seen_cannons(m_viewer.player, owner);
 }
 
+std::uint32_t View::strength(PlayerId owner) const {
+    return m_engine.strength(m_viewer.player, owner);
+}
+
+std::uint32_t View::threat(PlayerId owner) const {
+    return m_engine.threat_of(m_viewer.player, owner);
+}
+
+std::uint32_t View::seen_soldiers_on(PlayerId owner, std::uint16_t island) const {
+    if (owner != m_viewer.player && !omniscient_level() &&
+        (island >= m_engine.m_world.islands().size() || !knows_island(island))) {
+        return 0;
+    }
+    return m_engine.soldiers_on_island(owner, island);
+}
+
 std::optional<KontorOffer> View::kontor_offer(const City& partner, std::uint8_t ware) const {
     if (partner.owner == m_viewer.player || !m_engine.kontor_known(m_viewer, partner)) {
         return std::nullopt;

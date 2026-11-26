@@ -58,6 +58,22 @@ class ReportTest(unittest.TestCase):
         i = self.rep["inhabitants"]
         self.assertAlmostEqual(i["difference"], 1000 / 550 / 2 - 1100 / 550 / 2)
 
+    def test_debt_and_dry_unknown_without_track_lines(self):
+        # A tree with the decision lines but before the track lines: debt and dry are unknown, not 0.
+        d = pathlib.Path(self.tmp.name) / "l3"
+        d.mkdir()
+        rows = {30: {1: (1, 300, 100)}}
+        line = ("[ai 1 60s] decision found id 60000.0 cand 50 city 1/0 cost 1 upkeep 1 value 0 delay 0 horizon 30 "
+                "ware 0 amount 0 to 1/0\n")
+        for arm in ("A", "B"):
+            (d / f"{arm}-g8-1-p0.txt").write_text(bench(rows))
+            (d / f"{arm}-g8-1-p0.rc").write_text("0\n")
+            (d / f"{arm}-g8-1-p0.err").write_text(line)
+        a = report.report_set(d, "A", "B", human=False)["log"]["arm"]
+        self.assertEqual(a["foundings"], 1)
+        self.assertIsNone(a["debt_minutes"])
+        self.assertIsNone(a["dry_minutes"])
+
     def test_collapse_and_slide_window(self):
         self.assertEqual(self.rep["collapses"], {"arm": 1, "ref": 0})
         self.assertEqual(self.rep["two_extra"], [])

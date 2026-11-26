@@ -132,7 +132,7 @@ bool Engine::outmatched(const AiPlayer& p) {
     // A rival that could attack it (as plan_strategy weighs them: a settling human or computer,
     // near) and is not at peace with it shows a stronger army than its own, as both are seen.
     const Diplomacy& d = m_world.diplomacy();
-    const std::uint32_t own = strength(p.player, p.player);
+    const std::uint32_t own = view(p).strength(p.player);
     for (std::size_t bi = 0; bi < m_world.players().size(); ++bi) {
         const auto b = static_cast<PlayerId>(bi);
         const Player& pl = m_world.players()[bi];
@@ -142,7 +142,7 @@ bool Engine::outmatched(const AiPlayer& p) {
             continue;
         }
         const bool peace = d.allied(p.player, b) || d.relation(p.player, b).peace == Treaty::Signed;
-        if (outmatched_by(rival_near(p, b, nullptr), peace, threat_of(p.player, b), own)) {
+        if (outmatched_by(rival_near(p, b, nullptr), peace, view(p).threat(b), own)) {
             return true;
         }
     }
@@ -259,7 +259,7 @@ void Engine::plan_strategy(AiPlayer& p) {
     const std::size_t players = m_world.players().size();
     st.stances.resize(players, stance::kNeutral);
     const Diplomacy& d = m_world.diplomacy();
-    const std::uint32_t own = strength(p.player, p.player);
+    const std::uint32_t own = view(p).strength(p.player);
     // A conqueror presses earlier, a trader later; harder levels press earlier too.
     std::uint32_t press = bal.ai_pressure_percent;
     if (st.character == character::kConqueror) {
@@ -281,7 +281,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         }
         const Relation& rel = d.relation(p.player, b);
         const std::int32_t mood = d.mood(m_world, p.player, b, 0, now_ms());
-        const std::uint32_t theirs = threat_of(p.player, b);
+        const std::uint32_t theirs = view(p).threat(b);
         bool unseen = false;
         const bool near = rival_near(p, b, &unseen);
         if (unseen && !near) {
@@ -311,7 +311,7 @@ void Engine::plan_strategy(AiPlayer& p) {
         if (logging() && !sees_all()) {
             // The measurement of the information contract: the stance and the threat the whole
             // census would give (b's own view of itself is the whole).
-            const std::uint32_t all = threat_of(b, b);
+            const std::uint32_t all = threat_of(b, b);  // log only: b's view of itself
             const bool press_seen = s == stance::kPressure;
             const bool press_all = (s == stance::kNeutral || s == stance::kPressure) && presses_at(in, all, 0);
             const bool threat_seen = (s == stance::kHostile || rel.peace == Treaty::None) && near && theirs > own;
@@ -333,8 +333,8 @@ void Engine::plan_strategy(AiPlayer& p) {
         // census would give.
         for (std::size_t bi = 0; bi < players; ++bi) {
             const auto b = static_cast<PlayerId>(bi);
-            const std::uint32_t seen = seen_cannons(p.player, b);
-            const std::uint32_t all = seen_cannons(b, b);
+            const std::uint32_t seen = view(p).seen_cannons(b);
+            const std::uint32_t all = seen_cannons(b, b);  // log only: the census
             if (b != p.player && seen != all) {
                 log(p, "seen: player %u cannons %u (census %u)", b, seen, all);
             }
@@ -643,7 +643,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         return;
     }
     const Balance& bal = m_world.balance();
-    const std::uint32_t own = strength(p.player, p.player);
+    const std::uint32_t own = view(p).strength(p.player);
     PlayerId best = kNoPlayer;
     std::uint64_t best_ratio = 0;
     bool best_motive = false;
@@ -653,7 +653,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         if (st.stances[bi] != stance::kPressure || pl == nullptr || (pl->role == PlayerRole::Human && level == 0)) {
             continue;
         }
-        const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, threat_of(p.player, b));
+        const std::uint64_t ratio = std::uint64_t{own} * 1000U / std::max<std::uint32_t>(1, view(p).threat(b));
         // Open1602 (Merlin, 2026-11-23): an improved computer that has to plant a good on
         // half-fertile land, with no free island to grow it fully, turns its war on a rival that
         // holds such an island (holds_wanted_crop) before any other it presses.
@@ -685,7 +685,7 @@ void Engine::war_plan(AiPlayer& p, bool broke) {
         return;
     }
     log(p, "declares war on player %u (war plan, %u soldiers, strength %u against %u%s)", best, units, own,
-        threat_of(p.player, best), best_motive ? ", for an island that grows a crop it lacks" : "");
+        view(p).threat(best), best_motive ? ", for an island that grows a crop it lacks" : "");
     start_war(p, best);
 }
 
