@@ -455,6 +455,96 @@ TEST_CASE("houses: a public building of a kind of its own gives its service, whi
     CHECK(warnings.size() == 1);
 }
 
+TEST_CASE("houses: the growth rate from its inputs is the house's own, whatever city and house give") {
+    sim::City city;
+    city.satisfaction = {128, 128};
+    sim::House h;
+    for (const std::uint8_t cls : {std::uint8_t{0}, std::uint8_t{1}}) {
+        for (const bool market : {false, true}) {
+            for (const std::uint16_t services :
+                 {std::uint16_t{0}, sim::house_service::kKontor, std::uint16_t{1}, std::uint16_t{2}}) {
+                for (const std::uint8_t food :
+                     {std::uint8_t{0}, std::uint8_t{60}, std::uint8_t{88}, std::uint8_t{127}, std::uint8_t{128}}) {
+                    for (const std::uint8_t sat :
+                         {std::uint8_t{0}, std::uint8_t{50}, std::uint8_t{108}, std::uint8_t{128}}) {
+                        for (const std::uint8_t dist : {std::uint8_t{0}, std::uint8_t{3}, std::uint8_t{6}}) {
+                            for (const std::uint8_t fires : {std::uint8_t{0}, std::uint8_t{1}}) {
+                                h.resident_class = cls;
+                                h.market = market;
+                                h.services = services;
+                                h.services_complete = market;
+                                h.market_distance = dist;
+                                city.food_ratio = food;
+                                city.satisfaction[cls] = sat;
+                                city.disasters = fires;
+                                // The inputs as a human reads them in the city's and the house's window.
+                                sim::GrowthInputs in;
+                                in.satisfaction = market || cls == 0 ? sat : 0;
+                                in.food = market || (services & sim::house_service::kKontor) != 0 ? food : 0;
+                                in.market_distance = dist;
+                                in.services_complete = market;
+                                in.disaster = static_cast<std::uint8_t>(services & sim::house_service::kDisasterMask);
+                                in.city_disasters = fires != 0;
+                                CHECK(sim::growth_rate(in) == sim::growth_rate(city, h));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("houses: a house's projection is where its visits take it, growing and shrinking") {
+    Town town;
+    town.place(kMarket, 10, 11);
+    town.place(kChapel, 16, 11);
+    town.place(kSettlerHouse, 14, 13);
+    town.finish({{10, 11}, {16, 11}});
+    town.world.city(0, 0)->food_ratio = 128;
+    town.add_house(14, 13, 1, 64);
+    sim::update_services(town.world, town.buildings);
+    const std::uint32_t cap = town.buildings.resident_classes()[1].max_per_house * 64;
+    const auto project = [&](std::uint64_t ms) {
+        const sim::House& h = *town.world.house(0, 14, 13);
+        const std::size_t g = h.timer_group % sim::HouseClocks::kGroups;
+        return sim::project_house(sim::growth_inputs(*town.world.city(0, 0), h), h.inhabitants64, cap,
+                                  static_cast<std::uint32_t>(g), town.world.house_clocks().time_ms[g], ms);
+    };
+    REQUIRE(sim::growth_rate(*town.world.city(0, 0), *town.world.house(0, 14, 13)) > 0);
+    // Growing: 10 minutes, then 30 more, up to the room of the class (settlers: no class above).
+    for (const std::uint32_t minutes : {10U, 30U}) {
+        const std::uint32_t expected = project(minutes * 60'000ULL);
+        town.run(minutes * 60);
+        CHECK(town.world.house(0, 14, 13)->inhabitants64 == expected);
+    }
+    CHECK(town.world.house(0, 14, 13)->inhabitants64 == cap);
+    // Shrinking without enough food, for a few minutes while the house stays a settlers' one.
+    town.world.city(0, 0)->food_ratio = 80;
+    REQUIRE(sim::growth_rate(*town.world.city(0, 0), *town.world.house(0, 14, 13)) < 0);
+    const std::uint32_t expected = project(60'000);
+    town.run(60);
+    REQUIRE(town.world.house(0, 14, 13) != nullptr);
+    CHECK(town.world.house(0, 14, 13)->inhabitants64 == expected);
+    CHECK(expected < cap);
+}
+
+TEST_CASE("houses: the visits of a timer group are those its clock ticks") {
+    CHECK(sim::house_visits(0, sim::house_group_period_ms(0), 60'000) == 4);
+    CHECK(sim::house_visits(14'999, sim::house_group_period_ms(0), 1) == 1);
+    CHECK(sim::house_visits(0, sim::house_group_period_ms(15), 60'000) == 3);  // 15.96 s
+    CHECK(sim::house_visits(0, sim::house_group_period_ms(0), 14'999) == 0);
+    // A house at rate 0 keeps its people, an empty one stays empty.
+    sim::GrowthInputs still;
+    still.food = 100;
+    still.satisfaction = 128;
+    still.services_complete = true;
+    CHECK(sim::growth_rate(still) == 0);
+    CHECK(sim::project_house(still, 100, 384, 0, 0, 600'000) == 100);
+    CHECK(sim::grown_inhabitants64(63, -10, 384) == 0);
+    CHECK(sim::grown_inhabitants64(63, 0, 384) == 63);
+}
+
 TEST_CASE("houses: reaches() says which houses a building's radius covers, as update_services does") {
     Town town;
     town.place(kChapel, 16, 11);

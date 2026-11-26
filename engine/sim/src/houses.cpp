@@ -107,6 +107,15 @@ static_assert((kMarketNeed & (hs::kDisasterMask | hs::kKapelle | hs::kKirche | h
                               hs::kBrunnen | hs::kOwnMask)) == 0,
               "kMarketNeed must not be a bit of House::services");
 
+/// What a visit adds to the inhabitants (1/64) of a house of `n` at a positive growth rate, and
+/// takes at a negative one.
+std::uint32_t increase_of(std::uint32_t n, std::int32_t rate) noexcept {
+    return n * static_cast<std::uint32_t>(rate) * 6 / 128;
+}
+std::uint32_t decline_of(std::uint32_t n, std::int32_t rate) noexcept {
+    return n * static_cast<std::uint32_t>(-rate) * 4 / 128;
+}
+
 /// Decline for plague and fire on the house (P7).
 constexpr std::array<std::int32_t, 4> kDisasterLoss = {0, 256, 192, 0};
 
@@ -222,9 +231,9 @@ public:
             return;
         }
         if (rate < 0) {
-            shrink(city, *h, n * static_cast<std::uint32_t>(-rate) * 4 / 128);
+            shrink(city, *h, decline_of(n, rate));
         } else {
-            grow(city, *h, n * static_cast<std::uint32_t>(rate) * 6 / 128);
+            grow(city, *h, increase_of(n, rate));
         }
     }
 
@@ -708,23 +717,63 @@ void update_services(World& world, const assets::BuildingTable& buildings) {
     }
 }
 
-std::int32_t growth_rate(const City& city, const House& house) noexcept {
-    const Tables& t = tables();
+GrowthInputs growth_inputs(const City& city, const House& house) noexcept {
     const std::uint8_t c = house.resident_class;
-    const std::uint8_t s =
-        house.market ? satisfaction_of_class(city, c) : (c == 0 ? satisfaction_of_class(city, 0) : 0);
+    GrowthInputs in;
+    in.satisfaction = house.market ? satisfaction_of_class(city, c) : (c == 0 ? satisfaction_of_class(city, 0) : 0);
     const bool fed = house.market || (house.services & hs::kKontor) != 0;
-    const std::uint8_t food = fed ? std::min(city.food_ratio, kFull) : 0;
-    const auto disaster = static_cast<std::size_t>(house.services & hs::kDisasterMask);
-    const std::size_t dist = std::min<std::size_t>(house.market_distance, kNoMarket);
-    if (food > 87 && s > 107 && house.services_complete && disaster == 0) {
+    in.food = fed ? std::min(city.food_ratio, kFull) : 0;
+    in.market_distance = house.market_distance;
+    in.services_complete = house.services_complete;
+    in.disaster = static_cast<std::uint8_t>(house.services & hs::kDisasterMask);
+    in.city_disasters = city.disasters != 0;
+    return in;
+}
+
+std::int32_t growth_rate(const GrowthInputs& in) noexcept {
+    const Tables& t = tables();
+    const std::uint8_t s = std::min(in.satisfaction, kFull);
+    const std::uint8_t food = std::min(in.food, kFull);
+    const auto disaster = static_cast<std::size_t>(in.disaster & hs::kDisasterMask);
+    const std::size_t dist = std::min<std::size_t>(in.market_distance, kNoMarket);
+    if (food > 87 && s > 107 && in.services_complete && disaster == 0) {
         // A fire or plague anywhere in the city stops all growth.
-        if (food >= kFull && s >= kFull && city.disasters == 0) {
+        if (food >= kFull && s >= kFull && !in.city_disasters) {
             return (128 - t.t1[food]) * t.t2[dist] / 128;
         }
         return 0;  // nearly content: the house neither grows nor shrinks
     }
-    return -(((t.t3[s] + t.t4[food]) * t.t5[dist]) >> 7) - (house.services_complete ? 0 : 64) - kDisasterLoss[disaster];
+    return -(((t.t3[s] + t.t4[food]) * t.t5[dist]) >> 7) - (in.services_complete ? 0 : 64) - kDisasterLoss[disaster];
+}
+
+std::int32_t growth_rate(const City& city, const House& house) noexcept {
+    return growth_rate(growth_inputs(city, house));
+}
+
+std::uint32_t grown_inhabitants64(std::uint32_t inhabitants64, std::int32_t rate, std::uint32_t cap) noexcept {
+    if (rate == 0) {
+        return inhabitants64;
+    }
+    const std::uint32_t n = inhabitants64 / kInhabitantUnits;
+    if (n == 0) {
+        return 0;  // nobody left: the house is abandoned
+    }
+    if (rate < 0) {
+        const std::uint32_t sub = decline_of(n, rate);
+        return inhabitants64 > sub ? inhabitants64 - sub : 0;
+    }
+    return std::min(inhabitants64 + increase_of(n, rate), cap);
+}
+
+std::uint32_t project_house(const GrowthInputs& in, std::uint32_t inhabitants64, std::uint32_t cap, std::uint32_t group,
+                            std::uint32_t clock_ms, std::uint64_t ms) noexcept {
+    const std::int32_t rate = growth_rate(in);
+    const std::uint64_t visits = house_visits(clock_ms, house_group_period_ms(group), ms);
+    std::uint32_t v = inhabitants64;
+    for (std::uint64_t i = 0; i < visits && v != 0 && rate != 0; ++i) {
+        v = grown_inhabitants64(v, rate, cap);
+    }
+    return v;
 }
 
 void advance_houses(World& world, const assets::BuildingTable& buildings, std::uint32_t dt_ms,
