@@ -67,8 +67,16 @@ Ship* Engine::settle_ship(AiPlayer& p) {
 // The island search
 
 void Engine::log_seen_cities(const AiPlayer& p, PlayerId owner, std::uint16_t island, const char* where) const {
-    log(p, "seen cities: player %u has %u (all %u), %s island %u", unsigned{owner}, view(p).seen_city_count(owner),
-        own_city_count(owner), where, unsigned{island});
+    const std::uint32_t seen = view(p).seen_city_count(owner);
+    const std::uint32_t all = own_city_count(owner);
+    // One key per line text: the four places differ in their first letter.
+    const auto key = std::make_tuple(p.player, owner, island, where[0], seen, all);
+    const auto at = std::lower_bound(m_seen_logged.begin(), m_seen_logged.end(), key);
+    if (at != m_seen_logged.end() && *at == key) {
+        return;
+    }
+    m_seen_logged.insert(at, key);
+    log(p, "seen cities: player %u has %u (all %u), %s island %u", unsigned{owner}, seen, all, where, unsigned{island});
 }
 
 bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {

@@ -1590,6 +1590,10 @@ private:
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_sealed_logged;
     /// Player and city attack_ok passes over for towers out of the fleet's reach (only the log).
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
+    /// log_seen_cities' lines written, as viewer, owner, island, place and counts (only the log): a
+    /// search asks the same islands again and again, the log says each verdict once.
+    mutable std::vector<std::tuple<PlayerId, PlayerId, std::uint16_t, char, std::uint32_t, std::uint32_t>>
+        m_seen_logged;
     /// log_decision's id: the game time of the last decision logged and how many were logged at
     /// it (only the log).
     mutable std::uint64_t m_decision_ms = 0;
