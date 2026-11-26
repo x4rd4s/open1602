@@ -2352,15 +2352,15 @@ TEST_CASE("construction: water under grass comes back as meadow, beside the beac
         map.set_ground_cell(5, y + 3, sea);
         map.set_ground_cell(6, y + 3, sea);
     }
-    for (std::uint32_t y = 20; y <= 22; ++y) {
+    for (std::uint32_t y = 18; y <= 19; ++y) {
         map.set_ground_cell(5, y, sea);
     }
     REQUIRE(island.build({{kHouse, 8, 13, 0, 0}}).placed == 1);
     REQUIRE(island.build({{kHouse, 5, 16, 0, 0}}).placed == 1);
-    REQUIRE(island.build({{kRoad, 5, 20, 0, 0}, {kRoad, 5, 21, 0, 0}, {kRoad, 5, 22, 0, 0}}).placed == 3);
+    REQUIRE(island.build({{kRoad, 5, 18, 0, 0}, {kRoad, 5, 19, 0, 0}}).placed == 2);
     CHECK(island.demolish({9, 14}, {9, 14}) == 1);
     CHECK(island.demolish({6, 17}, {6, 17}) == 1);
-    CHECK(island.demolish({5, 20}, {5, 22}) == 3);
+    CHECK(island.demolish({5, 18}, {5, 19}) == 2);
     for (std::int32_t y = 13; y <= 14; ++y) {
         for (std::int32_t x = 8; x <= 9; ++x) {
             CHECK(island.at(x, y)->id == sim::id::kMeadow);
@@ -2370,7 +2370,7 @@ TEST_CASE("construction: water under grass comes back as meadow, beside the beac
         CHECK(island.at(5, y + 3)->id == sim::id::kMeadow);
         CHECK(island.at(6, y + 3)->id == sim::id::kMeadow);
     }
-    for (std::int32_t y = 20; y <= 22; ++y) {
+    for (std::int32_t y = 18; y <= 19; ++y) {
         CHECK(island.at(5, y)->id == sim::id::kMeadow);
     }
 }
