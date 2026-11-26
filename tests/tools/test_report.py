@@ -62,7 +62,7 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(self.rep["collapses"], {"arm": 1, "ref": 0})
         self.assertEqual(self.rep["two_extra"], [])
         self.assertEqual(self.rep["slides"], [{"key": "g4-1-p0", "player": 2, "peak": 20, "below": 30,
-                                               "landings": 1}])
+                                               "landings": 1, "change_lines": 0, "cause": "unknown"}])
 
     def test_gold_and_cities_are_sums_at_the_end(self):
         self.assertEqual(self.rep["gold"]["sum_arm"], 300 - 20 + 200)
@@ -73,6 +73,32 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(a["foundings"], 1)
         self.assertEqual(a["debt_minutes"], 10)
         self.assertEqual((a["dry_minutes"], a["episodes"], a["covered"], a["deficit_minutes"]), (20, 1, 1, 30))
+
+    def test_change_lines_in_the_window_link_the_collapse(self):
+        d = pathlib.Path(self.tmp.name) / "x3"
+        with open(d / "A-g4-1-p0.err", "a") as f:
+            f.write("[ai 2 1400s] lever X holds farm\n[ai 3 1400s] lever X holds farm\n")
+        linked = report.report_set(d, "A", "B", human=False, change=("lever X",))
+        self.assertEqual(linked["slides"][0]["change_lines"], 1)
+        self.assertEqual(linked["slides"][0]["cause"], "change")
+        war = report.report_set(d, "A", "B", human=False, change=("lever X",), war_change=True)
+        self.assertEqual(war["slides"][0]["cause"], "intended conquest")
+        free = report.report_set(d, "A", "B", human=False, change=("other lever",))
+        self.assertEqual(free["slides"][0]["cause"], "conquest")
+        r = report.rules({"x3": linked})
+        self.assertTrue(r["1"]["passes"] and r["2"]["passes"] and r["4"]["passes"])
+        self.assertEqual(r["3"]["why"], ["x3 g4-1-p0 P2 (change)"])
+        self.assertTrue(report.rules({"x3": free})["3"]["passes"])
+
+    def test_rules_two_and_four(self):
+        slide = lambda key, p, cause: {"key": key, "player": p, "cause": cause}  # noqa: E731
+        s = {"runs": 4, "inhabitants": {"in_se": -2.5},
+             "slides": [slide("m-p0", 1, "change"), slide("m-p0", 2, "unknown"), slide("m-p1", 1, "divergence"),
+                        slide("n-p0", 3, "divergence"), slide("n-p1", 3, "change")]}
+        r = report.rules({"x3": s})
+        self.assertEqual(r["1"]["why"], ["x3 -2.50 SE"])
+        self.assertEqual(r["2"]["why"], ["x3 m-p0"])
+        self.assertEqual(r["4"]["why"], ["x3 n P3 in 0, 1"])  # m P1's second phase is divergence
 
     def test_slide_starts_at_the_last_minute_at_the_peak(self):
         self.assertEqual(report.window({10: (5, 0, 0), 20: (9, 0, 0), 30: (9, 0, 0), 40: (6, 0, 0)}), (30, 40))

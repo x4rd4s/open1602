@@ -4,6 +4,7 @@
 
 Usage:
   python3 tools/measure/report.py RUNDIR --arm ARM --ref REF [--sets l2,l3,x3] [--human-sets l2] [--json OUT]
+      [--change 'PREFIX|PREFIX'] [--war-change]
 
 RUNDIR holds one folder per set, and in it per run ARM-KEY.txt (o1602-tool bench --per-player), ARM-KEY.rc
 and, for a logged run, ARM-KEY.err (the computer log, O1602_AI_LOG). A key is a map and a phase,
@@ -33,6 +34,8 @@ From the log, where the arm and the reference have one with main's standard line
                and its stock was 0: dry minutes, episodes of 10 minutes or more, and how many of
                them ended before the run did (covered); beside it the flow deficit (used less than
                asked for in the sample), which counts more cases.
+Then rules 1 to 4 of the gate (rules(), cause()): --change names the change's own log lines by how
+they begin, --war-change marks a change that acts on war (its conquests are intended).
 Exit code 0, 2 on wrong use.
 """
 from __future__ import annotations
@@ -92,8 +95,11 @@ def save_offset(key: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def parse_log(text: str) -> dict:
+def parse_log(text: str, change: tuple[str, ...] = ()) -> dict:
+    """The log's standard lines; with `change`, also the seconds of each player's lines that begin
+    with one of those prefixes (the change's own lines, for rules 3 and 4)."""
     landings = []  # (second, attacker, defender)
+    own: dict[int, list[int]] = {}
     foundings = 0
     gold: dict[int, list[tuple[int, int]]] = {}
     dry: dict[tuple[int, int, int, int], list[tuple[int, bool, bool]]] = {}
@@ -102,6 +108,8 @@ def parse_log(text: str) -> dict:
         if not m:
             continue
         player, second, rest = int(m.group(1)), int(m.group(2)), m.group(3)
+        if change and rest.startswith(change):
+            own.setdefault(player, []).append(second)
         if rest.startswith("decision found "):
             foundings += 1
         elif g := TRACK_GOLD.match(rest):
@@ -117,7 +125,7 @@ def parse_log(text: str) -> dict:
                 dry.setdefault(key, []).append((second, asked > 0 and stock == 0, asked > 0 and used < asked))
         elif a := LANDING.search(rest):
             landings.append((second, player, int(a.group(1))))
-    return {"landings": landings, "foundings": foundings, "gold": gold, "dry": dry}
+    return {"landings": landings, "foundings": foundings, "gold": gold, "dry": dry, "change": own}
 
 
 def dry_summary(dry: dict) -> dict:
@@ -144,10 +152,10 @@ def debt_summary(gold: dict) -> dict:
     return {"debt_minutes": negative * TRACK_MINUTES, "players_in_debt": players}
 
 
-def read_run(folder: pathlib.Path, arm: str, key: str) -> dict:
+def read_run(folder: pathlib.Path, arm: str, key: str, change: tuple[str, ...] = ()) -> dict:
     run = parse_bench((folder / f"{arm}-{key}.txt").read_text(encoding="utf-8", errors="replace"))
     err = folder / f"{arm}-{key}.err"
-    run["log"] = parse_log(err.read_text(encoding="utf-8", errors="replace")) if err.is_file() else None
+    run["log"] = parse_log(err.read_text(encoding="utf-8", errors="replace"), change) if err.is_file() else None
     return run
 
 
@@ -167,9 +175,63 @@ def compare(a: list[float], b: list[float]) -> dict:
             "in_se": d / se if se else None}
 
 
-def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool) -> dict:
+def cause(slide: dict, has_change: bool, war_change: bool) -> str:
+    """What an extra collapse is put down to by rules 3 and 4.
+
+    change            the change's own lines of that player lie in its slide window: the change acts
+                      for it (counts);
+    intended conquest the same, with landings in the window, for a change that acts on war
+                      (Merlin's rule of 2026-11-18: reported as intended, not counted under rules 2-4);
+    conquest          landings by or against the player in the window and no line of the change;
+    divergence        no line of the change in the window: the game only took another course;
+    unknown           no change lines were named, so rule 3 cannot be shown (counts: "cannot be
+                      shown" is not a pass).
+    """
+    if not has_change:
+        return "unknown"
+    if slide["change_lines"]:
+        return "intended conquest" if war_change and slide["landings"] else "change"
+    return "conquest" if slide["landings"] else "divergence"
+
+
+COUNTED = ("change", "unknown", "no log")
+
+
+def rules(sets: dict) -> dict:
+    """Rules 1 to 4 of the gate (ki/informationsvertrag-inventar.md, Prüfablauf: extra collapses).
+
+    1  inhabitants not worse than 2 standard errors of the difference, on every set;
+    2  no run with two or more extra collapses that count (COUNTED);
+    3  no extra collapse that counts;
+    4  the same computer collapsing in a second phase of the same map counts only if it counts there.
+    """
+    out = {"1": [], "2": [], "3": [], "4": []}
+    for name, s in sets.items():
+        if not s.get("runs"):
+            continue
+        i = s["inhabitants"]
+        if i["in_se"] is not None and i["in_se"] < -2:
+            out["1"].append(f"{name} {i['in_se']:.2f} SE")
+        counted = [w for w in s["slides"] if w["cause"] in COUNTED]
+        per_key: dict[str, int] = {}
+        for w in counted:
+            per_key[w["key"]] = per_key.get(w["key"], 0) + 1
+        out["2"] += [f"{name} {k}" for k, n in sorted(per_key.items()) if n >= 2]
+        out["3"] += [f"{name} {w['key']} P{w['player']} ({w['cause']})" for w in counted]
+        seen: dict[tuple[str, int], list[dict]] = {}
+        for w in s["slides"]:
+            seen.setdefault((w["key"].rsplit("-p", 1)[0], w["player"]), []).append(w)
+        for (m, p), ws in sorted(seen.items()):
+            ws.sort(key=lambda w: w["key"])
+            if len(ws) >= 2 and any(w["cause"] in COUNTED for w in ws[1:]):
+                out["4"].append(f"{name} {m} P{p} in {', '.join(w['key'].rsplit('-p', 1)[1] for w in ws)}")
+    return {r: {"passes": not v, "why": v} for r, v in out.items()}
+
+
+def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: tuple[str, ...] = (),
+               war_change: bool = False) -> dict:
     keys = keys_of(folder, arm, ref)
-    A = {k: read_run(folder, arm, k) for k in keys}
+    A = {k: read_run(folder, arm, k, change) for k in keys}
     B = {k: read_run(folder, ref, k) for k in keys}
     out: dict = {"runs": len(keys)}
     if not keys:
@@ -190,11 +252,14 @@ def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool) -> dict:
     for k in keys:
         for p in [p for p in cols[k][0] if p not in cols[k][1]]:
             peak, below = window(A[k]["S"][p])
-            entry = {"key": k, "player": p, "peak": peak, "below": below, "landings": None}
+            entry = {"key": k, "player": p, "peak": peak, "below": below, "landings": None,
+                     "change_lines": None, "cause": "no log"}
             log = A[k]["log"]
             if log is not None:
                 lo, hi = (peak - 30 + save_offset(k)) * 60, (below + save_offset(k)) * 60
                 entry["landings"] = sum(1 for s, att, dfn in log["landings"] if lo <= s <= hi and p in (att, dfn))
+                entry["change_lines"] = sum(1 for s in log["change"].get(p, []) if lo <= s <= hi)
+                entry["cause"] = cause(entry, bool(change), war_change)
             slides.append(entry)
     out["slides"] = slides
     for name, f in (("gold", gold), ("cities", cities)):
@@ -244,7 +309,8 @@ def print_report(rep: dict) -> None:
         c = s["collapses"]
         print(f"  collapses {c['arm']} vs {c['ref']}; keys with 2+ extra: {', '.join(s['two_extra']) or 'none'}")
         for w in s["slides"]:
-            print(f"    slide {w['key']} P{w['player']} peak {w['peak']} below {w['below']} landings {fmt(w['landings'])}")
+            print(f"    slide {w['key']} P{w['player']} peak {w['peak']} below {w['below']} landings {fmt(w['landings'])}"
+                  f" change lines {fmt(w['change_lines'])}: {w['cause']}")
         for f in ("gold", "cities"):
             g = s[f]
             print(f"  {f} {g['sum_arm']} vs {g['sum_ref']} (per run {fmt(g['arm'], 1)} vs {fmt(g['ref'], 1)}, "
@@ -260,7 +326,11 @@ def print_report(rep: dict) -> None:
 
 def main(argv: list[str]) -> int:
     args = list(argv)
-    opts = {"--arm": None, "--ref": None, "--sets": "l2,l3,x3", "--human-sets": "l2", "--json": None}
+    opts = {"--arm": None, "--ref": None, "--sets": "l2,l3,x3", "--human-sets": "l2", "--json": None,
+            "--change": "", "--war-change": None}
+    if "--war-change" in args:
+        args.remove("--war-change")
+        opts["--war-change"] = True
     try:
         for o in list(opts):
             if o in args:
@@ -275,10 +345,17 @@ def main(argv: list[str]) -> int:
         return 2
     rundir = pathlib.Path(args[0])
     human = set(opts["--human-sets"].split(",")) if opts["--human-sets"] else set()
+    # The change's own log lines, as the text after "[ai P Ts] " begins (rule 3); one or more,
+    # separated by "|", so that no change's names are built in.
+    change = tuple(x for x in opts["--change"].split("|") if x)
     rep = {"arm": opts["--arm"], "ref": opts["--ref"], "sets": {}}
     for name in opts["--sets"].split(","):
-        rep["sets"][name] = report_set(rundir / name, opts["--arm"], opts["--ref"], name in human)
+        rep["sets"][name] = report_set(rundir / name, opts["--arm"], opts["--ref"], name in human, change,
+                                       bool(opts["--war-change"]))
+    rep["rules"] = rules(rep["sets"])
     print_report(rep)
+    print("\nrules: " + "; ".join(f"{r} {'passes' if v['passes'] else 'fails: ' + ', '.join(v['why'])}"
+                                   for r, v in rep["rules"].items()))
     if opts["--json"]:
         pathlib.Path(opts["--json"]).write_text(json.dumps(rep, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return 0
