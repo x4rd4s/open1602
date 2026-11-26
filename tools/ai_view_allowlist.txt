@@ -1,0 +1,5 @@
+# Reads of the world's objects in the computer players' decision code that do not go through
+# ai::View (tools/check_ai_view.py). One per line:
+#     MEMBER | PATH | CLASS: WHY
+# CLASS is eigen, gesehen, Regel or Buchung (the classes of the P1.1 list); verborgen is never
+# taken, it goes through View::omniscient_level().
