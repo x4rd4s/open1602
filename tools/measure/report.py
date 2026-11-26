@@ -18,14 +18,15 @@ From the bench output, per set:
                (measure.py se_of_difference) and the difference in standard errors;
   collapses    players whose inhabitants end below 70 % of their peak (measure.py COLLAPSE_PERCENT,
                the rule every earlier report used), in each arm; the keys with two or more the
-               reference does not have; and for each extra collapse its slide window, from the peak to
+               reference does not have; and for each extra collapse its slide window, from the last
+               minute at the peak to
                the first minute after it below 70 %, with the landings by or against that player
                from 30 minutes before the peak (from the log, where there is one);
   gold, cities the sums at the last minute over all runs, the mean per run and the standard error
                of the per-run difference;
   computer 1   seat 1's end inhabitants in each run, and how many runs it lost (below 70 % of the
                reference's) or gained (the reference below 70 % of it), where either has 300 or more.
-From the log, where the arm and the reference have one (main's standard lines only):
+From the log, where the arm and the reference have one with main's standard lines (else n/a):
   foundings    the "decision found" lines;
   debt         the "track gold" samples below 0: minutes in debt (ten a sample) and players in debt;
   dry          per city and good, the "track city" samples in which its people asked for the good
@@ -79,8 +80,8 @@ def collapsed(samples: dict[int, tuple[int, int, int]]) -> bool:
 
 
 def window(samples: dict[int, tuple[int, int, int]]) -> tuple[int, int]:
-    """The slide: the minute of the peak, and the first minute after it below 70 % of the peak."""
-    peak_minute = max(samples, key=lambda m: (samples[m][0], -m))
+    """The slide: the last minute at the peak, and the first minute after it below 70 % of the peak."""
+    peak_minute = max(samples, key=lambda m: (samples[m][0], m))
     peak = samples[peak_minute][0]
     below = [m for m in sorted(samples) if m > peak_minute and samples[m][0] * 100 < peak * COLLAPSE_PERCENT]
     return peak_minute, below[0] if below else max(samples)
@@ -210,7 +211,9 @@ def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool) -> dict:
                 lost += x * 100 < y * COLLAPSE_PERCENT
                 gained += y * 100 < x * COLLAPSE_PERCENT
     out["computer1"] = {"runs": c1, "counted": counted, "lost": lost, "gained": gained}
-    if all(A[k]["log"] is not None and B[k]["log"] is not None for k in keys):
+    has_lines = lambda log: bool(log["foundings"] or log["gold"])  # noqa: E731
+    if all(A[k]["log"] is not None and B[k]["log"] is not None for k in keys) and any(
+            has_lines(A[k]["log"]) or has_lines(B[k]["log"]) for k in keys):
         def logged(runs: dict) -> dict:
             total = {"foundings": 0, "debt_minutes": 0, "players_in_debt": 0,
                      "dry_minutes": 0, "episodes": 0, "covered": 0, "deficit_minutes": 0}
@@ -251,6 +254,8 @@ def print_report(rep: dict) -> None:
         if "log" in s:
             a, b = s["log"]["arm"], s["log"]["ref"]
             print("  " + ", ".join(f"{f} {a[f]} vs {b[f]}" for f in a))
+        else:
+            print("  log: none with main's decision and track lines (foundings, debt, dry not counted)")
 
 
 def main(argv: list[str]) -> int:

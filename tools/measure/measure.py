@@ -371,7 +371,10 @@ def verdict(plan: dict, results: pathlib.Path) -> dict:
 
 def main(argv: list[str]) -> int:
     if len(argv) >= 2 and argv[1] == "report":
-        import report  # the standard report of a probe or gate (report.py)
+        # The standard report of a probe or gate (report.py, beside this file; python3 -I leaves
+        # the script's folder out of the import path).
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        import report
         return report.main(argv[2:])
     if len(argv) < 3 or argv[1] not in ("check", "jobs", "collect", "verdict"):
         print(__doc__, file=sys.stderr)

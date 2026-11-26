@@ -74,6 +74,9 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(a["debt_minutes"], 10)
         self.assertEqual((a["dry_minutes"], a["episodes"], a["covered"], a["deficit_minutes"]), (20, 1, 1, 30))
 
+    def test_slide_starts_at_the_last_minute_at_the_peak(self):
+        self.assertEqual(report.window({10: (5, 0, 0), 20: (9, 0, 0), 30: (9, 0, 0), 40: (6, 0, 0)}), (30, 40))
+
     def test_a_player_without_people_never_collapses(self):
         self.assertFalse(report.collapsed({10: (0, 0, 0), 20: (0, 0, 0)}))
 
