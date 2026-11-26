@@ -427,11 +427,21 @@ public:
     /// than they make (`short_of`), only while their slot can still add one (attempts, fail_level).
     [[nodiscard]] static bool farm_counts(bool siting, std::uint16_t farms, bool short_of, std::uint16_t attempts,
                                           std::uint16_t fail_level) noexcept;
+    /// Improved computers (p62): a colony for a crop whose good is `dry` in a city sets out when
+    /// the budget's flows carry it (Budget::flows_carry), without the gold in hand now; its ship
+    /// waits at the site for the Kontor's gold.
+    [[nodiscard]] static bool sails_for(bool improved, bool dry, bool carried) noexcept;
+    /// Whether a ship that waited at a site for the Kontor's gold gives up: after `waited` ms, more
+    /// than the budget's `horizon` minutes.
+    [[nodiscard]] static bool wait_ends(std::uint64_t waited, std::uint32_t horizon) noexcept;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
     /// Improved computers: a ship under the white flag takes no order while a pirate is near.
     [[nodiscard]] static bool flag_keeps(bool improved, bool held, bool pirate_near) noexcept;
+    /// Improved computers: the colony ship at its site waits for the Kontor's gold instead of trying.
+    [[nodiscard]] static bool founding_waits(bool improved, bool pirates, std::int64_t money,
+                                             std::int64_t cost) noexcept;
     /// The ships' missions of `p`, once (missions()); for tests.
     void run_missions(AiPlayer& p) { missions(p); }
     /// The orders of `a`'s soldiers on `island` against `enemies`, once (attack_orders); for tests.
@@ -657,6 +667,7 @@ private:
     [[nodiscard]] std::int64_t chain_upkeep(const AiPlayer& p, std::uint8_t crop) const;
     /// The crops a colony may be founded for, in the order choose_colony_crop takes the first of.
     [[nodiscard]] std::vector<std::uint8_t> colony_candidates(AiPlayer& p);
+    [[nodiscard]] bool crop_dry(const AiPlayer& p, std::uint8_t field) const;
     /// G4b: the rank of a colony for `crop` (0: any island) among the candidates, gold a minute: the
     /// taxes of the city it becomes, less its chain's running costs, plus what its good lets the
     /// home city's houses rise into. Ranks only; it refuses nothing.
@@ -1522,6 +1533,8 @@ private:
     std::vector<std::uint64_t> m_colony_plan_ms;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
+    /// The game minute (+1) each player's ship last logged its wait for the founding's gold.
+    std::vector<std::uint64_t> m_found_wait_logged;
     /// Why need_shipyard() builds no yard: the last reason logged per player (only the log).
     enum class YardWait : std::uint8_t {
         Unlogged,

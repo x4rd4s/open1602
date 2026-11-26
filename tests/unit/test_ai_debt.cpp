@@ -131,6 +131,15 @@ TEST_CASE("ai ships: a ship under the white flag takes no order while a pirate i
     CHECK(!Engine::flag_keeps(false, true, true));  // the original's computers: as before
 }
 
+TEST_CASE("ai settle: a colony ship short of the Kontor's gold waits at the site") {
+    // p58, x3 o4-505-p1 P3: 52 founding tries in a minute at -7,865 gold.
+    CHECK(Engine::founding_waits(true, false, -7865, 2000));
+    CHECK(Engine::founding_waits(true, false, 1999, 2000));
+    CHECK(!Engine::founding_waits(true, false, 2000, 2000));
+    CHECK(!Engine::founding_waits(false, false, -7865, 2000));  // the original's computers try on
+    CHECK(!Engine::founding_waits(true, true, -7865, 2000));    // the pirates found their nest as before
+}
+
 TEST_CASE("ai settle: an island chosen as contested is landed on by the same rule") {
     // The original: beside a city of a player with two cities or more that has no people yet.
     CHECK(Engine::leaves_room(false, false, false, true, false));
@@ -255,4 +264,16 @@ TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone
     CHECK(Engine::gold_exit(true, true, true));
     CHECK(!Engine::gold_exit(true, false, true));  // not rich
     CHECK(!Engine::gold_exit(false, false, true));
+}
+
+TEST_CASE("ai colony: a colony for a dry good sets out on its flows, and its ship waits no longer than the horizon") {
+    // p62: saved gold never stayed in hand; a player sails and builds the Kontor once the gold is there.
+    CHECK(Engine::sails_for(true, true, true));
+    CHECK(!Engine::sails_for(true, false, true));  // not dry
+    CHECK(!Engine::sails_for(true, true, false));  // the flows would not carry it
+    CHECK(!Engine::sails_for(false, true, true));  // the original's computers: as before
+    CHECK(!Engine::wait_ends(30 * 60'000, 30));
+    CHECK(Engine::wait_ends(30 * 60'000 + 1, 30));
+    CHECK(Engine::crop_good(assets::ware::kSugarField) == assets::ware::kAlcohol);
+    CHECK(Engine::crop_good(assets::ware::kCottonField) == 0);  // opens no class
 }

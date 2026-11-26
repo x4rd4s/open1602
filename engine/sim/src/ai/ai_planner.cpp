@@ -2626,6 +2626,11 @@ std::int64_t Engine::colony_savings(AiPlayer& p) {
     if (!rivals() || p.pirates || p.settle.failed || player(p).scenario.has(scenario_flag::kNoColonies)) {
         return 0;
     }
+    // Open1602 (p62): not for a colony that set out on its flows alone: its houses go on, and the
+    // Kontor waits at the site for the gold.
+    if (p.settle.plan_sails) {
+        return 0;
+    }
     // A settlement under way keeps the gold until the Kontor stands: spent meanwhile, the ship
     // arrived to find too little to found the city.
     // So too while its ship goes home to load: the gold fell from 3600 to 130 in those minutes.

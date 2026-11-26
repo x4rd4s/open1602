@@ -13,6 +13,7 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim::ai {
@@ -1037,6 +1038,48 @@ void Engine::task_settle_land(AiPlayer& p) {
         pl.money =
             money_plus(pl.money, std::int64_t{cheats().founding_money});  // the original's founding money (cheat)
     }
+    // Open1602 (probe p58, x3 o4-505-p1 P3: 52 tries in a minute at -7,865 gold, the site searched
+    // afresh after each): an improved computer's ship waits at the site with its load until the gold
+    // for the Kontor is there, as a player does, while its cities go on.
+    if (const assets::BuildingType* kontor = by_id(id::kKontor1);
+        kontor != nullptr && founding_waits(rivals(), p.pirates, pl.money, kontor->build_cost.money)) {
+        // Not past the budget's horizon: what its flows did not bring by then they do not carry.
+        if (s.wait_ms == 0) {
+            s.wait_ms = std::max<std::uint64_t>(now_ms(), 1);
+        } else if (wait_ends(now_ms() - s.wait_ms, m_world.balance().ai_budget_horizon_minutes)) {
+            log(p, "the ship gives up waiting at the site on island %u (gold %d of %d)", island, pl.money,
+                kontor->build_cost.money);
+            s.wait_ms = 0;
+            s.failed = true;
+            end_settlement(p);
+            return;
+        }
+        if (m_found_wait_logged.size() <= p.player) {
+            m_found_wait_logged.resize(std::size_t{p.player} + 1);
+        }
+        if (const std::uint64_t minute = now_ms() / kGoodsMinuteMs + 1; m_found_wait_logged[p.player] != minute) {
+            m_found_wait_logged[p.player] = minute;
+            log(p, "the ship waits at the site on island %u for the gold (%d of %d)", island, pl.money,
+                kontor->build_cost.money);
+        }
+        s.sailing = true;  // the root task lands again when it looks next
+        return;
+    }
+    // Open1602 (p62): a colony that set out on its flows alone, or waited for the gold, is founded only while the
+    // budget's net still pays its upkeep; a city whose net fell meanwhile keeps its gold.
+    if (rivals() && !p.pirates && (s.wait_ms != 0 || s.plan_sails)) {
+        const std::int64_t net = gold_budget(p).net;
+        const std::int64_t upkeep = colony_commitment(p, s.crop).upkeep;
+        if (net < upkeep) {
+            log(p, "does not found on island %u after the wait: net %lld below the colony's upkeep %lld", island,
+                static_cast<long long>(net), static_cast<long long>(upkeep));
+            s.wait_ms = 0;
+            s.failed = true;
+            end_settlement(p);
+            return;
+        }
+    }
+    s.wait_ms = 0;
     BuildOrder order;
     order.player = p.player;
     order.island = island;
@@ -1093,6 +1136,36 @@ void Engine::task_settle_land(AiPlayer& p) {
     end_settlement(p);
 }
 
+bool Engine::founding_waits(bool improved, bool pirates, std::int64_t money, std::int64_t cost) noexcept {
+    return improved && !pirates && money < cost;
+}
+
+bool Engine::wait_ends(std::uint64_t waited, std::uint32_t horizon) noexcept {
+    return waited > std::uint64_t{horizon} * kGoodsMinuteMs;
+}
+
+bool Engine::sails_for(bool improved, bool dry, bool carried) noexcept {
+    return improved && dry && carried;
+}
+
+bool Engine::crop_dry(const AiPlayer& p, std::uint8_t field) const {
+    // The crop's good is used in a city of the computer that holds none of it, and none of its
+    // islands grows a crop for it: lacking by the stock, as a player sees it.
+    const std::uint8_t good = crop_good(field);
+    if (good == 0) {
+        return false;
+    }
+    for (const std::uint8_t other :
+         {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kSugarField, ware::kCocoaField}) {
+        if (crop_good(other) == good && crop_available(p, other)) {
+            return false;
+        }
+    }
+    return std::ranges::any_of(m_world.cities(), [&](const City& c) {
+        return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
+    });
+}
+
 std::uint8_t Engine::crop_good(std::uint8_t field) noexcept {
     switch (field) {
         case ware::kWineField:
@@ -1136,6 +1209,8 @@ void Engine::end_settlement(AiPlayer& p) {
     s.sailing = false;
     s.regions.clear();
     s.island = -1;
+    s.wait_ms = 0;
+    s.plan_sails = false;
 }
 
 void Engine::unload_at(City& c, Ship& ship, bool keep_basics, bool destroy) {
@@ -1551,6 +1626,7 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         s.plan_crop = 0;
         s.plan_ms = 0;
         s.plan_ship = 0;
+        s.plan_sails = false;
     };
     // The candidates are the original's motives in its order, each as its budget weighs it
     // (colony_commitment, its own gold set aside by reserved() left out for the plan's).
@@ -1563,11 +1639,18 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         b.reserved -= colony_money(p);
     }
     std::vector<ColonyCandidate> weighed;
+    std::vector<std::uint8_t> on_flows;  // the crops that pass on their flows alone
     bool plan_holds = false;
     for (const std::uint8_t crop : crops) {
         ColonyCandidate c;
         c.crop = crop;
-        c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
+        const Commitment commitment = colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop);
+        c.passes = b.refusal(commitment) == Refusal::None;
+        if (!c.passes && crop != kAnyCrop &&
+            sails_for(rivals() && !p.pirates, crop_dry(p, crop), b.flows_carry(commitment))) {
+            c.passes = true;
+            on_flows.push_back(crop);
+        }
         c.rank = c.passes ? colony_rank(p, crop) : 0;
         plan_holds = plan_holds || (c.passes && crop == s.plan_crop);
         weighed.push_back(c);
@@ -1579,8 +1662,10 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         clear();
         return;
     }
+    const auto sails = [&] { s.plan_sails = std::ranges::find(on_flows, s.plan_crop) != on_flows.end(); };
     const bool load = colony_load_in_stock(p, false) || colony_load_in_stock(p, true);
     if (!asked) {
+        sails();
         if (s.plan_ship != 0 && !load) {
             log(p, "colony plan: ship %u released (no load)", s.plan_ship);
             s.plan_ship = 0;
@@ -1590,6 +1675,7 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
     if (*best != s.plan_crop) {
         // Another colony takes the plan's place only while no ship is kept for it.
         if (plan_holds && s.plan_ship != 0) {
+            sails();
             return;
         }
         log(p, "colony plan: crop %u rank %lld (first %u rank %lld)", unsigned{*best},
@@ -1601,6 +1687,7 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         s.plan_crop = *best;
         s.plan_ms = step;
     }
+    sails();
     // A ship is kept for it once the home city holds the load, so that the supply runs do not take
     // it while it is called home; before, kept from the plan on, it lay idle for most of an hour.
     if (s.plan_ship != 0 && !load) {
