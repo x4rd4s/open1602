@@ -21,6 +21,12 @@ For a decision at game time t in a city, and a horizon of h minutes:
              the sum starts up to ten minutes before t.
   to         for a decision for another city's people (a colony plan or founding: the home city it is
              weighed for), that city's people, tax and cost at t + h less at t.
+What is read for a kind: made for a producer, got and used for a run of goods, people and tax
+for houses, public buildings, markets and colonies (their ware is 0 or nothing they make). The
+ledger holds trade goods only (Goods::is_trade), so a producer of anything else (a quarry's
+stone) shows made 0; read the city's other fields for it.
+The actual values are the city's change over the horizon, not the decision's own share: decisions
+in one city at one time share them, and attributing them is the reader's work (P2.6).
 A horizon the run did not reach is null. A decision without a city (a colony plan) gets no city fields.
 """
 from __future__ import annotations
