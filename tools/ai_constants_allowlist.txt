@@ -44,3 +44,5 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met
 18 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithWarParty = 17
 kStateWithHeldBuild | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 18, which saves CityPlan::held_build
+19 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithHeldBuild = 18
+kStateWithFoundedCrop | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 19, which saves CityPlan::founded_crop

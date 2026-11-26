@@ -1076,6 +1076,11 @@ void Engine::task_settle_land(AiPlayer& p) {
     r.city = c->index;
     r.stage_ms = now_ms();
     r.land = free_land(island, c->index, &r.land_percent);
+    // Open1602: an improved computer's colony knows the crop it was founded for (luxury); a fifth
+    // of them planted it first, one founded for tobacco planted wine and sugar (t75).
+    if (rivals() && !p.pirates && crop_slot(s.crop) != kNoSlot) {
+        r.founded_crop = s.crop;
+    }
     unload_at(*c, *ship, false, false);
     if (gifts()) {
         add_goods(*c, m_buildings.materials().bricks,

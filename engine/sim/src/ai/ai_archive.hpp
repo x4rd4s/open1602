@@ -201,6 +201,9 @@ void io(A& a, CityPlan& r) {
     if (a.version() >= kStateWithHeldBuild) {
         a(r.held_build);
     }
+    if (a.version() >= kStateWithFoundedCrop) {
+        a(r.founded_crop);
+    }
 }
 
 template <class A>
