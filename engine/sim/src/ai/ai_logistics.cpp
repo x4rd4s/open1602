@@ -1516,6 +1516,17 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     n.supply = true;
     n.mission = 0;
     n.counter = 0;
+    if (logging()) {
+        // A run's price is what it buys from partners (none from its own cities); its value is not
+        // weighed today.
+        Commitment c;
+        c.cost = first->own ? 0 : price_paid(p, first->ware, first->amount);
+        log_decision(p, "supply", first->ware, home.island, home.index, c, first->amount);
+        if (second) {
+            c.cost = second->own ? 0 : price_paid(p, second->ware, second->amount);
+            log_decision(p, "supply", second->ware, home.island, home.index, c, second->amount);
+        }
+    }
     if (rivals()) {
         log(p, "supply ship %u: ware %u (%u t) from city %u/%u to %u/%u, %u s away%s", s.id, first->ware,
             first->amount / kTon, src1.island, src1.index, home.island, home.index, first->seconds,

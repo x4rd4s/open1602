@@ -85,6 +85,33 @@ void Engine::log(const AiPlayer& p, const char* format, ...) const {
     std::fputc('\n', stderr);
 }
 
+void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
+                          std::int32_t city, const Commitment& c, std::uint32_t amount) const {
+    // The fields a later step pairs with what came of the decision (P0.3): when, who, where, what
+    // it was weighed with.
+    if (!logging()) {
+        return;
+    }
+    const std::uint64_t ms = now_ms();
+    m_decision_seq = ms == m_decision_ms ? m_decision_seq + 1 : 0;
+    m_decision_ms = ms;
+    log(p, "decision %s id %llu.%u cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u amount %u",
+        kind, static_cast<unsigned long long>(ms), m_decision_seq, candidate, island, city,
+        static_cast<long long>(c.cost), static_cast<long long>(c.upkeep), static_cast<long long>(c.value), c.delay,
+        m_world.balance().ai_budget_horizon_minutes, amount);
+}
+
+Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
+    const std::vector<BudgetCache> budgets = m_budgets;
+    const Census census = m_census;
+    const std::vector<OverviewCache> overviews = m_overviews;
+    const Commitment c = colony_commitment(p, crop);
+    m_budgets = budgets;
+    m_census = census;
+    m_overviews = overviews;
+    return c;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Scheduler
 

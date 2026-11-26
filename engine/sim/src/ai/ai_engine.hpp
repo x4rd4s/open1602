@@ -516,6 +516,16 @@ private:
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
     [[nodiscard]] static bool logging() noexcept;
+    /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
+    /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
+    /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
+    /// (1/32 t) for a run of goods. Each line carries an id, game ms and a count within that ms,
+    /// that a later step pairs with what came of it (P0.3). Logging only: it changes nothing.
+    void log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
+                      std::int32_t city, const Commitment& c, std::uint32_t amount = 0) const;
+    /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
+    /// that a later check in the same step works them out as it would have without the log.
+    [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
     /// The computer log only: a report of each city every half hour of game time.
     void report(AiPlayer& p);
 
@@ -1570,6 +1580,10 @@ private:
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_sealed_logged;
     /// Player and city attack_ok passes over for towers out of the fleet's reach (only the log).
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
+    /// log_decision's id: the game time of the last decision logged and how many were logged at
+    /// it (only the log).
+    mutable std::uint64_t m_decision_ms = 0;
+    mutable std::uint32_t m_decision_seq = 0;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
     /// Per island and city: the fires and plagues logged at the last look (only the log).
