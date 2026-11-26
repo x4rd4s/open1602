@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <map>
 #include <optional>
 #include <set>
 #include <span>
@@ -273,6 +274,42 @@ void drain_events(sim::Simulation& s) {
     (void)s.take_ship_events();
     (void)s.take_diplomacy_notices();
     (void)s.take_command_results();
+}
+
+/// --out-stages: after a minute in which a city of a human or computer player first has houses of
+/// a class higher than any before, the game as a savegame `m<minute>.o1602` in `dir`, and a line for
+/// each such city. The stages are the classes of the table; writing the save leaves the game as it is.
+int save_stages(const sim::World& world, const assets::BuildingTable& buildings, const sim::Simulation& simulation,
+                const fs::path& dir, std::size_t minute,
+                std::map<std::pair<std::uint16_t, std::uint8_t>, int>& stages) {
+    bool any = false;
+    for (const sim::House& h : world.houses()) {
+        const sim::City* city = world.city(h.island, h.city);
+        const sim::Player* owner = city != nullptr ? world.player(city->owner) : nullptr;
+        if (owner == nullptr || (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+            continue;
+        }
+        const auto [it, added] = stages.try_emplace({h.island, h.city}, -1);
+        if (static_cast<int>(h.resident_class) > it->second) {
+            it->second = h.resident_class;
+            any = true;
+            std::printf("stage: minute %zu player %u island %u city %u class %u\n", minute,
+                        static_cast<unsigned>(city->owner), static_cast<unsigned>(h.island),
+                        static_cast<unsigned>(h.city), static_cast<unsigned>(h.resident_class));
+        }
+    }
+    if (!any) {
+        return 0;
+    }
+    auto save = sim::write_game(world, buildings, &simulation);
+    if (!save) {
+        return fail(save.error());
+    }
+    const fs::path file = dir / ("m" + std::to_string(minute) + ".o1602");
+    if (auto status = annokit::core::write_file(file, *save); !status) {
+        return fail(status.error());
+    }
+    return 0;
 }
 
 /// --reload-at: saves the running game, loads it into a second game and runs both side by side,
@@ -599,6 +636,8 @@ int cmd_bench(const Args& args) {
         period.ticks.reserve(period_minutes * ticks_per_minute);
         std::size_t tick = 0;
         std::vector<bool> reported_wins(world->players().size(), false);
+        // --out-stages: the highest class with houses each city has reached so far, by island and city.
+        std::map<std::pair<std::uint16_t, std::uint8_t>, int> stages;
         for (std::size_t minute = 1; minute <= minutes; ++minute) {
             for (std::uint64_t t = 0; t < ticks_per_minute; ++t, ++tick) {
                 std::fill(step_ns.begin(), step_ns.end(), 0);
@@ -628,6 +667,13 @@ int cmd_bench(const Args& args) {
                 if (world->players()[i].won && !reported_wins[i]) {
                     reported_wins[i] = true;
                     std::printf("won: player %zu at minute %zu\n", i, minute);
+                }
+            }
+            if (const auto dir = args.options.find("--out-stages"); last && dir != args.options.end()) {
+                if (const int status =
+                        save_stages(*world, *buildings, *simulation, fs::path(dir->second), minute, stages);
+                    status != 0) {
+                    return status;
                 }
             }
             if (last && reload_at && minute == *reload_at) {
