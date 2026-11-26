@@ -21,6 +21,14 @@ reason is not taken. A single line can carry its class in a comment instead, for
 the log makes or that is the computer's own:
     for (const City& c : m_world.cities()) {  // ai-view: Buchung: the log's census comparison
 Each hit is printed as path:line: reason. Exit code 1 when there are any.
+
+Review rules for the marks and entries (the check cannot judge them):
+- Buchung only inside a logging() block or for the engine's own bookkeeping (cursors, sizes, ids of
+  its own missions), never for a read a decision uses.
+- gesehen is reviewed by hand, line by line: it is the class that can hide a leak. Prefer a View
+  query that answers what is seen.
+- Keep the marks rare: a public part of the world's objects (a player's role, status or faction)
+  gets a View accessor rather than a mark.
 """
 from __future__ import annotations
 
