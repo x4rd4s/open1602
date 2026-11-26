@@ -237,7 +237,8 @@ public:
     /// The first record of id::kRequired the table lacks.
     [[nodiscard]] std::optional<std::uint32_t> missing() const noexcept;
 
-    [[nodiscard]] const std::vector<BuildingType>& types() const noexcept { return m_types; }
+    [[nodiscard]] const std::vector<BuildingType>& types() const& noexcept { return m_types; }
+    const std::vector<BuildingType>& types() const&& = delete;
     /// How many of types() come from haeuser.cod: they come first, the packages' own (add) after them.
     [[nodiscard]] std::size_t original_count() const noexcept { return m_original_count; }
     [[nodiscard]] const BuildingType* by_id(std::uint32_t id) const noexcept;
@@ -267,7 +268,9 @@ public:
     }
 
     /// Classes of inhabitants by BGRUPPE Nummer.
-    [[nodiscard]] const std::vector<ResidentClass>& resident_classes() const noexcept { return m_classes; }
+    [[nodiscard]] const std::vector<ResidentClass>& resident_classes() const& noexcept { return m_classes; }
+    /// Not of a temporary table: the list would die with it.
+    const std::vector<ResidentClass>& resident_classes() const&& = delete;
     /// Puts the classes of a game in place of these (resident_classes.hpp): the original's as
     /// packages changed them and those they added.
     void set_resident_classes(std::vector<ResidentClass> classes) { m_classes = std::move(classes); }
@@ -283,6 +286,18 @@ public:
         std::uint8_t cannons = 13;
     };
     [[nodiscard]] const Materials& materials() const noexcept { return m_materials; }
+    /// One ware of a build cost and how much of it, in 1/8192 t.
+    struct WareCost {
+        std::uint8_t ware = 0;
+        std::uint32_t amount = 0;
+    };
+    /// The wares `type` costs to build (its money aside), each build cost slot with the ware the
+    /// table names for it.
+    [[nodiscard]] std::array<WareCost, 4> ware_costs(const BuildingType& type) const noexcept {
+        const BuildingType::BuildCost& cost = type.build_cost;
+        return {WareCost{m_materials.tools, cost.tools}, WareCost{m_materials.bricks, cost.bricks},
+                WareCost{m_materials.wood, cost.wood}, WareCost{m_materials.cannons, cost.cannons}};
+    }
     /// Unlock levels by INFRA number (index 0 unused, levels without a BAUINFRA entry are {0, 0}:
     /// reached at once).
     [[nodiscard]] const std::vector<InfraLevel>& infra_levels() const noexcept { return m_infra; }

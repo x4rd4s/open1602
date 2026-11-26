@@ -544,3 +544,126 @@ TEST_CASE("houses: the visits of a timer group are those its clock ticks") {
     CHECK(sim::grown_inhabitants64(63, -10, 384) == 0);
     CHECK(sim::grown_inhabitants64(63, 0, 384) == 63);
 }
+
+TEST_CASE("houses: a full house rises exactly when rises() says, over every input of its ascent") {
+    const assets::BuildingTable table = make_buildings();
+    const auto& classes = table.resident_classes();
+    for (std::size_t c = 0; c + 1 < classes.size(); ++c) {
+        const auto cls = static_cast<std::uint8_t>(c);
+        const auto next = static_cast<std::uint8_t>(c + 1);
+        std::uint32_t risen = 0;
+        for (std::uint32_t combo = 0; combo < 32; ++combo) {
+            const bool food = (combo & 1U) != 0;
+            const bool satisfied = (combo & 2U) != 0;
+            const bool chapel = (combo & 4U) != 0;
+            const bool materials = (combo & 8U) != 0;
+            const bool lock = (combo & 16U) != 0;
+            Town town;
+            const assets::BuildingType& house = *town.buildings.first_house(cls);
+            const assets::BuildingType& target = *town.buildings.first_house(next);
+            town.place(kMarket, 10, 11);
+            if (chapel) {
+                town.place(kChapel, 16, 11);
+            }
+            town.place(house.id, 14, 13);
+            std::vector<std::pair<std::int32_t, std::int32_t>> productions{{10, 11}};
+            if (chapel) {
+                productions.emplace_back(16, 11);
+            }
+            town.finish(productions);
+            sim::City& city = *town.world.city(0, 0);
+            city.food_ratio = food ? assets::kFullSupply : assets::kFullSupply - 1;
+            city.satisfaction[next] = satisfied ? assets::kFullSupply : assets::kFullSupply - 1;
+            city.material_lock = lock;
+            for (const auto& [ware, amount] : town.buildings.ware_costs(target)) {
+                city.ensure_ware(ware);
+                city.goods[ware] = materials ? amount : 0;
+            }
+            const std::uint32_t room = town.buildings.resident_classes()[cls].max_per_house * 64U;
+            sim::House& h = town.add_house(14, 13, cls, room);
+            sim::update_services(town.world, town.buildings);
+            CHECK(sim::materials_available(city, town.buildings, target) == materials);
+            const bool grows = sim::growth_rate(city, h) > 0;
+            const bool expected = sim::rises(
+                sim::AscentInputs{grows ? room + 1 : room, room, true, city.food_ratio, city.satisfaction[next],
+                                  sim::has_services(h, town.buildings, next), lock, materials});
+            town.run(120);
+            CHECK((town.world.house(0, 14, 13)->resident_class == next) == expected);
+            risen += expected ? 1U : 0U;
+        }
+        CHECK(risen == 1);  // all inputs given, and only then
+    }
+}
+
+TEST_CASE("houses: a shrinking house falls exactly when falls() says, over every input of its descent") {
+    const assets::BuildingTable table = make_buildings();
+    const auto& classes = table.resident_classes();
+    for (std::size_t c = 1; c < classes.size(); ++c) {
+        const auto cls = static_cast<std::uint8_t>(c);
+        const auto below = static_cast<std::uint8_t>(c - 1);
+        std::uint32_t fallen = 0;
+        for (std::uint32_t combo = 0; combo < 8; ++combo) {
+            const bool chapel = (combo & 1U) != 0;
+            const bool content = (combo & 2U) != 0;
+            const bool few = (combo & 4U) != 0;
+            Town town;
+            town.place(kMarket, 10, 11);
+            if (chapel) {
+                town.place(kChapel, 16, 11);
+            }
+            town.place(town.buildings.first_house(cls)->id, 14, 13);
+            std::vector<std::pair<std::int32_t, std::int32_t>> productions{{10, 11}};
+            if (chapel) {
+                productions.emplace_back(16, 11);
+            }
+            town.finish(productions);
+            sim::City& city = *town.world.city(0, 0);
+            city.food_ratio = 0;  // shrinking
+            city.satisfaction[cls] = content ? sim::kContentSatisfaction : sim::kContentSatisfaction - 1;
+            const std::uint32_t room = town.buildings.resident_classes()[cls].max_per_house * 64U;
+            const std::uint32_t room_below = town.buildings.resident_classes()[below].max_per_house * 64U;
+            const std::uint32_t start = few ? room_below : room;
+            sim::House& h = town.add_house(14, 13, cls, start);
+            sim::update_services(town.world, town.buildings);
+            const std::int32_t rate = sim::growth_rate(city, h);
+            REQUIRE(rate < 0);
+            const std::uint32_t after = sim::grown_inhabitants64(start, rate, room);
+            const bool expected =
+                sim::falls(sim::DescentInputs{cls, after, room_below, h.services_complete, city.satisfaction[cls]});
+            // Up to the first visit: the house shrinks once, and falls or stays.
+            for (std::uint32_t t = 0; t < 20 * 60; ++t) {
+                sim::advance_houses(town.world, town.buildings, 50, nullptr);
+                const sim::House* now = town.world.house(0, 14, 13);
+                if (now == nullptr || now->inhabitants64 != start || now->resident_class != cls) {
+                    break;
+                }
+            }
+            const sim::House* now = town.world.house(0, 14, 13);
+            REQUIRE(now != nullptr);
+            CHECK(now->inhabitants64 == after);
+            CHECK((now->resident_class == below) == expected);
+            fallen += expected ? 1U : 0U;
+        }
+        CHECK(fallen == 3);  // few enough, and without the chapel or contentment
+    }
+}
+
+TEST_CASE("houses: the materials of an ascent are the build cost the table lists, ware by ware") {
+    Town town;
+    town.finish({});
+    sim::City& city = *town.world.city(0, 0);
+    const assets::BuildingType& target = *town.buildings.first_house(1);
+    for (const auto& [ware, amount] : town.buildings.ware_costs(target)) {
+        city.ensure_ware(ware);
+        city.goods[ware] = amount;
+    }
+    CHECK(sim::materials_available(city, town.buildings, target));
+    for (const auto& [ware, amount] : town.buildings.ware_costs(target)) {
+        if (amount == 0) {
+            continue;
+        }
+        city.goods[ware] = amount - 1;
+        CHECK(!sim::materials_available(city, town.buildings, target));
+        city.goods[ware] = amount;
+    }
+}
