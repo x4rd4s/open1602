@@ -345,7 +345,7 @@ std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
         known[i] = island_of(static_cast<std::uint16_t>(i)).discovered_by(viewer) ||
                    island_of(static_cast<std::uint16_t>(i)).explored_by(viewer);
     }
-    for (const City& c : m_world.cities()) {
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: the viewer's own cities
         if (c.owner == viewer && c.island < known.size()) {
             known[c.island] = true;
         }
@@ -3943,7 +3943,7 @@ void Engine::diplomacy(AiPlayer& p) {
                 const std::uint32_t roll = (rng().next() & 63U) + 40U;
                 if (logging() && !sees_all()) {
                     std::uint32_t all = 0;
-                    for (const City& c : m_world.cities()) {
+                    for (const City& c : m_world.cities()) {  // ai-view: Buchung: the log's whole count
                         all = c.owner == b ? std::max(all, population(c)) : all;
                     }
                     if ((largest > roll) != (all > roll)) {
