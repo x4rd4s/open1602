@@ -321,6 +321,11 @@ def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: re
                 parts = {"foundings": log["foundings"], **debt_summary(log["gold"]), **dry_summary(log["dry"])}
                 for f in total:
                     total[f] += parts[f]
+            if not any(runs[k]["log"]["gold"] or runs[k]["log"]["dry"] for k in keys):
+                # A tree with the decision lines but without the track lines (before P0.3): its debt
+                # and dry counts are unknown, not 0.
+                for f in total:
+                    total[f] = None if f != "foundings" else total[f]
             return total
         out["log"] = {"arm": logged(A), "ref": logged(B)}
     return out
@@ -358,7 +363,7 @@ def print_report(rep: dict) -> None:
         print(f"  computer 1: lost {c1['lost']}, gained {c1['gained']} of {c1['counted']}")
         if "log" in s:
             a, b = s["log"]["arm"], s["log"]["ref"]
-            print("  " + ", ".join(f"{f} {a[f]} vs {b[f]}" for f in a))
+            print("  " + ", ".join(f"{f} {fmt(a[f])} vs {fmt(b[f])}" for f in a))
         else:
             print("  log: none with main's decision and track lines (foundings, debt, dry not counted)")
 

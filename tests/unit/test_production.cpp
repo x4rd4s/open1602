@@ -566,3 +566,41 @@ TEST_CASE("production: a known deposit shows on an island the player has not dis
     CHECK(render::building_figure_sprites(symbol, world, buildings, view, layers, 0, s));
     CHECK(!render::building_figure_sprites(icon, world, buildings, view, layers, 0, s));  // still hidden
 }
+
+TEST_CASE("production: a spectator sees every deposit, known to a player or not") {
+    const auto buildings = make_buildings();
+    const auto figures = make_figures();
+    sim::World world;
+    world.set_players({sim::Player{}, sim::Player{sim::PlayerRole::Computer, 1, 0, ""}});
+    sim::WorldIsland island{assets::IslandHeader{}, sim::IslandMap(8, 8), 5, 5};
+    assets::IslandHeader::Deposit gold;
+    gold.ware = assets::ware::kGold;
+    gold.x = 2;
+    gold.y = 3;
+    island.header.deposits.push_back(gold);
+    REQUIRE(world.add_island(std::move(island)).ok());
+
+    const auto effekte = test::make_sheet(std::vector<std::pair<std::uint32_t, std::uint32_t>>(40, {6, 8}));
+    const auto palette = test::make_palette();
+    const assets::SpriteSheet* sheets[] = {&effekte};
+    auto atlas = render::SpriteAtlas::build(sheets, palette, 256);
+    REQUIRE(atlas.ok());
+    render::WorldLayers layers;
+    layers.figures = &figures;
+    layers.atlas = &*atlas;
+    layers.sheet_base[static_cast<std::size_t>(assets::FigureSheet::Effekte)] = atlas->sheet_base(0);
+    const render::WorldView view{render::Zoom::Large, 0};
+    render::FigureSprites s;
+
+    render::BuildingFigure symbol;
+    symbol.role = render::BuildingFigureRole::Deposit;
+    symbol.figure = 46;
+    symbol.island = 0;
+    symbol.origin_x = 2;
+    symbol.origin_y = 3;
+    // Nobody has explored the island: a player does not see the gold, a spectator does.
+    layers.local_player = 0;
+    CHECK(!render::building_figure_sprites(symbol, world, buildings, view, layers, 0, s));
+    layers.local_player = sim::kNoPlayer;
+    CHECK(render::building_figure_sprites(symbol, world, buildings, view, layers, 0, s));
+}

@@ -794,6 +794,21 @@ void GoodsWindow::layout_finances(const sim::World& world, const assets::Buildin
     y += 4;
     line("stats.fin.balance", balance, military ? std::nullopt : std::optional<std::int64_t>(average_balance), 0,
          s.dark);
+    // Open1602: the gold in the player's treasury (all islands together), and with a negative
+    // balance how many minutes it lasts at the balance of now.
+    if (const sim::Player* owner = world.player(player)) {
+        const std::int64_t gold = owner->money;
+        below.fill(Rect{kMargin + 4, y + 8, 10, 8}, s.dark);
+        above.text(Rect{kMargin + 20, y, 260, kLineH}, ui::tr("stats.fin.treasury"), Align::Left, st.text, kFontMedium);
+        above.text(Rect{kNowR - 100, y, 100, kLineH}, number_text(gold), Align::Right,
+                   gold < 0 ? ui::kTextInkRed : st.text, kFontMedium);
+        if (balance < 0 && gold > 0) {
+            above.text(Rect{kAverageR - 130, y, 130, kLineH},
+                       ui::tr("stats.fin.lasts", {std::to_string(gold / -balance)}), Align::Right, ui::kTextInkRed,
+                       kFontSmall);
+        }
+        y += kLineH;
+    }
 
     // Over time (without the military, which has no history).
     const std::vector<sim::CitySample> history = m_long_chart ? sim::city_history(world, scope, true) : minutes_list;

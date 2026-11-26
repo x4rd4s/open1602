@@ -458,3 +458,20 @@ TEST_CASE("goods window: a spectator chooses in the title whose figures it reads
     (void)w.draw(world, assets::BuildingTable{}, kFigures, sim::kNoPlayer, kNoFonts);
     CHECK(w.watched() == 1);
 }
+
+TEST_CASE("goods window: the finances show the gold in the treasury of the player read") {
+    sim::World world = make_world();
+    world.player(0)->money = 1234;
+    world.player(1)->money = 99;
+    GoodsWindow w(app::GoodsStyle{}, names(24), 192);
+    w.open();
+    (void)w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    click(w, kTab + static_cast<ui::Form::Id>(GoodsWindow::Tab::Finances));
+    auto items = w.draw(world, assets::BuildingTable{}, kFigures, 0, kNoFonts);
+    CHECK(draws_text(items, ui::tr("stats.fin.treasury")));
+    CHECK(draws_text(items, "1234"));
+    // A spectator reading another player's figures: that player's gold.
+    items = w.draw(world, assets::BuildingTable{}, kFigures, 1, kNoFonts);
+    CHECK(draws_text(items, "99"));
+    CHECK(!draws_text(items, "1234"));
+}

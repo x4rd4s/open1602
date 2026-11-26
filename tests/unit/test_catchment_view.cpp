@@ -202,3 +202,33 @@ TEST_CASE("catchment view: another owner's Kontor with a trade treaty lights the
     own.owner = 0;
     CHECK(l.dimmed(10, 12, &own));  // the player's land stays dark
 }
+
+TEST_CASE("catchment view: a spectator sees every player's circles as their owner does") {
+    const assets::BuildingTable buildings = make_buildings();
+    const sim::World world = make_world(buildings);
+    // Player 1's chapel: lit for player 1's land, and only its own chapel of the type.
+    const auto foreign = app::catchment_circles(world, buildings, sim::kNoPlayer, 0, 20, 2, true);
+    REQUIRE(foreign.has_value());
+    CHECK(foreign->owner == 1);
+    REQUIRE(foreign->circles.size() == 1);
+    CHECK(foreign->circles[0].centre.x == 20);
+    // Player 0's chapel: both of player 0's chapels clicked again.
+    const auto own = app::catchment_circles(world, buildings, sim::kNoPlayer, 0, 10, 2, true);
+    REQUIRE(own.has_value());
+    CHECK(own->owner == 0);
+    CHECK(own->circles.size() == 2);
+    // Still nothing for houses and open ground.
+    CHECK(!app::catchment_circles(world, buildings, sim::kNoPlayer, 0, 25, 2, true).has_value());
+    CHECK(!app::catchment_circles(world, buildings, sim::kNoPlayer, 0, 3, 7, true).has_value());
+    // A player still sees no circle of another player's building.
+    CHECK(!app::catchment_circles(world, buildings, 0, 0, 20, 2, true).has_value());
+    // The owner's land inside the circle lit, another player's dimmed.
+    render::TileLighting l = render::TileLighting::circle(foreign->owner, foreign->circles[0]);
+    sim::MapCell theirs;
+    theirs.sprite = 100;
+    theirs.owner = 1;
+    sim::MapCell other = theirs;
+    other.owner = 0;
+    CHECK(!l.dimmed(20, 2, &theirs));
+    CHECK(l.dimmed(20, 2, &other));
+}
