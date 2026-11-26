@@ -1564,7 +1564,7 @@ void Engine::update_fleet_target(AiPlayer& p) {
         std::int32_t h = 0;
         for (std::size_t q = 0; q < m_world.players().size(); ++q) {
             if (m_world.players()[q].role == PlayerRole::Human) {
-                h = std::max(h, static_cast<std::int32_t>(seen_cannons(p.player, static_cast<PlayerId>(q))));
+                h = std::max(h, static_cast<std::int32_t>(view(p).seen_cannons(static_cast<PlayerId>(q))));
             }
         }
         switch (difficulty()) {
@@ -1581,7 +1581,7 @@ void Engine::update_fleet_target(AiPlayer& p) {
                 break;
         }
         const City* home = home_city(p);
-        const auto own = static_cast<std::int32_t>(seen_cannons(p.player, p.player));
+        const auto own = static_cast<std::int32_t>(view(p).seen_cannons(p.player));
         if (t > 0 && own < h && home != nullptr && home->stock(m_buildings.materials().cannons) > kTon && own / t > 3) {
             t = h / 8;
         }
