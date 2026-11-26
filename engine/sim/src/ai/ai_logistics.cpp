@@ -1206,18 +1206,11 @@ std::uint32_t Engine::supply_ships_for(AiPlayer& p, const City& to, std::uint8_t
     const std::uint64_t rate = used > made ? used - made : 0;  // 1/32 t a minute
     const std::uint64_t load = supply_load(p);
     if (from.owner == p.player) {
-        // Open1602 (t74): what all its cities that could give the ware make beyond their use, not
-        // the nearest one's alone (a second city held 40 t spare while one ship brought 2 t a
-        // minute to a city of 851 without tobacco goods), and a run brings what the source has to
-        // spare, not a full load: the next run takes the next city with goods to spare.
-        std::uint64_t surplus = 0;
-        for (const City& c : m_world.cities()) {
-            if (c.owner == p.player && c.island != to.island && (&c == &from || own_source(p, c, to, w))) {
-                const std::uint32_t there_used = demand(c, w);
-                const std::uint32_t there_made = supply(c, w);
-                surplus += there_made > there_used ? there_made - there_used : 0;
-            }
-        }
+        // Open1602 (t74): a run brings what the source has to spare, not a full load; the next
+        // run takes the next city with goods to spare.
+        const std::uint32_t there_used = demand(from, w);
+        const std::uint32_t there_made = supply(from, w);
+        const std::uint64_t surplus = there_made > there_used ? there_made - there_used : 0;
         const std::uint32_t spare = own_spare(from, w, supply_reserve(w), is_home(p, from));
         return runs_for(std::min(rate, surplus), seconds, spare != 0 ? std::min<std::uint64_t>(load, spare) : load);
     }
