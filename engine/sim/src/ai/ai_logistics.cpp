@@ -743,8 +743,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                                                  std::uint16_t* price, const City* to) {
     // An own city on another island with goods to spare, else the cheapest Kontor
     // of a partner with a trade treaty.
-    const auto& m = m_buildings.materials();
-    const std::uint32_t reserve = (w == m.tools || w == m.bricks || w == m.wood) ? 28 * kTon : 5 * kTon;
+    const std::uint32_t reserve = supply_reserve(w);
     const auto& cities = m_world.cities();
     if (rivals()) {
         // Open1602: an improved computer weighs the way. Its nearest own city with goods to spare,
@@ -766,12 +765,7 @@ std::optional<std::size_t> Engine::supply_source(AiPlayer& p, std::uint16_t home
                 continue;
             }
             if (c.owner == p.player) {
-                // Not from a city that uses more of it than it makes for one that makes more than it
-                // uses, nor from one a ship brings it to: jewellery and clothes went back and forth
-                // between two cities a minute apart, eight runs each way within two hours.
-                const bool takes = supply(c, w) <= demand(c, w) && supply(*home, w) > demand(*home, w);
-                if (!takes && std::ranges::count(routed_wares(p, 0, c), w) == 0 &&
-                    own_spare(c, w, reserve, is_home(p, c)) != 0) {
+                if (own_source(p, c, *home, w)) {
                     const std::uint32_t sec = sail_seconds(p, at, city_point(c));
                     if (!nearest || sec < nearest_s) {
                         nearest = i;
@@ -1172,6 +1166,20 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
     return spare >= booked + kMinSupplyRun ? static_cast<std::uint32_t>(spare - booked) : 0;
 }
 
+std::uint32_t Engine::supply_reserve(std::uint8_t w) const {
+    const auto& m = m_buildings.materials();
+    return (w == m.tools || w == m.bricks || w == m.wood) ? 28 * kTon : 5 * kTon;
+}
+
+bool Engine::own_source(AiPlayer& p, const City& c, const City& to, std::uint8_t w) {
+    // Not from a city that uses more of it than it makes for one that makes more than it uses, nor
+    // from one a ship brings it to: jewellery and clothes went back and forth between two cities a
+    // minute apart, eight runs each way within two hours.
+    const bool takes = supply(c, w) <= demand(c, w) && supply(to, w) > demand(to, w);
+    return !takes && std::ranges::count(routed_wares(p, 0, c), w) == 0 &&
+           own_spare(c, w, supply_reserve(w), is_home(p, c)) != 0;
+}
+
 std::uint32_t Engine::supply_load(AiPlayer& p) {
     // What a supply run brings of one ware: half the holds (a run takes two wares), by the
     // computer's ships on average, at least one hold.
@@ -1195,16 +1203,31 @@ std::uint32_t Engine::supply_ships_for(AiPlayer& p, const City& to, std::uint8_t
     const City& from = m_world.cities()[src];
     const std::uint32_t used = demand(to, w);
     const std::uint32_t made = supply(to, w);
-    std::uint64_t rate = used > made ? used - made : 0;  // 1/32 t a minute
+    const std::uint64_t rate = used > made ? used - made : 0;  // 1/32 t a minute
+    const std::uint64_t load = supply_load(p);
     if (from.owner == p.player) {
-        const std::uint32_t there_used = demand(from, w);
-        const std::uint32_t there_made = supply(from, w);
-        rate = std::min<std::uint64_t>(rate, there_made > there_used ? there_made - there_used : 0);
+        // Open1602 (t74): what all its cities that could give the ware make beyond their use, not
+        // the nearest one's alone (a second city held 40 t spare while one ship brought 2 t a
+        // minute to a city of 851 without tobacco goods), and a run brings what the source has to
+        // spare, not a full load: the next run takes the next city with goods to spare.
+        std::uint64_t surplus = 0;
+        for (const City& c : m_world.cities()) {
+            if (c.owner == p.player && c.island != to.island && (&c == &from || own_source(p, c, to, w))) {
+                const std::uint32_t there_used = demand(c, w);
+                const std::uint32_t there_made = supply(c, w);
+                surplus += there_made > there_used ? there_made - there_used : 0;
+            }
+        }
+        const std::uint32_t spare = own_spare(from, w, supply_reserve(w), is_home(p, from));
+        return runs_for(std::min(rate, surplus), seconds, spare != 0 ? std::min<std::uint64_t>(load, spare) : load);
     }
+    return runs_for(rate, seconds, load);
+}
+
+std::uint32_t Engine::runs_for(std::uint64_t rate, std::uint32_t seconds, std::uint64_t carry) noexcept {
     const std::uint64_t round_s = 2 * std::uint64_t{seconds} + 120;
     const std::uint64_t per_round = rate * round_s / 60;  // stock units over one round trip
-    const std::uint64_t load = supply_load(p);
-    const std::uint64_t runs = (per_round + load - 1) / load;
+    const std::uint64_t runs = (per_round + carry - 1) / std::max<std::uint64_t>(carry, 1);
     return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(runs, 1, kMaxRunsPerWare));
 }
 

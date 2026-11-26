@@ -218,6 +218,17 @@ TEST_CASE("ai colony: a city that grows a crop plants it for another city that h
     CHECK(Engine::home_stocked(false, 50, 40, true));  // the original looks at the home city only
 }
 
+TEST_CASE("ai supply: the runs count what a run brings, not a full load") {
+    // t74: 2 t a minute reached a city of 851 without tobacco goods: one run "was enough" for a
+    // full load, while each brought the 17 to 38 t its source had to spare.
+    constexpr std::uint64_t kT = 32;  // stock units a ton
+    CHECK(Engine::runs_for(300, 428, 160 * kT) == 1);
+    CHECK(Engine::runs_for(300, 428, 40 * kT) == 4);  // 152 t a round trip, 40 t a run
+    CHECK(Engine::runs_for(300, 428, 17 * kT) == 4);  // at most kMaxRunsPerWare
+    CHECK(Engine::runs_for(0, 428, 17 * kT) == 1);    // at least one
+    CHECK(Engine::runs_for(300, 428, 0) >= 1);        // no carry known: no division by zero
+}
+
 TEST_CASE("ai stage: citizens move on with an income, without the gold in store") {
     // f39 o4-707-p0 P1: a poor computer never held the gold and waited 3.6 hours at stage citizens.
     CHECK(Engine::citizens_rise(true, true, false));

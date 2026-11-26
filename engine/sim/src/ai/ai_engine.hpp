@@ -416,6 +416,10 @@ public:
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
     /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
     [[nodiscard]] static std::uint8_t crop_good(std::uint8_t field) noexcept;
+    /// The runs at a time that bring `rate` (1/32 t a minute) over a round trip of twice `seconds`
+    /// and a minute at each end, `carry` a run; at least one, at most kMaxRunsPerWare.
+    [[nodiscard]] static std::uint32_t runs_for(std::uint64_t rate, std::uint32_t seconds,
+                                                std::uint64_t carry) noexcept;
     /// luxury(): whether the home city's store of a good (`stock` against `cap`) holds its fields
     /// back; for an improved computer not while one of its cities is `dry` of it (good_dry).
     [[nodiscard]] static bool home_stocked(bool improved, std::uint32_t stock, std::uint32_t cap, bool dry) noexcept;
@@ -1139,6 +1143,12 @@ private:
     }
     /// Improved computers: what is left to buy of `w` at a partner's city `c` (0 for nothing).
     [[nodiscard]] std::uint32_t partner_spare(AiPlayer& p, const City& c, std::uint8_t w);
+    /// The stock an own city keeps of a ware before it gives any (supply_source).
+    [[nodiscard]] std::uint32_t supply_reserve(std::uint8_t w) const;
+    /// Improved computers: whether its city `c` may give ware `w` to its city `to` (own_spare, and
+    /// neither a city that uses more than it makes for one that makes more, nor one a ship brings
+    /// it to).
+    [[nodiscard]] bool own_source(AiPlayer& p, const City& c, const City& to, std::uint8_t w);
     /// Improved computers: what one supply run brings of a ware, by the computer's ships.
     [[nodiscard]] std::uint32_t supply_load(AiPlayer& p);
     /// Improved computers: how many supply runs bring ware `w` to `to` at a time from city `src`,
