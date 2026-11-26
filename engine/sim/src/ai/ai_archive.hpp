@@ -198,6 +198,9 @@ void io(A& a, CityPlan& r) {
         a(r.move_x);
         a(r.move_y);
     }
+    if (a.version() >= kStateWithFoundedCrop) {
+        a(r.founded_crop);
+    }
 }
 
 template <class A>

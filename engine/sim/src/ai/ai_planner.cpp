@@ -1323,6 +1323,15 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
+    // The crop the city was founded for, until its farm stands or its good is lacking nowhere.
+    if (r.founded_crop != 0) {
+        const std::uint8_t slot = crop_slot(r.founded_crop);
+        const std::uint8_t good = crop_good_of(r.founded_crop);
+        const bool lacking = goods_ahead(p.player, good) != 0 || critical_short(p.player, good) != 0;
+        if (!founded_crop_kept(slot != kNoSlot ? r.slots[slot].count : 1, lacking, good_dry(p, good))) {
+            r.founded_crop = 0;
+        }
+    }
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
     const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
@@ -3210,6 +3219,55 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
+std::uint8_t Engine::crop_slot(std::uint8_t field) noexcept {
+    switch (field) {
+        case ware::kSpiceField:
+            return kSlotSpices;
+        case ware::kTobaccoField:
+            return kSlotTobacco;
+        case ware::kWineField:
+            return kSlotWine;
+        case ware::kCocoaField:
+            return kSlotCocoa;
+        case ware::kCottonField:
+            return kSlotCotton;
+        case ware::kSugarField:
+            return kSlotSugar;
+        default:
+            return kNoSlot;
+    }
+}
+
+std::uint8_t Engine::crop_good_of(std::uint8_t field) noexcept {
+    // The goods luxury() plants each crop for (its table's `good`).
+    switch (field) {
+        case ware::kSpiceField:
+            return ware::kSpices;
+        case ware::kTobaccoField:
+            return ware::kTobaccoGoods;
+        case ware::kWineField:
+        case ware::kSugarField:
+            return ware::kAlcohol;
+        case ware::kCocoaField:
+            return ware::kCocoa;
+        case ware::kCottonField:
+            return ware::kCloth;
+        default:
+            return 0;
+    }
+}
+
+bool Engine::founded_crop_kept(std::uint32_t farms, bool lacking, bool dry) noexcept {
+    // Not while the output is there but does not arrive: a city dry of the good keeps it (p65).
+    return farms == 0 && (lacking || dry);
+}
+
+bool Engine::good_dry(const AiPlayer& p, std::uint8_t good) const {
+    return std::ranges::any_of(m_world.cities(), [&](const City& c) {
+        return c.owner == p.player && demand(c, good) != 0 && c.stock(good) == 0;
+    });
+}
+
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
@@ -3220,9 +3278,18 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         return false;
     }
     std::int64_t budget = net_income(p);
+    // Open1602: an improved computer's colony plants the crop it was founded for (founded_crop)
+    // first, also while the player's income holds every other crop back: the colony was weighed
+    // and paid for this crop at its founding. Its upkeep is still weighed against a hundredth of
+    // the gold, as the gate does above 7000 (t76: the gate held 94 of 327 colonies' crop).
+    const std::uint8_t founded = rivals() ? r->founded_crop : 0;
+    bool founded_only = false;
     if (budget < std::int64_t{p.cities} * 25) {
         if (player(p).money < 7000) {
-            return false;
+            if (founded == 0) {
+                return false;
+            }
+            founded_only = true;
         }
         budget = player(p).money / 100;
     }
@@ -3231,19 +3298,21 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         const assets::BuildingType* b = producer(w, raw);
         return b != nullptr ? b->running_cost : 0;
     };
-    // 1. Iron
-    if (p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
-        static constexpr std::array<std::uint32_t, 4> kMines{1, 2, 2, 3};
-        if (need_iron_mine(p, kMines[std::min<std::uint32_t>(difficulty(), 3)])) {
-            return true;
+    if (!founded_only) {
+        // 1. Iron
+        if (p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
+            static constexpr std::array<std::uint32_t, 4> kMines{1, 2, 2, 3};
+            if (need_iron_mine(p, kMines[std::min<std::uint32_t>(difficulty(), 3)])) {
+                return true;
+            }
         }
-    }
-    // 2. Gold
-    if (p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
-        const auto gold = need_def(slots(), kSlotGoldMine, m_world.balance().computer_producers);
-        const assets::BuildingType* mine = gold ? by_id(gold->fixed) : nullptr;
-        if (mine != nullptr && mine->running_cost < budget && need_gold_mine(p)) {
-            return true;
+        // 2. Gold
+        if (p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
+            const auto gold = need_def(slots(), kSlotGoldMine, m_world.balance().computer_producers);
+            const assets::BuildingType* mine = gold ? by_id(gold->fixed) : nullptr;
+            if (mine != nullptr && mine->running_cost < budget && need_gold_mine(p)) {
+                return true;
+            }
         }
     }
     struct Crop {
@@ -3278,9 +3347,10 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             }
             return goods_ahead(p.player, crop.good) != 0 ? 1 : 2 + stock_lasts(*home, crop.good) / 2;
         });
+        std::ranges::stable_partition(order, [&](const Crop& crop) { return crop.field == founded; });
     }
     for (const Crop& crop : order) {
-        if (!crop.eligible) {
+        if (!crop.eligible || (founded_only && crop.field != founded)) {
             continue;
         }
         bool half = false;  // grows half here, planted for a dry market
@@ -3323,7 +3393,9 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
                 want = std::max(want, std::min(r->slots[crop.slot].count + (lacking + per - 1) / per, n + 2));
             }
         }
-        if (r->slots[crop.slot].count >= want || home->stock(crop.good) >= cap || crop.upkeep >= budget) {
+        // The home city's store does not hold back the crop the colony was founded for.
+        const bool stocked = crop.field != founded && home->stock(crop.good) >= cap;
+        if (r->slots[crop.slot].count >= want || stocked || crop.upkeep >= budget) {
             continue;
         }
         if (need(p, crop.slot, want)) {

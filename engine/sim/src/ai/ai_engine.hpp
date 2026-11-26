@@ -447,6 +447,16 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// The slot of luxury()'s farm for a crop (its field ware), kNoSlot for none.
+    [[nodiscard]] static std::uint8_t crop_slot(std::uint8_t field) noexcept;
+    /// The good luxury() plants a crop (its field ware) for, 0 for none.
+    [[nodiscard]] static std::uint8_t crop_good_of(std::uint8_t field) noexcept;
+    /// Whether a colony keeps planting first the crop it was founded for: none of its `farms`
+    /// stands yet, and its good is lacking (`lacking`, goods_ahead or critical_short) or some own
+    /// city is out of it (`dry`).
+    [[nodiscard]] static bool founded_crop_kept(std::uint32_t farms, bool lacking, bool dry) noexcept;
+    /// Whether some city of the player uses `good` and has none in store.
+    [[nodiscard]] bool good_dry(const AiPlayer& p, std::uint8_t good) const;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;

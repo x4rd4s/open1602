@@ -163,7 +163,8 @@ bool Engine::accepts(const State& state) const {
             return false;
         }
         for (const CityPlan& r : p.plans) {
-            if (r.move_x < -1 || r.move_x > kMaxSpan || r.move_y < -1 || r.move_y > kMaxSpan) {
+            if (r.move_x < -1 || r.move_x > kMaxSpan || r.move_y < -1 || r.move_y > kMaxSpan ||
+                (r.founded_crop != 0 && crop_slot(r.founded_crop) == kNoSlot)) {
                 return false;
             }
         }
@@ -638,6 +639,7 @@ void Engine::init_player(AiPlayer& p) {
                 r.flags = k.flags & city_flag::kAbandon;
                 r.move_x = k.move_x;
                 r.move_y = k.move_y;
+                r.founded_crop = k.founded_crop;
             }
         }
         r.land = free_land(c.island, c.index, &r.land_percent);
@@ -998,6 +1000,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (std::any_of(p.plans.begin(), p.plans.end(), [](const ai::CityPlan& r) { return r.founded_crop != 0; })) {
+            return static_cast<std::uint16_t>(ai::kStateWithFoundedCrop);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.war_party != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithWarParty);

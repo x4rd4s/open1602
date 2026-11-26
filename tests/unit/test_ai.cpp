@@ -3543,3 +3543,66 @@ TEST_CASE("ai: an improved computer goes to war below its gold reserve only on a
         g.military_cost = 20;
     }
 }
+
+TEST_CASE("ai colony: a colony plants first the crop it was founded for, until its farm stands") {
+    // t75: a fifth of the colonies planted their crop first; one founded for tobacco grew wine.
+    CHECK(sim::ai::Engine::crop_slot(assets::ware::kTobaccoField) == sim::ai::kSlotTobacco);
+    CHECK(sim::ai::Engine::crop_slot(assets::ware::kOre) == sim::ai::kNoSlot);
+    CHECK(sim::ai::Engine::crop_good_of(assets::ware::kSugarField) == assets::ware::kAlcohol);
+    CHECK(sim::ai::Engine::founded_crop_kept(0, true, false));
+    CHECK(sim::ai::Engine::founded_crop_kept(0, false, true));    // made, but it does not arrive (p65)
+    CHECK(!sim::ai::Engine::founded_crop_kept(0, false, false));  // lacking nowhere
+    CHECK(!sim::ai::Engine::founded_crop_kept(1, true, true));    // its farm stands
+}
+
+TEST_CASE("ai: the crop a colony was founded for survives a save, and older saves load without") {
+    Game g(false);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ComputerPlayers ai(s);
+    ai.reset();
+    CHECK(ai.state_version() < sim::ai::kStateWithFoundedCrop);
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(ai);
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, ai.state_version());
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    sim::ai::CityPlan r;
+    r.island = 1;
+    r.founded_crop = assets::ware::kTobaccoField;
+    state.players[0].plans.push_back(r);
+    const auto save_as = [&](std::uint32_t version) {
+        annokit::core::ByteWriter out;
+        sim::ai::Saver saver(out, version);
+        saver(state);
+        return out.take();
+    };
+    const std::vector<std::uint8_t> bytes = save_as(sim::ComputerPlayers::max_state_version());
+    annokit::core::ByteReader in(bytes);
+    REQUIRE(ai.load(in, sim::ComputerPlayers::max_state_version()));
+    CHECK(ai.state_version() == sim::ai::kStateWithFoundedCrop);
+    {
+        const std::vector<std::uint8_t> again = saved(ai);
+        annokit::core::ByteReader in2(again);
+        sim::StateIn reader(in2);
+        sim::ai::State copy;
+        sim::ai::Loader loader(reader, sim::ai::kStateWithFoundedCrop);
+        loader(copy);
+        REQUIRE(reader.ok());
+        REQUIRE(!copy.players[0].plans.empty());
+        CHECK(copy.players[0].plans.back().founded_crop == assets::ware::kTobaccoField);
+    }
+    state.players[0].plans.back().founded_crop = assets::ware::kOre;  // not a crop luxury() plants
+    const std::vector<std::uint8_t> bad = save_as(sim::ComputerPlayers::max_state_version());
+    annokit::core::ByteReader in_bad(bad);
+    CHECK(!ai.load(in_bad, sim::ComputerPlayers::max_state_version()));
+    state.players[0].plans.back().founded_crop = 0;
+    const std::vector<std::uint8_t> v17 = save_as(sim::ai::kStateWithWarParty);
+    annokit::core::ByteReader in3(v17);
+    REQUIRE(ai.load(in3, sim::ai::kStateWithWarParty));
+    CHECK(ai.state_version() < sim::ai::kStateWithFoundedCrop);
+}
