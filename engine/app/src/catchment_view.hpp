@@ -23,6 +23,7 @@ struct CatchmentCircles {
     const assets::BuildingType* type = nullptr;  ///< the clicked building's type
     std::vector<sim::Catchment> circles;         ///< the clicked building's own circle first
     std::vector<sim::TilePos> origins;           ///< the buildings' origins, in the order of `circles`
+    sim::PlayerId owner = sim::kNoPlayer;        ///< whose land inside the circles stays lit
 };
 
 /// Whether a building of `type` shows a catchment circle when clicked: production and public
@@ -31,7 +32,9 @@ struct CatchmentCircles {
 
 /// The circles lit for the building of `player` with its origin at (x, y) on `island`: its own, and
 /// with `same_type` those of all the player's other buildings of its type on the island. Nothing
-/// when there is no such building of the player there or it shows no circle.
+/// when there is no such building of the player there or it shows no circle. A spectator
+/// (`player` is kNoPlayer) sees every player's circles as their owner does: those of the clicked
+/// building's owner.
 [[nodiscard]] std::optional<CatchmentCircles> catchment_circles(const sim::World& world,
                                                                 const assets::BuildingTable& buildings,
                                                                 sim::PlayerId player, std::uint16_t island,

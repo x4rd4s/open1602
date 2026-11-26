@@ -198,3 +198,12 @@ TEST_CASE("tile status: ships by their owner, land units by their kind") {
     CHECK(soldier(1) == "Eingeborenenkrieger");  // whatever its figure
     CHECK(app::unit_status(world, ui::UnitRef{ui::UnitRef::Kind::Ship, 999}, *figures, texts).empty());
 }
+
+TEST_CASE("tile status: a spectator reads the buildings of an island nobody has discovered") {
+    Island i;
+    REQUIRE(i.island.map.place(*i.buildings.by_id(20501), 0, 0, 0, 0, 0, 0).ok());  // over the ground
+    i.island.discovered.clear();
+    // A player who has not discovered it sees the terrain only; a spectator what is built there.
+    CHECK(i.at(0).empty());
+    CHECK(app::tile_status(i.island, 0, 0, sim::kNoPlayer, i.buildings, i.texts) == "Weberei");
+}
