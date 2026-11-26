@@ -1183,7 +1183,7 @@ std::uint32_t Engine::partner_spare(AiPlayer& p, const City& c, std::uint8_t w) 
     // it can still take, and a one-way run nothing at a stop it has passed. Counted at the full
     // amount, runs that had loaded and sailed on kept a Kontor's spare booked to the end of their
     // way, and a computer whose luxury ran out found no seller among Kontors that held it.
-    const bool all = sees_all();
+    const bool all = view(p).omniscient_level();
     const Target at = Target::city_of(c.island, c.index);
     std::uint64_t booked = 0;
     for (const Ship& o : m_world.ships()) {
