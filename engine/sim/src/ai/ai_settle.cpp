@@ -75,7 +75,7 @@ bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
         if (c.owner == p.player) {
             return false;
         }
-        if (is_settler(c.owner) && own_city_count(c.owner) <= 2) {
+        if (is_settler(c.owner) && view(p).seen_city_count(c.owner) <= 2) {
             return false;
         }
     }
@@ -118,7 +118,7 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
         if (c.owner == p.player) {
             return false;
         }
-        if (!is_settler(c.owner) || own_city_count(c.owner) > 2) {
+        if (!is_settler(c.owner) || view(p).seen_city_count(c.owner) > 2) {
             continue;
         }
         if (stance_of(p, c.owner) == stance::kPartner || m_world.diplomacy().allied(p.player, c.owner) ||
@@ -376,8 +376,8 @@ PlayerId Engine::blocker(const AiPlayer& p, std::uint16_t island, bool room) con
         // The original's computers keep off the largest islands where another computer has a
         // city, though not where a human has one; improved, a computer's city counts as a human's.
         const bool human = o != nullptr && o->role == PlayerRole::Human;
-        if (!leaves_room(classic() && !human && island_size(island) > 3, contested, own_city_count(c.owner) < 2, room,
-                         has_population(c, 0, 50))) {
+        if (!leaves_room(classic() && !human && island_size(island) > 3, contested,
+                         view(p).seen_city_count(c.owner) < 2, room, has_population(c, 0, 50))) {
             return c.owner;
         }
     }

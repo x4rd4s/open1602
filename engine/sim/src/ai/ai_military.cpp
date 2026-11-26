@@ -338,12 +338,22 @@ std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
     if (viewer == owner || sees_all()) {
         return weighted_army(owner);
     }
-    // A human sees the soldiers on every island it discovered, and nothing of the others.
+    // A human sees the soldiers on every island it knows (discovered, explored or with a city of its
+    // own: knows_island), and nothing of the others.
+    std::vector<bool> known(m_world.islands().size());
+    for (std::size_t i = 0; i < known.size(); ++i) {
+        known[i] = island_of(static_cast<std::uint16_t>(i)).discovered_by(viewer) ||
+                   island_of(static_cast<std::uint16_t>(i)).explored_by(viewer);
+    }
+    for (const City& c : m_world.cities()) {
+        if (c.owner == viewer && c.island < known.size()) {
+            known[c.island] = true;
+        }
+    }
     const auto w = unit_weights();
     std::uint32_t s = 0;
     for (const Soldier& u : m_world.soldiers()) {
-        if (u.owner == owner && !u.away() && u.island < m_world.islands().size() &&
-            island_of(u.island).discovered_by(viewer)) {
+        if (u.owner == owner && !u.away() && u.island < known.size() && known[u.island]) {
             s += w[family_index(m_sim.m_figures, u.figure)];
         }
     }
@@ -3915,11 +3925,10 @@ void Engine::diplomacy(AiPlayer& p) {
         if (d.relation(p.player, b).peace == Treaty::Signed) {
             const Treaty trade = d.relation(p.player, b).trade;
             if (trade == Treaty::None) {
+                // Open1602 (B2): the largest of the partner's cities the computer knows of.
                 std::uint32_t largest = 0;
-                for (const City& c : m_world.cities()) {
-                    if (c.owner == b) {
-                        largest = std::max(largest, population(c));
-                    }
+                for (const City* c : view(p).seen_cities(b)) {
+                    largest = std::max(largest, population(*c));
                 }
                 const std::uint32_t roll = (rng().next() & 63U) + 40U;
                 if (m >= prev && m > -10 && largest > roll) {
