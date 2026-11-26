@@ -37,6 +37,10 @@ From the log, where the arm and the reference have one with main's standard line
 Then rules 1 to 4 of the gate (rules(), cause()): --change is a regular expression that finds the
 change's own log lines, --war-change marks a change that acts on war (its conquests are intended).
 --watch TEXT reports the keys of a set that contain TEXT as a set of their own ("SET watch").
+So that a too narrow --change shows, the report lists the kinds of log line (line_kind) the arm
+writes more than twice as often as the reference, each marked when --change finds it; a kind the
+change brings that --change misses lets rule 3 pass too easily. --change must find only the arm's
+own actions: a line the reference writes too (a Klinik's reserve, say) links collapses falsely.
 Exit code 0, 2 on wrong use.
 """
 from __future__ import annotations
@@ -58,6 +62,8 @@ LANDING = re.compile(r"landing of ship .*against player (\d+)")
 TRACK_GOLD = re.compile(r"^track gold (-?\d+)$")
 TRACK_CITY = re.compile(r"^track city (\d+)/(\d+) people \d+ tax -?\d+ cost -?\d+ goods(.*)$")
 TRACK_MINUTES = 10  # Engine::track's period (kTrackMinutes)
+KIND_WORDS = 8  # words of a line that name its kind (line_kind): enough to tell "city #/#: pulls down ..."
+KINDS_SHOWN = 40  # the most frequent line kinds of the arm the printout lists (all are in --json)
 LOST_FLOOR = 300  # computer 1: only seats with this many inhabitants in either run (f48's rule)
 
 
@@ -96,11 +102,17 @@ def save_offset(key: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def line_kind(rest: str) -> str:
+    """A log line without its numbers and cut to its first words: what kind of line it is."""
+    return " ".join(re.sub(r"-?\d+", "#", rest).split()[:KIND_WORDS])
+
+
 def parse_log(text: str, change: re.Pattern | None = None) -> dict:
     """The log's standard lines; with `change`, also the seconds of each player's lines in which it
     is found (the change's own lines, for rules 3 and 4)."""
     landings = []  # (second, attacker, defender)
     own: dict[int, list[int]] = {}
+    kinds: dict[str, list] = {}  # line kind -> [count, an example]
     foundings = 0
     gold: dict[int, list[tuple[int, int]]] = {}
     dry: dict[tuple[int, int, int, int], list[tuple[int, bool, bool]]] = {}
@@ -109,6 +121,11 @@ def parse_log(text: str, change: re.Pattern | None = None) -> dict:
         if not m:
             continue
         player, second, rest = int(m.group(1)), int(m.group(2)), m.group(3)
+        kind = line_kind(rest)
+        if kind in kinds:
+            kinds[kind][0] += 1
+        else:
+            kinds[kind] = [1, rest]
         if change is not None and change.search(rest):
             own.setdefault(player, []).append(second)
         if rest.startswith("decision found "):
@@ -126,7 +143,7 @@ def parse_log(text: str, change: re.Pattern | None = None) -> dict:
                 dry.setdefault(key, []).append((second, asked > 0 and stock == 0, asked > 0 and used < asked))
         elif a := LANDING.search(rest):
             landings.append((second, player, int(a.group(1))))
-    return {"landings": landings, "foundings": foundings, "gold": gold, "dry": dry, "change": own}
+    return {"landings": landings, "foundings": foundings, "gold": gold, "dry": dry, "change": own, "kinds": kinds}
 
 
 def dry_summary(dry: dict) -> dict:
@@ -277,6 +294,21 @@ def report_set(folder: pathlib.Path, arm: str, ref: str, human: bool, change: re
                 lost += x * 100 < y * COLLAPSE_PERCENT
                 gained += y * 100 < x * COLLAPSE_PERCENT
     out["computer1"] = {"runs": c1, "counted": counted, "lost": lost, "gained": gained}
+    # The kinds of line the arm writes and the reference does not, or twice as often: what --change
+    # should cover, so that a too narrow one shows.
+    if all(A[k]["log"] is not None and B[k]["log"] is not None for k in keys):
+        def kind_counts(runs: dict) -> dict:
+            total: dict[str, list] = {}
+            for k in keys:
+                for kind, (n, example) in runs[k]["log"]["kinds"].items():
+                    total.setdefault(kind, [0, example])[0] += n
+            return total
+        ka, kb = kind_counts(A), kind_counts(B)
+        out["arm_kinds"] = sorted(
+            ({"kind": kind, "arm": n, "ref": kb.get(kind, [0])[0], "example": ex,
+              "change": bool(change is not None and change.search(ex))}
+             for kind, (n, ex) in ka.items() if n > 2 * kb.get(kind, [0])[0]),
+            key=lambda x: -x["arm"])
     has_lines = lambda log: bool(log["foundings"] or log["gold"])  # noqa: E731
     if all(A[k]["log"] is not None and B[k]["log"] is not None for k in keys) and any(
             has_lines(A[k]["log"]) or has_lines(B[k]["log"]) for k in keys):
@@ -316,6 +348,11 @@ def print_report(rep: dict) -> None:
             g = s[f]
             print(f"  {f} {g['sum_arm']} vs {g['sum_ref']} (per run {fmt(g['arm'], 1)} vs {fmt(g['ref'], 1)}, "
                   f"SE {fmt(g['se'], 1)}, {fmt(g['in_se'], 2)} SE)")
+        kinds = s.get("arm_kinds", [])
+        if kinds:
+            print(f"  line kinds only or twice as often in the arm ({len(kinds)}; * = found by --change):")
+            for x in kinds[:KINDS_SHOWN]:
+                print(f"    {'*' if x['change'] else ' '} {x['arm']} vs {x['ref']}: {x['kind']}")
         c1 = s["computer1"]
         print(f"  computer 1: lost {c1['lost']}, gained {c1['gained']} of {c1['counted']}")
         if "log" in s:

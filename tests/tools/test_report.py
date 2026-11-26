@@ -88,6 +88,10 @@ class ReportTest(unittest.TestCase):
         r = report.rules({"x3": linked})
         self.assertTrue(r["1"]["passes"] and r["2"]["passes"] and r["4"]["passes"])
         self.assertEqual(r["3"]["why"], ["x3 g4-1-p0 P2 (change)"])
+        kinds = {x["kind"]: x for x in linked["arm_kinds"]}
+        self.assertEqual(kinds["lever X holds farm"]["arm"], 2)
+        self.assertTrue(kinds["lever X holds farm"]["change"])
+        self.assertIn("track gold #", kinds)
         self.assertTrue(report.rules({"x3": free})["3"]["passes"])
 
     def test_watch_keys_are_their_own_set(self):
