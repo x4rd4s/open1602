@@ -195,11 +195,13 @@ struct TownZone {
 };
 /// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
 [[nodiscard]] bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y);
-/// Open1602 (PB.4): a house site's score with `reserved` of its tiles on the work land of a
-/// producer: divided as zone_excess divides one outside the town zone, and a site that scored
-/// keeps scoring, so a house goes there rather than nowhere.
-[[nodiscard]] constexpr std::int32_t off_work_land(std::int32_t score, std::int32_t reserved) noexcept {
-    return score > 0 && reserved > 0 ? std::max(1, score / (1 + reserved)) : score;
+/// Open1602 (PB.4): a house site's score ordered first by its tiles off a producer's work land
+/// (`area` of them, `reserved` on it) and only then by `score`: each free tile adds `tier`, more than
+/// any score reaches, so a site on work land wins only where every site that scored takes as much.
+/// A site that did not score stays out, as before.
+[[nodiscard]] constexpr std::int32_t work_order(std::int32_t score, std::int32_t reserved, std::int32_t area,
+                                                std::int32_t tier) noexcept {
+    return score > 0 ? score + (area - reserved) * tier : score;
 }
 /// How far the middle of a site lies outside the town zone (negative: inside, by so much).
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,

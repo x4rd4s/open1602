@@ -673,8 +673,8 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
         // their ships saw; saving for a colony whose crop none of their islands grows. Their
         // cities keep the figures of the statistics windows (their overview). One colony decision a
         // step, among the original's motives, with the ship kept for it. Houses kept off the land
-        // their producers work.
-        test::check_golden("arena after an hour", s.state_hash(), 0x548071fb918fc198ULL);
+        // their producers work, fewer tiles on it before the score.
+        test::check_golden("arena after an hour", s.state_hash(), 0x78a7a57dc0d7434dULL);
     }
 }
 

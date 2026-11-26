@@ -3827,11 +3827,14 @@ TEST_CASE("ai: an improved computer keeps its houses off the land its producers 
     CHECK(engine.work_land_under(p, circles, 40, 23, 41, 24) == 2);
     CHECK(engine.work_land_under(p, circles, 40, 26, 41, 27) == 0);
     CHECK(engine.work_land_under(p, {}, 40, 22, 41, 23) == 0);
-    // The score: divided by one more than the tiles taken, as outside the town zone, and a site that
-    // scored still does; nothing changes without work land under it.
-    CHECK(sim::ai::off_work_land(100, 0) == 100);
-    CHECK(sim::ai::off_work_land(100, 3) == 25);
-    CHECK(sim::ai::off_work_land(2, 4) == 1);
-    CHECK(sim::ai::off_work_land(0, 4) == 0);
-    CHECK(sim::ai::off_work_land(-5, 2) == -5);
+    // The order: fewer tiles on work land first, the score second. A site with a far higher score
+    // loses to one off the work land; the only site that scored still wins on it; a site that did
+    // not score stays out.
+    constexpr std::int32_t tier = 1 << 17;
+    CHECK(sim::ai::work_order(5'000, 1, 4, tier) < sim::ai::work_order(10, 0, 4, tier));
+    CHECK(sim::ai::work_order(5'000, 2, 4, tier) < sim::ai::work_order(10, 1, 4, tier));
+    CHECK(sim::ai::work_order(10, 2, 4, tier) < sim::ai::work_order(20, 2, 4, tier));
+    CHECK(sim::ai::work_order(5'000, 4, 4, tier) == 5'000);
+    CHECK(sim::ai::work_order(0, 0, 4, tier) == 0);
+    CHECK(sim::ai::work_order(-5, 0, 4, tier) == -5);
 }

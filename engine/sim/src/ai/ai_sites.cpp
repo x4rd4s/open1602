@@ -44,6 +44,9 @@ constexpr std::int32_t kZoneFirstHouses = 12;
 /// Open1602: added to the score of a site on the right side of the town zone, so that any such site
 /// wins over any on the wrong side, which is taken only where none is left.
 constexpr std::int32_t kZoneTier = 1 << 16;
+/// Open1602 (PB.4): added to a house site's score for each of its tiles off the work land, above a
+/// score with its zone tier, so that fewer tiles on work land win before the score.
+constexpr std::int32_t kWorkTier = 2 * kZoneTier;
 /// Open1602: tiles inside the town zone's edge a workshop may stand without taking house land.
 constexpr std::int32_t kZoneWorkshopDepth = 4;
 /// Open1602: rings between a market in the town zone and the city's other markets and its Kontor.
@@ -725,7 +728,9 @@ bool Engine::search_houses(AiPlayer& p) {
                 const std::int32_t out = zone_excess(*zone, c.x0, c.y0, c.x1, c.y1);
                 score = out <= 0 ? score + kZoneTier - 4 * (out + zone->radius) : std::max(1, score / (1 + out));
             }
-            score = off_work_land(score, work_land_under(p, work, c.x0, c.y0, c.x1, c.y1));
+            if (!classic()) {
+                score = work_order(score, work_land_under(p, work, c.x0, c.y0, c.x1, c.y1), c.w() * c.h(), kWorkTier);
+            }
             tally_site(p, true, acc.market, score);
             if (acc.market && score > s.best) {
                 s.best = score;
