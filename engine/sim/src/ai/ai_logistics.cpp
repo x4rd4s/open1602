@@ -450,6 +450,14 @@ void Engine::scout(AiPlayer& p) {
     log(p, "scouting island %u with ship %u", target, ship->id);
 }
 
+bool Engine::repair_may_start(bool improved, bool stalled, bool in_yard) noexcept {
+    return !improved || !stalled || in_yard;
+}
+
+bool Engine::yard_builds(bool improved, bool order, bool repairing, bool calling) noexcept {
+    return !improved || !order || repairing || !calling;
+}
+
 bool Engine::yard_service(AiPlayer& p) {
     // One ship at a time into the yard for repair.
     const Tile t = tile(p.yard_island, p.yard_x, p.yard_y);
@@ -492,10 +500,18 @@ bool Engine::yard_service(AiPlayer& p) {
         release.on = false;
         release.ship = yard->repair_ship;
         execute(release);
-        log(p, "ship %u: no material at the yard, repair stopped", release.ship);
+        const Ship* stopped = m_world.ship(release.ship);
+        log(p, "ship %u: no material at the yard, repair stopped (health %u of 128)", release.ship,
+            stopped != nullptr ? health128(*stopped) : 0U);
         return false;
     }
-    if (!repairs) {
+    // After such a stall a repair starts only once the yard itself holds the material: with the
+    // Kontor's stock alone a called ship started and was released again ten seconds later, when
+    // that stock went elsewhere (f43, eight empty calls).
+    const auto in_yard = [&] {
+        return (t.type->raw_ware == 0 || yard->wood != 0) && (t.type->raw2_ware == 0 || yard->cloth != 0);
+    };
+    if (!repairs || !repair_may_start(rivals(), yard->idle_cycles >= kYardStalled, in_yard())) {
         return false;
     }
     for (Ship* s : own_ships(p)) {
@@ -511,7 +527,9 @@ bool Engine::yard_service(AiPlayer& p) {
             order.y = p.yard_y;
             order.op = ShipyardOrder::Op::Repair;
             order.ship = s->id;
-            execute(order);
+            if (execute(order).accepted && rivals()) {
+                log(p, "ship %u: repair at the yard (health %u of 128)", s->id, health128(*s));
+            }
             return false;
         }
         if (City* home = home_city(p)) {
@@ -535,6 +553,24 @@ bool Engine::yard_service(AiPlayer& p) {
                 weakest = s;
             }
         }
+    }
+    // Open1602 (P1): an improved computer pauses the ship its yard builds while it calls a damaged
+    // ship in, as a player switches the yard off, so that the build does not use up the wood the
+    // repair needs; the repair switches the yard on again, and so does the next look without one.
+    // On main a yard stopped its repairs for want of wood 57 times in 72 runs (gate f41), with a
+    // ship order pending in 20 of them.
+    if (const bool builds =
+            yard_builds(rivals(), yard->order != CostBuilding::kNoOrder, yard->repair_ship != 0, weakest != nullptr);
+        rivals() && yard->order != CostBuilding::kNoOrder && yard->repair_ship == 0 && yard->enabled != builds) {
+        ShipyardOrder pause;
+        pause.player = p.player;
+        pause.island = p.yard_island;
+        pause.x = p.yard_x;
+        pause.y = p.yard_y;
+        pause.op = ShipyardOrder::Op::Enable;
+        pause.on = builds;
+        execute(pause);
+        log(p, "yard on island %u: %s its ship", p.yard_island, builds ? "goes on with" : "pauses");
     }
     if (weakest != nullptr) {
         ShipOrder order;

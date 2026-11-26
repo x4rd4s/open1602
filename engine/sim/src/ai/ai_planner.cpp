@@ -12,6 +12,7 @@
 #include "ai_tables.hpp"
 
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/disasters.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 
@@ -93,6 +94,42 @@ bool Engine::peaceful(AiPlayer& p) {
     return true;
 }
 
+void Engine::log_disasters(const AiPlayer& p, const City& c) {
+    // Only the log: the fires and plagues burning in the city, and its inhabitants, whenever their
+    // number changes, so that a measurement can count what they cost.
+    if (!rivals() || !logging()) {
+        return;
+    }
+    std::uint32_t fires = 0;
+    std::uint32_t plagues = 0;
+    const IslandMap& map = island_of(c.island).map;
+    for (const Disaster& d : m_world.disasters()) {
+        if (d.island == c.island && map.contains(d.x, d.y) && map.top(d.x, d.y).city == c.index) {
+            (d.kind == Disaster::Kind::Fire ? fires : plagues) += 1;
+        }
+    }
+    auto it = std::ranges::find_if(m_disaster_logged,
+                                   [&](const DisasterLog& d) { return d.island == c.island && d.city == c.index; });
+    if (it == m_disaster_logged.end()) {
+        if (fires == 0 && plagues == 0) {
+            return;
+        }
+        m_disaster_logged.push_back(DisasterLog{c.island, c.index, 0, 0});
+        it = std::prev(m_disaster_logged.end());
+    }
+    if (it->fires != fires || it->plagues != plagues) {
+        it->fires = fires;
+        it->plagues = plagues;
+        // With the fire brigades (Brunnen) and doctors (Klinik) its plan counts.
+        const auto plan =
+            std::ranges::find_if(p.plans, [&](const CityPlan& r) { return r.island == c.island && r.city == c.index; });
+        const std::uint32_t brigades = plan != p.plans.end() ? plan->slots[kSlotBrunnen].count : 0U;
+        const std::uint32_t doctors = plan != p.plans.end() ? plan->slots[kSlotKlinik].count : 0U;
+        log(p, "city %u/%u: disasters: %u fires, %u plagues (inhabitants %llu, fire brigades %u, doctors %u)", c.island,
+            c.index, fires, plagues, static_cast<unsigned long long>(population(c)), brigades, doctors);
+    }
+}
+
 void Engine::refresh_city(AiPlayer& p) {
     City* c = current_city(p);
     CityPlan* r = current_plan(p);
@@ -104,6 +141,8 @@ void Engine::refresh_city(AiPlayer& p) {
         shed_public(p, *c);
         tax_rates(p, *c);
         material_lock(p, *c);
+        log_disasters(p, *c);
+        doctor_gaps(p, *c, *r);
     }
     p.refresh_ms = now_ms();
     // The original's steady money and subsidy (cheats), on every difficulty; improved computers
@@ -3037,6 +3076,41 @@ bool Engine::need_castle(AiPlayer& p) {
     return true;
 }
 
+bool Engine::checks_coverage(bool improved, std::uint8_t which, bool cov) noexcept {
+    return cov || which == kSlotKapelle || which == kSlotGalgen || which == kSlotBrunnen ||
+           (improved && which == kSlotKlinik);
+}
+
+bool Engine::doctor_gap(std::int32_t lacking, std::int32_t min_houses) noexcept {
+    return lacking > 0 && lacking >= min_houses;
+}
+
+bool Engine::lacks_doctor(const House& h, const City& c) noexcept {
+    return h.island == c.island && h.city == c.index && plague_prone(h) && (h.services & house_service::kKlinik) == 0;
+}
+
+void Engine::doctor_gaps(AiPlayer& p, const City& c, CityPlan& r) {
+    // Open1602 (p48): the original opens the doctor again only for a new house built without one;
+    // houses that never had one, or lost it, kept the city "covered" for good, and 92 % of the
+    // plague losses fell in cities with one doctor that never got the next. An improved computer
+    // looks at its houses the plague can break out in, as a player sees the gap on the map.
+    if (!rivals() || (r.flags & city_flag::kKlinik) == 0) {
+        return;
+    }
+    // Only once as many houses lack one as a doctor's site must newly cover (min_houses, p49): a
+    // gap of a few houses had the search fail again and again.
+    const ComputerSlot* def = computer_slot(slots(), kSlotKlinik);
+    if (def == nullptr) {
+        return;
+    }
+    const auto lacking = static_cast<std::int32_t>(
+        std::ranges::count_if(m_world.houses(), [&](const House& h) { return lacks_doctor(h, c); }));
+    if (doctor_gap(lacking, def->min_houses)) {
+        r.flags &= ~city_flag::kKlinik;
+        log(p, "city %u/%u: %d houses have no doctor", c.island, c.index, lacking);
+    }
+}
+
 bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     // A public building while fewer than n stand or houses lack it.
     City* c = current_city(p);
@@ -3049,10 +3123,10 @@ bool Engine::need_public(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool 
     if (def == nullptr || def->kind != ComputerSlot::Kind::Public) {
         return false;
     }
-    // The Kapelle always checks its flag; gallows and fountains ignore `cov`.
-    if (which == kSlotKapelle || which == kSlotGalgen || which == kSlotBrunnen) {
-        cov = true;
-    }
+    // The Kapelle always checks its flag; gallows and fountains ignore `cov`. Open1602 (p48): an
+    // improved computer builds its doctors where houses lack one too, as it does chapels, whatever
+    // its gold: affordable() weighs the cost and the running cost against its budget.
+    cov = checks_coverage(rivals(), which, cov);
     if (!cov) {
         r->flags |= def->flag;  // count only
     }
