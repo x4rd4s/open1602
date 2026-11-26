@@ -197,7 +197,8 @@ def cause(slide: dict, has_change: bool, war_change: bool) -> str:
     """What an extra collapse is put down to by rules 3 and 4.
 
     change            the change's own lines of that player lie in its slide window: the change acts
-                      for it (counts);
+                      for it (counts); a window hit, not yet a cause: read the window (did the
+                      change's action matter for the fall?) before the verdict;
     intended conquest the same, with landings in the window, for a change that acts on war
                       (Merlin's rule of 2026-11-18: reported as intended, not counted under rules 2-4);
     conquest          landings by or against the player in the window and no line of the change;
