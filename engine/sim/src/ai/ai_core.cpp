@@ -89,9 +89,16 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
                           std::int32_t city, const Commitment& c, std::uint32_t amount) const {
     // The fields a later step pairs with what came of the decision (P0.3): when, who, where, what
     // it was weighed with.
-    log(p, "decision %s cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u amount %u", kind,
-        candidate, island, city, static_cast<long long>(c.cost), static_cast<long long>(c.upkeep),
-        static_cast<long long>(c.value), c.delay, m_world.balance().ai_budget_horizon_minutes, amount);
+    if (!logging()) {
+        return;
+    }
+    const std::uint64_t ms = now_ms();
+    m_decision_seq = ms == m_decision_ms ? m_decision_seq + 1 : 0;
+    m_decision_ms = ms;
+    log(p, "decision %s id %llu.%u cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u amount %u",
+        kind, static_cast<unsigned long long>(ms), m_decision_seq, candidate, island, city,
+        static_cast<long long>(c.cost), static_cast<long long>(c.upkeep), static_cast<long long>(c.value), c.delay,
+        m_world.balance().ai_budget_horizon_minutes, amount);
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
