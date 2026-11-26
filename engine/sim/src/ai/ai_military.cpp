@@ -251,7 +251,8 @@ std::uint32_t Engine::army_target(const AiPlayer& p, bool whole) const {
             continue;
         }
         const auto human = static_cast<PlayerId>(h);
-        std::uint32_t s = seen_army(whole ? human : p.player, human);
+        // `whole` (the human's own view of itself) is the log's census comparison only.
+        std::uint32_t s = whole ? seen_army(human, human) : view(p).seen_army(human);
         s += s / 2;
         best = std::max(best, s);
     }
@@ -309,7 +310,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
             m_world.behaviour(pl) != FactionBehaviour::Settlers) {
             continue;
         }
-        rival = std::max(rival, seen_army(whole ? other : p.player, other));
+        rival = std::max(rival, whole ? seen_army(other, other) : view(p).seen_army(other));  // whole: log only
     }
     const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);
@@ -322,10 +323,11 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     return std::max(own, rival);
 }
 
-bool Engine::stronger(PlayerId a, PlayerId b) const {
+bool Engine::stronger(const AiPlayer& p, PlayerId b) const {
     // The original compares the armies and the cannons of the fleets. The original takes b's fleet
     // on both sides, so only the armies count (S-102).
-    return strength(a, a) >= strength(a, b);
+    const View v = view(p);
+    return v.strength(p.player) >= v.strength(b);
 }
 
 bool Engine::sees_all() const {
@@ -2928,7 +2930,7 @@ void Engine::target_scan(AiPlayer& p) {
             if (p.cities > 2 && own->inhabitants.size() > 0 && own->inhabitants[0] < 4) {
                 return;
             }
-            if (market_count(t) < 2 && building_count(t) < 3 && soldiers_on_island(t.owner, t.island) == 0) {
+            if (market_count(t) < 2 && building_count(t) < 3 && view(p).seen_soldiers_on(t.owner, t.island) == 0) {
                 raid_outpost(p, t);
                 return;
             }
@@ -2965,7 +2967,7 @@ std::vector<PlayerId> Engine::island_enemies(const AiPlayer& a, std::uint16_t is
             m_world.diplomacy().relation(a.player, pb).peace == Treaty::Signed) {
             continue;
         }
-        bool present = soldiers_on_island(pb, island) != 0;
+        bool present = view(a).seen_soldiers_on(pb, island) != 0;
         for (const City& c : m_world.cities()) {
             present = present || (c.owner == pb && c.island == island);
         }
@@ -3869,7 +3871,7 @@ void Engine::diplomacy(AiPlayer& p) {
             case Treaty::Offered:
             case Treaty::Signed:
                 if (m < -90 || prev - m > 60) {
-                    if (stronger(p.player, b)) {
+                    if (stronger(p, b)) {
                         log(p, "declares war on player %u (mood %d)", b, m);
                         order(DiplomacyOrder::Kind::Peace, Treaty::None);
                         subsidy(p, 3);

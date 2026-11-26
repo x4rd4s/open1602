@@ -109,7 +109,7 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     if (crop == 0 || crop != goal_crop(p) || !knows_crops(p, island) || !view(p).free_deposit(island, crop)) {
         return false;
     }
-    const std::uint32_t own = strength(p.player, p.player);
+    const std::uint32_t own = view(p).strength(p.player);
     bool contested = false;
     for (const City& c : m_world.cities()) {
         if (c.island != island) {
@@ -122,7 +122,7 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
             continue;
         }
         if (stance_of(p, c.owner) == stance::kPartner || m_world.diplomacy().allied(p.player, c.owner) ||
-            threat_of(p.player, c.owner) > own) {
+            view(p).threat(c.owner) > own) {
             return false;
         }
         contested = true;

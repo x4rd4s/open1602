@@ -3636,6 +3636,41 @@ TEST_CASE("ai view: what an island grows and its free veins only once its crops 
     CHECK(!v.free_deposit(99, assets::ware::kGold));
 }
 
+TEST_CASE("ai view: another player's soldiers count only on an island the viewer discovered") {
+    // Below the hardest level a computer sees the soldiers ashore on islands it discovered, not those
+    // elsewhere (P1.5); the hardest level and the owner itself see all of them.
+    for (const std::uint8_t difficulty : {std::uint8_t{2}, std::uint8_t{3}}) {
+        Game g;
+        sim::World::GameSettings settings = g.world.game_settings();
+        settings.difficulty = difficulty;
+        g.world.set_game_settings(settings);
+        g.world.add_soldier(
+            sim::make_soldier(40, 30, static_cast<std::uint16_t>(assets::FigureTable::kUnitFamilies[0]), kHuman, 1));
+        g.world.add_soldier(
+            sim::make_soldier(41, 30, static_cast<std::uint16_t>(assets::FigureTable::kUnitFamilies[0]), kHuman, 1));
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        sim::ai::AiPlayer h;
+        h.player = kHuman;
+        const sim::ai::View v = engine.view(p);
+        const sim::ai::View self = engine.view(h);
+        const bool hardest = difficulty == 3;
+        REQUIRE(!g.world.islands()[1].discovered_by(kComputer));
+        CHECK(v.omniscient_level() == hardest);
+        CHECK(self.seen_soldiers_on(kHuman, 1) == 2);
+        CHECK(v.seen_soldiers_on(kHuman, 1) == (hardest ? 2U : 0U));
+        CHECK(v.seen_army(kHuman) == (hardest ? self.seen_army(kHuman) : 0U));
+        CHECK(v.strength(kHuman) <= self.strength(kHuman));
+        g.world.island(1).discover(kComputer);
+        CHECK(v.seen_soldiers_on(kHuman, 1) == 2);
+        CHECK(v.seen_army(kHuman) == self.seen_army(kHuman));
+        CHECK(v.seen_soldiers_on(kHuman, 99) == 0);
+    }
+}
+
 TEST_CASE("ai view: a partner's Kontor offer only while known, and the hardest level is the one that sees all") {
     constexpr std::uint8_t kWare = assets::ware::kCloth;
     constexpr std::uint32_t kTon = 32;

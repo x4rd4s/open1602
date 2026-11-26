@@ -1224,8 +1224,8 @@ private:
     /// Open1602 (feedback 16, K5): the soldiers the war lacks for its next city (Strategy::war_party)
     /// while that city still stands and is the target's; 0 otherwise.
     [[nodiscard]] std::uint32_t war_party_lacking(const AiPlayer& p) const;
-    /// Whether a sees b at least as strong as itself: strength(a, a) against strength(a, b).
-    [[nodiscard]] bool stronger(PlayerId a, PlayerId b) const;
+    /// Whether p sees b at least as strong as itself: View::strength of both.
+    [[nodiscard]] bool stronger(const AiPlayer& p, PlayerId b) const;
     /// The original's computers and an improved one on the hardest level count every unit of
     /// another player; an improved one on the other levels only what a human in its place sees.
     [[nodiscard]] bool sees_all() const;
