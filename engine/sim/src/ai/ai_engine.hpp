@@ -46,6 +46,8 @@
 
 namespace o1602::sim::ai {
 
+class View;
+
 // The ware, Kind and production numbers and the building Ids the AI refers to are in
 // o1602/sim/game_data.hpp.
 
@@ -253,6 +255,8 @@ private:
 class Engine {
 public:
     Engine(Simulation& sim, State& state);
+    /// The world as `p`'s seat sees it (ai_view.hpp).
+    [[nodiscard]] View view(const AiPlayer& p) const;
 
     // ai_core.cpp
     void tick(std::uint32_t dt_ms);
@@ -498,6 +502,8 @@ public:
     /// Open1602 (F4): whether units released from `p`'s castle `e` on `island` can walk from the
     /// cell they step out on to the city's Kontor (true too where the check does not apply).
     [[nodiscard]] bool way_out(const AiPlayer& p, std::uint16_t island, const CastleEntry& e) const;
+
+    friend class View;
 
 private:
     // ---- ai_core.cpp ----
