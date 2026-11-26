@@ -724,7 +724,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
             continue;
         }
         for (const City& c : m_world.cities()) {
-            if (c.owner == b && grows(c.island, field) && knows_crops(p, c.island)) {
+            if (c.owner == b && view(p).grows(c.island, field) && knows_crops(p, c.island)) {
                 return true;
             }
         }

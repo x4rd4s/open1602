@@ -41,6 +41,15 @@ public:
     [[nodiscard]] bool knows_crops(std::uint16_t island) const;
     /// An island's fertility for a crop or resource (0, 64 or 128), once the viewer knows its crops.
     [[nodiscard]] std::optional<std::uint32_t> fertility(std::uint16_t island, std::uint8_t ware) const;
+    /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein. False
+    /// for an island whose crops the viewer does not know.
+    [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
+    /// Crops of an island that grow fully among spices, tobacco, wine, cotton, cocoa, sugar; 0 for
+    /// an island whose crops the viewer does not know.
+    [[nodiscard]] std::uint32_t full_crops(std::uint16_t island) const;
+    /// A vein of the ware (ore, gold) on the island outside every city's land, on an island whose
+    /// crops (and so veins) the viewer knows.
+    [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t ware) const;
     /// An island's size class: its outline is on every player's map from the start (the minimap
     /// draws an undiscovered island's ground), so it is not gated.
     [[nodiscard]] std::uint32_t island_size(std::uint16_t island) const;

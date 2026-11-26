@@ -595,10 +595,6 @@ private:
     /// First producer of `ware` from `raw`: the table the original builds at AI_Init.
     [[nodiscard]] const assets::BuildingType* producer(std::uint8_t ware, std::uint8_t raw) const;
     [[nodiscard]] const assets::BuildingType* by_id(std::uint32_t id) const { return m_buildings.by_id(id); }
-    /// Fertility of an island for a crop or resource: 0, 64 or 128.
-    [[nodiscard]] std::uint32_t fertility(std::uint16_t island, std::uint8_t ware) const;
-    /// Crops of an island that grow fully among spices, tobacco, wine, cotton, cocoa, sugar.
-    [[nodiscard]] std::uint32_t full_crops(std::uint16_t island) const;
     [[nodiscard]] std::uint8_t difficulty() const { return m_world.game_settings().difficulty; }
     [[nodiscard]] std::uint64_t now_ms() const { return m_world.time_ms(); }
     [[nodiscard]] Random& rng() { return m_world.random(RandomStream::Ai); }
@@ -663,8 +659,6 @@ private:
     [[nodiscard]] bool island_allowed(const AiPlayer& p, std::uint16_t island) const;
     /// Improved computers: an island of a small, weaker rival that has what the colony looks for.
     [[nodiscard]] bool island_contested(const AiPlayer& p, std::uint16_t island) const;
-    /// A vein of the ware (ore, gold) on the island outside every city's land.
-    [[nodiscard]] bool free_deposit(std::uint16_t island, std::uint8_t w) const;
     /// Improved computers with a city: an island below the colonies' size class that carries a free
     /// gold vein the computer knows of; such an island is settled for its gold.
     [[nodiscard]] bool gold_islet(const AiPlayer& p, std::uint16_t island) const;
@@ -715,8 +709,6 @@ private:
     [[nodiscard]] std::uint8_t choose_colony_crop(AiPlayer& p);
     /// Improved computers: whether city `c`'s farm for `crop` found no site after repeated tries.
     [[nodiscard]] bool crop_blocked(const AiPlayer& p, const City& c, std::uint8_t crop) const;
-    /// Whether the island grows `crop`: a full field (128), or for ore a big or small vein.
-    [[nodiscard]] bool grows(std::uint16_t island, std::uint8_t crop) const;
     /// Improved computers: an island it knows grows the crop fully and has no city yet, so a
     /// colony for the crop has room there, and its budget would found that colony now.
     [[nodiscard]] bool fertile_island_open(const AiPlayer& p, std::uint8_t crop) const;

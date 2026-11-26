@@ -3607,6 +3607,35 @@ TEST_CASE("ai view: an island's crops once explored, its outline always") {
     CHECK(!v.fertility(99, assets::ware::kSpiceField).has_value());
 }
 
+TEST_CASE("ai view: what an island grows and its free veins only once its crops are known") {
+    Game g;
+    assets::IslandHeader::Deposit vein;
+    vein.ware = assets::ware::kGold;
+    vein.x = 20;
+    vein.y = 20;
+    vein.amount = 100;
+    g.world.island(1).header.deposits.push_back(vein);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::ai::View v = engine.view(p);
+    g.world.island(1).discover(kComputer);  // seen, not explored: the crops are still unknown
+    CHECK(!v.grows(1, assets::ware::kSpiceField));
+    CHECK(!v.grows(1, assets::ware::kGold));
+    CHECK(v.full_crops(1) == 0);
+    CHECK(!v.free_deposit(1, assets::ware::kGold));
+    g.world.island(1).explore(kComputer);
+    CHECK(v.grows(1, assets::ware::kSpiceField));
+    CHECK(v.grows(1, assets::ware::kGold));  // a big vein
+    CHECK(!v.grows(1, assets::ware::kOre));  // no ore vein
+    CHECK(v.full_crops(1) == 6);             // every crop grows there fully
+    CHECK(v.free_deposit(1, assets::ware::kGold));
+    CHECK(!v.free_deposit(1, assets::ware::kOre));
+    CHECK(!v.free_deposit(99, assets::ware::kGold));
+}
+
 TEST_CASE("ai view: a partner's Kontor offer only while known, and the hardest level is the one that sees all") {
     constexpr std::uint8_t kWare = assets::ware::kCloth;
     constexpr std::uint32_t kTon = 32;

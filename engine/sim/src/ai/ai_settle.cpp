@@ -82,22 +82,12 @@ bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
     return true;
 }
 
-bool Engine::free_deposit(std::uint16_t island, std::uint8_t w) const {
-    // A vein of ore or gold left on the island that no city's land covers yet.
-    for (const auto& d : island_of(island).header.deposits) {
-        if (d.ware == w && d.amount > 0 && tile(island, d.x, d.y).city == MapCell::kNoCity) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool Engine::gold_islet(const AiPlayer& p, std::uint16_t island) const {
     // Open1602 (Merlin, 2026-11-26): the search leaves islands below colony_size_class alone, and
     // with them the gold that often lies there; an improved computer that has a city takes such an
     // island for a colony when it knows of a free gold vein on it.
     return islet_for_gold(!classic(), p.pirates, p.cities, island_size(island),
-                          knows_crops(p, island) && free_deposit(island, ware::kGold));
+                          knows_crops(p, island) && view(p).free_deposit(island, ware::kGold));
 }
 
 std::uint32_t Engine::colony_size_class(std::uint32_t cities) noexcept {
@@ -116,7 +106,7 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     // goal looks for. Not next to a partner or an ally, not next to a rival stronger than itself,
     // and never on an island with a city of its own.
     const std::uint8_t crop = p.settle.crop;
-    if (crop == 0 || crop != goal_crop(p) || !knows_crops(p, island) || !free_deposit(island, crop)) {
+    if (crop == 0 || crop != goal_crop(p) || !knows_crops(p, island) || !view(p).free_deposit(island, crop)) {
         return false;
     }
     const std::uint32_t own = strength(p.player, p.player);
@@ -264,11 +254,12 @@ void Engine::pick_island(AiPlayer& p) {
         }
         // A colony for the goal's ore takes a small vein too (as crop_available counts it), if it is
         // free; the rest grows fully.
-        if (s.crop != 0 && (!knows_crops(p, i) || (for_goal && s.crop == ware::kOre ? fertility(i, s.crop) < 64
-                                                                                    : fertility(i, s.crop) != 128))) {
+        if (s.crop != 0 && (!knows_crops(p, i) ||
+                            (for_goal && s.crop == ware::kOre ? view(p).fertility(i, s.crop).value_or(0) < 64
+                                                              : view(p).fertility(i, s.crop).value_or(0) != 128))) {
             continue;
         }
-        if (for_goal && !free_deposit(i, s.crop)) {
+        if (for_goal && !view(p).free_deposit(i, s.crop)) {
             continue;  // every vein lies in someone's land already
         }
         const bool islet = gold_islet(p, i);
@@ -1186,11 +1177,6 @@ void Engine::unload_at(City& c, Ship& ship, bool keep_basics, bool destroy) {
 // ---------------------------------------------------------------------------------------------
 // Later colonies
 
-bool Engine::grows(std::uint16_t island, std::uint8_t crop) const {
-    const std::uint32_t f = fertility(island, crop);
-    return crop == ware::kOre ? f >= 64 : f == 128;
-}
-
 bool Engine::fertile_island_open(const AiPlayer& p, std::uint8_t crop) const {
     // Open1602 (Merlin, 2026-11-23): a player founds a colony where the crop grows fully before he
     // plants it on half-fertile land: an island it knows grows the crop fully and no city stands
@@ -1213,7 +1199,7 @@ bool Engine::fertile_island_free(const AiPlayer& p, std::uint8_t crop) const {
     // An island the player knows grows the crop fully, and no city stands there yet.
     for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
         const auto island = static_cast<std::uint16_t>(i);
-        if (!grows(island, crop) || !knows_crops(p, island)) {
+        if (!view(p).grows(island, crop) || !knows_crops(p, island)) {
             continue;
         }
         if (std::ranges::none_of(m_world.cities(), [&](const City& c) { return c.island == island; })) {
@@ -1232,7 +1218,7 @@ bool Engine::crop_available(const AiPlayer& p, std::uint8_t crop) const {
         if (o == nullptr || o->role != PlayerRole::Computer || (rivals() && c.owner != p.player)) {
             continue;
         }
-        if (grows(c.island, crop) && !(rivals() && crop_blocked(p, c, crop))) {
+        if (view(p).grows(c.island, crop) && !(rivals() && crop_blocked(p, c, crop))) {
             return true;
         }
     }
@@ -1432,7 +1418,7 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
     std::uint32_t nearest = 0;
     for (std::size_t i = 0; i < m_world.islands().size(); ++i) {
         const auto at_island = static_cast<std::uint16_t>(i);
-        if (crop != 0 && crop != kAnyCrop && !grows(at_island, crop)) {
+        if (crop != 0 && crop != kAnyCrop && !view(p).grows(at_island, crop)) {
             continue;
         }
         if (!knows_crops(p, at_island) || !island_allowed(p, at_island) ||

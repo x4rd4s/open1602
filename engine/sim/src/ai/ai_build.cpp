@@ -11,6 +11,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/houses.hpp"
@@ -1564,7 +1565,7 @@ void Engine::task_survey(AiPlayer& p) {
         p.castle_island.reset();
     }
     const IslandMap& map = island_of(p.island).map;
-    const bool cotton_island = fertility(p.island, ware::kCottonField) == 128;
+    const bool cotton_island = view(p).fertility(p.island, ware::kCottonField).value_or(0) == 128;
     const assets::BuildingType* weberei = by_id(id::kWeberei);
     const bool weberei_ok = weberei != nullptr && unlocked(p, *weberei);
     SurveyFinds finds;

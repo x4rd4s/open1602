@@ -7,6 +7,8 @@
 
 #include <algorithm>
 
+#include "o1602/sim/growth.hpp"
+
 namespace o1602::sim::ai {
 
 View Engine::view(const AiPlayer& p) const {
@@ -55,7 +57,34 @@ std::optional<std::uint32_t> View::fertility(std::uint16_t island, std::uint8_t 
     if (island >= m_engine.m_world.islands().size() || !knows_crops(island)) {
         return std::nullopt;
     }
-    return m_engine.fertility(island, ware);
+    return island_fertility(m_engine.m_world, m_engine.m_world.islands()[island], ware);
+}
+
+bool View::grows(std::uint16_t island, std::uint8_t crop) const {
+    const std::uint32_t f = fertility(island, crop).value_or(0);
+    return crop == ware::kOre ? f >= 64 : f == 128;
+}
+
+std::uint32_t View::full_crops(std::uint16_t island) const {
+    // Open1602 TODO(PM): a fixed list of the six luxury field wares, not the goods table.
+    std::uint32_t n = 0;
+    for (const std::uint8_t w : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCottonField,
+                                 ware::kCocoaField, ware::kSugarField}) {
+        n += fertility(island, w).value_or(0) == 128 ? 1U : 0U;
+    }
+    return n;
+}
+
+bool View::free_deposit(std::uint16_t island, std::uint8_t ware) const {
+    if (island >= m_engine.m_world.islands().size() || !knows_crops(island)) {
+        return false;
+    }
+    for (const auto& d : m_engine.island_of(island).header.deposits) {
+        if (d.ware == ware && d.amount > 0 && m_engine.tile(island, d.x, d.y).city == MapCell::kNoCity) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::uint32_t View::island_size(std::uint16_t island) const {
