@@ -108,9 +108,43 @@ void update_services(World& world, const assets::BuildingTable& buildings, std::
 /// The same for every island.
 void update_services(World& world, const assets::BuildingTable& buildings);
 
+/// What the growth of a house depends on, as its city and its own state give it (growth_rate).
+struct GrowthInputs {
+    std::uint8_t satisfaction = 0;     ///< of its class (0..128); 0 for a house above the pioneers without a market
+    std::uint8_t food = 0;             ///< the city's food supply (0..128); 0 for a house no market or Kontor feeds
+    std::uint8_t market_distance = 0;  ///< House::market_distance
+    bool services_complete = false;    ///< House::services_complete
+    std::uint8_t disaster = 0;         ///< plague or fire on the house (House::services, kDisasterMask)
+    bool city_disasters = false;       ///< a fire or plague anywhere in the city
+};
+
+/// The inputs of a house's growth from its city and itself.
+[[nodiscard]] GrowthInputs growth_inputs(const City& city, const House& house) noexcept;
+
 /// Growth rate of a house: positive grows by rate * 6/128 of its inhabitants per
 /// visit, negative shrinks by |rate| * 4/128, 0 stays.
+[[nodiscard]] std::int32_t growth_rate(const GrowthInputs& in) noexcept;
 [[nodiscard]] std::int32_t growth_rate(const City& city, const House& house) noexcept;
+
+/// One visit's change of a house's inhabitants (in 1/64, House::inhabitants64) at growth rate
+/// `rate`, within the room `cap` (1/64) of its class: what grows beyond it is lost. Moves to the
+/// neighbours, a class up or down and an empty house's ruin are the visit's own (advance_houses).
+[[nodiscard]] std::uint32_t grown_inhabitants64(std::uint32_t inhabitants64, std::int32_t rate,
+                                                std::uint32_t cap) noexcept;
+
+/// How many times a house of a timer group is visited in the next `ms` of game time, from the
+/// group's clock `clock_ms` (HouseClocks::time_ms) and its period (house_group_period_ms), for steps
+/// shorter than the period.
+[[nodiscard]] constexpr std::uint64_t house_visits(std::uint32_t clock_ms, std::uint32_t period_ms,
+                                                   std::uint64_t ms) noexcept {
+    return (std::uint64_t{clock_ms} + ms) / period_ms;
+}
+
+/// A house's inhabitants (1/64) after the next `ms` of game time at fixed inputs: the visits of its
+/// timer group `group` from its clock `clock_ms`, each as grown_inhabitants64 within `cap`. An
+/// empty house stays empty.
+[[nodiscard]] std::uint32_t project_house(const GrowthInputs& in, std::uint32_t inhabitants64, std::uint32_t cap,
+                                          std::uint32_t group, std::uint32_t clock_ms, std::uint64_t ms) noexcept;
 
 /// Advances the house timer groups by `dt_ms` and visits the houses of every group that ticked.
 void advance_houses(World& world, const assets::BuildingTable& buildings, std::uint32_t dt_ms,
