@@ -283,6 +283,18 @@ public:
         std::uint8_t cannons = 13;
     };
     [[nodiscard]] const Materials& materials() const noexcept { return m_materials; }
+    /// One ware of a build cost and how much of it, in 1/8192 t.
+    struct WareCost {
+        std::uint8_t ware = 0;
+        std::uint32_t amount = 0;
+    };
+    /// The wares `type` costs to build (its money aside), each build cost slot with the ware the
+    /// table names for it.
+    [[nodiscard]] std::array<WareCost, 4> ware_costs(const BuildingType& type) const noexcept {
+        const BuildingType::BuildCost& cost = type.build_cost;
+        return {WareCost{m_materials.tools, cost.tools}, WareCost{m_materials.bricks, cost.bricks},
+                WareCost{m_materials.wood, cost.wood}, WareCost{m_materials.cannons, cost.cannons}};
+    }
     /// Unlock levels by INFRA number (index 0 unused, levels without a BAUINFRA entry are {0, 0}:
     /// reached at once).
     [[nodiscard]] const std::vector<InfraLevel>& infra_levels() const noexcept { return m_infra; }
