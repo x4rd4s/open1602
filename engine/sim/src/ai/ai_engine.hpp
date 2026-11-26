@@ -519,10 +519,13 @@ private:
     /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
     /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
     /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
-    /// (1/32 t) for a run of goods of `ware` (for a building: the good it makes). Each line carries an id, game ms and
+    /// (1/32 t) for a run of goods of `ware` (for a building: the good it makes), and the city `to`
+    /// whose people it is for, when that is another city (a colony's: the home city colony_rank
+    /// weighs it for). Each line carries an id, game ms and
     /// a count within that ms, that a later step pairs with what came of it (P0.3). Logging only: it changes nothing.
     void log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
-                      std::int32_t city, const Commitment& c, std::uint8_t ware = 0, std::uint32_t amount = 0) const;
+                      std::int32_t city, const Commitment& c, std::uint8_t ware = 0, std::uint32_t amount = 0,
+                      const City* to = nullptr) const;
     /// P0.3: every ten minutes of game time, for the log, what came of a player's decisions so far:
     /// its gold, and for each own city its people, taxes and running costs a minute and, for each
     /// good, what was made, shipped in or bought, and used by its people in the last ten minutes.

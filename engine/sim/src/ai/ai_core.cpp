@@ -87,7 +87,8 @@ void Engine::log(const AiPlayer& p, const char* format, ...) const {
 }
 
 void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
-                          std::int32_t city, const Commitment& c, std::uint8_t ware, std::uint32_t amount) const {
+                          std::int32_t city, const Commitment& c, std::uint8_t ware, std::uint32_t amount,
+                          const City* to) const {
     // The fields a later step pairs with what came of the decision (P0.3): when, who, where, what
     // it was weighed with.
     if (!logging()) {
@@ -98,10 +99,12 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
     m_decision_ms = ms;
     log(p,
         "decision %s id %llu.%u cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u ware %u amount "
-        "%u",
+        "%u "
+        "to %d/%d",
         kind, static_cast<unsigned long long>(ms), m_decision_seq, candidate, island, city,
         static_cast<long long>(c.cost), static_cast<long long>(c.upkeep), static_cast<long long>(c.value), c.delay,
-        m_world.balance().ai_budget_horizon_minutes, unsigned{ware}, amount);
+        m_world.balance().ai_budget_horizon_minutes, unsigned{ware}, amount, to != nullptr ? int{to->island} : island,
+        to != nullptr ? int{to->index} : city);
 }
 
 void Engine::track(const AiPlayer& p) const {
@@ -139,10 +142,8 @@ void Engine::track(const AiPlayer& p) const {
             if (made == 0 && in == 0 && used == 0) {
                 continue;
             }
-            char item[64];
-            std::snprintf(item, sizeof item, " %zu:%llu/%llu/%llu", w, static_cast<unsigned long long>(made),
-                          static_cast<unsigned long long>(in), static_cast<unsigned long long>(used));
-            goods += item;
+            goods += " " + std::to_string(w) + ":" + std::to_string(made) + "/" + std::to_string(in) + "/" +
+                     std::to_string(used);
         }
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());

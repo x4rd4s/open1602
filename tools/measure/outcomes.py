@@ -19,7 +19,9 @@ For a decision at game time t in a city, and a horizon of h minutes:
              what the city made, got (shipped in or bought) and its people used over the track
              lines after t up to t + h, in 1/32 t. Each track line covers its last ten minutes, so
              the sum starts up to ten minutes before t.
-A horizon the run did not reach is null. A decision without a city (a colony plan) gets gold only.
+  to         for a decision for another city's people (a colony plan or founding: the home city it is
+             weighed for), that city's people, tax and cost at t + h less at t.
+A horizon the run did not reach is null. A decision without a city (a colony plan) gets no city fields.
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ LINE = re.compile(r"^\[ai (\d+) (\d+)s\] (decision|track) (.*)$")
 DECISION = re.compile(
     r"^(?P<kind>[a-z ]+?) id (?P<ms>\d+)\.(?P<seq>\d+) cand (?P<cand>\d+) city (?P<island>-?\d+)/(?P<city>-?\d+) "
     r"cost (?P<cost>-?\d+) upkeep (?P<upkeep>-?\d+) value (?P<value>-?\d+) delay (?P<delay>\d+) "
-    r"horizon (?P<horizon>\d+) ware (?P<ware>\d+) amount (?P<amount>\d+)$"
+    r"horizon (?P<horizon>\d+) ware (?P<ware>\d+) amount (?P<amount>\d+) to (?P<to_island>-?\d+)/(?P<to_city>-?\d+)$"
 )
 TRACK_GOLD = re.compile(r"^gold (-?\d+)$")
 TRACK_CITY = re.compile(r"^city (\d+)/(\d+) people (\d+) tax (-?\d+) cost (-?\d+) goods(.*)$")
@@ -120,6 +122,15 @@ def outcome(d: dict, horizon_min: int, gold: dict, cities: dict):
     before = golds.at_or_before(t)
     after = golds.at_or_after(end)
     result = {"gold": after - (before if before is not None else after)}
+    if (d["to_island"], d["to_city"]) != (d["island"], d["city"]):
+        # A colony's value lands in the city it is for (the home city colony_rank weighs).
+        to = cities.get((d["player"], d["to_island"], d["to_city"]))
+        start = to.at_or_before(t) if to is not None else None
+        stop = to.at_or_after(end) if to is not None else None
+        if start is None or stop is None:
+            result["to"] = None
+        else:
+            result["to"] = {f: stop[f] - start[f] for f in ("people", "tax", "cost")}
     if d["island"] < 0:
         return result
     series = cities.get((d["player"], d["island"], d["city"]))
@@ -152,6 +163,7 @@ def pairs(decisions, gold, cities, horizons):
             "kind": d["kind"],
             "cand": d["cand"],
             "city": [d["island"], d["city"]],
+            "to": [d["to_island"], d["to_city"]],
             "ware": d["ware"],
             "expected": {k: d[k] for k in EXPECTED},
             "actual": {str(h): outcome(d, h, gold, cities) for h in horizons},
