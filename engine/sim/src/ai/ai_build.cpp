@@ -929,12 +929,25 @@ std::vector<Catchment> Engine::work_circles(const AiPlayer& p) const {
 
 std::int32_t Engine::work_land_under(const AiPlayer& p, std::span<const Catchment> circles, std::int32_t x0,
                                      std::int32_t y0, std::int32_t x1, std::int32_t y1) const {
+    if (circles.empty()) {
+        return 0;
+    }
+    const IslandMap& map = m_world.islands()[p.island].map;  // ai-view: eigen: the own island's terrain
     std::int32_t n = 0;
-    for (std::int32_t y = y0; y <= y1 && !circles.empty(); ++y) {
+    for (std::int32_t y = y0; y <= y1; ++y) {
         for (std::int32_t x = x0; x <= x1; ++x) {
-            const Tile t = tile(p.island, x, y);
-            const bool land = !t.valid() || t.kind == kind::kGround || t.kind == kind::kForest ||
-                              t.prod == prod::kRipe || t.prod == prod::kGrowing;
+            // Off the map or a record the table does not know reserves nothing; a cell without a
+            // record is free land (as the city metrics count it).
+            if (!map.contains(x, y)) {
+                continue;
+            }
+            const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            bool land = cell.empty();
+            if (!land) {
+                const Tile t = tile_of(cell, x, y);
+                land = t.valid() && (t.kind == kind::kGround || t.kind == kind::kForest || t.prod == prod::kRipe ||
+                                     t.prod == prod::kGrowing);
+            }
             if (land && std::ranges::any_of(circles, [&](const Catchment& a) { return in_circle(a, x, y); })) {
                 ++n;
             }

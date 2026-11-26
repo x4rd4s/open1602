@@ -340,7 +340,8 @@ public:
     /// carries it), unless their catchment is water.
     [[nodiscard]] std::vector<Catchment> work_circles(const AiPlayer& p) const;
     /// How many tiles of the site (x0, y0)-(x1, y1) lie in one of `circles` where a raw material
-    /// could grow: open ground, forest or a growing record, as the city metrics count work land.
+    /// could grow, as the city metrics count work land: a cell without a record (free land), a
+    /// ground or forest record, or a growing record. Off the map or an unknown record counts not.
     [[nodiscard]] std::int32_t work_land_under(const AiPlayer& p, std::span<const Catchment> circles, std::int32_t x0,
                                                std::int32_t y0, std::int32_t x1, std::int32_t y1) const;
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
