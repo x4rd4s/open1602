@@ -62,6 +62,14 @@ public:
     [[nodiscard]] std::uint32_t seen_houses(PlayerId owner) const;
     [[nodiscard]] std::uint32_t seen_army(PlayerId owner) const;
     [[nodiscard]] std::uint32_t seen_cannons(PlayerId owner) const;
+    /// The army and the fleet's cannons of `owner` as seen (Engine::strength): the whole only for
+    /// the viewer itself or at omniscient_level().
+    [[nodiscard]] std::uint32_t strength(PlayerId owner) const;
+    /// strength(), a human's raised on the harder levels (Engine::threat_of).
+    [[nodiscard]] std::uint32_t threat(PlayerId owner) const;
+    /// The soldiers of `owner` ashore on an island: all for the viewer's own, or at
+    /// omniscient_level(); otherwise only on an island the viewer knows (knows_island), else 0.
+    [[nodiscard]] std::uint32_t seen_soldiers_on(PlayerId owner, std::uint16_t island) const;
     /// What a partner's Kontor shows of `ware` while the viewer knows it; none for a Kontor it does
     /// not know, one of its own, or a ware the Kontor does not sell.
     [[nodiscard]] std::optional<KontorOffer> kontor_offer(const City& partner, std::uint8_t ware) const;

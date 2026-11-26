@@ -251,7 +251,8 @@ std::uint32_t Engine::army_target(const AiPlayer& p, bool whole) const {
             continue;
         }
         const auto human = static_cast<PlayerId>(h);
-        std::uint32_t s = seen_army(whole ? human : p.player, human);
+        // `whole` (the human's own view of itself) is the log's census comparison only.
+        std::uint32_t s = whole ? seen_army(human, human) : view(p).seen_army(human);
         s += s / 2;
         best = std::max(best, s);
     }
@@ -309,7 +310,7 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
             m_world.behaviour(pl) != FactionBehaviour::Settlers) {
             continue;
         }
-        rival = std::max(rival, seen_army(whole ? other : p.player, other));
+        rival = std::max(rival, whole ? seen_army(other, other) : view(p).seen_army(other));  // whole: log only
     }
     const std::uint32_t rival_whole = rival;
     rival = static_cast<std::uint32_t>(std::uint64_t{rival} * bal.ai_rival_army_percent / 100U);
@@ -322,10 +323,11 @@ std::uint32_t Engine::rival_army_target(const AiPlayer& p, bool whole) const {
     return std::max(own, rival);
 }
 
-bool Engine::stronger(PlayerId a, PlayerId b) const {
+bool Engine::stronger(const AiPlayer& p, PlayerId b) const {
     // The original compares the armies and the cannons of the fleets. The original takes b's fleet
     // on both sides, so only the armies count (S-102).
-    return strength(a, a) >= strength(a, b);
+    const View v = view(p);
+    return v.strength(p.player) >= v.strength(b);
 }
 
 bool Engine::sees_all() const {
@@ -336,13 +338,33 @@ std::uint32_t Engine::seen_army(PlayerId viewer, PlayerId owner) const {
     if (viewer == owner || sees_all()) {
         return weighted_army(owner);
     }
-    // A human sees the soldiers on every island it discovered, and nothing of the others.
+    // A human sees the soldiers on every island it knows (discovered, explored or with a city of its
+    // own: knows_island), and nothing of the others.
+    std::vector<bool> known(m_world.islands().size());
+    for (std::size_t i = 0; i < known.size(); ++i) {
+        known[i] = island_of(static_cast<std::uint16_t>(i)).discovered_by(viewer) ||
+                   island_of(static_cast<std::uint16_t>(i)).explored_by(viewer);
+    }
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: the viewer's own cities
+        if (c.owner == viewer && c.island < known.size()) {
+            known[c.island] = true;
+        }
+    }
     const auto w = unit_weights();
     std::uint32_t s = 0;
+    std::uint32_t flagged = 0;  // for the log: on discovered islands only, as before P1.5b
     for (const Soldier& u : m_world.soldiers()) {
-        if (u.owner == owner && !u.away() && u.island < m_world.islands().size() &&
-            island_of(u.island).discovered_by(viewer)) {
-            s += w[family_index(m_sim.m_figures, u.figure)];
+        if (u.owner == owner && !u.away() && u.island < known.size() && known[u.island]) {
+            const std::uint32_t k = w[family_index(m_sim.m_figures, u.figure)];
+            s += k;
+            flagged += island_of(u.island).discovered_by(viewer) ? k : 0U;
+        }
+    }
+    if (logging() && flagged != s) {
+        for (const AiPlayer& a : m_state.players) {
+            if (a.player == viewer) {
+                log(a, "seen army: player %u %u (discovered islands only %u)", unsigned{owner}, s, flagged);
+            }
         }
     }
     return s;
@@ -2928,7 +2950,7 @@ void Engine::target_scan(AiPlayer& p) {
             if (p.cities > 2 && own->inhabitants.size() > 0 && own->inhabitants[0] < 4) {
                 return;
             }
-            if (market_count(t) < 2 && building_count(t) < 3 && soldiers_on_island(t.owner, t.island) == 0) {
+            if (market_count(t) < 2 && building_count(t) < 3 && view(p).seen_soldiers_on(t.owner, t.island) == 0) {
                 raid_outpost(p, t);
                 return;
             }
@@ -2965,7 +2987,7 @@ std::vector<PlayerId> Engine::island_enemies(const AiPlayer& a, std::uint16_t is
             m_world.diplomacy().relation(a.player, pb).peace == Treaty::Signed) {
             continue;
         }
-        bool present = soldiers_on_island(pb, island) != 0;
+        bool present = view(a).seen_soldiers_on(pb, island) != 0;
         for (const City& c : m_world.cities()) {
             present = present || (c.owner == pb && c.island == island);
         }
@@ -3869,7 +3891,7 @@ void Engine::diplomacy(AiPlayer& p) {
             case Treaty::Offered:
             case Treaty::Signed:
                 if (m < -90 || prev - m > 60) {
-                    if (stronger(p.player, b)) {
+                    if (stronger(p, b)) {
                         log(p, "declares war on player %u (mood %d)", b, m);
                         order(DiplomacyOrder::Kind::Peace, Treaty::None);
                         subsidy(p, 3);
@@ -3913,13 +3935,22 @@ void Engine::diplomacy(AiPlayer& p) {
         if (d.relation(p.player, b).peace == Treaty::Signed) {
             const Treaty trade = d.relation(p.player, b).trade;
             if (trade == Treaty::None) {
+                // Open1602 (B2): the largest of the partner's cities the computer knows of.
                 std::uint32_t largest = 0;
-                for (const City& c : m_world.cities()) {
-                    if (c.owner == b) {
-                        largest = std::max(largest, population(c));
-                    }
+                for (const City* c : view(p).seen_cities(b)) {
+                    largest = std::max(largest, population(*c));
                 }
                 const std::uint32_t roll = (rng().next() & 63U) + 40U;
+                if (logging() && !sees_all()) {
+                    std::uint32_t all = 0;
+                    for (const City& c : m_world.cities()) {  // ai-view: Buchung: the log's whole count
+                        all = c.owner == b ? std::max(all, population(c)) : all;
+                    }
+                    if ((largest > roll) != (all > roll)) {
+                        log(p, "seen cities: partner %u largest %u (all %u), trade offer %d", unsigned{b}, largest, all,
+                            largest > roll ? 1 : 0);
+                    }
+                }
                 if (m >= prev && m > -10 && largest > roll) {
                     order(DiplomacyOrder::Kind::Trade, Treaty::Offered);
                 }
