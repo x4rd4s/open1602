@@ -440,6 +440,10 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// The income a minute luxury() weighs its crops' upkeep against: the original's net income
+    /// (`net`, taxes less running and military costs); an improved computer counts its trade too
+    /// (`earned`, earned_income), since its sales pay the farms as much as its taxes (t76b).
+    [[nodiscard]] static std::int64_t luxury_income(bool improved, std::int32_t net, std::int32_t earned) noexcept;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;

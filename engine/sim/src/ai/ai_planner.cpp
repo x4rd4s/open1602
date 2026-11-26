@@ -3210,6 +3210,10 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
+std::int64_t Engine::luxury_income(bool improved, std::int32_t net, std::int32_t earned) noexcept {
+    return improved ? earned : net;
+}
+
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
@@ -3219,7 +3223,9 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     if (c == nullptr || r == nullptr || home == nullptr || p.max_stage < stage::kSettlers) {
         return false;
     }
-    std::int64_t budget = net_income(p);
+    // Open1602: an improved computer counts its sales too (luxury_income); held by its taxes alone,
+    // the colony founded for a crop sat idle for its first hour with gold and wood in store (t76b).
+    std::int64_t budget = luxury_income(rivals(), net_income(p), rivals() ? earned_income(p) : 0);
     if (budget < std::int64_t{p.cities} * 25) {
         if (player(p).money < 7000) {
             return false;

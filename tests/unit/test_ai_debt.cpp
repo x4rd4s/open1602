@@ -297,3 +297,10 @@ TEST_CASE("ai stage: an improved computer leaves a citizens' stage on gold alone
     CHECK(!Engine::gold_exit(true, false, true));  // not rich
     CHECK(!Engine::gold_exit(false, false, true));
 }
+
+TEST_CASE("ai luxury: an improved computer weighs its crops against its sales as well as its taxes") {
+    // t76b: taxes below 25 a city held the colony's plantation for an hour, sales of 177 a minute.
+    CHECK(Engine::luxury_income(true, -40, 177) == 177);
+    CHECK(Engine::luxury_income(true, 300, -20) == -20);   // purchases count against it too
+    CHECK(Engine::luxury_income(false, -40, 177) == -40);  // the original looks at its taxes only
+}
