@@ -114,9 +114,7 @@ std::int64_t Engine::reliable_income(const AiPlayer& p) const {
 }
 
 std::int64_t Engine::class_taxes(const City& city, std::size_t k, std::uint64_t people) const {
-    const auto& classes = m_buildings.resident_classes();
-    const std::int64_t rate = k < city.tax_rate.size() ? city.tax_rate[k] : kFullSupply;
-    return static_cast<std::int64_t>(std::uint64_t{classes[k].tax} * people * 6 / 32) * rate / kFullSupply;
+    return m_sheet.tax(k, people, k < city.tax_rate.size() ? city.tax_rate[k] : kFullSupply);
 }
 
 bool Engine::young_colony(const City& c) const {

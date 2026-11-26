@@ -1426,7 +1426,7 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
     }
     // The taxes a minute of a full house of class k at the home city's rate.
     const auto house_tax = [&](std::size_t k) -> std::int64_t {
-        return class_taxes(*home, k, classes[k].max_per_house);
+        return class_taxes(*home, k, m_sheet.max_per_house(k));
     };
     // The city the colony becomes, on the nearest island it knows to grow the crop (any island it
     // knows for none): as many houses as its free land holds beside the fields, as densely as the
@@ -1494,7 +1494,7 @@ std::int64_t Engine::colony_rank(const AiPlayer& p, std::uint8_t crop) {
                 held += home->stock(n.ware) != 0 ? 1U : 0U;
             }
         }
-        const std::uint32_t per_house = std::max<std::uint32_t>(classes[k - 1].max_per_house, 1);
+        const std::uint32_t per_house = std::max<std::uint32_t>(m_sheet.max_per_house(k - 1), 1);
         const std::uint64_t houses = home->inhabitants[k - 1] / per_house;
         const std::uint64_t rising = others != 0 ? houses * held / others : houses;
         rise = static_cast<std::int64_t>(rising) * (house_tax(k) - house_tax(k - 1));

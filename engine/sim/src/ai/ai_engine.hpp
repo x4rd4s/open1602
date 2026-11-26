@@ -24,6 +24,7 @@
 
 #include "ai_chains.hpp"
 #include "ai_overview.hpp"
+#include "ai_sheet.hpp"
 #include "ai_state.hpp"
 
 #include "o1602/assets/building_table.hpp"
@@ -270,6 +271,8 @@ public:
     [[nodiscard]] bool accepts(const State& state) const;
     /// The producers of the packages' goods the computers build (ai_chains.hpp).
     [[nodiscard]] const std::vector<PackageNeed>& package_needs() const noexcept { return m_package_needs; }
+    /// The economy's figures from the building table (ai_sheet.hpp).
+    [[nodiscard]] const Sheet& sheet() const noexcept { return m_sheet; }
 
     /// How many cities a computer founds at most (Rules::computer_cities): four as in the original,
     /// or the world's islands shared among its players, by the difficulty.
@@ -1516,6 +1519,8 @@ private:
     Simulation& m_sim;
     World& m_world;
     const assets::BuildingTable& m_buildings;
+    /// The economy's figures from the building table (P2.1), read once.
+    Sheet m_sheet;
     State& m_state;
     Player m_nobody;  ///< stands in for a player slot that is gone
     /// Producers by ware: up to four records per ware, in file order.

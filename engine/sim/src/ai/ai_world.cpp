@@ -112,18 +112,13 @@ std::uint32_t Engine::population(const City& c, std::size_t from) const {
 std::uint32_t Engine::demand(const City& c, std::uint8_t w) const {
     // Food by all inhabitants, the other consumer goods by the classes that want them.
     if (w == m_buildings.food_ware()) {
-        return static_cast<std::uint32_t>((std::uint64_t{population(c)} * m_buildings.food_need() * 6) >> 8);
+        return static_cast<std::uint32_t>(Sheet::per_minute(std::uint64_t{population(c)} * m_sheet.food_need()));
     }
     std::uint64_t sum = 0;
-    const auto& classes = m_buildings.resident_classes();
-    for (std::size_t k = 0; k < classes.size() && k < c.inhabitants.size(); ++k) {
-        for (const assets::ResidentClass::Need& n : classes[k].needs) {
-            if (n.ware == w) {
-                sum += std::uint64_t{c.inhabitants[k]} * n.amount;
-            }
-        }
+    for (std::size_t k = 0; k < m_sheet.classes().size() && k < c.inhabitants.size(); ++k) {
+        sum += std::uint64_t{c.inhabitants[k]} * m_sheet.need_amount(k, w);
     }
-    return static_cast<std::uint32_t>((sum * 6) >> 8);
+    return static_cast<std::uint32_t>(Sheet::per_minute(sum));
 }
 
 std::uint32_t Engine::supply(const City& c, std::uint8_t ware) const {
@@ -145,7 +140,7 @@ std::uint32_t Engine::supply(const City& c, std::uint8_t ware) const {
         if (pr.elapsed >= 60) {
             sum += std::uint64_t{pr.produced} * 60 / pr.elapsed;
         } else {
-            sum += std::uint64_t{b->produce_amount} * 30 / b->interval;
+            sum += m_sheet.producer(*b)->output / 2;  // TODO(P2.4): half the full rate, a guess
         }
     }
     return static_cast<std::uint32_t>(std::min<std::uint64_t>(sum, 0xFFFFFFFFU));
