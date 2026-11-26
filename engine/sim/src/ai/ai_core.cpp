@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <memory>
+#include <string>
 
 #include "ai_archive.hpp"
 #include "ai_engine.hpp"
@@ -86,7 +87,8 @@ void Engine::log(const AiPlayer& p, const char* format, ...) const {
 }
 
 void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t candidate, std::int32_t island,
-                          std::int32_t city, const Commitment& c, std::uint32_t amount) const {
+                          std::int32_t city, const Commitment& c, std::uint8_t ware, std::uint32_t amount,
+                          const City* to) const {
     // The fields a later step pairs with what came of the decision (P0.3): when, who, where, what
     // it was weighed with.
     if (!logging()) {
@@ -95,10 +97,59 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
     const std::uint64_t ms = now_ms();
     m_decision_seq = ms == m_decision_ms ? m_decision_seq + 1 : 0;
     m_decision_ms = ms;
-    log(p, "decision %s id %llu.%u cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u amount %u",
+    log(p,
+        "decision %s id %llu.%u cand %u city %d/%d cost %lld upkeep %lld value %lld delay %u horizon %u ware %u amount "
+        "%u "
+        "to %d/%d",
         kind, static_cast<unsigned long long>(ms), m_decision_seq, candidate, island, city,
         static_cast<long long>(c.cost), static_cast<long long>(c.upkeep), static_cast<long long>(c.value), c.delay,
-        m_world.balance().ai_budget_horizon_minutes, amount);
+        m_world.balance().ai_budget_horizon_minutes, unsigned{ware}, amount, to != nullptr ? int{to->island} : island,
+        to != nullptr ? int{to->index} : city);
+}
+
+void Engine::track(const AiPlayer& p) const {
+    // Ten minutes: the shortest of P0.3's horizons (30, 60, 120 min) is three of them, and the
+    // ledger keeps the last hour minute by minute (GoodsLedger::kMinutes).
+    constexpr std::uint32_t kTrackMinutes = 10;
+    constexpr std::uint64_t kTrackMs = std::uint64_t{kTrackMinutes} * 60 * 1000;
+    if (!logging()) {
+        return;
+    }
+    if (m_track_ms.size() <= p.player) {
+        m_track_ms.resize(std::size_t{p.player} + 1, 0);
+    }
+    if (now_ms() < m_track_ms[p.player]) {
+        return;
+    }
+    m_track_ms[p.player] = now_ms() + kTrackMs;
+    log(p, "track gold %d", player(p).money);
+    const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
+    for (std::size_t index = 0; index < m_world.cities().size(); ++index) {
+        const City& c = m_world.cities()[index];
+        if (c.owner != p.player) {
+            continue;
+        }
+        std::string goods;
+        for (std::size_t w = 0; w < c.ledger.wares().size(); ++w) {
+            const auto ware = static_cast<std::uint8_t>(w);
+            if (!c.ledger.used(ware)) {
+                continue;
+            }
+            const FlowTotals t = c.ledger.totals(ware, kTrackMinutes);
+            const std::uint64_t made = t.of(GoodsFlow::Produced);
+            const std::uint64_t in = t.of(GoodsFlow::ShippedIn) + t.of(GoodsFlow::Bought);
+            const std::uint64_t used = t.of(GoodsFlow::Residents);
+            const std::uint64_t asked = t.of(GoodsFlow::Demand);
+            const std::uint32_t stock = c.stock(ware);
+            if (made == 0 && in == 0 && used == 0 && asked == 0 && stock == 0) {
+                continue;
+            }
+            goods += " " + std::to_string(w) + ":" + std::to_string(made) + "/" + std::to_string(in) + "/" +
+                     std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock);
+        }
+        log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
+            population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
+    }
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
@@ -316,6 +367,7 @@ void Engine::tick(std::uint32_t dt_ms) {
         if (logging() && p.has_plan) {
             report(p);
         }
+        track(p);
     }
 }
 
