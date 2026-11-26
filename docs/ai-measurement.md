@@ -54,6 +54,11 @@ metrics move the right way.
 - `tools/check_ai_constants.py` fails a pull request that brings a new number or named value into
   the computer players' code, the balance values or the balance files. A value that follows from
   others goes into `tools/ai_constants_allowlist.txt` with what it is derived from.
+- `tools/check_ai_view.py` fails a pull request that adds a read of the world's objects (cities,
+  islands, units, ships, buildings, players) to the decision code outside `ai::View`. A read that
+  is the computer's own, a rule or bookkeeping carries its class (eigen, gesehen, Regel, Buchung)
+  in an `// ai-view: CLASS: why` comment or in `tools/ai_view_allowlist.txt`; what a human does
+  not see goes through `View::omniscient_level()`.
 - The golden hashes of the unit tests (one per platform, `ctest`) keep "as in the original" the same.
 
 ## A plan
