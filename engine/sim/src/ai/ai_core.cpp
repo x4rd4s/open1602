@@ -139,11 +139,13 @@ void Engine::track(const AiPlayer& p) const {
             const std::uint64_t made = t.of(GoodsFlow::Produced);
             const std::uint64_t in = t.of(GoodsFlow::ShippedIn) + t.of(GoodsFlow::Bought);
             const std::uint64_t used = t.of(GoodsFlow::Residents);
-            if (made == 0 && in == 0 && used == 0) {
+            const std::uint64_t asked = t.of(GoodsFlow::Demand);
+            const std::uint32_t stock = c.stock(ware);
+            if (made == 0 && in == 0 && used == 0 && asked == 0 && stock == 0) {
                 continue;
             }
             goods += " " + std::to_string(w) + ":" + std::to_string(made) + "/" + std::to_string(in) + "/" +
-                     std::to_string(used);
+                     std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock);
         }
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());

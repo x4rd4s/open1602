@@ -76,10 +76,11 @@ class Series:
 
 
 def parse_goods(text: str) -> dict[int, tuple[int, int, int]]:
+    """made, got, used of each ware in a track line (its demand and stock are read by the report)."""
     goods = {}
     for item in text.split():
         ware, flows = item.split(":")
-        made, got, used = (int(x) for x in flows.split("/"))
+        made, got, used = (int(x) for x in flows.split("/")[:3])
         goods[int(ware)] = (made, got, used)
     return goods
 

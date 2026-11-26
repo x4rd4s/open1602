@@ -528,7 +528,8 @@ private:
                       const City* to = nullptr) const;
     /// P0.3: every ten minutes of game time, for the log, what came of a player's decisions so far:
     /// its gold, and for each own city its people, taxes and running costs a minute and, for each
-    /// good, what was made, shipped in or bought, and used by its people in the last ten minutes.
+    /// good, what was made, shipped in or bought, used by its people and asked for by them in the
+    /// last ten minutes, and its stock now.
     /// tools/measure/outcomes.py pairs these with the decision lines. Logging only.
     void track(const AiPlayer& p) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so

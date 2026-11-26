@@ -10,17 +10,17 @@ import outcomes  # noqa: E402
 
 LOG = """\
 [ai 3 0s] track gold 10000
-[ai 3 0s] track city 15/0 people 40 tax 5 cost 20 goods 9:0/0/3
+[ai 3 0s] track city 15/0 people 40 tax 5 cost 20 goods 9:0/0/3/4/0
 [ai 3 60s] decision build id 60000.0 cand 20809 city 15/0 cost 200 upkeep 10 value 0 delay 0 horizon 30 ware 9 amount 0 to 15/0
 [ai 3 60s] decision colony plan id 60000.1 cand 47 city -1/-1 cost 2000 upkeep 15 value 49 delay 15 horizon 30 ware 0 amount 0 to 15/0
 [ai 3 600s] track gold 9500
-[ai 3 600s] track city 15/0 people 50 tax 6 cost 30 goods 9:64/0/10
+[ai 3 600s] track city 15/0 people 50 tax 6 cost 30 goods 9:64/0/10/12/32
 [ai 3 1200s] track gold 9800
-[ai 3 1200s] track city 15/0 people 60 tax 7 cost 30 goods 9:96/32/20
+[ai 3 1200s] track city 15/0 people 60 tax 7 cost 30 goods 9:96/32/20/20/64
 [ai 3 1800s] track gold 9900
-[ai 3 1800s] track city 15/0 people 70 tax 8 cost 30 goods 9:96/0/20
+[ai 3 1800s] track city 15/0 people 70 tax 8 cost 30 goods 9:96/0/20/20/64
 [ai 3 2400s] track gold 10100
-[ai 3 2400s] track city 15/0 people 80 tax 9 cost 30 goods 9:96/0/20
+[ai 3 2400s] track city 15/0 people 80 tax 9 cost 30 goods 9:96/0/20/20/64
 noise line
 """
 
