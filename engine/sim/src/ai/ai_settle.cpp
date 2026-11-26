@@ -387,11 +387,10 @@ PlayerId Engine::blocker(const AiPlayer& p, std::uint16_t island, bool room) con
         // The original's computers keep off the largest islands where another computer has a
         // city, though not where a human has one; improved, a computer's city counts as a human's.
         const bool human = o != nullptr && o->role == PlayerRole::Human;
+        const bool populated = has_population(c, 0, 50);
         const bool kept_off = classic() && !human && island_size(island) > 3;
-        const bool leaves =
-            leaves_room(kept_off, contested, view(p).seen_city_count(c.owner) < 2, room, has_population(c, 0, 50));
-        if (logging() &&
-            leaves != leaves_room(kept_off, contested, own_city_count(c.owner) < 2, room, has_population(c, 0, 50))) {
+        const bool leaves = leaves_room(kept_off, contested, view(p).seen_city_count(c.owner) < 2, room, populated);
+        if (logging() && leaves != leaves_room(kept_off, contested, own_city_count(c.owner) < 2, room, populated)) {
             log_seen_cities(p, c.owner, island, leaves ? "lands beside" : "turns back from");
         }
         if (!leaves) {
