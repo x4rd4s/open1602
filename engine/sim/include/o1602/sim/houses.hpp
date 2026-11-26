@@ -162,6 +162,66 @@ struct GrowthInputs {
 [[nodiscard]] std::uint32_t project_house(const GrowthInputs& in, std::uint32_t inhabitants64, std::uint32_t cap,
                                           std::uint32_t group, std::uint32_t clock_ms, std::uint64_t ms) noexcept;
 
+/// What the ascent of a full house to the next class depends on (rises).
+struct AscentInputs {
+    std::uint32_t inhabitants64 = 0;     ///< after the visit's growth and the move to houses of the next class
+    std::uint32_t room = 0;              ///< what a house of its class holds (in 1/64)
+    bool next_class = false;             ///< the table lists a class above its own
+    std::uint8_t food = 0;               ///< the city's food supply (0..128)
+    std::uint8_t next_satisfaction = 0;  ///< satisfaction of the next class (0..128)
+    bool next_services = false;          ///< the house is reached by every service the next class needs
+    bool material_lock = false;          ///< City::material_lock
+    bool materials = false;              ///< the city holds the build cost of the next class's house
+};
+
+/// The gate of an ascent: food and the next class's satisfaction both full. Behind it, half the
+/// people move into houses of the next class first when the city has any.
+[[nodiscard]] constexpr bool ascent_open(std::uint8_t food, std::uint8_t next_satisfaction) noexcept {
+    return food >= assets::kFullSupply && next_satisfaction >= assets::kFullSupply;
+}
+
+/// Whether a house rebuilds as the first house of the next class on the visit that tries it.
+[[nodiscard]] constexpr bool rises(const AscentInputs& in) noexcept {
+    return in.next_class && ascent_open(in.food, in.next_satisfaction) && !in.material_lock &&
+           in.inhabitants64 > in.room && in.next_services && in.materials;
+}
+
+/// Visits from a full house's first try to its ascent: the first visit beyond its room queues it
+/// (one queue slot per next class, so one house of a class at a time), a later visit in another
+/// city tick tries it.
+[[nodiscard]] constexpr std::uint32_t rise_visits() noexcept {
+    return 2;
+}
+
+/// Whether `city` holds every ware of the build cost of `target` (BuildingTable::ware_costs).
+[[nodiscard]] bool materials_available(const City& city, const assets::BuildingTable& buildings,
+                                       const assets::BuildingType& target) noexcept;
+
+/// Satisfaction from which the people of a house with all its services stay in their class.
+inline constexpr std::uint8_t kContentSatisfaction = 88;
+
+/// What the descent of a house to the class below depends on (falls).
+struct DescentInputs {
+    std::uint8_t resident_class = 0;  ///< its class, as an index of the table's class list
+    std::uint32_t inhabitants64 = 0;  ///< after the visit's decline
+    std::uint32_t room_below = 0;     ///< what a house of the class below holds (in 1/64)
+    bool services_complete = false;   ///< House::services_complete
+    std::uint8_t satisfaction = 0;    ///< of its class (0..128)
+};
+
+/// Whether the people of a house are content: every service of their class and at least
+/// kContentSatisfaction.
+[[nodiscard]] constexpr bool content(bool services_complete, std::uint8_t satisfaction) noexcept {
+    return services_complete && satisfaction >= kContentSatisfaction;
+}
+
+/// Whether a shrinking house rebuilds as a house of the class below: it is above the lowest class
+/// of the list, its people are not content, and no more of them are left than the class below holds.
+[[nodiscard]] constexpr bool falls(const DescentInputs& in) noexcept {
+    return in.resident_class != 0 && !content(in.services_complete, in.satisfaction) &&
+           in.inhabitants64 <= in.room_below;
+}
+
 /// Advances the house timer groups by `dt_ms` and visits the houses of every group that ticked.
 void advance_houses(World& world, const assets::BuildingTable& buildings, std::uint32_t dt_ms,
                     std::vector<HouseEvent>* events);

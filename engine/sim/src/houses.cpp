@@ -368,27 +368,20 @@ private:
     }
 
     bool pay_materials(City& city, const assets::BuildingType& target) {
-        const auto& m = m_buildings.materials();
-        const auto& cost = target.build_cost;
-        if (city.available(m.tools) < cost.tools || city.available(m.bricks) < cost.bricks ||
-            city.available(m.wood) < cost.wood) {
+        if (!materials_available(city, m_buildings, target)) {
             return false;
         }
         // Min(stock, cost), nothing below a ton.
-        const auto take = [&](std::uint8_t ware, std::uint32_t amount) {
+        for (const auto& [ware, amount] : m_buildings.ware_costs(target)) {
             city.ensure_ware(ware);
             const std::uint32_t t = std::min(city.goods[ware], amount);
             if (t >= 32) {
                 city.goods[ware] -= t;
                 city.book(ware, GoodsFlow::Construction, t);
             }
-        };
-        take(m.tools, cost.tools);
-        take(m.bricks, cost.bricks);
-        take(m.wood, cost.wood);
-        take(m.cannons, cost.cannons);
+        }
         if (Player* owner = m_world.player(city.owner); owner != nullptr) {
-            owner->money = money_plus(owner->money, -std::int64_t{cost.money});
+            owner->money = money_plus(owner->money, -std::int64_t{target.build_cost.money});
         }
         return true;
     }
@@ -410,14 +403,17 @@ private:
                 // The queued house, one city tick later: try out the next class.
                 const std::vector<House*> nb = neighbours(h);
                 const std::uint32_t next_cap = max_inhabitants64(m_buildings, next);
-                if (city.food_ratio >= kFull && satisfaction_of_class(city, next) >= kFull) {
+                if (ascent_open(city.food_ratio, satisfaction_of_class(city, next))) {
                     if (city_count(city, next) != 0) {
                         // Half of the people move into houses of the next class first.
                         const std::uint32_t half = v / 2;
                         v = v - half + hand_over(city, nb, next, half, next_cap);
                     }
                     const assets::BuildingType* target = m_buildings.first_house(next);
-                    if (!city.material_lock && v > cap && target != nullptr && has_services(h, m_buildings, next) &&
+                    if (target != nullptr &&
+                        rises(AscentInputs{v, cap, true, city.food_ratio, satisfaction_of_class(city, next),
+                                           has_services(h, m_buildings, next), city.material_lock,
+                                           materials_available(city, m_buildings, *target)}) &&
                         pay_materials(city, *target)) {
                         const std::uint32_t before = h.inhabitants();
                         std::uint32_t& old_count = city_count(city, c);
@@ -450,9 +446,11 @@ private:
     void shrink(City& city, House& h, std::uint32_t sub) {
         const std::uint8_t c = h.resident_class;
         std::uint32_t v = h.inhabitants64 > sub ? h.inhabitants64 - sub : 0;
-        constexpr std::uint8_t kContent = 88;
-        if (!h.services_complete || satisfaction_of_class(city, c) < kContent) {
-            if (c != 0 && v <= max_inhabitants64(m_buildings, static_cast<std::uint8_t>(c - 1))) {
+        const std::uint8_t satisfaction = satisfaction_of_class(city, c);
+        if (!content(h.services_complete, satisfaction)) {
+            const std::uint32_t room_below =
+                c != 0 ? max_inhabitants64(m_buildings, static_cast<std::uint8_t>(c - 1)) : 0;
+            if (falls(DescentInputs{c, v, room_below, h.services_complete, satisfaction})) {
                 const std::uint32_t before = h.inhabitants();
                 std::uint32_t& old_count = city_count(city, c);
                 old_count -= std::min(old_count, before);
@@ -767,6 +765,12 @@ std::uint32_t grown_inhabitants64(std::uint32_t inhabitants64, std::int32_t rate
         return inhabitants64 > sub ? inhabitants64 - sub : 0;
     }
     return std::min(inhabitants64 + increase_of(n, rate), cap);
+}
+
+bool materials_available(const City& city, const assets::BuildingTable& buildings,
+                         const assets::BuildingType& target) noexcept {
+    return std::ranges::all_of(buildings.ware_costs(target),
+                               [&](const auto& cost) { return city.available(cost.ware) >= cost.amount; });
 }
 
 std::uint32_t project_house(const GrowthInputs& in, std::uint32_t inhabitants64, std::uint32_t cap, std::uint32_t group,
