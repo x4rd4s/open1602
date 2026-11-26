@@ -1244,10 +1244,46 @@ std::uint32_t Engine::supply_ships_for(AiPlayer& p, const City& to, std::uint8_t
     return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(runs, 1, kMaxRunsPerWare));
 }
 
+bool Engine::material_short(std::uint32_t stock, std::uint32_t target, std::uint32_t held) noexcept {
+    return stock < std::max(target / 2, held);
+}
+
+std::uint32_t Engine::held_need(const City& c, std::uint8_t w) const {
+    // Open1602: a city that waits on a building for want of its wood, tools or bricks gets them
+    // brought: a plantation needs 8 t of bricks, and a colony at 7 t, above half the target, never
+    // got a run, its plantation waiting for the whole first hour (t76b).
+    if (!rivals()) {
+        return 0;
+    }
+    for (const AiPlayer& p : m_state.players) {
+        if (p.player != c.owner || p.pirates) {
+            continue;
+        }
+        for (const CityPlan& r : p.plans) {
+            if (r.island != c.island || r.city != c.index || r.held_build == 0) {
+                continue;
+            }
+            const assets::BuildingType* b = by_id(r.held_build);
+            if (b == nullptr) {
+                return 0;
+            }
+            const auto& m = m_buildings.materials();
+            const auto& cost = b->build_cost;
+            return w == m.wood ? cost.wood : w == m.tools ? cost.tools : w == m.bricks ? cost.bricks : 0;
+        }
+    }
+    return 0;
+}
+
+bool Engine::holds_build(const City& c) const {
+    const auto& m = m_buildings.materials();
+    return held_need(c, m.wood) != 0 || held_need(c, m.tools) != 0 || held_need(c, m.bricks) != 0;
+}
+
 std::uint64_t Engine::supply_urgency(const City& c, std::uint8_t w, std::uint32_t target) const {
     const auto& m = m_buildings.materials();
     if (w == m.tools || w == m.bricks || w == m.wood) {
-        return c.stock(w) < target / 2 ? 0 : kNoUrgency;
+        return material_short(c.stock(w), target, held_need(c, w)) ? 0 : kNoUrgency;
     }
     // Open1602: an improved rival also brings what its houses will use once they rise (demand_ahead),
     // to have it in store before (ascent_ready).
@@ -1326,8 +1362,11 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     if (best_need < first) {
         return best;
     }
+    // Open1602: a city without people too while it waits on a building's materials (holds_build):
+    // the colony's outpost got none, its plantation's bricks never came (t76b).
     for (const City& c : m_world.cities()) {
-        if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+        if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x ||
+            (population(c) == 0 && !holds_build(c))) {
             continue;
         }
         const std::uint64_t need = supply_need(p, c);
@@ -1389,7 +1428,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
                 // Open1602: the further the source, the more the ship brings: what the city needs
                 // until the ship can be back, at most half the ship's holds.
                 seconds = sail_seconds(p, city_point(home), city_point(m_world.cities()[*src]));
-                keep = supply_buffer(target, 2 * seconds);
+                keep = std::max(supply_buffer(target, 2 * seconds), held_need(home, w));
                 // Food for kHomeFirstMinutes of what the city eats, up to half its Kontor: 40 t
                 // lasted a colony of 450 people four minutes.
                 if (w == m_buildings.food_ware()) {
@@ -1652,7 +1691,8 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
                 continue;
             }
             const std::uint32_t seconds = sail_seconds(p, at, city_point(m_world.cities()[*src]));
-            if (to.stock(w) >= supply_buffer(target, 2 * seconds) && demand(to, w) <= supply(to, w)) {
+            if (to.stock(w) >= std::max(supply_buffer(target, 2 * seconds), held_need(to, w)) &&
+                demand(to, w) <= supply(to, w)) {
                 continue;
             }
             runs += supply_ships_for(p, to, w, *src, seconds);
@@ -1661,7 +1701,8 @@ std::int32_t Engine::supply_ships_wanted(AiPlayer& p, const City& home) {
     count(home, true);
     // Open1602: the other cities where people live, for what runs out there (supply_destination).
     for (const City& c : m_world.cities()) {
-        if (c.owner == p.player && &c != &home && c.island != home.island && c.warehouse_x && population(c) != 0) {
+        if (c.owner == p.player && &c != &home && c.island != home.island && c.warehouse_x &&
+            (population(c) != 0 || holds_build(c))) {
             count(c, false);
         }
     }

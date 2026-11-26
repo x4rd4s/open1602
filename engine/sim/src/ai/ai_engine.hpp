@@ -440,6 +440,14 @@ public:
     /// make (`short_of`), none of its islands grows a crop for it (`grown`, crop_available), and a
     /// city that uses it has none (`dry`).
     [[nodiscard]] static bool crop_lacking(bool short_of, bool grown, bool dry) noexcept;
+    /// Improved computers: what of `ware` (wood, tools or bricks) the building city `c` waits on
+    /// (CityPlan::held_build) costs, 0 for none or another ware.
+    [[nodiscard]] std::uint32_t held_need(const City& c, std::uint8_t ware) const;
+    /// Improved computers: whether city `c` waits on a building for its materials (held_build).
+    [[nodiscard]] bool holds_build(const City& c) const;
+    /// A material runs short below half the city's supply target (`target`), or below what the
+    /// building the city waits on needs of it (`held`, held_need).
+    [[nodiscard]] static bool material_short(std::uint32_t stock, std::uint32_t target, std::uint32_t held) noexcept;
     /// Improved computers' first castle (t64): a rival `near` it and not at `peace` shows a stronger
     /// army (`theirs`, as seen) than its `own`.
     [[nodiscard]] static bool outmatched_by(bool near, bool peace, std::uint32_t theirs, std::uint32_t own) noexcept;
@@ -569,6 +577,8 @@ private:
     [[nodiscard]] bool unlocked(const AiPlayer& p, const assets::BuildingType& b) const;
     /// Money and goods of the current city cover the building.
     [[nodiscard]] bool affordable(const AiPlayer& p, const City& c, const assets::BuildingType& b) const;
+    /// Whether city `c` lacks wood, bricks or tools in store for building `b`.
+    [[nodiscard]] bool materials_missing(const City& c, const assets::BuildingType& b) const;
     /// First producer of `ware` from `raw`: the table the original builds at AI_Init.
     [[nodiscard]] const assets::BuildingType* producer(std::uint8_t ware, std::uint8_t raw) const;
     [[nodiscard]] const assets::BuildingType* by_id(std::uint32_t id) const { return m_buildings.by_id(id); }

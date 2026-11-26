@@ -3543,3 +3543,123 @@ TEST_CASE("ai: an improved computer goes to war below its gold reserve only on a
         g.military_cost = 20;
     }
 }
+
+TEST_CASE("ai supply: a material runs short below what the building the city waits on needs") {
+    // t76b: a plantation needs 8 t of bricks; a colony at 7 t, above half the target, got none.
+    constexpr std::uint32_t kT = 32;
+    CHECK(!sim::ai::Engine::material_short(7 * kT, 10 * kT, 0));
+    CHECK(sim::ai::Engine::material_short(7 * kT, 10 * kT, 8 * kT));
+    CHECK(!sim::ai::Engine::material_short(8 * kT, 10 * kT, 8 * kT));
+    CHECK(sim::ai::Engine::material_short(4 * kT, 10 * kT, 0));       // below half the target as before
+    CHECK(sim::ai::Engine::material_short(4 * kT, 10 * kT, 2 * kT));  // a smaller need lowers nothing
+}
+
+TEST_CASE("ai supply: a city without people that waits on a building's materials asks for them") {
+    // t76b: the colony's outposts were left out of every supply run, their plantations waiting.
+    for (const bool classic : {false, true}) {
+        Game g(false);
+        assets::BuildingType* kontor = g.buildings.by_id(kKontor);
+        REQUIRE(kontor != nullptr);
+        kontor->build_cost.bricks = 8 * 32;
+        kontor->build_cost.wood = 3 * 32;
+        kontor->build_cost.tools = 0;
+        sim::City c;
+        c.island = 1;
+        c.owner = kComputer;
+        g.world.add_city(c);
+        const sim::City& added = g.world.cities().back();
+        sim::City lost = added;  // the same city once another player holds it
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(g.world, g.buildings, g.figures, rules);
+        sim::ai::State state;
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        sim::ai::CityPlan r;
+        r.island = added.island;
+        r.city = added.index;
+        p.plans.push_back(r);
+        state.players.push_back(p);
+        sim::ai::Engine engine(s, state);
+        const auto& m = g.buildings.materials();
+        CHECK(!engine.holds_build(added));  // it waits on nothing: an outpost gets nothing
+        state.players[0].plans[0].held_build = kKontor;
+        CHECK(engine.holds_build(added) == !classic);
+        CHECK(engine.held_need(added, m.bricks) == (classic ? 0U : 8U * 32));
+        CHECK(engine.held_need(added, m.wood) == (classic ? 0U : 3U * 32));
+        CHECK(engine.held_need(added, m.tools) == 0);
+        lost.owner = kHuman;  // conquered: its old plan asks for nothing there
+        CHECK(!engine.holds_build(lost));
+    }
+}
+
+TEST_CASE("ai: a building a city waits on for its materials survives a save, and older saves load without") {
+    Game g(false);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ComputerPlayers ai(s);
+    ai.reset();
+    const std::uint32_t before = ai.state_version();
+    CHECK(before < sim::ai::kStateWithHeldBuild);
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(ai);
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, before);
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    sim::ai::CityPlan r;
+    r.island = 1;
+    r.held_build = kKontor;
+    state.players[0].plans.push_back(r);
+    annokit::core::ByteWriter out;
+    sim::ai::Saver saver(out, sim::ComputerPlayers::max_state_version());
+    saver(state);
+    const std::vector<std::uint8_t> bytes = out.take();
+    annokit::core::ByteReader in(bytes);
+    REQUIRE(ai.load(in, sim::ComputerPlayers::max_state_version()));
+    CHECK(ai.state_version() == sim::ai::kStateWithHeldBuild);
+    {
+        const std::vector<std::uint8_t> again = saved(ai);
+        annokit::core::ByteReader in2(again);
+        sim::StateIn reader(in2);
+        sim::ai::State copy;
+        sim::ai::Loader loader(reader, sim::ai::kStateWithHeldBuild);
+        loader(copy);
+        REQUIRE(reader.ok());
+        REQUIRE(!copy.players.empty());
+        REQUIRE(!copy.players[0].plans.empty());
+        CHECK(copy.players[0].plans.back().held_build == kKontor);
+    }
+    // An unknown building is refused.
+    state.players[0].plans.back().held_build = 1;
+    annokit::core::ByteWriter bad;
+    sim::ai::Saver bad_saver(bad, sim::ComputerPlayers::max_state_version());
+    bad_saver(state);
+    const std::vector<std::uint8_t> bad_bytes = bad.take();
+    annokit::core::ByteReader in_bad(bad_bytes);
+    CHECK(!ai.load(in_bad, sim::ComputerPlayers::max_state_version()));
+    // A game saved before (version 17) loads with no building waited on, and saves the same bytes.
+    state.players[0].plans.back().held_build = 0;
+    annokit::core::ByteWriter older;
+    sim::ai::Saver old_saver(older, sim::ai::kStateWithWarParty);
+    old_saver(state);
+    const std::vector<std::uint8_t> v17 = older.take();
+    annokit::core::ByteReader in3(v17);
+    REQUIRE(ai.load(in3, sim::ai::kStateWithWarParty));
+    CHECK(ai.state_version() < sim::ai::kStateWithHeldBuild);
+    {
+        const std::vector<std::uint8_t> again = saved(ai);
+        annokit::core::ByteReader in4(again);
+        sim::StateIn reader(in4);
+        sim::ai::State copy;
+        sim::ai::Loader loader(reader, ai.state_version());
+        loader(copy);
+        REQUIRE(reader.ok());
+        for (const sim::ai::CityPlan& k : copy.players[0].plans) {
+            CHECK(k.held_build == 0);
+        }
+    }
+}
