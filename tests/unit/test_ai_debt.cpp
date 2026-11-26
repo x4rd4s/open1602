@@ -143,6 +143,22 @@ TEST_CASE("ai settle: an island chosen as contested is landed on by the same rul
     CHECK(!Engine::leaves_room(false, true, true, false, true));  // too little free land
 }
 
+TEST_CASE("ai settle: an improved computer takes a small island for a colony when gold lies on it") {
+    // The search takes islands of size class 2 and up for the first city and colony, 1 and up later:
+    // an island of 30 x 30 tiles or less (class 0) never, gold or not.
+    CHECK(Engine::colony_size_class(0) == 2);
+    CHECK(Engine::colony_size_class(1) == 2);
+    CHECK(Engine::colony_size_class(2) == 1);
+    CHECK(Engine::islet_for_gold(true, false, 1, 0, true));
+    CHECK(Engine::islet_for_gold(true, false, 1, 1, true));  // the first colony, on a class 1 island
+    CHECK(Engine::islet_for_gold(true, false, 3, 0, true));
+    CHECK(!Engine::islet_for_gold(true, false, 3, 1, true));   // a class 1 island goes the usual way then
+    CHECK(!Engine::islet_for_gold(true, false, 1, 0, false));  // no free gold known there
+    CHECK(!Engine::islet_for_gold(false, false, 1, 0, true));  // the original's computers: as before
+    CHECK(!Engine::islet_for_gold(true, true, 1, 0, true));    // not the pirates
+    CHECK(!Engine::islet_for_gold(true, false, 0, 0, true));   // not for the first city
+}
+
 TEST_CASE("ai ships: a ship with soldiers aboard is not free for supply runs") {
     // Feedback 16, K4: a ship sailed ore to a Kontor with its troops aboard.
     CHECK(Engine::troops_aboard_idle(true, 4));

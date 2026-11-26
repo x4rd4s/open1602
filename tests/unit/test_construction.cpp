@@ -2337,9 +2337,10 @@ TEST_CASE("construction: the editor names the pirates' nest and gives them one c
     CHECK(editor::numbered_name(island.world, "Eingeborenendorf") == "Eingeborenendorf");
 }
 
-TEST_CASE("construction: water under grass comes back as meadow when no water borders it (F18)") {
+TEST_CASE("construction: water under grass comes back as meadow, beside the beach too (F18)") {
     // The ground layer can hold water where the island shows grass (an island template's water
-    // under a city's grass). Demolishing a house there showed the water amid land, with no shore.
+    // under a city's grass). Demolishing a house there showed the water amid land, with no shore;
+    // beside the beach a road torn down left a strip of open water in the island.
     Island island;
     island.found();
     sim::IslandMap& map = island.world.island(0).map;
@@ -2348,19 +2349,28 @@ TEST_CASE("construction: water under grass comes back as meadow when no water bo
         for (std::uint32_t x = 8; x <= 9; ++x) {
             map.set_ground_cell(x, y, sea);
         }
-        // Beside the beach the water still borders its shore: it stays water.
         map.set_ground_cell(5, y + 3, sea);
         map.set_ground_cell(6, y + 3, sea);
     }
+    for (std::uint32_t y = 18; y <= 19; ++y) {
+        map.set_ground_cell(5, y, sea);
+    }
     REQUIRE(island.build({{kHouse, 8, 13, 0, 0}}).placed == 1);
     REQUIRE(island.build({{kHouse, 5, 16, 0, 0}}).placed == 1);
+    REQUIRE(island.build({{kRoad, 5, 18, 0, 0}, {kRoad, 5, 19, 0, 0}}).placed == 2);
     CHECK(island.demolish({9, 14}, {9, 14}) == 1);
     CHECK(island.demolish({6, 17}, {6, 17}) == 1);
+    CHECK(island.demolish({5, 18}, {5, 19}) == 2);
     for (std::int32_t y = 13; y <= 14; ++y) {
         for (std::int32_t x = 8; x <= 9; ++x) {
             CHECK(island.at(x, y)->id == sim::id::kMeadow);
             CHECK(island.city_at(x, y) == 0);
         }
+        // Beside the beach as well: a house or road stood on land, and land comes back.
+        CHECK(island.at(5, y + 3)->id == sim::id::kMeadow);
+        CHECK(island.at(6, y + 3)->id == sim::id::kMeadow);
     }
-    CHECK(island.at(5, 16)->id == kSea);
+    for (std::int32_t y = 18; y <= 19; ++y) {
+        CHECK(island.at(5, y)->id == sim::id::kMeadow);
+    }
 }
