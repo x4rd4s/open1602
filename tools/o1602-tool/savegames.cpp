@@ -706,8 +706,24 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
 
 /// `--town-instances` of a .o1602: every building on the land of a city of a human or computer
 /// player, one line each, for drawing towns outside the tool (PB.2): its type's kind, production
-/// kind, radius and service as the table gives them, and its catchment as the game measures it.
+/// kind, radius and the needs it serves (as --city-metrics prints them) as the table gives them, and
+/// its catchment as the game measures it, with the circle of each radius.
 void town_instances(const sim::World& world, const assets::BuildingTable& buildings) {
+    namespace prod = assets::prod;
+    // The circles of the radii in use, as the game measures them: the half width at each row.
+    std::set<std::uint8_t> radii;
+    for (const assets::BuildingType& b : buildings.types()) {
+        if (b.radius != 0) {
+            radii.insert(b.radius);
+        }
+    }
+    for (const std::uint8_t r : radii) {
+        std::printf("circle %u:", static_cast<unsigned>(r));
+        for (const std::uint8_t half : sim::circle_table(r)) {
+            std::printf(" %u", static_cast<unsigned>(half));
+        }
+        std::printf("\n");
+    }
     for (std::size_t i = 0; i < world.islands().size(); ++i) {
         const sim::IslandMap& map = world.islands()[i].map;
         bool any = false;
@@ -745,8 +761,11 @@ void town_instances(const sim::World& world, const assets::BuildingTable& buildi
                     "radius %u serves 0x%X centre %d,%d parity %u,%u class %d\n",
                     i, static_cast<unsigned>(cell.city), static_cast<unsigned>(city->owner),
                     static_cast<unsigned>(owner->role), b.id, b.kind, b.prod_kind, x, y, w, h,
-                    static_cast<unsigned>(b.radius), static_cast<unsigned>(sim::service_of(b)), area.centre.x,
-                    area.centre.y, static_cast<unsigned>(area.parity_x), static_cast<unsigned>(area.parity_y),
+                    static_cast<unsigned>(b.radius),
+                    static_cast<unsigned>(sim::service_of(b) |
+                                          (b.prod_kind == prod::kMarket ? assets::public_building::kMarket : 0U)),
+                    area.centre.x, area.centre.y, static_cast<unsigned>(area.parity_x),
+                    static_cast<unsigned>(area.parity_y),
                     house != nullptr ? static_cast<int>(house->resident_class) : -1);
             }
         }
