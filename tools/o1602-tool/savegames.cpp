@@ -702,6 +702,55 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
     }
 }
 
+/// `--town-instances` of a .o1602: every building on the land of a city of a human or computer
+/// player, one line each, for drawing towns outside the tool (PB.2): its type's kind, production
+/// kind, radius and service as the table gives them, and its catchment as the game measures it.
+void town_instances(const sim::World& world, const assets::BuildingTable& buildings) {
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        const sim::IslandMap& map = world.islands()[i].map;
+        bool any = false;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::MapCell& cell = map.top(x, y);
+                if (cell.empty() || cell.city == sim::MapCell::kNoCity) {
+                    continue;
+                }
+                const sim::City* city = world.city(static_cast<std::uint16_t>(i), cell.city);
+                const sim::Player* owner = city != nullptr ? world.player(city->owner) : nullptr;
+                if (owner == nullptr ||
+                    (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+                    continue;
+                }
+                const sim::SubTile sub = map.sub_tile(buildings, x, y);
+                if (sub.building == nullptr || sub.origin_x != static_cast<std::int32_t>(x) ||
+                    sub.origin_y != static_cast<std::int32_t>(y)) {
+                    continue;
+                }
+                if (!any) {
+                    std::printf("island %zu size %ux%u\n", i, map.width(), map.height());
+                    any = true;
+                }
+                const assets::BuildingType& b = *sub.building;
+                std::uint32_t w = 1;
+                std::uint32_t h = 1;
+                sim::rotated_size(b, cell.rotation, w, h);
+                const sim::Catchment area =
+                    sim::catchment_of(b, cell.rotation, sim::TilePos{sub.origin_x, sub.origin_y});
+                const sim::House* house = world.house(static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(x),
+                                                      static_cast<std::uint16_t>(y));
+                std::printf(
+                    "building island %zu city %u owner %u role %u id %u kind %d prod %d at %u,%u size %ux%u "
+                    "radius %u serves 0x%X centre %d,%d parity %u,%u class %d\n",
+                    i, static_cast<unsigned>(cell.city), static_cast<unsigned>(city->owner),
+                    static_cast<unsigned>(owner->role), b.id, b.kind, b.prod_kind, x, y, w, h,
+                    static_cast<unsigned>(b.radius), static_cast<unsigned>(sim::service_of(b)), area.centre.x,
+                    area.centre.y, static_cast<unsigned>(area.parity_x), static_cast<unsigned>(area.parity_y),
+                    house != nullptr ? static_cast<int>(house->resident_class) : -1);
+            }
+        }
+    }
+}
+
 int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players, bool summary,
               bool towns, bool town_maps) {
     for (std::size_t i = 0; i < world.players().size(); ++i) {
@@ -815,6 +864,9 @@ int cmd_state(const Args& args) {
                 return fail(figures.error());
             }
             city_metrics((*own)->world, (*own)->buildings, &*figures);
+        }
+        if (status == 0 && args.flag("--town-instances")) {
+            town_instances((*own)->world, (*own)->buildings);
         }
         return status;
     }
