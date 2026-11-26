@@ -567,7 +567,9 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
         std::map<std::uint32_t, Work> work;
         for (const Instance& in : instances) {
             const assets::BuildingType& b = *in.type;
-            if (!producer(b) || b.radius == 0 || b.raw_ware == 0 || grown_wares.count(b.raw_ware) == 0) {
+            // A catchment over water (a fisher's) is no land the town could take.
+            if (!producer(b) || b.radius == 0 || b.raw_ware == 0 || grown_wares.count(b.raw_ware) == 0 ||
+                sim::catchment_covers_water(b)) {
                 continue;
             }
             const sim::Catchment area = sim::catchment_of(b, in.rotation, sim::TilePos{in.x, in.y});
