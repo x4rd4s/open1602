@@ -42,3 +42,8 @@ kPartyRunwayMinutes | engine/sim/src/ai/ai_strategy.cpp | derived from: kWarChec
 30 | engine/sim/src/ai/ai_strategy.cpp | derived from: kPartyRunwayMinutes, kWarCheckMs (ten minutes) times kWarFails (three) in minutes
 100 | engine/sim/src/ai/ai_settle.cpp | derived from: the percent scale of VictoryConditions::islands_percent, as victory.cpp's islands test (own cities * 100 >= islands * percent) counts it, in goal_city_count
 99 | engine/sim/src/ai/ai_settle.cpp | derived from: 100 - 1, rounding goal_city_count's islands share up to whole cities so that victory.cpp's test is met
+kTrackMinutes | engine/sim/src/ai/ai_core.cpp | derived from: P0.3's shortest horizon (30 min) in three samples, within the hour the goods ledger keeps minute by minute (GoodsLedger::kMinutes); the period of track's log lines (only the log, no effect on play)
+10 | engine/sim/src/ai/ai_core.cpp | derived from: kTrackMinutes, track's log period (only the log)
+kTrackMs | engine/sim/src/ai/ai_core.cpp | derived from: kTrackMinutes in game milliseconds (only the log)
+60 | engine/sim/src/ai/ai_core.cpp | derived from: seconds per minute, kTrackMinutes in game milliseconds (only the log)
+1000 | engine/sim/src/ai/ai_core.cpp | derived from: milliseconds per second, kTrackMinutes in game milliseconds (only the log)
