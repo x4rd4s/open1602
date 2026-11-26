@@ -1522,10 +1522,10 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
         // weighed today.
         Commitment c;
         c.cost = first->own ? 0 : price_paid(p, first->ware, first->amount);
-        log_decision(p, "supply", first->ware, home.island, home.index, c, first->amount);
+        log_decision(p, "supply", first->ware, home.island, home.index, c, first->ware, first->amount);
         if (second) {
             c.cost = second->own ? 0 : price_paid(p, second->ware, second->amount);
-            log_decision(p, "supply", second->ware, home.island, home.index, c, second->amount);
+            log_decision(p, "supply", second->ware, home.island, home.index, c, second->ware, second->amount);
         }
     }
     if (rivals()) {

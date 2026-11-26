@@ -1083,7 +1083,8 @@ void Engine::task_settle_land(AiPlayer& p) {
         return;
     }
     if (logging()) {
-        log_decision(p, "found", s.crop, island, c->index, logged_commitment(p, s.crop));
+        const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
+        log_decision(p, "found", s.crop, island, c->index, logged_commitment(p, s.crop), 0, 0, home);
     }
     p.has_city = true;
     p.island = island;
@@ -1562,7 +1563,8 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         if (logging()) {
             Commitment c = logged_commitment(p, *best == kAnyCrop ? std::uint8_t{0} : *best);
             c.value = best_rank;  // the plan is chosen by its rank, gold a minute
-            log_decision(p, "colony plan", *best, -1, -1, c);
+            const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
+            log_decision(p, "colony plan", *best, -1, -1, c, 0, 0, home);
         }
     }
     // A ship is kept for it once the home city holds the load, so that the supply runs do not take
