@@ -314,7 +314,7 @@ namespace city_ids {
 constexpr std::int32_t kTitle = 43002;
 constexpr std::int32_t kSell = 43003;
 constexpr std::int32_t kBuy = 43004;
-constexpr std::int32_t kKontorPicture = 43005;
+constexpr std::int32_t kDemandButton = 43005;  // "Bedarf": no function in the original
 constexpr std::int32_t kStock = 43006;
 constexpr std::int32_t kMaterialLock = 43025;
 constexpr std::int32_t kTrader = 43026;
@@ -357,8 +357,9 @@ public:
         if (const assets::Gadget* g = m_stadt.layout().find(city_ids::kTrader)) {
             m_cart_icon = g->gfx;
         }
-        // No handler in the original: the Kontor picture.
-        m_stadt.set_disabled(city_ids::kKontorPicture, true);
+        // The demand button between buy and stock does nothing in the original: Open1602 hides it
+        // (free for a function of its own later).
+        m_stadt.set_visible(city_ids::kDemandButton, false);
     }
 
     void set_scale(double scale) override {
