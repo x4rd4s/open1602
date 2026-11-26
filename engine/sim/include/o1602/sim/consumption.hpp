@@ -20,6 +20,11 @@ namespace o1602::sim {
 
 /// Game time between two ticks of a city (the original's 10-s epochs).
 inline constexpr std::uint32_t kCityTickMs = 10'000;
+/// City ticks in a game minute.
+inline constexpr std::uint32_t kCityTicksPerMinute = 60'000 / kCityTickMs;
+/// The demand and supply of a good (City::Supply, A and B) and a class's needs per inhabitant and
+/// tick (ResidentClass::Need::amount, BuildingTable::food_need) count 1/256 of a stock unit: 1/8192 t.
+inline constexpr std::uint64_t kSupplyUnitsPerStockUnit = 256;
 
 struct CityEvent {
     enum class Kind : std::uint8_t {
@@ -92,6 +97,11 @@ void consume_natives(City& city);
 /// One tick of a pirates' nest: twice, a random ware with at least 10 t loses up to
 /// 3 t.
 void consume_pirates(City& city, Random& random);
+
+/// Taxes in gold per minute of `n` inhabitants of class `resident_class` at tax rate `rate` (128 =
+/// normal): trunc(trunc(K * n * 6 / 32) * rate / 128) with K = trunc(Steuer * 16 / 3).
+[[nodiscard]] std::int64_t class_tax(const assets::ResidentClass& resident_class, std::uint64_t n,
+                                     std::uint32_t rate) noexcept;
 
 /// Taxes of a city in gold per minute: per class trunc(trunc(K * n * 6 / 32) * tax
 /// / 128) with K = trunc(Steuer * 16 / 3).

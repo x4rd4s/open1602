@@ -1922,7 +1922,8 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
 std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType& b) const {
     // What the producers of `b` in the city made in their statistics windows, on average; for none
     // that has run a minute yet, half the full rate.
-    const std::uint64_t full = b.interval == 0 ? 0 : std::uint64_t{b.produce_amount} * 60 / b.interval;
+    const Sheet::Producer* rates = m_sheet.producer(b);
+    const std::uint64_t full = rates != nullptr ? rates->output : 0;
     const IslandMap& map = island_of(c.island).map;
     std::uint64_t sum = 0;
     std::uint32_t n = 0;
@@ -2018,20 +2019,14 @@ std::uint32_t Engine::ascent_extra(const City& c, std::size_t k, std::uint8_t w)
     if (k == 0 || k >= classes.size() || k - 1 >= c.inhabitants.size() || c.inhabitants[k - 1] == 0) {
         return 0;
     }
-    const auto amount = [&](std::size_t of) {
-        std::uint64_t a = 0;
-        for (const assets::ResidentClass::Need& n : classes[of].needs) {
-            a += n.ware == w ? n.amount : 0U;
-        }
-        return a;
-    };
+    const auto amount = [&](std::size_t of) { return m_sheet.need_amount(of, w); };
     const std::uint64_t up = amount(k);
     const std::uint64_t before = amount(k - 1);
     if (up <= before) {
         return 0;
     }
     const std::uint64_t risers = c.inhabitants[k - 1] / 2;
-    return static_cast<std::uint32_t>(std::min<std::uint64_t>((risers * (up - before) * 6) >> 8, 0xFFFFFFFFU));
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(Sheet::per_minute(risers * (up - before)), 0xFFFFFFFFU));
 }
 
 std::uint32_t Engine::demand_ahead(const City& c, std::uint8_t w) const {
@@ -2535,10 +2530,7 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
             return true;
         }
         // Counted with every house full, the new one too: houses fill up after they are built.
-        const auto& classes = m_buildings.resident_classes();
-        const auto room = [&](std::uint8_t k) -> std::uint64_t {
-            return k < classes.size() ? classes[k].max_per_house : 0;
-        };
+        const auto room = [&](std::uint8_t k) -> std::uint64_t { return m_sheet.max_per_house(k); };
         std::uint64_t full = room(0);
         for (const House& h : m_world.houses()) {
             if (h.island == c->island && h.city == c->index) {
@@ -2547,7 +2539,7 @@ bool Engine::need_houses(AiPlayer& p, std::uint32_t n) {
         }
         const std::uint64_t people = std::max<std::uint64_t>(population(*c), full);
         const auto eat = static_cast<std::uint32_t>(
-            std::min<std::uint64_t>((people * m_buildings.food_need() * 6) >> 8, 0xFFFFFFFFU));
+            std::min<std::uint64_t>(Sheet::per_minute(people * m_sheet.food_need()), 0xFFFFFFFFU));
         if (!food_lasts(c->stock(m_buildings.food_ware()), eat)) {
             return false;
         }

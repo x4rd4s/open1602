@@ -15,9 +15,9 @@ namespace o1602::sim {
 namespace {
 
 constexpr std::uint8_t kFull = kFullSupply;  // supply level / satisfaction of a fully provided good
-constexpr std::uint64_t kSupplyUnit = 256;   // A and B count 1/256 of a stock unit (1/32 t)
-constexpr std::uint8_t kHungerLevel = 76;    // "Euer Volk hungert" at or below
-constexpr std::uint32_t kNativeKeep = 96;    // natives keep 96/128 of their store
+constexpr std::uint64_t kSupplyUnit = kSupplyUnitsPerStockUnit;
+constexpr std::uint8_t kHungerLevel = 76;  // "Euer Volk hungert" at or below
+constexpr std::uint32_t kNativeKeep = 96;  // natives keep 96/128 of their store
 constexpr std::uint32_t kNativeGoodwillFloor = 49;
 // Natives' few needs: one unit of cloth, alcohol and jewellery per tick.
 constexpr std::array<std::uint8_t, 3> kNativeGoods = {ware::kCloth, ware::kAlcohol, ware::kJewellery};
@@ -217,13 +217,16 @@ void consume_pirates(City& city, Random& random) {
     }
 }
 
+std::int64_t class_tax(const assets::ResidentClass& resident_class, std::uint64_t n, std::uint32_t rate) noexcept {
+    const std::int64_t per_minute = std::int64_t{resident_class.tax} * static_cast<std::int64_t>(n) * 6 / 32;
+    return per_minute * std::int64_t{rate} / kFull;
+}
+
 std::int32_t tax_income(const City& city, const assets::BuildingTable& buildings) {
     const auto& classes = buildings.resident_classes();
     std::int64_t total = 0;
     for (std::size_t c = 0; c < classes.size() && c < city.inhabitants.size(); ++c) {
-        const std::int64_t per_minute = std::int64_t{classes[c].tax} * city.inhabitants[c] * 6 / 32;
-        const std::int64_t rate = c < city.tax_rate.size() ? city.tax_rate[c] : kFull;
-        total += per_minute * rate / kFull;
+        total += class_tax(classes[c], city.inhabitants[c], c < city.tax_rate.size() ? city.tax_rate[c] : kFull);
     }
     return static_cast<std::int32_t>(total);
 }

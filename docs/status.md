@@ -1,6 +1,6 @@
 # Implementation status
 
-Status: 2026-11-25 (release 0.8.0; what each release changed is in [releases/](releases)). This page is the overview
+Status: 2026-11-26 (release 0.9.0; what each release changed is in [releases/](releases)). This page is the overview
 and the single place for the status of the project. The details are in the linked documents, each in
 its "Open" section. It is updated with every completed step.
 
