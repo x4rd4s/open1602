@@ -13,6 +13,7 @@ add_library(o1602_sim
     src/ai/ai_sites.cpp
     src/ai/ai_budget.cpp
     src/ai/ai_overview.cpp
+    src/ai/ai_view.cpp
     src/ai/ai_world.cpp
     src/blueprints.cpp
     src/construction.cpp

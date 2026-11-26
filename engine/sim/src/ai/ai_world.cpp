@@ -5,6 +5,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/growth.hpp"
 
@@ -325,19 +326,6 @@ const assets::BuildingType* Engine::producer(std::uint8_t w, std::uint8_t raw) c
     return nullptr;
 }
 
-std::uint32_t Engine::fertility(std::uint16_t island, std::uint8_t w) const {
-    return island < m_world.islands().size() ? island_fertility(m_world, m_world.islands()[island], w) : 0;
-}
-
-std::uint32_t Engine::full_crops(std::uint16_t island) const {
-    std::uint32_t n = 0;
-    for (const std::uint8_t w : {ware::kSpiceField, ware::kTobaccoField, ware::kWineField, ware::kCottonField,
-                                 ware::kCocoaField, ware::kSugarField}) {
-        n += fertility(island, w) == 128 ? 1U : 0U;
-    }
-    return n;
-}
-
 bool Engine::is_settler(PlayerId owner) const {
     const Player* pl = m_world.player(owner);
     return pl != nullptr && (pl->role == PlayerRole::Human || pl->role == PlayerRole::Computer);
@@ -412,7 +400,7 @@ bool Engine::behind(const AiPlayer& p) const {
             threshold = best_pop + best_pop / 2;
             break;
     }
-    return total_population(p.player) < threshold || army_strength(p.player) < best_army;
+    return view(p).own_population() < threshold || army_strength(p.player) < best_army;
 }
 
 bool Engine::threatened(const AiPlayer& p) const {

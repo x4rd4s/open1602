@@ -10,6 +10,7 @@
 
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/disasters.hpp"
@@ -544,10 +545,8 @@ Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) c
         needed[w] = true;
     }
     const auto& classes = m_buildings.resident_classes();
-    for (const City& o : m_world.cities()) {
-        if (o.owner != p.player) {
-            continue;
-        }
+    for (const City* own_o : view(p).own_cities()) {
+        const City& o = *own_o;
         std::size_t top = 0;
         for (std::size_t k = 0; k < classes.size() && k < o.inhabitants.size(); ++k) {
             if (o.inhabitants[k] != 0) {
@@ -1255,7 +1254,7 @@ std::uint32_t Engine::colony_fields(std::uint8_t max_stage) noexcept {
 bool Engine::colony_luxury(AiPlayer& p, const City& c, const CityPlan& r, std::uint32_t tiles_per_field) {
     // Luxury crops of a colony by the highest stage the player reached (stage 1, 0x17).
     const std::uint32_t n = r.land / tiles_per_field;
-    const std::uint32_t q = full_crops(c.island);
+    const std::uint32_t q = view(p).full_crops(c.island);
     const std::uint32_t cap = colony_fields(p.max_stage);
     switch (p.max_stage) {
         case stage::kSettlers:
@@ -1436,7 +1435,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Colony)) {
                 return;
             }
-            if (full_crops(c.island) == 0) {
+            if (view(p).full_crops(c.island) == 0) {
                 const std::uint32_t n =
                     std::min(r.land / at.ai_colony_animal_tiles, grown(r, at.ai_colony_animals, true));
                 if (need(p, kSlotSheep, n) || need(p, kSlotCattle, n)) {
@@ -1502,7 +1501,7 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
             if (needs(ComputerList::Second)) {
                 return;
             }
-            set_stage(p, r, full_crops(c.island) != 0 ? stage::kSecondLuxury : stage::kSecondFarming);
+            set_stage(p, r, view(p).full_crops(c.island) != 0 ? stage::kSecondLuxury : stage::kSecondFarming);
             return;
         }
         case stage::kSecondLuxury: {
@@ -1729,7 +1728,7 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     // where it grows fully.
     const std::vector<ComputerProducer>& changes = m_world.balance().computer_producers;
     if (const ComputerSlot* k = computer_slot(slots(), which);
-        k != nullptr && k->instead != kNoProducer && fertility(c->island, k->instead_crop) == 128) {
+        k != nullptr && k->instead != kNoProducer && view(p).fertility(c->island, k->instead_crop).value_or(0) == 128) {
         // With `instead_unlocked`, only once its building is unlocked.
         bool open = k->instead_unlocked == kNoProducer;
         if (!open) {
@@ -1793,7 +1792,7 @@ bool Engine::need(AiPlayer& p, std::uint8_t which, std::uint32_t n, bool cov) {
     if (slot->raw_stock != 0 && c->stock(slot->raw) <= slot->raw_stock * kStockUnitsPerTon) {
         return false;
     }
-    if (d->fertile != 0 && fertility(c->island, d->fertile) == 0) {
+    if (d->fertile != 0 && view(p).fertility(c->island, d->fertile).value_or(0) == 0) {
         return false;
     }
     const assets::BuildingType* b = d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
@@ -1897,7 +1896,7 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
         (void)need(p, n.raw_slot, 1);
         return p.stack.size() > before;
     }
-    if (n.fertile != 0 && fertility(c.island, n.fertile) == 0) {
+    if (n.fertile != 0 && view(p).fertility(c.island, n.fertile).value_or(0) == 0) {
         return false;
     }
     const assets::BuildingType* b = by_id(n.building);
@@ -2720,8 +2719,9 @@ std::uint32_t Engine::home_shortfall(AiPlayer& p, std::uint8_t w) {
     }
     std::uint64_t missing = wanted - made;
     // What the other cities make beyond their own use comes by ship (home_supply_route).
-    for (const City& o : m_world.cities()) {
-        if (o.owner != p.player || &o == home) {
+    for (const City* own_o : view(p).own_cities()) {
+        const City& o = *own_o;
+        if (&o == home) {
             continue;
         }
         const std::uint32_t own = supply(o, w);
@@ -3240,14 +3240,15 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
         return b != nullptr ? b->running_cost : 0;
     };
     // 1. Iron
-    if (p.score >= 2 && fertility(c->island, ware::kOre) >= 64 && home->stock(ware::kOre) < 10 * kTon) {
+    if (p.score >= 2 && view(p).fertility(c->island, ware::kOre).value_or(0) >= 64 &&
+        home->stock(ware::kOre) < 10 * kTon) {
         static constexpr std::array<std::uint32_t, 4> kMines{1, 2, 2, 3};
         if (need_iron_mine(p, kMines[std::min<std::uint32_t>(difficulty(), 3)])) {
             return true;
         }
     }
     // 2. Gold
-    if (p.score >= 4 && fertility(c->island, ware::kGold) >= 64) {
+    if (p.score >= 4 && view(p).fertility(c->island, ware::kGold).value_or(0) >= 64) {
         const auto gold = need_def(slots(), kSlotGoldMine, m_world.balance().computer_producers);
         const assets::BuildingType* mine = gold ? by_id(gold->fixed) : nullptr;
         if (mine != nullptr && mine->running_cost < budget && need_gold_mine(p)) {
@@ -3279,7 +3280,7 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     // make up what its cities lack, beyond the order's number.
     std::array<Crop, 6> order = crops;
     if (rivals()) {
-        wine_island = fertility(c->island, ware::kWineField) == 128;
+        wine_island = view(p).fertility(c->island, ware::kWineField).value_or(0) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
             if (critical_short(p.player, crop.good) != 0) {
                 return std::uint64_t{0};
@@ -3292,7 +3293,8 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             continue;
         }
         bool half = false;  // grows half here, planted for a dry market
-        if (const std::uint32_t f = fertility(c->island, crop.field); !plants_on(f, false, true, true, false)) {
+        if (const std::uint32_t f = view(p).fertility(c->island, crop.field).value_or(0);
+            !plants_on(f, false, true, true, false)) {
             // Open1602: where it grows only half, an improved computer plants it too while its cities
             // lack the good and no partner offers it (gate f26, g4-202 P3: its tobacco goods came
             // only by ship; when the market ran dry its citizens left, 420 to 133).

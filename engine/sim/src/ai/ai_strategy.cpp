@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ai_engine.hpp"
+#include "ai_view.hpp"
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/mission.hpp"
@@ -240,10 +241,8 @@ void Engine::plan_strategy(AiPlayer& p) {
 
     if (player(p).money < 0) {
         // In debt: how each city fares, for the log only.
-        for (const City& c : m_world.cities()) {
-            if (c.owner != p.player) {
-                continue;
-            }
+        for (const City* own_c : view(p).own_cities()) {
+            const City& c = *own_c;
             std::string line;
             for (std::size_t k = 0; k < c.inhabitants.size(); ++k) {
                 if (c.inhabitants[k] != 0) {
@@ -418,10 +417,8 @@ void Engine::restructure(AiPlayer& p) {
     const City* home = home_city(p);
     const City* largest = nullptr;
     std::vector<const City*> own;
-    for (const City& c : m_world.cities()) {
-        if (c.owner != p.player) {
-            continue;
-        }
+    for (const City* own_c : view(p).own_cities()) {
+        const City& c = *own_c;
         own.push_back(&c);
         if (largest == nullptr || population(c) > population(*largest)) {
             largest = &c;
@@ -727,7 +724,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
             continue;
         }
         for (const City& c : m_world.cities()) {
-            if (c.owner == b && grows(c.island, field) && knows_crops(p, c.island)) {
+            if (c.owner == b && view(p).grows(c.island, field) && knows_crops(p, c.island)) {
                 return true;
             }
         }
@@ -738,7 +735,7 @@ bool Engine::holds_wanted_crop(const AiPlayer& p, PlayerId b) const {
 bool Engine::settle_room(const AiPlayer& p) const {
     // Below the city limit, or (Merlin, 2026-11-24) with the scaled limit, where the island a war
     // frees may be settled above it.
-    return own_city_count(p.player) < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
+    return view(p).own_city_count() < city_room(p) || m_sim.rules().computer_cities == ComputerCities::Scaled;
 }
 
 bool Engine::stock_covers(std::uint32_t shortfall, std::uint64_t held, std::uint64_t minutes) noexcept {

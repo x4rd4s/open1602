@@ -16,6 +16,7 @@
 
 #include "../../engine/sim/src/ai/ai_archive.hpp"
 #include "../../engine/sim/src/ai/ai_engine.hpp"
+#include "../../engine/sim/src/ai/ai_view.hpp"
 #include "../test_framework.hpp"
 
 #include "annokit/core/byte_reader.hpp"
@@ -3541,5 +3542,137 @@ TEST_CASE("ai: an improved computer goes to war below its gold reserve only on a
         CHECK(sim::ai::war_carried(g));
         g.pays_upkeep = true;
         g.military_cost = 20;
+    }
+}
+
+TEST_CASE("ai view: own cities, and the others' only on islands the viewer discovered") {
+    Game g;
+    sim::City own;
+    own.island = 1;
+    own.owner = kComputer;
+    own.inhabitants = {40};
+    g.world.add_city(own);
+    sim::City other;
+    other.island = 0;
+    other.owner = kHuman;
+    other.inhabitants = {90};
+    g.world.add_city(other);
+    sim::House h;
+    h.island = 0;
+    h.city = 0;
+    g.world.add_house(h);
+    h.x = 2;
+    g.world.add_house(h);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::ai::View v = engine.view(p);
+    CHECK(v.own_city_count() == 1);
+    CHECK(v.own_population() == 40);
+    REQUIRE(v.own_cities().size() == 1);
+    CHECK(v.own_cities().front()->island == 1);
+    // The human's city stands on an island the computer has not discovered.
+    CHECK(v.seen_city_count(kHuman) == 0);
+    CHECK(v.seen_houses(kHuman) == 0);
+    g.world.island(0).discover(kComputer);
+    CHECK(v.seen_city_count(kHuman) == 1);
+    CHECK(v.seen_houses(kHuman) == 2);
+    // Its own cities it always sees.
+    CHECK(v.seen_city_count(kComputer) == 1);
+    // What a foreign city makes is not the viewer's statistics.
+    CHECK(v.own_supply(*g.world.city(0, 0), assets::ware::kCloth) == 0);
+}
+
+TEST_CASE("ai view: an island's crops once explored, its outline always") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::ai::View v = engine.view(p);
+    CHECK(!v.knows_island(1));
+    CHECK(!v.fertility(1, assets::ware::kSpiceField).has_value());
+    const std::uint32_t size = v.island_size(1);
+    g.world.island(1).discover(kComputer);
+    CHECK(v.island_size(1) == size);
+    CHECK(v.knows_island(1));
+    CHECK(!v.knows_crops(1));
+    CHECK(!v.fertility(1, assets::ware::kSpiceField).has_value());
+    g.world.island(1).explore(kComputer);
+    REQUIRE(v.fertility(1, assets::ware::kSpiceField).has_value());
+    CHECK(*v.fertility(1, assets::ware::kSpiceField) == 128);  // every crop grows there fully
+    CHECK(!v.fertility(99, assets::ware::kSpiceField).has_value());
+}
+
+TEST_CASE("ai view: what an island grows and its free veins only once its crops are known") {
+    Game g;
+    assets::IslandHeader::Deposit vein;
+    vein.ware = assets::ware::kGold;
+    vein.x = 20;
+    vein.y = 20;
+    vein.amount = 100;
+    g.world.island(1).header.deposits.push_back(vein);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    const sim::ai::View v = engine.view(p);
+    g.world.island(1).discover(kComputer);  // seen, not explored: the crops are still unknown
+    CHECK(!v.grows(1, assets::ware::kSpiceField));
+    CHECK(!v.grows(1, assets::ware::kGold));
+    CHECK(v.full_crops(1) == 0);
+    CHECK(!v.free_deposit(1, assets::ware::kGold));
+    g.world.island(1).explore(kComputer);
+    CHECK(v.grows(1, assets::ware::kSpiceField));
+    CHECK(v.grows(1, assets::ware::kGold));  // a big vein
+    CHECK(!v.grows(1, assets::ware::kOre));  // no ore vein
+    CHECK(v.full_crops(1) == 6);             // every crop grows there fully
+    CHECK(v.free_deposit(1, assets::ware::kGold));
+    CHECK(!v.free_deposit(1, assets::ware::kOre));
+    CHECK(!v.free_deposit(99, assets::ware::kGold));
+}
+
+TEST_CASE("ai view: a partner's Kontor offer only while known, and the hardest level is the one that sees all") {
+    constexpr std::uint8_t kWare = assets::ware::kCloth;
+    constexpr std::uint32_t kTon = 32;
+    for (const std::uint8_t difficulty : {std::uint8_t{2}, std::uint8_t{3}}) {
+        Game g;
+        sim::World::GameSettings settings = g.world.game_settings();
+        settings.difficulty = difficulty;
+        g.world.set_game_settings(settings);
+        sim::City c;
+        c.island = 1;
+        c.owner = kHuman;
+        g.world.add_city(c);
+        sim::City* city = g.world.city(1, 0);
+        REQUIRE(city != nullptr);
+        city->ensure_ware(kWare);
+        city->trade.resize(std::size_t{kWare} + 1);
+        city->trade[kWare].sell = true;
+        city->trade[kWare].sell_price = 42;
+        city->trade[kWare].keep = 10 * kTon;
+        city->goods[kWare] = 30 * kTon;
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        const sim::ai::View v = engine.view(p);
+        const bool hardest = difficulty == 3;
+        CHECK(v.omniscient_level() == hardest);
+        CHECK(v.kontor_offer(*city, kWare).has_value() == hardest);
+        g.world.island(1).discover(kComputer);
+        const auto offer = v.kontor_offer(*city, kWare);
+        REQUIRE(offer.has_value());
+        CHECK(offer->price == 42);
+        CHECK(offer->offered == 20U * kTon);
+        // What it does not sell, and an own Kontor, offer nothing here.
+        CHECK(!v.kontor_offer(*city, assets::ware::kTools).has_value());
+        city->owner = kComputer;
+        CHECK(!v.kontor_offer(*city, kWare).has_value());
     }
 }

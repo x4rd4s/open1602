@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "ai_engine.hpp"
+#include "ai_view.hpp"
 
 namespace o1602::sim::ai {
 
@@ -349,10 +350,8 @@ void Engine::logistics(AiPlayer& p) {
     if (rivals() && p.cities != 0) {
         scout(p);
     }
-    for (const City& c : m_world.cities()) {
-        if (c.owner != p.player) {
-            continue;
-        }
+    for (const City* own_c : view(p).own_cities()) {
+        const City& c = *own_c;
         if (static_cast<std::int32_t>(patrols(p, c.island)) < p.ships_per_city) {
             Ship* s = pick_patrol_ship(p, healthy);
             if (s == nullptr) {
@@ -1307,8 +1306,9 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     if (supply_need(p, home, food) >= first) {
         City* hungry = nullptr;
         std::uint64_t hungry_need = first;
-        for (const City& c : m_world.cities()) {
-            if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+        for (const City* own_c : view(p).own_cities()) {
+            const City& c = *own_c;
+            if (&c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
                 continue;
             }
             if (const std::uint64_t need = supply_need(p, c, food); need < hungry_need) {
@@ -1326,8 +1326,9 @@ City* Engine::supply_destination(AiPlayer& p, City& home) {
     if (best_need < first) {
         return best;
     }
-    for (const City& c : m_world.cities()) {
-        if (c.owner != p.player || &c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
+    for (const City* own_c : view(p).own_cities()) {
+        const City& c = *own_c;
+        if (&c == &home || c.island == home.island || !c.warehouse_x || population(c) == 0) {
             continue;
         }
         const std::uint64_t need = supply_need(p, c);
