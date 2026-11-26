@@ -635,7 +635,7 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
             continue;
         }
         // A public building of a kind of its own gives its own service (own_buildings.toml).
-        const assets::ServiceBits bit = b->own_service != 0 ? b->own_service : service_bit(b->prod_kind);
+        const assets::ServiceBits bit = service_of(*b);
         if (bit == 0 && b->prod_kind != prod::kMarket) {
             continue;
         }
@@ -667,19 +667,14 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
         for (auto it = std::lower_bound(sources.begin(), sources.end(), house.city, by_city);
              it != sources.end() && it->city == house.city; ++it) {
             const Source& s = *it;
-            const std::int32_t dx = gap(s.x, s.w, house.x, hw);
-            const std::int32_t dy = gap(s.y, s.h, house.y, hh);
-            const auto r = static_cast<std::int32_t>(s.radius);
-            if (dx > r || dy > r) {
-                continue;
-            }
-            const std::vector<std::uint8_t>& circle = circle_table(s.radius);
-            if (dx > circle[static_cast<std::size_t>(dy)]) {
+            if (!reaches(s.x, s.y, s.w, s.h, s.radius, house.x, house.y, hw, hh)) {
                 continue;
             }
             if (s.bit != 0) {
                 house.services |= s.bit;
             } else {
+                const std::int32_t dx = gap(s.x, s.w, house.x, hw);
+                const std::int32_t dy = gap(s.y, s.h, house.y, hh);
                 house.market = true;
                 const std::uint8_t d =
                     t.distance[static_cast<std::size_t>(std::min(dx, 16))][static_cast<std::size_t>(std::min(dy, 16))];
@@ -691,6 +686,23 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
 }
 
 }  // namespace
+
+std::span<const assets::ServiceBits> class_needs(const assets::BuildingTable& buildings,
+                                                 std::uint8_t resident_class) noexcept {
+    return needs_of(buildings, resident_class);
+}
+
+assets::ServiceBits service_of(const assets::BuildingType& building) noexcept {
+    return building.own_service != 0 ? building.own_service : service_bit(building.prod_kind);
+}
+
+bool reaches(std::int32_t x, std::int32_t y, std::uint32_t w, std::uint32_t h, std::uint8_t radius, std::int32_t hx,
+             std::int32_t hy, std::uint32_t hw, std::uint32_t hh) {
+    const std::int32_t dx = gap(x, w, hx, hw);
+    const std::int32_t dy = gap(y, h, hy, hh);
+    const auto r = static_cast<std::int32_t>(radius);
+    return dx <= r && dy <= r && dx <= circle_table(radius)[static_cast<std::size_t>(dy)];
+}
 
 void update_services(World& world, const assets::BuildingTable& buildings, std::uint16_t island) {
     services_on(world, buildings, island, nullptr);

@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -25,13 +26,18 @@
 #include "o1602/assets/game_content.hpp"
 #include "o1602/assets/game_directory.hpp"
 #include "o1602/assets/island.hpp"
+#include "o1602/assets/original_names.hpp"
 #include "o1602/assets/savegame.hpp"
 #include "o1602/assets/scenario.hpp"
 #include "o1602/assets/text_table.hpp"
 #include "o1602/sim/climates.hpp"
 #include "o1602/sim/computer_orders.hpp"
+#include "o1602/sim/houses.hpp"
+#include "o1602/sim/island_map.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/package_islands.hpp"
+#include "o1602/sim/pathfinding.hpp"
+#include "o1602/sim/production_cycle.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_writer.hpp"
 #include "o1602/sim/world.hpp"
@@ -369,6 +375,403 @@ void town_summary(const sim::World& world, const assets::BuildingTable& building
 /// `state` of a .o1602: players, cities with their goods, ships, the computers' producers a package
 /// changed; with `buildings_of_players`, how many buildings of each Id every player owns; with
 /// `summary`, player_summary().
+/// `--city-metrics` of a .o1602: how each city of a human or computer player is built (PB.1).
+/// Kinds, radii, needs and rates come from the building table; no building is named.
+void city_metrics(const sim::World& world, const assets::BuildingTable& buildings, const assets::FigureTable* figures) {
+    namespace kind = assets::kind;
+    namespace prod = assets::prod;
+    const auto grown = [](const assets::BuildingType& b) {
+        return b.prod_kind == prod::kRipe || b.prod_kind == prod::kGrowing;
+    };
+    const auto producer = [&](const assets::BuildingType& b) { return b.interval != 0 && !grown(b); };
+    const auto house = [](const assets::BuildingType& b) { return b.prod_kind == prod::kHouse; };
+    const auto way = [](const assets::BuildingType& b) {
+        return b.kind == kind::kRoad || b.kind == kind::kSquare || b.kind == kind::kBridge;
+    };
+    // A ware grows on the map when a growing record of the table carries it.
+    std::set<std::uint8_t> grown_wares;
+    for (const assets::BuildingType& b : buildings.types()) {
+        if (grown(b) && b.ware != 0) {
+            grown_wares.insert(b.ware);
+        }
+    }
+    // The readable name of a building of the original (original_names.hpp), "-" for another.
+    const auto name_of = [](std::uint32_t id) {
+        for (const assets::OriginalName& n : assets::original_building_names()) {
+            if (id >= n.first && id < n.first + n.count) {
+                return std::string(n.name);
+            }
+        }
+        return std::string("-");
+    };
+    struct Instance {
+        const assets::BuildingType* type;
+        std::int32_t x;
+        std::int32_t y;
+        std::uint32_t w;
+        std::uint32_t h;
+        std::uint8_t rotation;
+    };
+    for (const sim::City& c : world.cities()) {
+        const sim::Player* owner = world.player(c.owner);
+        if (owner == nullptr || (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+            continue;
+        }
+        const sim::IslandMap& map = world.islands()[c.island].map;
+        const auto in_city = [&](const sim::MapCell& cell) { return cell.city == c.index && cell.owner == c.owner; };
+        std::vector<Instance> instances;
+        std::size_t town_tiles = 0;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::MapCell& cell = map.top(x, y);
+                if (cell.empty() || !in_city(cell)) {
+                    continue;
+                }
+                const sim::SubTile sub = map.sub_tile(buildings, x, y);
+                if (sub.building == nullptr) {
+                    continue;
+                }
+                const assets::BuildingType& b = *sub.building;
+                if (house(b) || way(b) || (b.kind == kind::kBuilding && !producer(b) && !grown(b))) {
+                    ++town_tiles;
+                }
+                if (sub.origin_x == static_cast<std::int32_t>(x) && sub.origin_y == static_cast<std::int32_t>(y)) {
+                    std::uint32_t w = 1;
+                    std::uint32_t h = 1;
+                    sim::rotated_size(b, cell.rotation, w, h);
+                    instances.push_back(
+                        Instance{&b, static_cast<std::int32_t>(x), static_cast<std::int32_t>(y), w, h, cell.rotation});
+                }
+            }
+        }
+        std::vector<const sim::House*> houses;
+        std::vector<Instance> house_rects;
+        std::size_t people = 0;
+        for (const sim::House& hs : world.houses()) {
+            if (hs.island != c.island || hs.city != c.index) {
+                continue;
+            }
+            const sim::MapCell& cell = map.top(hs.x, hs.y);
+            const assets::BuildingType* type = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+            std::uint32_t w = 1;
+            std::uint32_t h = 1;
+            if (type != nullptr) {
+                sim::rotated_size(*type, cell.rotation, w, h);
+            }
+            houses.push_back(&hs);
+            house_rects.push_back(Instance{type, hs.x, hs.y, w, h, cell.rotation});
+            people += hs.inhabitants();
+        }
+        if (houses.empty()) {
+            continue;
+        }
+        const auto way_at = [&](std::int32_t x, std::int32_t y) {
+            if (x < 0 || y < 0 || !map.contains(x, y)) {
+                return false;
+            }
+            const sim::MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+            return b != nullptr && way(*b);
+        };
+        // 1. Houses with a road or square on one of their edges.
+        std::size_t on_road = 0;
+        for (const Instance& r : house_rects) {
+            bool any = false;
+            for (std::uint32_t i = 0; i < r.w && !any; ++i) {
+                const auto x = r.x + static_cast<std::int32_t>(i);
+                any = way_at(x, r.y - 1) || way_at(x, r.y + static_cast<std::int32_t>(r.h));
+            }
+            for (std::uint32_t i = 0; i < r.h && !any; ++i) {
+                const auto y = r.y + static_cast<std::int32_t>(i);
+                any = way_at(r.x - 1, y) || way_at(r.x + static_cast<std::int32_t>(r.w), y);
+            }
+            on_road += any ? 1U : 0U;
+        }
+        // 4. The market.
+        std::size_t no_market = 0;
+        std::size_t distance = 0;
+        for (const sim::House* hs : houses) {
+            no_market += hs->market ? 0U : 1U;
+            distance += hs->market ? hs->market_distance : 0U;
+        }
+        const std::size_t with_market = houses.size() - no_market;
+        std::printf(
+            "city of player %u, island %u #%u: %zu houses, %zu inhabitants; %zu houses on a road; %zu without "
+            "market, market distance class %.2f; %.2f town tiles per inhabitant\n",
+            static_cast<unsigned>(c.owner), static_cast<unsigned>(c.island), static_cast<unsigned>(c.index),
+            houses.size(), people, on_road, no_market,
+            with_market != 0 ? static_cast<double>(distance) / static_cast<double>(with_market) : 0.0,
+            people != 0 ? static_cast<double>(town_tiles) / static_cast<double>(people) : 0.0);
+        // 2. Buildings that reach houses (a radius and no production cycle): reach and houses each.
+        std::map<std::uint32_t, std::vector<const Instance*>> reach_types;
+        for (const Instance& in : instances) {
+            if (in.type->radius != 0 && !producer(*in.type) && !grown(*in.type) && !house(*in.type)) {
+                reach_types[in.type->id].push_back(&in);
+            }
+        }
+        for (const auto& [id, list] : reach_types) {
+            std::size_t covered = 0;
+            for (const Instance& r : house_rects) {
+                covered +=
+                    std::any_of(list.begin(), list.end(),
+                                [&](const Instance* s) {
+                                    return sim::reaches(s->x, s->y, s->w, s->h, s->type->radius, r.x, r.y, r.w, r.h);
+                                })
+                        ? 1U
+                        : 0U;
+            }
+            const assets::BuildingType& t = *list.front()->type;
+            // The bits of the needs it serves: its service, and the market's need for a market.
+            const assets::ServiceBits serves =
+                sim::service_of(t) | (t.prod_kind == prod::kMarket ? assets::public_building::kMarket : 0U);
+            std::printf(
+                "  reach %u %s (radius %u, serves 0x%X): %zu built, %zu of %zu houses in reach, %.1f houses "
+                "each\n",
+                id, name_of(id).c_str(), static_cast<unsigned>(t.radius), static_cast<unsigned>(serves), list.size(),
+                covered, houses.size(), static_cast<double>(covered) / static_cast<double>(list.size()));
+        }
+        // 3. The needs of each class, as its houses have them.
+        for (std::size_t k = 0; k < buildings.resident_classes().size(); ++k) {
+            const auto cls = static_cast<std::uint8_t>(k);
+            std::size_t of_class = 0;
+            for (const sim::House* hs : houses) {
+                of_class += hs->resident_class == cls ? 1U : 0U;
+            }
+            if (of_class == 0) {
+                continue;
+            }
+            std::printf("  needs of class %zu (%zu houses):", k, of_class);
+            for (const assets::ServiceBits any : sim::class_needs(buildings, cls)) {
+                if (any == 0) {
+                    continue;
+                }
+                std::size_t have = 0;
+                for (const sim::House* hs : houses) {
+                    const assets::ServiceBits s = hs->services | (hs->market ? assets::public_building::kMarket : 0U);
+                    have += hs->resident_class == cls && (s & any) != 0 ? 1U : 0U;
+                }
+                std::printf(" 0x%X %zu", static_cast<unsigned>(any), have);
+            }
+            std::printf("\n");
+        }
+        // 5. Work areas of producers whose raw material grows on the map: what stands on them.
+        struct Work {
+            std::size_t built = 0;
+            std::size_t land = 0;
+            std::size_t fields = 0;
+            std::size_t by_houses = 0;
+            std::size_t by_producers = 0;
+            std::size_t by_ways = 0;
+            double worst = 0.0;
+        };
+        std::map<std::uint32_t, Work> work;
+        for (const Instance& in : instances) {
+            const assets::BuildingType& b = *in.type;
+            // A catchment over water (a fisher's) is no land the town could take.
+            if (!producer(b) || b.radius == 0 || b.raw_ware == 0 || grown_wares.count(b.raw_ware) == 0 ||
+                sim::catchment_covers_water(b)) {
+                continue;
+            }
+            const sim::Catchment area = sim::catchment_of(b, in.rotation, sim::TilePos{in.x, in.y});
+            const std::vector<std::uint8_t>& circle = sim::circle_table(area.radius);
+            Work one;
+            for (std::uint32_t j = 0; j < area.height(); ++j) {
+                for (std::uint32_t i = 0; i < area.width(); ++i) {
+                    const std::int32_t x = area.min().x + static_cast<std::int32_t>(i);
+                    const std::int32_t y = area.min().y + static_cast<std::int32_t>(j);
+                    const std::int32_t dx = std::max({0, area.centre.x - x, x - area.centre.x - area.parity_x});
+                    const std::int32_t dy = std::max({0, area.centre.y - y, y - area.centre.y - area.parity_y});
+                    if (dy > area.radius || dx > circle[static_cast<std::size_t>(dy)] || x < 0 || y < 0 ||
+                        !map.contains(x, y)) {
+                        continue;
+                    }
+                    const auto ux = static_cast<std::uint32_t>(x);
+                    const auto uy = static_cast<std::uint32_t>(y);
+                    if (map.top(ux, uy).empty()) {
+                        ++one.land;
+                        continue;
+                    }
+                    const sim::SubTile sub = map.sub_tile(buildings, ux, uy);
+                    const assets::BuildingType* t = sub.building;
+                    if (t == nullptr || (sub.origin_x == in.x && sub.origin_y == in.y)) {
+                        continue;
+                    }
+                    if (grown(*t)) {
+                        ++one.land;
+                        if (t->ware == b.raw_ware) {
+                            ++one.fields;
+                        } else {
+                            ++one.by_producers;
+                        }
+                    } else if (t->kind == kind::kGround || t->kind == kind::kForest) {
+                        ++one.land;
+                    } else if (house(*t)) {
+                        ++one.land;
+                        ++one.by_houses;
+                    } else if (producer(*t)) {
+                        ++one.land;
+                        ++one.by_producers;
+                    } else if (way(*t) || t->kind == kind::kBuilding) {
+                        ++one.land;
+                        ++one.by_ways;
+                    }
+                }
+            }
+            Work& sum = work[b.id];
+            ++sum.built;
+            sum.land += one.land;
+            sum.fields += one.fields;
+            sum.by_houses += one.by_houses;
+            sum.by_producers += one.by_producers;
+            sum.by_ways += one.by_ways;
+            if (one.land != 0) {
+                sum.worst = std::max(sum.worst, static_cast<double>(one.by_houses + one.by_producers + one.by_ways) /
+                                                    static_cast<double>(one.land));
+            }
+        }
+        const auto share = [](std::size_t n, std::size_t of) {
+            return of != 0 ? 100.0 * static_cast<double>(n) / static_cast<double>(of) : 0.0;
+        };
+        for (const auto& [id, s] : work) {
+            std::printf(
+                "  work area %u %s: %zu built, %zu land tiles, %zu of its raw material (%.1f each); blocked by houses "
+                "%zu (%.1f%%), producers %zu (%.1f%%), roads and public %zu (%.1f%%), worst %.1f%%\n",
+                id, name_of(id).c_str(), s.built, s.land, s.fields,
+                static_cast<double>(s.fields) / static_cast<double>(s.built), s.by_houses, share(s.by_houses, s.land),
+                s.by_producers, share(s.by_producers, s.land), s.by_ways, share(s.by_ways, s.land), 100.0 * s.worst);
+        }
+        // 6. Suppliers per processor, next to what the table's rates ask: the processor's raw use
+        // over the supplier's output (both per second of their cycles).
+        std::map<std::uint32_t, std::size_t> built;
+        for (const Instance& in : instances) {
+            ++built[in.type->id];
+        }
+        for (const auto& [id, n] : built) {
+            const assets::BuildingType& b = *buildings.by_id(id);
+            if (!producer(b) || b.raw_ware == 0 || b.raw_amount == 0) {
+                continue;
+            }
+            std::size_t suppliers = 0;
+            const assets::BuildingType* supplier = nullptr;
+            for (const auto& [sid, sn] : built) {
+                const assets::BuildingType& s = *buildings.by_id(sid);
+                if (producer(s) && s.ware == b.raw_ware && s.produce_amount != 0) {
+                    suppliers += sn;
+                    supplier = supplier != nullptr ? supplier : &s;
+                }
+            }
+            if (supplier == nullptr) {
+                continue;
+            }
+            const double asks =
+                (static_cast<double>(b.raw_amount) / static_cast<double>(b.interval)) /
+                (static_cast<double>(supplier->produce_amount) / static_cast<double>(supplier->interval));
+            std::printf("  supply %u %s (raw %u): %zu built, %zu suppliers, %.2f each; the table's rates ask %.2f\n",
+                        id, name_of(id).c_str(), static_cast<unsigned>(b.raw_ware), n, suppliers,
+                        static_cast<double>(suppliers) / static_cast<double>(n), asks);
+        }
+        // 7. What each producer type made against its full speed, the measure of the building window.
+        struct Use {
+            std::size_t n = 0;
+            std::int64_t sum = 0;
+            std::int64_t lowest = 100;
+        };
+        std::map<std::uint32_t, Use> use;
+        for (const sim::Production& p : world.productions()) {
+            if (!p.used || p.island != c.island || p.elapsed == 0 || !map.contains(p.x, p.y)) {
+                continue;
+            }
+            const sim::MapCell& cell = map.top(p.x, p.y);
+            const assets::BuildingType* b = cell.empty() ? nullptr : buildings.by_sprite(cell.sprite);
+            if (b == nullptr || !in_city(cell) || !producer(*b)) {
+                continue;
+            }
+            const std::uint32_t cycle = sim::full_speed_seconds(*b, figures);
+            if (cycle == 0) {
+                continue;
+            }
+            const std::int64_t full = std::int64_t{p.elapsed} * 32 / cycle;
+            const std::int64_t u = full == 0 ? 100 : std::min<std::int64_t>(100, std::int64_t{p.produced} * 100 / full);
+            Use& s = use[b->id];
+            ++s.n;
+            s.sum += u;
+            s.lowest = std::min(s.lowest, u);
+        }
+        for (const auto& [id, s] : use) {
+            std::printf("  use %u %s: %zu built, %.0f%% mean, %lld%% lowest\n", id, name_of(id).c_str(), s.n,
+                        static_cast<double>(s.sum) / static_cast<double>(s.n), static_cast<long long>(s.lowest));
+        }
+    }
+}
+
+/// `--town-instances` of a .o1602: every building on the land of a city of a human or computer
+/// player, one line each, for drawing towns outside the tool (PB.2): its type's kind, production
+/// kind, radius and the needs it serves (as --city-metrics prints them) as the table gives them, and
+/// its catchment as the game measures it, with the circle of each radius.
+void town_instances(const sim::World& world, const assets::BuildingTable& buildings) {
+    namespace prod = assets::prod;
+    // The circles of the radii in use, as the game measures them: the half width at each row.
+    std::set<std::uint8_t> radii;
+    for (const assets::BuildingType& b : buildings.types()) {
+        if (b.radius != 0) {
+            radii.insert(b.radius);
+        }
+    }
+    for (const std::uint8_t r : radii) {
+        std::printf("circle %u:", static_cast<unsigned>(r));
+        for (const std::uint8_t half : sim::circle_table(r)) {
+            std::printf(" %u", static_cast<unsigned>(half));
+        }
+        std::printf("\n");
+    }
+    for (std::size_t i = 0; i < world.islands().size(); ++i) {
+        const sim::IslandMap& map = world.islands()[i].map;
+        bool any = false;
+        for (std::uint32_t y = 0; y < map.height(); ++y) {
+            for (std::uint32_t x = 0; x < map.width(); ++x) {
+                const sim::MapCell& cell = map.top(x, y);
+                if (cell.empty() || cell.city == sim::MapCell::kNoCity) {
+                    continue;
+                }
+                const sim::City* city = world.city(static_cast<std::uint16_t>(i), cell.city);
+                const sim::Player* owner = city != nullptr ? world.player(city->owner) : nullptr;
+                if (owner == nullptr ||
+                    (owner->role != sim::PlayerRole::Human && owner->role != sim::PlayerRole::Computer)) {
+                    continue;
+                }
+                const sim::SubTile sub = map.sub_tile(buildings, x, y);
+                if (sub.building == nullptr || sub.origin_x != static_cast<std::int32_t>(x) ||
+                    sub.origin_y != static_cast<std::int32_t>(y)) {
+                    continue;
+                }
+                if (!any) {
+                    std::printf("island %zu size %ux%u\n", i, map.width(), map.height());
+                    any = true;
+                }
+                const assets::BuildingType& b = *sub.building;
+                std::uint32_t w = 1;
+                std::uint32_t h = 1;
+                sim::rotated_size(b, cell.rotation, w, h);
+                const sim::Catchment area =
+                    sim::catchment_of(b, cell.rotation, sim::TilePos{sub.origin_x, sub.origin_y});
+                const sim::House* house = world.house(static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(x),
+                                                      static_cast<std::uint16_t>(y));
+                std::printf(
+                    "building island %zu city %u owner %u role %u id %u kind %d prod %d at %u,%u size %ux%u "
+                    "radius %u serves 0x%X centre %d,%d parity %u,%u class %d\n",
+                    i, static_cast<unsigned>(cell.city), static_cast<unsigned>(city->owner),
+                    static_cast<unsigned>(owner->role), b.id, b.kind, b.prod_kind, x, y, w, h,
+                    static_cast<unsigned>(b.radius),
+                    static_cast<unsigned>(sim::service_of(b) |
+                                          (b.prod_kind == prod::kMarket ? assets::public_building::kMarket : 0U)),
+                    area.centre.x, area.centre.y, static_cast<unsigned>(area.parity_x),
+                    static_cast<unsigned>(area.parity_y),
+                    house != nullptr ? static_cast<int>(house->resident_class) : -1);
+            }
+        }
+    }
+}
+
 int own_state(const sim::World& world, const assets::BuildingTable& buildings, bool buildings_of_players, bool summary,
               bool towns, bool town_maps) {
     for (std::size_t i = 0; i < world.players().size(); ++i) {
@@ -467,9 +870,26 @@ int cmd_state(const Args& args) {
     }
     const auto mods = args.options.find("--mods");
     if (auto own = read_own_save(fs::path(args.positional[0]), mods != args.options.end() ? &mods->second : nullptr)) {
-        return *own ? own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"),
-                                args.flag("--towns"), args.flag("--town-maps"))
-                    : fail(own->error());
+        if (!*own) {
+            return fail(own->error());
+        }
+        const int status = own_state((*own)->world, (*own)->buildings, args.flag("--buildings"), args.flag("--summary"),
+                                     args.flag("--towns"), args.flag("--town-maps"));
+        if (status == 0 && args.flag("--city-metrics")) {
+            auto game = assets::GameDirectory::from_environment();
+            if (!game) {
+                return fail(game.error());
+            }
+            auto figures = assets::FigureTable::load(*game);
+            if (!figures) {
+                return fail(figures.error());
+            }
+            city_metrics((*own)->world, (*own)->buildings, &*figures);
+        }
+        if (status == 0 && args.flag("--town-instances")) {
+            town_instances((*own)->world, (*own)->buildings);
+        }
+        return status;
     }
     auto file = assets::ChunkFile::load(fs::path(args.positional[0]));
     if (!file) {

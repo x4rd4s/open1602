@@ -259,6 +259,14 @@ if(TARGET o1602-tool)
         set_tests_properties(tool:${_command}-o1602-without-data PROPERTIES
             ENVIRONMENT "ANNO1602_DIR=${_files}/no-installation")
     endforeach()
+    # --city-metrics and --town-instances are flags: they take no value, so the file is still read.
+    foreach(_flag city-metrics town-instances)
+        o1602_tool_test(state-${_flag}-without-data 1
+            STDERR "^error: [^\\n]*does not look like an Anno 1602 installation \\(missing haeuser.cod\\)\\n$"
+            ARGS state "${_files}/own.o1602" --${_flag})
+        set_tests_properties(tool:state-${_flag}-without-data PROPERTIES
+            ENVIRONMENT "ANNO1602_DIR=${_files}/no-installation")
+    endforeach()
     o1602_tool_test(check-mod-without-data 1
         STDERR "^error: [^\\n]*does not look like an Anno 1602 installation \\(missing haeuser.cod\\)\\n$"
         ARGS check-mod "${PROJECT_SOURCE_DIR}/data/mods")
