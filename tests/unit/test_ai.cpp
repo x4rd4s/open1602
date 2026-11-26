@@ -2865,9 +2865,10 @@ TEST_CASE("ai: when a city moves on to the next stage comes from the game's bala
 TEST_CASE("ai: improved computers settle on a large island another computer holds, the original's do not") {
     // The big island counts as one of the largest (a template of size class 4); a second computer
     // has a young city there (fewer than 50 inhabitants) and two more on islets, so that the island
-    // is open to others.
+    // is open to others. An improved computer counts only the cities it knows of (P1.5b): with the
+    // islets undiscovered the other looks like a small player, whose island it leaves alone.
     constexpr sim::PlayerId kOther = 4;
-    const auto founded = [&](bool classic, sim::PlayerRole other = sim::PlayerRole::Computer) {
+    const auto founded = [&](bool classic, sim::PlayerRole other = sim::PlayerRole::Computer, bool known = true) {
         Game g;
         g.add_islet(2, 80);
         g.world.island(1).header.template_number = 1;
@@ -2886,12 +2887,17 @@ TEST_CASE("ai: improved computers settle on a large island another computer hold
         add_city(1, kOther, 20);
         add_city(0, kOther, 20);
         add_city(2, kOther, 20);
+        if (known) {
+            g.world.island(0).discover(kComputer);
+            g.world.island(2).discover(kComputer);
+        }
         sim::Rules rules;
         rules.bugs.classic_ai = classic;
         sim::Simulation s(g.world, g.buildings, g.figures, rules);
         return run_until(s, 600'000, [&] { return g.cities_of(kComputer) != 0; });
     };
     CHECK(founded(false));
+    CHECK(!founded(false, sim::PlayerRole::Computer, false));
     CHECK(!founded(true));
     // A human's city there the original's computers settle beside.
     CHECK(founded(true, sim::PlayerRole::Human));
@@ -3670,6 +3676,32 @@ TEST_CASE("ai view: another player's soldiers count only on an island the viewer
         CHECK(v.seen_army(kHuman) == self.seen_army(kHuman));
         CHECK(v.seen_soldiers_on(kHuman, 99) == 0);
     }
+}
+
+TEST_CASE("ai view: soldiers on an island with a city of the viewer's own count, discovered or not") {
+    // A computer's own city island need not carry the discovered flag; a human sees the soldiers
+    // there all the same (P1.5b: seen_army by knows_island, as seen_soldiers_on).
+    Game g;
+    sim::World::GameSettings settings = g.world.game_settings();
+    settings.difficulty = 2;
+    g.world.set_game_settings(settings);
+    sim::City own;
+    own.island = 1;
+    own.owner = kComputer;
+    g.world.add_city(own);
+    g.world.add_soldier(
+        sim::make_soldier(40, 30, static_cast<std::uint16_t>(assets::FigureTable::kUnitFamilies[0]), kHuman, 1));
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    sim::ai::AiPlayer h;
+    h.player = kHuman;
+    REQUIRE(!g.world.islands()[1].discovered_by(kComputer));
+    REQUIRE(!engine.view(p).omniscient_level());
+    CHECK(engine.view(p).seen_soldiers_on(kHuman, 1) == 1);
+    CHECK(engine.view(p).seen_army(kHuman) == engine.view(h).seen_army(kHuman));
 }
 
 TEST_CASE("ai view: a partner's Kontor offer only while known, and the hardest level is the one that sees all") {

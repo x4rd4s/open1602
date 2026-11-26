@@ -522,6 +522,9 @@ private:
     /// Debug trace to stderr when O1602_AI_LOG is set.
     void log(const AiPlayer& p, const char* format, ...) const O1602_PRINTF_FORMAT(3, 4);
     [[nodiscard]] static bool logging() noexcept;
+    /// For the log (P1.5b): a choice that counts another player's cities as seen and would have gone
+    /// the other way with all of them.
+    void log_seen_cities(const AiPlayer& p, PlayerId owner, std::uint16_t island, const char* where) const;
     /// P0.2: one log line for a decision a computer takes, of `kind` (build, colony plan, found,
     /// supply), for `candidate` (a building id, a crop, a ware) in city `island`/`city` (-1: none),
     /// with what it expects: the costs and value of `c` over the budget's horizon, and `amount`
@@ -1587,6 +1590,10 @@ private:
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_sealed_logged;
     /// Player and city attack_ok passes over for towers out of the fleet's reach (only the log).
     mutable std::vector<std::pair<PlayerId, std::uint32_t>> m_skips_logged;
+    /// log_seen_cities' lines written, as viewer, owner, island, place and counts (only the log): a
+    /// search asks the same islands again and again, the log says each verdict once.
+    mutable std::vector<std::tuple<PlayerId, PlayerId, std::uint16_t, char, std::uint32_t, std::uint32_t>>
+        m_seen_logged;
     /// log_decision's id: the game time of the last decision logged and how many were logged at
     /// it (only the log).
     mutable std::uint64_t m_decision_ms = 0;
