@@ -660,19 +660,14 @@ void services_on(World& world, const assets::BuildingTable& buildings, std::uint
         for (auto it = std::lower_bound(sources.begin(), sources.end(), house.city, by_city);
              it != sources.end() && it->city == house.city; ++it) {
             const Source& s = *it;
-            const std::int32_t dx = gap(s.x, s.w, house.x, hw);
-            const std::int32_t dy = gap(s.y, s.h, house.y, hh);
-            const auto r = static_cast<std::int32_t>(s.radius);
-            if (dx > r || dy > r) {
-                continue;
-            }
-            const std::vector<std::uint8_t>& circle = circle_table(s.radius);
-            if (dx > circle[static_cast<std::size_t>(dy)]) {
+            if (!reaches(s.x, s.y, s.w, s.h, s.radius, house.x, house.y, hw, hh)) {
                 continue;
             }
             if (s.bit != 0) {
                 house.services |= s.bit;
             } else {
+                const std::int32_t dx = gap(s.x, s.w, house.x, hw);
+                const std::int32_t dy = gap(s.y, s.h, house.y, hh);
                 house.market = true;
                 const std::uint8_t d =
                     t.distance[static_cast<std::size_t>(std::min(dx, 16))][static_cast<std::size_t>(std::min(dy, 16))];
