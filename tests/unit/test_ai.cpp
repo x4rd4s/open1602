@@ -3827,14 +3827,14 @@ TEST_CASE("ai: an improved computer keeps its houses off the land its producers 
     CHECK(engine.work_land_under(p, circles, 40, 23, 41, 24) == 2);
     CHECK(engine.work_land_under(p, circles, 40, 26, 41, 27) == 0);
     CHECK(engine.work_land_under(p, {}, 40, 22, 41, 23) == 0);
-    // The order: fewer tiles on work land first, the score second. A site with a far higher score
-    // loses to one off the work land; the only site that scored still wins on it; a site that did
-    // not score stays out.
-    constexpr std::int32_t tier = (1 << 16) / (2 * 4);  // half the zone tier over a 2 x 2 site
-    CHECK(sim::ai::work_order(5'000, 1, 4, tier) < sim::ai::work_order(10, 0, 4, tier));
-    CHECK(sim::ai::work_order(5'000, 2, 4, tier) < sim::ai::work_order(10, 1, 4, tier));
-    CHECK(sim::ai::work_order(10, 2, 4, tier) < sim::ai::work_order(20, 2, 4, tier));
-    CHECK(sim::ai::work_order(5'000, 4, 4, tier) == 5'000);
-    CHECK(sim::ai::work_order(0, 0, 4, tier) == 0);
-    CHECK(sim::ai::work_order(-5, 0, 4, tier) == -5);
+    // The order: the side of the town zone first, then fewer tiles on work land, then the score.
+    // A site with a far higher score loses to one off the work land, but not across the zone's
+    // side; with the same tiles taken the score decides.
+    using sim::ai::HouseRank;
+    using sim::ai::ranks_above;
+    CHECK(ranks_above(HouseRank{true, 0, 10}, HouseRank{true, 1, 5'000}));
+    CHECK(ranks_above(HouseRank{true, 1, 10}, HouseRank{true, 2, 5'000}));
+    CHECK(ranks_above(HouseRank{true, 2, 20}, HouseRank{true, 2, 10}));
+    CHECK(ranks_above(HouseRank{true, 4, 10}, HouseRank{false, 0, 5'000}));
+    CHECK(!ranks_above(HouseRank{true, 1, 10}, HouseRank{true, 1, 10}));
 }

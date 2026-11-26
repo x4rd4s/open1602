@@ -195,13 +195,17 @@ struct TownZone {
 };
 /// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
 [[nodiscard]] bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y);
-/// Open1602 (PB.4): a house site's score ordered first by its tiles off a producer's work land
-/// (`area` of them, `reserved` on it) and only then by `score`: each free tile adds `tier`, more than
-/// any score reaches, so a site on work land wins only where every site that scored takes as much.
-/// A site that did not score stays out, as before; the town zone's tier stays above all of it.
-[[nodiscard]] constexpr std::int32_t work_order(std::int32_t score, std::int32_t reserved, std::int32_t area,
-                                                std::int32_t tier) noexcept {
-    return score > 0 ? score + (area - reserved) * tier : score;
+/// Open1602 (PB.4): what an improved computer ranks a house site that scored by: the side of the
+/// town zone first, then fewer tiles on its producers' work land, then the score.
+struct HouseRank {
+    bool in_zone = false;
+    std::int32_t reserved = 0;
+    std::int32_t score = 0;
+};
+/// Whether house site `a` ranks above `b`: an order, so a site on work land wins only where every
+/// site on its side of the zone takes as much.
+[[nodiscard]] constexpr bool ranks_above(const HouseRank& a, const HouseRank& b) noexcept {
+    return std::tuple(a.in_zone, -a.reserved, a.score) > std::tuple(b.in_zone, -b.reserved, b.score);
 }
 /// How far the middle of a site lies outside the town zone (negative: inside, by so much).
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
