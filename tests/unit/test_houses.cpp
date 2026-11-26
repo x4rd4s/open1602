@@ -546,7 +546,8 @@ TEST_CASE("houses: the visits of a timer group are those its clock ticks") {
 }
 
 TEST_CASE("houses: a full house rises exactly when rises() says, over every input of its ascent") {
-    const auto& classes = make_buildings().resident_classes();
+    const assets::BuildingTable table = make_buildings();
+    const auto& classes = table.resident_classes();
     for (std::size_t c = 0; c + 1 < classes.size(); ++c) {
         const auto cls = static_cast<std::uint8_t>(c);
         const auto next = static_cast<std::uint8_t>(c + 1);
@@ -595,7 +596,8 @@ TEST_CASE("houses: a full house rises exactly when rises() says, over every inpu
 }
 
 TEST_CASE("houses: a shrinking house falls exactly when falls() says, over every input of its descent") {
-    const auto& classes = make_buildings().resident_classes();
+    const assets::BuildingTable table = make_buildings();
+    const auto& classes = table.resident_classes();
     for (std::size_t c = 1; c < classes.size(); ++c) {
         const auto cls = static_cast<std::uint8_t>(c);
         const auto below = static_cast<std::uint8_t>(c - 1);
