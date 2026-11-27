@@ -249,3 +249,9 @@ TEST_CASE("game data: unit and ship figures come from the tables, not from id ar
         }
     }
 }
+
+TEST_CASE("building table: an empty table knows no id") {
+    const assets::BuildingTable empty;
+    CHECK(empty.by_id(20101) == nullptr);
+    CHECK(empty.by_id(0) == nullptr);
+}
