@@ -4114,3 +4114,17 @@ TEST_CASE("ai: the projected gold adds every city's taxes less its running costs
     CHECK(gold[2] == 25);
     CHECK(gold[3] == 35);
 }
+
+TEST_CASE("ai: open land for a farm counts a crop's field only where it bears (K3)") {
+    using sim::ai::Engine;
+    namespace ware = assets::ware;
+    // A plantation claims no market for desert grass its crop would not bear on.
+    CHECK(Engine::field_open(ware::kCornField, true, true, true));
+    CHECK(!Engine::field_open(ware::kCornField, true, true, false));
+    CHECK(!Engine::field_open(ware::kCocoaField, true, true, false));
+    // A herd's meadow is open wherever grass grows.
+    CHECK(Engine::field_open(ware::kWool, true, true, false));
+    // Claimed or built-on land never counts.
+    CHECK(!Engine::field_open(ware::kCornField, false, true, true));
+    CHECK(!Engine::field_open(ware::kWool, true, false, true));
+}

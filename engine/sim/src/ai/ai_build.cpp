@@ -486,7 +486,7 @@ void Engine::task_farm(AiPlayer& p, std::uint8_t task) {
     } else if (!classic() && !p.pirates && std::ranges::find(kFieldSlots, s.slot) != kFieldSlots.end()) {
         // Open1602: with no site left in its land, an improved computer claims open land of the
         // island for its farms with a market (claim_fields).
-        (void)claim_fields(p, s.slot);
+        (void)claim_fields(p, s.slot, b->raw_ware);
     }
 }
 

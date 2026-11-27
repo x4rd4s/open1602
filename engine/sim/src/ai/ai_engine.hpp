@@ -505,6 +505,9 @@ public:
     /// marks are, where the field would bear (`bears`, tile_fertile_at) and a player may plant too.
     /// The original's computers leave such tiles out; with "Fertile" every one of them bears, and
     /// the plantations stood with gaps (feedback 17).
+    /// K3: whether an unclaimed tile counts as land for `field`'s farm (field_land): open ground
+    /// a field may take, and for a crop only where it bears.
+    [[nodiscard]] static bool field_open(std::uint8_t field, bool unclaimed, bool plantable, bool bears) noexcept;
     [[nodiscard]] static bool bare_ground_planted(bool improved, std::int32_t tile_kind, std::uint8_t ware,
                                                   bool bears) noexcept;
     /// The same for tile `t` at (x, y) of the computer's island and a field of `field_ware`, for an
@@ -1127,9 +1130,10 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
-    /// Open1602: the place of the island with the most unclaimed land fields could take about it,
-    /// near the city's markets (kFieldLandTiles at least); false without one.
-    [[nodiscard]] bool field_land(const AiPlayer& p, std::int32_t& x, std::int32_t& y) const;
+    /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
+    /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
+    /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
+    [[nodiscard]] bool field_land(const AiPlayer& p, std::uint8_t field, std::int32_t& x, std::int32_t& y) const;
     /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
     /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
     bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
@@ -1148,7 +1152,7 @@ private:
     bool walk_ground(AiPlayer& p, GroundWalk& walk,
                      const std::function<void(std::int32_t i, std::int32_t x, std::int32_t y)>& visit);
     bool farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain);
-    bool claim_fields(AiPlayer& p, std::uint8_t slot);
+    bool claim_fields(AiPlayer& p, std::uint8_t slot, std::uint8_t field);
     /// Open1602: tiles of the city or of nobody within `r` of (x, y) that fields could take.
     [[nodiscard]] std::int32_t open_land(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                          std::int32_t r) const;

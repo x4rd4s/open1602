@@ -2452,14 +2452,14 @@ bool Engine::claim_land(AiPlayer& p, std::uint8_t slot, std::int32_t x, std::int
     return true;
 }
 
-bool Engine::claim_fields(AiPlayer& p, std::uint8_t slot) {
+bool Engine::claim_fields(AiPlayer& p, std::uint8_t slot, std::uint8_t field) {
     // Open1602: open land of the island for a farm whose slot found no site in the city's land:
     // the place with the most unclaimed land fields can take about it, nearest to the city's
     // markets, which a market then brings in (claim_land). Islands with a thousand free tiles and
     // more were left to the forest while the city starved.
     std::int32_t x = -1;
     std::int32_t y = -1;
-    if (!field_land(p, x, y)) {
+    if (!field_land(p, field, x, y)) {
         return false;
     }
     log(p, "fields: open land at %d,%d for slot %u", x, y, unsigned{slot});
