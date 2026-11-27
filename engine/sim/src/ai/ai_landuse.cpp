@@ -41,6 +41,25 @@ std::int32_t work_land_under(const LandUse& u, std::int32_t x0, std::int32_t y0,
     return n;
 }
 
+std::int32_t town_land_under(const LandUse& u, const Catchment& c) {
+    // Open1602 (PB.9): the free land of the town a work circle would take: free tiles of the zone,
+    // and outside it free tiles beside one of the city's houses, where the town grows on.
+    const auto house = [&](std::int32_t x, std::int32_t y) { return u.is(x, y, LandUse::Use::House); };
+    std::int32_t n = 0;
+    const TilePos lo = c.min();
+    for (std::int32_t y = lo.y; y < lo.y + static_cast<std::int32_t>(c.height()); ++y) {
+        for (std::int32_t x = lo.x; x < lo.x + static_cast<std::int32_t>(c.width()); ++x) {
+            if (!u.is(x, y, LandUse::Use::Free) || !in_circle(c, x, y)) {
+                continue;
+            }
+            const bool town = u.is(x, y, LandUse::Use::Zone) || house(x - 1, y) || house(x + 1, y) || house(x, y - 1) ||
+                              house(x, y + 1);
+            n += town ? 1 : 0;
+        }
+    }
+    return n;
+}
+
 ZoneOverlap zone_overlap(const LandUse& u) {
     ZoneOverlap o;
     for (const std::uint32_t type : u.workers) {
@@ -102,6 +121,16 @@ std::vector<Catchment> Engine::work_circles(const AiPlayer& p, std::vector<std::
                    });
         },
         types);
+}
+
+std::int32_t Engine::spare_town(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x0, std::int32_t y0,
+                                std::int32_t w, std::int32_t score) {
+    if (classic() || score <= 0 || b.radius == 0) {
+        return score;
+    }
+    const std::uint8_t rotation = static_cast<std::uint32_t>(w) != b.size_x ? 1 : 0;
+    const std::int32_t n = town_land_under(land_use(p), catchment_of(b, rotation, TilePos{x0, y0}));
+    return std::max(1, score / (1 + n));
 }
 
 const LandUse& Engine::land_use(const AiPlayer& p) {

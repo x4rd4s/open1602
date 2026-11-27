@@ -1026,8 +1026,11 @@ bool Engine::search_farm(AiPlayer& p, bool woodcutter) {
                     acc.score += 32;
                 }
                 const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
+                // Open1602 (PB.9): an improved computer's work circle spares the town's free land.
                 const std::int32_t score =
-                    outside_zone(zone, margin, c, away_from_town(parity_penalty(acc.score, parity, 4), acc.extra));
+                    outside_zone(zone, margin, c,
+                                 spare_town(p, *b, c.x0, c.y0, c.w(),
+                                            away_from_town(parity_penalty(acc.score, parity, 4), acc.extra)));
                 const bool enough = woodcutter
                                         ? acc.count >= (sparse ? kSparseWoodTrees : 10)
                                         : acc.count >= (sparse_farm ? kSparseFarmFields : farm_rule(false).fields);
@@ -1091,8 +1094,10 @@ bool Engine::search_grain(AiPlayer& p) {
                       grain_tile(acc, t, d, improved);
                   });
             const std::int32_t parity = std::abs(s.x - s.ref_x) + std::abs(s.y - s.ref_y);
-            const std::int32_t score = outside_zone(
-                zone, margin, c, away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra));
+            const std::int32_t score =
+                outside_zone(zone, margin, c,
+                             spare_town(p, *b, c.x0, c.y0, c.w(),
+                                        away_from_town((parity & 1) != 0 ? acc.score - 32 : acc.score, acc.extra)));
             if (acc.count >= farm_rule(true).fields && acc.road && acc.market && score > s.best &&
                 (!rivals() || cart_reaches(p, c.x0, c.y0, c.x1, c.y1, stub_road(c))) &&
                 farm_room(p, *b, c.x0, c.y0, c.x1, c.y1)) {
@@ -2335,7 +2340,8 @@ bool Engine::farm_by_path(AiPlayer& p, const assets::BuildingType& b, bool grain
                           farm_tile(acc, t, d, b.ware, improved);
                       }
                   });
-            const std::int32_t score = outside_zone(zone, margin, c, away_from_town(acc.score, acc.extra));
+            const std::int32_t score = outside_zone(
+                zone, margin, c, spare_town(p, b, c.x0, c.y0, c.w(), away_from_town(acc.score, acc.extra)));
             if (acc.count >= rule.fields && acc.market && score > best &&
                 (!rivals() || cart_reaches(p, c.x0, c.y0, c.x1, c.y1, walk.road_to(i))) &&
                 farm_room(p, b, c.x0, c.y0, c.x1, c.y1)) {

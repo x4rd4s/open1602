@@ -236,6 +236,9 @@ struct LandUse {
 /// The free tiles of the site (x0, y0)-(x1, y1) inside one of the work circles.
 [[nodiscard]] std::int32_t work_land_under(const LandUse& u, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                            std::int32_t y1);
+/// Open1602 (PB.9): the town's free land in work circle `c`: free tiles of the zone, and outside it
+/// free tiles beside one of the city's houses.
+[[nodiscard]] std::int32_t town_land_under(const LandUse& u, const Catchment& c);
 /// How the town zone's free land and the work circles overlap: the zone's free tiles, those of them
 /// in some work circle, and per producer type (building id) those in its circles, in the order of
 /// the circles.
@@ -391,6 +394,11 @@ public:
     /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
     /// change and land_use() is asked again for the city (the scans themselves stay in place).
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
+    /// Open1602 (PB.9): an improved computer's producer site score, cut by the town's free land its
+    /// work circle would take (town_land_under); the original's and a producer without a work
+    /// circle keep theirs.
+    [[nodiscard]] std::int32_t spare_town(const AiPlayer& p, const assets::BuildingType& b, std::int32_t x0,
+                                          std::int32_t y0, std::int32_t w, std::int32_t score);
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;

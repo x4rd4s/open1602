@@ -3880,3 +3880,42 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     CHECK(!sim::ai::in_zone(z, 13, 13));
     CHECK(!sim::ai::in_zone(sim::ai::TownZone{}, 10, 10));
 }
+
+TEST_CASE("ai: a work circle's town land is the zone's free land and the free land beside a house (PB.9)") {
+    // A window of 12 x 12 tiles, all free land; a house at (8, 8)-(9, 9); the zone the rows 0..2.
+    sim::ai::LandUse u;
+    u.x0 = 0;
+    u.y0 = 0;
+    u.w = 12;
+    u.h = 12;
+    u.bits.assign(144, sim::ai::LandUse::bit(sim::ai::LandUse::Use::Free));
+    const auto set = [&](std::int32_t x, std::int32_t y, std::uint8_t b) {
+        u.bits[static_cast<std::size_t>(y * 12 + x)] = b;
+    };
+    for (std::int32_t x = 0; x < 12; ++x) {
+        for (std::int32_t y = 0; y < 3; ++y) {
+            set(x, y,
+                sim::ai::LandUse::bit(sim::ai::LandUse::Use::Free) |
+                    sim::ai::LandUse::bit(sim::ai::LandUse::Use::Zone));
+        }
+    }
+    for (std::int32_t x = 8; x < 10; ++x) {
+        for (std::int32_t y = 8; y < 10; ++y) {
+            set(x, y, sim::ai::LandUse::bit(sim::ai::LandUse::Use::House));
+        }
+    }
+    sim::Catchment far;  // a circle of radius 1 in the middle of free land: nothing of the town's
+    far.centre = {4, 6};
+    far.radius = 1;
+    CHECK(sim::ai::town_land_under(u, far) == 0);
+    sim::Catchment zone;  // radius 1 about (4, 1): its rows 0..2 are all zone, 9 tiles
+    zone.centre = {4, 1};
+    zone.radius = 1;
+    CHECK(sim::ai::town_land_under(u, zone) == 9);
+    // Radius 1 about (7, 8) covers x 6..8, y 7..9: (7, 8), (7, 9) and (8, 7) lie beside the house,
+    // (8, 8) and (8, 9) are it, the rest is plain free land.
+    sim::Catchment beside;
+    beside.centre = {7, 8};
+    beside.radius = 1;
+    CHECK(sim::ai::town_land_under(u, beside) == 3);
+}
