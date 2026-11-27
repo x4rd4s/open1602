@@ -13,6 +13,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "annokit/core/byte_reader.hpp"
@@ -99,6 +100,27 @@ public:
         std::vector<City> plans;
     };
     [[nodiscard]] std::vector<View> view() const;
+
+    /// Open1602 (PB.3): how the land of an improved computer's city is used (o1602-tool state
+    /// --city-metrics; the original's computers have no zone): its town zone, the zone's free land, the part of it in
+    /// its producers' work circles (in all and per producer type, by building id) and its house tiles inside and
+    /// outside the zone. Taking it draws nothing and changes nothing of the game.
+    struct LandUseView {
+        PlayerId player = kNoPlayer;
+        std::uint16_t island = 0;
+        std::uint8_t city = 0;
+        bool zone_valid = false;
+        std::int32_t zone_x = 0;
+        std::int32_t zone_y = 0;
+        std::int32_t zone_radius = 0;
+        std::int32_t zone_free = 0;
+        std::int32_t zone_work = 0;
+        std::vector<std::pair<std::uint32_t, std::int32_t>> zone_work_by_type;
+        std::int32_t work_circles = 0;
+        std::int32_t house_tiles = 0;
+        std::int32_t house_tiles_outside_zone = 0;
+    };
+    [[nodiscard]] std::vector<LandUseView> land_use();
 
 private:
     std::unique_ptr<ai::State> m_state;

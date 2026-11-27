@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <limits>
 #include <optional>
@@ -193,6 +194,57 @@ struct TownZone {
     std::int32_t cy = 0;
     std::int32_t radius = 0;  ///< houses within it, fields outside
 };
+/// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
+[[nodiscard]] bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y);
+/// Open1602 (PB.3): what the tiles of a computer's city are used for, derived from the state of
+/// the game alone (its town zone, its producers' work circles, what stands on each tile). Nothing
+/// of it is saved; it is taken again whenever the island's tiles change.
+struct LandUse {
+    /// The uses a tile can have, each a bit of its byte in `bits`.
+    enum class Use : std::uint8_t {
+        Zone,   ///< inside the town zone
+        Work,   ///< inside a work circle of one of the city's producers
+        House,  ///< a house of the city
+        Road,   ///< a road or bridge of the city
+        Built,  ///< another building of the city
+        Free,   ///< growable land: no record, ground, forest or a crop
+    };
+    [[nodiscard]] static constexpr std::uint8_t bit(Use use) noexcept {
+        return static_cast<std::uint8_t>(1U << static_cast<unsigned>(use));
+    }
+    std::int32_t x0 = 0;  ///< the window: the city's tiles and its town zone, on the island
+    std::int32_t y0 = 0;
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    std::vector<std::uint8_t> bits;      ///< w * h, row by row
+    std::vector<Catchment> circles;      ///< the work circles
+    std::vector<std::uint32_t> workers;  ///< the building id of each circle's producer
+    TownZone zone;
+
+    /// The uses of tile (x, y) as bits, none outside the window.
+    [[nodiscard]] std::uint8_t at(std::int32_t x, std::int32_t y) const noexcept {
+        return x < x0 || y < y0 || x >= x0 + w || y >= y0 + h
+                   ? 0
+                   : bits[static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(w) +
+                          static_cast<std::size_t>(x - x0)];
+    }
+    [[nodiscard]] bool is(std::int32_t x, std::int32_t y, Use use) const noexcept { return (at(x, y) & bit(use)) != 0; }
+};
+/// Whether tile (x, y) lies in town zone `z`: as near its middle as the zone's radius, the rings
+/// town_zone() counts its room in.
+[[nodiscard]] bool in_zone(const TownZone& z, std::int32_t x, std::int32_t y) noexcept;
+/// The free tiles of the site (x0, y0)-(x1, y1) inside one of the work circles.
+[[nodiscard]] std::int32_t work_land_under(const LandUse& u, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                           std::int32_t y1);
+/// How the town zone's free land and the work circles overlap: the zone's free tiles, those of them
+/// in some work circle, and per producer type (building id) those in its circles, in the order of
+/// the circles.
+struct ZoneOverlap {
+    std::int32_t zone_free = 0;
+    std::int32_t zone_work = 0;
+    std::vector<std::pair<std::uint32_t, std::int32_t>> by_type;
+};
+[[nodiscard]] ZoneOverlap zone_overlap(const LandUse& u);
 /// How far the middle of a site lies outside the town zone (negative: inside, by so much).
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                        std::int32_t y1);
@@ -324,6 +376,21 @@ public:
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
+    /// The circles of the standing productions of `p`'s city whose type `keep` takes, with each
+    /// producer's type in `types` when given.
+    [[nodiscard]] std::vector<Catchment> own_circles(const AiPlayer& p,
+                                                     const std::function<bool(const assets::BuildingType&)>& keep,
+                                                     std::vector<std::uint32_t>* types = nullptr) const;
+    /// Open1602 (PB.3): the circles of the producers of `p`'s city that work land: a production
+    /// cycle, a radius and a raw material that grows on the map (a growing record of the table
+    /// carries it), unless their catchment is water; their types in `types` when given.
+    [[nodiscard]] std::vector<Catchment> work_circles(const AiPlayer& p,
+                                                      std::vector<std::uint32_t>* types = nullptr) const;
+    /// Open1602 (PB.3): the land use of `p`'s city (improved computers), taken again when the island's
+    /// tiles changed. Its town zone is the one town_zone() plans, none before the player drew its
+    /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
+    /// change and land_use() is asked again for the city (the scans themselves stay in place).
+    [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -1680,6 +1747,10 @@ private:
     /// free and town land; kept while the island's tiles stay the same, and found again from them
     /// alone after a game is loaded.
     const TownZone& town_zone(AiPlayer& p);
+    /// The same; the town style is drawn into `draw` when it has none yet, and with no `draw` taken
+    /// from p.town_seed as it is (land_use(), which asks only once it is drawn). A city's zone is
+    /// kept for it whoever asks: its seed is the player's and does not change once drawn.
+    const TownZone& plan_zone(const AiPlayer& p, AiPlayer* draw);
     /// The town style of the current city, drawing the computer's AiPlayer::town_seed first if it
     /// has none yet.
     TownStyle town_style_of(AiPlayer& p);
@@ -1695,9 +1766,14 @@ private:
         std::vector<Segment> segments;
         std::uint64_t zone_revision = 0;
         TownZone zone;
+        std::uint64_t land_revision = 0;
+        bool land_seeded = false;
+        LandUse land;
     };
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
-    std::vector<CityScans> m_city_scans;
+    /// A deque: the references town_zone() and land_use() hand out stay valid when another city's
+    /// scans are added.
+    std::deque<CityScans> m_city_scans;
     bool m_in_tick = false;
     /// The computer log only (not saved): what a player's last site search saw, and when its cities
     /// were last reported.
