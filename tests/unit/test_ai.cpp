@@ -3930,11 +3930,11 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     CHECK(!sim::ai::in_zone(sim::ai::TownZone{}, 10, 10));
 }
 
-TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, supply, growth and descents (P2.4)") {
-    // A town of its own (a human player's, so that no computer builds in it): two pioneer houses
-    // and a settler house by a market, no chapel, a little food. The game runs it for 20 minutes and
-    // the projection taken at the start says each minute what the game then shows: the food runs out,
-    // the houses grow and shrink, the settlers fall back to pioneers.
+namespace {
+
+// A town of its own (a human player's, so that no computer builds in it): two pioneer houses and a
+// settler house by a market, no chapel, a little food (P2.4, P2.7).
+assets::BuildingTable hungry_town_table() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"BGRUPPE", 5}, {"BGRUPPE_WARE", 6}};
     const auto doc = assets::cod::parse(
         "Nahrung: 1.3\n"
@@ -3955,13 +3955,18 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
         "  @Nummer: 4\n  Id: 20809\n  Kind: 14\n  Gfx: 20\n  Size: 4, 3\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 16\n    Kosten: 10, 5\n    Arbeiter: 4\n  EndObj\n"
         "  @Nummer: 5\n  Id: 22601\n  Kind: 12\n  Gfx: 50\n  Size: 1, 1\n"
+        // A workshop of ware 19 from raw material 6, not built in the town (P2.7 places it).
+        "  @Nummer: 6\n  Id: 20702\n  Kind: 14\n  Gfx: 60\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 19\n    Rohstoff: 6\n    Prodmenge: 1\n    Rohmenge: 2\n    Interval: 40\n    Kosten: 5, 2\n"
+        "    Arbeiter: 2\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
     REQUIRE(table.ok());
-    const assets::BuildingTable buildings = std::move(table).value();
-    const assets::FigureTable figures = make_figures();
-    sim::World world{60, 60};
+    return std::move(table).value();
+}
+
+void build_hungry_town(sim::World& world, const assets::BuildingTable& buildings, std::uint32_t workshop = 0) {
     sim::IslandMap map{40, 30};
     for (std::int32_t y = 0; y < 30; ++y) {
         for (std::int32_t x = 0; x < 40; ++x) {
@@ -3972,6 +3977,9 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     REQUIRE(map.place(*buildings.by_id(20605), 14, 13, 0, 0, 0, 0).ok());
     REQUIRE(map.place(*buildings.by_id(20605), 17, 13, 0, 0, 0, 0).ok());
     REQUIRE(map.place(*buildings.by_id(20621), 20, 13, 0, 0, 0, 0).ok());
+    if (workshop != 0) {
+        REQUIRE(map.place(*buildings.by_id(workshop), 26, 13, 0, 0, 0, 0).ok());
+    }
     REQUIRE(world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 0, 0}).ok());
     sim::City town;
     town.owner = kHuman;
@@ -4006,6 +4014,19 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     add(17, 0, 64 + 32);
     add(20, 1, 6 * 64);
     sim::update_services(world, buildings);
+}
+
+}  // namespace
+
+TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, supply, growth and descents (P2.4)") {
+    // A town of its own (a human player's, so that no computer builds in it): two pioneer houses
+    // and a settler house by a market, no chapel, a little food. The game runs it for 20 minutes and
+    // the projection taken at the start says each minute what the game then shows: the food runs out,
+    // the houses grow and shrink, the settlers fall back to pioneers.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
     sim::Simulation s(world, buildings, figures);
     sim::ai::State state;
     sim::ai::Engine engine(s, state);
@@ -4157,6 +4178,209 @@ TEST_CASE("ai: a city's projection trades at the ledger's rates as far as stock 
     }
 }
 
+TEST_CASE("ai: an action's value is the city's gold with it less without it, less its cost and running costs (P2.7)") {
+    sim::ai::CityProjection with;
+    sim::ai::CityProjection without;
+    with.running_cost = 5;
+    without.running_cost = 5;
+    for (int m = 0; m < 3; ++m) {
+        sim::ai::ProjectedMinute a;
+        a.taxes = 20;
+        a.inhabitants = {3, 1};
+        with.minutes.push_back(a);
+        sim::ai::ProjectedMinute b;
+        b.taxes = 10;
+        b.inhabitants = {2, 1};
+        without.minutes.push_back(b);
+    }
+    sim::ai::Commitment c;
+    c.cost = 15;
+    c.upkeep = 2;
+    const sim::ai::ActionValue v = sim::ai::action_value(with, without, c);
+    CHECK((v.gold == std::vector<std::int64_t>{-15, -7, 1, 9}));
+    CHECK(v.payback == 2);
+    CHECK((v.people == std::vector<std::int64_t>{1, 0}));
+    // An action that costs nothing and brings nothing never pays back.
+    const sim::ai::ActionValue none = sim::ai::action_value(without, without, sim::ai::Commitment{});
+    CHECK((none.gold == std::vector<std::int64_t>{0, 0, 0, 0}));
+    CHECK(none.payback == 0);
+    // A run between own cities: what the source loses is added, and the payback found again.
+    sim::ai::ActionValue loss;
+    loss.gold = {0, -4, -8, -12};
+    const sim::ai::ActionValue both = sim::ai::add_value(v, loss);
+    CHECK((both.gold == std::vector<std::int64_t>{-15, -11, -7, -3}));
+    CHECK(both.payback == 0);
+    CHECK((both.people == v.people));
+}
+
+TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its good, up to its rate (P2.7)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings, 20702);
+    sim::Production shop;
+    shop.x = 26;
+    shop.y = 13;
+    shop.elapsed = 120;  // a statistics window run, nothing made in it: all of its rate is spare
+    world.set_production(shop);
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 30 * 32;
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::Sheet::Producer* r = engine.sheet().producer(20702);
+    REQUIRE(r != nullptr);
+    const auto raw_rate = static_cast<std::int64_t>(r->raw_use);  // what the workshop can take a minute
+    REQUIRE(raw_rate > 0);
+    // Twice what the workshop takes, for as long as the rest fits the town's room.
+    constexpr std::uint32_t kMinutes = 8;
+    constexpr std::uint8_t kRaw = 6;
+    constexpr std::uint8_t kGood = 19;
+    REQUIRE(raw_rate * kMinutes < 30 * 32);
+    const sim::ai::Inflow crop[] = {{kRaw, 2 * raw_rate, 1, kMinutes}};
+    const sim::ai::CityProjection without = engine.project_city(p, *world.city(0, 0), kMinutes);
+    const sim::ai::CityProjection with = engine.project_city(p, *world.city(0, 0), kMinutes, crop);
+    for (std::uint32_t m = 1; m <= kMinutes; ++m) {
+        const std::int64_t left = std::int64_t{with.minutes[m - 1].stock[kRaw]} - without.minutes[m - 1].stock[kRaw];
+        const std::int64_t used = 2 * raw_rate * m - left;
+        // The workshop takes what its rate allows, a tick's rounding aside, and no more.
+        CHECK(used <= raw_rate * m);
+        CHECK(used + raw_rate >= raw_rate * m);
+    }
+    CHECK(with.minutes.back().stock[kGood] + 0 >= without.minutes.back().stock[kGood]);
+    std::int64_t made = 0;
+    for (const sim::ai::ProjectedMinute& pm : with.minutes) {
+        made = std::max<std::int64_t>(made, pm.stock[kGood]);
+    }
+    CHECK(made > 0);
+    // The settlers take the good, and pay more taxes for it.
+    CHECK(with.minutes.back().taxes > without.minutes.back().taxes);
+    {  // a full store: the room cuts off what the action brings, and the town's own raw material stays its own
+        sim::City& town = *world.city(0, 0);
+        town.ensure_ware(kRaw);
+        town.goods[kRaw] = town.capacity;
+        const sim::ai::CityProjection full_without = engine.project_city(p, town, kMinutes);
+        const sim::ai::CityProjection full_with = engine.project_city(p, town, kMinutes, crop);
+        CHECK(full_with.minutes.back().stock[kGood] == full_without.minutes.back().stock[kGood]);
+        CHECK(full_with.minutes.back().stock[kRaw] == full_without.minutes.back().stock[kRaw]);
+    }
+}
+
+TEST_CASE(
+    "ai: a colony's raw material with a workshop planned along is valued with its goods, taxes and running cost "
+    "(P2.7c)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);  // no workshop for the raw material at home
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 30 * 32;
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::Sheet::Producer* shop = engine.sheet().producer(20702);
+    REQUIRE(shop != nullptr);
+    constexpr std::uint32_t kMinutes = 8;
+    constexpr std::uint8_t kRaw = 6;
+    constexpr std::uint8_t kGood = 19;
+    const auto raw_rate = static_cast<std::int64_t>(shop->raw_use);
+    REQUIRE(raw_rate * kMinutes < 30 * 32);
+    const sim::ai::Inflow crop[] = {{kRaw, raw_rate, 1, kMinutes}};
+    const sim::ai::CityProjection without = engine.project_city(p, *world.city(0, 0), kMinutes);
+    const sim::ai::CityProjection alone = engine.project_city(p, *world.city(0, 0), kMinutes, crop);
+    const sim::ai::Sheet::Producer* const plan[] = {shop};
+    const sim::ai::CityProjection bundle = engine.project_city(p, *world.city(0, 0), kMinutes, crop, plan);
+    // Alone, the raw material only fills the store; with the workshop it becomes the good the settlers pay for.
+    CHECK(alone.minutes.back().stock[kGood] == without.minutes.back().stock[kGood]);
+    CHECK(alone.minutes.back().taxes == without.minutes.back().taxes);
+    CHECK(bundle.minutes.back().stock[kRaw] < alone.minutes.back().stock[kRaw]);
+    CHECK(bundle.minutes.back().taxes > without.minutes.back().taxes);
+    // Before its running cost the bundle's gold is above the raw material's alone; the value takes that cost off a
+    // minute.
+    sim::ai::Commitment c;
+    const sim::ai::ActionValue v_alone = sim::ai::action_value(alone, without, c);
+    sim::ai::Commitment with_shop;
+    with_shop.upkeep = shop->running_cost;
+    const sim::ai::ActionValue v_bundle = sim::ai::action_value(bundle, without, with_shop);
+    const sim::ai::ActionValue v_gross = sim::ai::action_value(bundle, without, c);
+    CHECK(v_alone.gold.back() <= 0);
+    CHECK(v_gross.gold.back() > v_alone.gold.back());
+    CHECK(v_bundle.gold.back() == v_gross.gold.back() - std::int64_t{shop->running_cost} * kMinutes);
+}
+
+TEST_CASE("ai: the value of a supply run, a colony and a plantation, projected with and without it (P2.7)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 30 * 32;  // room for what comes (the town has no Kontor)
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    constexpr std::uint32_t kMinutes = 20;
+    const std::uint8_t food = buildings.food_ware();
+    const sim::ai::CityProjection without = engine.project_city(p, *world.city(0, 0), kMinutes);
+    REQUIRE(without.minutes.size() == kMinutes);
+    sim::ai::Commitment free;
+
+    {
+        // a supply run's food, landed at once, keeps inhabitants the town loses without it.
+        const sim::ai::Inflow load[] = {{food, 20 * 32, 1, 1}};
+        const sim::ai::CityProjection with = engine.project_city(p, *world.city(0, 0), kMinutes, load);
+        const sim::ai::ActionValue v = sim::ai::action_value(with, without, free);
+        CHECK(v.people[0] > 0);  // the pioneers stay; the settlers still lack their ware 19
+        CHECK(v.gold.back() > 0);
+    }
+    {
+        // the same load taken from the town as an own source: its stock falls, and it is worth no gain to it.
+        sim::City& town = *world.city(0, 0);
+        town.ensure_ware(food);
+        const std::uint32_t had = town.goods[food];
+        town.goods[food] = 20 * 32;
+        const sim::ai::Inflow taken[] = {{food, -20 * 32, 1, 1}};
+        const sim::ai::CityProjection kept = engine.project_city(p, town, kMinutes);
+        const sim::ai::CityProjection lost = engine.project_city(p, town, kMinutes, taken);
+        const sim::ai::ActionValue v = sim::ai::action_value(lost, kept, free);
+        CHECK(lost.minutes.front().stock[food] < kept.minutes.front().stock[food]);
+        CHECK(v.gold.back() <= 0);
+        CHECK(v.people[0] <= 0);
+        town.goods[food] = had;
+    }
+    {
+        // a colony's food from its delivery minute on: nothing changes before, its costs count from now.
+        constexpr std::uint32_t kDelivery = 10;
+        const sim::ai::Inflow ship[] = {{food, 32, kDelivery, kMinutes}};
+        const sim::ai::CityProjection with = engine.project_city(p, *world.city(0, 0), kMinutes, ship);
+        sim::ai::Commitment c;
+        c.cost = 100;
+        c.upkeep = 3;
+        const sim::ai::ActionValue v = sim::ai::action_value(with, without, c);
+        for (std::uint32_t m = 1; m < kDelivery; ++m) {
+            CHECK(with.minutes[m - 1].stock == without.minutes[m - 1].stock);
+            CHECK(v.gold[m] == -100 - 3 * std::int64_t{m});
+        }
+        CHECK(with.minutes[kDelivery - 1].stock[food] > without.minutes[kDelivery - 1].stock[food]);
+    }
+    {
+        // a plantation whose ware nobody works or needs is worth no more than its costs.
+        constexpr std::uint8_t kRaw = 22;
+        const sim::ai::Inflow crop[] = {{kRaw, 32, 1, kMinutes}};
+        const sim::ai::CityProjection with = engine.project_city(p, *world.city(0, 0), kMinutes, crop);
+        sim::ai::Commitment c;
+        c.cost = 100;
+        c.upkeep = 3;
+        const sim::ai::ActionValue v = sim::ai::action_value(with, without, c);
+        for (std::uint32_t m = 1; m <= kMinutes; ++m) {
+            CHECK(with.minutes[m - 1].stock[kRaw] == without.minutes[m - 1].stock[kRaw] + 32 * m);
+        }
+        CHECK(v.gold.back() == -100 - 3 * std::int64_t{kMinutes});
+        CHECK(v.payback == 0);
+    }
+}
 TEST_CASE("ai: the projected gold adds every city's taxes less its running costs (P2.4)") {
     sim::ai::CityProjection a;
     a.running_cost = 5;

@@ -57,3 +57,4 @@ kAttackTries | engine/sim/src/ai/ai_military.cpp | derived from: kWarFails (thre
 3 | engine/sim/src/ai/ai_military.cpp | derived from: kAttackTries, kWarFails (three looks without progress end a war)
 kAttackTriesMs | engine/sim/src/ai/ai_military.cpp | derived from: kLeftIslandMs (45 min before an improved computer settles an island it turned back from again), the time it leaves a city it could not land at
 2'700'000 | engine/sim/src/ai/ai_military.cpp | derived from: kAttackTriesMs, kLeftIslandMs = 2'700'000 (45 min)
+60 | engine/sim/src/ai/ai_logistics.cpp | derived from: seconds per minute, the minute a supply run's load lands in value's log line (only the log)

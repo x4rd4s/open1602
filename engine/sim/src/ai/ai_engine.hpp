@@ -210,6 +210,30 @@ struct CityProjection {
 /// minute, to gold[m] (gold[0] stays; minutes past the projection add its last sum).
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f);
 
+/// Open1602 (P2.7): goods an action brings a city, `per_minute` (1/32 t) in minutes `from` to `until`
+/// (counted from 1, both included).
+struct Inflow {
+    std::uint8_t ware = 0;
+    std::int64_t per_minute = 0;
+    std::uint32_t from = 1;
+    std::uint32_t until = 0;
+};
+
+/// Open1602 (P2.7): what an action is worth to a city: the city's gold with it less without it, summed
+/// up to each minute, less the action's cost and its running costs (gold[0] = -cost); the first
+/// minute that sum is above zero (0: none within the projection, also for an action that costs and
+/// brings nothing); and the inhabitants per
+/// class with it less without it at the last minute.
+struct ActionValue {
+    std::vector<std::int64_t> gold;
+    std::uint32_t payback = 0;
+    std::vector<std::int64_t> people;
+};
+[[nodiscard]] ActionValue action_value(const CityProjection& with, const CityProjection& without, const Commitment& c);
+/// Open1602 (P2.7): `a` with another city's share `b` of the same action added minute by minute (a
+/// run between own cities: what the source loses), its payback found again; the people stay `a`'s.
+[[nodiscard]] ActionValue add_value(ActionValue a, const ActionValue& b);
+
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
     bool valid = false;
@@ -416,8 +440,11 @@ public:
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
-    /// consumption alone. Compute only: nothing decides by it yet.
-    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
+    /// consumption alone. `extra` adds an action's goods (P2.7); `planned` adds the workshops an
+    /// action list builds with it, idle at their table rates (P2.7c). Compute only: nothing decides by it yet.
+    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
+                                              std::span<const Inflow> extra = {},
+                                              std::span<const Sheet::Producer* const> planned = {}) const;
     /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
     /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
     /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
@@ -678,6 +705,14 @@ private:
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
+    /// P2.7: for the log, what an action is worth to city `c`: its goods `extra` and its costs `commit`
+    /// in action_value, at every ten minutes of the budget's horizon, beside the decision's line.
+    /// With `source` (an own city the goods come from), its loss `taken` is added (add_value).
+    void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
+                   const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {}) const;
+    /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
+    /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
+    [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;
     /// The computer log only: a report of each city every half hour of game time.
     void report(AiPlayer& p);
 
@@ -1015,6 +1050,11 @@ private:
     static constexpr std::uint32_t kAscentStockMinutes = 5;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
+    /// Whether producer `pr` has run a minute of its statistics window.
+    [[nodiscard]] static bool has_window(const Production& pr) noexcept;
+    /// What producer `pr` made a minute in its statistics window, 1/32 t; half `full` before it has
+    /// run a minute (made_per_minute's rule for one producer).
+    [[nodiscard]] static std::uint64_t made_rate(const Production& pr, std::uint64_t full) noexcept;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);

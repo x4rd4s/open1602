@@ -1666,6 +1666,12 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         c.upkeep = b.running_cost;
         const City* at = current_city(p);
         log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c, b.ware);
+        if (at != nullptr && b.ware != 0) {
+            // shortcut: its good as made by the producers like it there, from now on, its inputs not
+            // taken; upgrade when the projection runs the city's producers.
+            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, m_world.balance().ai_budget_horizon_minutes}};
+            log_value(p, "build", *at, made, c);
+        }
     }
     return true;
 }
@@ -1923,6 +1929,14 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     return true;
 }
 
+bool Engine::has_window(const Production& pr) noexcept {
+    return pr.elapsed >= 60;
+}
+
+std::uint64_t Engine::made_rate(const Production& pr, std::uint64_t full) noexcept {
+    return has_window(pr) ? std::uint64_t{pr.produced} * 60 / pr.elapsed : full / 2;
+}
+
 std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType& b) const {
     // What the producers of `b` in the city made in their statistics windows, on average; for none
     // that has run a minute yet, half the full rate.
@@ -1932,17 +1946,18 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
     std::uint64_t sum = 0;
     std::uint32_t n = 0;
     for (const Production& pr : m_world.productions()) {
-        if (!pr.used || pr.island != c.island || pr.elapsed < 60 || !map.contains(pr.x, pr.y)) {
+        if (!pr.used || pr.island != c.island || !has_window(pr) || !map.contains(pr.x, pr.y)) {
             continue;
         }
         const MapCell& cell = map.top(pr.x, pr.y);
         if (cell.city != c.index || cell.empty() || m_buildings.by_sprite(cell.sprite) != &b) {
             continue;
         }
-        sum += std::uint64_t{pr.produced} * 60 / pr.elapsed;
+        sum += made_rate(pr, full);
         ++n;
     }
-    return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? full / 2 : sum / n, 0xFFFFFFFFU));
+    return static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(n == 0 ? made_rate(Production{}, full) : sum / n, 0xFFFFFFFFU));
 }
 
 bool Engine::food_ahead(const City& c) const {

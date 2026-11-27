@@ -1602,6 +1602,11 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
             c.value = best_rank;  // the plan is chosen by its rank, gold a minute
             const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
             log_decision(p, "colony plan", *best, -1, -1, c, 0, 0, home);
+            if (home != nullptr && *best != kAnyCrop) {
+                const Commitment commit = logged_commitment(p, *best);
+                const Inflow ship[] = {colony_inflow(*home, *best, commit)};
+                log_value(p, "colony plan", *home, ship, commit);
+            }
         }
     }
     // A ship is kept for it once the home city holds the load, so that the supply runs do not take

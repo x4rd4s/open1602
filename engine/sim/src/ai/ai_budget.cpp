@@ -259,6 +259,20 @@ std::uint8_t crop_good(std::uint8_t crop) {
 
 }  // namespace
 
+Inflow Engine::colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const {
+    // shortcut: the colony covers what the home city lacks of the good, from the interim delivery
+    // minute on; upgrade when P2.8 projects the colony's own crop and the ships' runs.
+    Inflow in;
+    in.ware = crop_good(crop);
+    in.from = c.delay + 1;
+    in.until = m_world.balance().ai_budget_horizon_minutes;
+    const FlowTotals t = home.ledger.totals(in.ware, in.until);
+    if (in.ware != 0 && t.minutes != 0 && t.of(GoodsFlow::Demand) > t.of(GoodsFlow::Residents)) {
+        in.per_minute = static_cast<std::int64_t>((t.of(GoodsFlow::Demand) - t.of(GoodsFlow::Residents)) / t.minutes);
+    }
+    return in;
+}
+
 Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const {
     // A colony costs its gold now and, a minute, what one of the computer's colonies costs beyond
     // its taxes (at least its Kontor's running costs); it brings what its crop's good opens in the
