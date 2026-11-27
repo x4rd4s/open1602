@@ -895,25 +895,9 @@ bool Engine::mine_reached(const AiPlayer& p, const assets::BuildingType& mine, s
 }
 
 std::vector<Catchment> Engine::mason_circles(const AiPlayer& p) const {
-    std::vector<Catchment> circles;
-    const IslandMap& map = m_world.islands()[p.island].map;
-    for (const Production& pr : m_world.productions()) {
-        if (!pr.used || pr.island != p.island || !map.contains(pr.x, pr.y)) {
-            continue;
-        }
-        const MapCell& cell = map.top(pr.x, pr.y);
-        const assets::BuildingType* b = cell.empty() ? nullptr : m_buildings.by_sprite(cell.sprite);
-        if (cell.city != p.city || b == nullptr || b->destroyed || b->raw_ware != ware::kStone) {
-            continue;
-        }
-        circles.push_back(catchment_of(*b, cell.rotation, TilePos{pr.x, pr.y}));
-    }
-    return circles;
+    return own_circles(p, [](const assets::BuildingType& b) { return b.raw_ware == ware::kStone; });
 }
 
-namespace {
-
-/// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
 bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y) {
     std::int32_t dx = x - a.centre.x;
     std::int32_t dy = y - a.centre.y;
@@ -922,8 +906,6 @@ bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y) {
     return dy <= a.radius && dx <= a.radius &&
            (a.radius <= 1 || dx <= circle_table(a.radius)[static_cast<std::size_t>(dy)]);
 }
-
-}  // namespace
 
 bool Engine::masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry, std::int32_t x0,
                           std::int32_t y0, std::uint8_t rotation) const {

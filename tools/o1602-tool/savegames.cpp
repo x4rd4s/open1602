@@ -40,6 +40,7 @@
 #include "o1602/sim/production_cycle.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/savegame_writer.hpp"
+#include "o1602/sim/simulation.hpp"
 #include "o1602/sim/world.hpp"
 #include "o1602/sim/world_plan.hpp"
 
@@ -704,6 +705,37 @@ void city_metrics(const sim::World& world, const assets::BuildingTable& building
     }
 }
 
+/// `--city-metrics`, the improved computers' land use (PB.3): each city's town zone, how much of its
+/// free land lies in its producers' work circles (per producer type) and its house tiles outside it.
+/// The game runs on a copy of the world and is not advanced; taking the land use draws nothing.
+void land_use_metrics(const sim::World& world, const assets::BuildingTable& buildings,
+                      const assets::FigureTable& figures) {
+    sim::World copy = world;
+    sim::Simulation simulation(copy, buildings, figures, world.saved_rules().value_or(sim::Rules::open1602()));
+    const auto name_of = [](std::uint32_t id) {
+        for (const assets::OriginalName& n : assets::original_building_names()) {
+            if (id >= n.first && id < n.first + n.count) {
+                return std::string(n.name);
+            }
+        }
+        return std::string("-");
+    };
+    for (const sim::ComputerPlayers::LandUseView& v : simulation.computers().land_use()) {
+        std::printf("land use P%u island %u city %u: ", unsigned{v.player}, unsigned{v.island}, unsigned{v.city});
+        if (!v.zone_valid) {
+            std::printf("no town zone");
+        } else {
+            std::printf("zone %d,%d r%d free %d in work circles %d (%.1f%%)", v.zone_x, v.zone_y, v.zone_radius,
+                        v.zone_free, v.zone_work, v.zone_free > 0 ? 100.0 * v.zone_work / v.zone_free : 0.0);
+            for (const auto& [type, tiles] : v.zone_work_by_type) {
+                std::printf(" | %s %u: %d", name_of(type).c_str(), type, tiles);
+            }
+        }
+        std::printf("; work circles %d; house tiles %d, outside the zone %d\n", v.work_circles, v.house_tiles,
+                    v.house_tiles_outside_zone);
+    }
+}
+
 /// `--town-instances` of a .o1602: every building on the land of a city of a human or computer
 /// player, one line each, for drawing towns outside the tool (PB.2): its type's kind, production
 /// kind, radius and the needs it serves (as --city-metrics prints them) as the table gives them, and
@@ -885,6 +917,7 @@ int cmd_state(const Args& args) {
                 return fail(figures.error());
             }
             city_metrics((*own)->world, (*own)->buildings, &*figures);
+            land_use_metrics((*own)->world, (*own)->buildings, *figures);
         }
         if (status == 0 && args.flag("--town-instances")) {
             town_instances((*own)->world, (*own)->buildings);

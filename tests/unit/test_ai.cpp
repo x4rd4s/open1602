@@ -3787,3 +3787,88 @@ TEST_CASE("ai view: only the hardest level and the original's computers see what
         }
     }
 }
+
+TEST_CASE("ai: a computer city's land use follows its tiles and its producers' work circles (PB.3)") {
+    // A woodcutter's circle holds the trees it fells: work land. A stonemason fetches stone that
+    // does not grow: its circle is none. Ruins are no land until cleared; a tile's picture changing
+    // (as a field ripens) is taken again as well.
+    Game g;
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 22407\n  Kind: 11\n  Gfx: 13\n  Size: 1, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 11\n    Ware: 54\n  EndObj\n"
+        "  @Nummer: 14\n  Id: 20901\n  Kind: 14\n  Gfx: 30\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 2\n    Ware: 9\n    Rohstoff: 54\n    Interval: 20\n    Radius: 4\n"
+        "  EndObj\n"
+        "  @Nummer: 15\n  Id: 20903\n  Kind: 14\n  Gfx: 34\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 2\n    Ware: 23\n    Rohstoff: 53\n    Interval: 20\n    Radius: 4\n"
+        "  EndObj\n"
+        "  @Nummer: 16\n  Id: 22601\n  Kind: 12\n  Gfx: 40\n  Size: 1, 1\n");
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s, 5'000);  // the Kontor at 44,16, a road west along row 17
+    const sim::City* city = computer_city(g);
+    REQUIRE(city != nullptr);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    p.island = city->island;
+    p.city = city->index;
+    sim::IslandMap& map = g.world.island(city->island).map;
+    CHECK(engine.land_use(p).circles.empty());
+    sim::BuildOrder order;
+    order.player = kComputer;
+    order.island = city->island;
+    order.items = {{20901, 37, 18, 0, 0}};
+    REQUIRE(sim::execute_build(g.world, g.buildings, order, {}, nullptr).placed == 1);
+    CHECK(engine.land_use(p).circles.empty());  // the mason's stone grows nowhere
+    order.items = {{20903, 40, 18, 0, 0}};
+    REQUIRE(sim::execute_build(g.world, g.buildings, order, {}, nullptr).placed == 1);
+    {
+        const sim::ai::LandUse& u = engine.land_use(p);
+        REQUIRE(u.circles.size() == 1);
+        CHECK(u.workers == std::vector<std::uint32_t>{20903});
+        CHECK(!u.zone.valid);  // no town style drawn: no zone, and none is drawn for it
+        CHECK(p.town_seed == 0);
+        using sim::ai::LandUse;
+        CHECK(u.at(40, 22) == (LandUse::kWork | LandUse::kFree));
+        CHECK(u.at(40, 25) == LandUse::kFree);
+        CHECK(u.at(40, 24) == LandUse::kRoad);
+        CHECK(u.at(40, 18) == (LandUse::kWork | LandUse::kBuilt));
+        CHECK((u.at(40, 17) & LandUse::kRoad) != 0);
+        // The circle of radius 4 about the woodcutter's 2 x 2 tiles (40..41, 18..19): rows 14..23.
+        CHECK(sim::ai::work_land_under(u, 40, 22, 41, 23) == 4);
+        CHECK(sim::ai::work_land_under(u, 40, 23, 41, 24) == 2);
+        CHECK(sim::ai::work_land_under(u, 40, 26, 41, 27) == 0);
+    }
+    // Ruins on the work land are no land; cleared, the tile is free again (it shows its ground).
+    REQUIRE(map.place(*g.buildings.by_id(22601), 40, 22, 0, 0, kComputer, city->index).ok());
+    CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 3);
+    map.restore_ground(40, 22);
+    CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 4);
+    // A tile's picture changing in place, as a field ripens or a tree grows, counts at once.
+    const auto ground = map.top(40, 23).sprite;
+    map.set_sprite(40, 23, static_cast<std::uint16_t>(g.buildings.by_id(20401)->gfx));
+    CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 3);
+    map.set_sprite(40, 23, ground);
+    CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 4);
+    // The zone's overlap with the work land: its free tiles, those in a circle, per producer type.
+    sim::ai::LandUse zoned = engine.land_use(p);
+    for (std::int32_t y = 22; y <= 25; ++y) {  // two rows of work land, a road, a row without
+        for (std::int32_t x = 40; x <= 41; ++x) {
+            zoned.bits[static_cast<std::size_t>(y - zoned.y0) * static_cast<std::size_t>(zoned.w) +
+                       static_cast<std::size_t>(x - zoned.x0)] |= sim::ai::LandUse::kZone;
+        }
+    }
+    const sim::ai::ZoneOverlap o = sim::ai::zone_overlap(zoned);
+    CHECK(o.zone_free == 6);
+    CHECK(o.zone_work == 4);
+    REQUIRE(o.by_type.size() == 1);
+    CHECK(o.by_type.front().first == 20903);
+    CHECK(o.by_type.front().second == 4);
+    // A zone tile: as near the zone's middle as its radius.
+    const sim::ai::TownZone z{true, 10, 10, 3};
+    CHECK(sim::ai::in_zone(z, 13, 10));
+    CHECK(sim::ai::in_zone(z, 12, 12));
+    CHECK(!sim::ai::in_zone(z, 13, 13));
+    CHECK(!sim::ai::in_zone(sim::ai::TownZone{}, 10, 10));
+}

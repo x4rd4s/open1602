@@ -1190,6 +1190,39 @@ void ComputerPlayers::founding_query(PlayerId asker, std::uint16_t island) {
     m_engine->founding_query(asker, island);
 }
 
+std::vector<ComputerPlayers::LandUseView> ComputerPlayers::land_use() {
+    std::vector<LandUseView> out;
+    for (const ai::AiPlayer& player : m_state->players) {
+        for (const ai::CityPlan& r : player.plans) {
+            ai::AiPlayer p = player;  // the city's view; the player's own state stays as it is
+            p.island = r.island;
+            p.city = r.city;
+            const ai::LandUse& u = m_engine->land_use(p);
+            const ai::ZoneOverlap o = ai::zone_overlap(u);
+            LandUseView v;
+            v.player = player.player;
+            v.island = r.island;
+            v.city = r.city;
+            v.zone_valid = u.zone.valid;
+            v.zone_x = u.zone.cx;
+            v.zone_y = u.zone.cy;
+            v.zone_radius = u.zone.radius;
+            v.zone_free = o.zone_free;
+            v.zone_work = o.zone_work;
+            v.zone_work_by_type = o.by_type;
+            v.work_circles = static_cast<std::int32_t>(u.circles.size());
+            for (const std::uint8_t b : u.bits) {
+                if ((b & ai::LandUse::kHouse) != 0) {
+                    ++v.house_tiles;
+                    v.house_tiles_outside_zone += (b & ai::LandUse::kZone) == 0 ? 1 : 0;
+                }
+            }
+            out.push_back(std::move(v));
+        }
+    }
+    return out;
+}
+
 std::vector<ComputerPlayers::View> ComputerPlayers::view() const {
     std::vector<View> out;
     for (const ai::AiPlayer& p : m_state->players) {

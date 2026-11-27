@@ -193,6 +193,49 @@ struct TownZone {
     std::int32_t cy = 0;
     std::int32_t radius = 0;  ///< houses within it, fields outside
 };
+/// Whether tile (x, y) lies in circle `a`, as the circle's workers find their goals.
+[[nodiscard]] bool in_circle(const Catchment& a, std::int32_t x, std::int32_t y);
+/// Open1602 (PB.3): what the tiles of a computer's city are used for, derived from the state of
+/// the game alone (its town zone, its producers' work circles, what stands on each tile). Nothing
+/// of it is saved; it is taken again whenever the island's tiles change.
+struct LandUse {
+    static constexpr std::uint8_t kZone = 1;    ///< inside the town zone
+    static constexpr std::uint8_t kWork = 2;    ///< inside a work circle of one of the city's producers
+    static constexpr std::uint8_t kHouse = 4;   ///< a house of the city
+    static constexpr std::uint8_t kRoad = 8;    ///< a road or bridge of the city
+    static constexpr std::uint8_t kBuilt = 16;  ///< another building of the city
+    static constexpr std::uint8_t kFree = 32;   ///< growable land: no record, ground, forest or a crop
+    std::int32_t x0 = 0;                        ///< the window: the city's tiles and its town zone, on the island
+    std::int32_t y0 = 0;
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    std::vector<std::uint8_t> bits;      ///< w * h, row by row
+    std::vector<Catchment> circles;      ///< the work circles
+    std::vector<std::uint32_t> workers;  ///< the building id of each circle's producer
+    TownZone zone;
+
+    [[nodiscard]] std::uint8_t at(std::int32_t x, std::int32_t y) const noexcept {
+        return x < x0 || y < y0 || x >= x0 + w || y >= y0 + h
+                   ? 0
+                   : bits[static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(w) +
+                          static_cast<std::size_t>(x - x0)];
+    }
+};
+/// Whether tile (x, y) lies in town zone `z`: as near its middle as the zone's radius, the rings
+/// town_zone() counts its room in.
+[[nodiscard]] bool in_zone(const TownZone& z, std::int32_t x, std::int32_t y) noexcept;
+/// The free tiles of the site (x0, y0)-(x1, y1) inside one of the work circles.
+[[nodiscard]] std::int32_t work_land_under(const LandUse& u, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                           std::int32_t y1);
+/// How the town zone's free land and the work circles overlap: the zone's free tiles, those of them
+/// in some work circle, and per producer type (building id) those in its circles, in the order of
+/// the circles.
+struct ZoneOverlap {
+    std::int32_t zone_free = 0;
+    std::int32_t zone_work = 0;
+    std::vector<std::pair<std::uint32_t, std::int32_t>> by_type;
+};
+[[nodiscard]] ZoneOverlap zone_overlap(const LandUse& u);
 /// How far the middle of a site lies outside the town zone (negative: inside, by so much).
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                        std::int32_t y1);
@@ -324,6 +367,20 @@ public:
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
+    /// The circles of the standing productions of `p`'s city whose type `keep` takes, with each
+    /// producer's type in `types` when given.
+    [[nodiscard]] std::vector<Catchment> own_circles(const AiPlayer& p,
+                                                     const std::function<bool(const assets::BuildingType&)>& keep,
+                                                     std::vector<std::uint32_t>* types = nullptr) const;
+    /// Open1602 (PB.3): the circles of the producers of `p`'s city that work land: a production
+    /// cycle, a radius and a raw material that grows on the map (a growing record of the table
+    /// carries it), unless their catchment is water; their types in `types` when given.
+    [[nodiscard]] std::vector<Catchment> work_circles(const AiPlayer& p,
+                                                      std::vector<std::uint32_t>* types = nullptr) const;
+    /// Open1602 (PB.3): the land use of `p`'s city (improved computers), taken again when the island's
+    /// tiles changed. Its town zone is the one town_zone() plans, none before the player drew its
+    /// town style.
+    [[nodiscard]] const LandUse& land_use(AiPlayer& p);
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -1695,6 +1752,9 @@ private:
         std::vector<Segment> segments;
         std::uint64_t zone_revision = 0;
         TownZone zone;
+        std::uint64_t land_revision = 0;
+        bool land_seeded = false;
+        LandUse land;
     };
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
     std::vector<CityScans> m_city_scans;

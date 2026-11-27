@@ -677,6 +677,23 @@ TEST_CASE("ai arena: an hour of two computers develops the same on every platfor
     }
 }
 
+TEST_CASE("ai arena: taking the computers' land use draws nothing and changes nothing (PB.3)") {
+    Arena a;
+    sim::Simulation s(a.world, a.buildings, a.figures);
+    run(s, 20 * 60'000);
+    const std::uint64_t state = s.state_hash();
+    const std::uint64_t world = test::world_hash(a.world, a.buildings);
+    const auto ai_before = saved(s.computers());
+    const std::vector<sim::ComputerPlayers::LandUseView> uses = s.computers().land_use();
+    CHECK(s.state_hash() == state);
+    CHECK(test::world_hash(a.world, a.buildings) == world);
+    CHECK(saved(s.computers()) == ai_before);
+    REQUIRE(!uses.empty());
+    CHECK(std::ranges::any_of(uses, [](const auto& v) { return v.zone_valid && v.zone_free > 0; }));
+    CHECK(std::ranges::all_of(uses, [](const auto& v) { return v.zone_work <= v.zone_free; }));
+    CHECK(std::ranges::all_of(uses, [](const auto& v) { return v.house_tiles_outside_zone <= v.house_tiles; }));
+}
+
 TEST_CASE("ai arena: improved computers make peace with each other, the original's leave it as it is") {
     for (const bool classic : {false, true}) {
         Arena a;
