@@ -54,6 +54,7 @@
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/package_islands.hpp"
 #include "o1602/sim/package_landscapes.hpp"
+#include "o1602/sim/random.hpp"
 #include "o1602/ui/build_menu.hpp"
 #include "o1602/ui/localization.hpp"
 #include "o1602/ui/package_icons.hpp"
@@ -2820,7 +2821,7 @@ void MapViewer::apply_hud(const Hud::Action& action) {
                 const annokit::core::Status status = path.empty()
                                                          ? annokit::core::Status(annokit::core::make_error(
                                                                annokit::core::ErrorCode::NotFound, "no such chapter"))
-                                                         : load_game(path);
+                                                         : load_game(path, nullptr, std::nullopt, true);
                 if (status) {
                     break;
                 }
@@ -3433,7 +3434,7 @@ void give_chosen_banner(sim::World& world, std::optional<sim::BannerId> banner) 
 }  // namespace
 
 annokit::core::Status MapViewer::load_game(const std::filesystem::path& path, const sim::Rules* rules,
-                                           std::optional<sim::BannerId> banner) {
+                                           std::optional<sim::BannerId> banner, bool new_start) {
     finish_autosave();  // "continue" right after an autosave loads the file it wrote
     if (m_session && m_session->ended()) {
         end_session();  // one that ended in its game stood only to show the game
@@ -3446,7 +3447,7 @@ annokit::core::Status MapViewer::load_game(const std::filesystem::path& path, co
         m_sound->prefill();  // the frames stand still while the game loads
     }
     std::size_t warnings = 0;
-    auto world = read_world(path, &warnings);
+    auto world = read_world(path, &warnings, new_start ? std::optional<std::uint64_t>(start_seed()) : std::nullopt);
     if (!world) {
         return world.error();
     }
@@ -3541,7 +3542,7 @@ annokit::core::Status MapViewer::start_package_scenario(const std::string& id, c
                                          "no other game while a multiplayer game runs");
     }
     std::size_t warning_count = 0;
-    auto world = read_world(scenario->file, &warning_count);
+    auto world = read_world(scenario->file, &warning_count, start_seed());
     if (!world) {
         return world.error();
     }
@@ -3907,27 +3908,45 @@ void MapViewer::log_world_notes(const std::vector<std::string>& notes) {
     }
 }
 
-annokit::core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path,
-                                                        std::size_t* warning_count) const {
+std::uint64_t MapViewer::start_seed() const {
+    if (m_options.fixed_seed) {
+        return m_options.world.seed;
+    }
+    std::random_device device;
+    return (std::uint64_t{device()} << 32U) | device();
+}
+
+annokit::core::Result<sim::World> MapViewer::read_world(const std::filesystem::path& path, std::size_t* warning_count,
+                                                        std::optional<std::uint64_t> new_start_seed) const {
     auto bytes = annokit::core::read_file(path);
     if (!bytes) {
         return bytes.error();
+    }
+    sim::WorldStart start = m_options.world;
+    if (new_start_seed) {
+        start.seed = *new_start_seed;
+        std::fprintf(stderr, "scenario start: seed %llu\n", static_cast<unsigned long long>(start.seed));
     }
     std::vector<std::string> warnings;
     std::vector<std::string> world_notes;
     annokit::core::Result<sim::World> world = annokit::core::make_error(annokit::core::ErrorCode::NotFound, "no game");
     if (sim::is_open1602_save(*bytes)) {
         world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
+        if (world && new_start_seed) {
+            // The file carries the generators as they stood when it was written: a new start
+            // draws its own, as one of the original's files does (load_world).
+            world->reseed(start.seed + sim::kDefaultSimulationSeed);
+        }
         if (world) {
             // A scenario that makes its islands or crops when the game starts (ADR 0013).
-            world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, m_options.world, &world_notes);
+            world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, start, &world_notes);
         }
     } else {
         auto file = assets::ChunkFile::from_bytes(std::move(bytes).value());
         if (!file) {
             return file.error();
         }
-        world = sim::load_world(*file, m_buildings, m_game, &warnings, m_options.world);
+        world = sim::load_world(*file, m_buildings, m_game, &warnings, start);
         if (world) {
             give_mod_content(*world);  // the original's files have none of their own
         }
@@ -4243,7 +4262,7 @@ void MapViewer::apply_menu() {
                     menu->set_tutorial_chapter(*e.tutorial_chapter);
                 }
                 started = e.package_scenario.empty()
-                              ? load_game(e.path, e.setup ? &e.setup->rules : nullptr, e.scenario_banner)
+                              ? load_game(e.path, e.setup ? &e.setup->rules : nullptr, e.scenario_banner, true)
                               : start_package_scenario(e.package_scenario, e.setup ? &e.setup->rules : nullptr,
                                                        e.package_campaign, e.level, e.scenario_banner);
                 if (started && e.setup && !e.scenario_rules && !(e.setup->rules == m_app_settings.scenario.rules)) {

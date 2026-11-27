@@ -234,8 +234,10 @@ private:
     /// settings chosen for a scenario (a savegame of Open1602 keeps its own).
     /// `banner`: the human chose it on the colour screen (a scenario of the editor that lets the
     /// human choose, sim::ScenarioInfo::choose_banner); the player who had it takes the human's.
+    /// `new_start`: the file is a scenario that starts anew (from the scenario list, a tutorial's
+    /// chapter), not a game saved while played: it draws its random numbers anew (start_seed).
     annokit::core::Status load_game(const std::filesystem::path& path, const sim::Rules* rules = nullptr,
-                                    std::optional<sim::BannerId> banner = std::nullopt);
+                                    std::optional<sim::BannerId> banner = std::nullopt, bool new_start = false);
     /// A game loaded alone that does not know this person and has several human players: they
     /// choose which one to play before it starts (ask_choice); the human players to choose from,
     /// empty if the game needs no choice.
@@ -245,8 +247,17 @@ private:
     /// A savegame or scenario as a world, not started.
     /// `warnings`: how many the loader gave (they are written to the log); the notes of the
     /// generator for islands made when the game starts are not among them (log_world_notes).
-    [[nodiscard]] annokit::core::Result<sim::World> read_world(const std::filesystem::path& path,
-                                                               std::size_t* warnings = nullptr) const;
+    /// `new_start_seed`: a scenario that starts anew with this number (start_seed()): where the
+    /// players' ships start (start places at random), the crops and islands made at the start and
+    /// every generator of the simulation (the computers' choices among them) follow it, not the
+    /// numbers stored in the file, so that each start of the same scenario plays differently.
+    /// Nothing: a game saved while played, which goes on with its own numbers.
+    [[nodiscard]] annokit::core::Result<sim::World> read_world(
+        const std::filesystem::path& path, std::size_t* warnings = nullptr,
+        std::optional<std::uint64_t> new_start_seed = std::nullopt) const;
+    /// The number a new start of a scenario draws its random numbers from: a new one each time,
+    /// as the original draws them from the clock; that of --seed when it was given.
+    [[nodiscard]] std::uint64_t start_seed() const;
     /// The game goes on in another world (a savegame, a scenario, a new game): the new game is
     /// built whole, then everything of the old one goes. `source`: the file it came from, for the
     /// window title when the game has no name of its own. Out of memory leaves the old game running.

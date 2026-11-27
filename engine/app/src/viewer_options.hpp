@@ -42,6 +42,9 @@ struct ViewerOptions {
     /// How the islands of a scenario that makes them at the start are drawn (also --scenario
     /// Szenes/Endlosspiel00.szs).
     sim::WorldStart world;
+    /// --seed was given: every start of a scenario uses world.seed, so that it can be played again
+    /// the same; else each start draws a number of its own (MapViewer::start_seed).
+    bool fixed_seed = false;
     bool frame = true;    ///< the original's panel and status bar around the map
     bool effects = true;  ///< sounds and voice messages (also off in the original's Game.dat)
     bool music = true;
