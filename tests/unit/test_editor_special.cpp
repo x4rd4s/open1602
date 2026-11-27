@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <algorithm>
 #include <utility>
 
 #include "../test_framework.hpp"
@@ -172,4 +173,22 @@ TEST_CASE("editor special objects: ruins on land or beach, buildings on open lan
     (*gone)->apply(island.world);
     CHECK(island.at(4, 4)->id == kGround);
     CHECK(island.at(4, 5)->id == kTree);
+}
+
+TEST_CASE("editor objects: the natives' and pirates' group offers every building the pirates build") {
+    // Feedback 17: the original's list (kLandscape) leaves the pirates' tavern (the third pirate
+    // house) out, which their nest builds; the editor adds it after the second pirate house.
+    namespace id = o1602::assets::id;
+    const auto offered = [](std::uint32_t b) {
+        return std::find(id::kLandscape.begin(), id::kLandscape.end(), b) != id::kLandscape.end() ||
+               std::find(id::kLandscapeAdded.begin(), id::kLandscapeAdded.end(), b) != id::kLandscapeAdded.end();
+    };
+    for (const std::uint32_t b :
+         {id::kPirateKontor, id::kPirateHouse1, id::kPirateHouse2, id::kPirateHouse3, id::kPirateTower}) {
+        CHECK(offered(b));
+    }
+    CHECK(std::find(id::kLandscape.begin(), id::kLandscape.end(), id::kLandscapeAddedAfter) != id::kLandscape.end());
+    for (const std::uint32_t b : id::kLandscapeAdded) {
+        CHECK(std::find(id::kLandscape.begin(), id::kLandscape.end(), b) == id::kLandscape.end());  // listed once
+    }
 }

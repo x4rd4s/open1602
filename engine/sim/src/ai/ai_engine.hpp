@@ -662,6 +662,8 @@ private:
     /// last ten minutes, and its stock now.
     /// tools/measure/outcomes.py pairs these with the decision lines. Logging only.
     void track(const AiPlayer& p) const;
+    /// P2.4: a city's goods movements of the last minutes by kind ("track flows"). Logging only.
+    void log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
     /// Open1602 (P2.4): logs project_city of each own city at every `every` minutes of the budget's horizon.
     void log_projection(const AiPlayer& p, std::uint32_t every) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so

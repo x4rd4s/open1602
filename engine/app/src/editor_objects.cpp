@@ -50,7 +50,8 @@ constexpr std::uint32_t kEditorLookSeed = 1602;
 constexpr std::int32_t kLandscapeGroup = 31099;
 
 /// The group of the natives' and pirates' buildings, which no build menu lists: the original's
-/// list after the menu's (Text.cod [LANDSCHAFT]) without its two forests, which the terrain has.
+/// list after the menu's (Text.cod [LANDSCHAFT]) without its two forests, which the terrain has,
+/// and with the pirates' buildings it leaves out (kLandscapeAdded).
 const ui::BuildCategory& landscape_group() {
     static const ui::BuildCategory group = [] {
         ui::BuildCategory c;
@@ -62,6 +63,11 @@ const ui::BuildCategory& landscape_group() {
             if (id != assets::id::island_shape::kForestNorth.front() &&
                 id != assets::id::island_shape::kForestSouth.front()) {
                 row.push_back(ui::BuildButton{id, 0, static_cast<std::int32_t>(i), {}, {}});
+            }
+            if (id == assets::id::kLandscapeAddedAfter) {
+                for (const std::uint32_t added : assets::id::kLandscapeAdded) {
+                    row.push_back(ui::BuildButton{added, 0, -1, {}, {}});
+                }
             }
         }
         c.rows.push_back(std::move(row));
@@ -129,6 +135,9 @@ const ui::BuildCategory& editor_group(const ui::BuildCategory& c, const assets::
 std::string landscape_name(const assets::BuildingType& b) {
     // The natives' buildings come first in the list, five of each of their two looks.
     constexpr std::ptrdiff_t kNativeLook = 5;
+    if (b.id == assets::id::kPirateHouse3) {
+        return ui::tr("editor.objects.pirate.tavern");
+    }
     const auto at = std::find(assets::id::kLandscape.begin(), assets::id::kLandscape.end(), b.id);
     const std::ptrdiff_t index = at - assets::id::kLandscape.begin();
     if (at == assets::id::kLandscape.end() || index >= 2 * kNativeLook) {

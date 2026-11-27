@@ -1803,6 +1803,7 @@ editor.objects.native.warriors = Kriegerhütte
 editor.objects.native.tobacco = Tabakhütte
 editor.objects.native.spices = Gewürzhütte
 editor.objects.native.hut = Wohnhütte
+editor.objects.pirate.tavern = Piratenkneipe
 editor.objects.native.look = {1} (Aussehen {2})
 editor.objects.ownerless = keiner (Kulisse)
 editor.objects.note.special = Klick setzt es ohne Besitzer auf freies Land außerhalb jeder Stadt: wilde Felder, Ruinen, ungenutzte Bauten. Eine Stadt übernimmt es mit dem Land.
