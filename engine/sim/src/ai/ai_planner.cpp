@@ -1666,6 +1666,12 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         c.upkeep = b.running_cost;
         const City* at = current_city(p);
         log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c, b.ware);
+        if (at != nullptr && b.ware != 0) {
+            // shortcut: its good as made by the producers like it there, from now on, its inputs not
+            // taken; upgrade when the projection runs the city's producers.
+            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, m_world.balance().ai_budget_horizon_minutes}};
+            log_value(p, "build", *at, made, c);
+        }
     }
     return true;
 }

@@ -699,6 +699,13 @@ private:
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
+    /// P2.7: for the log, what an action is worth to city `c`: its goods `extra` and its costs `commit`
+    /// in action_value, at every ten minutes of the budget's horizon, beside the decision's line.
+    void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
+                   const Commitment& commit) const;
+    /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
+    /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
+    [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;
     /// The computer log only: a report of each city every half hour of game time.
     void report(AiPlayer& p);
 

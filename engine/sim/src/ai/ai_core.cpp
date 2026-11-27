@@ -271,6 +271,26 @@ void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) 
     log(p, "track flows %u/%u%s", unsigned{c.island}, unsigned{c.index}, flows.c_str());
 }
 
+void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
+                       const Commitment& commit) const {
+    constexpr std::uint32_t kEvery = 10;  // the track period, kTrackMinutes
+    if (!logging()) {
+        return;
+    }
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    const ActionValue v = action_value(project_city(p, c, horizon, extra), project_city(p, c, horizon), commit);
+    std::string gold;
+    for (std::uint32_t m = kEvery; m < v.gold.size(); m += kEvery) {
+        gold += " +" + std::to_string(m) + " " + std::to_string(v.gold[m]);
+    }
+    std::string people;
+    for (const std::int64_t n : v.people) {
+        people += " " + std::to_string(n);
+    }
+    log(p, "value %s city %u/%u gold%s payback %u people%s", kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(),
+        v.payback, people.c_str());
+}
+
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
     const std::vector<BudgetCache> budgets = m_budgets;
     const Census census = m_census;
