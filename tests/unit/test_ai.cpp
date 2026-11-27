@@ -3851,6 +3851,14 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 3);
     map.set_sprite(40, 23, ground);
     CHECK(sim::ai::work_land_under(engine.land_use(p), 40, 22, 41, 23) == 4);
+    // Another city's ground is no free land of this one; unclaimed ground is.
+    const std::uint8_t own = map.top(40, 25).city;
+    const sim::PlayerId owner = map.top(40, 25).owner;
+    map.set_city(40, 25, static_cast<std::uint8_t>(city->index + 1), kHuman);
+    CHECK(engine.land_use(p).at(40, 25) == 0);
+    map.set_city(40, 25, sim::MapCell::kNoCity, sim::kNoPlayer);
+    CHECK(engine.land_use(p).is(40, 25, sim::ai::LandUse::Use::Free));
+    map.set_city(40, 25, own, owner);
     // The zone's overlap with the work land: its free tiles, those in a circle, per producer type.
     sim::ai::LandUse zoned = engine.land_use(p);
     for (std::int32_t y = 22; y <= 25; ++y) {  // two rows of work land, a road, a row without

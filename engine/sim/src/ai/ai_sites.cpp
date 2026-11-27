@@ -416,6 +416,10 @@ std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, st
 }
 
 const TownZone& Engine::town_zone(AiPlayer& p) {
+    return plan_zone(p, &p);
+}
+
+const TownZone& Engine::plan_zone(const AiPlayer& p, AiPlayer* draw) {
     CityScans& known = city_scans(p.island, p.city);
     const std::uint64_t revision = island_revision(p.island);
     if (known.zone_revision == revision) {
@@ -465,7 +469,7 @@ const TownZone& Engine::town_zone(AiPlayer& p) {
             }
         }
     }
-    const TownStyle style = town_style_of(p);
+    const TownStyle style = draw != nullptr ? town_style_of(*draw) : town_style(p.town_seed, p.island, p.city);
     // Some towns lie a little further inland from the Kontor than others.
     if (style.shift != 0 && (mx != kx || my != ky)) {
         const std::int32_t len =

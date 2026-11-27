@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <limits>
 #include <optional>
@@ -387,8 +388,9 @@ public:
                                                       std::vector<std::uint32_t>* types = nullptr) const;
     /// Open1602 (PB.3): the land use of `p`'s city (improved computers), taken again when the island's
     /// tiles changed. Its town zone is the one town_zone() plans, none before the player drew its
-    /// town style.
-    [[nodiscard]] const LandUse& land_use(AiPlayer& p);
+    /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
+    /// change and land_use() is asked again for the city (the scans themselves stay in place).
+    [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -1745,6 +1747,10 @@ private:
     /// free and town land; kept while the island's tiles stay the same, and found again from them
     /// alone after a game is loaded.
     const TownZone& town_zone(AiPlayer& p);
+    /// The same; the town style is drawn into `draw` when it has none yet, and with no `draw` taken
+    /// from p.town_seed as it is (land_use(), which asks only once it is drawn). A city's zone is
+    /// kept for it whoever asks: its seed is the player's and does not change once drawn.
+    const TownZone& plan_zone(const AiPlayer& p, AiPlayer* draw);
     /// The town style of the current city, drawing the computer's AiPlayer::town_seed first if it
     /// has none yet.
     TownStyle town_style_of(AiPlayer& p);
@@ -1765,7 +1771,9 @@ private:
         LandUse land;
     };
     CityScans& city_scans(std::uint16_t island, std::uint8_t city);
-    std::vector<CityScans> m_city_scans;
+    /// A deque: the references town_zone() and land_use() hand out stay valid when another city's
+    /// scans are added.
+    std::deque<CityScans> m_city_scans;
     bool m_in_tick = false;
     /// The computer log only (not saved): what a player's last site search saw, and when its cities
     /// were last reported.

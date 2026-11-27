@@ -104,7 +104,7 @@ std::vector<Catchment> Engine::work_circles(const AiPlayer& p, std::vector<std::
         types);
 }
 
-const LandUse& Engine::land_use(AiPlayer& p) {
+const LandUse& Engine::land_use(const AiPlayer& p) {
     CityScans& known = city_scans(p.island, p.city);
     const std::uint64_t revision = island_revision(p.island);
     const bool seeded = p.town_seed != 0;
@@ -117,9 +117,12 @@ const LandUse& Engine::land_use(AiPlayer& p) {
     u = LandUse{};
     // The zone only once the player drew its town style: taking it here draws nothing.
     if (!classic() && seeded) {
-        u.zone = town_zone(p);
+        u.zone = plan_zone(p, nullptr);
     }
     u.circles = work_circles(p, &u.workers);
+    // The window takes a scan of the whole island at each change of its tiles, which fields and trees
+    // bring often: before a decision reads the land use, take the bounds from the city's buildings
+    // or the reach of its Kontor and markets instead (PB.4, PB.9).
     const IslandMap& map = m_world.islands()[p.island].map;  // ai-view: eigen: the own island's terrain
     const auto mw = static_cast<std::int32_t>(map.width());
     const auto mh = static_cast<std::int32_t>(map.height());
@@ -162,9 +165,12 @@ const LandUse& Engine::land_use(AiPlayer& p) {
                 b |= LandUse::bit(LandUse::Use::Work);
             }
             // A cell without a record is free land; a record the table does not know is nothing.
+            // Free land is the city's own or unclaimed, the land town_zone() counts its room on: the
+            // zone may reach onto unclaimed ground, never onto another city's.
             const Tile t = cell.empty() ? Tile{} : tile_of(cell, x, y);
-            if (cell.empty() || (t.valid() && (t.kind == kind::kGround || t.kind == kind::kForest ||
-                                               t.prod == prod::kRipe || t.prod == prod::kGrowing))) {
+            const bool ours = cell.city == p.city || cell.city == MapCell::kNoCity;
+            if (ours && (cell.empty() || (t.valid() && (t.kind == kind::kGround || t.kind == kind::kForest ||
+                                                        t.prod == prod::kRipe || t.prod == prod::kGrowing)))) {
                 b |= LandUse::bit(LandUse::Use::Free);
             } else if (t.valid() && cell.city == p.city) {
                 if (t.kind == kind::kRoad || t.kind == kind::kBridge) {
