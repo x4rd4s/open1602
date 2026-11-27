@@ -3880,3 +3880,33 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     CHECK(!sim::ai::in_zone(z, 13, 13));
     CHECK(!sim::ai::in_zone(sim::ai::TownZone{}, 10, 10));
 }
+
+TEST_CASE("ai: a house site is as large as the largest house of any class in the table (PB.7a)") {
+    // Houses of two classes, 2x2 and (as a mod might add) 3x2: the site takes the largest side,
+    // so that every class fits where a site is planned. Without houses it is one tile.
+    Game g;
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 20605\n  Kind: 14\n  Gfx: 13\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n"
+        "  @Nummer: 14\n  Id: 20611\n  Kind: 14\n  Gfx: 30\n  Size: 3, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n");
+    {
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        CHECK(engine.house_size() == 3);
+    }
+    g.buildings = make_buildings("  @Nummer: 13\n  Id: 20605\n  Kind: 14\n  Gfx: 13\n  Size: 2, 2\n"
+                                 "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n");
+    {
+        sim::Simulation s(g.world, g.buildings, g.figures);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        CHECK(engine.house_size() == 2);
+    }
+    g.buildings = make_buildings("  @Nummer: 16\n  Id: 22601\n  Kind: 12\n  Gfx: 40\n  Size: 1, 1\n");
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    CHECK(engine.house_size() == 1);
+}

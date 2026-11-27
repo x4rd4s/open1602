@@ -381,6 +381,8 @@ public:
     /// stops to put a fire out.
     [[nodiscard]] bool touches_road(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                     std::int32_t y1) const;
+    /// Open1602 (PB.7a): the side of the square site a house of any class takes, from the table.
+    [[nodiscard]] std::int32_t house_size() const;
     /// The circles of the standing productions of `p`'s city whose type `keep` takes, with each
     /// producer's type in `types` when given.
     [[nodiscard]] std::vector<Catchment> own_circles(const AiPlayer& p,

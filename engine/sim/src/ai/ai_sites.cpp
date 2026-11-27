@@ -156,6 +156,15 @@ Site gen_double_row(const Segment& s, std::int32_t cx, std::int32_t cy, std::int
     return r;
 }
 
+/// Open1602: a square house site of `size` tiles in one of four rows along the road: sides 0 and
+/// -1 touch the road, sides 1 and -2 lie one house further back. For size 2 it is gen_double_row.
+Site gen_row(const Segment& s, std::int32_t cx, std::int32_t cy, std::int32_t side, std::int32_t size) {
+    const std::int32_t off = side == 0 ? 1 : side == 1 ? size + 1 : side == -1 ? -size : -2 * size;
+    Site r = frame_rect(s, cx, cy, 1 - size, 0, off, off + size - 1);
+    r.side = side;
+    return r;
+}
+
 /// A 2x2 farm beside the road or one row back with a road stub.
 Site gen_farm(const Segment& s, std::int32_t cx, std::int32_t cy, std::int32_t side, bool grain) {
     const std::int32_t off = side == 0 ? 1 : side == 1 ? 2 : side == -1 ? -2 : -3;
@@ -628,6 +637,18 @@ std::int32_t parity_penalty(std::int32_t score, std::int32_t parity, std::int32_
 
 }  // namespace
 
+std::int32_t Engine::house_size() const {
+    // Open1602: the side of the square a house of any class takes, from the table, mod houses
+    // included; the largest wins, so that every house fits where a site is planned.
+    std::int32_t size = 0;
+    for (const assets::BuildingType& t : m_buildings.types()) {
+        if (t.prod_kind == prod::kHouse && !t.destroyed) {
+            size = std::max({size, static_cast<std::int32_t>(t.size_x), static_cast<std::int32_t>(t.size_y)});
+        }
+    }
+    return std::max(size, 1);
+}
+
 bool Engine::touches_road(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1) const {
     const auto road = [&](std::int32_t x, std::int32_t y) {
         const Tile t = tile(p.island, x, y);
@@ -657,6 +678,7 @@ bool Engine::search_houses(AiPlayer& p) {
     if (zone != nullptr && !zone->valid) {
         zone = nullptr;
     }
+    const std::int32_t size = house_size();
     for (std::int32_t visited = 1;; ++visited) {
         if (s.segment >= static_cast<std::int32_t>(p.segments.size())) {
             return true;
@@ -664,7 +686,7 @@ bool Engine::search_houses(AiPlayer& p) {
         const Segment& g = p.segments[static_cast<std::size_t>(s.segment)];
         bool any = false;
         for (const std::int32_t side : {0, 1, -1, -2}) {
-            Site c = gen_double_row(g, s.x, s.y, side);
+            Site c = classic() ? gen_double_row(g, s.x, s.y, side) : gen_row(g, s.x, s.y, side, size);
             // Open1602 (PB.5): an improved computer's houses all touch a road, where the fire brigade
             // reaches them; the original's second row behind the first does not.
             if (!can_place(p, *b, c.x0, c.y0, c.w(), c.h()) ||
