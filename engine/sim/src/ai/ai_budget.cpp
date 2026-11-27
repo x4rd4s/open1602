@@ -241,6 +241,8 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
 namespace {
 
 /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
+// shortcut: the original's fixed crop and ware ids; upgrade (PM) to the table's chain from the crop's
+// field to a class's need when mods add crops, which P2.8's colony value then follows.
 std::uint8_t crop_good(std::uint8_t crop) {
     switch (crop) {
         case ware::kWineField:
