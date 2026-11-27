@@ -199,13 +199,19 @@ struct TownZone {
 /// the game alone (its town zone, its producers' work circles, what stands on each tile). Nothing
 /// of it is saved; it is taken again whenever the island's tiles change.
 struct LandUse {
-    static constexpr std::uint8_t kZone = 1;    ///< inside the town zone
-    static constexpr std::uint8_t kWork = 2;    ///< inside a work circle of one of the city's producers
-    static constexpr std::uint8_t kHouse = 4;   ///< a house of the city
-    static constexpr std::uint8_t kRoad = 8;    ///< a road or bridge of the city
-    static constexpr std::uint8_t kBuilt = 16;  ///< another building of the city
-    static constexpr std::uint8_t kFree = 32;   ///< growable land: no record, ground, forest or a crop
-    std::int32_t x0 = 0;                        ///< the window: the city's tiles and its town zone, on the island
+    /// The uses a tile can have, each a bit of its byte in `bits`.
+    enum class Use : std::uint8_t {
+        Zone,   ///< inside the town zone
+        Work,   ///< inside a work circle of one of the city's producers
+        House,  ///< a house of the city
+        Road,   ///< a road or bridge of the city
+        Built,  ///< another building of the city
+        Free,   ///< growable land: no record, ground, forest or a crop
+    };
+    [[nodiscard]] static constexpr std::uint8_t bit(Use use) noexcept {
+        return static_cast<std::uint8_t>(1U << static_cast<unsigned>(use));
+    }
+    std::int32_t x0 = 0;  ///< the window: the city's tiles and its town zone, on the island
     std::int32_t y0 = 0;
     std::int32_t w = 0;
     std::int32_t h = 0;
@@ -214,12 +220,14 @@ struct LandUse {
     std::vector<std::uint32_t> workers;  ///< the building id of each circle's producer
     TownZone zone;
 
+    /// The uses of tile (x, y) as bits, none outside the window.
     [[nodiscard]] std::uint8_t at(std::int32_t x, std::int32_t y) const noexcept {
         return x < x0 || y < y0 || x >= x0 + w || y >= y0 + h
                    ? 0
                    : bits[static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(w) +
                           static_cast<std::size_t>(x - x0)];
     }
+    [[nodiscard]] bool is(std::int32_t x, std::int32_t y, Use use) const noexcept { return (at(x, y) & bit(use)) != 0; }
 };
 /// Whether tile (x, y) lies in town zone `z`: as near its middle as the zone's radius, the rings
 /// town_zone() counts its room in.

@@ -1212,9 +1212,9 @@ std::vector<ComputerPlayers::LandUseView> ComputerPlayers::land_use() {
             v.zone_work_by_type = o.by_type;
             v.work_circles = static_cast<std::int32_t>(u.circles.size());
             for (const std::uint8_t b : u.bits) {
-                if ((b & ai::LandUse::kHouse) != 0) {
+                if ((b & ai::LandUse::bit(ai::LandUse::Use::House)) != 0) {
                     ++v.house_tiles;
-                    v.house_tiles_outside_zone += (b & ai::LandUse::kZone) == 0 ? 1 : 0;
+                    v.house_tiles_outside_zone += (b & ai::LandUse::bit(ai::LandUse::Use::Zone)) == 0 ? 1 : 0;
                 }
             }
             out.push_back(std::move(v));

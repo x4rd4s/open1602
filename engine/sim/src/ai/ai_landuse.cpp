@@ -35,7 +35,7 @@ std::int32_t work_land_under(const LandUse& u, std::int32_t x0, std::int32_t y0,
     for (std::int32_t y = y0; y <= y1; ++y) {
         for (std::int32_t x = x0; x <= x1; ++x) {
             const std::uint8_t b = u.at(x, y);
-            n += (b & LandUse::kFree) != 0 && (b & LandUse::kWork) != 0 ? 1 : 0;
+            n += (b & LandUse::bit(LandUse::Use::Free)) != 0 && (b & LandUse::bit(LandUse::Use::Work)) != 0 ? 1 : 0;
         }
     }
     return n;
@@ -51,11 +51,11 @@ ZoneOverlap zone_overlap(const LandUse& u) {
     for (std::int32_t y = u.y0; y < u.y0 + u.h; ++y) {
         for (std::int32_t x = u.x0; x < u.x0 + u.w; ++x) {
             const std::uint8_t b = u.at(x, y);
-            if ((b & LandUse::kZone) == 0 || (b & LandUse::kFree) == 0) {
+            if ((b & LandUse::bit(LandUse::Use::Zone)) == 0 || (b & LandUse::bit(LandUse::Use::Free)) == 0) {
                 continue;
             }
             ++o.zone_free;
-            o.zone_work += (b & LandUse::kWork) != 0 ? 1 : 0;
+            o.zone_work += (b & LandUse::bit(LandUse::Use::Work)) != 0 ? 1 : 0;
             for (auto& [type, tiles] : o.by_type) {
                 for (std::size_t i = 0; i < u.circles.size(); ++i) {
                     if (u.workers[i] == type && in_circle(u.circles[i], x, y)) {
@@ -156,23 +156,23 @@ const LandUse& Engine::land_use(AiPlayer& p) {
             const MapCell& cell = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
             std::uint8_t b = 0;
             if (in_zone(u.zone, x, y)) {
-                b |= LandUse::kZone;
+                b |= LandUse::bit(LandUse::Use::Zone);
             }
             if (std::ranges::any_of(u.circles, [&](const Catchment& c) { return in_circle(c, x, y); })) {
-                b |= LandUse::kWork;
+                b |= LandUse::bit(LandUse::Use::Work);
             }
             // A cell without a record is free land; a record the table does not know is nothing.
             const Tile t = cell.empty() ? Tile{} : tile_of(cell, x, y);
             if (cell.empty() || (t.valid() && (t.kind == kind::kGround || t.kind == kind::kForest ||
                                                t.prod == prod::kRipe || t.prod == prod::kGrowing))) {
-                b |= LandUse::kFree;
+                b |= LandUse::bit(LandUse::Use::Free);
             } else if (t.valid() && cell.city == p.city) {
                 if (t.kind == kind::kRoad || t.kind == kind::kBridge) {
-                    b |= LandUse::kRoad;
+                    b |= LandUse::bit(LandUse::Use::Road);
                 } else if (t.prod == prod::kHouse) {
-                    b |= LandUse::kHouse;
+                    b |= LandUse::bit(LandUse::Use::House);
                 } else {
-                    b |= LandUse::kBuilt;
+                    b |= LandUse::bit(LandUse::Use::Built);
                 }
             }
             u.bits[static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(u.w) +

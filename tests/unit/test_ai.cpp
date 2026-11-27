@@ -3830,11 +3830,11 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
         CHECK(!u.zone.valid);  // no town style drawn: no zone, and none is drawn for it
         CHECK(p.town_seed == 0);
         using sim::ai::LandUse;
-        CHECK(u.at(40, 22) == (LandUse::kWork | LandUse::kFree));
-        CHECK(u.at(40, 25) == LandUse::kFree);
-        CHECK(u.at(40, 24) == LandUse::kRoad);
-        CHECK(u.at(40, 18) == (LandUse::kWork | LandUse::kBuilt));
-        CHECK((u.at(40, 17) & LandUse::kRoad) != 0);
+        CHECK(u.at(40, 22) == (LandUse::bit(LandUse::Use::Work) | LandUse::bit(LandUse::Use::Free)));
+        CHECK(u.at(40, 25) == LandUse::bit(LandUse::Use::Free));
+        CHECK(u.at(40, 24) == LandUse::bit(LandUse::Use::Road));
+        CHECK(u.at(40, 18) == (LandUse::bit(LandUse::Use::Work) | LandUse::bit(LandUse::Use::Built)));
+        CHECK((u.at(40, 17) & LandUse::bit(LandUse::Use::Road)) != 0);
         // The circle of radius 4 about the woodcutter's 2 x 2 tiles (40..41, 18..19): rows 14..23.
         CHECK(sim::ai::work_land_under(u, 40, 22, 41, 23) == 4);
         CHECK(sim::ai::work_land_under(u, 40, 23, 41, 24) == 2);
@@ -3856,7 +3856,7 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     for (std::int32_t y = 22; y <= 25; ++y) {  // two rows of work land, a road, a row without
         for (std::int32_t x = 40; x <= 41; ++x) {
             zoned.bits[static_cast<std::size_t>(y - zoned.y0) * static_cast<std::size_t>(zoned.w) +
-                       static_cast<std::size_t>(x - zoned.x0)] |= sim::ai::LandUse::kZone;
+                       static_cast<std::size_t>(x - zoned.x0)] |= sim::ai::LandUse::bit(sim::ai::LandUse::Use::Zone);
         }
     }
     const sim::ai::ZoneOverlap o = sim::ai::zone_overlap(zoned);
