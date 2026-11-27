@@ -200,12 +200,19 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
                 m, static_cast<unsigned long long>(people), pm.taxes, goods.c_str(), static_cast<long long>(us));
         }
     }
+    // Only the Kontors' share of the trade balance is projected; the ships' share (supply runs that
+    // buy at partners, P2.6) stays in the line as it is now.
+    std::int64_t kontors = 0;
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
+        if (c.owner == p.player) {
+            kontors += c.sales / 480 - c.purchases / 480;
+        }
+    }
     for (std::uint32_t m = every; m <= horizon; m += every) {
         // The budget line with the cities' taxes less their running costs and the Kontors' trade as
         // projected instead of as now; the rest of the line (upkeep, what is set aside) stays.
         const std::int64_t line = b.at(Commitment{}, m);
-        const std::int64_t now =
-            (static_cast<std::int64_t>(civil_income(p)) + trade_balance(player(p))) * static_cast<std::int64_t>(m);
+        const std::int64_t now = (static_cast<std::int64_t>(civil_income(p)) + kontors) * static_cast<std::int64_t>(m);
         log(p, "project gold +%u %lld budget line %lld", m, static_cast<long long>(line + gold[m] - now),
             static_cast<long long>(line));
     }
