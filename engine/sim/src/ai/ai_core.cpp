@@ -334,9 +334,23 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         }
         path += " tax " + std::to_string(f.taxes);
     }
-    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld", kind, unsigned{c.island},
-        unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware}, ratio.c_str(), path.c_str(),
-        static_cast<long long>(us));
+    // P2.8: past the validated horizon, the action's last slope until it pays back, up to the game's
+    // end where the scenario has one.
+    std::uint32_t from = extra.empty() ? 1 : extra.front().from;
+    for (const Inflow& in : extra) {
+        from = std::min(from, in.from);
+    }
+    const std::uint32_t limit = m_sim.rules().victory.time_limit_minutes;
+    const auto played = static_cast<std::uint32_t>(now_ms() / 60'000);
+    const std::optional<std::uint32_t> left =
+        limit == 0 ? std::nullopt : std::optional<std::uint32_t>{std::max(limit, played) - played};
+    const Extension e = extend_value(v, from, kTrackMinutes, left);
+    const std::string beyond = e.too_early
+                                   ? std::string{"too early to extend"}
+                                   : "slope " + std::to_string(e.slope) + " payback " + std::to_string(e.payback);
+    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s",
+        kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware},
+        ratio.c_str(), path.c_str(), static_cast<long long>(us), beyond.c_str());
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {

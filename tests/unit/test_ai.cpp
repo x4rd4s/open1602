@@ -4240,6 +4240,31 @@ TEST_CASE("ai: an action's value is the city's gold with it less without it, les
     CHECK((both.people == v.people));
 }
 
+TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
+    sim::ai::ActionValue v;
+    v.gold = {-100, -90, -80, -70, -60, -50, -40};  // six minutes, +10 a minute
+    {
+        const sim::ai::Extension e = sim::ai::extend_value(v, 1, 3, std::nullopt);
+        CHECK(!e.too_early);
+        CHECK(e.slope == 10);
+        CHECK(e.payback == 6 + 5);  // -40 + 5 * 10 = +10
+    }
+    // Its goods began too late: the slope would hold their run-up.
+    CHECK(sim::ai::extend_value(v, 4, 3, std::nullopt).too_early);
+    // The game ends first.
+    CHECK(sim::ai::extend_value(v, 1, 3, std::uint32_t{10}).payback == 0);
+    CHECK(sim::ai::extend_value(v, 1, 3, std::uint32_t{11}).payback == 11);
+    // Falling or flat: no payback.
+    sim::ai::ActionValue flat;
+    flat.gold = {-100, -100, -100, -100};
+    CHECK(sim::ai::extend_value(flat, 1, 2, std::nullopt).payback == 0);
+    // Paid back within the horizon: that minute.
+    sim::ai::ActionValue early;
+    early.gold = {-10, 5, 20};
+    early.payback = 1;
+    CHECK(sim::ai::extend_value(early, 1, 1, std::nullopt).payback == 1);
+}
+
 TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its good, up to its rate (P2.7)") {
     const assets::BuildingTable buildings = hungry_town_table();
     const assets::FigureTable figures = make_figures();

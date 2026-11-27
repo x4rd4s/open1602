@@ -233,6 +233,17 @@ struct ActionValue {
 /// Open1602 (P2.7): `a` with another city's share `b` of the same action added minute by minute (a
 /// run between own cities: what the source loses), its payback found again; the people stay `a`'s.
 [[nodiscard]] ActionValue add_value(ActionValue a, const ActionValue& b);
+/// Open1602 (P2.8): an action's value past the validated horizon (the projection's last minute):
+/// its gold goes on at its mean slope over the last `period` minutes until it pays back, at most
+/// `left` minutes from now (none: the game has no end). Too early when the action's goods begin (minute `from`) less
+/// than one period before the horizon, so that the slope would still hold their run-up.
+struct Extension {
+    bool too_early = false;
+    std::int64_t slope = 0;     ///< gold a minute past the horizon
+    std::uint32_t payback = 0;  ///< the first minute the extended sum is above zero (0: none)
+};
+[[nodiscard]] Extension extend_value(const ActionValue& v, std::uint32_t from, std::uint32_t period,
+                                     std::optional<std::uint32_t> left) noexcept;
 
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -292,6 +294,35 @@ ActionValue add_value(ActionValue a, const ActionValue& b) {
         }
     }
     return a;
+}
+
+Extension extend_value(const ActionValue& v, std::uint32_t from, std::uint32_t period,
+                       std::optional<std::uint32_t> left) noexcept {
+    // A straight line on the action's own effect past what the projection shows, the yardstick's own
+    // rule (P2.6), from the mean of the last period so that a tick or a tax step does not set it.
+    Extension e;
+    if (v.gold.empty()) {
+        return e;
+    }
+    const auto horizon = static_cast<std::uint32_t>(v.gold.size() - 1);
+    if (v.payback != 0) {
+        e.payback = v.payback;
+        return e;
+    }
+    if (period == 0 || from + period > horizon) {
+        e.too_early = true;
+        return e;
+    }
+    e.slope = (v.gold[horizon] - v.gold[horizon - period]) / static_cast<std::int64_t>(period);
+    if (e.slope <= 0) {
+        return e;
+    }
+    const std::int64_t past = -v.gold[horizon] / e.slope + 1;  // minutes past the horizon until above zero
+    const std::int64_t at = std::int64_t{horizon} + past;
+    if (!left || at <= std::int64_t{*left}) {
+        e.payback = static_cast<std::uint32_t>(std::min<std::int64_t>(at, std::numeric_limits<std::uint32_t>::max()));
+    }
+    return e;
 }
 
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f) {
