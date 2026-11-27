@@ -17,6 +17,7 @@
 
 #include "o1602/sim/ai.hpp"
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim {
