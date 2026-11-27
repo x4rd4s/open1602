@@ -204,8 +204,9 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
     // buy at partners, P2.6) stays in the line as it is now.
     std::int64_t kontors = 0;
     for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
-        if (c.owner == p.player) {
-            kontors += c.sales / 480 - c.purchases / 480;
+        const std::vector<CitySample> last = c.owner == p.player ? c.history.last_minutes() : std::vector<CitySample>{};
+        if (!last.empty()) {
+            kontors += last.back().of(CityFigure::Sales) - last.back().of(CityFigure::Purchases);
         }
     }
     for (std::uint32_t m = every; m <= horizon; m += every) {
