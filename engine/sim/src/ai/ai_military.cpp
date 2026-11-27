@@ -65,6 +65,12 @@ std::string tallied(const std::vector<std::pair<std::uint16_t, std::uint32_t>>& 
 /// How often the log follows a landing party: once a minute of game time (only the log).
 constexpr std::uint64_t kLandingLogMs = 60'000;
 
+/// Open1602 (feedback 17, K2): an improved computer leaves a city be after kAttackTries attacks on it
+/// that landed no soldier, the war's kWarFails looks without progress, for kAttackTriesMs, the time
+/// it leaves an island it turned back from (kLeftIslandMs).
+constexpr std::size_t kAttackTries = 3;
+constexpr std::uint64_t kAttackTriesMs = 2'700'000;
+
 /// Guard posts kept per city.
 constexpr std::size_t kMaxPosts = 64;
 
@@ -1385,6 +1391,7 @@ void Engine::missions(AiPlayer& p) {
                     if (p.strategy.war_target == owner) {
                         p.strategy.war_fails = 0;  // a landing is progress: the fight takes its time
                     }
+                    forget_attack_tries(p, owner);
                     UnloadOrder order;
                     order.player = p.player;
                     order.ship = s->id;
@@ -2691,6 +2698,20 @@ void Engine::note_war_party(AiPlayer& p, const City& t, const Convoy& cv) {
     st.war_party_city = key;
 }
 
+std::size_t Engine::attack_tries(AiPlayer& p, const City& t) {
+    std::erase_if(p.strategy.attack_tries, [&](const auto& e) { return now_ms() - e.second >= kAttackTriesMs; });
+    const std::uint32_t key = city_param(t);
+    return static_cast<std::size_t>(
+        std::ranges::count_if(p.strategy.attack_tries, [&](const auto& e) { return e.first == key; }));
+}
+
+void Engine::forget_attack_tries(AiPlayer& p, PlayerId owner) {
+    std::erase_if(p.strategy.attack_tries, [&](const auto& e) {
+        const City* c = param_city(e.first);
+        return c == nullptr || c->owner == owner;
+    });
+}
+
 bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
     convoy = 1;
     // The original's conditions, the cheap ones first: none has a side effect, so the
@@ -2714,6 +2735,9 @@ bool Engine::attack_ok(AiPlayer& p, const City& t, std::size_t& convoy) {
         return false;
     }
     if (soldiers_near(p.player, *home, 8, 4).size() < 4) {
+        return false;
+    }
+    if (rivals() && attack_tries(p, t) >= kAttackTries) {
         return false;
     }
     // Open1602: no attack on a city whose towers over the landing no fleet of the computer's armed,
@@ -2836,6 +2860,13 @@ void Engine::start_attack(AiPlayer& p, const City& t, std::size_t convoy) {
         ship = bigger;
     }
     log(p, "attack on city %u/%u of player %u with ship %u", t.island, t.index, t.owner, ship->id);
+    if (rivals()) {
+        p.strategy.attack_tries.emplace_back(city_param(t), std::max<std::uint64_t>(now_ms(), 1));
+        if (attack_tries(p, t) == kAttackTries) {
+            log(p, "leaves city %u/%u be after this attack unless it lands: %zu attacks without a landing", t.island,
+                t.index, kAttackTries);
+        }
+    }
     // The party is for that one city: an attack on another city of the same target leaves it be
     // (probe p27, where one on a nearer city cleared it before any soldier was raised).
     if (rivals() && t.owner == p.strategy.war_target && p.strategy.war_party != 0 &&

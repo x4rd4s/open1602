@@ -423,6 +423,9 @@ public:
     }
     /// Sends `p`'s attack on city `t` (start_attack); for tests.
     void start_attack_for(AiPlayer& p, const City& t, std::size_t convoy = 1) { start_attack(p, t, convoy); }
+    /// `p`'s attack tries on city `t` (attack_tries) and their end on a landing; for tests.
+    [[nodiscard]] std::size_t attack_tries_for(AiPlayer& p, const City& t) { return attack_tries(p, t); }
+    void forget_attack_tries_for(AiPlayer& p, PlayerId owner) { forget_attack_tries(p, owner); }
     /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
@@ -1442,6 +1445,11 @@ private:
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
     /// `convoy`: how many ships take the party (1 but where towers no fleet wrecks are stormed).
+    /// Open1602 (feedback 17, K2): the attacks `p` started on city `t` within kAttackTriesMs that
+    /// landed no soldier since (Strategy::attack_tries), older ones dropped.
+    std::size_t attack_tries(AiPlayer& p, const City& t);
+    /// Drops `p`'s attack tries on the cities of `owner` (and of cities gone): it landed against them.
+    void forget_attack_tries(AiPlayer& p, PlayerId owner);
     bool attack_ok(AiPlayer& p, const City& t, std::size_t& convoy);
     void start_attack(AiPlayer& p, const City& t, std::size_t convoy);
     /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well

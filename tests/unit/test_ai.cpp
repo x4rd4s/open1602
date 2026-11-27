@@ -822,6 +822,51 @@ TEST_CASE("ai: a computer arming for a war still arms after the game is loaded (
     CHECK(s.computers().state_version() < sim::ai::kStateWithArming);
 }
 
+TEST_CASE("ai: a computer's attacks without a landing survive saving (version 18), older states load") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    run(s, 8'000);
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(s.computers());
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, s.computers().state_version());
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    // Without tries the state keeps its earlier version, so a version 17 reader reads it.
+    CHECK(s.computers().state_version() < sim::ai::kStateWithAttackTries);
+    state.players[0].strategy.attack_tries = {{0x0101, 5'000}, {0x0101, 6'000}};
+    annokit::core::ByteWriter out;
+    sim::ai::Saver saver(out, sim::ai::kStateWithAttackTries);
+    saver(state);
+    const std::vector<std::uint8_t> bytes = out.take();
+    annokit::core::ByteReader in(bytes);
+    sim::ComputerPlayers computers(s);
+    REQUIRE(computers.load(in, sim::ai::kStateWithAttackTries));
+    CHECK(computers.state_version() == sim::ai::kStateWithAttackTries);
+    const std::vector<std::uint8_t> again = saved(computers);
+    CHECK(again == bytes);
+    annokit::core::ByteReader back(again);
+    sim::StateIn reader(back);
+    sim::ai::State loaded;
+    sim::ai::Loader loader(reader, computers.state_version());
+    loader(loaded);
+    REQUIRE(reader.ok());
+    CHECK(loaded.players[0].strategy.attack_tries == state.players[0].strategy.attack_tries);
+    // A version 17 state loads with none.
+    annokit::core::ByteWriter old;
+    sim::ai::Saver old_saver(old, sim::ai::kStateWithWarParty);
+    old_saver(state);
+    const std::vector<std::uint8_t> v17 = old.take();
+    annokit::core::ByteReader old_in(v17);
+    sim::ComputerPlayers older(s);
+    REQUIRE(older.load(old_in, sim::ai::kStateWithWarParty));
+    CHECK(older.state_version() < sim::ai::kStateWithAttackTries);
+}
+
 TEST_CASE("ai: land freed on its island lets a computer's city search its sites anew, not the original's") {
     for (const bool classic : {false, true}) {
         Game g;
