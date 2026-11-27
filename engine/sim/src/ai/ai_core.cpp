@@ -125,6 +125,19 @@ void Engine::track(const AiPlayer& p) const {
     }
     m_track_ms[p.player] = now_ms() + kTrackMs;
     log(p, "track gold %d", player(p).money);
+    // The Kontors' share of the trade balance; the rest is the ships' (supply runs that buy at
+    // partners, P2.6).
+    std::int64_t kontors = 0;
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
+        const std::vector<CitySample> last = c.owner == p.player ? c.history.last_minutes() : std::vector<CitySample>{};
+        if (!last.empty()) {
+            kontors += last.back().of(CityFigure::Sales) - last.back().of(CityFigure::Purchases);
+        }
+    }
+    // The terms of the budget's straight line a minute, as now (P2.6), to split the gold's error.
+    log(p, "track money civil %d military %d kontor %lld ships %lld young %lld", civil_income(p), military_cost(p),
+        static_cast<long long>(kontors), static_cast<long long>(trade_balance(player(p)) - kontors),
+        static_cast<long long>(young_colonies_gap(p)));
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     for (std::size_t index = 0; index < m_world.cities().size(); ++index) {
         const City& c = m_world.cities()[index];
@@ -153,10 +166,10 @@ void Engine::track(const AiPlayer& p) const {
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
         log_flows(p, c, kTrackMinutes);
     }
-    log_projection(p, kTrackMinutes);
+    log_projection(p, kTrackMinutes, kontors);
 }
 
-void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
+void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t kontors) const {
     // Open1602 (P2.4): each own city over the budget's horizon, at every `every` minutes of it, for
     // the track lines that come then; and the gold, against the budget's straight line. Only the
     // log: the budget's caches are put back.
@@ -172,7 +185,8 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
     m_census = census;
     m_overviews = overviews;
     std::vector<std::int64_t> gold(horizon + 1, 0);
-    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
+    std::vector<std::int64_t> trade(horizon + 1, 0);  // the Kontors' part of gold
+    for (const City& c : m_world.cities()) {          // ai-view: eigen: only the own cities' figures
         if (c.owner != p.player) {
             continue;
         }
@@ -181,6 +195,11 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
         const auto us =
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
         add_city_gold(gold, f);
+        std::int64_t sum = 0;
+        for (std::uint32_t m = 1; m <= horizon; ++m) {
+            sum += m <= f.minutes.size() ? f.minutes[m - 1].trade : 0;
+            trade[m] += sum;
+        }
         for (std::uint32_t m = 1; m <= f.minutes.size(); ++m) {
             const ProjectedMinute& pm = f.minutes[m - 1];
             if (m % every != 0) {
@@ -200,22 +219,16 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
                 m, static_cast<unsigned long long>(people), pm.taxes, goods.c_str(), static_cast<long long>(us));
         }
     }
-    // Only the Kontors' share of the trade balance is projected; the ships' share (supply runs that
-    // buy at partners, P2.6) stays in the line as it is now.
-    std::int64_t kontors = 0;
-    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
-        const std::vector<CitySample> last = c.owner == p.player ? c.history.last_minutes() : std::vector<CitySample>{};
-        if (!last.empty()) {
-            kontors += last.back().of(CityFigure::Sales) - last.back().of(CityFigure::Purchases);
-        }
-    }
+    // Only the Kontors' share of the trade balance is projected; the ships' share stays in the line
+    // as it is now.
     for (std::uint32_t m = every; m <= horizon; m += every) {
         // The budget line with the cities' taxes less their running costs and the Kontors' trade as
         // projected instead of as now; the rest of the line (upkeep, what is set aside) stays.
         const std::int64_t line = b.at(Commitment{}, m);
         const std::int64_t now = (static_cast<std::int64_t>(civil_income(p)) + kontors) * static_cast<std::int64_t>(m);
-        log(p, "project gold +%u %lld budget line %lld", m, static_cast<long long>(line + gold[m] - now),
-            static_cast<long long>(line));
+        log(p, "project gold +%u %lld budget line %lld civil %lld kontor %lld", m,
+            static_cast<long long>(line + gold[m] - now), static_cast<long long>(line),
+            static_cast<long long>(gold[m] - trade[m]), static_cast<long long>(trade[m]));
     }
 }
 

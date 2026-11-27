@@ -665,7 +665,8 @@ private:
     /// P2.4: a city's goods movements of the last minutes by kind ("track flows"). Logging only.
     void log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
     /// Open1602 (P2.4): logs project_city of each own city at every `every` minutes of the budget's horizon.
-    void log_projection(const AiPlayer& p, std::uint32_t every) const;
+    /// `kontors` is the own cities' share of the trade balance now (P2.6).
+    void log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t kontors) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
