@@ -532,6 +532,10 @@ bool Engine::plants_on(std::uint32_t fertility, bool lacking, bool traded, bool 
     return fertility == 128 || (fertility != 0 && lacking && !traded && !colony && pays);
 }
 
+bool Engine::half_crop_planted(std::uint32_t fertility, std::uint32_t other) noexcept {
+    return fertility == 128 || other != 128;
+}
+
 Engine::WareSet Engine::needed_wares(const AiPlayer& p, bool soon, bool sales) const {
     // The wares the computer needs: building material and food, what its inhabitants want and
     // what its own buildings work into such a ware, down the chain, and the weapons while it arms
@@ -3304,6 +3308,16 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             const bool traded = lacking && c->stock(crop.good) != 0;
             if (!plants_on(f, lacking, traded, lacking && !traded && fertile_island_open(p, crop.field),
                            lacking && !traded && slot_affordable_now(p, crop.slot))) {
+                continue;
+            }
+            // Not while another crop for the same good grows fully here (half_crop_planted).
+            std::uint32_t other = 0;
+            for (const Crop& o : crops) {
+                if (o.slot != crop.slot && o.good == crop.good && o.eligible && o.upkeep < budget) {
+                    other = std::max(other, view(p).fertility(c->island, o.field).value_or(0));
+                }
+            }
+            if (!half_crop_planted(f, other)) {
                 continue;
             }
             half = true;

@@ -467,6 +467,23 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Whether a crop that grows here at `fertility` is planted while another crop for the same
+    /// good grows here at `other` (island_fertility; 0: none): one that grows only half waits for
+    /// one that grows fully, as wine at 50 % for sugar cane at 100 %, both for alcohol (feedback
+    /// 17: three vineyards at half the yield and no rum).
+    [[nodiscard]] static bool half_crop_planted(std::uint32_t fertility, std::uint32_t other) noexcept;
+    /// Whether an improved computer plants a field on a tile that is neither meadow, tree nor
+    /// ruin (fill_fields): bare ground without a ware (`tile_kind`, `ware` of its Tile), as the desert
+    /// marks are, where the field would bear (`bears`, tile_fertile_at) and a player may plant too.
+    /// The original's computers leave such tiles out; with "Fertile" every one of them bears, and
+    /// the plantations stood with gaps (feedback 17).
+    [[nodiscard]] static bool bare_ground_planted(bool improved, std::int32_t tile_kind, std::uint8_t ware,
+                                                  bool bears) noexcept;
+    /// The same for tile `t` at (x, y) of the computer's island and a field of `field_ware`, for an
+    /// improved computer with "Fertile" only (Rules::fertile_fields), on dry ground only (a
+    /// Randwachs below the full); asks tile_fertile_at only for that ground.
+    [[nodiscard]] bool bare_ground_planted(const AiPlayer& p, const Tile& t, std::int32_t x, std::int32_t y,
+                                           std::uint8_t field_ware) const;
     /// Whether another player's city leaves room to found beside it: not an island the original keeps
     /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
