@@ -509,6 +509,9 @@ their soldiers and ships attack every enemy near them on their own. Improved com
   attack on that city starts or the war ends. While its gold above the broke line (2000) pays
   their upkeep and its cities' deficit for half an hour, it trains them beyond its budget, several
   at once; otherwise within its budget like any unit.
+  After three attacks on one city that landed no soldier (called off at the beach, or turned home
+  before it), the computer leaves that city be for 45 minutes, as long as an island it turned back
+  from, and logs it. A landing against the city's owner ends the wait, and so do the 45 minutes.
 - **Walled coasts.** Where every beach near the city is walled or sealed by trees behind it, a
   warship shoots a gap into the wall on the beach, or into the trees or walls behind it. With no
   beach within 24 tiles of the market an improved computer takes one farther away, the soldiers

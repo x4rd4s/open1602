@@ -23,7 +23,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 17;
+inline constexpr std::uint32_t kStateVersion = 18;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -61,6 +61,9 @@ inline constexpr std::uint32_t kStateWithFreedIslands = 16;
 /// Version 17: the soldiers an improved computer's war lacks for the next city it attacks
 /// (Strategy::war_party, war_party_city). Written only while it lacks some.
 inline constexpr std::uint32_t kStateWithWarParty = 17;
+/// Version 18: the attacks an improved computer started on a city without landing there since
+/// (Strategy::attack_tries). Written only while it has some.
+inline constexpr std::uint32_t kStateWithAttackTries = 18;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -491,6 +494,10 @@ struct Strategy {
     /// (army_target) until an attack starts or the war ends (state 17).
     std::uint16_t war_party = 0;
     std::uint32_t war_party_city = 0;
+    /// Open1602 (feedback 17, K2): the attacks it started, by city (city_param) and game time, that
+    /// landed no soldier against the city's owner since; it leaves a city with kAttackTries of them
+    /// within kAttackTriesMs be (attack_ok), as a ship turned home some 50 times from one (state 18).
+    std::vector<std::pair<std::uint32_t, std::uint64_t>> attack_tries;
 };
 
 struct AiPlayer {
