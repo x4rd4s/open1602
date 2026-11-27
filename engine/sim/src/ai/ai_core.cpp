@@ -128,16 +128,24 @@ void Engine::track(const AiPlayer& p) const {
     // The Kontors' share of the trade balance; the rest is the ships' (supply runs that buy at
     // partners, P2.6).
     std::int64_t kontors = 0;
+    std::uint64_t sold = 0;  // the Kontors' gold of the last minutes in the ledger, as project_city prices it
+    std::uint64_t bought = 0;
     for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
         const std::vector<CitySample> last = c.owner == p.player ? c.history.last_minutes() : std::vector<CitySample>{};
         if (!last.empty()) {
             kontors += last.back().of(CityFigure::Sales) - last.back().of(CityFigure::Purchases);
         }
+        for (std::size_t w = 0; c.owner == p.player && w < c.ledger.wares().size(); ++w) {
+            const FlowTotals t = c.ledger.totals(static_cast<std::uint8_t>(w), kTrackMinutes);
+            sold += t.of(GoodsFlow::SoldValue);
+            bought += t.of(GoodsFlow::BoughtValue);
+        }
     }
     // The terms of the budget's straight line a minute, as now (P2.6), to split the gold's error.
-    log(p, "track money civil %d military %d kontor %lld ships %lld young %lld", civil_income(p), military_cost(p),
-        static_cast<long long>(kontors), static_cast<long long>(trade_balance(player(p)) - kontors),
-        static_cast<long long>(young_colonies_gap(p)));
+    log(p, "track money civil %d military %d kontor %lld ships %lld young %lld sold %llu bought %llu", civil_income(p),
+        military_cost(p), static_cast<long long>(kontors), static_cast<long long>(trade_balance(player(p)) - kontors),
+        static_cast<long long>(young_colonies_gap(p)), static_cast<unsigned long long>(sold),
+        static_cast<unsigned long long>(bought));
     const std::vector<std::int32_t> costs = running_costs(m_world, m_buildings);
     for (std::size_t index = 0; index < m_world.cities().size(); ++index) {
         const City& c = m_world.cities()[index];
@@ -186,6 +194,7 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t
     m_overviews = overviews;
     std::vector<std::int64_t> gold(horizon + 1, 0);
     std::vector<std::int64_t> trade(horizon + 1, 0);  // the Kontors' part of gold
+    std::vector<std::int64_t> sold(horizon + 1, 0);   // of it, the sales
     for (const City& c : m_world.cities()) {          // ai-view: eigen: only the own cities' figures
         if (c.owner != p.player) {
             continue;
@@ -196,9 +205,12 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
         add_city_gold(gold, f);
         std::int64_t sum = 0;
+        std::int64_t sales = 0;
         for (std::uint32_t m = 1; m <= horizon; ++m) {
             sum += m <= f.minutes.size() ? f.minutes[m - 1].trade : 0;
+            sales += m <= f.minutes.size() ? f.minutes[m - 1].sold : 0;
             trade[m] += sum;
+            sold[m] += sales;
         }
         for (std::uint32_t m = 1; m <= f.minutes.size(); ++m) {
             const ProjectedMinute& pm = f.minutes[m - 1];
@@ -226,9 +238,10 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t
         // projected instead of as now; the rest of the line (upkeep, what is set aside) stays.
         const std::int64_t line = b.at(Commitment{}, m);
         const std::int64_t now = (static_cast<std::int64_t>(civil_income(p)) + kontors) * static_cast<std::int64_t>(m);
-        log(p, "project gold +%u %lld budget line %lld civil %lld kontor %lld", m,
+        log(p, "project gold +%u %lld budget line %lld civil %lld kontor %lld sold %lld bought %lld", m,
             static_cast<long long>(line + gold[m] - now), static_cast<long long>(line),
-            static_cast<long long>(gold[m] - trade[m]), static_cast<long long>(trade[m]));
+            static_cast<long long>(gold[m] - trade[m]), static_cast<long long>(trade[m]),
+            static_cast<long long>(sold[m]), static_cast<long long>(sold[m] - trade[m]));
     }
 }
 

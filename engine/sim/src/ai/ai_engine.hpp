@@ -195,6 +195,7 @@ struct ProjectedMinute {
     std::vector<std::uint8_t> satisfaction;  ///< per class
     std::int32_t taxes = 0;                  ///< gold a minute (tax_income)
     std::int64_t trade = 0;                  ///< gold of the Kontor's sales less its purchases (P2.5)
+    std::int64_t sold = 0;                   ///< gold of the Kontor's sales alone (P2.6)
 };
 
 /// Open1602 (P2.4): what a computer city does over the next minutes with what it gets now: its
