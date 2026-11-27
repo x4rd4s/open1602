@@ -4059,6 +4059,26 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     CHECK(fell);
 }
 
+TEST_CASE("ai: a computer's projected city sets its taxes as the computer would; a person's keeps them (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::City& town = *world.city(0, 0);
+    const sim::ai::CityProjection person = engine.project_city(p, town, 1);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    const sim::ai::CityProjection computer = engine.project_city(p, town, 1);
+    // At the start the town's classes stay content above the normal rate: the computer taxes them more.
+    REQUIRE(!person.minutes.empty());
+    REQUIRE(!computer.minutes.empty());
+    CHECK(computer.minutes.front().taxes > person.minutes.front().taxes);
+}
+
 TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute by minute (P2.4)") {
     // A city with no inhabitants: what its ledger shows coming in a minute (made and shipped in,
     // less what went out but to the inhabitants) comes in each projected minute, a sixth each city

@@ -937,6 +937,10 @@ private:
     /// Whether it switches off what it does not need: in debt, or for its army's upkeep.
     [[nodiscard]] bool saving_costs(const AiPlayer& p) const;
     void tax_rates(AiPlayer& p, City& c);
+    /// Whether `p` is in debt and losing money, so that tax_rates taxes up to just content.
+    [[nodiscard]] bool tax_broke(const AiPlayer& p) const;
+    /// The rate tax_rates sets for class `k` of city `c` (an improved computer's), with `money` gold.
+    [[nodiscard]] std::uint8_t chosen_tax(const City& c, std::size_t k, bool broke, std::int64_t money) const;
     /// Open1602: an improved computer keeps its houses from rising while the city lacks food or a
     /// good its upper classes want, as a player would.
     void material_lock(AiPlayer& p, City& c);

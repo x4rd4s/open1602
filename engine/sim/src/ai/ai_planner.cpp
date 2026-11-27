@@ -412,54 +412,62 @@ std::int64_t Engine::stage_gold(std::uint32_t gold) const {
 }
 
 void Engine::tax_rates(AiPlayer& p, City& c) {
-    // Improved computers set their taxes as a player does: as high as each class stays fully
-    // content with a step to spare, so growth never stops for it. Short of money, a class that is
-    // fully supplied pays up to where it is just content enough not to move out; with money to
-    // spare, a class short of goods pays less so that it still grows. The original's computers
+    // Improved computers set their taxes as a player does (chosen_tax). The original's computers
     // keep the normal rate.
     if (!rivals()) {
         return;
     }
-    constexpr std::uint8_t kNormal = 128;
-    constexpr std::uint8_t kStep = 8;
-    constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
     const auto& classes = m_buildings.resident_classes();
-    const std::int64_t money = player(p).money;
-    // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
-    // and with little gold but no debt it kept that rate for hours.
-    const bool broke = money < 0 && net_income(p) < 0;
+    const bool broke = tax_broke(p);
     for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
         if (c.inhabitants[k] == 0) {
             continue;
         }
-        const auto content = [&](std::uint32_t rate) {
-            return satisfaction_of(c, classes[k], static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
-        };
-        std::uint32_t rate = CityOrder::kMinTax;
-        for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
-            if (content(r + kStep) >= kFullSupply) {
-                rate = r;
-            }
-        }
-        if (rate < kNormal) {
-            rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
-        }
-        if (broke) {
-            for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
-                if (content(r) >= kStable) {
-                    rate = r;
-                }
-            }
-        }
-        const auto chosen = static_cast<std::uint8_t>(rate);
+        const std::uint8_t chosen = chosen_tax(c, k, broke, player(p).money);
         if (c.tax_rate[k] != chosen) {
             c.tax_rate[k] = chosen;
             if (k < c.satisfaction.size()) {
-                c.satisfaction[k] = content(chosen);
+                c.satisfaction[k] = satisfaction_of(c, classes[k], chosen);
             }
             log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
         }
     }
+}
+
+bool Engine::tax_broke(const AiPlayer& p) const {
+    // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
+    // and with little gold but no debt it kept that rate for hours.
+    return player(p).money < 0 && net_income(p) < 0;
+}
+
+std::uint8_t Engine::chosen_tax(const City& c, std::size_t k, bool broke, std::int64_t money) const {
+    // As high as class `k` stays fully content with a step to spare, so growth never stops for it.
+    // Short of money, a class that is fully supplied pays up to where it is just content enough not
+    // to move out; with money to spare, a class short of goods pays less so that it still grows.
+    constexpr std::uint8_t kNormal = 128;
+    constexpr std::uint8_t kStep = 8;
+    constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
+    const assets::ResidentClass& resident_class = m_buildings.resident_classes()[k];
+    const auto content = [&](std::uint32_t rate) {
+        return satisfaction_of(c, resident_class, static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
+    };
+    std::uint32_t rate = CityOrder::kMinTax;
+    for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
+        if (content(r + kStep) >= kFullSupply) {
+            rate = r;
+        }
+    }
+    if (rate < kNormal) {
+        rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
+    }
+    if (broke) {
+        for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
+            if (content(r) >= kStable) {
+                rate = r;
+            }
+        }
+    }
+    return static_cast<std::uint8_t>(rate);
 }
 
 void Engine::material_lock(AiPlayer& p, City& c) {
