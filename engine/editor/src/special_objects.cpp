@@ -31,6 +31,12 @@ bool ruin(const assets::BuildingType& b) noexcept {
     return b.kind == assets::kind::kRuin || b.kind == assets::kind::kBeachRuin;
 }
 
+/// A destroyed Kontor, market or chief's hut of the original's ruin slots (kRuins), not a ruin.
+bool destroyed_building(const assets::BuildingType& b) noexcept {
+    return b.destroyed && !ruin(b) &&
+           std::find(assets::id::kRuins.begin(), assets::id::kRuins.end(), b.id) != assets::id::kRuins.end();
+}
+
 bool unused_building(const assets::BuildingType& b) noexcept {
     return std::find(assets::id::kUnusedBuildings.begin(), assets::id::kUnusedBuildings.end(), b.id) !=
            assets::id::kUnusedBuildings.end();
@@ -84,6 +90,13 @@ std::vector<SpecialPiece> special_pieces(const assets::BuildingTable& buildings)
             add_once(pieces, seen, b, SpecialPiece{b.id, 0, 1, SpecialKind::Ruin});
         }
     }
+    // Without a city a destroyed market does not collapse (collapse_market_ruins): it stays.
+    for (const std::uint32_t id : assets::id::kRuins) {
+        if (const assets::BuildingType* b = buildings.by_id(id);
+            b != nullptr && destroyed_building(*b) && b->size_x > 0 && b->size_y > 0) {
+            add_once(pieces, seen, *b, SpecialPiece{b->id, 0, 1, SpecialKind::Destroyed});
+        }
+    }
     for (const std::uint32_t id : assets::id::kUnusedBuildings) {
         if (const assets::BuildingType* b = buildings.by_id(id); b != nullptr && b->size_x > 0 && b->size_y > 0) {
             add_once(pieces, seen, *b, SpecialPiece{b->id, 0, 1, SpecialKind::Building});
@@ -93,7 +106,7 @@ std::vector<SpecialPiece> special_pieces(const assets::BuildingTable& buildings)
 }
 
 bool is_special(const assets::BuildingTable& buildings, const assets::BuildingType& building) noexcept {
-    if (ruin(building) || unused_building(building) || ripe_crop(buildings, building)) {
+    if (ruin(building) || destroyed_building(building) || unused_building(building) || ripe_crop(buildings, building)) {
         return true;
     }
     if (building.prod_kind != assets::prod::kGrowing) {
@@ -136,8 +149,10 @@ SpecialRefusal special_fits(const sim::World& world, const assets::BuildingTable
             if (!group) {
                 return SpecialRefusal::Taken;  // a building, road, field or ruin
             }
+            // A destroyed Kontor stands at the coast as a Kontor does: beach too.
+            const bool land = *group == TerrainGroup::Ground || *group == TerrainGroup::Forest;
             const bool fits = beach ? *group == TerrainGroup::Beach
-                                    : *group == TerrainGroup::Ground || *group == TerrainGroup::Forest;
+                                    : land || (piece.kind == SpecialKind::Destroyed && *group == TerrainGroup::Beach);
             if (!fits) {
                 return SpecialRefusal::Ground;
             }

@@ -50,7 +50,8 @@ constexpr std::uint32_t kEditorLookSeed = 1602;
 constexpr std::int32_t kLandscapeGroup = 31099;
 
 /// The group of the natives' and pirates' buildings, which no build menu lists: the original's
-/// list after the menu's (Text.cod [LANDSCHAFT]) without its two forests, which the terrain has.
+/// list after the menu's (Text.cod [LANDSCHAFT]) without its two forests, which the terrain has,
+/// and with the pirates' buildings it leaves out (kLandscapeAdded).
 const ui::BuildCategory& landscape_group() {
     static const ui::BuildCategory group = [] {
         ui::BuildCategory c;
@@ -62,6 +63,11 @@ const ui::BuildCategory& landscape_group() {
             if (id != assets::id::island_shape::kForestNorth.front() &&
                 id != assets::id::island_shape::kForestSouth.front()) {
                 row.push_back(ui::BuildButton{id, 0, static_cast<std::int32_t>(i), {}, {}});
+            }
+            if (id == assets::id::kLandscapeAddedAfter) {
+                for (const std::uint32_t added : assets::id::kLandscapeAdded) {
+                    row.push_back(ui::BuildButton{added, 0, -1, {}, {}});
+                }
             }
         }
         c.rows.push_back(std::move(row));
@@ -129,6 +135,9 @@ const ui::BuildCategory& editor_group(const ui::BuildCategory& c, const assets::
 std::string landscape_name(const assets::BuildingType& b) {
     // The natives' buildings come first in the list, five of each of their two looks.
     constexpr std::ptrdiff_t kNativeLook = 5;
+    if (b.id == assets::id::kPirateHouse3) {
+        return ui::tr("editor.objects.pirate.tavern");
+    }
     const auto at = std::find(assets::id::kLandscape.begin(), assets::id::kLandscape.end(), b.id);
     const std::ptrdiff_t index = at - assets::id::kLandscape.begin();
     if (at == assets::id::kLandscape.end() || index >= 2 * kNativeLook) {
@@ -185,6 +194,18 @@ std::string special_name(const editor::SpecialPiece& p, const assets::BuildingTa
         return ui::tr(
             b != nullptr && b->kind == assets::kind::kBeachRuin ? "editor.special.beach_ruin" : "editor.special.ruin",
             {number});
+    }
+    if (p.kind == Kind::Destroyed && b != nullptr) {
+        // kRuins: Kontor I-IV, then the chief's huts of the natives' two looks, then the market.
+        const auto& r = assets::id::kRuins;
+        const auto at = static_cast<std::size_t>(std::find(r.begin(), r.end(), p.id) - r.begin());
+        if (b->prod_kind == assets::prod::kMarket) {
+            return ui::tr("editor.special.destroyed_market", {number});
+        }
+        if (at >= 8 && at < 12) {
+            return ui::tr("editor.special.destroyed_kontor", {std::to_string(at - 7), number});
+        }
+        return ui::tr("editor.special.destroyed_chief", {at == 12 ? "1" : "2", number});
     }
     if (p.id == assets::id::kUnusedBuildings[0]) {
         return ui::tr("editor.special.outpost", {number});
