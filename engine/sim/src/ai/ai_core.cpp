@@ -195,8 +195,11 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t
     // Open1602 (P2.4): each own city over the budget's horizon, at every `every` minutes of it, for
     // the track lines that come then; and the gold, against the budget's straight line. Only the
     // log: the budget's caches are put back.
-    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    if (horizon == 0 || every == 0) {
+    // P2.8: as far as the ledger keeps its minutes one by one, past the budget's horizon, so that the
+    // log shows how far the projection still holds (the horizon a value may look ahead).
+    const std::uint32_t horizon =
+        std::max(m_world.balance().ai_budget_horizon_minutes, static_cast<std::uint32_t>(GoodsLedger::kMinutes));
+    if (m_world.balance().ai_budget_horizon_minutes == 0 || every == 0) {
         return;
     }
     const std::vector<BudgetCache> budgets = m_budgets;
