@@ -139,9 +139,32 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         return now;
     };
     // Only a computer's own taxes follow its rule; a person sets theirs.
-    const bool sets_taxes = rivals() && player(p).role == PlayerRole::Computer;
+    // P2.8: the computer sets its taxes again as its city changes (tax_rates), with or without the
+    // action, so that an action that contents a class lets it pay more. It does so for the city it
+    // tends (refresh_city, every few seconds), at each of the city's ticks here; a person sets their
+    // own taxes.
+    // shortcut: only the city tended now, at the gold the player has now; upgrade when the projection
+    // carries which city is tended and the player's gold.
+    const City* tended = current_city(p);
+    const bool sets_taxes = rivals() && player(p).role == PlayerRole::Computer && tended != nullptr &&
+                            tended->island == c.island && tended->index == c.index;
     const bool broke = sets_taxes && tax_broke(p);
     const std::int64_t money = player(p).money;
+    const auto retax = [&] {
+        const auto& classes = m_buildings.resident_classes();
+        for (std::size_t k = 0; k < classes.size() && k < city->tax_rate.size() && k < city->inhabitants.size(); ++k) {
+            if (city->inhabitants[k] == 0) {
+                continue;
+            }
+            const std::uint8_t chosen = chosen_tax(*city, k, broke, money);
+            if (city->tax_rate[k] != chosen) {
+                city->tax_rate[k] = chosen;
+                if (k < city->satisfaction.size()) {
+                    city->satisfaction[k] = satisfaction_of(*city, classes[k], chosen);
+                }
+            }
+        }
+    };
     std::uint32_t city_ms = m_sim.m_city_ms;
     out.minutes.reserve(minutes);
     for (std::uint32_t m = 0; m < minutes; ++m) {
@@ -152,26 +175,6 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         std::vector<Traded> traded(rate.size());  // this minute
         for (std::size_t w = 0; w < rate.size(); ++w) {
             rate[w][kExtra] = 0;
-        }
-        // P2.8: the computer sets its taxes again as its city changes (tax_rates), with or without the
-        // action; an action that contents a class lets it pay more.
-        // shortcut: once a minute, at the gold the player has now; upgrade when the projection carries the player's
-        // gold.
-        if (sets_taxes) {
-            const auto& classes = m_buildings.resident_classes();
-            for (std::size_t k = 0; k < classes.size() && k < city->tax_rate.size() && k < city->inhabitants.size();
-                 ++k) {
-                if (city->inhabitants[k] == 0) {
-                    continue;
-                }
-                const std::uint8_t chosen = chosen_tax(*city, k, broke, money);
-                if (city->tax_rate[k] != chosen) {
-                    city->tax_rate[k] = chosen;
-                    if (k < city->satisfaction.size()) {
-                        city->satisfaction[k] = satisfaction_of(*city, classes[k], chosen);
-                    }
-                }
-            }
         }
         for (const Inflow& in : extra) {
             if (in.from <= m + 1 && m + 1 <= in.until && in.ware < rate.size()) {
@@ -215,6 +218,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                     pool[k.raw] -= used;
                     city->goods[k.ware] += static_cast<std::uint32_t>(std::max<std::int64_t>(0, added));
                     pool[k.ware] += std::max<std::int64_t>(0, added);
+                }
+                if (sets_taxes) {
+                    retax();
                 }
                 advance_city(copy, m_buildings, *city, out.running_cost, workers, nullptr);
             }

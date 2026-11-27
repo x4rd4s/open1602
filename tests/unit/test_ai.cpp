@@ -4059,7 +4059,9 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     CHECK(fell);
 }
 
-TEST_CASE("ai: a computer's projected city sets its taxes as the computer would; a person's keeps them (P2.8)") {
+TEST_CASE(
+    "ai: a computer's projected city sets its taxes as the computer would where it tends; a person's keeps them "
+    "(P2.8)") {
     const assets::BuildingTable buildings = hungry_town_table();
     const assets::FigureTable figures = make_figures();
     sim::World world{60, 60};
@@ -4072,11 +4074,16 @@ TEST_CASE("ai: a computer's projected city sets its taxes as the computer would;
     const sim::City& town = *world.city(0, 0);
     const sim::ai::CityProjection person = engine.project_city(p, town, 1);
     world.player(kHuman)->role = sim::PlayerRole::Computer;
+    const sim::ai::CityProjection elsewhere = engine.project_city(p, town, 1);  // a city it does not tend now
+    p.has_city = true;
+    p.island = town.island;
+    p.city = town.index;
     const sim::ai::CityProjection computer = engine.project_city(p, town, 1);
     // At the start the town's classes stay content above the normal rate: the computer taxes them more.
     REQUIRE(!person.minutes.empty());
     REQUIRE(!computer.minutes.empty());
     CHECK(computer.minutes.front().taxes > person.minutes.front().taxes);
+    CHECK(elsewhere.minutes.front().taxes == person.minutes.front().taxes);
 }
 
 TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute by minute (P2.4)") {
