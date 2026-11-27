@@ -2,6 +2,7 @@
 // An improved computer in debt (ai_planner.cpp): it keeps what it sold within the hour its goods
 // statistics show, and it switches farms with fields off instead of tearing them down.
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -105,6 +106,33 @@ TEST_CASE("ai luxury: a crop on half-fertile land only as the last resort") {
     CHECK(!Engine::plants_on(0, true, false, false, true));    // it does not grow there
     // Gate f27: one it cannot pay now waited in need() on every planner step, for hours.
     CHECK(!Engine::plants_on(64, true, false, false, false));
+}
+
+TEST_CASE("ai luxury: a half-fertile crop waits for a fully fertile one of the same good") {
+    // Feedback 17: an island with sugar cane at 100 % and wine at 50 %; short of alcohol, the
+    // computer planted three vineyards at half the yield and no rum.
+    CHECK(!Engine::half_crop_planted(64, 128));  // wine at half: the sugar cane grows fully here
+    CHECK(Engine::half_crop_planted(128, 64));   // sugar cane at full: planted
+    CHECK(Engine::half_crop_planted(64, 64));    // both half: the last resort as before
+    CHECK(Engine::half_crop_planted(64, 0));     // no other crop for the good: as before
+    CHECK(Engine::half_crop_planted(128, 128));
+}
+
+TEST_CASE("ai fields: an improved computer plants bare ground where the field bears") {
+    // Feedback 17: with "Fertile" the desert marks among the fields bear in full, and the
+    // plantations of the computers stood with gaps; a player may plant there.
+    CHECK(Engine::bare_ground_planted(true, assets::kind::kGround, 0, true));
+    CHECK(!Engine::bare_ground_planted(false, assets::kind::kGround, 0, true));  // the original's computers
+    CHECK(!Engine::bare_ground_planted(true, assets::kind::kGround, 0, false));  // it would not bear
+    CHECK(!Engine::bare_ground_planted(true, assets::kind::kGround, assets::ware::kGrass, true));  // meadow: as before
+    CHECK(!Engine::bare_ground_planted(true, assets::kind::kRoad, 0, true));
+}
+
+TEST_CASE("ai first island: large at random draws among the largest free islands first") {
+    // Feedback 17: at random the computers took small islands with larger ones free around them.
+    CHECK((Engine::first_island_sizes(sim::FirstIsland::AtRandom, 4) == std::array<std::uint32_t, 2>{2, 0}));
+    CHECK((Engine::first_island_sizes(sim::FirstIsland::LargeAtRandom, 4) == std::array<std::uint32_t, 2>{4, 0}));
+    CHECK((Engine::first_island_sizes(sim::FirstIsland::LargeAtRandom, 1) == std::array<std::uint32_t, 2>{1, 0}));
 }
 
 TEST_CASE("ai war plan: a crop island is a war motive only when the freed island can be settled") {

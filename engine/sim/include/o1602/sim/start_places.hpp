@@ -33,8 +33,9 @@ struct StartPlace {
 /// slots: those whose start places are drawn.
 [[nodiscard]] std::vector<PlayerId> players_starting_at_sea(const World& world);
 
-/// The start places of `world`: the first ship of each of players_starting_at_sea(), then the
-/// further start places of its markers (ship_start_marker), each place once.
+/// The start places of `world`: those of its markers (ship_start_marker) alone when there are at
+/// least as many as players_starting_at_sea(), so that the author sets every place; else the first
+/// ship of each of those players, then the places of the markers. Each place once.
 [[nodiscard]] std::vector<StartPlace> start_places(const World& world);
 
 /// Gives each of players_starting_at_sea() a start place of start_places() drawn from `seed`, each

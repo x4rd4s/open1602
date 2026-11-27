@@ -1135,6 +1135,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
     for (const ai::AiPlayer& p : m_state->players) {
+        if (!p.strategy.attack_tries.empty()) {
+            return static_cast<std::uint16_t>(ai::kStateWithAttackTries);
+        }
+    }
+    for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.war_party != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithWarParty);
         }

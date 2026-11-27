@@ -202,6 +202,9 @@ TEST_CASE("unit selection: formation, filters and groups") {
     sel.box(f.world, {{a, 1}, {b, 1}, {c, 1}}, 0, false);
     // Kinds: infantry (1) and musketeers (3).
     CHECK(sel.kind_mask(f.world, f.figures) == ((1U << 1) | (1U << 3)));
+    CHECK(sel.kind_count(f.world, f.figures, 1) == 2);
+    CHECK(sel.kind_count(f.world, f.figures, 3) == 1);
+    CHECK(sel.kind_count(f.world, f.figures, 2) == 0);
     // A line around the centre: each to the nearest free place.
     sel.formation(f.world, f.figures, 0);
     std::vector<ui::UnitSelection::Offset> offsets = sel.offsets();

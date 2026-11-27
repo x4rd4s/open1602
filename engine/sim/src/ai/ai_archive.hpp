@@ -434,6 +434,9 @@ void io(A& a, AiPlayer& p) {
         a(p.strategy.war_party);
         a(p.strategy.war_party_city);
     }
+    if (a.version() >= kStateWithAttackTries) {
+        a(p.strategy.attack_tries);
+    }
 }
 
 template <class A>

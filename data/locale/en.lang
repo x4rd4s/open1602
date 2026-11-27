@@ -401,6 +401,9 @@ ship.cannons_unmount = {1} (Shift+click: all that fit into the hold)
 city.cart_more = {1} (Shift+click: another trade cart)
 # The status line over a trade cart on the map
 unit.trade_cart = Trade cart
+# {1}: how many are selected (the heading of a group of land units or ships)
+units.group.soldiers = {1} units
+units.group.ships = {1} ships
 # The name frame of a trade cart's window
 cart.name_help = Name of the trade cart
 cart.default = Cart {1}
@@ -1613,9 +1616,10 @@ editor.attitude.class_share = {1} +{2} %
 editor.attitude.note = When a computer grows cross, as in the original's editor: while its best city is below a level (with everyone) or it has fewer inhabitants (with humans), and when a human is above a level or a number of inhabitants. Cross computers end peace and treaties sooner. First island: where a computer that starts without a city founds its first one. None of it applies to humans.
 editor.attitude.note_short = When a computer grows cross, and where it founds its first city.
 editor.attitude.first_island = First island
-editor.attitude.first_island.tip = Where a computer that starts with ships but without a city founds its first one. "original" searches the islands as in the original, "at random" draws an island when the game starts, "Island n" takes this island if it has room for a city. A click steps through the choices.
+editor.attitude.first_island.tip = Where a computer that starts with ships but without a city founds its first one. "original" searches the islands as in the original, "at random" draws an island when the game starts, "large at random" draws among the largest free islands, "Island n" takes this island if it has room for a city. A click steps through the choices.
 editor.attitude.first_original = original
 editor.attitude.first_random = at random
+editor.attitude.first_large = large at random
 editor.attitude.first_fixed = Island {1}
 editor.attitude.first_gone = island gone
 editor.packages.button = Packages ({1})
@@ -1681,7 +1685,7 @@ editor.scenario.neutrals_peaceful = Peaceful, taken by land
 editor.scenario.neutrals_none = None on this map
 editor.scenario.choose_banner = Player picks the flag
 editor.scenario.shuffle_starts = Start places at random
-editor.scenario.shuffle_starts.tip = When the game starts, the start places of the players who begin with ships but without a city are shuffled among them. The places are where their ships stand on the map, plus the point markers made ship start places (Markers).
+editor.scenario.shuffle_starts.tip = When the game starts, the start places of the players who begin with ships but without a city are shuffled among them. The places are where their ships stand on the map, plus the point markers made ship start places (Markers). With at least as many such markers as players, only the markers count.
 editor.scenario.shuffle_starts_on = Yes, {1} places for {2} players
 editor.scenario.empty = (empty)
 editor.scenario.text_note = An empty text takes it away.

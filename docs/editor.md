@@ -301,7 +301,7 @@ in a tooltip; so do **Start places at random** (Description) and **Make ship sta
 | Human above level | Cross with a human whose best city is beyond a level. |
 | Itself below people | Cross with the humans while it has fewer inhabitants than this (50 to 10 000). |
 | Human above people | Cross with a human who has more inhabitants than this. |
-| First island | Where a computer that starts with ships but without a city founds its first one: **original** (it searches the islands in the order of their numbers, from one of the first sixteen at random, for one large enough that grows its first crop, so on a map of fixed islands it often takes the same one), **at random** (an island without a city drawn when the game starts, the medium and larger ones first, none another computer goes to), or **Island n**, one of the map's islands (a click steps through them). The computer looks at that island first and founds its city there if it finds a site with room for it, even on an island the search would pass over; else it searches as always. It does so only for its first city, and not on an island that already has its city or one of a small rival. A fixed island goes by its number, so it stays chosen when islands before it are taken out; one deleted shows "island gone", and the computer searches as always. This does not exist in the original. |
+| First island | Where a computer that starts with ships but without a city founds its first one: **original** (it searches the islands in the order of their numbers, from one of the first sixteen at random, for one large enough that grows its first crop, so on a map of fixed islands it often takes the same one), **at random** (an island without a city drawn when the game starts, the medium and larger ones first, none another computer goes to), **large at random** (the same, drawn among the islands of the largest size free), or **Island n**, one of the map's islands (a click steps through them). The computer looks at that island first and founds its city there if it finds a site with room for it, even on an island the search would pass over; else it searches as always. It does so only for its first city, and not on an island that already has its city or one of a small rival. A fixed island goes by its number, so it stays chosen when islands before it are taken out; one deleted shows "island gone", and the computer searches as always. This does not exist in the original. |
 
 The original's scenario files hold the same thresholds, so a scenario keeps them when it is
 converted.
@@ -325,9 +325,10 @@ who start with ships but without a city (humans and computers alike) draw their 
 the game starts: each takes one place of the map at random, its ships going there together, as they
 lie to each other. The places are where the first ship of each of these players lies, and every
 point marker made a ship start place (page Markers), so that more places than players give more
-variety. A ship whose tile there is land or lies beside another ship goes to the nearest free water.
+variety. With at least as many such markers as these players, the markers alone are the places: the
+author sets every one. A ship whose tile there is land or lies beside another ship goes to the nearest free water.
 The row shows how many places there are for how many players; the check list warns when there are
-fewer than two. A game saved of the scenario keeps the places it drew.
+fewer than two. A game saved of the scenario keeps the places it drew. Every start of the scenario, also after a restart from the scenario list or a test from the editor, draws anew; so do the computers' choices, such as a first island **at random**.
 
 The introduction is the page shown before the scenario starts; the missions' own texts are set
 under Goals.

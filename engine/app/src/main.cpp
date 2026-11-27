@@ -233,6 +233,7 @@ int run_program(int argc, char** argv) {
     // game id from the clock.
     std::random_device device;
     options.world.seed = command.seed.value_or((std::uint64_t{device()} << 32) | device());
+    options.fixed_seed = command.seed.has_value();
     options.world.guarantee_resources = options.rules.guarantee_resources;
     options.world.climate_crops = options.rules.climate_crops;
     options.world.big_ore_veins = options.rules.big_ore_veins;

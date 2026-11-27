@@ -661,7 +661,10 @@ annokit::core::Status MapViewer::host_lobby(const HostSetup& setup) {
     } else {
         const std::filesystem::path path =
             setup.kind == HostSetup::Kind::Scenario ? setup.file : slot_file(save_folder(), setup.slot);
-        auto loaded = read_world(path);
+        // A scenario starts anew with numbers of its own; a savegame goes on with its own.
+        auto loaded = read_world(
+            path, nullptr,
+            setup.kind == HostSetup::Kind::Scenario ? std::optional<std::uint64_t>(start_seed()) : std::nullopt);
         if (!loaded) {
             return loaded.error();
         }

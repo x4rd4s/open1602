@@ -86,20 +86,28 @@ std::vector<PlayerId> players_starting_at_sea(const World& world) {
 }
 
 std::vector<StartPlace> start_places(const World& world) {
-    std::vector<StartPlace> out;
-    const auto add = [&](StartPlace p) {
-        if (std::find(out.begin(), out.end(), p) == out.end()) {
-            out.push_back(p);
+    std::vector<StartPlace> markers;
+    const auto add = [](std::vector<StartPlace>& to, StartPlace p) {
+        if (std::find(to.begin(), to.end(), p) == to.end()) {
+            to.push_back(p);
         }
     };
-    for (const PlayerId player : players_starting_at_sea(world)) {
-        const Ship& s = world.ships()[*first_ship(world, player)];
-        add(StartPlace{s.x, s.y});
-    }
     for (const ScenarioMarker& m : world.markers()) {
         if (ship_start_marker(m)) {
-            add(StartPlace{m.x, m.y});
+            add(markers, StartPlace{m.x, m.y});
         }
+    }
+    const std::vector<PlayerId> players = players_starting_at_sea(world);
+    if (markers.size() >= players.size()) {
+        return markers;  // enough of the author's own places: the ships' tiles are not among them
+    }
+    std::vector<StartPlace> out;
+    for (const PlayerId player : players) {
+        const Ship& s = world.ships()[*first_ship(world, player)];
+        add(out, StartPlace{s.x, s.y});
+    }
+    for (const StartPlace& p : markers) {
+        add(out, p);
     }
     return out;
 }

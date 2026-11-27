@@ -448,6 +448,9 @@ public:
     }
     /// Sends `p`'s attack on city `t` (start_attack); for tests.
     void start_attack_for(AiPlayer& p, const City& t, std::size_t convoy = 1) { start_attack(p, t, convoy); }
+    /// `p`'s attack tries on city `t` (attack_tries) and their end on a landing; for tests.
+    [[nodiscard]] std::size_t attack_tries_for(AiPlayer& p, const City& t) { return attack_tries(p, t); }
+    void forget_attack_tries_for(AiPlayer& p, PlayerId owner) { forget_attack_tries(p, owner); }
     /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
@@ -492,6 +495,28 @@ public:
     /// (`colony`, fertile_island_open), and it can pay for the plantation now (`pays`).
     [[nodiscard]] static bool plants_on(std::uint32_t fertility, bool lacking, bool traded, bool colony,
                                         bool pays) noexcept;
+    /// Whether a crop that grows here at `fertility` is planted while another crop for the same
+    /// good grows here at `other` (island_fertility; 0: none): one that grows only half waits for
+    /// one that grows fully, as wine at 50 % for sugar cane at 100 %, both for alcohol (feedback
+    /// 17: three vineyards at half the yield and no rum).
+    [[nodiscard]] static bool half_crop_planted(std::uint32_t fertility, std::uint32_t other) noexcept;
+    /// Whether an improved computer plants a field on a tile that is neither meadow, tree nor
+    /// ruin (fill_fields): bare ground without a ware (`tile_kind`, `ware` of its Tile), as the desert
+    /// marks are, where the field would bear (`bears`, tile_fertile_at) and a player may plant too.
+    /// The original's computers leave such tiles out; with "Fertile" every one of them bears, and
+    /// the plantations stood with gaps (feedback 17).
+    [[nodiscard]] static bool bare_ground_planted(bool improved, std::int32_t tile_kind, std::uint8_t ware,
+                                                  bool bears) noexcept;
+    /// The same for tile `t` at (x, y) of the computer's island and a field of `field_ware`, for an
+    /// improved computer with "Fertile" only (Rules::fertile_fields), on dry ground only (a
+    /// Randwachs below the full); asks tile_fertile_at only for that ground.
+    [[nodiscard]] bool bare_ground_planted(const AiPlayer& p, const Tile& t, std::int32_t x, std::int32_t y,
+                                           std::uint8_t field_ware) const;
+    /// The least size classes (island_size) a computer's first island drawn at random takes, in
+    /// turn until one finds a free island: the medium and larger ones first, then any; for
+    /// FirstIsland::LargeAtRandom the largest class free (`largest`) first.
+    [[nodiscard]] static std::array<std::uint32_t, 2> first_island_sizes(FirstIsland choice,
+                                                                         std::uint32_t largest) noexcept;
     /// Whether another player's city leaves room to found beside it: not an island the original keeps
     /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
@@ -1447,6 +1472,11 @@ private:
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
     /// `convoy`: how many ships take the party (1 but where towers no fleet wrecks are stormed).
+    /// Open1602 (feedback 17, K2): the attacks `p` started on city `t` within kAttackTriesMs that
+    /// landed no soldier since (Strategy::attack_tries), older ones dropped.
+    std::size_t attack_tries(AiPlayer& p, const City& t);
+    /// Drops `p`'s attack tries on the cities of `owner` (and of cities gone): it landed against them.
+    void forget_attack_tries(AiPlayer& p, PlayerId owner);
     bool attack_ok(AiPlayer& p, const City& t, std::size_t& convoy);
     void start_attack(AiPlayer& p, const City& t, std::size_t convoy);
     /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
