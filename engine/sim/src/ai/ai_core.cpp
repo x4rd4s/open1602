@@ -150,7 +150,34 @@ void Engine::track(const AiPlayer& p) const {
         }
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
+        log_flows(p, c, kTrackMinutes);
     }
+}
+
+void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) const {
+    // Every goods movement of the last minutes by its kind, in the order of GoodsFlow, so a
+    // reader can tell a sale from a ship or a building site (P2.4).
+    static constexpr std::array<const char*, static_cast<std::size_t>(GoodsFlow::Lost) + 1> kNames{
+        "made",     "bought",       "shipin", "returned", "residents", "workshops",
+        "military", "construction", "sold",   "shipout",  "lost"};
+    std::string flows;
+    for (std::size_t w = 0; w < c.ledger.wares().size(); ++w) {
+        const auto ware = static_cast<std::uint8_t>(w);
+        if (!c.ledger.used(ware)) {
+            continue;
+        }
+        const FlowTotals t = c.ledger.totals(ware, minutes);
+        std::string kinds;
+        for (std::size_t f = 0; f < kNames.size(); ++f) {
+            if (t.flow[f] != 0) {
+                kinds += (kinds.empty() ? "" : ",") + std::string(kNames[f]) + "=" + std::to_string(t.flow[f]);
+            }
+        }
+        if (!kinds.empty()) {
+            flows += " " + std::to_string(w) + ":" + kinds;
+        }
+    }
+    log(p, "track flows %u/%u%s", unsigned{c.island}, unsigned{c.index}, flows.c_str());
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
