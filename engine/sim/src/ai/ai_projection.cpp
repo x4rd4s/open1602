@@ -19,7 +19,10 @@ namespace o1602::sim::ai {
 CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const {
     (void)p;
     CityProjection out;
-    // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city.
+    // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city; nothing
+    // of another player's is read from it. Its steps raise no events (nullptr) and draw from the
+    // copy's own random streams (a house's new variant, a ruin), so the game's streams stay as they
+    // are and the projection is the same for the same game state.
     World copy = m_world;
     std::vector<House> others;
     for (const House& h : copy.houses()) {
