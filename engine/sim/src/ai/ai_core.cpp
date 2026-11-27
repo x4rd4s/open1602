@@ -2,6 +2,7 @@
 //
 // Scheduler, task stack, root task and (re)initialisation of the computer players.
 #include <algorithm>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <memory>
@@ -150,6 +151,60 @@ void Engine::track(const AiPlayer& p) const {
         }
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
+    }
+    log_projection(p, kTrackMinutes);
+}
+
+void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
+    // Open1602 (P2.4): each own city over the budget's horizon, at every `every` minutes of it, for
+    // the track lines that come then; and the gold, against the budget's straight line. Only the
+    // log: the budget's caches are put back.
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    if (horizon == 0 || every == 0) {
+        return;
+    }
+    const std::vector<BudgetCache> budgets = m_budgets;
+    const Census census = m_census;
+    const std::vector<OverviewCache> overviews = m_overviews;
+    const Budget b = gold_budget(p);
+    m_budgets = budgets;
+    m_census = census;
+    m_overviews = overviews;
+    std::vector<std::int64_t> gold(horizon + 1, 0);
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
+        if (c.owner != p.player) {
+            continue;
+        }
+        const auto start = std::chrono::steady_clock::now();
+        const CityProjection f = project_city(p, c, horizon);
+        const auto us =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
+        for (std::uint32_t m = 1; m <= f.minutes.size(); ++m) {
+            const ProjectedMinute& pm = f.minutes[m - 1];
+            gold[m] = gold[m - 1] + pm.taxes - f.running_cost;
+            if (m % every != 0) {
+                continue;
+            }
+            std::uint64_t people = 0;
+            for (const std::uint32_t n : pm.inhabitants) {
+                people += n;
+            }
+            std::string goods;
+            for (std::size_t w = 0; w < pm.stock.size(); ++w) {
+                if (c.ledger.used(static_cast<std::uint8_t>(w)) || pm.stock[w] != 0) {
+                    goods += " " + std::to_string(w) + ":" + std::to_string(pm.stock[w]);
+                }
+            }
+            log(p, "project city %u/%u +%u people %llu tax %d goods%s (%lld us)", unsigned{c.island}, unsigned{c.index},
+                m, static_cast<unsigned long long>(people), pm.taxes, goods.c_str(), static_cast<long long>(us));
+        }
+    }
+    for (std::uint32_t m = every; m <= horizon; m += every) {
+        // The cities' taxes less their running costs as projected; the rest of the net as now.
+        const std::int64_t rest = b.net - civil_income(p);
+        log(p, "project gold +%u %lld budget line %lld", m,
+            static_cast<long long>(b.cash + gold[m] + rest * static_cast<std::int64_t>(m)),
+            static_cast<long long>(b.at(Commitment{}, m)));
     }
 }
 

@@ -187,6 +187,23 @@ struct TownStyle {
     std::int32_t block = 7;         ///< length of the roads that open new blocks
     std::int32_t field_margin = 0;  ///< tiles fields keep beyond the zone
 };
+/// Open1602 (P2.4): a computer city a minute ahead, as Engine::project_city runs it.
+struct ProjectedMinute {
+    std::vector<std::uint32_t> stock;        ///< per ware of the city (City::goods), 1/32 t
+    std::vector<std::uint8_t> ratio;         ///< per ware, its supply level (City::Supply::ratio)
+    std::vector<std::uint32_t> inhabitants;  ///< per class
+    std::vector<std::uint8_t> satisfaction;  ///< per class
+    std::int32_t taxes = 0;                  ///< gold a minute (tax_income)
+};
+
+/// Open1602 (P2.4): what a computer city does over the next minutes with what it gets now: its
+/// goods' inflow of the ledger, its consumption, supply levels and satisfaction, and its houses'
+/// growth, ascents and descents, with the game's own steps on a copy of its state.
+struct CityProjection {
+    std::vector<ProjectedMinute> minutes;  ///< minute 1, 2, ... after now
+    std::int32_t running_cost = 0;         ///< gold a minute, as now
+};
+
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
     bool valid = false;
@@ -391,6 +408,10 @@ public:
     /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
     /// change and land_use() is asked again for the city (the scans themselves stay in place).
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
+    /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
+    /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
+    /// consumption alone. Compute only: nothing decides by it yet.
+    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -611,6 +632,8 @@ private:
     /// last ten minutes, and its stock now.
     /// tools/measure/outcomes.py pairs these with the decision lines. Logging only.
     void track(const AiPlayer& p) const;
+    /// Open1602 (P2.4): logs project_city of each own city at every `every` minutes of the budget's horizon.
+    void log_projection(const AiPlayer& p, std::uint32_t every) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
