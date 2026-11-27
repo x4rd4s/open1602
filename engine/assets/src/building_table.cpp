@@ -353,7 +353,7 @@ annokit::core::Result<BuildingTable> BuildingTable::from_cod(const cod::Document
 }
 
 const BuildingType* BuildingTable::by_id(std::uint32_t id) const noexcept {
-    if (id < kIdOffset || id > BuildingTable::kMaxId) {
+    if (id < kIdOffset || id > BuildingTable::kMaxId || id - kIdOffset >= m_by_id.size()) {  // an empty table too
         return nullptr;
     }
     const std::int32_t index = m_by_id[id - kIdOffset];
