@@ -84,7 +84,7 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     // P2.7: the city's workshops turn an action's raw materials into their goods, as far as their
     // rates now leave them spare; what the city makes without the action is in the steady flow.
     // shortcut: workshops with a second raw material are left out; upgrade when a decision values one.
-    struct Chain {
+    struct Shop {
         std::uint8_t raw = 0;
         std::uint8_t ware = 0;
         std::uint64_t raw_use = 0;  // per `output`, from the table
@@ -92,7 +92,7 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         std::int64_t spare = 0;  // raw material a minute the workshops could take on
         std::int64_t carried = 0;
     };
-    std::vector<Chain> chains;
+    std::vector<Shop> chains;
     if (!extra.empty()) {
         const IslandMap& map = island_of(c.island).map;
         for (const Production& pr : m_world.productions()) {  // ai-view: eigen: the own city's workshops
@@ -108,10 +108,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                 continue;
             }
             const std::uint64_t idle = r->output - std::min(r->output, made_rate(pr, r->output));
-            auto it =
-                std::ranges::find_if(chains, [&](const Chain& k) { return k.raw == r->raw && k.ware == r->ware; });
+            auto it = std::ranges::find_if(chains, [&](const Shop& k) { return k.raw == r->raw && k.ware == r->ware; });
             if (it == chains.end()) {
-                chains.push_back(Chain{r->raw, r->ware, r->raw_use, r->output, 0, 0});
+                chains.push_back(Shop{r->raw, r->ware, r->raw_use, r->output, 0, 0});
                 it = chains.end() - 1;
             }
             it->spare += static_cast<std::int64_t>(idle * r->raw_use / r->output);
@@ -167,7 +166,7 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                     traded[w].bought += bought;
                     city->goods[w] = static_cast<std::uint32_t>(stock);
                 }
-                for (Chain& k : chains) {
+                for (Shop& k : chains) {
                     k.carried += k.spare;
                     const std::int64_t can = k.carried / kCityTicksPerMinute;
                     k.carried -= can * kCityTicksPerMinute;

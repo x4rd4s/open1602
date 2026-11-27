@@ -1956,7 +1956,8 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
         sum += made_rate(pr, full);
         ++n;
     }
-    return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? made_rate(Production{}, full) : sum / n, 0xFFFFFFFFU));
+    return static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(n == 0 ? made_rate(Production{}, full) : sum / n, 0xFFFFFFFFU));
 }
 
 bool Engine::food_ahead(const City& c) const {
