@@ -173,7 +173,8 @@ void Engine::track(const AiPlayer& p) const {
                 continue;
             }
             goods += " " + std::to_string(w) + ":" + std::to_string(made) + "/" + std::to_string(in) + "/" +
-                     std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock);
+                     std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock) + "/" +
+                     std::to_string(w < c.supply.size() ? c.supply[w].ratio : 0);
         }
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
@@ -282,7 +283,9 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         return;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    ActionValue v = action_value(project_city(p, c, horizon, extra), project_city(p, c, horizon), commit);
+    const CityProjection with = project_city(p, c, horizon, extra);
+    const CityProjection without = project_city(p, c, horizon);
+    ActionValue v = action_value(with, without, commit);
     if (source != nullptr) {
         v = add_value(std::move(v), action_value(project_city(p, *source, horizon, taken),
                                                  project_city(p, *source, horizon), Commitment{}));
@@ -295,8 +298,18 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
     for (const std::int64_t n : v.people) {
         people += " " + std::to_string(n);
     }
-    log(p, "value %s city %u/%u gold%s payback %u people%s", kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(),
-        v.payback, people.c_str());
+    // The supply level of the action's first ware with and without it, where the action acts (P2.7).
+    std::string ratio;
+    const std::uint8_t ware = extra.empty() ? 0 : extra.front().ware;
+    for (std::uint32_t m = kTrackMinutes; m <= with.minutes.size() && m <= without.minutes.size(); m += kTrackMinutes) {
+        const auto at = [&](const CityProjection& f) {
+            const std::vector<std::uint8_t>& r = f.minutes[m - 1].ratio;
+            return unsigned{ware < r.size() ? r[ware] : 0U};
+        };
+        ratio += " +" + std::to_string(m) + " " + std::to_string(at(with)) + "/" + std::to_string(at(without));
+    }
+    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s", kind, unsigned{c.island},
+        unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware}, ratio.c_str());
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
