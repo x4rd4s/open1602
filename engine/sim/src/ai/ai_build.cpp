@@ -1461,62 +1461,70 @@ void Engine::task_roads(AiPlayer& p) {
                 return r->slots[k].attempts != 0 || r->slots[k].fail_level != 0;
             });
     }
-    std::int32_t best = -1;
-    std::size_t best_index = 0;
-    std::int32_t bx = 0;
-    std::int32_t by = 0;
-    std::int32_t b_back = 0;
-    std::int32_t b_left = 0;
-    std::int32_t b_right = 0;
-    for (std::size_t i = 0; i < p.segments.size(); ++i) {
-        const Segment& g = p.segments[i];
-        if (!g.open) {
-            continue;
-        }
-        const std::uint8_t out = static_cast<std::uint8_t>((g.dir + 2U) & 3U);
-        std::int32_t back = free_run(p.island, p.city, g.x0 + kStep[out][0], g.y0 + kStep[out][1], out);
-        std::int32_t sx = g.x0;
-        std::int32_t sy = g.y0;
-        if (back != 0) {
-            const Tile behind = tile(p.island, g.x0 + kStep[out][0], g.y0 + kStep[out][1]);
-            if (behind.kind != kind::kRiver) {
-                sx += kStep[out][0];
-                sy += kStep[out][1];
+    // Open1602: an improved computer whose best run places no road (the run points onto a road
+    // it already has, or every line is blocked) tries the next open run; the original gave up and
+    // counted it as a failed house search, so a city with a dense road net stopped growing.
+    for (;;) {
+        std::int32_t best = -1;
+        std::size_t best_index = 0;
+        std::int32_t bx = 0;
+        std::int32_t by = 0;
+        std::int32_t b_back = 0;
+        std::int32_t b_left = 0;
+        std::int32_t b_right = 0;
+        for (std::size_t i = 0; i < p.segments.size(); ++i) {
+            const Segment& g = p.segments[i];
+            if (!g.open) {
+                continue;
+            }
+            const std::uint8_t out = static_cast<std::uint8_t>((g.dir + 2U) & 3U);
+            std::int32_t back = free_run(p.island, p.city, g.x0 + kStep[out][0], g.y0 + kStep[out][1], out);
+            std::int32_t sx = g.x0;
+            std::int32_t sy = g.y0;
+            if (back != 0) {
+                const Tile behind = tile(p.island, g.x0 + kStep[out][0], g.y0 + kStep[out][1]);
+                if (behind.kind != kind::kRiver) {
+                    sx += kStep[out][0];
+                    sy += kStep[out][1];
+                }
+            }
+            const std::int32_t right = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 1U) & 3U));
+            const std::int32_t left = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 3U) & 3U));
+            std::int32_t score = (left + right) / 2 + 2 * back;
+            // Open1602: an improved computer whose farms find no site while its houses do leads its
+            // roads out where the land is open, a block ahead of the run's end. The runs alone counted
+            // the roads they followed, so new roads went into the built-up core, and the farms found no
+            // site on islands with a thousand free tiles.
+            if (fields) {
+                const std::int32_t ahead = std::min(back, block) / 2;
+                score +=
+                    open_land(p.island, p.city, sx + kStep[out][0] * ahead, sy + kStep[out][1] * ahead, kOpenLandRange);
+            }
+            if (score > best) {
+                best = score;
+                best_index = i;
+                bx = sx;
+                by = sy;
+                b_back = back;
+                b_left = left;
+                b_right = right;
             }
         }
-        const std::int32_t right = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 1U) & 3U));
-        const std::int32_t left = free_run(p.island, p.city, sx, sy, static_cast<std::uint8_t>((g.dir + 3U) & 3U));
-        std::int32_t score = (left + right) / 2 + 2 * back;
-        // Open1602: an improved computer whose farms find no site while its houses do leads its
-        // roads out where the land is open, a block ahead of the run's end. The runs alone counted
-        // the roads they followed, so new roads went into the built-up core, and the farms found no
-        // site on islands with a thousand free tiles.
-        if (fields) {
-            const std::int32_t ahead = std::min(back, block) / 2;
-            score +=
-                open_land(p.island, p.city, sx + kStep[out][0] * ahead, sy + kStep[out][1] * ahead, kOpenLandRange);
+        if (best <= 0) {
+            for (Segment& g : p.segments) {
+                g.open = false;
+            }
+            return;
         }
-        if (score > best) {
-            best = score;
-            best_index = i;
-            bx = sx;
-            by = sy;
-            b_back = back;
-            b_left = left;
-            b_right = right;
+        const Segment g = p.segments[best_index];
+        const std::int32_t placed = road_three(p, bx, by, g.dir, std::min(b_right, block), std::min(b_left, block),
+                                               std::min(b_back, block), g.length > 3);
+        if (placed == 0 && best_index < p.segments.size()) {
+            p.segments[best_index].open = false;
         }
-    }
-    if (best <= 0) {
-        for (Segment& g : p.segments) {
-            g.open = false;
+        if (placed != 0 || classic()) {
+            return;
         }
-        return;
-    }
-    const Segment g = p.segments[best_index];
-    const std::int32_t placed = road_three(p, bx, by, g.dir, std::min(b_right, block), std::min(b_left, block),
-                                           std::min(b_back, block), g.length > 3);
-    if (placed == 0 && best_index < p.segments.size()) {
-        p.segments[best_index].open = false;
     }
 }
 
