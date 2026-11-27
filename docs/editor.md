@@ -161,7 +161,9 @@ else, and its piers go with it.
 
 The group **Special objects** holds pieces no build menu offers, placed without owner on open land
 (ground or forest) outside every city: every crop field at each of its growing stages, ripe and
-withered, as wild vegetation; the ruins of the land and of the beach (a beach ruin on the beach); and
+withered, as wild vegetation; the ruins of the land and of the beach (a beach ruin on the beach); the destroyed Kontors I to IV,
+the destroyed market and the destroyed chief's huts of both looks (on land or beach; without a city a
+destroyed market does not collapse, it stays as placed); and
 the buildings of the game data no list uses (a wooden outpost, a 2 x 2 building). A growing field
 grows on in the game. In a game they count like forest and ruins: a city that claims their land takes
 them over. **Remove** takes them away again and the ground under them comes back.
