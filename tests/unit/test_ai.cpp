@@ -34,6 +34,9 @@
 #include "o1602/sim/computer_orders.hpp"
 #include "o1602/sim/computer_slots.hpp"
 #include "o1602/sim/construction.hpp"
+#include "o1602/sim/consumption.hpp"
+#include "o1602/sim/goods_statistics.hpp"
+#include "o1602/sim/houses.hpp"
 #include "o1602/sim/new_game.hpp"
 #include "o1602/sim/pathfinding.hpp"
 #include "o1602/sim/save_game.hpp"
@@ -3925,4 +3928,189 @@ TEST_CASE("ai: a computer city's land use follows its tiles and its producers' w
     CHECK(sim::ai::in_zone(z, 12, 12));
     CHECK(!sim::ai::in_zone(z, 13, 13));
     CHECK(!sim::ai::in_zone(sim::ai::TownZone{}, 10, 10));
+}
+
+TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, supply, growth and descents (P2.4)") {
+    // A town of its own (a human player's, so that no computer builds in it): two pioneer houses
+    // and a settler house by a market, no chapel, a little food. The game runs it for 20 minutes and
+    // the projection taken at the start says each minute what the game then shows: the food runs out,
+    // the houses grow and shrink, the settlers fall back to pioneers.
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}, {"BGRUPPE", 5}, {"BGRUPPE_WARE", 6}};
+    const auto doc = assets::cod::parse(
+        "Nahrung: 1.3\n"
+        "Objekt: BGRUPPE\n"
+        "  Nummer: 0\n  Prozent: 0\n  Maxwohn: 2\n  Steuer: 1.4\n"
+        "  Nummer: 1\n  Prozent: 47\n  Maxwohn: 6\n  Steuer: 1.6\n"
+        "  Objekt: BGRUPPE_WARE\n    Ware: 19, 0.6\n  EndObj\n"
+        "EndObj\n"
+        "Objekt: HAUS\n"
+        "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
+        "  @Nummer: 1\n  Id: 20401\n  Kind: 1\n  Gfx: 1\n  Size: 1, 1\n"
+        "  @Nummer: 2\n  Id: 20605\n  Kind: 14\n  Gfx: 10\n  Size: 2, 2\n  Ruinenr: 0\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n    BGruppe: 0\n    Radius: 6\n  EndObj\n"
+        "  Objekt: HAUS_BAUKOST\n    Holz: 3\n  EndObj\n"
+        "  @Nummer: 3\n  Id: 20621\n  Kind: 14\n  Gfx: 14\n  Size: 2, 2\n  Ruinenr: 0\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n    BGruppe: 1\n    Radius: 6\n  EndObj\n"
+        "  Objekt: HAUS_BAUKOST\n    Werkzeug: 1\n    Holz: 3\n  EndObj\n"
+        "  @Nummer: 4\n  Id: 20809\n  Kind: 14\n  Gfx: 20\n  Size: 4, 3\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 7\n    Radius: 16\n    Kosten: 10, 5\n    Arbeiter: 4\n  EndObj\n"
+        "  @Nummer: 5\n  Id: 22601\n  Kind: 12\n  Gfx: 50\n  Size: 1, 1\n"
+        "EndObj\n",
+        types);
+    auto table = assets::BuildingTable::from_cod(doc);
+    REQUIRE(table.ok());
+    const assets::BuildingTable buildings = std::move(table).value();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    sim::IslandMap map{40, 30};
+    for (std::int32_t y = 0; y < 30; ++y) {
+        for (std::int32_t x = 0; x < 40; ++x) {
+            REQUIRE(map.place(*buildings.by_id(y == 10 ? 20401 : 20101), x, y, 0, 0, 0, 0).ok());
+        }
+    }
+    REQUIRE(map.place(*buildings.by_id(20809), 10, 11, 0, 0, 0, 0).ok());
+    REQUIRE(map.place(*buildings.by_id(20605), 14, 13, 0, 0, 0, 0).ok());
+    REQUIRE(map.place(*buildings.by_id(20605), 17, 13, 0, 0, 0, 0).ok());
+    REQUIRE(map.place(*buildings.by_id(20621), 20, 13, 0, 0, 0, 0).ok());
+    REQUIRE(world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 0, 0}).ok());
+    sim::City town;
+    town.owner = kHuman;
+    town.capacity = 30 * 32;
+    town.inhabitants = {0, 0};
+    town.satisfaction = {128, 128};
+    town.tax_rate = {128, 128};
+    world.add_city(town);
+    std::vector<sim::Player> players(1);
+    players[0].role = sim::PlayerRole::Human;
+    players[0].money = 1000;
+    world.set_players(players);
+    sim::Production market;
+    market.x = 10;
+    market.y = 11;
+    world.set_production(market);
+    sim::City& city = *world.city(0, 0);
+    city.ensure_ware(24);
+    city.goods[buildings.food_ware()] = 32;
+    const auto add = [&](std::uint16_t x, std::uint8_t cls, std::uint32_t inhabitants64) {
+        sim::House h;
+        h.x = x;
+        h.y = 13;
+        h.city = 0;
+        h.resident_class = cls;
+        h.inhabitants64 = inhabitants64;
+        h.timer_group = static_cast<std::uint8_t>(x % 16);
+        world.add_house(h);
+        city.inhabitants[cls] += inhabitants64 >> 6;
+    };
+    add(14, 0, 64);
+    add(17, 0, 64 + 32);
+    add(20, 1, 6 * 64);
+    sim::update_services(world, buildings);
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::CityProjection f = engine.project_city(p, *world.city(0, 0), 20);
+    REQUIRE(f.minutes.size() == 20);
+    // The market's running costs as the city's books show them (civil_income's figure).
+    CHECK(f.running_cost == sim::running_costs(world, buildings)[0]);
+    CHECK(f.running_cost > 0);
+    bool hungry = false;
+    bool fell = false;
+    for (const sim::ai::ProjectedMinute& m : f.minutes) {
+        run(s, 60'000);
+        const sim::City& c = *world.city(0, 0);
+        CHECK(m.stock == c.goods);
+        std::vector<std::uint8_t> ratio;
+        for (const sim::City::Supply& k : c.supply) {
+            ratio.push_back(k.ratio);
+        }
+        CHECK(m.ratio == ratio);
+        CHECK(m.inhabitants == c.inhabitants);
+        CHECK(m.satisfaction == c.satisfaction);
+        CHECK(m.taxes == sim::tax_income(c, buildings));
+        hungry = hungry || c.food_ratio < 128;
+        const sim::House* settler = world.house(0, 20, 13);
+        fell = fell || (settler != nullptr && settler->resident_class == 0);
+    }
+    CHECK(hungry);
+    CHECK(fell);
+}
+
+TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute by minute (P2.4)") {
+    // A city with no inhabitants: what its ledger shows coming in a minute (made and shipped in,
+    // less what went out but to the inhabitants) comes in each projected minute, a sixth each city
+    // tick, up to the warehouse's room.
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
+    const auto doc = assets::cod::parse(
+        "Nahrung: 1.3\nObjekt: HAUS\n"
+        "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
+        "EndObj\n",
+        types);
+    auto table = assets::BuildingTable::from_cod(doc);
+    REQUIRE(table.ok());
+    const assets::BuildingTable buildings = std::move(table).value();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{30, 30};
+    sim::IslandMap map{10, 10};
+    for (std::int32_t y = 0; y < 10; ++y) {
+        for (std::int32_t x = 0; x < 10; ++x) {
+            REQUIRE(map.place(*buildings.by_id(20101), x, y, 0, 0, 0, 0).ok());
+        }
+    }
+    REQUIRE(world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 0, 0}).ok());
+    sim::City town;
+    town.owner = kHuman;
+    town.capacity = 100 * 32;
+    world.add_city(town);
+    std::vector<sim::Player> players(1);
+    players[0].role = sim::PlayerRole::Human;
+    world.set_players(players);
+    sim::City& city = *world.city(0, 0);
+    city.ensure_ware(24);
+    constexpr std::uint8_t kTools = 22;
+    constexpr std::uint8_t kWood = 23;
+    city.goods[kWood] = 10 * 32;
+    for (int minute = 0; minute < 5; ++minute) {
+        city.book(kTools, sim::GoodsFlow::Produced, 40);     // 40 a minute made
+        city.book(kWood, sim::GoodsFlow::ShippedIn, 50);     // 50 in,
+        city.book(kWood, sim::GoodsFlow::Construction, 20);  // 20 out: 30 a minute
+        sim::close_goods_minute(world, buildings, nullptr);
+    }
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 100 * 32;  // the room of a Kontor it does not have
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::CityProjection f = engine.project_city(p, *world.city(0, 0), 100);
+    REQUIRE(f.minutes.size() == 100);
+    for (std::uint32_t m = 1; m <= 100; ++m) {
+        CHECK(f.minutes[m - 1].stock[kTools] == std::min<std::uint32_t>(40 * m, 100 * 32));
+        CHECK(f.minutes[m - 1].stock[kWood] == std::min<std::uint32_t>(10 * 32 + 30 * m, 100 * 32));
+    }
+    CHECK(world.city(0, 0)->goods[kTools] == 0);  // the game's city is left as it was
+}
+
+TEST_CASE("ai: the projected gold adds every city's taxes less its running costs (P2.4)") {
+    sim::ai::CityProjection a;
+    a.running_cost = 5;
+    a.minutes.resize(3);
+    for (auto& m : a.minutes) {
+        m.taxes = 15;
+    }
+    sim::ai::CityProjection b;
+    b.running_cost = 1;
+    b.minutes.resize(2);
+    b.minutes[0].taxes = 3;
+    b.minutes[1].taxes = 4;
+    std::vector<std::int64_t> gold(4, 0);
+    sim::ai::add_city_gold(gold, a);
+    sim::ai::add_city_gold(gold, b);
+    // a: 10, 20, 30; b: 2, 5, and 5 past its last minute.
+    CHECK(gold[0] == 0);
+    CHECK(gold[1] == 12);
+    CHECK(gold[2] == 25);
+    CHECK(gold[3] == 35);
 }

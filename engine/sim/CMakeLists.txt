@@ -6,6 +6,7 @@ add_library(o1602_sim
     src/ai/ai_chains.cpp
     src/ai/ai_core.cpp
     src/ai/ai_landuse.cpp
+    src/ai/ai_projection.cpp
     src/ai/ai_logistics.cpp
     src/ai/ai_military.cpp
     src/ai/ai_planner.cpp

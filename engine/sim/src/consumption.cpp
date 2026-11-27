@@ -422,42 +422,50 @@ void remind_material_lock(const World& world, City& city, std::vector<CityEvent>
     }
 }
 
+void advance_city(World& world, const assets::BuildingTable& buildings, City& city, std::int32_t cost,
+                  std::uint32_t workers, std::vector<CityEvent>* events) {
+    Player* owner = world.player(city.owner);
+    if (owner == nullptr) {
+        return;
+    }
+    switch (world.behaviour(*owner)) {
+        case FactionBehaviour::Settlers:
+            consume(city, buildings, events);
+            // Money: a sixth of the balance per minute, truncated towards zero
+            // every 10 s (kept: small balances cost nothing, as in the original).
+            owner->money =
+                money_plus(owner->money, static_cast<std::int64_t>((tax_income(city, buildings) - cost) / 6));
+            unlock_levels(world, buildings, city, events);
+            announce_population(city, workers, events);
+            allow_monument(world, city, events);
+            remind_material_lock(world, city, events);
+            break;
+        case FactionBehaviour::Natives:
+            consume_natives(city);
+            break;
+        case FactionBehaviour::Pirates:
+            consume_pirates(city, world.random(RandomStream::Pirates));
+            break;
+        case FactionBehaviour::Trader:
+        case FactionBehaviour::Neutral:
+            break;  // the free trader and the neutral buildings consume nothing
+    }
+    // The trade statistics fade.
+    city.purchases = city.purchases * 89 / 90;
+    city.sales = city.sales * 89 / 90;
+    city.epoch = static_cast<std::uint8_t>((city.epoch + 1) & 7U);
+}
+
 void advance_cities(World& world, const assets::BuildingTable& buildings, std::vector<CityEvent>* events) {
     const std::vector<std::int32_t> costs = running_costs(world, buildings);
     const std::vector<std::uint32_t> workers = city_workers(world, buildings);
     for (std::size_t i = 0; i < world.cities().size(); ++i) {
         const City& c = world.cities()[i];
         City* city = world.city(c.island, c.index);
-        Player* owner = world.player(city->owner);
-        if (owner == nullptr) {
+        if (world.player(city->owner) == nullptr) {
             continue;
         }
-        switch (world.behaviour(*owner)) {
-            case FactionBehaviour::Settlers:
-                consume(*city, buildings, events);
-                // Money: a sixth of the balance per minute, truncated towards zero
-                // every 10 s (kept: small balances cost nothing, as in the original).
-                owner->money =
-                    money_plus(owner->money, static_cast<std::int64_t>((tax_income(*city, buildings) - costs[i]) / 6));
-                unlock_levels(world, buildings, *city, events);
-                announce_population(*city, workers[i], events);
-                allow_monument(world, *city, events);
-                remind_material_lock(world, *city, events);
-                break;
-            case FactionBehaviour::Natives:
-                consume_natives(*city);
-                break;
-            case FactionBehaviour::Pirates:
-                consume_pirates(*city, world.random(RandomStream::Pirates));
-                break;
-            case FactionBehaviour::Trader:
-            case FactionBehaviour::Neutral:
-                break;  // the free trader and the neutral buildings consume nothing
-        }
-        // The trade statistics fade.
-        city->purchases = city->purchases * 89 / 90;
-        city->sales = city->sales * 89 / 90;
-        city->epoch = static_cast<std::uint8_t>((city->epoch + 1) & 7U);
+        advance_city(world, buildings, *city, costs[i], workers[i], events);
     }
 }
 

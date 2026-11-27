@@ -115,6 +115,12 @@ void consume_pirates(City& city, Random& random);
 /// buildings of its island; 0 for a city that is not in the list.
 [[nodiscard]] std::int32_t running_cost(const World& world, const assets::BuildingTable& buildings, const City& city);
 
+/// One city's tick of advance_cities: what its owner's role consumes, its money (its taxes less
+/// `cost`, its running costs), its levels and messages (`workers`: its workers, city_workers), and
+/// the fading trade statistics and its epoch.
+void advance_city(World& world, const assets::BuildingTable& buildings, City& city, std::int32_t cost,
+                  std::uint32_t workers, std::vector<CityEvent>* events);
+
 /// Ticks every city of `world` by the role of its owner, including the money: every 10 s the
 /// owner gets (taxes - running costs) / 6, truncated like the original.
 void advance_cities(World& world, const assets::BuildingTable& buildings, std::vector<CityEvent>* events);
