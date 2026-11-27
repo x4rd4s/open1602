@@ -4179,3 +4179,80 @@ TEST_CASE("ai: the projected gold adds every city's taxes less its running costs
     CHECK(gold[2] == 25);
     CHECK(gold[3] == 35);
 }
+
+TEST_CASE("ai: open land for a farm counts a crop's field only where it bears (K3)") {
+    using sim::ai::Engine;
+    // A plantation claims no market for desert grass its crop would not bear on.
+    CHECK(Engine::field_open(true, true, true, true));
+    CHECK(!Engine::field_open(true, true, true, false));
+    // A herd's meadow is open wherever grass grows.
+    CHECK(Engine::field_open(false, true, true, false));
+    // Claimed or built-on land never counts.
+    CHECK(!Engine::field_open(true, false, true, true));
+    CHECK(!Engine::field_open(false, true, false, true));
+}
+
+namespace {
+
+/// K3: the corn records (growing, ripe, withered) and a desert wood: trees on dry ground whose
+/// Randwachs is a quarter, as the player's desert grass.
+const std::string kCornAndDesert =
+    "  @Nummer: 13\n  Id: 20651\n  Kind: 10\n  Gfx: 100\n  Size: 1, 1\n"
+    "  Objekt: HAUS_PRODTYP\n    Kind: 10\n  EndObj\n"
+    "  @Nummer: 14\n  Id: 20652\n  Kind: 10\n  Gfx: 101\n  Size: 1, 1\n"
+    "  Objekt: HAUS_PRODTYP\n    Kind: 9\n    Ware: 45\n  EndObj\n"
+    "  @Nummer: 15\n  Id: 20653\n  Kind: 10\n  Gfx: 102\n  Size: 1, 1\n"
+    "  Objekt: HAUS_PRODTYP\n    Kind: 10\n    Doerrflg: 1\n  EndObj\n"
+    "  @Nummer: 16\n  Id: 20203\n  Kind: 10\n  Gfx: 103\n  Size: 1, 1\n  Randwachs: 25\n"
+    "  Objekt: HAUS_PRODTYP\n    Kind: 9\n    Ware: 53\n  EndObj\n";
+
+/// field_land of the computer's city for corn and for a meadow, with the wood's rows from
+/// `desert_from` on dry ground (50: none).
+std::pair<bool, bool> corn_and_meadow_land(std::int32_t desert_from, bool corn_island = true) {
+    Game g;
+    g.buildings = make_buildings(kCornAndDesert);
+    g.buildings.by_id(kKontor)->ware = sim::ware::kAll;
+    sim::IslandMap& map = g.world.island(1).map;
+    for (std::int32_t y = desert_from; y < 50; ++y) {
+        for (std::int32_t x = 32; x <= 43; ++x) {
+            REQUIRE(map.place(*g.buildings.by_id(20203), x, y, 0, 0).ok());
+        }
+    }
+    map.capture_ground();
+    if (!corn_island) {
+        g.world.island(1).header.fertility = 0;
+    }
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    const sim::City* city = nullptr;
+    for (const sim::City& c : g.world.cities()) {
+        if (c.owner == kComputer) {
+            city = &c;
+        }
+    }
+    REQUIRE(city != nullptr);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    p.island = city->island;
+    p.city = city->index;
+    std::int32_t x = -1;
+    std::int32_t y = -1;
+    const bool corn = engine.field_land(p, assets::ware::kCornField, x, y);
+    return {corn, engine.field_land(p, assets::ware::kWool, x, y)};
+}
+
+}  // namespace
+
+TEST_CASE("ai: an improved computer claims no open land for corn on desert ground (K3)") {
+    // The island grows corn; its wood stands on ground that bears it fully: open land for corn.
+    CHECK((corn_and_meadow_land(50) == std::pair{true, true}));
+    // The whole wood on desert ground, a quarter's Randwachs: corn bears too little there for a
+    // farm, no land is claimed for it; the herds' meadow still counts.
+    CHECK((corn_and_meadow_land(0) == std::pair{false, true}));
+    // Desert on the wood's lower half only: the upper half is land for corn.
+    CHECK((corn_and_meadow_land(25) == std::pair{true, true}));
+    // An island without corn at all.
+    CHECK((corn_and_meadow_land(50, false) == std::pair{false, true}));
+}
