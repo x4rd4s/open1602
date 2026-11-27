@@ -109,10 +109,15 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
         to != nullptr ? int{to->index} : city);
 }
 
+namespace {
+
+// Ten minutes: the shortest of P0.3's horizons (30, 60, 120 min) is three of them, and the ledger
+// keeps the last hour minute by minute (GoodsLedger::kMinutes).
+constexpr std::uint32_t kTrackMinutes = 10;
+
+}  // namespace
+
 void Engine::track(const AiPlayer& p) const {
-    // Ten minutes: the shortest of P0.3's horizons (30, 60, 120 min) is three of them, and the
-    // ledger keeps the last hour minute by minute (GoodsLedger::kMinutes).
-    constexpr std::uint32_t kTrackMinutes = 10;
     constexpr std::uint64_t kTrackMs = std::uint64_t{kTrackMinutes} * 60 * 1000;
     if (!logging()) {
         return;
@@ -273,14 +278,13 @@ void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) 
 
 void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
                        const Commitment& commit) const {
-    constexpr std::uint32_t kEvery = 10;  // the track period, kTrackMinutes
     if (!logging()) {
         return;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
     const ActionValue v = action_value(project_city(p, c, horizon, extra), project_city(p, c, horizon), commit);
     std::string gold;
-    for (std::uint32_t m = kEvery; m < v.gold.size(); m += kEvery) {
+    for (std::uint32_t m = kTrackMinutes; m < v.gold.size(); m += kTrackMinutes) {
         gold += " +" + std::to_string(m) + " " + std::to_string(v.gold[m]);
     }
     std::string people;
