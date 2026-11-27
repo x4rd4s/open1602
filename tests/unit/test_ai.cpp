@@ -4094,10 +4094,10 @@ TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute
     CHECK(world.city(0, 0)->goods[kTools] == 0);  // the game's city is left as it was
 }
 
-TEST_CASE("ai: a city's projection sells only above the Kontor's keep and buys only up to its limit (P2.5)") {
+TEST_CASE("ai: a city's projection trades at the ledger's rates as far as stock and room go (P2.6)") {
     // The ledger shows 30 a minute sold at 3 gold and 20 bought at 2 gold. The projection goes on
-    // trading at those rates and prices, but as the Kontor would: sales stop at `keep`, purchases
-    // at `limit`.
+    // trading at those rates and prices; the Kontor's keep and limit as now do not cut it, the
+    // stock and the room do.
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
     const auto doc = assets::cod::parse(
         "Nahrung: 1.3\nObjekt: HAUS\n"
@@ -4149,10 +4149,10 @@ TEST_CASE("ai: a city's projection sells only above the Kontor's keep and buys o
     REQUIRE(f.minutes.size() == 30);
     for (std::uint32_t m = 1; m <= 30; ++m) {
         const sim::ai::ProjectedMinute& pm = f.minutes[m - 1];
-        CHECK(pm.stock[kSold] == std::max<std::uint32_t>(200, 320 - std::min<std::uint32_t>(320, 30 * m)));
-        CHECK(pm.stock[kBought] == std::min<std::uint32_t>(400, 20 * m));
-        const std::int64_t sold = m <= 4 ? 30 : 0;
-        const std::int64_t bought = m <= 20 ? 20 : 0;
+        CHECK(pm.stock[kSold] == 320 - std::min<std::uint32_t>(320, 30 * m));
+        CHECK(pm.stock[kBought] == 20 * m);
+        const std::int64_t sold = m <= 10 ? 30 : m == 11 ? 20 : 0;
+        const std::int64_t bought = 20;
         CHECK(pm.trade == 3 * sold - 2 * bought);
     }
 }
