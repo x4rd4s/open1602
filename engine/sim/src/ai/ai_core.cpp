@@ -341,7 +341,7 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         from = std::min(from, in.from);
     }
     const std::uint32_t limit = m_sim.rules().victory.time_limit_minutes;
-    const auto played = static_cast<std::uint32_t>(now_ms() / 60'000);
+    const auto played = static_cast<std::uint32_t>(now_ms() / kGoodsMinuteMs);
     const std::optional<std::uint32_t> left =
         limit == 0 ? std::nullopt : std::optional<std::uint32_t>{std::max(limit, played) - played};
     const Extension e = extend_value(v, from, kTrackMinutes, left);
