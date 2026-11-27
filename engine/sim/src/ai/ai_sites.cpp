@@ -628,6 +628,25 @@ std::int32_t parity_penalty(std::int32_t score, std::int32_t parity, std::int32_
 
 }  // namespace
 
+bool Engine::touches_road(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1) const {
+    const auto road = [&](std::int32_t x, std::int32_t y) {
+        const Tile t = tile(p.island, x, y);
+        return t.valid() && t.city == p.city &&
+               (t.kind == kind::kRoad || t.kind == kind::kBridge || t.kind == kind::kSquare);
+    };
+    for (std::int32_t x = x0; x <= x1; ++x) {
+        if (road(x, y0 - 1) || road(x, y1 + 1)) {
+            return true;
+        }
+    }
+    for (std::int32_t y = y0; y <= y1; ++y) {
+        if (road(x0 - 1, y) || road(x1 + 1, y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Engine::search_houses(AiPlayer& p) {
     const assets::BuildingType* b = by_id(p.search.building);
     Search& s = p.search;
@@ -646,7 +665,10 @@ bool Engine::search_houses(AiPlayer& p) {
         bool any = false;
         for (const std::int32_t side : {0, 1, -1, -2}) {
             Site c = gen_double_row(g, s.x, s.y, side);
-            if (!can_place(p, *b, c.x0, c.y0, c.w(), c.h())) {
+            // Open1602 (PB.5): an improved computer's houses all touch a road, where the fire brigade
+            // reaches them; the original's second row behind the first does not.
+            if (!can_place(p, *b, c.x0, c.y0, c.w(), c.h()) ||
+                (!classic() && !touches_road(p, c.x0, c.y0, c.x1, c.y1))) {
                 continue;
             }
             any = true;

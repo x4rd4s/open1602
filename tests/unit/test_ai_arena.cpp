@@ -694,6 +694,51 @@ TEST_CASE("ai arena: taking the computers' land use draws nothing and changes no
     CHECK(std::ranges::all_of(uses, [](const auto& v) { return v.house_tiles_outside_zone <= v.house_tiles; }));
 }
 
+TEST_CASE("ai arena: an improved computer's houses all touch a road, the original's also stand in a second row") {
+    for (const bool classic : {false, true}) {
+        Arena a;
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        run(s, 20 * 60'000);
+        std::size_t houses = 0;
+        std::size_t off_road = 0;
+        for (const sim::House& h : a.world.houses()) {
+            const sim::IslandMap& map = a.world.islands()[h.island].map;
+            const assets::BuildingType* t = a.buildings.by_sprite(map.top(h.x, h.y).sprite);
+            REQUIRE(t != nullptr);
+            const auto road = [&](std::int32_t x, std::int32_t y) {
+                if (!map.contains(x, y)) {
+                    return false;
+                }
+                const sim::MapCell& c = map.top(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+                const assets::BuildingType* n = c.empty() ? nullptr : a.buildings.by_sprite(c.sprite);
+                return n != nullptr && (n->kind == assets::kind::kRoad || n->kind == assets::kind::kBridge ||
+                                        n->kind == assets::kind::kSquare);
+            };
+            const std::int32_t x0 = h.x;
+            const std::int32_t y0 = h.y;
+            const std::int32_t x1 = x0 + static_cast<std::int32_t>(t->size_x) - 1;
+            const std::int32_t y1 = y0 + static_cast<std::int32_t>(t->size_y) - 1;
+            bool touches = false;
+            for (std::int32_t x = x0; x <= x1; ++x) {
+                touches = touches || road(x, y0 - 1) || road(x, y1 + 1);
+            }
+            for (std::int32_t y = y0; y <= y1; ++y) {
+                touches = touches || road(x0 - 1, y) || road(x1 + 1, y);
+            }
+            ++houses;
+            off_road += touches ? 0 : 1;
+        }
+        REQUIRE(houses >= 100);
+        if (classic) {
+            CHECK(off_road > 0);
+        } else {
+            CHECK(off_road == 0);
+        }
+    }
+}
+
 TEST_CASE("ai arena: improved computers make peace with each other, the original's leave it as it is") {
     for (const bool classic : {false, true}) {
         Arena a;

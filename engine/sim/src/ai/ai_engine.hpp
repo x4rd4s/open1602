@@ -376,6 +376,11 @@ public:
     /// Open1602 (F3r): the circles of the stonemasons of `p`'s city, which fetch the stone from the
     /// quarries' tiles inside them; empty without a mason.
     [[nodiscard]] std::vector<Catchment> mason_circles(const AiPlayer& p) const;
+    /// Open1602 (PB.5): whether a road, bridge or square of `p`'s city borders the site
+    /// (x0, y0)-(x1, y1) on one of its sides, where the fire brigade, which walks the roads alone,
+    /// stops to put a fire out.
+    [[nodiscard]] bool touches_road(const AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1,
+                                    std::int32_t y1) const;
     /// The circles of the standing productions of `p`'s city whose type `keep` takes, with each
     /// producer's type in `types` when given.
     [[nodiscard]] std::vector<Catchment> own_circles(const AiPlayer& p,
