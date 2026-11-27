@@ -4093,6 +4093,69 @@ TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute
     CHECK(world.city(0, 0)->goods[kTools] == 0);  // the game's city is left as it was
 }
 
+TEST_CASE("ai: a city's projection sells only above the Kontor's keep and buys only up to its limit (P2.5)") {
+    // The ledger shows 30 a minute sold at 3 gold and 20 bought at 2 gold. The projection goes on
+    // trading at those rates and prices, but as the Kontor would: sales stop at `keep`, purchases
+    // at `limit`.
+    const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
+    const auto doc = assets::cod::parse(
+        "Nahrung: 1.3\nObjekt: HAUS\n"
+        "  @Nummer: 0\n  Id: 20101\n  Kind: 11\n  Gfx: 0\n  Size: 1, 1\n"
+        "EndObj\n",
+        types);
+    auto table = assets::BuildingTable::from_cod(doc);
+    REQUIRE(table.ok());
+    const assets::BuildingTable buildings = std::move(table).value();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{30, 30};
+    sim::IslandMap map{10, 10};
+    for (std::int32_t y = 0; y < 10; ++y) {
+        for (std::int32_t x = 0; x < 10; ++x) {
+            REQUIRE(map.place(*buildings.by_id(20101), x, y, 0, 0, 0, 0).ok());
+        }
+    }
+    REQUIRE(world.add_island(sim::WorldIsland{assets::IslandHeader{}, std::move(map), 0, 0}).ok());
+    sim::City town;
+    town.owner = kHuman;
+    world.add_city(town);
+    std::vector<sim::Player> players(1);
+    players[0].role = sim::PlayerRole::Human;
+    world.set_players(players);
+    sim::City& city = *world.city(0, 0);
+    city.ensure_ware(24);
+    constexpr std::uint8_t kSold = 22;
+    constexpr std::uint8_t kBought = 23;
+    city.trade.resize(24);
+    city.trade[kSold].sell = true;
+    city.trade[kSold].keep = 200;
+    city.trade[kBought].buy = true;
+    city.trade[kBought].limit = 400;
+    city.goods[kSold] = 320;
+    for (int minute = 0; minute < 5; ++minute) {
+        city.book(kSold, sim::GoodsFlow::Sold, 30);
+        city.book(kSold, sim::GoodsFlow::SoldValue, 90);
+        city.book(kBought, sim::GoodsFlow::Bought, 20);
+        city.book(kBought, sim::GoodsFlow::BoughtValue, 40);
+        sim::close_goods_minute(world, buildings, nullptr);
+    }
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 100 * 32;
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::CityProjection f = engine.project_city(p, *world.city(0, 0), 30);
+    REQUIRE(f.minutes.size() == 30);
+    for (std::uint32_t m = 1; m <= 30; ++m) {
+        const sim::ai::ProjectedMinute& pm = f.minutes[m - 1];
+        CHECK(pm.stock[kSold] == std::max<std::uint32_t>(200, 320 - std::min<std::uint32_t>(320, 30 * m)));
+        CHECK(pm.stock[kBought] == std::min<std::uint32_t>(400, 20 * m));
+        const std::int64_t sold = m <= 4 ? 30 : 0;
+        const std::int64_t bought = m <= 20 ? 20 : 0;
+        CHECK(pm.trade == 3 * sold - 2 * bought);
+    }
+}
+
 TEST_CASE("ai: the projected gold adds every city's taxes less its running costs (P2.4)") {
     sim::ai::CityProjection a;
     a.running_cost = 5;
@@ -4104,7 +4167,8 @@ TEST_CASE("ai: the projected gold adds every city's taxes less its running costs
     b.running_cost = 1;
     b.minutes.resize(2);
     b.minutes[0].taxes = 3;
-    b.minutes[1].taxes = 4;
+    b.minutes[1].taxes = 2;
+    b.minutes[1].trade = 2;
     std::vector<std::int64_t> gold(4, 0);
     sim::ai::add_city_gold(gold, a);
     sim::ai::add_city_gold(gold, b);

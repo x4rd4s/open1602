@@ -194,6 +194,7 @@ struct ProjectedMinute {
     std::vector<std::uint32_t> inhabitants;  ///< per class
     std::vector<std::uint8_t> satisfaction;  ///< per class
     std::int32_t taxes = 0;                  ///< gold a minute (tax_income)
+    std::int64_t trade = 0;                  ///< gold of the Kontor's sales less its purchases (P2.5)
 };
 
 /// Open1602 (P2.4): what a computer city does over the next minutes with what it gets now: its
@@ -204,7 +205,7 @@ struct CityProjection {
     std::int32_t running_cost = 0;         ///< gold a minute, as now
 };
 
-/// Open1602 (P2.4): adds a city's projected taxes less its running costs, summed up to each
+/// Open1602 (P2.4): adds a city's projected taxes less its running costs, with its trade (P2.5), summed up to each
 /// minute, to gold[m] (gold[0] stays; minutes past the projection add its last sum).
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f);
 
