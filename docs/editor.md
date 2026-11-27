@@ -327,7 +327,7 @@ lie to each other. The places are where the first ship of each of these players 
 point marker made a ship start place (page Markers), so that more places than players give more
 variety. A ship whose tile there is land or lies beside another ship goes to the nearest free water.
 The row shows how many places there are for how many players; the check list warns when there are
-fewer than two. A game saved of the scenario keeps the places it drew.
+fewer than two. A game saved of the scenario keeps the places it drew. Every start of the scenario, also after a restart from the scenario list or a test from the editor, draws anew; so do the computers' choices, such as a first island **at random**.
 
 The introduction is the page shown before the scenario starts; the missions' own texts are set
 under Goals.

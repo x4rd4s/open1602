@@ -38,6 +38,7 @@
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/island_shapes.hpp"
 #include "o1602/sim/island_templates.hpp"
+#include "o1602/sim/random.hpp"
 #include "o1602/sim/save_game.hpp"
 #include "o1602/sim/start_places.hpp"
 #include "o1602/sim/validate.hpp"
@@ -704,7 +705,11 @@ void MapViewer::editor_test_play(std::optional<sim::PlayerId> as) {
     std::vector<std::string> notes;
     auto world = sim::read_game(*bytes, m_buildings, &warnings, &m_figures);
     if (world) {
-        world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, m_options.world, &notes);
+        // Each test draws its numbers anew, as each start from the scenario list does.
+        sim::WorldStart start = m_options.world;
+        start.seed = start_seed();
+        world->reseed(start.seed + sim::kDefaultSimulationSeed);
+        world = sim::start_scenario(std::move(world).value(), m_game, m_buildings, start, &notes);
     }
     if (!world) {
         failed(world.error());
