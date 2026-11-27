@@ -78,6 +78,9 @@ public:
     [[nodiscard]] bool any_white_flag(const sim::World& world) const;
     /// Bit k set: a unit of FIGUR Kind k is selected (0 ships, 1 infantry .. 4 cannoneers).
     [[nodiscard]] std::uint32_t kind_mask(const sim::World& world, const assets::FigureTable& figures) const;
+    /// How many selected units are of FIGUR Kind `kind` (0 ships, 1 infantry .. 4 cannoneers).
+    [[nodiscard]] std::size_t kind_count(const sim::World& world, const assets::FigureTable& figures,
+                                         std::int32_t kind) const;
     /// Alt+1 .. Alt+4 (History Edition): all of `local`'s land units among `candidates` (the units on
     /// screen) of FIGUR Kind `kind` (1 infantry, 2 cavalry, 3 musketeers, 4 cannoneers) become the
     /// selection; false (and the selection unchanged) if there is none.

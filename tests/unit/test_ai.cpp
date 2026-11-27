@@ -352,7 +352,8 @@ TEST_CASE("ai: a computer founds its first city on the island the scenario chose
 TEST_CASE("ai: a first island chosen that cannot take a city, or drawn at random, still ends in a city") {
     // The islet (25 tiles) is too small even for the least the search ends with: the computer
     // searches as always. At random it draws among the islands free for a first city.
-    for (const sim::FirstIsland choice : {sim::FirstIsland::Fixed, sim::FirstIsland::AtRandom}) {
+    for (const sim::FirstIsland choice :
+         {sim::FirstIsland::Fixed, sim::FirstIsland::AtRandom, sim::FirstIsland::LargeAtRandom}) {
         Game g;
         g.world.player(kComputer)->first_island = choice;
         g.world.player(kComputer)->first_island_number = g.world.islands()[0].header.number;

@@ -377,6 +377,9 @@ ship.cannons_unmount = {1} (Umschalt+Klick: so viele, wie in den Laderaum passen
 city.cart_more = {1} (Umschalt+Klick: ein weiterer fahrender Händler)
 # The status line over a trade cart on the map
 unit.trade_cart = Fahrender Händler
+# {1}: how many are selected (the heading of a group of land units or ships)
+units.group.soldiers = {1} Einheiten
+units.group.ships = {1} Schiffe
 # The name frame of a trade cart's window
 cart.name_help = Name des fahrenden Händlers
 cart.default = Händler {1}
@@ -1543,9 +1546,10 @@ editor.attitude.class_share = {1} +{2} %
 editor.attitude.note = Wann ein Computer verärgert ist, wie im Editor des Originals: solange seine beste Stadt unter einer Stufe liegt (gegen alle) oder er weniger Einwohner hat (gegen Menschen), und wenn ein Mensch über einer Stufe oder Einwohnerzahl liegt. Verärgerte Computer kündigen eher Frieden und Verträge. Erste Insel: wo ein Computer, der ohne Stadt beginnt, seine erste gründet. Für Menschen gilt nichts davon.
 editor.attitude.note_short = Wann ein Computer verärgert ist und wo er seine erste Stadt gründet.
 editor.attitude.first_island = Erste Insel
-editor.attitude.first_island.tip = Wo ein Computer, der mit Schiffen, aber ohne Stadt beginnt, seine erste Stadt gründet. Original: Er sucht die Inseln wie im Original. Zufällig: eine Insel, die beim Spielstart gezogen wird. Insel n: diese Insel, wenn dort Platz für eine Stadt ist. Ein Klick schaltet weiter.
+editor.attitude.first_island.tip = Wo ein Computer, der mit Schiffen, aber ohne Stadt beginnt, seine erste Stadt gründet. Original: Er sucht die Inseln wie im Original. Zufällig: eine Insel, die beim Spielstart gezogen wird. Zufällig, große zuerst: gezogen unter den größten freien Inseln. Insel n: diese Insel, wenn dort Platz für eine Stadt ist. Ein Klick schaltet weiter.
 editor.attitude.first_original = Original
 editor.attitude.first_random = zufällig
+editor.attitude.first_large = zufällig, große zuerst
 editor.attitude.first_fixed = Insel {1}
 editor.attitude.first_gone = Insel fehlt
 editor.packages.button = Pakete ({1})
@@ -1611,7 +1615,7 @@ editor.scenario.neutrals_peaceful = Friedlich, durch Land
 editor.scenario.neutrals_none = Keine auf dieser Karte
 editor.scenario.choose_banner = Flagge frei wählbar
 editor.scenario.shuffle_starts = Startplätze zufällig
-editor.scenario.shuffle_starts.tip = Beim Spielstart werden die Startplätze der Spieler, die mit Schiffen, aber ohne Stadt beginnen, unter ihnen vertauscht. Startplätze sind die Stellen ihrer Schiffe auf der Karte und die Punktmarker, die zu Schiffsstartplätzen gemacht wurden (Marker).
+editor.scenario.shuffle_starts.tip = Beim Spielstart werden die Startplätze der Spieler, die mit Schiffen, aber ohne Stadt beginnen, unter ihnen vertauscht. Startplätze sind die Stellen ihrer Schiffe auf der Karte und die Punktmarker, die zu Schiffsstartplätzen gemacht wurden (Marker). Gibt es mindestens so viele solche Marker wie Spieler, zählen nur die Marker.
 editor.scenario.shuffle_starts_on = Ja, {1} Plätze für {2} Spieler
 editor.scenario.empty = (leer)
 editor.scenario.text_note = Ein leerer Text nimmt ihn weg.

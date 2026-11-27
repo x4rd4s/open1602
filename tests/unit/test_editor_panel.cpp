@@ -2048,6 +2048,18 @@ TEST_CASE("editor panel: the page Computers steps when a computer grows cross, o
     REQUIRE(r.has_value());
     CHECK(r->index == 8);
     CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::AtRandom));
+    m.player_slots[1].first_island = static_cast<std::uint8_t>(sim::FirstIsland::AtRandom);
+    (void)panel.draw(m, kNoFonts);
+    r = click_id(panel, m, ui::Form::Id{1144});  // then large at random (feedback 17)
+    REQUIRE(r.has_value());
+    CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::LargeAtRandom));
+    m.player_slots[1].first_island = static_cast<std::uint8_t>(sim::FirstIsland::LargeAtRandom);
+    (void)panel.draw(m, kNoFonts);
+    CHECK(says(panel, "large at random"));
+    r = click_id(panel, m, ui::Form::Id{1144});  // then the first island
+    REQUIRE(r.has_value());
+    CHECK(r->player.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Fixed));
+    CHECK(r->player.first_island_index == 0);
     m.player_slots[1].first_island = static_cast<std::uint8_t>(sim::FirstIsland::Fixed);
     m.player_slots[1].first_island_index = 1;
     (void)panel.draw(m, kNoFonts);

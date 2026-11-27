@@ -489,6 +489,8 @@ std::string attitude_text(const EditorPlayer& p, std::size_t column, bool& enabl
                 return ui::tr("editor.attitude.first_original");
             case sim::FirstIsland::AtRandom:
                 return ui::tr("editor.attitude.first_random");
+            case sim::FirstIsland::LargeAtRandom:
+                return ui::tr("editor.attitude.first_large");
             default:
                 return p.first_island_index < 0
                            ? ui::tr("editor.attitude.first_gone")
@@ -1715,20 +1717,26 @@ std::optional<EditorRequest> EditorPanel::press_attitude(const EditorModel& mode
     r.index = 5;  // the attitude
     EditorPlayer& p = r.player;
     if (column == kFirstIslandColumn) {
-        // As the original, at random, then each island of the map, round (the right button back).
+        // As the original, at random, large at random, then each island of the map, round (the
+        // right button back).
         r.index = 8;
-        const std::size_t positions = model.islands + 2;
+        constexpr std::size_t kChoices = 3;
+        const std::size_t positions = model.islands + kChoices;
         std::size_t at = 0;
         if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::AtRandom)) {
             at = 1;
+        } else if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::LargeAtRandom)) {
+            at = 2;
         } else if (p.first_island == static_cast<std::uint8_t>(sim::FirstIsland::Fixed)) {
-            at = p.first_island_index < 0 ? (forward ? 1 : 2) : static_cast<std::size_t>(p.first_island_index) + 2;
+            at = p.first_island_index < 0 ? (forward ? kChoices - 1 : kChoices)
+                                          : static_cast<std::size_t>(p.first_island_index) + kChoices;
         }
         const std::size_t next = step(at, positions, forward);
         p.first_island = static_cast<std::uint8_t>(next == 0   ? sim::FirstIsland::Original
                                                    : next == 1 ? sim::FirstIsland::AtRandom
+                                                   : next == 2 ? sim::FirstIsland::LargeAtRandom
                                                                : sim::FirstIsland::Fixed);
-        p.first_island_index = next >= 2 ? static_cast<std::int32_t>(next - 2) : -1;
+        p.first_island_index = next >= kChoices ? static_cast<std::int32_t>(next - kChoices) : -1;
         return r;
     }
     // Off, then the steps, round (the right button back). A threshold between two steps goes on

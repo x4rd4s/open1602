@@ -915,9 +915,11 @@ private:
                 m_ship.set_slider(kPriceSlider, 0, ship.sale_factor, sim::ShipCommand::kMaxSaleFactor);
             }
         }
-        for (const std::int32_t id : {kHealthFrame, kHealth, kHealthHover, kCannonsDown, kCannons}) {
-            m_ship.set_visible(id, own);
+        // A spectator reads every ship's health and cannons too, without the button to take one off.
+        for (const std::int32_t id : {kHealthFrame, kHealth, kHealthHover, kCannons}) {
+            m_ship.set_visible(id, own || spectating(c));
         }
+        m_ship.set_visible(kCannonsDown, own);
         m_ship.set_slider(kHealth, 0, static_cast<std::int32_t>(std::uint64_t{health} * 1000 / max_health), 1000);
         m_ship.set_text(kCannons, std::to_string(ship.cannons));
         m_ship.set_disabled(kCannonsDown, ship.cannons == 0);
