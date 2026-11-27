@@ -4256,6 +4256,49 @@ TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its
     }
 }
 
+TEST_CASE(
+    "ai: a colony's raw material with a workshop planned along is valued with its goods, taxes and running cost "
+    "(P2.7c)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);  // no workshop for the raw material at home
+    sim::Simulation s(world, buildings, figures);
+    world.city(0, 0)->capacity = 30 * 32;
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::ai::Sheet::Producer* shop = engine.sheet().producer(20702);
+    REQUIRE(shop != nullptr);
+    constexpr std::uint32_t kMinutes = 8;
+    constexpr std::uint8_t kRaw = 6;
+    constexpr std::uint8_t kGood = 19;
+    const auto raw_rate = static_cast<std::int64_t>(shop->raw_use);
+    REQUIRE(raw_rate * kMinutes < 30 * 32);
+    const sim::ai::Inflow crop[] = {{kRaw, raw_rate, 1, kMinutes}};
+    const sim::ai::CityProjection without = engine.project_city(p, *world.city(0, 0), kMinutes);
+    const sim::ai::CityProjection alone = engine.project_city(p, *world.city(0, 0), kMinutes, crop);
+    const sim::ai::Sheet::Producer* const plan[] = {shop};
+    const sim::ai::CityProjection bundle = engine.project_city(p, *world.city(0, 0), kMinutes, crop, plan);
+    // Alone, the raw material only fills the store; with the workshop it becomes the good the settlers pay for.
+    CHECK(alone.minutes.back().stock[kGood] == without.minutes.back().stock[kGood]);
+    CHECK(alone.minutes.back().taxes == without.minutes.back().taxes);
+    CHECK(bundle.minutes.back().stock[kRaw] < alone.minutes.back().stock[kRaw]);
+    CHECK(bundle.minutes.back().taxes > without.minutes.back().taxes);
+    // Before its running cost the bundle's gold is above the raw material's alone; the value takes that cost off a
+    // minute.
+    sim::ai::Commitment c;
+    const sim::ai::ActionValue v_alone = sim::ai::action_value(alone, without, c);
+    sim::ai::Commitment with_shop;
+    with_shop.upkeep = shop->running_cost;
+    const sim::ai::ActionValue v_bundle = sim::ai::action_value(bundle, without, with_shop);
+    const sim::ai::ActionValue v_gross = sim::ai::action_value(bundle, without, c);
+    CHECK(v_alone.gold.back() <= 0);
+    CHECK(v_gross.gold.back() > v_alone.gold.back());
+    CHECK(v_bundle.gold.back() == v_gross.gold.back() - std::int64_t{shop->running_cost} * kMinutes);
+}
+
 TEST_CASE("ai: the value of a supply run, a colony and a plantation, projected with and without it (P2.7)") {
     const assets::BuildingTable buildings = hungry_town_table();
     const assets::FigureTable figures = make_figures();

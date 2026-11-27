@@ -20,7 +20,8 @@
 namespace o1602::sim::ai {
 
 CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
-                                    std::span<const Inflow> extra) const {
+                                    std::span<const Inflow> extra,
+                                    std::span<const Sheet::Producer* const> planned) const {
     (void)p;
     CityProjection out;
     // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city; nothing
@@ -93,6 +94,24 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         std::int64_t carried = 0;
     };
     std::vector<Shop> chains;
+    // `idle` of producer `r`'s output a minute still free to take on the action's raw material.
+    const auto add_shop = [&](const Sheet::Producer* r, std::uint64_t idle) {
+        if (r == nullptr || r->raw == 0 || r->raw2 != 0 || r->output == 0 || r->raw_use == 0 ||
+            r->raw >= city->goods.size() || r->ware >= city->goods.size()) {
+            return;
+        }
+        auto it = std::ranges::find_if(chains, [&](const Shop& k) { return k.raw == r->raw && k.ware == r->ware; });
+        if (it == chains.end()) {
+            chains.push_back(Shop{r->raw, r->ware, r->raw_use, r->output, 0, 0});
+            it = chains.end() - 1;
+        }
+        it->spare += static_cast<std::int64_t>(std::min(idle, r->output) * r->raw_use / r->output);
+    };
+    // P2.7c: the workshops an action list plans with its inflow, idle and at their full rate.
+    // shortcut: a planned workshop works from the first minute; upgrade when its build time is planned.
+    for (const Sheet::Producer* r : planned) {
+        add_shop(r, r != nullptr ? r->output : 0);
+    }
     if (!extra.empty()) {
         const IslandMap& map = island_of(c.island).map;
         for (const Production& pr : m_world.productions()) {  // ai-view: eigen: the own city's workshops
@@ -103,17 +122,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
             const assets::BuildingType* b =
                 cell.city == c.index && !cell.empty() ? m_buildings.by_sprite(cell.sprite) : nullptr;
             const Sheet::Producer* r = b != nullptr ? m_sheet.producer(*b) : nullptr;
-            if (r == nullptr || r->raw == 0 || r->raw2 != 0 || r->output == 0 || r->raw_use == 0 ||
-                r->raw >= city->goods.size() || r->ware >= city->goods.size()) {
-                continue;
+            if (r != nullptr && r->output != 0) {
+                add_shop(r, r->output - std::min(r->output, made_rate(pr, r->output)));
             }
-            const std::uint64_t idle = r->output - std::min(r->output, made_rate(pr, r->output));
-            auto it = std::ranges::find_if(chains, [&](const Shop& k) { return k.raw == r->raw && k.ware == r->ware; });
-            if (it == chains.end()) {
-                chains.push_back(Shop{r->raw, r->ware, r->raw_use, r->output, 0, 0});
-                it = chains.end() - 1;
-            }
-            it->spare += static_cast<std::int64_t>(idle * r->raw_use / r->output);
         }
     }
     std::vector<std::int64_t> pool(city->goods.size(), 0);  // of the stock, what the action brought

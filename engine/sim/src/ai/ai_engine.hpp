@@ -436,9 +436,11 @@ public:
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
-    /// consumption alone. `extra` adds an action's goods (P2.7). Compute only: nothing decides by it yet.
+    /// consumption alone. `extra` adds an action's goods (P2.7); `planned` adds the workshops an
+    /// action list builds with it, idle at their table rates (P2.7c). Compute only: nothing decides by it yet.
     [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
-                                              std::span<const Inflow> extra = {}) const;
+                                              std::span<const Inflow> extra = {},
+                                              std::span<const Sheet::Producer* const> planned = {}) const;
     /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
     /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
     /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
