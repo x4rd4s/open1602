@@ -149,9 +149,11 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                 for (std::size_t w = 0; w < rate.size(); ++w) {
                     const std::int64_t room = std::max(city->capacity, city->goods[w]);
                     const std::int64_t brought = share(w, kExtra);
-                    pool[w] += brought;
-                    std::int64_t stock = std::clamp<std::int64_t>(
-                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips) + brought, 0, room);
+                    const std::int64_t came =
+                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips) + brought;
+                    std::int64_t stock = std::clamp<std::int64_t>(came, 0, room);
+                    // What the room cuts off is the action's first: it brought no more than fits.
+                    pool[w] = std::max<std::int64_t>(0, pool[w] + brought - std::max<std::int64_t>(0, came - stock));
                     const City::Trade* k = w < city->trade.size() ? &city->trade[w] : nullptr;
                     const std::int64_t sold = std::clamp<std::int64_t>(
                         share(w, kSold), 0, k != nullptr && k->sell ? std::max<std::int64_t>(0, stock - k->keep) : 0);

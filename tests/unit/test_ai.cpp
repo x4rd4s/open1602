@@ -4245,6 +4245,15 @@ TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its
     CHECK(made > 0);
     // The settlers take the good, and pay more taxes for it.
     CHECK(with.minutes.back().taxes > without.minutes.back().taxes);
+    {  // a full store: the room cuts off what the action brings, and the town's own raw material stays its own
+        sim::City& town = *world.city(0, 0);
+        town.ensure_ware(kRaw);
+        town.goods[kRaw] = town.capacity;
+        const sim::ai::CityProjection full_without = engine.project_city(p, town, kMinutes);
+        const sim::ai::CityProjection full_with = engine.project_city(p, town, kMinutes, crop);
+        CHECK(full_with.minutes.back().stock[kGood] == full_without.minutes.back().stock[kGood]);
+        CHECK(full_with.minutes.back().stock[kRaw] == full_without.minutes.back().stock[kRaw]);
+    }
 }
 
 TEST_CASE("ai: the value of a supply run, a colony and a plantation, projected with and without it (P2.7)") {
