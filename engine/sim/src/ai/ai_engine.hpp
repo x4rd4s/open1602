@@ -195,6 +195,7 @@ struct ProjectedMinute {
     std::vector<std::uint8_t> satisfaction;  ///< per class
     std::int32_t taxes = 0;                  ///< gold a minute (tax_income)
     std::int64_t trade = 0;                  ///< gold of the Kontor's sales less its purchases (P2.5)
+    std::int64_t sold = 0;                   ///< gold of the Kontor's sales alone (P2.6)
 };
 
 /// Open1602 (P2.4): what a computer city does over the next minutes with what it gets now: its
@@ -672,7 +673,8 @@ private:
     /// P2.4: a city's goods movements of the last minutes by kind ("track flows"). Logging only.
     void log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
     /// Open1602 (P2.4): logs project_city of each own city at every `every` minutes of the budget's horizon.
-    void log_projection(const AiPlayer& p, std::uint32_t every) const;
+    /// `kontors` is the own cities' share of the trade balance now (P2.6).
+    void log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t kontors) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;

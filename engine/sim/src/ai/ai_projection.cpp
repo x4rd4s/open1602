@@ -131,14 +131,15 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
             // At the window's prices: its gold per ton sold and bought.
             const FlowTotals& t = window[w];
             if (t.of(GoodsFlow::Sold) != 0) {
-                pm.trade += traded[w].sold * static_cast<std::int64_t>(t.of(GoodsFlow::SoldValue)) /
-                            static_cast<std::int64_t>(t.of(GoodsFlow::Sold));
+                pm.sold += traded[w].sold * static_cast<std::int64_t>(t.of(GoodsFlow::SoldValue)) /
+                           static_cast<std::int64_t>(t.of(GoodsFlow::Sold));
             }
             if (t.of(GoodsFlow::Bought) != 0) {
                 pm.trade -= traded[w].bought * static_cast<std::int64_t>(t.of(GoodsFlow::BoughtValue)) /
                             static_cast<std::int64_t>(t.of(GoodsFlow::Bought));
             }
         }
+        pm.trade += pm.sold;
         out.minutes.push_back(std::move(pm));
     }
     return out;
