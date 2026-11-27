@@ -4204,6 +4204,13 @@ TEST_CASE("ai: an action's value is the city's gold with it less without it, les
     const sim::ai::ActionValue none = sim::ai::action_value(without, without, sim::ai::Commitment{});
     CHECK((none.gold == std::vector<std::int64_t>{0, 0, 0, 0}));
     CHECK(none.payback == 0);
+    // A run between own cities: what the source loses is added, and the payback found again.
+    sim::ai::ActionValue loss;
+    loss.gold = {0, -4, -8, -12};
+    const sim::ai::ActionValue both = sim::ai::add_value(v, loss);
+    CHECK((both.gold == std::vector<std::int64_t>{-15, -11, -7, -3}));
+    CHECK(both.payback == 0);
+    CHECK((both.people == v.people));
 }
 
 TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its good, up to its rate (P2.7)") {
@@ -4327,6 +4334,21 @@ TEST_CASE("ai: the value of a supply run, a colony and a plantation, projected w
         const sim::ai::ActionValue v = sim::ai::action_value(with, without, free);
         CHECK(v.people[0] > 0);  // the pioneers stay; the settlers still lack their ware 19
         CHECK(v.gold.back() > 0);
+    }
+    {
+        // the same load taken from the town as an own source: its stock falls, and it is worth no gain to it.
+        sim::City& town = *world.city(0, 0);
+        town.ensure_ware(food);
+        const std::uint32_t had = town.goods[food];
+        town.goods[food] = 20 * 32;
+        const sim::ai::Inflow taken[] = {{food, -20 * 32, 1, 1}};
+        const sim::ai::CityProjection kept = engine.project_city(p, town, kMinutes);
+        const sim::ai::CityProjection lost = engine.project_city(p, town, kMinutes, taken);
+        const sim::ai::ActionValue v = sim::ai::action_value(lost, kept, free);
+        CHECK(lost.minutes.front().stock[food] < kept.minutes.front().stock[food]);
+        CHECK(v.gold.back() <= 0);
+        CHECK(v.people[0] <= 0);
+        town.goods[food] = had;
     }
     {
         // a colony's food from its delivery minute on: nothing changes before, its costs count from now.

@@ -1526,13 +1526,17 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
         // The load lands in the minute the run arrives; the ship's upkeep is paid with or without it.
         const std::uint32_t arrives = first->seconds / 60 + 1;
         const Inflow load[] = {{first->ware, first->amount, arrives, arrives}};
-        log_value(p, "supply", home, load, c);
+        // From an own city the load is the source's loss: a run between own cities is not free.
+        // shortcut: the source loses it in the first minute; upgrade when the run's loading minute is known.
+        const Inflow taken[] = {{first->ware, -std::int64_t{first->amount}, 1, 1}};
+        log_value(p, "supply", home, load, c, first->own ? &src1 : nullptr, taken);
         if (second) {
             c.cost = second->own ? 0 : price_paid(p, second->ware, second->amount);
             log_decision(p, "supply", second->ware, home.island, home.index, c, second->ware, second->amount);
             const std::uint32_t lands = second->seconds / 60 + 1;
             const Inflow more[] = {{second->ware, second->amount, lands, lands}};
-            log_value(p, "supply", home, more, c);
+            const Inflow gone[] = {{second->ware, -std::int64_t{second->amount}, 1, 1}};
+            log_value(p, "supply", home, more, c, second->own ? &m_world.cities()[second->source] : nullptr, gone);
         }
     }
     if (rivals()) {

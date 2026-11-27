@@ -230,6 +230,9 @@ struct ActionValue {
     std::vector<std::int64_t> people;
 };
 [[nodiscard]] ActionValue action_value(const CityProjection& with, const CityProjection& without, const Commitment& c);
+/// Open1602 (P2.7): `a` with another city's share `b` of the same action added minute by minute (a
+/// run between own cities: what the source loses), its payback found again; the people stay `a`'s.
+[[nodiscard]] ActionValue add_value(ActionValue a, const ActionValue& b);
 
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
@@ -704,8 +707,9 @@ private:
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
     /// P2.7: for the log, what an action is worth to city `c`: its goods `extra` and its costs `commit`
     /// in action_value, at every ten minutes of the budget's horizon, beside the decision's line.
+    /// With `source` (an own city the goods come from), its loss `taken` is added (add_value).
     void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
-                   const Commitment& commit) const;
+                   const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {}) const;
     /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
     /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
     [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;

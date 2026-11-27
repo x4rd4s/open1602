@@ -249,6 +249,17 @@ ActionValue action_value(const CityProjection& with, const CityProjection& witho
     return v;
 }
 
+ActionValue add_value(ActionValue a, const ActionValue& b) {
+    a.payback = 0;
+    for (std::size_t m = 0; m < a.gold.size(); ++m) {
+        a.gold[m] += m < b.gold.size() ? b.gold[m] : 0;
+        if (a.payback == 0 && m != 0 && a.gold[m] > 0) {
+            a.payback = static_cast<std::uint32_t>(m);
+        }
+    }
+    return a;
+}
+
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f) {
     // Each city adds its own running sum; summing onto gold[m - 1] would drop the cities before.
     std::int64_t sum = 0;
