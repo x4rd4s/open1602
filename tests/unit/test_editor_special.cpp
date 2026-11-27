@@ -8,6 +8,7 @@
 #include "o1602/assets/game_data.hpp"
 #include "o1602/editor/objects.hpp"
 #include "o1602/editor/special_objects.hpp"
+#include "o1602/sim/construction.hpp"
 #include "o1602/sim/logistics.hpp"
 #include "o1602/sim/world.hpp"
 
@@ -25,6 +26,7 @@ constexpr std::uint32_t kBeach = 21011;
 constexpr std::uint32_t kBeachRuin = 22610;
 constexpr std::uint32_t kOutpost = 21801;
 constexpr std::uint32_t kBig = 20601;
+constexpr std::uint32_t kMarketDestroyed = 20823;
 
 assets::BuildingTable make_buildings() {
     const assets::CodPredefinedSymbol types[] = {{"HAUS", 1}};
@@ -44,6 +46,8 @@ assets::BuildingTable make_buildings() {
         "  @Nummer: 7\n  Id: 22610\n  Kind: 29\n  Gfx: 24\n  Size: 1, 1\n"
         "  @Nummer: 8\n  Id: 21801\n  Kind: 14\n  Gfx: 25\n  Size: 1, 1\n  Rotate: 1\n"
         "  @Nummer: 9\n  Id: 20601\n  Kind: 14\n  Gfx: 29\n  Size: 2, 2\n  Rotate: 4\n"
+        "  @Nummer: 10\n  Id: 20823\n  Kind: 14\n  Gfx: 33\n  Size: 2, 2\n  Destroyflg: 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 7\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -91,7 +95,7 @@ editor::SpecialPiece piece_of(const std::vector<editor::SpecialPiece>& pieces, s
 TEST_CASE("editor special objects: the crops at each stage, the ruins and the unused buildings") {
     Island island;
     const std::vector<editor::SpecialPiece> pieces = editor::special_pieces(island.buildings);
-    REQUIRE(pieces.size() == 11);  // 5 stages, ripe, withered, 2 ruins, 2 buildings; no tree
+    REQUIRE(pieces.size() == 12);  // 5 stages, ripe, withered, 2 ruins, a destroyed market, 2 buildings; no tree
     using Kind = editor::SpecialKind;
     for (std::uint8_t s = 0; s < 5; ++s) {
         CHECK(pieces[s] == (editor::SpecialPiece{kGrowing, s, 5, Kind::Growing}));
@@ -100,9 +104,10 @@ TEST_CASE("editor special objects: the crops at each stage, the ruins and the un
     CHECK(pieces[6] == (editor::SpecialPiece{kWithered, 0, 1, Kind::Withered}));
     CHECK(pieces[7].id == kRuin);
     CHECK(pieces[8].id == kBeachRuin);
-    CHECK(pieces[9] == (editor::SpecialPiece{kOutpost, 0, 1, Kind::Building}));
-    CHECK(pieces[10] == (editor::SpecialPiece{kBig, 0, 1, Kind::Building}));
-    for (const std::uint32_t id : {kGrowing, kRipe, kWithered, kRuin, kBeachRuin, kOutpost, kBig}) {
+    CHECK(pieces[9] == (editor::SpecialPiece{kMarketDestroyed, 0, 1, Kind::Destroyed}));
+    CHECK(pieces[10] == (editor::SpecialPiece{kOutpost, 0, 1, Kind::Building}));
+    CHECK(pieces[11] == (editor::SpecialPiece{kBig, 0, 1, Kind::Building}));
+    for (const std::uint32_t id : {kGrowing, kRipe, kWithered, kRuin, kBeachRuin, kMarketDestroyed, kOutpost, kBig}) {
         CHECK(editor::is_special(island.buildings, *island.buildings.by_id(id)));
     }
     for (const std::uint32_t id : {kGround, kTree, kBeach}) {
@@ -191,4 +196,27 @@ TEST_CASE("editor objects: the natives' and pirates' group offers every building
     for (const std::uint32_t b : id::kLandscapeAdded) {
         CHECK(std::find(id::kLandscape.begin(), id::kLandscape.end(), b) == id::kLandscape.end());  // listed once
     }
+}
+
+TEST_CASE("editor special objects: a destroyed market without owner stands on land or beach and stays") {
+    // Merlin: destroyed Kontors, markets and chief's huts as pieces of their own; without a player
+    // they do not collapse.
+    Island island;
+    const auto pieces = editor::special_pieces(island.buildings);
+    const editor::SpecialPiece market = piece_of(pieces, kMarketDestroyed);
+    using R = editor::SpecialRefusal;
+    CHECK(editor::special_fits(island.world, island.buildings, 0, {18, 4}, market, 0) == R::None);  // half on the beach
+    CHECK(editor::special_fits(island.world, island.buildings, 0, {19, 4}, market, 0) == R::NoIsland);
+    auto placed = editor::place_special(island.world, island.buildings, 0, {4, 8}, market, 0);
+    REQUIRE(placed.ok());
+    (*placed)->apply(island.world);
+    REQUIRE(island.at(4, 8)->id == kMarketDestroyed);
+    for (int epoch = 0; epoch < 200; ++epoch) {
+        CHECK(sim::collapse_market_ruins(island.world, island.buildings, nullptr) == 0);
+    }
+    CHECK(island.at(4, 8)->id == kMarketDestroyed);
+    auto gone = editor::remove_building(island.world, island.buildings, 0, {4, 8});
+    REQUIRE(gone.ok());
+    (*gone)->apply(island.world);
+    CHECK(island.at(4, 8)->id == kGround);
 }

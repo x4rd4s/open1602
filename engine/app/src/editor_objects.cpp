@@ -195,6 +195,18 @@ std::string special_name(const editor::SpecialPiece& p, const assets::BuildingTa
             b != nullptr && b->kind == assets::kind::kBeachRuin ? "editor.special.beach_ruin" : "editor.special.ruin",
             {number});
     }
+    if (p.kind == Kind::Destroyed && b != nullptr) {
+        // kRuins: Kontor I-IV, then the chief's huts of the natives' two looks, then the market.
+        const auto& r = assets::id::kRuins;
+        const auto at = static_cast<std::size_t>(std::find(r.begin(), r.end(), p.id) - r.begin());
+        if (b->prod_kind == assets::prod::kMarket) {
+            return ui::tr("editor.special.destroyed_market", {number});
+        }
+        if (at >= 8 && at < 12) {
+            return ui::tr("editor.special.destroyed_kontor", {std::to_string(at - 7), number});
+        }
+        return ui::tr("editor.special.destroyed_chief", {at == 12 ? "1" : "2", number});
+    }
     if (p.id == assets::id::kUnusedBuildings[0]) {
         return ui::tr("editor.special.outpost", {number});
     }

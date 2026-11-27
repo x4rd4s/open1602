@@ -22,11 +22,12 @@ namespace o1602::editor {
 
 /// What a special object is.
 enum class SpecialKind : std::uint8_t {
-    Growing,   ///< a crop field growing, at one of its stages
-    Ripe,      ///< a ripe crop field
-    Withered,  ///< a crop field withered by a drought
-    Ruin,      ///< a ruin of the land or the beach
-    Building,  ///< a building no list of the game offers
+    Growing,    ///< a crop field growing, at one of its stages
+    Ripe,       ///< a ripe crop field
+    Withered,   ///< a crop field withered by a drought
+    Ruin,       ///< a ruin of the land or the beach
+    Building,   ///< a building no list of the game offers
+    Destroyed,  ///< a destroyed Kontor, market or chief's hut (kRuins), without owner: it stays
 };
 
 /// A special object as the editor offers it: a record of haeuser.cod and, for a growing field, the
@@ -40,7 +41,7 @@ struct SpecialPiece {
 };
 
 /// The special objects of the game data, in the order the editor lists them: each crop with its
-/// growing stages, ripe and withered, then the ruins, then the unused buildings.
+/// growing stages, ripe and withered, then the ruins, the destroyed buildings, then the unused buildings.
 [[nodiscard]] std::vector<SpecialPiece> special_pieces(const assets::BuildingTable& buildings);
 
 /// Whether a record is one the editor places as a special object (a crop field, a ruin or an
