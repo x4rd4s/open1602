@@ -374,6 +374,12 @@ std::uint32_t UnitSelection::kind_mask(const sim::World& world, const assets::Fi
     return mask;
 }
 
+std::size_t UnitSelection::kind_count(const sim::World& world, const assets::FigureTable& figures,
+                                      std::int32_t kind) const {
+    return static_cast<std::size_t>(std::count_if(
+        m_units.begin(), m_units.end(), [&](const UnitRef& r) { return figure_kind(world, figures, r) == kind; }));
+}
+
 bool UnitSelection::select_kind(const sim::World& world, const assets::FigureTable& figures,
                                 const std::vector<UnitCandidate>& candidates, sim::PlayerId local, std::int32_t kind) {
     std::vector<UnitRef> units;

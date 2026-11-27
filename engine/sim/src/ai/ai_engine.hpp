@@ -484,6 +484,11 @@ public:
     /// Randwachs below the full); asks tile_fertile_at only for that ground.
     [[nodiscard]] bool bare_ground_planted(const AiPlayer& p, const Tile& t, std::int32_t x, std::int32_t y,
                                            std::uint8_t field_ware) const;
+    /// The least size classes (island_size) a computer's first island drawn at random takes, in
+    /// turn until one finds a free island: the medium and larger ones first, then any; for
+    /// FirstIsland::LargeAtRandom the largest class free (`largest`) first.
+    [[nodiscard]] static std::array<std::uint32_t, 2> first_island_sizes(FirstIsland choice,
+                                                                         std::uint32_t largest) noexcept;
     /// Whether another player's city leaves room to found beside it: not an island the original keeps
     /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
     /// no people yet, unless the improved computer chose the island as contested (`contested`).

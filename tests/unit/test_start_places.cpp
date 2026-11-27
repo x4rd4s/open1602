@@ -68,6 +68,24 @@ TEST_CASE("start places: the places of the players who start at sea, and the mar
            std::vector<sim::StartPlace>{sim::StartPlace{10, 10}, sim::StartPlace{60, 60}, sim::StartPlace{30, 50}}));
 }
 
+TEST_CASE("start places: as many markers as players at sea, the markers alone") {
+    // Feedback 17: 30 markers for 12 players showed 42 places, the ships' tiles counted too; the
+    // author sets every place.
+    sim::World world = sea_world();
+    world.set_markers({
+        sim::ScenarioMarker{"ship_start_1", sim::ScenarioMarker::Shape::Point, 30, 50, 1, 1},
+        sim::ScenarioMarker{"ship_start_2", sim::ScenarioMarker::Shape::Point, 70, 30, 1, 1},
+    });
+    CHECK((sim::start_places(world) == std::vector<sim::StartPlace>{sim::StartPlace{30, 50}, sim::StartPlace{70, 30}}));
+    for (std::uint64_t seed = 1; seed <= 20; ++seed) {
+        sim::World w = world;
+        sim::shuffle_start_places(w, assets::BuildingTable{}, seed);
+        const std::set<std::pair<std::uint32_t, std::uint32_t>> places = {{30, 50}, {70, 30}};
+        CHECK(places.count(at(w, "A")) == 1);
+        CHECK(places.count(at(w, "B")) == 1);
+    }
+}
+
 TEST_CASE("start places: drawn from the seed, each to one player, the player's ships moving together") {
     std::set<std::pair<std::uint32_t, std::uint32_t>> firsts;
     for (std::uint64_t seed = 1; seed <= 40; ++seed) {

@@ -323,13 +323,21 @@ std::optional<std::uint16_t> Engine::first_island_choice(AiPlayer& p) {
         return std::nullopt;
     }
     const auto n = static_cast<std::uint16_t>(m_world.islands().size());
-    if (player->first_island == FirstIsland::AtRandom) {
+    if (player->first_island == FirstIsland::AtRandom || player->first_island == FirstIsland::LargeAtRandom) {
         // Drawn among the islands free for a first city, the medium and larger ones first, and
-        // none another computer goes to; it is then this computer's own choice.
+        // none another computer goes to; it is then this computer's own choice. "Large at
+        // random" draws among those of the largest size class free (first_island_sizes).
+        const auto takes = [&](std::uint16_t i) { return island_allowed(p, i) && !first_island_aimed(p, i); };
+        std::uint32_t largest = 0;
+        for (std::uint16_t i = 0; i < n; ++i) {
+            if (takes(i)) {
+                largest = std::max(largest, island_size(i));
+            }
+        }
         std::vector<std::uint16_t> free;
-        for (const std::uint32_t least : {2U, 0U}) {
+        for (const std::uint32_t least : first_island_sizes(player->first_island, largest)) {
             for (std::uint16_t i = 0; i < n; ++i) {
-                if (island_size(i) >= least && island_allowed(p, i) && !first_island_aimed(p, i)) {
+                if (island_size(i) >= least && takes(i)) {
                     free.push_back(i);
                 }
             }
@@ -356,6 +364,11 @@ std::optional<std::uint16_t> Engine::first_island_choice(AiPlayer& p) {
     }
     player->first_island = FirstIsland::Original;  // gone, or taken already: the search as always
     return std::nullopt;
+}
+
+std::array<std::uint32_t, 2> Engine::first_island_sizes(FirstIsland choice, std::uint32_t largest) noexcept {
+    return choice == FirstIsland::LargeAtRandom ? std::array<std::uint32_t, 2>{largest, 0U}
+                                                : std::array<std::uint32_t, 2>{2U, 0U};
 }
 
 bool Engine::spend_first_island(AiPlayer& p, std::uint16_t island) {
