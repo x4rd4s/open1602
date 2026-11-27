@@ -13,6 +13,7 @@
 #include "ai_tables.hpp"
 #include "ai_view.hpp"
 
+#include "o1602/sim/construction.hpp"
 #include "o1602/sim/growth.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/logistics.hpp"
@@ -270,6 +271,23 @@ std::vector<WoodReach> Engine::woodcutters_near(AiPlayer& p, std::int32_t x0, st
     return reaches;
 }
 
+bool Engine::bare_ground_planted(bool improved, std::int32_t tile_kind, std::uint8_t ware, bool bears) noexcept {
+    return improved && tile_kind == kind::kGround && ware == 0 && bears;
+}
+
+bool Engine::bare_ground_planted(const AiPlayer& p, const Tile& t, std::int32_t x, std::int32_t y,
+                                 std::uint8_t field_ware) const {
+    // Only with "Fertile" (Rules::fertile_fields), where such ground bears in full; else it bears
+    // a quarter at most and the field takes the town's land for little. Only the dry ground among
+    // the fields, whose Randwachs is below the full (growth 32 of 32): bare ground at the full
+    // Randwachs is the meadow cattle grazed, which grows back, and the land of the town's houses
+    // (with it the second computer of the arena built 80 houses in the hour instead of 119).
+    const bool improved = !classic() && m_world.fertile_fields();
+    const bool bare = improved && t.kind == kind::kGround && t.ware == 0 && t.growth < 32;
+    return bare_ground_planted(improved, t.kind, t.ware,
+                               bare && tile_fertile_at(m_world, m_buildings, p.island, field_ware, x, y, 0));
+}
+
 void Engine::fill_fields(AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int32_t x1, std::int32_t y1,
                          std::int32_t rings_n, std::uint8_t field_ware, std::uint8_t radius) {
     // Fields in rings around the farm, inside its reach, on ruins, meadows and trees.
@@ -313,7 +331,8 @@ void Engine::fill_fields(AiPlayer& p, std::int32_t x0, std::int32_t y0, std::int
             if (dy > radius || dx > circle[static_cast<std::size_t>(dy)]) {
                 continue;
             }
-            if (!((tl.ware == 0 && tl.kind == kind::kRuin) || tl.ware == ware::kGrass || tl.ware == ware::kTree)) {
+            if (!((tl.ware == 0 && tl.kind == kind::kRuin) || tl.ware == ware::kGrass || tl.ware == ware::kTree) &&
+                !bare_ground_planted(p, tl, x, y, field_ware)) {
                 continue;
             }
             if (tl.ware == ware::kTree && in_wood_reach(woods, x, y)) {
