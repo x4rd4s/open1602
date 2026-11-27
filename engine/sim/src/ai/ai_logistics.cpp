@@ -1530,6 +1530,9 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
         if (second) {
             c.cost = second->own ? 0 : price_paid(p, second->ware, second->amount);
             log_decision(p, "supply", second->ware, home.island, home.index, c, second->ware, second->amount);
+            const std::uint32_t lands = second->seconds / 60 + 1;
+            const Inflow more[] = {{second->ware, second->amount, lands, lands}};
+            log_value(p, "supply", home, more, c);
         }
     }
     if (rivals()) {
