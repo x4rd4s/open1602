@@ -3,3 +3,4 @@
 #     MEMBER | PATH | CLASS: WHY
 # CLASS is eigen, gesehen, Regel or Buchung (the classes of the P1.1 list); verborgen is never
 # taken, it goes through View::omniscient_level().
+fertile_fields | engine/sim/src/ai/ai_build.cpp | Regel: the game setting "Fertile" (Rules::fertile_fields), chosen at the start and shown to every player
