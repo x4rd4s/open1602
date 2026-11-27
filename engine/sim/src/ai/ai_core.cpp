@@ -176,8 +176,16 @@ void Engine::track(const AiPlayer& p) const {
                      std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock) + "/" +
                      std::to_string(w < c.supply.size() ? c.supply[w].ratio : 0);
         }
-        log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
-            population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
+        // Per class: inhabitants/satisfaction/taxes, as the value lines project them (P2.8's window reads).
+        std::string classes;
+        for (std::size_t k = 0; k < c.inhabitants.size(); ++k) {
+            classes += " " + std::to_string(c.inhabitants[k]) + "/" +
+                       std::to_string(k < c.satisfaction.size() ? c.satisfaction[k] : 0) + "/" +
+                       std::to_string(m_sheet.tax(k, c.inhabitants[k], k < c.tax_rate.size() ? c.tax_rate[k] : 0));
+        }
+        log(p, "track city %u/%u people %u tax %d cost %d goods%s classes%s", unsigned{c.island}, unsigned{c.index},
+            population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str(),
+            classes.c_str());
         log_flows(p, c, kTrackMinutes);
     }
     log_projection(p, kTrackMinutes, kontors);
@@ -283,6 +291,7 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         return;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    const auto start = std::chrono::steady_clock::now();
     const CityProjection with = project_city(p, c, horizon, extra);
     const CityProjection without = project_city(p, c, horizon);
     ActionValue v = action_value(with, without, commit);
@@ -290,6 +299,8 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         v = add_value(std::move(v), action_value(project_city(p, *source, horizon, taken),
                                                  project_city(p, *source, horizon), Commitment{}));
     }
+    const auto us =
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::string gold;
     for (std::uint32_t m = kTrackMinutes; m < v.gold.size(); m += kTrackMinutes) {
         gold += " +" + std::to_string(m) + " " + std::to_string(v.gold[m]);
@@ -308,8 +319,21 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         };
         ratio += " +" + std::to_string(m) + " " + std::to_string(at(with)) + "/" + std::to_string(at(without));
     }
-    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s", kind, unsigned{c.island},
-        unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware}, ratio.c_str());
+    // With the action, per class at each horizon: inhabitants/satisfaction, then the city's taxes
+    // (the path from supply level to gold, beside track city's actual figures).
+    std::string path;
+    for (std::uint32_t m = kTrackMinutes; m <= with.minutes.size(); m += kTrackMinutes) {
+        const ProjectedMinute& f = with.minutes[m - 1];
+        path += " +" + std::to_string(m);
+        for (std::size_t k = 0; k < f.inhabitants.size(); ++k) {
+            path += " " + std::to_string(f.inhabitants[k]) + "/" +
+                    std::to_string(k < f.satisfaction.size() ? f.satisfaction[k] : 0);
+        }
+        path += " tax " + std::to_string(f.taxes);
+    }
+    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld", kind, unsigned{c.island},
+        unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware}, ratio.c_str(), path.c_str(),
+        static_cast<long long>(us));
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
