@@ -4240,6 +4240,39 @@ TEST_CASE("ai: an action's value is the city's gold with it less without it, les
     CHECK((both.people == v.people));
 }
 
+TEST_CASE("ai: a colony brings its raw material home and plans the workshop the home lacks (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);  // ware 19 from raw 6
+    REQUIRE(shop != nullptr);
+    const sim::ai::Inflow good{19, 30, 11, 30};
+    {  // the home makes none of the good: the raw material at the workshop's rate, the workshop planned
+        sim::ai::Commitment c;
+        c.upkeep = 3;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, good, 0, c);
+        CHECK(b.workshop == shop);
+        CHECK(b.inflow.ware == 6);
+        CHECK(b.inflow.per_minute == 30 * static_cast<std::int64_t>(shop->raw_use / shop->output));
+        CHECK(b.inflow.from == 11);
+        CHECK(c.upkeep == 3 + std::int64_t{shop->running_cost});
+        CHECK(c.cost == std::int64_t{shop->build_cost.money});
+    }
+    {  // it makes the good already: its own workshops take the raw material, none planned
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, good, 1, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 6);
+        CHECK(c.upkeep == 0);
+    }
+    {  // a good no workshop makes comes as it is
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, sim::ai::Inflow{22, 30, 11, 30}, 0, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 22);
+        CHECK(b.inflow.per_minute == 30);
+    }
+}
+
 TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
     sim::ai::ActionValue v;
     v.gold = {-100, -90, -80, -70, -60, -50, -40};  // six minutes, +10 a minute

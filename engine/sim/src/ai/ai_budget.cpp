@@ -273,6 +273,39 @@ Inflow Engine::colony_inflow(const City& home, std::uint8_t crop, const Commitme
     return in;
 }
 
+ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t made, Commitment& c) {
+    ColonyBundle out;
+    out.inflow = good;
+    // The workshop of the table that makes the good from one raw material (P2.7c's single input).
+    const Sheet::Producer* shop = nullptr;
+    for (const Sheet::Producer& r : sheet.producers()) {
+        if (r.ware == good.ware && r.raw != 0 && r.raw2 == 0 && r.output != 0) {
+            shop = &r;
+            break;
+        }
+    }
+    if (shop == nullptr) {
+        return out;  // the crop's good comes from the field itself
+    }
+    out.inflow.ware = shop->raw;
+    out.inflow.per_minute =
+        good.per_minute * static_cast<std::int64_t>(shop->raw_use) / static_cast<std::int64_t>(shop->output);
+    if (made == 0) {
+        out.workshop = shop;
+        c.cost += shop->build_cost.money;
+        c.upkeep += shop->running_cost;
+    }
+    return out;
+}
+
+ColonyBundle Engine::colony_bundle(const City& home, std::uint8_t crop, Commitment& c) const {
+    const Inflow good = colony_inflow(home, crop, c);
+    // shortcut: "makes none" from the home ledger's production of the good over the horizon; upgrade
+    // when a workshop that has not yet made anything counts.
+    const FlowTotals t = home.ledger.totals(good.ware, m_world.balance().ai_budget_horizon_minutes);
+    return ai::colony_bundle(m_sheet, good, t.of(GoodsFlow::Produced), c);
+}
+
 Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const {
     // A colony costs its gold now and, a minute, what one of the computer's colonies costs beyond
     // its taxes (at least its Kontor's running costs); it brings what its crop's good opens in the

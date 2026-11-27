@@ -1603,9 +1603,13 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
             const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
             log_decision(p, "colony plan", *best, -1, -1, c, 0, 0, home);
             if (home != nullptr && *best != kAnyCrop) {
-                const Commitment commit = logged_commitment(p, *best);
-                const Inflow ship[] = {colony_inflow(*home, *best, commit)};
-                log_value(p, "colony plan", *home, ship, commit);
+                Commitment commit = logged_commitment(p, *best);
+                const ColonyBundle bundle = colony_bundle(*home, *best, commit);
+                const Inflow ship[] = {bundle.inflow};
+                const Sheet::Producer* const shop[] = {bundle.workshop};
+                log_value(p, "colony plan", *home, ship, commit, nullptr, {},
+                          bundle.workshop != nullptr ? std::span<const Sheet::Producer* const>{shop}
+                                                     : std::span<const Sheet::Producer* const>{});
             }
         }
     }

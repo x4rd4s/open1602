@@ -233,6 +233,16 @@ struct ActionValue {
 /// Open1602 (P2.7): `a` with another city's share `b` of the same action added minute by minute (a
 /// run between own cities: what the source loses), its payback found again; the people stay `a`'s.
 [[nodiscard]] ActionValue add_value(ActionValue a, const ActionValue& b);
+/// Open1602 (P2.8): a colony as the action list it is: for `good` (the good it brings, at the rate
+/// the home lacks), the crop's raw material shipped home where a workshop of the table turns it into
+/// the good, with that workshop planned (its gold and running costs added to `c`) when the home city
+/// made none of the good (`made` over the horizon); with no such workshop, the good itself.
+struct ColonyBundle {
+    Inflow inflow;
+    const Sheet::Producer* workshop = nullptr;  ///< planned at home, or none
+};
+[[nodiscard]] ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t made, Commitment& c);
+
 /// Open1602 (P2.8): an action's value past the validated horizon (the projection's last minute):
 /// its gold goes on at its mean slope over the last `period` minutes until it pays back, at most
 /// `left` minutes from now (none: the game has no end). Too early when the action's goods begin (minute `from`) less
@@ -720,10 +730,13 @@ private:
     /// in action_value, at every ten minutes of the budget's horizon, beside the decision's line.
     /// With `source` (an own city the goods come from), its loss `taken` is added (add_value).
     void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
-                   const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {}) const;
+                   const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {},
+                   std::span<const Sheet::Producer* const> planned = {}) const;
     /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
     /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
     [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;
+    /// P2.8: colony_inflow as the action list a colony is (colony_bundle), for the home city.
+    [[nodiscard]] ColonyBundle colony_bundle(const City& home, std::uint8_t crop, Commitment& c) const;
     /// The computer log only: a report of each city every half hour of game time.
     void report(AiPlayer& p);
 

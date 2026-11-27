@@ -290,13 +290,14 @@ void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) 
 }
 
 void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
-                       const Commitment& commit, const City* source, std::span<const Inflow> taken) const {
+                       const Commitment& commit, const City* source, std::span<const Inflow> taken,
+                       std::span<const Sheet::Producer* const> planned) const {
     if (!logging()) {
         return;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
     const auto start = std::chrono::steady_clock::now();
-    const CityProjection with = project_city(p, c, horizon, extra);
+    const CityProjection with = project_city(p, c, horizon, extra, planned);
     const CityProjection without = project_city(p, c, horizon);
     ActionValue v = action_value(with, without, commit);
     if (source != nullptr) {
