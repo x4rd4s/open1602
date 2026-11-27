@@ -3967,6 +3967,9 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     p.player = kHuman;
     const sim::ai::CityProjection f = engine.project_city(p, *world.city(0, 0), 20);
     REQUIRE(f.minutes.size() == 20);
+    // The market's running costs as the city's books show them (civil_income's figure).
+    CHECK(f.running_cost == sim::running_costs(world, buildings)[0]);
+    CHECK(f.running_cost > 0);
     bool hungry = false;
     bool fell = false;
     for (const sim::ai::ProjectedMinute& m : f.minutes) {
