@@ -249,6 +249,18 @@ struct ZoneOverlap {
 [[nodiscard]] std::int32_t zone_excess(const TownZone& z, std::int32_t x0, std::int32_t y0, std::int32_t x1,
                                        std::int32_t y1);
 [[nodiscard]] TownStyle town_style(std::uint32_t seed, std::uint16_t island, std::uint8_t city);
+/// Open1602 (PB.7a): the rows of houses between two parallel roads, one along each road, so that
+/// every house touches one (PB.5).
+inline constexpr std::int32_t kBlockRows = 2;
+/// Open1602 (PB.7a): the spacing of two parallel roads for houses of side `size`: the block's rows
+/// and the road.
+[[nodiscard]] constexpr std::int32_t block_depth(std::int32_t size) noexcept {
+    return kBlockRows * size + 1;
+}
+/// Open1602 (PB.7a): a style's road length cut down to whole houses of side `size`, one at least.
+[[nodiscard]] constexpr std::int32_t whole_houses(std::int32_t block, std::int32_t size) noexcept {
+    return size <= 0 ? block : std::max(size, block - block % size);
+}
 
 /// Which tiles a ring iterator visits.
 enum class RingFilter : std::uint8_t {

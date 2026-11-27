@@ -159,7 +159,7 @@ Site gen_double_row(const Segment& s, std::int32_t cx, std::int32_t cy, std::int
 /// Open1602: a square house site of `size` tiles in one of four rows along the road: sides 0 and
 /// -1 touch the road, sides 1 and -2 lie one house further back. For size 2 it is gen_double_row.
 Site gen_row(const Segment& s, std::int32_t cx, std::int32_t cy, std::int32_t side, std::int32_t size) {
-    const std::int32_t off = side == 0 ? 1 : side == 1 ? size + 1 : side == -1 ? -size : -2 * size;
+    const std::int32_t off = side == 0 ? 1 : side == 1 ? size + 1 : side == -1 ? -size : -kBlockRows * size;
     Site r = frame_rect(s, cx, cy, 1 - size, 0, off, off + size - 1);
     r.side = side;
     return r;
@@ -487,7 +487,13 @@ const TownZone& Engine::plan_zone(const AiPlayer& p, AiPlayer* draw) {
         my += (my - ky) * style.shift / len;
     }
     // As large as the room of the houses there are and a dozen more.
-    const std::int64_t wanted = static_cast<std::int64_t>(houses + kZoneSpareHouses) * style.room;
+    // Open1602 (PB.7a): at least the tiles a house takes in a block two houses deep, its roads
+    // included (task_roads), so that a close style's zone holds the houses it plans.
+    const std::int32_t size = house_size();
+    const std::int32_t along = whole_houses(style.block, size);
+    const std::int32_t per_block = kBlockRows * (along / size);
+    const std::int32_t block_room = (block_depth(size) * (along + 1) + per_block - 1) / per_block;
+    const std::int64_t wanted = static_cast<std::int64_t>(houses + kZoneSpareHouses) * std::max(style.room, block_room);
     std::int64_t room = 0;
     std::int32_t r = kZoneMinRadius;
     std::vector<std::int64_t> by_ring(static_cast<std::size_t>(kZoneMaxRadius) + 1, 0);

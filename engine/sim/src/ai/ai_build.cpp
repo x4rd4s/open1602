@@ -1452,7 +1452,12 @@ void Engine::task_roads(AiPlayer& p) {
         return;
     }
     // Open1602: roads of the town style's length, so that towns have blocks of different sizes.
-    const std::int32_t block = classic() ? 7 : town_style_of(p).block;
+    // Open1602 (PB.7a): an improved computer's roads open blocks two houses deep, so that every
+    // house touches a road: the straight run goes on by two house sides and the road beyond them;
+    // the side roads keep the style's length, cut down to whole houses.
+    const std::int32_t size = house_size();
+    const std::int32_t block = classic() ? 7 : whole_houses(town_style_of(p).block, size);
+    const std::int32_t depth = classic() ? block : block_depth(size);
     bool fields = false;
     if (const CityPlan* r = current_plan(p); r != nullptr && !classic() && !p.pirates) {
         const SlotState& houses = r->slots[kSlotHouses];
@@ -1514,7 +1519,7 @@ void Engine::task_roads(AiPlayer& p) {
     }
     const Segment g = p.segments[best_index];
     const std::int32_t placed = road_three(p, bx, by, g.dir, std::min(b_right, block), std::min(b_left, block),
-                                           std::min(b_back, block), g.length > 3);
+                                           std::min(b_back, depth), g.length > 3);
     if (placed == 0 && best_index < p.segments.size()) {
         p.segments[best_index].open = false;
     }

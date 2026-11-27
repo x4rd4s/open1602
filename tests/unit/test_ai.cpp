@@ -3896,8 +3896,9 @@ TEST_CASE("ai: a house site is as large as the largest house of any class in the
         sim::ai::Engine engine(s, state);
         CHECK(engine.house_size() == 3);
     }
-    g.buildings = make_buildings("  @Nummer: 13\n  Id: 20605\n  Kind: 14\n  Gfx: 13\n  Size: 2, 2\n"
-                                 "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n");
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 20605\n  Kind: 14\n  Gfx: 13\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 13\n  EndObj\n");
     {
         sim::Simulation s(g.world, g.buildings, g.figures);
         sim::ai::State state;
@@ -3909,4 +3910,12 @@ TEST_CASE("ai: a house site is as large as the largest house of any class in the
     sim::ai::State state;
     sim::ai::Engine engine(s, state);
     CHECK(engine.house_size() == 1);
+}
+
+TEST_CASE("ai: a style's road length is cut down to whole houses (PB.7a)") {
+    CHECK(sim::ai::whole_houses(7, 2) == 6);
+    CHECK(sim::ai::whole_houses(8, 2) == 8);
+    CHECK(sim::ai::whole_houses(9, 2) == 8);
+    CHECK(sim::ai::whole_houses(7, 3) == 6);
+    CHECK(sim::ai::whole_houses(1, 2) == 2);  // one house at least
 }
