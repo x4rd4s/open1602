@@ -49,10 +49,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     out.running_cost = running_cost(copy, m_buildings, *city);
     const std::uint32_t workers = city_workers(copy, m_buildings, *city);
     // Each ware's flows a minute (1/32 t, what a minute leaves over carried on). The steady ones
-    // (production, workshops, what overflows) run at the budget's horizon rate. Trade at the Kontor
-    // follows its own settings: sales only take stock above `keep`, purchases fill only up to
-    // `limit` (P2.5). Own ships come and go in batches about as long apart as the horizon, so they
-    // run at the rate of the ledger's whole minute window.
+    // (production, workshops, what overflows) run at the budget's horizon rate, and so does trade at
+    // the Kontor, as far as stock and room let it (P2.6). Own ships come and go in batches about as long apart as the
+    // horizon, so they run at the rate of the ledger's whole minute window.
     enum Flow : std::size_t { kSteady, kSold, kBought, kShips, kExtra, kFlows };
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
     std::vector<std::array<std::int64_t, kFlows>> rate(city->goods.size());
@@ -169,15 +168,11 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                     std::int64_t stock = std::clamp<std::int64_t>(came, 0, room);
                     // What the room cuts off is the action's first: it brought no more than fits.
                     pool[w] = std::max<std::int64_t>(0, pool[w] + brought - std::max<std::int64_t>(0, came - stock));
-                    const City::Trade* k = w < city->trade.size() ? &city->trade[w] : nullptr;
-                    const std::int64_t sold = std::clamp<std::int64_t>(
-                        share(w, kSold), 0, k != nullptr && k->sell ? std::max<std::int64_t>(0, stock - k->keep) : 0);
+                    // The window's rates already hold how the Kontor's settings let trade through; only
+                    // the stock and the room bound it (P2.6: keep and limit as now cut half of it).
+                    const std::int64_t sold = std::clamp<std::int64_t>(share(w, kSold), 0, stock);
                     stock -= sold;
-                    const std::int64_t bought = std::clamp<std::int64_t>(
-                        share(w, kBought), 0,
-                        k != nullptr && k->buy
-                            ? std::max<std::int64_t>(0, std::min<std::int64_t>(k->limit, room) - stock)
-                            : 0);
+                    const std::int64_t bought = std::clamp<std::int64_t>(share(w, kBought), 0, room - stock);
                     stock += bought;
                     traded[w].sold += sold;
                     traded[w].bought += bought;
