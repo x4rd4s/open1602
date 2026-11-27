@@ -235,7 +235,7 @@ ActionValue action_value(const CityProjection& with, const CityProjection& witho
     for (std::size_t m = 0; m < n; ++m) {
         sum += gold(with, m) - gold(without, m) - c.upkeep;
         v.gold.push_back(sum);
-        if (v.payback == 0 && sum >= 0) {
+        if (v.payback == 0 && sum > 0) {
             v.payback = static_cast<std::uint32_t>(m + 1);
         }
     }

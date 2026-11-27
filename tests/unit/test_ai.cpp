@@ -4200,6 +4200,10 @@ TEST_CASE("ai: an action's value is the city's gold with it less without it, les
     CHECK((v.gold == std::vector<std::int64_t>{-15, -7, 1, 9}));
     CHECK(v.payback == 2);
     CHECK((v.people == std::vector<std::int64_t>{1, 0}));
+    // An action that costs nothing and brings nothing never pays back.
+    const sim::ai::ActionValue none = sim::ai::action_value(without, without, sim::ai::Commitment{});
+    CHECK((none.gold == std::vector<std::int64_t>{0, 0, 0, 0}));
+    CHECK(none.payback == 0);
 }
 
 TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its good, up to its rate (P2.7)") {

@@ -221,7 +221,8 @@ struct Inflow {
 
 /// Open1602 (P2.7): what an action is worth to a city: the city's gold with it less without it, summed
 /// up to each minute, less the action's cost and its running costs (gold[0] = -cost); the first
-/// minute that sum is no longer negative (0: none within the projection); and the inhabitants per
+/// minute that sum is above zero (0: none within the projection, also for an action that costs and
+/// brings nothing); and the inhabitants per
 /// class with it less without it at the last minute.
 struct ActionValue {
     std::vector<std::int64_t> gold;
