@@ -12,6 +12,7 @@
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
+#include "o1602/sim/random.hpp"
 #include "o1602/sim/simulation.hpp"
 
 namespace o1602::sim::ai {
@@ -20,10 +21,12 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     (void)p;
     CityProjection out;
     // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city; nothing
-    // of another player's is read from it. Its steps raise no events (nullptr) and draw from the
-    // copy's own random streams (a house's new variant, a ruin), so the game's streams stay as they
-    // are and the projection is the same for the same game state.
+    // of another player's is read from it. Its steps raise no events (nullptr). Their only draws pick
+    // a picture (a risen or fallen house's variant, a ruin's), never an outcome; still, the copy
+    // draws from streams of the default seed, not from the game's own, so that it cannot foresee
+    // the game's next numbers, and the game's streams stay as they are.
     World copy = m_world;
+    copy.reseed(kDefaultSimulationSeed);
     std::vector<House> others;
     for (const House& h : copy.houses()) {
         if (h.island != c.island || h.city != c.index) {
