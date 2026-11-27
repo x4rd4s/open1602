@@ -22,7 +22,6 @@ namespace o1602::sim::ai {
 CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
                                     std::span<const Inflow> extra,
                                     std::span<const Sheet::Producer* const> planned) const {
-    (void)p;
     CityProjection out;
     // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city; nothing
     // of another player's is read from it. Its steps raise no events (nullptr). Their only draws pick
@@ -110,6 +109,11 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     // P2.7c: the workshops an action list plans with its inflow, idle and at their full rate.
     // shortcut: a planned workshop works from the first minute; upgrade when its build time is planned.
     for (const Sheet::Producer* r : planned) {
+        if (r != nullptr && r->raw2 != 0) {
+            // Left out (the shortcut above): logged, so that a bundle valued too low shows.
+            log(p, "value: planned shop %u skipped, second raw", unsigned{r->type->id});
+            continue;
+        }
         add_shop(r, r != nullptr ? r->output : 0);
     }
     if (!extra.empty()) {
