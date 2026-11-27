@@ -95,4 +95,15 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     return out;
 }
 
+void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f) {
+    // Each city adds its own running sum; summing onto gold[m - 1] would drop the cities before.
+    std::int64_t sum = 0;
+    for (std::size_t m = 1; m < gold.size(); ++m) {
+        if (m <= f.minutes.size()) {
+            sum += f.minutes[m - 1].taxes - f.running_cost;
+        }
+        gold[m] += sum;
+    }
+}
+
 }  // namespace o1602::sim::ai

@@ -4043,3 +4043,25 @@ TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute
     }
     CHECK(world.city(0, 0)->goods[kTools] == 0);  // the game's city is left as it was
 }
+
+TEST_CASE("ai: the projected gold adds every city's taxes less its running costs (P2.4)") {
+    sim::ai::CityProjection a;
+    a.running_cost = 5;
+    a.minutes.resize(3);
+    for (auto& m : a.minutes) {
+        m.taxes = 15;
+    }
+    sim::ai::CityProjection b;
+    b.running_cost = 1;
+    b.minutes.resize(2);
+    b.minutes[0].taxes = 3;
+    b.minutes[1].taxes = 4;
+    std::vector<std::int64_t> gold(4, 0);
+    sim::ai::add_city_gold(gold, a);
+    sim::ai::add_city_gold(gold, b);
+    // a: 10, 20, 30; b: 2, 5, and 5 past its last minute.
+    CHECK(gold[0] == 0);
+    CHECK(gold[1] == 12);
+    CHECK(gold[2] == 25);
+    CHECK(gold[3] == 35);
+}

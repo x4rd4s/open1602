@@ -179,9 +179,9 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
         const CityProjection f = project_city(p, c, horizon);
         const auto us =
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
+        add_city_gold(gold, f);
         for (std::uint32_t m = 1; m <= f.minutes.size(); ++m) {
             const ProjectedMinute& pm = f.minutes[m - 1];
-            gold[m] = gold[m - 1] + pm.taxes - f.running_cost;
             if (m % every != 0) {
                 continue;
             }

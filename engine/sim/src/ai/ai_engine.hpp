@@ -204,6 +204,10 @@ struct CityProjection {
     std::int32_t running_cost = 0;         ///< gold a minute, as now
 };
 
+/// Open1602 (P2.4): adds a city's projected taxes less its running costs, summed up to each
+/// minute, to gold[m] (gold[0] stays; minutes past the projection add its last sum).
+void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f);
+
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
     bool valid = false;
