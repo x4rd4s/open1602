@@ -691,6 +691,62 @@ TEST_CASE("ai landing: an improved computer starts no attack its landing would e
     }
 }
 
+TEST_CASE("ai landing: an improved computer leaves a city be after attacks on it that landed none") {
+    // Feedback 17, K2: a ship of cavalry sailed to a city and turned home some 50 times before it
+    // landed. After kAttackTries attacks without a landing (the war's three looks without progress)
+    // an improved computer leaves the city be for kAttackTriesMs (45 min, as an island it left); a
+    // landing against the owner, or the time, ends that. The classic computer attacks as before.
+    for (const bool classic : {false, true}) {
+        Coast a;
+        a.build(kKontor, 28, 14, kComputer, 0);
+        a.build(kMarket, 18, 14, kComputer, 0);
+        a.build(kKontor, 0, 14, kHuman, 1);
+        a.build(kMarket, 6, 6, kHuman, 1);
+        for (std::int32_t k = 0; k < 4; ++k) {
+            a.build(kHouse, 12 + 3 * k, 20, kHuman, 1);
+        }
+        for (std::int32_t k = 0; k < 6; ++k) {
+            a.add(kComputer, 2 * (10 + 23) + k, 2 * (10 + 18), 0);
+        }
+        sim::Ship ship = sim::make_ship("Ship", 41, 15, kShipFigure, kComputer, 2);
+        ship.cargo.resize(4);
+        ship.cannons = 4;
+        a.world.add_ship(ship);
+        REQUIRE(a.world.diplomacy().set_peace(a.world, kHuman, kComputer, sim::Treaty::None, a.world.time_ms()));
+        a.world.island(1).discover(kComputer);
+        a.world.set_time_ms(1'000'000);
+        sim::Rules rules;
+        rules.bugs.classic_ai = classic;
+        sim::Simulation s(a.world, a.buildings, a.figures, rules);
+        sim::ai::State state;
+        sim::ai::Engine engine(s, state);
+        sim::ai::AiPlayer p;
+        p.player = kComputer;
+        p.home_valid = true;
+        p.home_island = 0;
+        p.home_city = 0;
+        sim::ai::ShipNote n;
+        n.id = a.world.ships().back().id;
+        p.ships.push_back(n);
+        const sim::City& t = *a.world.city(1, 1);
+        REQUIRE(engine.attack_ok_for(p, t));
+        const std::uint32_t key = (std::uint32_t{t.island} << 8) | t.index;
+        p.strategy.attack_tries = {{key, 900'000}, {key, 950'000}};
+        CHECK(engine.attack_ok_for(p, t));  // two tries: it attacks again
+        p.strategy.attack_tries.emplace_back(key, 990'000);
+        CHECK(engine.attack_ok_for(p, t) == classic);
+        // A landing against the owner ends the wait.
+        engine.forget_attack_tries_for(p, kHuman);
+        CHECK(p.strategy.attack_tries.empty());
+        CHECK(engine.attack_ok_for(p, t));
+        // So does the time: tries older than 45 min drop.
+        p.strategy.attack_tries = {{key, 900'000}, {key, 950'000}, {key, 990'000}};
+        a.world.set_time_ms(950'000 + 2'700'000);
+        CHECK(engine.attack_tries_for(p, t) == 1);
+        CHECK(engine.attack_ok_for(p, t));
+    }
+}
+
 TEST_CASE("ai landing: an improved computer starts no attack whose shelling would not pay") {
     // attack_ok asked only whether some fleet finishes the shelling; shell_towers then refused one
     // that does not pay (a ship of 1000 sunk for a tower worth 300) and, with no party enough to

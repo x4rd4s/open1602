@@ -60,9 +60,12 @@ public:
         c.show_mark(m_panel, kShipHeading.name, NameTarget::of(*ship));
         m_panel.set_no_select(kName, !can_rename(c.world(), c.local, NameTarget::of(*ship)));
         const bool moving = !ship->target.empty() || ship->motion.path_index < ship->motion.path.size();
-        for (const std::int32_t id :
-             {kCannonsDown, kCannons, kHealthFrame, kHealth, kHealthHover, kPatrol, kWhiteFlag, kDump}) {
+        for (const std::int32_t id : {kCannonsDown, kPatrol, kWhiteFlag, kDump}) {
             m_panel.set_visible(id, own);
+        }
+        // A spectator reads every ship's health and cannons, as its holds in the ship window.
+        for (const std::int32_t id : {kCannons, kHealthFrame, kHealth, kHealthHover}) {
+            m_panel.set_visible(id, own || spectating(c));
         }
         m_panel.set_visible(kStop, own && moving);
         m_panel.set_disabled(kCannonsDown, ship->cannons == 0);
@@ -355,6 +358,9 @@ public:
         if (c.units == nullptr) {
             return;
         }
+        // Open1602: how many are selected, in the heading; for land units also on each kind's button.
+        m_panel.set_text(m_base + kHeading, ui::tr(m_ships ? "units.group.ships" : "units.group.soldiers",
+                                                   {std::to_string(c.units->size())}));
         m_panel.set_visible(m_base + 21, c.units->any_moving(c.world()));
         if (m_ships) {
             m_panel.set_selected(50022, c.units->any_white_flag(c.world()));
@@ -362,8 +368,41 @@ public:
         }
         const std::uint32_t mask = c.units->kind_mask(c.world(), c.figures);
         for (std::int32_t k = 0; k < 4; ++k) {
-            m_panel.set_visible(52031 + k, (mask & (1U << static_cast<std::uint32_t>(k + 1))) != 0);
+            const bool shown = (mask & (1U << static_cast<std::uint32_t>(k + 1))) != 0;
+            m_panel.set_visible(52031 + k, shown);
+            m_panel.set_visible(kKindCount + k, shown);
+            if (shown) {
+                m_panel.set_text(kKindCount + k, std::to_string(c.units->kind_count(c.world(), c.figures, k + 1)));
+            }
         }
+    }
+
+    /// MKSOLDAT.GAD with a number on the foot of each kind's button (kKindCount + k), in the font of
+    /// the heading. Layouts without the buttons stay as they are.
+    static assets::GadgetLayout with_kind_counts(assets::GadgetLayout layout) {
+        const assets::Gadget* heading = layout.find(52000 + kHeading);
+        if (heading == nullptr) {
+            return layout;
+        }
+        const assets::Gadget font = *heading;
+        for (std::int32_t k = 0; k < 4; ++k) {
+            const assets::Gadget* button = layout.find(52031 + k);
+            if (button == nullptr) {
+                continue;
+            }
+            assets::Gadget g;
+            g.id = kKindCount + k;
+            g.kind = assets::GadgetKind::TextCentre;
+            g.block = font.block;
+            g.colour = font.colour;
+            g.no_select = true;
+            constexpr std::int32_t kLine = 20;
+            g.pos = {button->pos[0], button->pos[1] + button->size[1] - kLine};
+            g.size = {button->size[0], kLine};
+            g.offset = {static_cast<std::int16_t>(button->size[0] / 2), static_cast<std::int16_t>(kLine - 2)};
+            layout.gadgets.push_back(g);
+        }
+        return layout;
     }
 
     void clicked(const ui::PanelEvent& e, const Selection&, const PanelContext& c,
@@ -428,6 +467,8 @@ public:
     }
 
 private:
+    static constexpr std::int32_t kHeading = 1;        ///< m_base + 1: the heading's text
+    static constexpr std::int32_t kKindCount = 52041;  ///< + k: the number of kind k + 1 (Open1602)
     bool m_ships = true;
     std::int32_t m_base = 50000;
 };
@@ -441,7 +482,8 @@ std::unique_ptr<SelectionPanel> make_soldier_unit_panel(assets::GadgetLayout lay
     return std::make_unique<SoldierUnitPanel>(with_owner_heading(std::move(layout), kSoldierHeading));
 }
 std::unique_ptr<SelectionPanel> make_group_panel(assets::GadgetLayout layout, bool ships) {
-    return std::make_unique<GroupPanel>(std::move(layout), ships);
+    return std::make_unique<GroupPanel>(ships ? std::move(layout) : GroupPanel::with_kind_counts(std::move(layout)),
+                                        ships);
 }
 
 }  // namespace o1602::app

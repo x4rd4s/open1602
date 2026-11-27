@@ -50,3 +50,10 @@ kTrackMs | engine/sim/src/ai/ai_core.cpp | derived from: kTrackMinutes in game m
 2 | engine/sim/src/ai/ai_world.cpp | derived from: half of the sheet's full rate, the guess produce_amount * 30 / interval had before P2.1 (P2.4's flow model replaces it)
 128 | engine/sim/src/ai/ai_planner.cpp | derived from: the island's full fertility for a crop (island_fertility: 0, 64 or 128), as plants_on tests it, in half_crop_planted
 32 | engine/sim/src/ai/ai_build.cpp | derived from: the full growth of a tile (Tile::growth is Randwachs * 32 / 128, so 32 is a Randwachs of 100), in bare_ground_planted
+2 | engine/sim/src/ai/ai_engine.hpp | derived from: the two rounds of a first island drawn at random (a least size class, then any), the existing pair {2, 0} of first_island_choice, in first_island_sizes
+18 | engine/sim/src/ai/ai_state.hpp | derived from: the next version number of the saved computer state (AIST), one after kStateWithWarParty = 17
+kStateWithAttackTries | engine/sim/src/ai/ai_state.hpp | derived from: the name of AIST version 18, which saves Strategy::attack_tries
+kAttackTries | engine/sim/src/ai/ai_military.cpp | derived from: kWarFails (three looks without progress end a war), as three attacks on a city without a landing
+3 | engine/sim/src/ai/ai_military.cpp | derived from: kAttackTries, kWarFails (three looks without progress end a war)
+kAttackTriesMs | engine/sim/src/ai/ai_military.cpp | derived from: kLeftIslandMs (45 min before an improved computer settles an island it turned back from again), the time it leaves a city it could not land at
+2'700'000 | engine/sim/src/ai/ai_military.cpp | derived from: kAttackTriesMs, kLeftIslandMs = 2'700'000 (45 min)

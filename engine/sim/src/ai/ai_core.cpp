@@ -2,6 +2,7 @@
 //
 // Scheduler, task stack, root task and (re)initialisation of the computer players.
 #include <algorithm>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <memory>
@@ -151,6 +152,61 @@ void Engine::track(const AiPlayer& p) const {
         log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
             population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
         log_flows(p, c, kTrackMinutes);
+    }
+    log_projection(p, kTrackMinutes);
+}
+
+void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
+    // Open1602 (P2.4): each own city over the budget's horizon, at every `every` minutes of it, for
+    // the track lines that come then; and the gold, against the budget's straight line. Only the
+    // log: the budget's caches are put back.
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    if (horizon == 0 || every == 0) {
+        return;
+    }
+    const std::vector<BudgetCache> budgets = m_budgets;
+    const Census census = m_census;
+    const std::vector<OverviewCache> overviews = m_overviews;
+    const Budget b = gold_budget(p);
+    m_budgets = budgets;
+    m_census = census;
+    m_overviews = overviews;
+    std::vector<std::int64_t> gold(horizon + 1, 0);
+    for (const City& c : m_world.cities()) {  // ai-view: eigen: only the own cities' figures
+        if (c.owner != p.player) {
+            continue;
+        }
+        const auto start = std::chrono::steady_clock::now();
+        const CityProjection f = project_city(p, c, horizon);
+        const auto us =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
+        add_city_gold(gold, f);
+        for (std::uint32_t m = 1; m <= f.minutes.size(); ++m) {
+            const ProjectedMinute& pm = f.minutes[m - 1];
+            if (m % every != 0) {
+                continue;
+            }
+            std::uint64_t people = 0;
+            for (const std::uint32_t n : pm.inhabitants) {
+                people += n;
+            }
+            std::string goods;
+            for (std::size_t w = 0; w < pm.stock.size(); ++w) {
+                if (c.ledger.used(static_cast<std::uint8_t>(w)) || pm.stock[w] != 0) {
+                    goods += " " + std::to_string(w) + ":" + std::to_string(pm.stock[w]);
+                }
+            }
+            log(p, "project city %u/%u +%u people %llu tax %d goods%s (%lld us)", unsigned{c.island}, unsigned{c.index},
+                m, static_cast<unsigned long long>(people), pm.taxes, goods.c_str(), static_cast<long long>(us));
+        }
+    }
+    for (std::uint32_t m = every; m <= horizon; m += every) {
+        // The budget line with the cities' taxes less their running costs as projected instead of
+        // as now; the rest of the line (sales, upkeep, purchases, what is set aside) stays.
+        const std::int64_t line = b.at(Commitment{}, m);
+        const std::int64_t now = static_cast<std::int64_t>(civil_income(p)) * static_cast<std::int64_t>(m);
+        log(p, "project gold +%u %lld budget line %lld", m, static_cast<long long>(line + gold[m] - now),
+            static_cast<long long>(line));
     }
 }
 
@@ -1105,6 +1161,11 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // Without public buildings of a kind of their own past the 19th bit the state fits version 5, and
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
+    for (const ai::AiPlayer& p : m_state->players) {
+        if (!p.strategy.attack_tries.empty()) {
+            return static_cast<std::uint16_t>(ai::kStateWithAttackTries);
+        }
+    }
     for (const ai::AiPlayer& p : m_state->players) {
         if (p.strategy.war_party != 0) {
             return static_cast<std::uint16_t>(ai::kStateWithWarParty);

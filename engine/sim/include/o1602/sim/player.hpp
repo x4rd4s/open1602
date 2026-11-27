@@ -85,7 +85,10 @@ enum class FirstIsland : std::uint8_t {
     Original,  ///< as the original: the search by the islands' numbers
     AtRandom,  ///< an island drawn at random among those free for a first city
     Fixed,     ///< the island with the number Player::first_island_number
-    Last = Fixed,
+    /// An island drawn at random among the largest free for a first city (the size class of
+    /// their kind), the smaller ones only when none of those is free.
+    LargeAtRandom,
+    Last = LargeAtRandom,
 };
 
 /// Index into World::missions().

@@ -187,6 +187,27 @@ struct TownStyle {
     std::int32_t block = 7;         ///< length of the roads that open new blocks
     std::int32_t field_margin = 0;  ///< tiles fields keep beyond the zone
 };
+/// Open1602 (P2.4): a computer city a minute ahead, as Engine::project_city runs it.
+struct ProjectedMinute {
+    std::vector<std::uint32_t> stock;        ///< per ware of the city (City::goods), 1/32 t
+    std::vector<std::uint8_t> ratio;         ///< per ware, its supply level (City::Supply::ratio)
+    std::vector<std::uint32_t> inhabitants;  ///< per class
+    std::vector<std::uint8_t> satisfaction;  ///< per class
+    std::int32_t taxes = 0;                  ///< gold a minute (tax_income)
+};
+
+/// Open1602 (P2.4): what a computer city does over the next minutes with what it gets now: its
+/// goods' inflow of the ledger, its consumption, supply levels and satisfaction, and its houses'
+/// growth, ascents and descents, with the game's own steps on a copy of its state.
+struct CityProjection {
+    std::vector<ProjectedMinute> minutes;  ///< minute 1, 2, ... after now
+    std::int32_t running_cost = 0;         ///< gold a minute, as now
+};
+
+/// Open1602 (P2.4): adds a city's projected taxes less its running costs, summed up to each
+/// minute, to gold[m] (gold[0] stays; minutes past the projection add its last sum).
+void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f);
+
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
     bool valid = false;
@@ -391,6 +412,10 @@ public:
     /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
     /// change and land_use() is asked again for the city (the scans themselves stay in place).
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
+    /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
+    /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
+    /// consumption alone. Compute only: nothing decides by it yet.
+    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -423,6 +448,9 @@ public:
     }
     /// Sends `p`'s attack on city `t` (start_attack); for tests.
     void start_attack_for(AiPlayer& p, const City& t, std::size_t convoy = 1) { start_attack(p, t, convoy); }
+    /// `p`'s attack tries on city `t` (attack_tries) and their end on a landing; for tests.
+    [[nodiscard]] std::size_t attack_tries_for(AiPlayer& p, const City& t) { return attack_tries(p, t); }
+    void forget_attack_tries_for(AiPlayer& p, PlayerId owner) { forget_attack_tries(p, owner); }
     /// Open1602: whether a computer that pays upkeep adds a unit or tower, `next` its upkeep with
     /// it: below its core army while its civil income carries that, beyond it within three
     /// quarters of its army budget; never in debt, where a war's losses were refilled to the core
@@ -484,6 +512,11 @@ public:
     /// Randwachs below the full); asks tile_fertile_at only for that ground.
     [[nodiscard]] bool bare_ground_planted(const AiPlayer& p, const Tile& t, std::int32_t x, std::int32_t y,
                                            std::uint8_t field_ware) const;
+    /// The least size classes (island_size) a computer's first island drawn at random takes, in
+    /// turn until one finds a free island: the medium and larger ones first, then any; for
+    /// FirstIsland::LargeAtRandom the largest class free (`largest`) first.
+    [[nodiscard]] static std::array<std::uint32_t, 2> first_island_sizes(FirstIsland choice,
+                                                                         std::uint32_t largest) noexcept;
     /// Whether another player's city leaves room to found beside it: not an island the original keeps
     /// off (`kept_off`), enough free land (`room`), and the owner has two cities or more and its city
     /// no people yet, unless the improved computer chose the island as contested (`contested`).
@@ -630,6 +663,8 @@ private:
     void track(const AiPlayer& p) const;
     /// P2.4: a city's goods movements of the last minutes by kind ("track flows"). Logging only.
     void log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
+    /// Open1602 (P2.4): logs project_city of each own city at every `every` minutes of the budget's horizon.
+    void log_projection(const AiPlayer& p, std::uint32_t every) const;
     /// P0.2: colony_commitment for the log, with the caches it may fill put back as they were, so
     /// that a later check in the same step works them out as it would have without the log.
     [[nodiscard]] Commitment logged_commitment(const AiPlayer& p, std::uint8_t crop) const;
@@ -1439,6 +1474,11 @@ private:
     Ship* free_warship(AiPlayer& p);
     Ship* best_armed_ship(AiPlayer& p, const Target& ref, std::uint32_t max_same);
     /// `convoy`: how many ships take the party (1 but where towers no fleet wrecks are stormed).
+    /// Open1602 (feedback 17, K2): the attacks `p` started on city `t` within kAttackTriesMs that
+    /// landed no soldier since (Strategy::attack_tries), older ones dropped.
+    std::size_t attack_tries(AiPlayer& p, const City& t);
+    /// Drops `p`'s attack tries on the cities of `owner` (and of cities gone): it landed against them.
+    void forget_attack_tries(AiPlayer& p, PlayerId owner);
     bool attack_ok(AiPlayer& p, const City& t, std::size_t& convoy);
     void start_attack(AiPlayer& p, const City& t, std::size_t convoy);
     /// Open1602: the ships that take a party, as best_armed_ship picks one (takes_landing, well
