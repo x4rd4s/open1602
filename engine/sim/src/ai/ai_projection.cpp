@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "ai_engine.hpp"
@@ -18,7 +19,8 @@
 
 namespace o1602::sim::ai {
 
-CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const {
+CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
+                                    std::span<const Inflow> extra) const {
     (void)p;
     CityProjection out;
     // ai-view: eigen: the copy keeps only the own city's houses and runs only the own city; nothing
@@ -41,6 +43,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     if (city == nullptr) {
         return out;
     }
+    for (const Inflow& in : extra) {
+        city->ensure_ware(in.ware);
+    }
     out.running_cost = running_cost(copy, m_buildings, *city);
     const std::uint32_t workers = city_workers(copy, m_buildings, *city);
     // Each ware's flows a minute (1/32 t, what a minute leaves over carried on). The steady ones
@@ -48,7 +53,7 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     // follows its own settings: sales only take stock above `keep`, purchases fill only up to
     // `limit` (P2.5). Own ships come and go in batches about as long apart as the horizon, so they
     // run at the rate of the ledger's whole minute window.
-    enum Flow : std::size_t { kSteady, kSold, kBought, kShips, kFlows };
+    enum Flow : std::size_t { kSteady, kSold, kBought, kShips, kExtra, kFlows };
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
     std::vector<std::array<std::int64_t, kFlows>> rate(city->goods.size());
     std::vector<std::array<std::int64_t, kFlows>> carried(city->goods.size());
@@ -91,6 +96,14 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
             std::int64_t bought = 0;
         };
         std::vector<Traded> traded(rate.size());  // this minute
+        for (std::size_t w = 0; w < rate.size(); ++w) {
+            rate[w][kExtra] = 0;
+        }
+        for (const Inflow& in : extra) {
+            if (in.from <= m + 1 && m + 1 <= in.until && in.ware < rate.size()) {
+                rate[in.ware][kExtra] += in.per_minute;
+            }
+        }
         for (std::uint32_t ms = 0; ms < kCityTicksPerMinute * kCityTickMs; ms += Simulation::kTickMs) {
             city_ms += Simulation::kTickMs;
             if (city_ms >= kCityTickMs) {
@@ -100,7 +113,8 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                 for (std::size_t w = 0; w < rate.size(); ++w) {
                     const std::int64_t room = std::max(city->capacity, city->goods[w]);
                     std::int64_t stock = std::clamp<std::int64_t>(
-                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips), 0, room);
+                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips) + share(w, kExtra), 0,
+                        room);
                     const City::Trade* k = w < city->trade.size() ? &city->trade[w] : nullptr;
                     const std::int64_t sold = std::clamp<std::int64_t>(
                         share(w, kSold), 0, k != nullptr && k->sell ? std::max<std::int64_t>(0, stock - k->keep) : 0);
@@ -143,6 +157,33 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         out.minutes.push_back(std::move(pm));
     }
     return out;
+}
+
+ActionValue action_value(const CityProjection& with, const CityProjection& without, const Commitment& c) {
+    // One rule for every kind of action: the city's gold with it less without it, less its cost now and
+    // its running costs a minute (P2.7). The extra inhabitants' taxes are in the gold already.
+    ActionValue v;
+    const std::size_t n = std::min(with.minutes.size(), without.minutes.size());
+    const auto gold = [](const CityProjection& f, std::size_t m) {
+        return f.minutes[m].taxes - f.running_cost + f.minutes[m].trade;
+    };
+    std::int64_t sum = -c.cost;
+    v.gold.push_back(sum);
+    for (std::size_t m = 0; m < n; ++m) {
+        sum += gold(with, m) - gold(without, m) - c.upkeep;
+        v.gold.push_back(sum);
+        if (v.payback == 0 && sum >= 0) {
+            v.payback = static_cast<std::uint32_t>(m + 1);
+        }
+    }
+    if (n != 0) {
+        const std::vector<std::uint32_t>& a = with.minutes[n - 1].inhabitants;
+        const std::vector<std::uint32_t>& b = without.minutes[n - 1].inhabitants;
+        for (std::size_t k = 0; k < std::max(a.size(), b.size()); ++k) {
+            v.people.push_back(std::int64_t{k < a.size() ? a[k] : 0} - std::int64_t{k < b.size() ? b[k] : 0});
+        }
+    }
+    return v;
 }
 
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f) {

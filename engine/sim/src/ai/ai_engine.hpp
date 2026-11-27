@@ -210,6 +210,26 @@ struct CityProjection {
 /// minute, to gold[m] (gold[0] stays; minutes past the projection add its last sum).
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f);
 
+/// Open1602 (P2.7): goods an action brings a city, `per_minute` (1/32 t) in minutes `from` to `until`
+/// (counted from 1, both included).
+struct Inflow {
+    std::uint8_t ware = 0;
+    std::int64_t per_minute = 0;
+    std::uint32_t from = 1;
+    std::uint32_t until = 0;
+};
+
+/// Open1602 (P2.7): what an action is worth to a city: the city's gold with it less without it, summed
+/// up to each minute, less the action's cost and its running costs (gold[0] = -cost); the first
+/// minute that sum is no longer negative (0: none within the projection); and the inhabitants per
+/// class with it less without it at the last minute.
+struct ActionValue {
+    std::vector<std::int64_t> gold;
+    std::uint32_t payback = 0;
+    std::vector<std::int64_t> people;
+};
+[[nodiscard]] ActionValue action_value(const CityProjection& with, const CityProjection& without, const Commitment& c);
+
 /// Open1602: the town zone of a city (Engine::town_zone()).
 struct TownZone {
     bool valid = false;
@@ -416,8 +436,9 @@ public:
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
-    /// consumption alone. Compute only: nothing decides by it yet.
-    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
+    /// consumption alone. `extra` adds an action's goods (P2.7). Compute only: nothing decides by it yet.
+    [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes,
+                                              std::span<const Inflow> extra = {}) const;
     /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
     /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
     /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
