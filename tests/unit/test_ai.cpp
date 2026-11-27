@@ -4117,14 +4117,48 @@ TEST_CASE("ai: the projected gold adds every city's taxes less its running costs
 
 TEST_CASE("ai: open land for a farm counts a crop's field only where it bears (K3)") {
     using sim::ai::Engine;
-    namespace ware = assets::ware;
     // A plantation claims no market for desert grass its crop would not bear on.
-    CHECK(Engine::field_open(ware::kCornField, true, true, true));
-    CHECK(!Engine::field_open(ware::kCornField, true, true, false));
-    CHECK(!Engine::field_open(ware::kCocoaField, true, true, false));
+    CHECK(Engine::field_open(true, true, true, true));
+    CHECK(!Engine::field_open(true, true, true, false));
     // A herd's meadow is open wherever grass grows.
-    CHECK(Engine::field_open(ware::kWool, true, true, false));
+    CHECK(Engine::field_open(false, true, true, false));
     // Claimed or built-on land never counts.
-    CHECK(!Engine::field_open(ware::kCornField, false, true, true));
-    CHECK(!Engine::field_open(ware::kWool, true, false, true));
+    CHECK(!Engine::field_open(true, false, true, true));
+    CHECK(!Engine::field_open(false, true, false, true));
+}
+
+TEST_CASE("ai: an improved computer claims no open land for a crop that bears nowhere on the island (K3)") {
+    // A corn field's records (growing, ripe, withered); the island's wood is open land fields
+    // could take. Where corn bears, the wood counts; on an island without corn it counts for the
+    // herds' meadows only, so no market is claimed for a farm that would find no site there.
+    Game g;
+    g.buildings = make_buildings(
+        "  @Nummer: 13\n  Id: 20651\n  Kind: 10\n  Gfx: 100\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 10\n  EndObj\n"
+        "  @Nummer: 14\n  Id: 20652\n  Kind: 10\n  Gfx: 101\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 9\n    Ware: 45\n  EndObj\n"
+        "  @Nummer: 15\n  Id: 20653\n  Kind: 10\n  Gfx: 102\n  Size: 1, 1\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 10\n    Doerrflg: 1\n  EndObj\n");
+    g.buildings.by_id(kKontor)->ware = sim::ware::kAll;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    const sim::City* city = nullptr;
+    for (const sim::City& c : g.world.cities()) {
+        if (c.owner == kComputer) {
+            city = &c;
+        }
+    }
+    REQUIRE(city != nullptr);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kComputer;
+    p.island = city->island;
+    p.city = city->index;
+    std::int32_t x = -1;
+    std::int32_t y = -1;
+    CHECK(engine.field_land(p, assets::ware::kCornField, x, y));  // corn bears on the island
+    g.world.island(city->island).header.fertility = 0;
+    CHECK(!engine.field_land(p, assets::ware::kCornField, x, y));  // nowhere now
+    CHECK(engine.field_land(p, assets::ware::kWool, x, y));        // meadows still
 }

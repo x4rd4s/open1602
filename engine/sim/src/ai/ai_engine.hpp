@@ -416,6 +416,10 @@ public:
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
     /// consumption alone. Compute only: nothing decides by it yet.
     [[nodiscard]] CityProjection project_city(const AiPlayer& p, const City& c, std::uint32_t minutes) const;
+    /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
+    /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
+    /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
+    [[nodiscard]] bool field_land(const AiPlayer& p, std::uint8_t field, std::int32_t& x, std::int32_t& y) const;
     /// Whether a quarry `quarry` placed at (x0, y0) with `rotation` has a tile in one of `circles`.
     [[nodiscard]] bool masons_reach(std::span<const Catchment> circles, const assets::BuildingType& quarry,
                                     std::int32_t x0, std::int32_t y0, std::uint8_t rotation) const;
@@ -505,9 +509,9 @@ public:
     /// marks are, where the field would bear (`bears`, tile_fertile_at) and a player may plant too.
     /// The original's computers leave such tiles out; with "Fertile" every one of them bears, and
     /// the plantations stood with gaps (feedback 17).
-    /// K3: whether an unclaimed tile counts as land for `field`'s farm (field_land): open ground
-    /// a field may take, and for a crop only where it bears.
-    [[nodiscard]] static bool field_open(std::uint8_t field, bool unclaimed, bool plantable, bool bears) noexcept;
+    /// K3: whether an unclaimed tile counts as land for a farm (field_land): open ground a field
+    /// may take, and for a crop only where it bears.
+    [[nodiscard]] static bool field_open(bool crop, bool unclaimed, bool plantable, bool bears) noexcept;
     [[nodiscard]] static bool bare_ground_planted(bool improved, std::int32_t tile_kind, std::uint8_t ware,
                                                   bool bears) noexcept;
     /// The same for tile `t` at (x, y) of the computer's island and a field of `field_ware`, for an
@@ -1130,10 +1134,6 @@ private:
                                bool commit = true);
     [[nodiscard]] std::int32_t free_run(std::uint16_t island, std::uint8_t city, std::int32_t x, std::int32_t y,
                                         std::uint8_t dir) const;
-    /// Open1602: the place of the island with the most unclaimed land fields of `field` could take
-    /// about it, near the city's markets (kFieldLandTiles at least); false without one. A crop's
-    /// field counts only where it bears (tile_fertile_at), so dry ground claims no market (K3).
-    [[nodiscard]] bool field_land(const AiPlayer& p, std::uint8_t field, std::int32_t& x, std::int32_t& y) const;
     /// Open1602: an improved computer claims open land for a farm's slot with a market (field_land).
     /// Open1602: a market at the edge of the city's land towards (x, y), with a road to it.
     bool claim_by_path(AiPlayer& p, std::int32_t x, std::int32_t y);
