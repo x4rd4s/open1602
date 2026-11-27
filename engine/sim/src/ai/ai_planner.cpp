@@ -1929,8 +1929,12 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     return true;
 }
 
+bool Engine::has_window(const Production& pr) noexcept {
+    return pr.elapsed >= 60;
+}
+
 std::uint64_t Engine::made_rate(const Production& pr, std::uint64_t full) noexcept {
-    return pr.elapsed < 60 ? full / 2 : std::uint64_t{pr.produced} * 60 / pr.elapsed;
+    return has_window(pr) ? std::uint64_t{pr.produced} * 60 / pr.elapsed : full / 2;
 }
 
 std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType& b) const {
@@ -1942,7 +1946,7 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
     std::uint64_t sum = 0;
     std::uint32_t n = 0;
     for (const Production& pr : m_world.productions()) {
-        if (!pr.used || pr.island != c.island || pr.elapsed < 60 || !map.contains(pr.x, pr.y)) {
+        if (!pr.used || pr.island != c.island || !has_window(pr) || !map.contains(pr.x, pr.y)) {
             continue;
         }
         const MapCell& cell = map.top(pr.x, pr.y);
@@ -1952,7 +1956,7 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
         sum += made_rate(pr, full);
         ++n;
     }
-    return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? full / 2 : sum / n, 0xFFFFFFFFU));
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? made_rate(Production{}, full) : sum / n, 0xFFFFFFFFU));
 }
 
 bool Engine::food_ahead(const City& c) const {

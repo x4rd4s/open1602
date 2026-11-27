@@ -1043,6 +1043,8 @@ private:
     static constexpr std::uint32_t kAscentStockMinutes = 5;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
+    /// Whether producer `pr` has run a minute of its statistics window.
+    [[nodiscard]] static bool has_window(const Production& pr) noexcept;
     /// What producer `pr` made a minute in its statistics window, 1/32 t; half `full` before it has
     /// run a minute (made_per_minute's rule for one producer).
     [[nodiscard]] static std::uint64_t made_rate(const Production& pr, std::uint64_t full) noexcept;
