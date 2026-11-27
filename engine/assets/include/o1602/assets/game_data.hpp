@@ -639,6 +639,12 @@ inline constexpr DryLand kDrySouth{
 /// [LANDSCHAFT]: the natives' and pirates' buildings and a few others.
 inline constexpr std::array<std::uint32_t, 17> kLandscape{22201, 22202, 22203, 22204, 22205, 22231, 22232, 22233, 22234,
                                                           22235, 22211, 22221, 22222, 22223, 22241, 21304, 22802};
+/// Open1602 (feedback 17): the pirates' buildings the original's list leaves out, which the editor
+/// offers after the last pirate house of kLandscape: the third pirate house (the tavern), which the
+/// pirates build too.
+inline constexpr std::array<std::uint32_t, 1> kLandscapeAdded{kPirateHouse3};
+/// The record of kLandscape after which the editor lists kLandscapeAdded.
+inline constexpr std::uint32_t kLandscapeAddedAfter = kPirateHouse2;
 /// Buildings of the game data that no build menu, no list of the natives or pirates and no ruin
 /// slot offers, with pictures of their own: a 1 x 1 wooden outpost and a 2 x 2 building. The editor
 /// places them as special objects, without owner.
