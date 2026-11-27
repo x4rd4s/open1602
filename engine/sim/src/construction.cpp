@@ -847,6 +847,8 @@ bool tile_fertile_at(const World& world, const assets::BuildingTable& buildings,
     const MapCell& ground = map.ground(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
     const assets::BuildingType* g = ground.empty() ? nullptr : buildings.by_sprite(ground.sprite);
     // Rules::fertile_fields: poor ground takes nothing from a crop, it grows as the island has it.
+    // shortcut: crops are the fixed field ids, a mod's new crop falls outside; upgrade to the
+    // table's withered record once mods add crops.
     const bool even = world.fertile_fields() && ware >= ware::kCornField && ware <= ware::kCocoaField;
     const std::uint32_t edge = g != nullptr && !even ? g->edge_growth : 128;
     std::uint32_t f = std::min<std::uint32_t>(island_fertility(world, island, ware) * edge >> 7, 128);

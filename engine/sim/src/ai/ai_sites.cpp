@@ -17,6 +17,7 @@
 #include "ai_engine.hpp"
 #include "ai_tables.hpp"
 
+#include "o1602/sim/growth.hpp"
 #include "o1602/sim/houses.hpp"
 
 namespace o1602::sim::ai {
@@ -1855,7 +1856,11 @@ std::int32_t Engine::open_land(std::uint16_t island, std::uint8_t own, std::int3
     return n;
 }
 
-bool Engine::field_land(const AiPlayer& p, std::int32_t& best_x, std::int32_t& best_y) const {
+bool Engine::field_open(bool crop, bool unclaimed, bool plantable, bool bears) noexcept {
+    return unclaimed && plantable && (!crop || bears);
+}
+
+bool Engine::field_land(const AiPlayer& p, std::uint8_t field, std::int32_t& best_x, std::int32_t& best_y) const {
     if (p.island >= m_world.islands().size()) {
         return false;
     }
@@ -1877,18 +1882,24 @@ bool Engine::field_land(const AiPlayer& p, std::int32_t& best_x, std::int32_t& b
     if (markets.empty()) {
         return false;
     }
+    // A crop withers (the table's withered record); the herds' grass and the trees do not.
+    const assets::BuildingType* ripe = producer(field, 0);
+    const bool crop = ripe != nullptr && withered_record(m_buildings, *ripe) != nullptr;
+    const auto open_at = [&](const Tile& t, std::int32_t x, std::int32_t y) {
+        return t.valid() && field_open(crop, t.city == MapCell::kNoCity, plantable(t),
+                                       !crop || tile_fertile_at(m_world, m_buildings, p.island, field, x, y, 0));
+    };
     std::int32_t best = 0;
     for (std::int32_t y = 0; y < static_cast<std::int32_t>(map.height()); y += kFieldLandStep) {
         for (std::int32_t x = 0; x < static_cast<std::int32_t>(map.width()); x += kFieldLandStep) {
             const Tile t = tile(p.island, x, y);
-            if (!t.valid() || t.city != MapCell::kNoCity || !plantable(t)) {
+            if (!open_at(t, x, y)) {
                 continue;
             }
             std::int32_t open = 0;
             for (std::int32_t ty = y - kOpenLandRange; ty <= y + kOpenLandRange; ++ty) {
                 for (std::int32_t tx = x - kOpenLandRange; tx <= x + kOpenLandRange; ++tx) {
-                    const Tile o = tile(p.island, tx, ty);
-                    open += o.valid() && o.city == MapCell::kNoCity && plantable(o) ? 1 : 0;
+                    open += open_at(tile(p.island, tx, ty), tx, ty) ? 1 : 0;
                 }
             }
             if (open < kFieldLandTiles) {
