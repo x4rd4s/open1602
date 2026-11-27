@@ -1440,6 +1440,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     };
     std::vector<Stop> stops;
     const City& src1 = m_world.cities()[first->source];
+    const City* src2 = second ? &m_world.cities()[second->source] : nullptr;
     // Cannons for an own colony on the way out.
     const std::uint8_t cannons = m_buildings.materials().cannons;
     if (first->own && ship_at_city(s, home) && src1.stock(cannons) < kTon && home.stock(cannons) > 2 * kTon) {
@@ -1454,8 +1455,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
     load1.entries[1] = RouteEntry{first->ware, false, first->own && classic() ? 50U * kTon : first->amount};
     stops.push_back(load1);
     if (second) {
-        const City& src2 = m_world.cities()[second->source];
-        Stop load2{Target::city_of(src2.island, src2.index), {}};
+        Stop load2{Target::city_of(src2->island, src2->index), {}};
         // The original loads the first ware's amount here too (S-101).
         load2.entries[1] = RouteEntry{second->ware, false, second->own && classic() ? 50U * kTon : second->amount};
         if (load2.target == load1.target) {
@@ -1536,7 +1536,7 @@ bool Engine::home_supply_route(AiPlayer& p, Ship& s, City& home) {
             const std::uint32_t lands = second->seconds / 60 + 1;
             const Inflow more[] = {{second->ware, second->amount, lands, lands}};
             const Inflow gone[] = {{second->ware, -std::int64_t{second->amount}, 1, 1}};
-            log_value(p, "supply", home, more, c, second->own ? &m_world.cities()[second->source] : nullptr, gone);
+            log_value(p, "supply", home, more, c, second->own ? src2 : nullptr, gone);
         }
     }
     if (rivals()) {
