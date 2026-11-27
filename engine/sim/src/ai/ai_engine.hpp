@@ -1043,6 +1043,9 @@ private:
     static constexpr std::uint32_t kAscentStockMinutes = 5;
     /// Open1602: what one producer of `b` makes in a city, 1/32 t a minute (made_per_minute).
     [[nodiscard]] std::uint32_t made_per_minute(const City& c, const assets::BuildingType& b) const;
+    /// What producer `pr` made a minute in its statistics window, 1/32 t; half `full` before it has
+    /// run a minute (made_per_minute's rule for one producer).
+    [[nodiscard]] static std::uint64_t made_rate(const Production& pr, std::uint64_t full) noexcept;
     /// The producers of the packages' goods the city lacks (ai_chains.hpp): true if one was planned.
     bool package_chains(AiPlayer& p, const City& c, const CityPlan& r);
     bool package_need(AiPlayer& p, const City& c, const CityPlan& r, const PackageNeed& n, std::uint32_t wanted);

@@ -81,6 +81,43 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
             rate[w][kShips] = (of(l, GoodsFlow::ShippedIn) - of(l, GoodsFlow::ShippedOut)) / l.minutes;
         }
     }
+    // P2.7: the city's workshops turn an action's raw materials into their goods, as far as their
+    // rates now leave them spare; what the city makes without the action is in the steady flow.
+    // shortcut: workshops with a second raw material are left out; upgrade when a decision values one.
+    struct Chain {
+        std::uint8_t raw = 0;
+        std::uint8_t ware = 0;
+        std::uint64_t raw_use = 0;  // per `output`, from the table
+        std::uint64_t output = 0;
+        std::int64_t spare = 0;  // raw material a minute the workshops could take on
+        std::int64_t carried = 0;
+    };
+    std::vector<Chain> chains;
+    if (!extra.empty()) {
+        const IslandMap& map = island_of(c.island).map;
+        for (const Production& pr : m_world.productions()) {  // ai-view: eigen: the own city's workshops
+            if (!pr.used || pr.island != c.island || !map.contains(pr.x, pr.y)) {
+                continue;
+            }
+            const MapCell& cell = map.top(pr.x, pr.y);
+            const assets::BuildingType* b =
+                cell.city == c.index && !cell.empty() ? m_buildings.by_sprite(cell.sprite) : nullptr;
+            const Sheet::Producer* r = b != nullptr ? m_sheet.producer(*b) : nullptr;
+            if (r == nullptr || r->raw == 0 || r->raw2 != 0 || r->output == 0 || r->raw_use == 0 ||
+                r->raw >= city->goods.size() || r->ware >= city->goods.size()) {
+                continue;
+            }
+            const std::uint64_t idle = r->output - std::min(r->output, made_rate(pr, r->output));
+            auto it =
+                std::ranges::find_if(chains, [&](const Chain& k) { return k.raw == r->raw && k.ware == r->ware; });
+            if (it == chains.end()) {
+                chains.push_back(Chain{r->raw, r->ware, r->raw_use, r->output, 0, 0});
+                it = chains.end() - 1;
+            }
+            it->spare += static_cast<std::int64_t>(idle * r->raw_use / r->output);
+        }
+    }
+    std::vector<std::int64_t> pool(city->goods.size(), 0);  // of the stock, what the action brought
     // A sixth of each flow's minute, with what is left over carried to the next tick.
     const auto share = [&](std::size_t w, Flow f) {
         carried[w][f] += rate[w][f];
@@ -112,9 +149,10 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                 // the city tick.
                 for (std::size_t w = 0; w < rate.size(); ++w) {
                     const std::int64_t room = std::max(city->capacity, city->goods[w]);
+                    const std::int64_t brought = share(w, kExtra);
+                    pool[w] += brought;
                     std::int64_t stock = std::clamp<std::int64_t>(
-                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips) + share(w, kExtra), 0,
-                        room);
+                        std::int64_t{city->goods[w]} + share(w, kSteady) + share(w, kShips) + brought, 0, room);
                     const City::Trade* k = w < city->trade.size() ? &city->trade[w] : nullptr;
                     const std::int64_t sold = std::clamp<std::int64_t>(
                         share(w, kSold), 0, k != nullptr && k->sell ? std::max<std::int64_t>(0, stock - k->keep) : 0);
@@ -128,6 +166,20 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                     traded[w].sold += sold;
                     traded[w].bought += bought;
                     city->goods[w] = static_cast<std::uint32_t>(stock);
+                }
+                for (Chain& k : chains) {
+                    k.carried += k.spare;
+                    const std::int64_t can = k.carried / kCityTicksPerMinute;
+                    k.carried -= can * kCityTicksPerMinute;
+                    const std::int64_t used = std::min({can, pool[k.raw], std::int64_t{city->goods[k.raw]}});
+                    const std::int64_t made =
+                        used * static_cast<std::int64_t>(k.output) / static_cast<std::int64_t>(k.raw_use);
+                    const std::int64_t room = std::max(city->capacity, city->goods[k.ware]);
+                    const std::int64_t added = std::min(made, room - std::int64_t{city->goods[k.ware]});
+                    city->goods[k.raw] -= static_cast<std::uint32_t>(used);
+                    pool[k.raw] -= used;
+                    city->goods[k.ware] += static_cast<std::uint32_t>(std::max<std::int64_t>(0, added));
+                    pool[k.ware] += std::max<std::int64_t>(0, added);
                 }
                 advance_city(copy, m_buildings, *city, out.running_cost, workers, nullptr);
             }

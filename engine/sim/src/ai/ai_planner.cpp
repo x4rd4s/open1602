@@ -1929,6 +1929,10 @@ bool Engine::package_need(AiPlayer& p, const City& c, const CityPlan& r, const P
     return true;
 }
 
+std::uint64_t Engine::made_rate(const Production& pr, std::uint64_t full) noexcept {
+    return pr.elapsed < 60 ? full / 2 : std::uint64_t{pr.produced} * 60 / pr.elapsed;
+}
+
 std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType& b) const {
     // What the producers of `b` in the city made in their statistics windows, on average; for none
     // that has run a minute yet, half the full rate.
@@ -1945,7 +1949,7 @@ std::uint32_t Engine::made_per_minute(const City& c, const assets::BuildingType&
         if (cell.city != c.index || cell.empty() || m_buildings.by_sprite(cell.sprite) != &b) {
             continue;
         }
-        sum += std::uint64_t{pr.produced} * 60 / pr.elapsed;
+        sum += made_rate(pr, full);
         ++n;
     }
     return static_cast<std::uint32_t>(std::min<std::uint64_t>(n == 0 ? full / 2 : sum / n, 0xFFFFFFFFU));
