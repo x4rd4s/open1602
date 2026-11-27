@@ -143,13 +143,15 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     // action, so that an action that contents a class lets it pay more. It does so for the city it
     // tends (refresh_city, every few seconds), at each of the city's ticks here; a person sets their
     // own taxes.
-    // shortcut: only the city tended now, at the gold the player has now; upgrade when the projection
-    // carries which city is tended and the player's gold.
+    // Its gold for the rule runs on at its net income now, minute by minute, as tax_rates sees both.
+    // shortcut: only the city tended now, at today's net income; upgrade when the projection carries
+    // which city is tended and the player's gold.
     const City* tended = current_city(p);
     const bool sets_taxes = rivals() && player(p).role == PlayerRole::Computer && tended != nullptr &&
                             tended->island == c.island && tended->index == c.index;
-    const bool broke = sets_taxes && tax_broke(p);
-    const std::int64_t money = player(p).money;
+    const std::int64_t net = sets_taxes ? std::int64_t{net_income(p)} : 0;
+    std::int64_t money = player(p).money;
+    bool broke = false;
     const auto retax = [&] {
         const auto& classes = m_buildings.resident_classes();
         for (std::size_t k = 0; k < classes.size() && k < city->tax_rate.size() && k < city->inhabitants.size(); ++k) {
@@ -168,6 +170,8 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     std::uint32_t city_ms = m_sim.m_city_ms;
     out.minutes.reserve(minutes);
     for (std::uint32_t m = 0; m < minutes; ++m) {
+        money = player(p).money + net * static_cast<std::int64_t>(m);
+        broke = money < 0 && net < 0;  // tax_broke's rule at this minute's gold
         struct Traded {
             std::int64_t sold = 0;
             std::int64_t bought = 0;
