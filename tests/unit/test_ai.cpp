@@ -4075,7 +4075,7 @@ TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute
     for (int minute = 0; minute < 5; ++minute) {
         city.book(kTools, sim::GoodsFlow::Produced, 40);     // 40 a minute made
         city.book(kWood, sim::GoodsFlow::ShippedIn, 50);     // 50 in,
-        city.book(kWood, sim::GoodsFlow::Construction, 20);  // 20 out: 30 a minute
+        city.book(kWood, sim::GoodsFlow::Construction, 20);  // 20 out to a building site
         sim::close_goods_minute(world, buildings, nullptr);
     }
     sim::Simulation s(world, buildings, figures);
@@ -4088,7 +4088,8 @@ TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute
     REQUIRE(f.minutes.size() == 100);
     for (std::uint32_t m = 1; m <= 100; ++m) {
         CHECK(f.minutes[m - 1].stock[kTools] == std::min<std::uint32_t>(40 * m, 100 * 32));
-        CHECK(f.minutes[m - 1].stock[kWood] == std::min<std::uint32_t>(10 * 32 + 30 * m, 100 * 32));
+        // Building is a decision of its own, left out: the ships' 50 a minute come in.
+        CHECK(f.minutes[m - 1].stock[kWood] == std::min<std::uint32_t>(10 * 32 + 50 * m, 100 * 32));
     }
     CHECK(world.city(0, 0)->goods[kTools] == 0);  // the game's city is left as it was
 }

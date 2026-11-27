@@ -44,7 +44,7 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
     out.running_cost = running_cost(copy, m_buildings, *city);
     const std::uint32_t workers = city_workers(copy, m_buildings, *city);
     // Each ware's flows a minute (1/32 t, what a minute leaves over carried on). The steady ones
-    // (production, workshops, building, ...) run at the budget's horizon rate. Trade at the Kontor
+    // (production, workshops, what overflows) run at the budget's horizon rate. Trade at the Kontor
     // follows its own settings: sales only take stock above `keep`, purchases fill only up to
     // `limit` (P2.5). Own ships come and go in batches about as long apart as the horizon, so they
     // run at the rate of the ledger's whole minute window.
@@ -65,7 +65,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
             const std::int64_t n = t.minutes;
             const std::int64_t trade = of(t, GoodsFlow::Bought) - of(t, GoodsFlow::Sold);
             const std::int64_t ships = of(t, GoodsFlow::ShippedIn) - of(t, GoodsFlow::ShippedOut);
-            rate[w][kSteady] = (t.net() + of(t, GoodsFlow::Residents) - trade - ships) / n;
+            // Building and recruiting are new decisions, not the city's own flow (P2.6 plans them).
+            const std::int64_t decided = of(t, GoodsFlow::Construction) + of(t, GoodsFlow::Military);
+            rate[w][kSteady] = (t.net() + of(t, GoodsFlow::Residents) + decided - trade - ships) / n;
             rate[w][kSold] = of(t, GoodsFlow::Sold) / n;
             rate[w][kBought] = of(t, GoodsFlow::Bought) / n;
             window[w] = t;
