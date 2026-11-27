@@ -200,11 +200,12 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every) const {
         }
     }
     for (std::uint32_t m = every; m <= horizon; m += every) {
-        // The cities' taxes less their running costs as projected; the rest of the net as now.
-        const std::int64_t rest = b.net - civil_income(p);
-        log(p, "project gold +%u %lld budget line %lld", m,
-            static_cast<long long>(b.cash + gold[m] + rest * static_cast<std::int64_t>(m)),
-            static_cast<long long>(b.at(Commitment{}, m)));
+        // The budget line with the cities' taxes less their running costs as projected instead of
+        // as now; the rest of the line (sales, upkeep, purchases, what is set aside) stays.
+        const std::int64_t line = b.at(Commitment{}, m);
+        const std::int64_t now = static_cast<std::int64_t>(civil_income(p)) * static_cast<std::int64_t>(m);
+        log(p, "project gold +%u %lld budget line %lld", m, static_cast<long long>(line + gold[m] - now),
+            static_cast<long long>(line));
     }
 }
 
