@@ -3959,6 +3959,9 @@ assets::BuildingTable hungry_town_table() {
         "  @Nummer: 6\n  Id: 20702\n  Kind: 14\n  Gfx: 60\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
         "    Ware: 19\n    Rohstoff: 6\n    Prodmenge: 1\n    Rohmenge: 2\n    Interval: 40\n    Kosten: 5, 2\n"
         "    Arbeiter: 2\n  EndObj\n"
+        // A chapel, not built in the town but where a test places it (P2.8).
+        "  @Nummer: 7\n  Id: 20803\n  Kind: 14\n  Gfx: 70\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 18\n    Radius: 16\n    Kosten: 5, 2\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -4084,6 +4087,43 @@ TEST_CASE(
     REQUIRE(!computer.minutes.empty());
     CHECK(computer.minutes.front().taxes > person.minutes.front().taxes);
     CHECK(elsewhere.minutes.front().taxes == person.minutes.front().taxes);
+}
+
+TEST_CASE("ai: a good the next class needs raises a projected house to that class's room (P2.8)") {
+    // Houses hold people by their class's Maxwohn: a good counts for room only through the ascent it
+    // opens. Full pioneer houses with food, wood and tools at hand: with the settlers' good coming in
+    // they rise and hold the settlers' Maxwohn, without it they stay at the pioneers'.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings, 20803);
+    sim::Production chapel;
+    chapel.x = 26;
+    chapel.y = 13;
+    world.set_production(chapel);
+    sim::update_services(world, buildings);
+    sim::City& town = *world.city(0, 0);
+    town.goods[buildings.food_ware()] = 30 * 32;
+    town.goods[22] = 10 * 32;  // tools
+    town.goods[23] = 20 * 32;  // wood
+    sim::Simulation s(world, buildings, figures);
+    town.capacity = 30 * 32;  // room for what comes (the town has no Kontor)
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    constexpr std::uint32_t kMinutes = 30;
+    const sim::ai::Inflow good[] = {sim::ai::Inflow{19, 4 * 32, 1, kMinutes}};
+    const sim::ai::CityProjection with = engine.project_city(p, town, kMinutes, good);
+    const sim::ai::CityProjection without = engine.project_city(p, town, kMinutes);
+    REQUIRE(with.minutes.size() == kMinutes);
+    REQUIRE(without.minutes.size() == kMinutes);
+    const std::vector<std::uint32_t>& a = with.minutes.back().inhabitants;
+    const std::vector<std::uint32_t>& b = without.minutes.back().inhabitants;
+    const auto room = [&](std::size_t k) { return buildings.resident_classes()[k].max_per_house; };
+    const std::uint32_t houses = 3;
+    CHECK(a[0] + a[1] == houses * room(1));
+    CHECK(b[0] + b[1] == houses * room(0));  // the settler house falls back too, without its good
 }
 
 TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute by minute (P2.4)") {
