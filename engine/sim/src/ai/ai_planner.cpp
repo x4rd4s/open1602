@@ -3270,30 +3270,34 @@ std::vector<Engine::LuxuryCrop> Engine::luxury_crops(const AiPlayer& p) const {
 }
 
 std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
+                                                         std::vector<std::uint32_t> stock,
                                                          std::uint32_t minutes) const {
-    // P2.8: the colony stage's handler (run_stage, stage::kColony) on slot counts of its own, as far as
-    // the projected gold pays: its order (a market, the workshops of its raw materials), then animals
-    // or the luxury fields the island grows fully, then its materials. ai-view: eigen and seen: the
-    // own plan and gold, the island's fertility as the player has seen it.
-    // shortcut: no sites, catchments or materials are looked for, the luxury crops come in their
-    // table order (luxury() puts what the home city lacks first), and the gold runs on at today's net
-    // income; upgrade when V2 runs the planner itself on a copy.
+    // P2.8: the colony stage's handler (run_stage, stage::kColony) on slot counts and a stock of its
+    // own: its order (a market, the workshops of its raw materials), then animals or the luxury fields
+    // the island grows fully, then its materials. Each entry is tried as need() and need_market() try
+    // it: one its gold (and its fields' gold) or its materials do not cover waits there (NeedType B and
+    // C) or lets the handler go on to the next. ai-view: eigen and seen: the own plan, gold and stock,
+    // the island's fertility as the player has seen it.
+    // shortcut: no sites or catchments are looked for, no ship brings materials, the fields' gold
+    // holds the plantation back but is not spent, the luxury crops come in their table order
+    // (luxury() puts what the home city lacks first), and the gold runs on at today's net income;
+    // upgrade when V2 runs the planner itself on a copy.
     std::vector<ColonyBuild> out;
     const Balance& at = m_world.balance();
     const std::vector<ComputerProducer>& changes = at.computer_producers;
+    const auto& mat = m_buildings.materials();
     std::array<std::uint32_t, kAllSlots> count{};
     for (std::size_t k = 0; k < kAllSlots; ++k) {
         count[k] = r.slots[k].count;
     }
-    const auto building_of = [&](std::uint8_t slot) -> const assets::BuildingType* {
-        if (slot == kSlotMarket) {
-            return by_id(id::kMarket);
-        }
-        const std::optional<NeedDef> d = need_def(slots(), slot, changes);
-        if (!d) {
-            return nullptr;
-        }
-        return d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
+    stock.resize(std::max<std::size_t>({stock.size(), std::size_t{mat.wood} + 1, std::size_t{mat.bricks} + 1,
+                                        std::size_t{mat.tools} + 1, std::size_t{mat.cannons} + 1}),
+                 0);
+    const auto in_stock = [&](std::uint8_t w) { return w < stock.size() ? stock[w] : 0U; };
+    const auto goods_for = [&](const assets::BuildingType& b) {
+        const auto& cost = b.build_cost;
+        return in_stock(mat.wood) >= cost.wood && in_stock(mat.bricks) >= cost.bricks &&
+               in_stock(mat.tools) >= cost.tools && in_stock(mat.cannons) >= cost.cannons;
     };
     const std::int64_t net = net_income(p);
     const std::uint32_t n_fields =
@@ -3301,8 +3305,9 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std:
     const std::uint32_t n_animals = std::min(r.land / at.ai_colony_animal_tiles, grown(r, at.ai_colony_animals, true));
     const bool crops_here = view(p).full_crops(island) != 0;
     const std::vector<LuxuryCrop> crops = luxury_crops(p);
-    // The next slot the handler wants built, kNoSlot for none.
-    const auto next = [&](std::int64_t budget) -> std::uint8_t {
+    // The slots the handler asks for, entry by entry in its order.
+    const auto wanted = [&](std::int64_t budget) {
+        std::vector<std::uint8_t> out_slots;
         // shortcut: one market, and one more for each crop that has fields (need_market's flag: the
         // fields lie apart); upgrade with V2's catchments.
         std::uint32_t planted = 0;
@@ -3310,7 +3315,7 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std:
             planted += count[crop.slot] != 0 ? 1U : 0U;
         }
         if (count[kSlotMarket] < 1 + planted) {
-            return kSlotMarket;
+            out_slots.push_back(kSlotMarket);
         }
         // processing(): a workshop for every so many producers of its raw material.
         std::vector<const ComputerSlot*> by_rank;
@@ -3325,13 +3330,14 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std:
             const std::uint32_t want =
                 k->process_round_up ? (from + k->process_per - 1) / k->process_per : from / k->process_per;
             if (count[k->number] < want) {
-                return k->number;
+                out_slots.push_back(k->number);
+                break;
             }
         }
         if (!crops_here) {
             for (const std::uint8_t slot : {std::uint8_t{kSlotSheep}, std::uint8_t{kSlotCattle}}) {
                 if (count[slot] < n_animals) {
-                    return slot;
+                    out_slots.push_back(slot);
                 }
             }
         } else if (p.max_stage >= stage::kSettlers) {
@@ -3345,39 +3351,79 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std:
                 if ((crop.slot == kSlotSugar && wine_island) || count[crop.slot] >= n_fields || crop.upkeep >= budget) {
                     continue;
                 }
-                return crop.slot;
+                out_slots.push_back(crop.slot);
             }
         }
         for (const std::uint8_t slot :
              {std::uint8_t{kSlotQuarry}, std::uint8_t{kSlotWoodcutter}, std::uint8_t{kSlotStonemason}}) {
             if (count[slot] < grown(r, 1)) {
-                return slot;
+                out_slots.push_back(slot);
             }
         }
-        return kNoSlot;
+        return out_slots;
     };
     std::int64_t money = player(p).money;
     std::int64_t upkeep = 0;
     for (std::uint32_t m = 1; m <= minutes; ++m) {
         money += net - upkeep;
-        const std::uint8_t slot =
-            next(luxury_budget(p, net - upkeep, money).value_or(std::numeric_limits<std::int64_t>::min()));
-        const assets::BuildingType* b = slot != kNoSlot ? building_of(slot) : nullptr;
-        if (b == nullptr) {
-            if (slot != kNoSlot) {
-                ++count[slot];  // a slot the table has no building for
+        // What the colony's producers made this minute, at their table rates.
+        for (const ColonyBuild& b : out) {
+            const Sheet::Producer* f = m_sheet.producer(*b.type);
+            if (f == nullptr || f->output == 0 || f->ware >= stock.size() || f->raw2 != 0) {
                 continue;
             }
+            if (f->raw != 0) {
+                if (in_stock(f->raw) < f->raw_use) {
+                    continue;
+                }
+                stock[f->raw] -= static_cast<std::uint32_t>(f->raw_use);
+            }
+            stock[f->ware] += static_cast<std::uint32_t>(f->output);
+        }
+        const std::int64_t budget =
+            luxury_budget(p, net - upkeep, money).value_or(std::numeric_limits<std::int64_t>::min());
+        // shortcut: one building a minute at most; the planner's rounds are shorter, gold and goods bind.
+        for (const std::uint8_t slot : wanted(budget)) {
+            const assets::BuildingType* b = nullptr;
+            std::optional<NeedDef> d;
+            if (slot == kSlotMarket) {
+                b = by_id(id::kMarket);
+            } else {
+                d = need_def(slots(), slot, changes);
+                if (d) {
+                    b = d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
+                }
+            }
+            if (b == nullptr || (d && d->after != kNoProducer && count[d->after] == 0)) {
+                continue;  // need(): no building, or its raw material's producer first
+            }
+            if (d && !unlocked(p, *b)) {
+                if (d->type == NeedType::C) {
+                    break;
+                }
+                continue;
+            }
+            const std::int64_t fields = d ? fields_money(*d) : 0;
+            const bool gold = money >= std::int64_t{b->build_cost.money} &&
+                              (fields == 0 || money > fields + std::int64_t{b->build_cost.money});
+            if (!gold || !goods_for(*b)) {
+                // need_market waits once a woodcutter stands; need() waits for NeedType B and C.
+                if (slot == kSlotMarket ? count[kSlotWoodcutter] != 0
+                                        : d->type == NeedType::B || d->type == NeedType::C) {
+                    break;
+                }
+                continue;
+            }
+            ++count[slot];
+            money -= b->build_cost.money;
+            upkeep += b->running_cost;
+            stock[mat.wood] -= b->build_cost.wood;
+            stock[mat.bricks] -= b->build_cost.bricks;
+            stock[mat.tools] -= b->build_cost.tools;
+            stock[mat.cannons] -= b->build_cost.cannons;
+            out.push_back(ColonyBuild{m, b});
             break;
         }
-        // shortcut: one building a minute at most; the planner's rounds are shorter, the gold binds.
-        if (money < std::int64_t{b->build_cost.money}) {
-            continue;
-        }
-        ++count[slot];
-        money -= b->build_cost.money;
-        upkeep += b->running_cost;
-        out.push_back(ColonyBuild{m, b});
     }
     return out;
 }

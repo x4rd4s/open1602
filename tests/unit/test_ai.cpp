@@ -4373,12 +4373,12 @@ TEST_CASE("ai: a raw-material colony's build-out follows its stage handler, slot
     sim::ai::CityPlan r;
     r.land = 240;
     const sim::City& town = *world.city(0, 0);
-    const std::vector<sim::ai::Engine::ColonyBuild> fresh = engine.colony_buildout(p, town.island, r, 30);
+    const std::vector<sim::ai::Engine::ColonyBuild> fresh = engine.colony_buildout(p, town.island, r, town.goods, 30);
     REQUIRE(fresh.size() == 1);
     CHECK(fresh.front().minute == 1);
     CHECK(fresh.front().type == buildings.by_id(20809));
     r.slots[sim::ai::kSlotMarket].count = 1;  // its market stands
-    CHECK(engine.colony_buildout(p, town.island, r, 30).empty());
+    CHECK(engine.colony_buildout(p, town.island, r, town.goods, 30).empty());
 }
 
 TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat one (P2.8)") {

@@ -1141,13 +1141,13 @@ void Engine::task_settle_land(AiPlayer& p) {
     r.city = c->index;
     r.stage_ms = now_ms();
     r.land = free_land(island, c->index, &r.land_percent);
-    if (logging() && rivals() && !p.pirates) {
-        log_founded_value(p, *c, r);
-    }
     unload_at(*c, *ship, false, false);
     if (gifts()) {
         add_goods(*c, m_buildings.materials().bricks,
                   cheats().founding_bricks * kStockUnitsPerTon);  // free bricks after founding
+    }
+    if (logging() && rivals() && !p.pirates) {
+        log_founded_value(p, *c, r);  // with the ship's load in the colony's stock
     }
     s.failed = false;
     p.budget = 14;
@@ -1187,7 +1187,7 @@ void Engine::log_founded_value(const AiPlayer& p, const City& c, const CityPlan&
         kontor = b->running_cost;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    const std::vector<ColonyBuild> builds = colony_buildout(p, c.island, r, horizon);
+    const std::vector<ColonyBuild> builds = colony_buildout(p, c.island, r, c.goods, horizon);
     ColonyUpkeep own;
     own.by_minute.assign(horizon, kontor);
     std::string list;

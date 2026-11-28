@@ -486,7 +486,9 @@ public:
     /// P2.8: what the colony stage (stage::kColony) of a city on `island` with plan `r` (its land,
     /// its slot counts) builds over `minutes` minutes, entry by entry in the handler's order, each at
     /// the first minute the projected gold pays for it. A candidate island takes a plan of its own.
+    /// `stock` is the colony's goods at its start (a founded colony's, or a founding ship's load).
     [[nodiscard]] std::vector<ColonyBuild> colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
+                                                           std::vector<std::uint32_t> stock,
                                                            std::uint32_t minutes) const;
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
