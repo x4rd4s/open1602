@@ -4316,7 +4316,8 @@ TEST_CASE("ai: a colony brings its raw material home and plans the workshop the 
     }
 }
 
-TEST_CASE("ai: a planned colony's upkeep is its own buildings' less its workers' taxes, its workshop's from its raw (P2.8)") {
+TEST_CASE(
+    "ai: a planned colony's upkeep is its own buildings' less its workers' taxes, its workshop's from its raw (P2.8)") {
     const assets::BuildingTable buildings = hungry_town_table();
     const sim::ai::Sheet sheet(buildings);
     const sim::ai::Sheet::Producer* field = sheet.producer(20704);  // raw 6, no raw material

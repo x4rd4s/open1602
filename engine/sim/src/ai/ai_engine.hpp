@@ -746,8 +746,7 @@ private:
     /// With `source` (an own city the goods come from), its loss `taken` is added (add_value).
     void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
                    const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {},
-                   std::span<const Sheet::Producer* const> planned = {},
-                   const ColonyUpkeep* derived = nullptr) const;
+                   std::span<const Sheet::Producer* const> planned = {}, const ColonyUpkeep* derived = nullptr) const;
     /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
     /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
     [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;

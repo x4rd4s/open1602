@@ -364,7 +364,8 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         }
         own += " payback " + std::to_string(d.payback) + " beyond " + beyond_of(d);
     }
-    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s%s",
+    log(p,
+        "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s%s",
         kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware},
         ratio.c_str(), path.c_str(), static_cast<long long>(us), beyond.c_str(), own.c_str());
 }
