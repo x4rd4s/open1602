@@ -310,7 +310,7 @@ void Engine::pick_island(AiPlayer& p) {
         if (rivals() && p.home_valid) {
             if (const City* home = home_city(p); home != nullptr) {
                 const ColonyRate r = colony_rate(p, *home, s.crop, i);
-                if (r.colony && r.verdict != Patience::Pays) {
+                if (r.colony && !r.need && r.verdict != Patience::Pays) {
                     if (logging()) {
                         log(p, "colony rate crop %u island %u at founding colony %lld/%lld home %lld/%lld verdict %s",
                             unsigned{s.crop}, unsigned{i}, static_cast<long long>(r.gold),
@@ -1764,8 +1764,10 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         c.crop = crop;
         c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
         // P2.9: a raw-material colony only when it pays by the horizon (colony_rate).
-        if (c.passes && home != nullptr && colony_rate(p, *home, crop).verdict != Patience::Pays) {
-            c.passes = false;
+        // shortcut: need crops not gated until value() weighs a class's rise, P3.
+        if (c.passes && home != nullptr) {
+            const ColonyRate r = colony_rate(p, *home, crop);
+            c.passes = r.need || r.verdict == Patience::Pays;
         }
         c.rank = c.passes ? colony_rank(p, crop) : 0;
         plan_holds = plan_holds || (c.passes && crop == s.plan_crop);
