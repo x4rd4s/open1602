@@ -73,6 +73,7 @@ void Engine::slot_built(AiPlayer& p, std::uint8_t slot) {
         ++r->slots[slot].count;
     }
     p.present[slot] = true;
+    note_home_build(p);
 }
 
 void Engine::slot_ok(AiPlayer& p, std::uint8_t slot) {

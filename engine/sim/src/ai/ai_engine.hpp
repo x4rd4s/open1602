@@ -526,6 +526,8 @@ public:
         Patience verdict = Patience::Pays;
     };
     /// `island`: the island the settlement chose (pick_island), in place of colony_island's.
+    /// P2.9: a production build `p` placed at an own city, valued for AiPlayer::home_builds.
+    void note_home_build(AiPlayer& p);
     [[nodiscard]] ColonyRate colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop,
                                          std::optional<std::uint16_t> island = std::nullopt);
     /// P2.9, the computer log only: colony_rate of each candidate weighed at a new plan.
