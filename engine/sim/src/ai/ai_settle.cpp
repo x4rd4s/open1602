@@ -305,6 +305,22 @@ void Engine::pick_island(AiPlayer& p) {
         if (std::int64_t{map.width()} * std::int64_t{map.height()} < std::int64_t{s.need} && !islet) {
             continue;
         }
+        // P2.9: the island chosen is weighed as the plan's was (colony_rate): a raw-material colony
+        // there only when it pays by the horizon.
+        if (rivals() && p.home_valid) {
+            if (const City* home = home_city(p); home != nullptr) {
+                const ColonyRate r = colony_rate(p, *home, s.crop, i);
+                if (r.colony && r.verdict != Patience::Pays) {
+                    if (logging()) {
+                        log(p, "colony rate crop %u island %u at founding colony %lld/%lld home %lld/%lld verdict %s",
+                            unsigned{s.crop}, unsigned{i}, static_cast<long long>(r.gold),
+                            static_cast<long long>(r.cost), static_cast<long long>(r.home.gold),
+                            static_cast<long long>(r.home.cost), patience_name(r.verdict));
+                    }
+                    continue;
+                }
+            }
+        }
         s.island = i;
         push(p, kSettleArea, true);
         return;
@@ -1255,7 +1271,8 @@ Engine::RawColonyValue Engine::raw_colony_value(const AiPlayer& p, const City& h
     return out;
 }
 
-Engine::ColonyRate Engine::colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop) {
+Engine::ColonyRate Engine::colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop,
+                                       std::optional<std::uint16_t> island) {
     // P2.9, the patience rule: a raw-material colony is worth founding when its gold at the budget's
     // horizon is above zero and, per gold of its cost, above the best home build planned within that
     // horizon; past the horizon the projection is not validated, so nothing is extended. Idle gold
@@ -1280,7 +1297,7 @@ Engine::ColonyRate Engine::colony_rate(const AiPlayer& p, const City& home, std:
     const std::uint8_t c = crop == kAnyCrop ? std::uint8_t{0} : crop;
     const std::vector<LuxuryCrop> luxuries = luxury_crops(p);
     out.need = std::ranges::any_of(luxuries, [&](const LuxuryCrop& l) { return l.field == c; });
-    out.island = colony_island(p, home, crop);
+    out.island = island ? island : colony_island(p, home, crop);
     if (!out.island) {
         return out;
     }
