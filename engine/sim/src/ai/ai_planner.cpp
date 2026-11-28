@@ -3269,6 +3269,23 @@ std::vector<Engine::LuxuryCrop> Engine::luxury_crops(const AiPlayer& p) const {
     }};
 }
 
+void produce_minute(const Sheet& sheet, const assets::BuildingType& b, std::vector<std::uint32_t>& stock) {
+    const Sheet::Producer* f = sheet.producer(b);
+    if (f == nullptr || f->output == 0 || f->ware >= stock.size() || f->raw2 != 0) {
+        return;
+    }
+    // A raw material no staffed producer makes grows on the producer's own fields or trees.
+    const bool grown_here = std::ranges::none_of(
+        sheet.producers(), [&](const Sheet::Producer& q) { return q.ware == f->raw && q.workers != 0; });
+    if (f->raw != 0 && !grown_here) {
+        if (f->raw >= stock.size() || stock[f->raw] < f->raw_use) {
+            return;
+        }
+        stock[f->raw] -= static_cast<std::uint32_t>(f->raw_use);
+    }
+    stock[f->ware] += static_cast<std::uint32_t>(f->output);
+}
+
 std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
                                                          std::vector<std::uint32_t> stock,
                                                          std::uint32_t minutes) const {
@@ -3368,17 +3385,7 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std:
         money += net - upkeep;
         // What the colony's producers made this minute, at their table rates.
         for (const ColonyBuild& b : out) {
-            const Sheet::Producer* f = m_sheet.producer(*b.type);
-            if (f == nullptr || f->output == 0 || f->ware >= stock.size() || f->raw2 != 0) {
-                continue;
-            }
-            if (f->raw != 0) {
-                if (in_stock(f->raw) < f->raw_use) {
-                    continue;
-                }
-                stock[f->raw] -= static_cast<std::uint32_t>(f->raw_use);
-            }
-            stock[f->ware] += static_cast<std::uint32_t>(f->output);
+            produce_minute(m_sheet, *b.type, stock);
         }
         const std::int64_t budget =
             luxury_budget(p, net - upkeep, money).value_or(std::numeric_limits<std::int64_t>::min());

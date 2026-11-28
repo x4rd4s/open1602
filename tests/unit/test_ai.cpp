@@ -4439,6 +4439,24 @@ TEST_CASE("ai: a colony's farm waits for its fields' gold and its materials, as 
     }
 }
 
+TEST_CASE("ai: a colony's producer makes its ware from its own fields or from its raw material in stock (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* sheep = sheet.producer(20706);  // wool 4 from its grass 52, nobody makes grass
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);   // ware 19 from raw 6, which a plantation makes
+    REQUIRE(sheep != nullptr);
+    REQUIRE(shop != nullptr);
+    std::vector<std::uint32_t> stock(53, 0);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20706), stock);
+    CHECK(stock[4] == sheep->output);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20702), stock);  // no raw 6 in stock
+    CHECK(stock[19] == 0);
+    stock[6] = static_cast<std::uint32_t>(shop->raw_use);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20702), stock);
+    CHECK(stock[19] == shop->output);
+    CHECK(stock[6] == 0);
+}
+
 TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat one (P2.8)") {
     sim::ai::ColonyUpkeep u;
     u.by_minute = {10, 10, 30, 30};

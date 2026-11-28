@@ -257,6 +257,9 @@ struct ColonyUpkeep {
 };
 [[nodiscard]] ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64_t kontor,
                                          std::uint32_t rate);
+/// Open1602 (P2.8): a minute of producer `b` at its table rate on `stock`: from its raw material in
+/// stock, or from its own fields where no staffed producer makes the raw material.
+void produce_minute(const Sheet& sheet, const assets::BuildingType& b, std::vector<std::uint32_t>& stock);
 /// `v`, weighed with `booked` gold a minute of running costs, weighed with `u`'s instead.
 [[nodiscard]] ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u);
 
