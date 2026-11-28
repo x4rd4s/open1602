@@ -1255,65 +1255,78 @@ Engine::RawColonyValue Engine::raw_colony_value(const AiPlayer& p, const City& h
     return out;
 }
 
-void Engine::log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops) {
-    // P2.9, only the log: the patience rule on each candidate. A raw-material colony is
-    // worth founding when its gold at the budget's horizon is above zero and, per gold of its cost,
-    // above the best home build's planned within that horizon; past the horizon the projection is
-    // not validated, so nothing is extended. Idle gold earns nothing: with no home build or none that
-    // pays, the bar is zero.
+Engine::ColonyRate Engine::colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop) {
+    // P2.9, the patience rule: a raw-material colony is worth founding when its gold at the budget's
+    // horizon is above zero and, per gold of its cost, above the best home build planned within that
+    // horizon; past the horizon the projection is not validated, so nothing is extended. Idle gold
+    // earns nothing: with no home build or none that pays, the bar is zero. ai-view: eigen: the own
+    // cities' figures, the island's land and fertility as the player has seen them.
     // shortcut: value() counts gold only, so a colony whose good opens a class (need crop) or feeds a
     // chain (ore) shows its taxes but not the class it opens; upgrade when value() weighs a class's
-    // rise. The founding ship's load as the stock, without food (colony_load).
+    // rise. The founding ship's load as the stock, without food (colony_full_load).
+    // shortcut: only home production builds set the bar (houses and public buildings have no value()
+    // yet); upgrade with P3, where every build is valued.
+    ColonyRate out;
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    const std::uint64_t now = now_ms();
+    for (const HomeBuild& h : p.home_builds) {
+        const bool recent = now - h.ms <= std::uint64_t{horizon} * kGoodsMinuteMs;
+        // h.gold / h.cost above out.home.gold / out.home.cost
+        if (recent && h.cost > 0 && h.gold > 0 &&
+            (out.home.cost == 0 || h.gold * out.home.cost > out.home.gold * h.cost)) {
+            out.home = h;
+        }
+    }
+    const std::uint8_t c = crop == kAnyCrop ? std::uint8_t{0} : crop;
+    const std::vector<LuxuryCrop> luxuries = luxury_crops(p);
+    out.need = std::ranges::any_of(luxuries, [&](const LuxuryCrop& l) { return l.field == c; });
+    out.island = colony_island(p, home, crop);
+    if (!out.island) {
+        return out;
+    }
+    CityPlan r;
+    r.island = *out.island;
+    r.land = free_land(*out.island, MapCell::kNoCity, &r.land_percent);
+    out.land = r.land;
+    out.colony = becomes_colony(p, nullptr, r.land, 0);
+    if (!out.colony) {
+        return out;
+    }
+    const auto& m = m_buildings.materials();
+    std::vector<std::uint32_t> stock(
+        std::max<std::size_t>({std::size_t{m.wood}, std::size_t{m.tools}, std::size_t{m.bricks}}) + 1, 0);
+    const std::uint32_t load = colony_full_load();
+    stock[m.wood] = load;
+    stock[m.tools] = load;
+    stock[m.bricks] = load;
+    const RawColonyValue v = raw_colony_value(p, home, c, *out.island, r, std::move(stock));
+    out.gold = v.value.gold.empty() ? 0 : v.value.gold[std::min<std::size_t>(horizon, v.value.gold.size() - 1)];
+    out.cost = v.cost;
+    out.verdict = patience(out.gold, out.cost, out.home.gold, out.home.cost);
+    return out;
+}
+
+void Engine::log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops) {
     const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
     if (!logging() || home == nullptr || home->owner != p.player) {
         return;
     }
-    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    const std::uint64_t now = now_ms();
-    HomeBuildValue best;
-    if (p.player < m_home_builds.size()) {
-        for (const HomeBuildValue& h : m_home_builds[p.player]) {
-            const bool recent = now - h.ms <= std::uint64_t{horizon} * kGoodsMinuteMs;
-            // h.gold / h.cost above best.gold / best.cost
-            if (recent && h.cost > 0 && h.gold > 0 && (best.cost == 0 || h.gold * best.cost > best.gold * h.cost)) {
-                best = h;
-            }
-        }
-    }
-    const std::vector<LuxuryCrop> luxuries = luxury_crops(p);
-    const auto& m = m_buildings.materials();
     for (const std::uint8_t crop : crops) {
-        const std::uint8_t c = crop == kAnyCrop ? std::uint8_t{0} : crop;
-        const bool need = std::ranges::any_of(luxuries, [&](const LuxuryCrop& l) { return l.field == c; });
-        const std::optional<std::uint16_t> island = colony_island(p, *home, crop);
-        if (!island) {
-            log(p, "colony rate crop %u need %d no island", unsigned{crop}, need ? 1 : 0);
-            continue;
+        const ColonyRate r = colony_rate(p, *home, crop);
+        if (!r.island) {
+            log(p, "colony rate crop %u need %d no island", unsigned{crop}, r.need ? 1 : 0);
+        } else if (!r.colony) {
+            log(p, "colony rate crop %u need %d island %u kind settlement land %u", unsigned{crop}, r.need ? 1 : 0,
+                unsigned{*r.island}, r.land);
+        } else {
+            log(p,
+                "colony rate crop %u need %d island %u kind colony land %u colony %lld/%lld home %lld/%lld at %u "
+                "verdict %s",
+                unsigned{crop}, r.need ? 1 : 0, unsigned{*r.island}, r.land, static_cast<long long>(r.gold),
+                static_cast<long long>(r.cost), static_cast<long long>(r.home.gold),
+                static_cast<long long>(r.home.cost), m_world.balance().ai_budget_horizon_minutes,
+                patience_name(r.verdict));
         }
-        CityPlan r;
-        r.island = *island;
-        r.land = free_land(*island, MapCell::kNoCity, &r.land_percent);
-        if (!becomes_colony(p, nullptr, r.land, 0)) {
-            log(p, "colony rate crop %u need %d island %u kind settlement land %u", unsigned{crop}, need ? 1 : 0,
-                unsigned{*island}, r.land);
-            continue;
-        }
-        std::vector<std::uint32_t> stock(
-            std::max<std::size_t>({std::size_t{m.wood}, std::size_t{m.tools}, std::size_t{m.bricks}}) + 1, 0);
-        const std::uint32_t load = colony_full_load();
-        stock[m.wood] = load;
-        stock[m.tools] = load;
-        stock[m.bricks] = load;
-        const RawColonyValue v = raw_colony_value(p, *home, c, *island, r, std::move(stock));
-        const std::int64_t gold =
-            v.value.gold.empty() ? 0 : v.value.gold[std::min<std::size_t>(horizon, v.value.gold.size() - 1)];
-        const char* verdict = patience_name(patience(gold, v.cost, best.gold, best.cost));
-        log(p,
-            "colony rate crop %u need %d island %u kind colony land %u colony %lld/%lld home %lld/%lld at %u verdict "
-            "%s",
-            unsigned{crop}, need ? 1 : 0, unsigned{*island}, r.land, static_cast<long long>(gold),
-            static_cast<long long>(v.cost), static_cast<long long>(best.gold), static_cast<long long>(best.cost),
-            horizon, verdict);
     }
 }
 
@@ -1725,12 +1738,18 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
     if (s.plan_crop != 0) {
         b.reserved -= colony_money(p);
     }
+    const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
+    home = home != nullptr && home->owner == p.player ? home : nullptr;
     std::vector<ColonyCandidate> weighed;
     bool plan_holds = false;
     for (const std::uint8_t crop : crops) {
         ColonyCandidate c;
         c.crop = crop;
         c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
+        // P2.9: a raw-material colony only when it pays by the horizon (colony_rate).
+        if (c.passes && home != nullptr && colony_rate(p, *home, crop).verdict != Patience::Pays) {
+            c.passes = false;
+        }
         c.rank = c.passes ? colony_rank(p, crop) : 0;
         plan_holds = plan_holds || (c.passes && crop == s.plan_crop);
         weighed.push_back(c);
@@ -1773,7 +1792,6 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
             log_colony_rates(p, passing);
             Commitment c = logged_commitment(p, *best == kAnyCrop ? std::uint8_t{0} : *best);
             c.value = best_rank;  // the plan is chosen by its rank, gold a minute
-            const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
             log_decision(p, "colony plan", *best, -1, -1, c, 0, 0, home);
             if (home != nullptr && *best != kAnyCrop) {
                 Commitment commit = logged_commitment(p, *best);

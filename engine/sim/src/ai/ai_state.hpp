@@ -23,7 +23,7 @@ namespace o1602::sim::ai {
 /// attack plans and the islands' state byte. 3 added the deferred yard request (GB-2). 4 added the
 /// target of a search (Search::target_x/target_y, task kClaimLand). 5 added the slots of the
 /// packages' producers (kSlots and up, ai_chains.hpp). Every version from kFirstStateVersion on loads.
-inline constexpr std::uint32_t kStateVersion = 18;
+inline constexpr std::uint32_t kStateVersion = 19;
 inline constexpr std::uint32_t kStateWithPackageSlots = 5;
 /// Version 6: a city record's flags and a search's service as 64 bits, for the public buildings of a
 /// kind of their own above the second. The computers write it only when one of those needs it.
@@ -64,6 +64,9 @@ inline constexpr std::uint32_t kStateWithWarParty = 17;
 /// Version 18: the attacks an improved computer started on a city without landing there since
 /// (Strategy::attack_tries). Written only while it has some.
 inline constexpr std::uint32_t kStateWithAttackTries = 18;
+/// Version 19: the home builds an improved computer valued within the budget's horizon
+/// (AiPlayer::home_builds), the bar of its colony patience rule. Written only while it has some.
+inline constexpr std::uint32_t kStateWithHomeBuilds = 19;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
 /// Task ids of the computer players, numbered as in the original.
@@ -500,6 +503,14 @@ struct Strategy {
     std::vector<std::pair<std::uint32_t, std::uint64_t>> attack_tries;
 };
 
+/// Open1602 (P2.9): a home production build an improved computer planned: when, its gold at the
+/// budget's horizon (value()) and its cost.
+struct HomeBuild {
+    std::uint64_t ms = 0;
+    std::int64_t gold = 0;
+    std::int64_t cost = 0;
+};
+
 struct AiPlayer {
     PlayerId player = kNoPlayer;
     bool pirates = false;
@@ -573,6 +584,8 @@ struct AiPlayer {
     std::vector<std::pair<std::uint16_t, std::uint64_t>> left_islands;
     /// Open1602, improved computers: the strategy planner's choices (state 10).
     Strategy strategy;
+    /// Open1602, improved computers: the home builds of the budget's last horizon (state 19).
+    std::vector<HomeBuild> home_builds;
 };
 
 /// Everything of all computer players.

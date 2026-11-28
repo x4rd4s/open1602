@@ -512,9 +512,21 @@ public:
     /// P2.9: the island colony_rank values a colony of `crop` on: the nearest it knows to grow the
     /// crop (any it knows for none), allowed, without a city of its own; none without.
     [[nodiscard]] std::optional<std::uint16_t> colony_island(const AiPlayer& p, const City& home, std::uint8_t crop);
-    /// P2.9, the computer log only: each colony candidate weighed at a new plan, a raw-material one
-    /// with its gold at the budget's horizon per gold of its cost against the best home build's
-    /// (home_build_rate), and the verdict the patience rule would give.
+    /// P2.9: a colony candidate as the patience rule weighs it: on the island colony_island picks, a
+    /// raw-material colony (becomes_colony) with its gold at the budget's horizon and its cost, the
+    /// best home build of that horizon (AiPlayer::home_builds) and the verdict.
+    struct ColonyRate {
+        std::optional<std::uint16_t> island;
+        bool colony = false;  ///< a raw-material colony; a settlement is not weighed
+        bool need = false;    ///< the crop's good is one luxury_crops plants for
+        std::uint32_t land = 0;
+        std::int64_t gold = 0;
+        std::int64_t cost = 0;
+        HomeBuild home;
+        Patience verdict = Patience::Pays;
+    };
+    [[nodiscard]] ColonyRate colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop);
+    /// P2.9, the computer log only: colony_rate of each candidate weighed at a new plan.
     void log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops);
     /// P2.8: what the colony stage (stage::kColony) of a city on `island` with plan `r` (its land,
     /// its slot counts) builds over `minutes` minutes, entry by entry in the handler's order, each at
@@ -1846,14 +1858,6 @@ private:
     mutable PathFinder m_reach_finder;
     /// The step colony_plan last ran in, per player.
     std::vector<std::uint64_t> m_colony_plan_ms;
-    /// P2.9, only the log: a home build's gold at the budget's horizon and its cost (plan_building).
-    struct HomeBuildValue {
-        std::uint64_t ms = 0;
-        std::int64_t gold = 0;
-        std::int64_t cost = 0;
-    };
-    /// The home builds planned within the last budget horizon, per player (only the log).
-    std::vector<std::vector<HomeBuildValue>> m_home_builds;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
     /// Why need_shipyard() builds no yard: the last reason logged per player (only the log).

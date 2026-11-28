@@ -437,6 +437,16 @@ void io(A& a, AiPlayer& p) {
     if (a.version() >= kStateWithAttackTries) {
         a(p.strategy.attack_tries);
     }
+    if (a.version() >= kStateWithHomeBuilds) {
+        a(p.home_builds);
+    }
+}
+
+template <class A>
+void io(A& a, HomeBuild& h) {
+    a(h.ms);
+    a(h.gold);
+    a(h.cost);
 }
 
 template <class A>

@@ -1679,36 +1679,30 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         return false;
     }
     start_search(p, b, slot, from_start);
+    Commitment c;
+    c.cost = b.build_cost.money;
+    c.upkeep = b.running_cost;
+    const City* at = current_city(p);
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    // shortcut: its good as made by the producers like it there, from now on, its inputs not taken;
+    // upgrade when the projection runs the city's producers.
+    const Inflow made[] = {{b.ware, at != nullptr ? made_per_minute(*at, b) : 0, 1, horizon}};
     if (logging()) {
         // What the building is weighed with today: its price and running costs; no value of its own.
-        Commitment c;
-        c.cost = b.build_cost.money;
-        c.upkeep = b.running_cost;
-        const City* at = current_city(p);
         log_decision(p, "build", b.id, at != nullptr ? at->island : -1, at != nullptr ? at->index : -1, c, b.ware);
         if (at != nullptr && b.ware != 0) {
-            // shortcut: its good as made by the producers like it there, from now on, its inputs not
-            // taken; upgrade when the projection runs the city's producers.
-            const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, horizon}};
             log_value(p, "build", *at, made, c);
-            // P2.9: the home build's rate for the colony patience rule (log_colony_rates), from the
-            // player's own cities only.
-            if (at->owner == p.player && c.cost > 0) {
-                const ActionValue v =
-                    action_value(project_city(p, *at, horizon, made), project_city(p, *at, horizon), c);
-                if (m_home_builds.size() <= p.player) {
-                    m_home_builds.resize(std::size_t{p.player} + 1);
-                }
-                std::vector<HomeBuildValue>& list = m_home_builds[p.player];
-                const std::uint64_t now = now_ms();
-                std::erase_if(list, [&](const HomeBuildValue& h) {
-                    return now - h.ms > std::uint64_t{horizon} * kGoodsMinuteMs;
-                });
-                list.push_back(
-                    {now, v.gold.empty() ? 0 : v.gold[std::min<std::size_t>(horizon, v.gold.size() - 1)], c.cost});
-            }
         }
+    }
+    // P2.9: an improved rival keeps the home production builds of the budget's horizon with their
+    // gold at its end, the bar of its colony patience rule (colony_rate); from its own cities only.
+    if (rivals() && !p.pirates && at != nullptr && at->owner == p.player && b.ware != 0 && c.cost > 0) {
+        const ActionValue v = action_value(project_city(p, *at, horizon, made), project_city(p, *at, horizon), c);
+        const std::uint64_t now = now_ms();
+        std::erase_if(p.home_builds,
+                      [&](const HomeBuild& h) { return now - h.ms > std::uint64_t{horizon} * kGoodsMinuteMs; });
+        p.home_builds.push_back(
+            {now, v.gold.empty() ? 0 : v.gold[std::min<std::size_t>(horizon, v.gold.size() - 1)], c.cost});
     }
     return true;
 }

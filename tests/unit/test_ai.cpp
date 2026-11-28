@@ -1470,6 +1470,82 @@ TEST_CASE("ai: a computer's colony plan counts its own gold once") {
     CHECK(engine.goal_crop(*p) == assets::ware::kGold);
 }
 
+TEST_CASE("ai: the colony patience rule's bar is the best paying home build of the budget's horizon (P2.9)") {
+    Game g;
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    found_city(g, s);
+    const std::vector<std::uint8_t> bytes = saved(s.computers());
+    annokit::core::ByteReader in(bytes);
+    sim::StateIn reader(in);
+    sim::ai::State state;
+    sim::ai::Loader loader(reader, s.computers().state_version());
+    loader(state);
+    REQUIRE(reader.ok());
+    sim::ai::AiPlayer* p = nullptr;
+    for (sim::ai::AiPlayer& k : state.players) {
+        p = k.player == kComputer ? &k : p;
+    }
+    REQUIRE(p != nullptr);
+    const sim::City* home = nullptr;
+    for (const sim::City& c : g.world.cities()) {
+        home = c.owner == kComputer ? &c : home;
+    }
+    REQUIRE(home != nullptr);
+    const std::uint64_t horizon_ms = std::uint64_t{g.world.balance().ai_budget_horizon_minutes} * 60'000;
+    const std::uint64_t now = horizon_ms * 2;
+    g.world.set_time_ms(now);
+    p->home_builds = {
+        {now - horizon_ms - 1, 900, 1000},  // older than the horizon
+        {now - 10, 100, 1000},
+        {now - 20, 300, 2000},  // the best rate
+        {now - 30, -50, 100},   // does not pay
+    };
+    sim::ai::Engine engine(s, state);
+    const sim::ai::Engine::ColonyRate r = engine.colony_rate(*p, *home, 0);
+    CHECK(r.home.gold == 300);
+    CHECK(r.home.cost == 2000);
+    p->home_builds = {{now - 30, -50, 100}};
+    CHECK(engine.colony_rate(*p, *home, 0).home.cost == 0);  // idle gold: no bar
+}
+
+TEST_CASE("ai: a computer's home builds survive a save (P2.9)") {
+    Game g(false);
+    sim::Simulation s(g.world, g.buildings, g.figures);
+    sim::ComputerPlayers ai(s);
+    ai.reset();
+    const std::uint32_t before = ai.state_version();
+    CHECK(before < sim::ai::kStateWithHomeBuilds);
+    sim::ai::State state;
+    {
+        const std::vector<std::uint8_t> now = saved(ai);
+        annokit::core::ByteReader in(now);
+        sim::StateIn reader(in);
+        sim::ai::Loader loader(reader, before);
+        loader(state);
+        REQUIRE(reader.ok());
+    }
+    REQUIRE(!state.players.empty());
+    state.players[0].home_builds = {{1'000, 250, 400}};
+    annokit::core::ByteWriter out;
+    sim::ai::Saver saver(out, sim::ComputerPlayers::max_state_version());
+    saver(state);
+    const std::vector<std::uint8_t> bytes = out.take();
+    annokit::core::ByteReader in(bytes);
+    REQUIRE(ai.load(in, sim::ComputerPlayers::max_state_version()));
+    CHECK(ai.state_version() == sim::ai::kStateWithHomeBuilds);
+    const std::vector<std::uint8_t> again = saved(ai);
+    annokit::core::ByteReader in2(again);
+    sim::StateIn reader(in2);
+    sim::ai::State copy;
+    sim::ai::Loader loader(reader, sim::ai::kStateWithHomeBuilds);
+    loader(copy);
+    REQUIRE(reader.ok());
+    REQUIRE(copy.players[0].home_builds.size() == 1);
+    CHECK(copy.players[0].home_builds[0].ms == 1'000);
+    CHECK(copy.players[0].home_builds[0].gold == 250);
+    CHECK(copy.players[0].home_builds[0].cost == 400);
+}
+
 TEST_CASE("ai: below the hardest level a rival is near only by cities on islands the computer discovered") {
     // A player knows of another's city only once their ships have discovered its island. Here the
     // rival's city stands on the computer's home island, which the test leaves undiscovered; the
