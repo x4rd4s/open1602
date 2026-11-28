@@ -309,14 +309,10 @@ void Engine::pick_island(AiPlayer& p) {
         // there only when it pays by the horizon.
         if (rivals() && p.home_valid) {
             if (const City* home = home_city(p); home != nullptr) {
-                const ColonyRate r = colony_rate(p, *home, s.crop, i);
-                if (r.colony && r.verdict != Patience::Pays) {
-                    if (logging()) {
-                        log(p, "colony rate crop %u island %u at founding colony %lld/%lld home %lld/%lld verdict %s",
-                            unsigned{s.crop}, unsigned{i}, static_cast<long long>(r.gold),
-                            static_cast<long long>(r.cost), static_cast<long long>(r.home.gold),
-                            static_cast<long long>(r.home.cost), patience_name(r.verdict));
-                    }
+                const ColonyVerdict v = colony_verdict(p, *home, s.crop, i);
+                if (v.colony && static_cast<Patience>(v.verdict) != Patience::Pays) {
+                    log(p, "colony rate crop %u island %u at founding verdict %s", unsigned{s.crop}, unsigned{i},
+                        patience_name(static_cast<Patience>(v.verdict)));
                     continue;
                 }
             }
@@ -1323,6 +1319,30 @@ Engine::ColonyRate Engine::colony_rate(const AiPlayer& p, const City& home, std:
     return out;
 }
 
+ColonyVerdict Engine::colony_verdict(AiPlayer& p, const City& home, std::uint8_t crop,
+                                     std::optional<std::uint16_t> island) {
+    const std::uint64_t minute = now_ms() / kGoodsMinuteMs + 1;  // 0: none yet
+    if (p.verdict_minute != minute) {
+        p.verdict_minute = minute;
+        p.verdicts.clear();
+    }
+    const std::int32_t at = island ? std::int32_t{*island} : -1;
+    for (const ColonyVerdict& v : p.verdicts) {
+        if (v.crop == crop && v.island == at) {
+            return v;
+        }
+    }
+    const ColonyRate r = colony_rate(p, home, crop, island);
+    ColonyVerdict v;
+    v.crop = crop;
+    v.island = at;
+    v.colony = r.colony;
+    v.need = r.need;
+    v.verdict = static_cast<std::uint8_t>(r.verdict);
+    p.verdicts.push_back(v);
+    return v;
+}
+
 void Engine::log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops) {
     const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
     if (!logging() || home == nullptr || home->owner != p.player) {
@@ -1764,7 +1784,8 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
         c.crop = crop;
         c.passes = b.refusal(colony_commitment(p, crop == kAnyCrop ? std::uint8_t{0} : crop)) == Refusal::None;
         // P2.9: a raw-material colony only when it pays by the horizon (colony_rate).
-        if (c.passes && home != nullptr && colony_rate(p, *home, crop).verdict != Patience::Pays) {
+        if (c.passes && home != nullptr &&
+            static_cast<Patience>(colony_verdict(p, *home, crop).verdict) != Patience::Pays) {
             c.passes = false;
         }
         c.rank = c.passes ? colony_rank(p, crop) : 0;

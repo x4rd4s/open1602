@@ -65,7 +65,8 @@ inline constexpr std::uint32_t kStateWithWarParty = 17;
 /// (Strategy::attack_tries). Written only while it has some.
 inline constexpr std::uint32_t kStateWithAttackTries = 18;
 /// Version 19: the home builds an improved computer valued within the budget's horizon
-/// (AiPlayer::home_builds), the bar of its colony patience rule. Written only while it has some.
+/// (AiPlayer::home_builds), the bar of its colony patience rule, and the rule's verdicts of the
+/// goods minute (AiPlayer::verdict_minute, verdicts). Written only while it has some.
 inline constexpr std::uint32_t kStateWithHomeBuilds = 19;
 inline constexpr std::uint32_t kFirstStateVersion = 1;
 
@@ -511,6 +512,17 @@ struct HomeBuild {
     std::int64_t cost = 0;
 };
 
+/// Open1602 (P2.9): the colony patience rule's verdict on a crop and island (-1: the island
+/// colony_island picks) in one goods minute: whether it would be a raw-material colony, whether the
+/// crop is a need crop, and the verdict (Patience).
+struct ColonyVerdict {
+    std::uint8_t crop = 0;
+    std::int32_t island = -1;
+    bool colony = false;
+    bool need = false;
+    std::uint8_t verdict = 0;
+};
+
 struct AiPlayer {
     PlayerId player = kNoPlayer;
     bool pirates = false;
@@ -586,6 +598,9 @@ struct AiPlayer {
     Strategy strategy;
     /// Open1602, improved computers: the home builds of the budget's last horizon (state 19).
     std::vector<HomeBuild> home_builds;
+    /// Open1602, improved computers: the goods minute of `verdicts` (state 19).
+    std::uint64_t verdict_minute = 0;
+    std::vector<ColonyVerdict> verdicts;
 };
 
 /// Everything of all computer players.

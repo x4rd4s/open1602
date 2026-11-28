@@ -530,6 +530,10 @@ public:
     void note_home_build(AiPlayer& p);
     [[nodiscard]] ColonyRate colony_rate(const AiPlayer& p, const City& home, std::uint8_t crop,
                                          std::optional<std::uint16_t> island = std::nullopt);
+    /// P2.9: colony_rate's verdict, worked out once a goods minute for a crop and island (the
+    /// projection's inputs are the ledger's minute means) and kept with the player.
+    [[nodiscard]] ColonyVerdict colony_verdict(AiPlayer& p, const City& home, std::uint8_t crop,
+                                               std::optional<std::uint16_t> island = std::nullopt);
     /// P2.9, the computer log only: colony_rate of each candidate weighed at a new plan.
     void log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops);
     /// P2.8: what the colony stage (stage::kColony) of a city on `island` with plan `r` (its land,
