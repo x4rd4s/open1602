@@ -1785,8 +1785,8 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
                         static_cast<long long>(bundle.workshop->build_cost.money), bundle.workshop->running_cost);
                 }
                 std::int64_t kontor = 0;
-                if (const assets::BuildingType* b = by_id(id::kontor(1)); b != nullptr) {
-                    kontor = b->running_cost;
+                if (const assets::BuildingType* k = by_id(id::kontor(1)); k != nullptr) {
+                    kontor = k->running_cost;
                 }
                 // shortcut: the colony's workers taxed at the home's pioneer rate; upgrade when P2.8
                 // projects the colony's own city.
