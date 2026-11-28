@@ -3966,6 +3966,13 @@ assets::BuildingTable hungry_town_table() {
         "  @Nummer: 9\n  Id: 20704\n  Kind: 14\n  Gfx: 80\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
         "    Ware: 6\n    Rohstoff: 5\n    Prodmenge: 1\n    Rohmenge: 1\n    Interval: 40\n    Kosten: 4, 1\n"
         "    Arbeiter: 3\n  EndObj\n"
+        // A sheep farm (wool from grass) and its grass field, neither built in the town (P2.8's
+        // colony build-out plans them: the farm waits for its fields' gold and its wood).
+        "  @Nummer: 10\n  Id: 20706\n  Kind: 14\n  Gfx: 100\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 4\n    Rohstoff: 52\n    Prodmenge: 1\n    Rohmenge: 1\n    Interval: 40\n    Kosten: 5, 1\n"
+        "    Arbeiter: 2\n  EndObj\n  Objekt: HAUS_BAUKOST\n    Holz: 2\n    Money: 100\n  EndObj\n"
+        "  @Nummer: 11\n  Id: 20707\n  Kind: 14\n  Gfx: 110\n  Size: 1, 1\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 52\n    Prodmenge: 1\n    Interval: 40\n  EndObj\n  Objekt: HAUS_BAUKOST\n    Money: 1\n  EndObj\n"
         // A chapel, not built in the town but where a test places it (P2.8).
         "  @Nummer: 7\n  Id: 20803\n  Kind: 14\n  Gfx: 70\n  Size: 2, 2\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 18\n    Radius: 16\n    Kosten: 5, 2\n  EndObj\n"
@@ -4379,6 +4386,57 @@ TEST_CASE("ai: a raw-material colony's build-out follows its stage handler, slot
     CHECK(fresh.front().type == buildings.by_id(20809));
     r.slots[sim::ai::kSlotMarket].count = 1;  // its market stands
     CHECK(engine.colony_buildout(p, town.island, r, town.goods, 30).empty());
+}
+
+TEST_CASE("ai: a colony's farm waits for its fields' gold and its materials, as need() waits (P2.8)") {
+    // No crops seen on the island: the colony asks for sheep, one farm per 120 tiles. Its market
+    // stands. The farm (NeedType B) waits while the gold does not cover it and its 64 fields, or
+    // while the colony lacks its wood.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    sim::ai::CityPlan r;
+    r.land = 240;
+    r.slots[sim::ai::kSlotMarket].count = 1;
+    const assets::BuildingType* farm = buildings.by_id(20706);
+    REQUIRE(farm != nullptr);
+    const std::uint8_t wood = buildings.materials().wood;
+    std::vector<std::uint32_t> stock = world.city(0, 0)->goods;
+    stock.resize(std::max<std::size_t>(stock.size(), wood + 1U), 0);
+    {  // no wood: the farm waits, and so does all after it
+        stock[wood] = 0;
+        world.player(kHuman)->money = 100'000;
+        CHECK(engine.colony_buildout(p, 0, r, stock, 30).empty());
+    }
+    {  // gold for the farm but not for its fields: it waits
+        stock[wood] = 100 * 32;
+        // The minute's gold: what the player has and the town's taxes less its running costs.
+        const std::int64_t net =
+            sim::tax_income(*world.city(0, 0), buildings) - std::int64_t{sim::running_costs(world, buildings)[0]};
+        const std::int64_t fields = 64;  // 64 grass fields at 1 gold
+        world.player(kHuman)->money = static_cast<std::int32_t>(farm->build_cost.money + fields - net);
+        CHECK(engine.colony_buildout(p, 0, r, stock, 1).empty());
+        world.player(kHuman)->money = static_cast<std::int32_t>(farm->build_cost.money + fields + 1 - net);
+        const std::vector<sim::ai::Engine::ColonyBuild> one = engine.colony_buildout(p, 0, r, stock, 1);
+        REQUIRE(one.size() == 1);
+        CHECK(one.front().type == farm);
+    }
+    {  // both: two farms (240 tiles), one a minute
+        world.player(kHuman)->money = 100'000;
+        const std::vector<sim::ai::Engine::ColonyBuild> b = engine.colony_buildout(p, 0, r, stock, 30);
+        REQUIRE(b.size() >= 2);
+        CHECK(b[0].type == farm);
+        CHECK(b[0].minute == 1);
+        CHECK(b[1].type == farm);
+        CHECK(b[1].minute == 2);
+    }
 }
 
 TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat one (P2.8)") {
