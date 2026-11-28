@@ -14,6 +14,7 @@
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/disasters.hpp"
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 
@@ -412,54 +413,62 @@ std::int64_t Engine::stage_gold(std::uint32_t gold) const {
 }
 
 void Engine::tax_rates(AiPlayer& p, City& c) {
-    // Improved computers set their taxes as a player does: as high as each class stays fully
-    // content with a step to spare, so growth never stops for it. Short of money, a class that is
-    // fully supplied pays up to where it is just content enough not to move out; with money to
-    // spare, a class short of goods pays less so that it still grows. The original's computers
+    // Improved computers set their taxes as a player does (chosen_tax). The original's computers
     // keep the normal rate.
     if (!rivals()) {
         return;
     }
-    constexpr std::uint8_t kNormal = 128;
-    constexpr std::uint8_t kStep = 8;
-    constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
     const auto& classes = m_buildings.resident_classes();
-    const std::int64_t money = player(p).money;
-    // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
-    // and with little gold but no debt it kept that rate for hours.
-    const bool broke = money < 0 && net_income(p) < 0;
+    const bool broke = tax_broke(p);
     for (std::size_t k = 0; k < classes.size() && k < c.tax_rate.size() && k < c.inhabitants.size(); ++k) {
         if (c.inhabitants[k] == 0) {
             continue;
         }
-        const auto content = [&](std::uint32_t rate) {
-            return satisfaction_of(c, classes[k], static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
-        };
-        std::uint32_t rate = CityOrder::kMinTax;
-        for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
-            if (content(r + kStep) >= kFullSupply) {
-                rate = r;
-            }
-        }
-        if (rate < kNormal) {
-            rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
-        }
-        if (broke) {
-            for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
-                if (content(r) >= kStable) {
-                    rate = r;
-                }
-            }
-        }
-        const auto chosen = static_cast<std::uint8_t>(rate);
+        const std::uint8_t chosen = chosen_tax(c, k, broke, player(p).money);
         if (c.tax_rate[k] != chosen) {
             c.tax_rate[k] = chosen;
             if (k < c.satisfaction.size()) {
-                c.satisfaction[k] = content(chosen);
+                c.satisfaction[k] = satisfaction_of(c, classes[k], chosen);
             }
             log(p, "city %u/%u: tax of class %zu at %u", c.island, c.index, k, unsigned{chosen});
         }
     }
+}
+
+bool Engine::tax_broke(const AiPlayer& p) const {
+    // Only in debt does a computer tax its people below full content: a city at 120 stops growing,
+    // and with little gold but no debt it kept that rate for hours.
+    return player(p).money < 0 && net_income(p) < 0;
+}
+
+std::uint8_t Engine::chosen_tax(const City& c, std::size_t k, bool broke, std::int64_t money) const {
+    // As high as class `k` stays fully content with a step to spare, so growth never stops for it.
+    // Short of money, a class that is fully supplied pays up to where it is just content enough not
+    // to move out; with money to spare, a class short of goods pays less so that it still grows.
+    constexpr std::uint8_t kNormal = 128;
+    constexpr std::uint8_t kStep = 8;
+    constexpr std::uint8_t kStable = 112;  // above the 107 below which houses lose people
+    const assets::ResidentClass& resident_class = m_buildings.resident_classes()[k];
+    const auto content = [&](std::uint32_t rate) {
+        return satisfaction_of(c, resident_class, static_cast<std::uint8_t>(std::min<std::uint32_t>(rate, 255)));
+    };
+    std::uint32_t rate = CityOrder::kMinTax;
+    for (std::uint32_t r = CityOrder::kMinTax; r <= CityOrder::kMaxTax; r += kStep) {
+        if (content(r + kStep) >= kFullSupply) {
+            rate = r;
+        }
+    }
+    if (rate < kNormal) {
+        rate = money >= 4000 ? std::max<std::uint32_t>(rate, kNormal - 4 * kStep) : kNormal;
+    }
+    if (broke) {
+        for (std::uint32_t r = rate + kStep; r <= CityOrder::kMaxTax; r += kStep) {
+            if (content(r) >= kStable) {
+                rate = r;
+            }
+        }
+    }
+    return static_cast<std::uint8_t>(rate);
 }
 
 void Engine::material_lock(AiPlayer& p, City& c) {
@@ -1214,6 +1223,9 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                     m_last_need.resize(std::size_t{p.player} + 1, -1);
                 }
                 m_last_need[p.player] = static_cast<std::int32_t>(n.kind) << 8 | n.slot;
+                CityVisits& v = visits_of(p, c);
+                v.hold_kind = static_cast<std::uint8_t>(static_cast<std::uint8_t>(n.kind) + 1);
+                v.hold_slot = n.slot;
             }
             return true;
         }
@@ -1326,6 +1338,11 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
+    if (logging()) {
+        CityVisits& v = visits_of(p, c);
+        ++v.visits;
+        v.stage = r.stage;
+    }
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
     const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
@@ -1372,6 +1389,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                                                        home_shortfall(p, ware::kCloth) != 0);
         if (&c == home_city(p) && (wants_room(p) || short_home) && want_colony(p, 0, short_home, true)) {
             return;
+        }
+        if (logging()) {
+            ++visits_of(p, c).done;
         }
         nothing_to_do(p);
     };
@@ -1669,8 +1689,25 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         if (at != nullptr && b.ware != 0) {
             // shortcut: its good as made by the producers like it there, from now on, its inputs not
             // taken; upgrade when the projection runs the city's producers.
-            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, m_world.balance().ai_budget_horizon_minutes}};
+            const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, horizon}};
             log_value(p, "build", *at, made, c);
+            // P2.9: the home build's rate for the colony patience rule (log_colony_rates), from the
+            // player's own cities only.
+            if (at->owner == p.player && c.cost > 0) {
+                const ActionValue v =
+                    action_value(project_city(p, *at, horizon, made), project_city(p, *at, horizon), c);
+                if (m_home_builds.size() <= p.player) {
+                    m_home_builds.resize(std::size_t{p.player} + 1);
+                }
+                std::vector<HomeBuildValue>& list = m_home_builds[p.player];
+                const std::uint64_t now = now_ms();
+                std::erase_if(list, [&](const HomeBuildValue& h) {
+                    return now - h.ms > std::uint64_t{horizon} * kGoodsMinuteMs;
+                });
+                list.push_back(
+                    {now, v.gold.empty() ? 0 : v.gold[std::min<std::size_t>(horizon, v.gold.size() - 1)], c.cost});
+            }
         }
     }
     return true;
@@ -3229,6 +3266,204 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
+std::optional<std::int64_t> Engine::luxury_budget(const AiPlayer& p, std::int64_t net, std::int64_t money) noexcept {
+    // What luxury() lets a crop's producers cost a minute: the net income, or a hundredth of the
+    // gold when the income is small; nothing with little gold besides.
+    if (net >= std::int64_t{p.cities} * 25) {
+        return net;
+    }
+    if (money < 7000) {
+        return std::nullopt;
+    }
+    return money / 100;
+}
+
+std::vector<Engine::LuxuryCrop> Engine::luxury_crops(const AiPlayer& p) const {
+    // The crops luxury() plants, with the good the home city must lack for each.
+    const auto upkeep = [&](std::uint8_t w, std::uint8_t raw) -> std::int64_t {
+        const assets::BuildingType* b = producer(w, raw);
+        return b != nullptr ? b->running_cost : 0;
+    };
+    return {{
+        {kSlotSpices, ware::kSpiceField, ware::kSpices, upkeep(ware::kSpices, ware::kSpiceField), true},
+        {kSlotTobacco, ware::kTobaccoField, ware::kTobaccoGoods,
+         upkeep(ware::kTobacco, ware::kTobaccoField) + upkeep(ware::kTobaccoGoods, ware::kTobacco), true},
+        {kSlotWine, ware::kWineField, ware::kAlcohol, upkeep(ware::kAlcohol, ware::kWineField), true},
+        {kSlotCocoa, ware::kCocoaField, ware::kCocoa, upkeep(ware::kCocoa, ware::kCocoaField),
+         p.score >= 3 || m_state.max_score >= 3},
+        {kSlotCotton, ware::kCottonField, ware::kCloth,
+         upkeep(ware::kWool, ware::kCottonField) + upkeep(ware::kCloth, ware::kWool), p.max_stage >= stage::kCitizens},
+        {kSlotSugar, ware::kSugarField, ware::kAlcohol,
+         upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
+    }};
+}
+
+void produce_minute(const Sheet& sheet, const assets::BuildingType& b, std::vector<std::uint32_t>& stock) {
+    const Sheet::Producer* f = sheet.producer(b);
+    if (f == nullptr || f->output == 0 || f->ware >= stock.size() || f->raw2 != 0) {
+        return;
+    }
+    // A raw material no staffed producer makes grows on the producer's own fields or trees.
+    const bool grown_here = std::ranges::none_of(
+        sheet.producers(), [&](const Sheet::Producer& q) { return q.ware == f->raw && q.workers != 0; });
+    if (f->raw != 0 && !grown_here) {
+        if (f->raw >= stock.size() || stock[f->raw] < f->raw_use) {
+            return;
+        }
+        stock[f->raw] -= static_cast<std::uint32_t>(f->raw_use);
+    }
+    stock[f->ware] += static_cast<std::uint32_t>(f->output);
+}
+
+std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
+                                                         std::vector<std::uint32_t> stock,
+                                                         std::uint32_t minutes) const {
+    // P2.8: the colony stage's handler (run_stage, stage::kColony) on slot counts and a stock of its
+    // own: its order (a market, the workshops of its raw materials), then animals or the luxury fields
+    // the island grows fully, then its materials. Each entry is tried as need() and need_market() try
+    // it: one its gold (and its fields' gold) or its materials do not cover waits there (NeedType B and
+    // C) or lets the handler go on to the next. ai-view: eigen and seen: the own plan, gold and stock,
+    // the island's fertility as the player has seen it.
+    // shortcut: no sites or catchments are looked for, no ship brings materials, the fields' gold
+    // holds the plantation back but is not spent, the luxury crops come in their table order
+    // (luxury() puts what the home city lacks first), and the gold runs on at today's net income;
+    // upgrade when V2 runs the planner itself on a copy.
+    std::vector<ColonyBuild> out;
+    const Balance& at = m_world.balance();
+    const std::vector<ComputerProducer>& changes = at.computer_producers;
+    const auto& mat = m_buildings.materials();
+    std::array<std::uint32_t, kAllSlots> count{};
+    for (std::size_t k = 0; k < kAllSlots; ++k) {
+        count[k] = r.slots[k].count;
+    }
+    stock.resize(std::max<std::size_t>({stock.size(), std::size_t{mat.wood} + 1, std::size_t{mat.bricks} + 1,
+                                        std::size_t{mat.tools} + 1, std::size_t{mat.cannons} + 1}),
+                 0);
+    const auto in_stock = [&](std::uint8_t w) { return w < stock.size() ? stock[w] : 0U; };
+    const auto goods_for = [&](const assets::BuildingType& b) {
+        const auto& cost = b.build_cost;
+        return in_stock(mat.wood) >= cost.wood && in_stock(mat.bricks) >= cost.bricks &&
+               in_stock(mat.tools) >= cost.tools && in_stock(mat.cannons) >= cost.cannons;
+    };
+    const std::int64_t net = net_income(p);
+    const std::uint32_t n_fields =
+        std::min(r.land / at.ai_colony_luxury_tiles, grown(r, colony_fields(p.max_stage), true));
+    const std::uint32_t n_animals = std::min(r.land / at.ai_colony_animal_tiles, grown(r, at.ai_colony_animals, true));
+    const bool crops_here = view(p).full_crops(island) != 0;
+    const std::vector<LuxuryCrop> crops = luxury_crops(p);
+    // The slots the handler asks for, entry by entry in its order.
+    const auto wanted = [&](std::int64_t budget) {
+        std::vector<std::uint8_t> out_slots;
+        // shortcut: one market, and one more for each crop that has fields (need_market's flag: the
+        // fields lie apart); upgrade with V2's catchments.
+        std::uint32_t planted = 0;
+        for (const LuxuryCrop& crop : crops) {
+            planted += count[crop.slot] != 0 ? 1U : 0U;
+        }
+        if (count[kSlotMarket] < 1 + planted) {
+            out_slots.push_back(kSlotMarket);
+        }
+        // processing(): a workshop for every so many producers of its raw material.
+        std::vector<const ComputerSlot*> by_rank;
+        for (const ComputerSlot& k : slots()) {
+            if (k.process_rank != 0 && k.process_from != kNoProducer && k.process_per != 0) {
+                by_rank.push_back(&k);
+            }
+        }
+        std::ranges::stable_sort(by_rank, {}, &ComputerSlot::process_rank);
+        for (const ComputerSlot* k : by_rank) {
+            const std::uint32_t from = count[k->process_from];
+            const std::uint32_t want =
+                k->process_round_up ? (from + k->process_per - 1) / k->process_per : from / k->process_per;
+            if (count[k->number] < want) {
+                out_slots.push_back(k->number);
+                break;
+            }
+        }
+        if (!crops_here) {
+            for (const std::uint8_t slot : {std::uint8_t{kSlotSheep}, std::uint8_t{kSlotCattle}}) {
+                if (count[slot] < n_animals) {
+                    out_slots.push_back(slot);
+                }
+            }
+        } else if (p.max_stage >= stage::kSettlers) {
+            bool wine_island = false;
+            for (const LuxuryCrop& crop : crops) {
+                if (!crop.eligible ||
+                    !plants_on(view(p).fertility(island, crop.field).value_or(0), false, true, true, false)) {
+                    continue;
+                }
+                wine_island = wine_island || crop.slot == kSlotWine;
+                if ((crop.slot == kSlotSugar && wine_island) || count[crop.slot] >= n_fields || crop.upkeep >= budget) {
+                    continue;
+                }
+                out_slots.push_back(crop.slot);
+            }
+        }
+        for (const std::uint8_t slot :
+             {std::uint8_t{kSlotQuarry}, std::uint8_t{kSlotWoodcutter}, std::uint8_t{kSlotStonemason}}) {
+            if (count[slot] < grown(r, 1)) {
+                out_slots.push_back(slot);
+            }
+        }
+        return out_slots;
+    };
+    std::int64_t money = player(p).money;
+    std::int64_t upkeep = 0;
+    for (std::uint32_t m = 1; m <= minutes; ++m) {
+        money += net - upkeep;
+        // What the colony's producers made this minute, at their table rates.
+        for (const ColonyBuild& b : out) {
+            produce_minute(m_sheet, *b.type, stock);
+        }
+        const std::int64_t budget =
+            luxury_budget(p, net - upkeep, money).value_or(std::numeric_limits<std::int64_t>::min());
+        // shortcut: one building a minute at most; the planner's rounds are shorter, gold and goods bind.
+        for (const std::uint8_t slot : wanted(budget)) {
+            const assets::BuildingType* b = nullptr;
+            std::optional<NeedDef> d;
+            if (slot == kSlotMarket) {
+                b = by_id(id::kMarket);
+            } else {
+                d = need_def(slots(), slot, changes);
+                if (d) {
+                    b = d->fixed != 0 ? by_id(d->fixed) : producer(d->ware, d->raw);
+                }
+            }
+            if (b == nullptr || (d && d->after != kNoProducer && count[d->after] == 0)) {
+                continue;  // need(): no building, or its raw material's producer first
+            }
+            if (d && !unlocked(p, *b)) {
+                if (d->type == NeedType::C) {
+                    break;
+                }
+                continue;
+            }
+            const std::int64_t fields = d ? fields_money(*d) : 0;
+            const bool gold = money >= std::int64_t{b->build_cost.money} &&
+                              (fields == 0 || money > fields + std::int64_t{b->build_cost.money});
+            if (!gold || !goods_for(*b)) {
+                // need_market waits once a woodcutter stands; need() waits for NeedType B and C.
+                if (slot == kSlotMarket ? count[kSlotWoodcutter] != 0
+                                        : d->type == NeedType::B || d->type == NeedType::C) {
+                    break;
+                }
+                continue;
+            }
+            ++count[slot];
+            money -= b->build_cost.money;
+            upkeep += b->running_cost;
+            stock[mat.wood] -= b->build_cost.wood;
+            stock[mat.bricks] -= b->build_cost.bricks;
+            stock[mat.tools] -= b->build_cost.tools;
+            stock[mat.cannons] -= b->build_cost.cannons;
+            out.push_back(ColonyBuild{m, b});
+            break;
+        }
+    }
+    return out;
+}
+
 bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     // Luxury raw materials by the island's fertility, what the home city lacks and
     // what the computer can afford to run.
@@ -3238,18 +3473,12 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     if (c == nullptr || r == nullptr || home == nullptr || p.max_stage < stage::kSettlers) {
         return false;
     }
-    std::int64_t budget = net_income(p);
-    if (budget < std::int64_t{p.cities} * 25) {
-        if (player(p).money < 7000) {
-            return false;
-        }
-        budget = player(p).money / 100;
+    const std::optional<std::int64_t> afford = luxury_budget(p, net_income(p), player(p).money);
+    if (!afford) {
+        return false;
     }
+    const std::int64_t budget = *afford;
     const std::uint32_t cap = home->capacity / 2;
-    const auto upkeep = [&](std::uint8_t w, std::uint8_t raw) -> std::int64_t {
-        const assets::BuildingType* b = producer(w, raw);
-        return b != nullptr ? b->running_cost : 0;
-    };
     // 1. Iron
     if (p.score >= 2 && view(p).fertility(c->island, ware::kOre).value_or(0) >= 64 &&
         home->stock(ware::kOre) < 10 * kTon) {
@@ -3266,30 +3495,13 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
             return true;
         }
     }
-    struct Crop {
-        std::uint8_t slot;
-        std::uint8_t field;
-        std::uint8_t good;  ///< what the home city must lack
-        std::int64_t upkeep;
-        bool eligible;
-    };
     bool wine_island = false;
-    const std::array<Crop, 6> crops{{
-        {kSlotSpices, ware::kSpiceField, ware::kSpices, upkeep(ware::kSpices, ware::kSpiceField), true},
-        {kSlotTobacco, ware::kTobaccoField, ware::kTobaccoGoods,
-         upkeep(ware::kTobacco, ware::kTobaccoField) + upkeep(ware::kTobaccoGoods, ware::kTobacco), true},
-        {kSlotWine, ware::kWineField, ware::kAlcohol, upkeep(ware::kAlcohol, ware::kWineField), true},
-        {kSlotCocoa, ware::kCocoaField, ware::kCocoa, upkeep(ware::kCocoa, ware::kCocoaField),
-         p.score >= 3 || m_state.max_score >= 3},
-        {kSlotCotton, ware::kCottonField, ware::kCloth,
-         upkeep(ware::kWool, ware::kCottonField) + upkeep(ware::kCloth, ware::kWool), p.max_stage >= stage::kCitizens},
-        {kSlotSugar, ware::kSugarField, ware::kAlcohol,
-         upkeep(ware::kSugar, ware::kSugarField) + upkeep(ware::kAlcohol, ware::kSugar), true},
-    }};
+    using Crop = LuxuryCrop;
+    const std::vector<Crop> crops = luxury_crops(p);
     // Open1602: an improved computer plants first what its people go without (critical_short),
     // then what its home city's people run out of soonest; for a critical good as many fields as
     // make up what its cities lack, beyond the order's number.
-    std::array<Crop, 6> order = crops;
+    std::vector<Crop> order = crops;
     if (rivals()) {
         wine_island = view(p).fertility(c->island, ware::kWineField).value_or(0) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {

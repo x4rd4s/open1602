@@ -241,6 +241,8 @@ std::int64_t Engine::gate_value(const AiPlayer& p, std::uint8_t good) const {
 namespace {
 
 /// The good a colony's crop is grown for, 0 for one that opens no class (ore, gold, cotton).
+// shortcut: the original's fixed crop and ware ids; upgrade (PM) to the table's chain from the crop's
+// field to a class's need when mods add crops, which P2.8's colony value then follows.
 std::uint8_t crop_good(std::uint8_t crop) {
     switch (crop) {
         case ware::kWineField:
@@ -271,6 +273,107 @@ Inflow Engine::colony_inflow(const City& home, std::uint8_t crop, const Commitme
         in.per_minute = static_cast<std::int64_t>((t.of(GoodsFlow::Demand) - t.of(GoodsFlow::Residents)) / t.minutes);
     }
     return in;
+}
+
+ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t made, Commitment& c) {
+    ColonyBundle out;
+    out.inflow = good;
+    // The workshop of the table that makes the good from one raw material (P2.7c's single input),
+    // a raw material that a staffed producer makes: a plantation's field ware employs nobody, and a
+    // plantation is the colony's, not a workshop at home.
+    const auto staffed = [&](std::uint8_t w) {
+        return std::ranges::any_of(sheet.producers(),
+                                   [w](const Sheet::Producer& r) { return r.ware == w && r.workers != 0; });
+    };
+    const Sheet::Producer* shop = nullptr;
+    for (const Sheet::Producer& r : sheet.producers()) {
+        if (r.ware == good.ware && r.raw != 0 && r.raw2 == 0 && r.output != 0 && staffed(r.raw)) {
+            shop = &r;
+            break;
+        }
+    }
+    if (shop == nullptr) {
+        return out;  // the crop's good comes from the field itself
+    }
+    out.inflow.ware = shop->raw;
+    out.inflow.per_minute =
+        good.per_minute * static_cast<std::int64_t>(shop->raw_use) / static_cast<std::int64_t>(shop->output);
+    if (made == 0) {
+        out.workshop = shop;
+        c.cost += shop->build_cost.money;
+        c.upkeep += shop->running_cost;
+    }
+    return out;
+}
+
+ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64_t kontor, std::uint32_t rate) {
+    ColonyUpkeep u;
+    // The colony's plantations for the inflow: the table's producer of that ware with workers (a
+    // plantation harvests its field ware; the fields themselves employ nobody).
+    // shortcut: the field's cycle alone, its walks left out (Sheet::Producer::output), and the
+    // workers' houses at no running cost and from the founding, the workshop from when its raw
+    // material comes in; upgrade when P2.8 projects the colony's own build-out.
+    std::int64_t fields_cost = 0;
+    for (const Sheet::Producer& r : sheet.producers()) {
+        if (r.ware == b.inflow.ware && r.raw2 == 0 && r.output != 0 && r.workers != 0) {
+            const auto need = static_cast<std::uint64_t>(std::max<std::int64_t>(b.inflow.per_minute, 0));
+            u.fields = static_cast<std::uint32_t>(std::max<std::uint64_t>((need + r.output - 1) / r.output, 1));
+            u.workers = std::uint64_t{u.fields} * r.workers;
+            fields_cost = std::int64_t{u.fields} * r.running_cost;
+            break;
+        }
+    }
+    u.colony = kontor + fields_cost - sheet.tax(0, u.workers, rate);
+    if (b.workshop != nullptr) {
+        u.workshop = b.workshop->running_cost;
+        u.workshop_from = b.inflow.from;
+    }
+    return u;
+}
+
+Patience patience(std::int64_t gold, std::int64_t cost, std::int64_t home_gold, std::int64_t home_cost) noexcept {
+    if (gold <= 0) {
+        return Patience::NotPositive;
+    }
+    // gold / cost at or below home_gold / home_cost; a home build that does not pay sets no bar.
+    if (home_cost > 0 && home_gold > 0 && gold * home_cost <= home_gold * cost) {
+        return Patience::HomeRate;
+    }
+    return Patience::Pays;
+}
+
+const char* patience_name(Patience v) noexcept {
+    switch (v) {
+        case Patience::Pays:
+            return "pays";
+        case Patience::NotPositive:
+            return "refused: not positive";
+        case Patience::HomeRate:
+            return "refused: home rate";
+    }
+    return "";
+}
+
+ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u) {
+    std::int64_t diff = 0;
+    v.payback = 0;
+    for (std::size_t m = 1; m < v.gold.size(); ++m) {
+        const std::int64_t colony = u.by_minute.empty() ? u.colony : u.by_minute[std::min(m, u.by_minute.size()) - 1];
+        diff += booked - colony - (u.workshop_from != 0 && m >= u.workshop_from ? u.workshop : 0);
+        v.gold[m] += diff;
+        if (v.payback == 0 && v.gold[m] > 0) {
+            v.payback = static_cast<std::uint32_t>(m);
+        }
+    }
+    return v;
+}
+
+ColonyBundle Engine::colony_bundle(const City& home, std::uint8_t crop, Commitment& c) const {
+    const Inflow good = colony_inflow(home, crop, c);
+    // shortcut: "makes none" from the home ledger's production of the good over the horizon; upgrade
+    // when a workshop that has not yet made anything counts.
+    const FlowTotals t = home.ledger.totals(good.ware, m_world.balance().ai_budget_horizon_minutes);
+    return ai::colony_bundle(m_sheet, good, t.of(GoodsFlow::Produced), c);
 }
 
 Commitment Engine::colony_commitment(const AiPlayer& p, std::uint8_t crop) const {

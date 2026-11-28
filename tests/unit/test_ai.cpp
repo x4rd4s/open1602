@@ -3959,6 +3959,23 @@ assets::BuildingTable hungry_town_table() {
         "  @Nummer: 6\n  Id: 20702\n  Kind: 14\n  Gfx: 60\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
         "    Ware: 19\n    Rohstoff: 6\n    Prodmenge: 1\n    Rohmenge: 2\n    Interval: 40\n    Kosten: 5, 2\n"
         "    Arbeiter: 2\n  EndObj\n"
+        // A field of ware 5, which employs nobody, and a plantation of raw material 6 from it, neither
+        // built in the town (P2.8 plans the plantation for a colony).
+        "  @Nummer: 8\n  Id: 20705\n  Kind: 14\n  Gfx: 90\n  Size: 1, 1\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 5\n    Prodmenge: 1\n    Interval: 40\n  EndObj\n"
+        "  @Nummer: 9\n  Id: 20704\n  Kind: 14\n  Gfx: 80\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 6\n    Rohstoff: 5\n    Prodmenge: 1\n    Rohmenge: 1\n    Interval: 40\n    Kosten: 4, 1\n"
+        "    Arbeiter: 3\n  EndObj\n"
+        // A sheep farm (wool from grass) and its grass field, neither built in the town (P2.8's
+        // colony build-out plans them: the farm waits for its fields' gold and its wood).
+        "  @Nummer: 10\n  Id: 20706\n  Kind: 14\n  Gfx: 100\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 4\n    Rohstoff: 52\n    Prodmenge: 1\n    Rohmenge: 1\n    Interval: 40\n    Kosten: 5, 1\n"
+        "    Arbeiter: 2\n  EndObj\n  Objekt: HAUS_BAUKOST\n    Holz: 2\n    Money: 100\n  EndObj\n"
+        "  @Nummer: 11\n  Id: 20707\n  Kind: 14\n  Gfx: 110\n  Size: 1, 1\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 52\n    Prodmenge: 1\n    Interval: 40\n  EndObj\n  Objekt: HAUS_BAUKOST\n    Money: 1\n  EndObj\n"
+        // A chapel, not built in the town but where a test places it (P2.8).
+        "  @Nummer: 7\n  Id: 20803\n  Kind: 14\n  Gfx: 70\n  Size: 2, 2\n"
+        "  Objekt: HAUS_PRODTYP\n    Kind: 18\n    Radius: 16\n    Kosten: 5, 2\n  EndObj\n"
         "EndObj\n",
         types);
     auto table = assets::BuildingTable::from_cod(doc);
@@ -4057,6 +4074,70 @@ TEST_CASE("ai: a city's projection is the game's own, minute by minute: stock, s
     }
     CHECK(hungry);
     CHECK(fell);
+}
+
+TEST_CASE(
+    "ai: a computer's projected city sets its taxes as the computer would where it tends; a person's keeps them "
+    "(P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    const sim::City& town = *world.city(0, 0);
+    const sim::ai::CityProjection person = engine.project_city(p, town, 1);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    const sim::ai::CityProjection elsewhere = engine.project_city(p, town, 1);  // a city it does not tend now
+    p.has_city = true;
+    p.island = town.island;
+    p.city = town.index;
+    const sim::ai::CityProjection computer = engine.project_city(p, town, 1);
+    // At the start the town's classes stay content above the normal rate: the computer taxes them more.
+    REQUIRE(!person.minutes.empty());
+    REQUIRE(!computer.minutes.empty());
+    CHECK(computer.minutes.front().taxes > person.minutes.front().taxes);
+    CHECK(elsewhere.minutes.front().taxes == person.minutes.front().taxes);
+}
+
+TEST_CASE("ai: a good the next class needs raises a projected house to that class's room (P2.8)") {
+    // Houses hold people by their class's Maxwohn: a good counts for room only through the ascent it
+    // opens. Full pioneer houses with food, wood and tools at hand: with the settlers' good coming in
+    // they rise and hold the settlers' Maxwohn, without it they stay at the pioneers'.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings, 20803);
+    sim::Production chapel;
+    chapel.x = 26;
+    chapel.y = 13;
+    world.set_production(chapel);
+    sim::update_services(world, buildings);
+    sim::City& town = *world.city(0, 0);
+    town.goods[buildings.food_ware()] = 30 * 32;
+    town.goods[22] = 10 * 32;  // tools
+    town.goods[23] = 20 * 32;  // wood
+    sim::Simulation s(world, buildings, figures);
+    town.capacity = 30 * 32;  // room for what comes (the town has no Kontor)
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    constexpr std::uint32_t kMinutes = 30;
+    const sim::ai::Inflow good[] = {sim::ai::Inflow{19, 4 * 32, 1, kMinutes}};
+    const sim::ai::CityProjection with = engine.project_city(p, town, kMinutes, good);
+    const sim::ai::CityProjection without = engine.project_city(p, town, kMinutes);
+    REQUIRE(with.minutes.size() == kMinutes);
+    REQUIRE(without.minutes.size() == kMinutes);
+    const std::vector<std::uint32_t>& a = with.minutes.back().inhabitants;
+    const std::vector<std::uint32_t>& b = without.minutes.back().inhabitants;
+    const auto room = [&](std::size_t k) { return buildings.resident_classes()[k].max_per_house; };
+    const std::uint32_t houses = 3;
+    CHECK(a[0] + a[1] == houses * room(1));
+    CHECK(b[0] + b[1] == houses * room(0));  // the settler house falls back too, without its good
 }
 
 TEST_CASE("ai: a city's projection adds each ware's inflow of the ledger, minute by minute (P2.4)") {
@@ -4211,6 +4292,221 @@ TEST_CASE("ai: an action's value is the city's gold with it less without it, les
     CHECK((both.gold == std::vector<std::int64_t>{-15, -11, -7, -3}));
     CHECK(both.payback == 0);
     CHECK((both.people == v.people));
+}
+
+TEST_CASE("ai: a colony brings its raw material home and plans the workshop the home lacks (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);  // ware 19 from raw 6
+    REQUIRE(shop != nullptr);
+    const sim::ai::Inflow good{19, 30, 11, 30};
+    {  // the home makes none of the good: the raw material at the workshop's rate, the workshop planned
+        sim::ai::Commitment c;
+        c.upkeep = 3;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, good, 0, c);
+        CHECK(b.workshop == shop);
+        CHECK(b.inflow.ware == 6);
+        CHECK(b.inflow.per_minute == 30 * static_cast<std::int64_t>(shop->raw_use / shop->output));
+        CHECK(b.inflow.from == 11);
+        CHECK(c.upkeep == 3 + std::int64_t{shop->running_cost});
+        CHECK(c.cost == std::int64_t{shop->build_cost.money});
+    }
+    {  // it makes the good already: its own workshops take the raw material, none planned
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, good, 1, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 6);
+        CHECK(c.upkeep == 0);
+    }
+    {  // a plantation's ware comes as it is: the plantation is the colony's, its field ware employs nobody
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, sim::ai::Inflow{6, 30, 11, 30}, 0, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 6);
+        CHECK(c.upkeep == 0);
+    }
+    {  // a good no workshop makes comes as it is
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, sim::ai::Inflow{22, 30, 11, 30}, 0, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 22);
+        CHECK(b.inflow.per_minute == 30);
+    }
+}
+
+TEST_CASE(
+    "ai: a planned colony's upkeep is its own buildings' less its workers' taxes, its workshop's from its raw (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* field = sheet.producer(20704);  // raw 6 from its field ware 5
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);   // ware 19 from raw 6
+    REQUIRE(field != nullptr);
+    REQUIRE(shop != nullptr);
+    REQUIRE(field->output != 0);
+    sim::ai::ColonyBundle b;
+    b.inflow = sim::ai::Inflow{6, static_cast<std::int64_t>(field->output) * 2 + 1, 11, 30};  // two fields and a bit
+    b.workshop = shop;
+    constexpr std::int64_t kKontorCost = 15;
+    constexpr std::uint32_t kRate = 128;
+    const sim::ai::ColonyUpkeep u = sim::ai::colony_upkeep(sheet, b, kKontorCost, kRate);
+    CHECK(u.fields == 3);
+    CHECK(u.workers == 3 * std::uint64_t{field->workers});
+    CHECK(u.colony == kKontorCost + 3 * std::int64_t{field->running_cost} - sheet.tax(0, u.workers, kRate));
+    CHECK(u.workshop == std::int64_t{shop->running_cost});
+    CHECK(u.workshop_from == 11);
+    // Weighed with it instead of a booked 100 a minute: the colony's own each minute, the workshop's from minute 11.
+    sim::ai::ActionValue v;
+    v.gold.assign(21, -1000);
+    v.payback = 0;
+    const sim::ai::ActionValue d = sim::ai::with_upkeep(v, 100, u);
+    CHECK(d.gold[0] == -1000);
+    CHECK(d.gold[10] == -1000 + 10 * (100 - u.colony));
+    CHECK(d.gold[20] == -1000 + 20 * (100 - u.colony) - 10 * u.workshop);
+}
+
+TEST_CASE("ai: a raw-material colony's build-out follows its stage handler, slot by slot (P2.8)") {
+    // The town as a colony of a computer with no crops seen on its island: its order's market first,
+    // once; the animals and materials its table has no building for are passed over.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    sim::ai::CityPlan r;
+    r.land = 240;
+    const sim::City& town = *world.city(0, 0);
+    const std::vector<sim::ai::Engine::ColonyBuild> fresh = engine.colony_buildout(p, town.island, r, town.goods, 30);
+    REQUIRE(fresh.size() == 1);
+    CHECK(fresh.front().minute == 1);
+    CHECK(fresh.front().type == buildings.by_id(20809));
+    r.slots[sim::ai::kSlotMarket].count = 1;  // its market stands
+    CHECK(engine.colony_buildout(p, town.island, r, town.goods, 30).empty());
+}
+
+TEST_CASE("ai: a colony's farm waits for its fields' gold and its materials, as need() waits (P2.8)") {
+    // No crops seen on the island: the colony asks for sheep, one farm per 120 tiles. Its market
+    // stands. The farm (NeedType B) waits while the gold does not cover it and its 64 fields, or
+    // while the colony lacks its wood.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    sim::ai::CityPlan r;
+    r.land = 240;
+    r.slots[sim::ai::kSlotMarket].count = 1;
+    const assets::BuildingType* farm = buildings.by_id(20706);
+    REQUIRE(farm != nullptr);
+    const std::uint8_t wood = buildings.materials().wood;
+    std::vector<std::uint32_t> stock = world.city(0, 0)->goods;
+    stock.resize(std::max<std::size_t>(stock.size(), wood + 1U), 0);
+    {  // no wood: the farm waits, and so does all after it
+        stock[wood] = 0;
+        world.player(kHuman)->money = 100'000;
+        CHECK(engine.colony_buildout(p, 0, r, stock, 30).empty());
+    }
+    {  // gold for the farm but not for its fields: it waits
+        stock[wood] = 100 * 32;
+        // The minute's gold: what the player has and the town's taxes less its running costs.
+        const std::int64_t net =
+            sim::tax_income(*world.city(0, 0), buildings) - std::int64_t{sim::running_costs(world, buildings)[0]};
+        const std::int64_t fields = 64;  // 64 grass fields at 1 gold
+        world.player(kHuman)->money = static_cast<std::int32_t>(farm->build_cost.money + fields - net);
+        CHECK(engine.colony_buildout(p, 0, r, stock, 1).empty());
+        world.player(kHuman)->money = static_cast<std::int32_t>(farm->build_cost.money + fields + 1 - net);
+        const std::vector<sim::ai::Engine::ColonyBuild> one = engine.colony_buildout(p, 0, r, stock, 1);
+        REQUIRE(one.size() == 1);
+        CHECK(one.front().type == farm);
+    }
+    {  // both: two farms (240 tiles), one a minute
+        world.player(kHuman)->money = 100'000;
+        const std::vector<sim::ai::Engine::ColonyBuild> b = engine.colony_buildout(p, 0, r, stock, 30);
+        REQUIRE(b.size() >= 2);
+        CHECK(b[0].type == farm);
+        CHECK(b[0].minute == 1);
+        CHECK(b[1].type == farm);
+        CHECK(b[1].minute == 2);
+    }
+}
+
+TEST_CASE("ai: a colony's producer makes its ware from its own fields or from its raw material in stock (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* sheep = sheet.producer(20706);  // wool 4 from its grass 52, nobody makes grass
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);   // ware 19 from raw 6, which a plantation makes
+    REQUIRE(sheep != nullptr);
+    REQUIRE(shop != nullptr);
+    std::vector<std::uint32_t> stock(53, 0);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20706), stock);
+    CHECK(stock[4] == sheep->output);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20702), stock);  // no raw 6 in stock
+    CHECK(stock[19] == 0);
+    stock[6] = static_cast<std::uint32_t>(shop->raw_use);
+    sim::ai::produce_minute(sheet, *buildings.by_id(20702), stock);
+    CHECK(stock[19] == shop->output);
+    CHECK(stock[6] == 0);
+}
+
+TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat one (P2.8)") {
+    sim::ai::ColonyUpkeep u;
+    u.by_minute = {10, 10, 30, 30};
+    sim::ai::ActionValue v;
+    v.gold.assign(5, -100);
+    const sim::ai::ActionValue d = sim::ai::with_upkeep(v, 20, u);
+    CHECK(d.gold[1] == -100 + 10);
+    CHECK(d.gold[2] == -100 + 20);
+    CHECK(d.gold[4] == -100 + 20 - 20);
+}
+
+TEST_CASE(
+    "ai: a raw-material colony pays when its gold at the horizon beats idle gold and the best home build (P2.9)") {
+    using sim::ai::Patience;
+    using sim::ai::patience;
+    // Not above zero by the horizon: refused whatever home does.
+    CHECK(patience(0, 3000, 0, 0) == Patience::NotPositive);
+    CHECK(patience(-500, 3000, 100, 1000) == Patience::NotPositive);
+    // No home build, or one that does not pay: idle gold is the bar.
+    CHECK(patience(1, 3000, 0, 0) == Patience::Pays);
+    CHECK(patience(1, 3000, -200, 1000) == Patience::Pays);
+    // Per gold against the home build: 300/3000 is 100/1000, so the colony does not beat it.
+    CHECK(patience(300, 3000, 100, 1000) == Patience::HomeRate);
+    CHECK(patience(301, 3000, 100, 1000) == Patience::Pays);
+    CHECK(sim::ai::patience_name(Patience::HomeRate) == std::string{"refused: home rate"});
+}
+
+TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
+    sim::ai::ActionValue v;
+    v.gold = {-100, -90, -80, -70, -60, -50, -40};  // six minutes, +10 a minute
+    {
+        const sim::ai::Extension e = sim::ai::extend_value(v, 1, 3, std::nullopt);
+        CHECK(!e.too_early);
+        CHECK(e.slope == 10);
+        CHECK(e.payback == 6 + 5);  // -40 + 5 * 10 = +10
+    }
+    // Its goods began too late: the slope would hold their run-up.
+    CHECK(sim::ai::extend_value(v, 4, 3, std::nullopt).too_early);
+    // The game ends first.
+    CHECK(sim::ai::extend_value(v, 1, 3, std::uint32_t{10}).payback == 0);
+    CHECK(sim::ai::extend_value(v, 1, 3, std::uint32_t{11}).payback == 11);
+    // Falling or flat: no payback.
+    sim::ai::ActionValue flat;
+    flat.gold = {-100, -100, -100, -100};
+    CHECK(sim::ai::extend_value(flat, 1, 2, std::nullopt).payback == 0);
+    // Paid back within the horizon: that minute.
+    sim::ai::ActionValue early;
+    early.gold = {-10, 5, 20};
+    early.payback = 1;
+    CHECK(sim::ai::extend_value(early, 1, 1, std::nullopt).payback == 1);
 }
 
 TEST_CASE("ai: a town's idle workshop turns a plantation's raw material into its good, up to its rate (P2.7)") {

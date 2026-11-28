@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -138,9 +140,40 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
         carried[w][f] -= now * kCityTicksPerMinute;
         return now;
     };
+    // Only a computer's own taxes follow its rule; a person sets theirs.
+    // P2.8: the computer sets its taxes again as its city changes (tax_rates), with or without the
+    // action, so that an action that contents a class lets it pay more. It does so for the city it
+    // tends (refresh_city, every few seconds), at each of the city's ticks here; a person sets their
+    // own taxes.
+    // Its gold for the rule runs on at its net income now, minute by minute, as tax_rates sees both.
+    // shortcut: only the city tended now, at today's net income; upgrade when the projection carries
+    // which city is tended and the player's gold.
+    const City* tended = current_city(p);
+    const bool sets_taxes = rivals() && player(p).role == PlayerRole::Computer && tended != nullptr &&
+                            tended->island == c.island && tended->index == c.index;
+    const std::int64_t net = sets_taxes ? std::int64_t{net_income(p)} : 0;
+    std::int64_t money = player(p).money;
+    bool broke = false;
+    const auto retax = [&] {
+        const auto& classes = m_buildings.resident_classes();
+        for (std::size_t k = 0; k < classes.size() && k < city->tax_rate.size() && k < city->inhabitants.size(); ++k) {
+            if (city->inhabitants[k] == 0) {
+                continue;
+            }
+            const std::uint8_t chosen = chosen_tax(*city, k, broke, money);
+            if (city->tax_rate[k] != chosen) {
+                city->tax_rate[k] = chosen;
+                if (k < city->satisfaction.size()) {
+                    city->satisfaction[k] = satisfaction_of(*city, classes[k], chosen);
+                }
+            }
+        }
+    };
     std::uint32_t city_ms = m_sim.m_city_ms;
     out.minutes.reserve(minutes);
     for (std::uint32_t m = 0; m < minutes; ++m) {
+        money = player(p).money + net * static_cast<std::int64_t>(m);
+        broke = money < 0 && net < 0;  // tax_broke's rule at this minute's gold
         struct Traded {
             std::int64_t sold = 0;
             std::int64_t bought = 0;
@@ -191,6 +224,9 @@ CityProjection Engine::project_city(const AiPlayer& p, const City& c, std::uint3
                     pool[k.raw] -= used;
                     city->goods[k.ware] += static_cast<std::uint32_t>(std::max<std::int64_t>(0, added));
                     pool[k.ware] += std::max<std::int64_t>(0, added);
+                }
+                if (sets_taxes) {
+                    retax();
                 }
                 advance_city(copy, m_buildings, *city, out.running_cost, workers, nullptr);
             }
@@ -258,6 +294,35 @@ ActionValue add_value(ActionValue a, const ActionValue& b) {
         }
     }
     return a;
+}
+
+Extension extend_value(const ActionValue& v, std::uint32_t from, std::uint32_t period,
+                       std::optional<std::uint32_t> left) noexcept {
+    // A straight line on the action's own effect past what the projection shows, the yardstick's own
+    // rule (P2.6), from the mean of the last period so that a tick or a tax step does not set it.
+    Extension e;
+    if (v.gold.empty()) {
+        return e;
+    }
+    const auto horizon = static_cast<std::uint32_t>(v.gold.size() - 1);
+    if (v.payback != 0) {
+        e.payback = v.payback;
+        return e;
+    }
+    if (period == 0 || from + period > horizon) {
+        e.too_early = true;
+        return e;
+    }
+    e.slope = (v.gold[horizon] - v.gold[horizon - period]) / static_cast<std::int64_t>(period);
+    if (e.slope <= 0) {
+        return e;
+    }
+    const std::int64_t past = -v.gold[horizon] / e.slope + 1;  // minutes past the horizon until above zero
+    const std::int64_t at = std::int64_t{horizon} + past;
+    if (!left || at <= std::int64_t{*left}) {
+        e.payback = static_cast<std::uint32_t>(std::min<std::int64_t>(at, std::numeric_limits<std::uint32_t>::max()));
+    }
+    return e;
 }
 
 void add_city_gold(std::vector<std::int64_t>& gold, const CityProjection& f) {

@@ -577,6 +577,10 @@ int cmd_bench(const Args& args) {
         if (const auto phase = args.number("--ai-phase")) {
             simulation->computers().delay_first_step(static_cast<std::uint32_t>(*phase));
         }
+        // A measurement's counterfactual (P2.9): no raw-material colonies.
+        if (args.flag("--ai-no-raw-colonies")) {
+            simulation->computers().forbid_raw_colonies(true);
+        }
         std::size_t handed_over = 0;
         for (sim::PlayerId p = sim::first_human_player(*world); p != sim::kNoPlayer;
              p = sim::first_human_player(*world)) {

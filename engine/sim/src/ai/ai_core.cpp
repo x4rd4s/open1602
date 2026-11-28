@@ -17,6 +17,7 @@
 
 #include "o1602/sim/ai.hpp"
 #include "o1602/sim/consumption.hpp"
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/mission.hpp"
 
 namespace o1602::sim {
@@ -96,6 +97,10 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
     if (!logging()) {
         return;
     }
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    ++m_idle[p.player].decisions;
     const std::uint64_t ms = now_ms();
     m_decision_seq = ms == m_decision_ms ? m_decision_seq + 1 : 0;
     m_decision_ms = ms;
@@ -117,6 +122,22 @@ constexpr std::uint32_t kTrackMinutes = 10;
 
 }  // namespace
 
+Engine::CityVisits& Engine::visits_of(const AiPlayer& p, const City& c) const {
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    std::vector<CityVisits>& list = m_idle[p.player].cities;
+    for (CityVisits& v : list) {
+        if (v.island == c.island && v.city == c.index) {
+            return v;
+        }
+    }
+    CityVisits v;
+    v.island = c.island;
+    v.city = c.index;
+    return list.emplace_back(v);
+}
+
 void Engine::track(const AiPlayer& p) const {
     constexpr std::uint64_t kTrackMs = std::uint64_t{kTrackMinutes} * 60 * 1000;
     if (!logging()) {
@@ -130,6 +151,34 @@ void Engine::track(const AiPlayer& p) const {
     }
     m_track_ms[p.player] = now_ms() + kTrackMs;
     log(p, "track gold %d", player(p).money);
+    // P2.9: a window with gold above the cushion and no decision: what each city's order did, so that
+    // a list gone through (done) tells apart from an entry that held it (holds kind:slot).
+    // shortcut: the entry that held the visit, not why it held; upgrade with a reason per need().
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    IdleWindow& window = m_idle[p.player];
+    if (window.decisions == 0 && m_world.balance().ai_budget_horizon_minutes != 0) {
+        const std::vector<BudgetCache> budgets = m_budgets;
+        const Census census = m_census;
+        const std::vector<OverviewCache> overviews = m_overviews;
+        const Budget b = gold_budget(p);
+        m_budgets = budgets;
+        m_census = census;
+        m_overviews = overviews;
+        if (b.cash - b.reserved > b.cushion()) {
+            std::string cities;
+            for (const CityVisits& v : window.cities) {
+                cities += " " + std::to_string(v.island) + "/" + std::to_string(v.city) + " stage " +
+                          std::to_string(v.stage) + " visits " + std::to_string(v.visits) + " done " +
+                          std::to_string(v.done) + " holds " + std::to_string(v.hold_kind) + ":" +
+                          std::to_string(v.hold_slot);
+            }
+            log(p, "track idle cash %lld reserved %lld cushion %lld cities%s", static_cast<long long>(b.cash),
+                static_cast<long long>(b.reserved), static_cast<long long>(b.cushion()), cities.c_str());
+        }
+    }
+    window = IdleWindow{};
     // The Kontors' share of the trade balance; the rest is the ships' (supply runs that buy at
     // partners, P2.6).
     std::int64_t kontors = 0;
@@ -176,8 +225,16 @@ void Engine::track(const AiPlayer& p) const {
                      std::to_string(used) + "/" + std::to_string(asked) + "/" + std::to_string(stock) + "/" +
                      std::to_string(w < c.supply.size() ? c.supply[w].ratio : 0);
         }
-        log(p, "track city %u/%u people %u tax %d cost %d goods%s", unsigned{c.island}, unsigned{c.index},
-            population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str());
+        // Per class: inhabitants/satisfaction/taxes, as the value lines project them (P2.8's window reads).
+        std::string classes;
+        for (std::size_t k = 0; k < c.inhabitants.size(); ++k) {
+            classes += " " + std::to_string(c.inhabitants[k]) + "/" +
+                       std::to_string(k < c.satisfaction.size() ? c.satisfaction[k] : 0) + "/" +
+                       std::to_string(m_sheet.tax(k, c.inhabitants[k], k < c.tax_rate.size() ? c.tax_rate[k] : 0));
+        }
+        log(p, "track city %u/%u people %u tax %d cost %d goods%s classes%s", unsigned{c.island}, unsigned{c.index},
+            population(c), tax_income(c, m_buildings), index < costs.size() ? costs[index] : 0, goods.c_str(),
+            classes.c_str());
         log_flows(p, c, kTrackMinutes);
     }
     log_projection(p, kTrackMinutes, kontors);
@@ -187,8 +244,11 @@ void Engine::log_projection(const AiPlayer& p, std::uint32_t every, std::int64_t
     // Open1602 (P2.4): each own city over the budget's horizon, at every `every` minutes of it, for
     // the track lines that come then; and the gold, against the budget's straight line. Only the
     // log: the budget's caches are put back.
-    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    if (horizon == 0 || every == 0) {
+    // P2.8: as far as the ledger keeps its minutes one by one, past the budget's horizon, so that the
+    // log shows how far the projection still holds (the horizon a value may look ahead).
+    const std::uint32_t horizon =
+        std::max(m_world.balance().ai_budget_horizon_minutes, static_cast<std::uint32_t>(GoodsLedger::kMinutes));
+    if (m_world.balance().ai_budget_horizon_minutes == 0 || every == 0) {
         return;
     }
     const std::vector<BudgetCache> budgets = m_budgets;
@@ -278,18 +338,22 @@ void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) 
 }
 
 void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
-                       const Commitment& commit, const City* source, std::span<const Inflow> taken) const {
+                       const Commitment& commit, const City* source, std::span<const Inflow> taken,
+                       std::span<const Sheet::Producer* const> planned, const ColonyUpkeep* derived) const {
     if (!logging()) {
         return;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    const CityProjection with = project_city(p, c, horizon, extra);
+    const auto start = std::chrono::steady_clock::now();
+    const CityProjection with = project_city(p, c, horizon, extra, planned);
     const CityProjection without = project_city(p, c, horizon);
     ActionValue v = action_value(with, without, commit);
     if (source != nullptr) {
         v = add_value(std::move(v), action_value(project_city(p, *source, horizon, taken),
                                                  project_city(p, *source, horizon), Commitment{}));
     }
+    const auto us =
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
     std::string gold;
     for (std::uint32_t m = kTrackMinutes; m < v.gold.size(); m += kTrackMinutes) {
         gold += " +" + std::to_string(m) + " " + std::to_string(v.gold[m]);
@@ -308,8 +372,50 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
         };
         ratio += " +" + std::to_string(m) + " " + std::to_string(at(with)) + "/" + std::to_string(at(without));
     }
-    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s", kind, unsigned{c.island},
-        unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware}, ratio.c_str());
+    // With the action, per class at each horizon: inhabitants/satisfaction, then the city's taxes
+    // (the path from supply level to gold, beside track city's actual figures).
+    std::string path;
+    for (std::uint32_t m = kTrackMinutes; m <= with.minutes.size(); m += kTrackMinutes) {
+        const ProjectedMinute& f = with.minutes[m - 1];
+        path += " +" + std::to_string(m);
+        for (std::size_t k = 0; k < f.inhabitants.size(); ++k) {
+            path += " " + std::to_string(f.inhabitants[k]) + "/" +
+                    std::to_string(k < f.satisfaction.size() ? f.satisfaction[k] : 0);
+        }
+        path += " tax " + std::to_string(f.taxes);
+    }
+    // P2.8: past the validated horizon, the action's last slope until it pays back, up to the game's
+    // end where the scenario has one.
+    std::uint32_t from = extra.empty() ? 1 : extra.front().from;
+    for (const Inflow& in : extra) {
+        from = std::min(from, in.from);
+    }
+    const std::uint32_t limit = m_sim.rules().victory.time_limit_minutes;
+    const auto played = static_cast<std::uint32_t>(now_ms() / kGoodsMinuteMs);
+    const std::optional<std::uint32_t> left =
+        limit == 0 ? std::nullopt : std::optional<std::uint32_t>{std::max(limit, played) - played};
+    const auto beyond_of = [&](const ActionValue& a) {
+        const Extension e = extend_value(a, from, kTrackMinutes, left);
+        return e.too_early ? std::string{"too early to extend"}
+                           : "slope " + std::to_string(e.slope) + " payback " + std::to_string(e.payback);
+    };
+    const std::string beyond = beyond_of(v);
+    // P2.8: a colony's value with the upkeep of its own planned buildings, beside the booked one.
+    std::string own;
+    if (derived != nullptr) {
+        const ActionValue d = with_upkeep(v, commit.upkeep, *derived);
+        own = " derived upkeep colony " + std::to_string(derived->colony) + " fields " +
+              std::to_string(derived->fields) + " workers " + std::to_string(derived->workers) + " workshop " +
+              std::to_string(derived->workshop) + " from " + std::to_string(derived->workshop_from) + " gold";
+        for (std::uint32_t m = kTrackMinutes; m < d.gold.size(); m += kTrackMinutes) {
+            own += " +" + std::to_string(m) + " " + std::to_string(d.gold[m]);
+        }
+        own += " payback " + std::to_string(d.payback) + " beyond " + beyond_of(d);
+    }
+    log(p,
+        "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s%s",
+        kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware},
+        ratio.c_str(), path.c_str(), static_cast<long long>(us), beyond.c_str(), own.c_str());
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {
@@ -1227,6 +1333,10 @@ void ComputerPlayers::reset() {
 
 void ComputerPlayers::delay_first_step(std::uint32_t steps) {
     m_engine->delay_first_step(steps);
+}
+
+void ComputerPlayers::forbid_raw_colonies(bool on) {
+    m_engine->forbid_raw_colonies(on);
 }
 
 std::uint16_t ComputerPlayers::max_state_version() noexcept {

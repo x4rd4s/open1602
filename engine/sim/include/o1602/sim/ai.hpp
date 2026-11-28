@@ -47,6 +47,9 @@ public:
     /// `steps` steps later, so that runs of the same world show what chance alone moves. No game
     /// calls it; 0 leaves every run as it was.
     void delay_first_step(std::uint32_t steps);
+    /// For measurements only (o1602-tool bench --ai-no-raw-colonies, P2.9): an improved computer
+    /// founds no city that would become a colony without houses. No game calls it.
+    void forbid_raw_colonies(bool on);
 
     /// A ship a computer player or the pirates direct themselves (a nest founding): the pirates'
     /// own wandering leaves it alone.
