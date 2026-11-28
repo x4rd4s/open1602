@@ -1002,6 +1002,8 @@ private:
     [[nodiscard]] bool colony_loading(AiPlayer& p);
     /// The tons of a ware a colony ship sets out with, of the original's `tons`.
     [[nodiscard]] std::uint32_t colony_load(std::uint32_t tons) const;
+    /// A full load of wood, tools or bricks (colony_load of the original's 30 t), in stock units.
+    [[nodiscard]] std::uint32_t colony_full_load() const;
     [[nodiscard]] std::uint32_t colony_ship_candidate(AiPlayer& p);
     void task_abandon(AiPlayer& p);
     void unload_at(City& c, Ship& ship, bool keep_basics, bool destroy);

@@ -1300,7 +1300,7 @@ void Engine::log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> c
         }
         std::vector<std::uint32_t> stock(
             std::max<std::size_t>({std::size_t{m.wood}, std::size_t{m.tools}, std::size_t{m.bricks}}) + 1, 0);
-        const std::uint32_t load = colony_load(30) * kTon;
+        const std::uint32_t load = colony_full_load();
         stock[m.wood] = load;
         stock[m.tools] = load;
         stock[m.bricks] = load;
@@ -2125,6 +2125,10 @@ std::uint32_t Engine::colony_load(std::uint32_t tons) const {
     return classic() ? tons : tons * 2 / 3;
 }
 
+std::uint32_t Engine::colony_full_load() const {
+    return colony_load(30) * kTon;
+}
+
 bool Engine::colony_load_in_stock(AiPlayer& p, bool food) {
     // The whole load in the home city: an improved computer loads all of its stock there
     // (prepare_colony_ship) and sets out as soon as the ship is home.
@@ -2133,7 +2137,7 @@ bool Engine::colony_load_in_stock(AiPlayer& p, bool food) {
         return false;
     }
     const auto& m = m_buildings.materials();
-    const std::uint32_t full = colony_load(30) * kTon;
+    const std::uint32_t full = colony_full_load();
     return c->stock(m.wood) >= full && c->stock(m.tools) >= full &&
            (food ? c->stock(m_buildings.food_ware()) >= colony_load(15) * kTon : c->stock(m.bricks) >= full);
 }
