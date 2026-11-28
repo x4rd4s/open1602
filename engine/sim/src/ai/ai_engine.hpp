@@ -400,6 +400,7 @@ public:
     void tick(std::uint32_t dt_ms);
     void reset();
     void delay_first_step(std::uint32_t steps) { m_delay_steps = steps; }
+    void forbid_raw_colonies(bool on) { m_no_raw_colonies = on; }
     void init_player(AiPlayer& p);
     /// Gives every computer slot without a state one (reset() makes them for the slots of the start).
     void adopt_new_computers();
@@ -1970,6 +1971,8 @@ private:
     std::vector<std::int32_t> m_last_need;
     /// A measurement's delay of each computer's first step (delay_first_step), and whom it reached.
     std::uint32_t m_delay_steps = 0;
+    /// A measurement's counterfactual (forbid_raw_colonies): no city founded that becomes a colony.
+    bool m_no_raw_colonies = false;
     std::vector<bool> m_delayed;
 };
 

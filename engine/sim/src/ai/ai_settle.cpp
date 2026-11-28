@@ -1091,6 +1091,15 @@ void Engine::task_settle_land(AiPlayer& p) {
         site_unreachable(p);
         return;
     }
+    // A measurement's counterfactual (forbid_raw_colonies, P2.9): no city that becomes a colony
+    // without houses, judged as the colony stage will judge it, on the island's land free of other
+    // cities.
+    if (m_no_raw_colonies && rivals() && !p.pirates &&
+        becomes_colony(p, nullptr, free_land(island, MapCell::kNoCity, nullptr), 0)) {
+        log(p, "measurement: no raw-material colony on island %u", island);
+        end_settlement(p);
+        return;
+    }
     Player& pl = player(p);
     if (gifts() && pl.money < cheats().founding_below) {
         pl.money =

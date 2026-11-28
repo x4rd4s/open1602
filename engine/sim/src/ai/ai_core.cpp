@@ -1287,6 +1287,10 @@ void ComputerPlayers::delay_first_step(std::uint32_t steps) {
     m_engine->delay_first_step(steps);
 }
 
+void ComputerPlayers::forbid_raw_colonies(bool on) {
+    m_engine->forbid_raw_colonies(on);
+}
+
 std::uint16_t ComputerPlayers::max_state_version() noexcept {
     return static_cast<std::uint16_t>(ai::kStateVersion);
 }
