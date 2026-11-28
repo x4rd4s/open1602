@@ -278,10 +278,16 @@ Inflow Engine::colony_inflow(const City& home, std::uint8_t crop, const Commitme
 ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t made, Commitment& c) {
     ColonyBundle out;
     out.inflow = good;
-    // The workshop of the table that makes the good from one raw material (P2.7c's single input).
+    // The workshop of the table that makes the good from one raw material (P2.7c's single input),
+    // a raw material that a staffed producer makes: a plantation's field ware employs nobody, and a
+    // plantation is the colony's, not a workshop at home.
+    const auto staffed = [&](std::uint8_t w) {
+        return std::ranges::any_of(sheet.producers(),
+                                   [w](const Sheet::Producer& r) { return r.ware == w && r.workers != 0; });
+    };
     const Sheet::Producer* shop = nullptr;
     for (const Sheet::Producer& r : sheet.producers()) {
-        if (r.ware == good.ware && r.raw != 0 && r.raw2 == 0 && r.output != 0) {
+        if (r.ware == good.ware && r.raw != 0 && r.raw2 == 0 && r.output != 0 && staffed(r.raw)) {
             shop = &r;
             break;
         }
@@ -302,13 +308,14 @@ ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t
 
 ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64_t kontor, std::uint32_t rate) {
     ColonyUpkeep u;
-    // The colony's field for the inflow: the table's producer of that ware without a raw material.
+    // The colony's plantations for the inflow: the table's producer of that ware with workers (a
+    // plantation harvests its field ware; the fields themselves employ nobody).
     // shortcut: the field's cycle alone, its walks left out (Sheet::Producer::output), and the
     // workers' houses at no running cost and from the founding, the workshop from when its raw
     // material comes in; upgrade when P2.8 projects the colony's own build-out.
     std::int64_t fields_cost = 0;
     for (const Sheet::Producer& r : sheet.producers()) {
-        if (r.ware == b.inflow.ware && r.raw == 0 && r.output != 0) {
+        if (r.ware == b.inflow.ware && r.raw2 == 0 && r.output != 0 && r.workers != 0) {
             const auto need = static_cast<std::uint64_t>(std::max<std::int64_t>(b.inflow.per_minute, 0));
             u.fields = static_cast<std::uint32_t>(std::max<std::uint64_t>((need + r.output - 1) / r.output, 1));
             u.workers = std::uint64_t{u.fields} * r.workers;

@@ -3959,9 +3959,13 @@ assets::BuildingTable hungry_town_table() {
         "  @Nummer: 6\n  Id: 20702\n  Kind: 14\n  Gfx: 60\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
         "    Ware: 19\n    Rohstoff: 6\n    Prodmenge: 1\n    Rohmenge: 2\n    Interval: 40\n    Kosten: 5, 2\n"
         "    Arbeiter: 2\n  EndObj\n"
-        // A field of raw material 6, not built in the town (P2.8 plans it for a colony).
-        "  @Nummer: 8\n  Id: 20704\n  Kind: 14\n  Gfx: 80\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
-        "    Ware: 6\n    Prodmenge: 1\n    Interval: 40\n    Kosten: 4, 1\n    Arbeiter: 3\n  EndObj\n"
+        // A field of ware 5, which employs nobody, and a plantation of raw material 6 from it, neither
+        // built in the town (P2.8 plans the plantation for a colony).
+        "  @Nummer: 8\n  Id: 20705\n  Kind: 14\n  Gfx: 90\n  Size: 1, 1\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 5\n    Prodmenge: 1\n    Interval: 40\n  EndObj\n"
+        "  @Nummer: 9\n  Id: 20704\n  Kind: 14\n  Gfx: 80\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 6\n    Rohstoff: 5\n    Prodmenge: 1\n    Rohmenge: 1\n    Interval: 40\n    Kosten: 4, 1\n"
+        "    Arbeiter: 3\n  EndObj\n"
         // A chapel, not built in the town but where a test places it (P2.8).
         "  @Nummer: 7\n  Id: 20803\n  Kind: 14\n  Gfx: 70\n  Size: 2, 2\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 18\n    Radius: 16\n    Kosten: 5, 2\n  EndObj\n"
@@ -4307,6 +4311,13 @@ TEST_CASE("ai: a colony brings its raw material home and plans the workshop the 
         CHECK(b.inflow.ware == 6);
         CHECK(c.upkeep == 0);
     }
+    {  // a plantation's ware comes as it is: the plantation is the colony's, its field ware employs nobody
+        sim::ai::Commitment c;
+        const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, sim::ai::Inflow{6, 30, 11, 30}, 0, c);
+        CHECK(b.workshop == nullptr);
+        CHECK(b.inflow.ware == 6);
+        CHECK(c.upkeep == 0);
+    }
     {  // a good no workshop makes comes as it is
         sim::ai::Commitment c;
         const sim::ai::ColonyBundle b = sim::ai::colony_bundle(sheet, sim::ai::Inflow{22, 30, 11, 30}, 0, c);
@@ -4320,7 +4331,7 @@ TEST_CASE(
     "ai: a planned colony's upkeep is its own buildings' less its workers' taxes, its workshop's from its raw (P2.8)") {
     const assets::BuildingTable buildings = hungry_town_table();
     const sim::ai::Sheet sheet(buildings);
-    const sim::ai::Sheet::Producer* field = sheet.producer(20704);  // raw 6, no raw material
+    const sim::ai::Sheet::Producer* field = sheet.producer(20704);  // raw 6 from its field ware 5
     const sim::ai::Sheet::Producer* shop = sheet.producer(20702);   // ware 19 from raw 6
     REQUIRE(field != nullptr);
     REQUIRE(shop != nullptr);
