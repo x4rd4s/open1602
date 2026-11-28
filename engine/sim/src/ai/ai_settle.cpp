@@ -1256,7 +1256,7 @@ Engine::RawColonyValue Engine::raw_colony_value(const AiPlayer& p, const City& h
 }
 
 void Engine::log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops) {
-    // P2.9, only the log: the patience rule (2026-11-28) on each candidate. A raw-material colony is
+    // P2.9, only the log: the patience rule on each candidate. A raw-material colony is
     // worth founding when its gold at the budget's horizon is above zero and, per gold of its cost,
     // above the best home build's planned within that horizon; past the horizon the projection is
     // not validated, so nothing is extended. Idle gold earns nothing: with no home build or none that
