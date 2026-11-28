@@ -4346,12 +4346,12 @@ TEST_CASE(
     sim::ai::ColonyBundle b;
     b.inflow = sim::ai::Inflow{6, static_cast<std::int64_t>(field->output) * 2 + 1, 11, 30};  // two fields and a bit
     b.workshop = shop;
-    constexpr std::int64_t kKontor = 15;
+    constexpr std::int64_t kKontorCost = 15;
     constexpr std::uint32_t kRate = 128;
-    const sim::ai::ColonyUpkeep u = sim::ai::colony_upkeep(sheet, b, kKontor, kRate);
+    const sim::ai::ColonyUpkeep u = sim::ai::colony_upkeep(sheet, b, kKontorCost, kRate);
     CHECK(u.fields == 3);
     CHECK(u.workers == 3 * std::uint64_t{field->workers});
-    CHECK(u.colony == kKontor + 3 * std::int64_t{field->running_cost} - sheet.tax(0, u.workers, kRate));
+    CHECK(u.colony == kKontorCost + 3 * std::int64_t{field->running_cost} - sheet.tax(0, u.workers, kRate));
     CHECK(u.workshop == std::int64_t{shop->running_cost});
     CHECK(u.workshop_from == 11);
     // Weighed with it instead of a booked 100 a minute: the colony's own each minute, the workshop's from minute 11.
