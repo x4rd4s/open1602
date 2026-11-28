@@ -1506,9 +1506,18 @@ TEST_CASE("ai: the colony patience rule's bar is the best paying home build of t
     CHECK(r.home.cost == 2000);
     p->home_builds = {{now - 30, -50, 100}};
     CHECK(engine.colony_rate(*p, *home, 0).home.cost == 0);  // idle gold: no bar
+    // The verdict is worked out once a goods minute and kept with the player.
+    (void)engine.colony_verdict(*p, *home, 0);
+    (void)engine.colony_verdict(*p, *home, 0);
+    CHECK(p->verdicts.size() == 1);
+    const std::uint64_t minute = p->verdict_minute;
+    g.world.set_time_ms(now + 60'000);
+    (void)engine.colony_verdict(*p, *home, 0);
+    CHECK(p->verdict_minute == minute + 1);
+    CHECK(p->verdicts.size() == 1);
 }
 
-TEST_CASE("ai: a computer's home builds survive a save (P2.9)") {
+TEST_CASE("ai: a computer's home builds and colony verdicts survive a save (P2.9)") {
     Game g(false);
     sim::Simulation s(g.world, g.buildings, g.figures);
     sim::ComputerPlayers ai(s);
@@ -1526,6 +1535,8 @@ TEST_CASE("ai: a computer's home builds survive a save (P2.9)") {
     }
     REQUIRE(!state.players.empty());
     state.players[0].home_builds = {{1'000, 250, 400}};
+    state.players[0].verdict_minute = 17;
+    state.players[0].verdicts = {{sim::ware::kTobaccoField, 3, true, true, 1}};
     annokit::core::ByteWriter out;
     sim::ai::Saver saver(out, sim::ComputerPlayers::max_state_version());
     saver(state);
@@ -1544,6 +1555,13 @@ TEST_CASE("ai: a computer's home builds survive a save (P2.9)") {
     CHECK(copy.players[0].home_builds[0].ms == 1'000);
     CHECK(copy.players[0].home_builds[0].gold == 250);
     CHECK(copy.players[0].home_builds[0].cost == 400);
+    CHECK(copy.players[0].verdict_minute == 17);
+    REQUIRE(copy.players[0].verdicts.size() == 1);
+    CHECK(copy.players[0].verdicts[0].crop == sim::ware::kTobaccoField);
+    CHECK(copy.players[0].verdicts[0].island == 3);
+    CHECK(copy.players[0].verdicts[0].colony);
+    CHECK(copy.players[0].verdicts[0].need);
+    CHECK(copy.players[0].verdicts[0].verdict == 1);
 }
 
 TEST_CASE("ai: below the hardest level a rival is near only by cities on islands the computer discovered") {

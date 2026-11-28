@@ -1348,7 +1348,7 @@ std::uint16_t ComputerPlayers::state_version() const noexcept {
     // a game writes the bytes it wrote before.
     constexpr std::uint64_t kNarrow = 0xFFFFFFFFU;
     for (const ai::AiPlayer& p : m_state->players) {
-        if (!p.home_builds.empty()) {
+        if (!p.home_builds.empty() || !p.verdicts.empty()) {
             return static_cast<std::uint16_t>(ai::kStateWithHomeBuilds);
         }
     }

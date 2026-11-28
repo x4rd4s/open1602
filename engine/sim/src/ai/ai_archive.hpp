@@ -439,7 +439,18 @@ void io(A& a, AiPlayer& p) {
     }
     if (a.version() >= kStateWithHomeBuilds) {
         a(p.home_builds);
+        a(p.verdict_minute);
+        a(p.verdicts);
     }
+}
+
+template <class A>
+void io(A& a, ColonyVerdict& v) {
+    a(v.crop);
+    a(v.island);
+    a(v.colony);
+    a(v.need);
+    a(v.verdict);
 }
 
 template <class A>
