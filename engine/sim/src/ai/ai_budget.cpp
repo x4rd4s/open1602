@@ -300,6 +300,43 @@ ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t
     return out;
 }
 
+ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64_t kontor, std::uint32_t rate) {
+    ColonyUpkeep u;
+    // The colony's field for the inflow: the table's producer of that ware without a raw material.
+    // shortcut: the field's cycle alone, its walks left out (Sheet::Producer::output), and the
+    // workers' houses at no running cost and from the founding, the workshop from when its raw
+    // material comes in; upgrade when P2.8 projects the colony's own build-out.
+    std::int64_t fields_cost = 0;
+    for (const Sheet::Producer& r : sheet.producers()) {
+        if (r.ware == b.inflow.ware && r.raw == 0 && r.output != 0) {
+            const auto need = static_cast<std::uint64_t>(std::max<std::int64_t>(b.inflow.per_minute, 0));
+            u.fields = static_cast<std::uint32_t>(std::max<std::uint64_t>((need + r.output - 1) / r.output, 1));
+            u.workers = std::uint64_t{u.fields} * r.workers;
+            fields_cost = std::int64_t{u.fields} * r.running_cost;
+            break;
+        }
+    }
+    u.colony = kontor + fields_cost - sheet.tax(0, u.workers, rate);
+    if (b.workshop != nullptr) {
+        u.workshop = b.workshop->running_cost;
+        u.workshop_from = b.inflow.from;
+    }
+    return u;
+}
+
+ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u) {
+    std::int64_t diff = 0;
+    v.payback = 0;
+    for (std::size_t m = 1; m < v.gold.size(); ++m) {
+        diff += booked - u.colony - (u.workshop_from != 0 && m >= u.workshop_from ? u.workshop : 0);
+        v.gold[m] += diff;
+        if (v.payback == 0 && v.gold[m] > 0) {
+            v.payback = static_cast<std::uint32_t>(m);
+        }
+    }
+    return v;
+}
+
 ColonyBundle Engine::colony_bundle(const City& home, std::uint8_t crop, Commitment& c) const {
     const Inflow good = colony_inflow(home, crop, c);
     // shortcut: "makes none" from the home ledger's production of the good over the horizon; upgrade

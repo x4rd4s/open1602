@@ -1122,6 +1122,8 @@ void Engine::task_settle_land(AiPlayer& p) {
     if (logging()) {
         const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
         log_decision(p, "found", s.crop, island, c->index, logged_commitment(p, s.crop), 0, 0, home);
+        // P2.8: the colony plan it was founded from, by the plan decision's id (its game time); 0 for none.
+        log(p, "found from plan %llu crop %u", static_cast<unsigned long long>(s.plan_ms), unsigned{s.plan_crop});
     }
     p.has_city = true;
     p.island = island;
@@ -1607,9 +1609,22 @@ void Engine::colony_plan(AiPlayer& p, bool asked) {
                 const ColonyBundle bundle = colony_bundle(*home, *best, commit);
                 const Inflow ship[] = {bundle.inflow};
                 const Sheet::Producer* const shop[] = {bundle.workshop};
+                if (bundle.workshop != nullptr) {
+                    log(p, "colony plan workshop %u cost %lld upkeep %u", unsigned{bundle.workshop->type->id},
+                        static_cast<long long>(bundle.workshop->build_cost.money), bundle.workshop->running_cost);
+                }
+                std::int64_t kontor = 0;
+                if (const assets::BuildingType* b = by_id(id::kontor(1)); b != nullptr) {
+                    kontor = b->running_cost;
+                }
+                // shortcut: the colony's workers taxed at the home's pioneer rate; upgrade when P2.8
+                // projects the colony's own city.
+                const std::uint32_t rate = home->tax_rate.empty() ? 0 : home->tax_rate.front();
+                const ColonyUpkeep own = colony_upkeep(m_sheet, bundle, kontor, rate);
                 log_value(p, "colony plan", *home, ship, commit, nullptr, {},
                           bundle.workshop != nullptr ? std::span<const Sheet::Producer* const>{shop}
-                                                     : std::span<const Sheet::Producer* const>{});
+                                                     : std::span<const Sheet::Producer* const>{},
+                          &own);
             }
         }
     }

@@ -291,7 +291,7 @@ void Engine::log_flows(const AiPlayer& p, const City& c, std::uint32_t minutes) 
 
 void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
                        const Commitment& commit, const City* source, std::span<const Inflow> taken,
-                       std::span<const Sheet::Producer* const> planned) const {
+                       std::span<const Sheet::Producer* const> planned, const ColonyUpkeep* derived) const {
     if (!logging()) {
         return;
     }
@@ -346,13 +346,27 @@ void Engine::log_value(const AiPlayer& p, const char* kind, const City& c, std::
     const auto played = static_cast<std::uint32_t>(now_ms() / kGoodsMinuteMs);
     const std::optional<std::uint32_t> left =
         limit == 0 ? std::nullopt : std::optional<std::uint32_t>{std::max(limit, played) - played};
-    const Extension e = extend_value(v, from, kTrackMinutes, left);
-    const std::string beyond = e.too_early
-                                   ? std::string{"too early to extend"}
-                                   : "slope " + std::to_string(e.slope) + " payback " + std::to_string(e.payback);
-    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s",
+    const auto beyond_of = [&](const ActionValue& a) {
+        const Extension e = extend_value(a, from, kTrackMinutes, left);
+        return e.too_early ? std::string{"too early to extend"}
+                           : "slope " + std::to_string(e.slope) + " payback " + std::to_string(e.payback);
+    };
+    const std::string beyond = beyond_of(v);
+    // P2.8: a colony's value with the upkeep of its own planned buildings, beside the booked one.
+    std::string own;
+    if (derived != nullptr) {
+        const ActionValue d = with_upkeep(v, commit.upkeep, *derived);
+        own = " derived upkeep colony " + std::to_string(derived->colony) + " fields " +
+              std::to_string(derived->fields) + " workers " + std::to_string(derived->workers) + " workshop " +
+              std::to_string(derived->workshop) + " from " + std::to_string(derived->workshop_from) + " gold";
+        for (std::uint32_t m = kTrackMinutes; m < d.gold.size(); m += kTrackMinutes) {
+            own += " +" + std::to_string(m) + " " + std::to_string(d.gold[m]);
+        }
+        own += " payback " + std::to_string(d.payback) + " beyond " + beyond_of(d);
+    }
+    log(p, "value %s city %u/%u gold%s payback %u people%s ware %u ratio%s path%s us %lld beyond validated horizon %s%s",
         kind, unsigned{c.island}, unsigned{c.index}, gold.c_str(), v.payback, people.c_str(), unsigned{ware},
-        ratio.c_str(), path.c_str(), static_cast<long long>(us), beyond.c_str());
+        ratio.c_str(), path.c_str(), static_cast<long long>(us), beyond.c_str(), own.c_str());
 }
 
 Commitment Engine::logged_commitment(const AiPlayer& p, std::uint8_t crop) const {

@@ -243,6 +243,21 @@ struct ColonyBundle {
 };
 [[nodiscard]] ColonyBundle colony_bundle(const Sheet& sheet, const Inflow& good, std::uint64_t made, Commitment& c);
 
+/// Open1602 (P2.8): what a planned colony costs a minute from its own buildings: from the founding its
+/// Kontor and the fields for the bundle's inflow, less the taxes of the fields' workers at `rate`; the
+/// planned workshop at home from when its raw material comes in.
+struct ColonyUpkeep {
+    std::int64_t colony = 0;
+    std::int64_t workshop = 0;
+    std::uint32_t workshop_from = 0;
+    std::uint32_t fields = 0;
+    std::uint64_t workers = 0;
+};
+[[nodiscard]] ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64_t kontor,
+                                         std::uint32_t rate);
+/// `v`, weighed with `booked` gold a minute of running costs, weighed with `u`'s instead.
+[[nodiscard]] ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u);
+
 /// Open1602 (P2.8): an action's value past the validated horizon (the projection's last minute):
 /// its gold goes on at its mean slope over the last `period` minutes until it pays back, at most
 /// `left` minutes from now (none: the game has no end). Too early when the action's goods begin (minute `from`) less
@@ -731,7 +746,8 @@ private:
     /// With `source` (an own city the goods come from), its loss `taken` is added (add_value).
     void log_value(const AiPlayer& p, const char* kind, const City& c, std::span<const Inflow> extra,
                    const Commitment& commit, const City* source = nullptr, std::span<const Inflow> taken = {},
-                   std::span<const Sheet::Producer* const> planned = {}) const;
+                   std::span<const Sheet::Producer* const> planned = {},
+                   const ColonyUpkeep* derived = nullptr) const;
     /// P2.7: what a colony of `crop` brings the home city: the home's demand of the crop's good it
     /// does not get (Demand less Residents over the budget's horizon), from the colony's delivery on.
     [[nodiscard]] Inflow colony_inflow(const City& home, std::uint8_t crop, const Commitment& c) const;

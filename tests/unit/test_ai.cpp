@@ -3959,6 +3959,9 @@ assets::BuildingTable hungry_town_table() {
         "  @Nummer: 6\n  Id: 20702\n  Kind: 14\n  Gfx: 60\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
         "    Ware: 19\n    Rohstoff: 6\n    Prodmenge: 1\n    Rohmenge: 2\n    Interval: 40\n    Kosten: 5, 2\n"
         "    Arbeiter: 2\n  EndObj\n"
+        // A field of raw material 6, not built in the town (P2.8 plans it for a colony).
+        "  @Nummer: 8\n  Id: 20704\n  Kind: 14\n  Gfx: 80\n  Size: 2, 2\n  Objekt: HAUS_PRODTYP\n    Kind: 3\n"
+        "    Ware: 6\n    Prodmenge: 1\n    Interval: 40\n    Kosten: 4, 1\n    Arbeiter: 3\n  EndObj\n"
         // A chapel, not built in the town but where a test places it (P2.8).
         "  @Nummer: 7\n  Id: 20803\n  Kind: 14\n  Gfx: 70\n  Size: 2, 2\n"
         "  Objekt: HAUS_PRODTYP\n    Kind: 18\n    Radius: 16\n    Kosten: 5, 2\n  EndObj\n"
@@ -4311,6 +4314,35 @@ TEST_CASE("ai: a colony brings its raw material home and plans the workshop the 
         CHECK(b.inflow.ware == 22);
         CHECK(b.inflow.per_minute == 30);
     }
+}
+
+TEST_CASE("ai: a planned colony's upkeep is its own buildings' less its workers' taxes, its workshop's from its raw (P2.8)") {
+    const assets::BuildingTable buildings = hungry_town_table();
+    const sim::ai::Sheet sheet(buildings);
+    const sim::ai::Sheet::Producer* field = sheet.producer(20704);  // raw 6, no raw material
+    const sim::ai::Sheet::Producer* shop = sheet.producer(20702);   // ware 19 from raw 6
+    REQUIRE(field != nullptr);
+    REQUIRE(shop != nullptr);
+    REQUIRE(field->output != 0);
+    sim::ai::ColonyBundle b;
+    b.inflow = sim::ai::Inflow{6, static_cast<std::int64_t>(field->output) * 2 + 1, 11, 30};  // two fields and a bit
+    b.workshop = shop;
+    constexpr std::int64_t kKontor = 15;
+    constexpr std::uint32_t kRate = 128;
+    const sim::ai::ColonyUpkeep u = sim::ai::colony_upkeep(sheet, b, kKontor, kRate);
+    CHECK(u.fields == 3);
+    CHECK(u.workers == 3 * std::uint64_t{field->workers});
+    CHECK(u.colony == kKontor + 3 * std::int64_t{field->running_cost} - sheet.tax(0, u.workers, kRate));
+    CHECK(u.workshop == std::int64_t{shop->running_cost});
+    CHECK(u.workshop_from == 11);
+    // Weighed with it instead of a booked 100 a minute: the colony's own each minute, the workshop's from minute 11.
+    sim::ai::ActionValue v;
+    v.gold.assign(21, -1000);
+    v.payback = 0;
+    const sim::ai::ActionValue d = sim::ai::with_upkeep(v, 100, u);
+    CHECK(d.gold[0] == -1000);
+    CHECK(d.gold[10] == -1000 + 10 * (100 - u.colony));
+    CHECK(d.gold[20] == -1000 + 20 * (100 - u.colony) - 10 * u.workshop);
 }
 
 TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
