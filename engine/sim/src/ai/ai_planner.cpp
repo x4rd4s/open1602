@@ -3269,7 +3269,7 @@ std::vector<Engine::LuxuryCrop> Engine::luxury_crops(const AiPlayer& p) const {
     }};
 }
 
-std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, const City& c, const CityPlan& r,
+std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
                                                          std::uint32_t minutes) const {
     // P2.8: the colony stage's handler (run_stage, stage::kColony) on slot counts of its own, as far as
     // the projected gold pays: its order (a market, the workshops of its raw materials), then animals
@@ -3299,7 +3299,7 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, cons
     const std::uint32_t n_fields =
         std::min(r.land / at.ai_colony_luxury_tiles, grown(r, colony_fields(p.max_stage), true));
     const std::uint32_t n_animals = std::min(r.land / at.ai_colony_animal_tiles, grown(r, at.ai_colony_animals, true));
-    const bool crops_here = view(p).full_crops(c.island) != 0;
+    const bool crops_here = view(p).full_crops(island) != 0;
     const std::vector<LuxuryCrop> crops = luxury_crops(p);
     // The next slot the handler wants built, kNoSlot for none.
     const auto next = [&](std::int64_t budget) -> std::uint8_t {
@@ -3338,7 +3338,7 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, cons
             bool wine_island = false;
             for (const LuxuryCrop& crop : crops) {
                 if (!crop.eligible ||
-                    !plants_on(view(p).fertility(c.island, crop.field).value_or(0), false, true, true, false)) {
+                    !plants_on(view(p).fertility(island, crop.field).value_or(0), false, true, true, false)) {
                     continue;
                 }
                 wine_island = wine_island || crop.slot == kSlotWine;

@@ -483,10 +483,10 @@ public:
     };
     /// P2.8, the computer log only: a founded colony's value with its planned build-out.
     void log_founded_value(const AiPlayer& p, const City& c, const CityPlan& r) const;
-    /// P2.8: what the colony stage (stage::kColony) of city `c` with plan `r` builds over `minutes`
-    /// minutes, entry by entry in the handler's order, each at the first minute the projected gold
-    /// pays for it.
-    [[nodiscard]] std::vector<ColonyBuild> colony_buildout(const AiPlayer& p, const City& c, const CityPlan& r,
+    /// P2.8: what the colony stage (stage::kColony) of a city on `island` with plan `r` (its land,
+    /// its slot counts) builds over `minutes` minutes, entry by entry in the handler's order, each at
+    /// the first minute the projected gold pays for it. A candidate island takes a plan of its own.
+    [[nodiscard]] std::vector<ColonyBuild> colony_buildout(const AiPlayer& p, std::uint16_t island, const CityPlan& r,
                                                            std::uint32_t minutes) const;
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and

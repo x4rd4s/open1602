@@ -1167,6 +1167,9 @@ void Engine::log_founded_value(const AiPlayer& p, const City& c, const CityPlan&
     // houses and pays taxes, which the virtual colony does not yet project.
     // shortcut: the build-out follows today's stage orders, so the value predicts today's build
     // behaviour; upgrade in Phase 3, where builds follow value() and the colony takes P3's planned path.
+    // shortcut: valued at the founding, after the island is chosen, so it steers nothing yet; upgrade
+    // with the behaviour step, where colony_rank or the founding check values each candidate island
+    // (colony_buildout on a plan of its own, with the land and fertility the player sees there).
     const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
     const std::uint8_t crop = p.settle.crop;
     if (home == nullptr || crop == kAnyCrop || crop == 0) {
@@ -1184,7 +1187,7 @@ void Engine::log_founded_value(const AiPlayer& p, const City& c, const CityPlan&
         kontor = b->running_cost;
     }
     const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
-    const std::vector<ColonyBuild> builds = colony_buildout(p, c, r, horizon);
+    const std::vector<ColonyBuild> builds = colony_buildout(p, c.island, r, horizon);
     ColonyUpkeep own;
     own.by_minute.assign(horizon, kontor);
     std::string list;
