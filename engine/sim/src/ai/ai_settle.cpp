@@ -1200,10 +1200,9 @@ void Engine::log_founded_value(const AiPlayer& p, const City& c, const CityPlan&
         own.workshop = bundle.workshop->running_cost;
         own.workshop_from = bundle.inflow.from;
     }
-    log(p, "value found city %u/%u kind colony land %u builds%s spent %lld upkeep +10 %lld +30 %lld",
-        unsigned{c.island}, unsigned{c.index}, r.land, list.c_str(), static_cast<long long>(spent),
-        static_cast<long long>(own.by_minute[std::min<std::uint32_t>(10, horizon) - 1]),
-        static_cast<long long>(own.by_minute.back()));
+    log(p, "value found city %u/%u kind colony land %u builds%s spent %lld upkeep %lld", unsigned{c.island},
+        unsigned{c.index}, r.land, list.c_str(), static_cast<long long>(spent),
+        static_cast<long long>(own.by_minute.empty() ? kontor : own.by_minute.back()));
     const Inflow ship[] = {bundle.inflow};
     const Sheet::Producer* const shop[] = {bundle.workshop};
     log_value(p, "colony found", *home, ship, commit, nullptr, {},

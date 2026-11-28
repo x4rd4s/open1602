@@ -1156,7 +1156,9 @@ private:
         std::int64_t upkeep;
         bool eligible;
     };
-    [[nodiscard]] std::array<LuxuryCrop, 6> luxury_crops(const AiPlayer& p) const;
+    [[nodiscard]] std::vector<LuxuryCrop> luxury_crops(const AiPlayer& p) const;
+    [[nodiscard]] static std::optional<std::int64_t> luxury_budget(const AiPlayer& p, std::int64_t net,
+                                                                   std::int64_t money) noexcept;
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;

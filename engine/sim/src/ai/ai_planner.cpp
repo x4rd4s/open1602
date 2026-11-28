@@ -3237,7 +3237,19 @@ bool Engine::weapons(AiPlayer& p) {
     return need(p, kSlotCannons, 1);
 }
 
-std::array<Engine::LuxuryCrop, 6> Engine::luxury_crops(const AiPlayer& p) const {
+std::optional<std::int64_t> Engine::luxury_budget(const AiPlayer& p, std::int64_t net, std::int64_t money) noexcept {
+    // What luxury() lets a crop's producers cost a minute: the net income, or a hundredth of the
+    // gold when the income is small; nothing with little gold besides.
+    if (net >= std::int64_t{p.cities} * 25) {
+        return net;
+    }
+    if (money < 7000) {
+        return std::nullopt;
+    }
+    return money / 100;
+}
+
+std::vector<Engine::LuxuryCrop> Engine::luxury_crops(const AiPlayer& p) const {
     // The crops luxury() plants, with the good the home city must lack for each.
     const auto upkeep = [&](std::uint8_t w, std::uint8_t raw) -> std::int64_t {
         const assets::BuildingType* b = producer(w, raw);
@@ -3288,7 +3300,7 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, cons
         std::min(r.land / at.ai_colony_luxury_tiles, grown(r, colony_fields(p.max_stage), true));
     const std::uint32_t n_animals = std::min(r.land / at.ai_colony_animal_tiles, grown(r, at.ai_colony_animals, true));
     const bool crops_here = view(p).full_crops(c.island) != 0;
-    const std::array<LuxuryCrop, 6> crops = luxury_crops(p);
+    const std::vector<LuxuryCrop> crops = luxury_crops(p);
     // The next slot the handler wants built, kNoSlot for none.
     const auto next = [&](std::int64_t budget) -> std::uint8_t {
         // shortcut: one market, and one more for each crop that has fields (need_market's flag: the
@@ -3348,12 +3360,8 @@ std::vector<Engine::ColonyBuild> Engine::colony_buildout(const AiPlayer& p, cons
     std::int64_t upkeep = 0;
     for (std::uint32_t m = 1; m <= minutes; ++m) {
         money += net - upkeep;
-        // luxury()'s budget: the net income, or a hundredth of the gold when it is small.
-        std::int64_t budget = net - upkeep;
-        if (budget < std::int64_t{p.cities} * 25) {
-            budget = money >= 7000 ? money / 100 : std::numeric_limits<std::int64_t>::min();
-        }
-        const std::uint8_t slot = next(budget);
+        const std::uint8_t slot =
+            next(luxury_budget(p, net - upkeep, money).value_or(std::numeric_limits<std::int64_t>::min()));
         const assets::BuildingType* b = slot != kNoSlot ? building_of(slot) : nullptr;
         if (b == nullptr) {
             if (slot != kNoSlot) {
@@ -3383,13 +3391,11 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     if (c == nullptr || r == nullptr || home == nullptr || p.max_stage < stage::kSettlers) {
         return false;
     }
-    std::int64_t budget = net_income(p);
-    if (budget < std::int64_t{p.cities} * 25) {
-        if (player(p).money < 7000) {
-            return false;
-        }
-        budget = player(p).money / 100;
+    const std::optional<std::int64_t> afford = luxury_budget(p, net_income(p), player(p).money);
+    if (!afford) {
+        return false;
     }
+    const std::int64_t budget = *afford;
     const std::uint32_t cap = home->capacity / 2;
     // 1. Iron
     if (p.score >= 2 && view(p).fertility(c->island, ware::kOre).value_or(0) >= 64 &&
@@ -3409,11 +3415,11 @@ bool Engine::luxury(AiPlayer& p, std::uint32_t n, bool exclusive) {
     }
     bool wine_island = false;
     using Crop = LuxuryCrop;
-    const std::array<Crop, 6> crops = luxury_crops(p);
+    const std::vector<Crop> crops = luxury_crops(p);
     // Open1602: an improved computer plants first what its people go without (critical_short),
     // then what its home city's people run out of soonest; for a critical good as many fields as
     // make up what its cities lack, beyond the order's number.
-    std::array<Crop, 6> order = crops;
+    std::vector<Crop> order = crops;
     if (rivals()) {
         wine_island = view(p).fertility(c->island, ware::kWineField).value_or(0) == 128;
         std::ranges::stable_sort(order, {}, [&](const Crop& crop) {
