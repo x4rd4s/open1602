@@ -30,6 +30,7 @@ namespace fs = std::filesystem;
 inline constexpr std::string_view kFlags[] = {
     "--per-player",
     "--reveal-resources",
+    "--ai-no-raw-colonies",
     "--buildings",
     "--json",
     "--no-template",
