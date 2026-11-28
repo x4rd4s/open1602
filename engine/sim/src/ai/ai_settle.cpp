@@ -1141,6 +1141,9 @@ void Engine::task_settle_land(AiPlayer& p) {
     r.city = c->index;
     r.stage_ms = now_ms();
     r.land = free_land(island, c->index, &r.land_percent);
+    if (logging() && rivals() && !p.pirates) {
+        log_founded_value(p, *c, r);
+    }
     unload_at(*c, *ship, false, false);
     if (gifts()) {
         add_goods(*c, m_buildings.materials().bricks,
@@ -1156,6 +1159,57 @@ void Engine::task_settle_land(AiPlayer& p) {
     push(p, kSurvey, true);
     push(p, kLayout, true);
     end_settlement(p);
+}
+
+void Engine::log_founded_value(const AiPlayer& p, const City& c, const CityPlan& r) const {
+    // P2.8: the colony's value at its founding, its island and land now known: a raw-material colony
+    // (becomes_colony) with the upkeep of its planned build-out minute by minute; a settlement grows
+    // houses and pays taxes, which the virtual colony does not yet project.
+    // shortcut: the build-out follows today's stage orders, so the value predicts today's build
+    // behaviour; upgrade in Phase 3, where builds follow value() and the colony takes P3's planned path.
+    const City* home = p.home_valid ? city(p.home_island, p.home_city) : nullptr;
+    const std::uint8_t crop = p.settle.crop;
+    if (home == nullptr || crop == kAnyCrop || crop == 0) {
+        return;
+    }
+    const bool colony = becomes_colony(p, &c, r.land, building_count(c));
+    if (!colony) {
+        log(p, "value found city %u/%u kind settlement land %u", unsigned{c.island}, unsigned{c.index}, r.land);
+        return;
+    }
+    Commitment commit = logged_commitment(p, crop);
+    const ColonyBundle bundle = colony_bundle(*home, crop, commit);
+    std::int64_t kontor = 0;
+    if (const assets::BuildingType* b = by_id(id::kontor(1)); b != nullptr) {
+        kontor = b->running_cost;
+    }
+    const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+    const std::vector<ColonyBuild> builds = colony_buildout(p, c, r, horizon);
+    ColonyUpkeep own;
+    own.by_minute.assign(horizon, kontor);
+    std::string list;
+    std::int64_t spent = 0;
+    for (const ColonyBuild& b : builds) {
+        for (std::uint32_t m = b.minute; m <= horizon; ++m) {
+            own.by_minute[m - 1] += b.type->running_cost;
+        }
+        spent += b.type->build_cost.money;
+        list += " " + std::to_string(b.minute) + ":" + std::to_string(b.type->id);
+    }
+    if (bundle.workshop != nullptr) {
+        own.workshop = bundle.workshop->running_cost;
+        own.workshop_from = bundle.inflow.from;
+    }
+    log(p, "value found city %u/%u kind colony land %u builds%s spent %lld upkeep +10 %lld +30 %lld",
+        unsigned{c.island}, unsigned{c.index}, r.land, list.c_str(), static_cast<long long>(spent),
+        static_cast<long long>(own.by_minute[std::min<std::uint32_t>(10, horizon) - 1]),
+        static_cast<long long>(own.by_minute.back()));
+    const Inflow ship[] = {bundle.inflow};
+    const Sheet::Producer* const shop[] = {bundle.workshop};
+    log_value(p, "colony found", *home, ship, commit, nullptr, {},
+              bundle.workshop != nullptr ? std::span<const Sheet::Producer* const>{shop}
+                                         : std::span<const Sheet::Producer* const>{},
+              &own);
 }
 
 void Engine::site_unreachable(AiPlayer& p) {

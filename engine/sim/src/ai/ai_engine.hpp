@@ -248,6 +248,8 @@ struct ColonyBundle {
 /// planned workshop at home from when its raw material comes in.
 struct ColonyUpkeep {
     std::int64_t colony = 0;
+    /// When not empty, the colony's own upkeep at each minute (index m - 1) in place of `colony`.
+    std::vector<std::int64_t> by_minute;
     std::int64_t workshop = 0;
     std::uint32_t workshop_from = 0;
     std::uint32_t fields = 0;
@@ -474,6 +476,18 @@ public:
     /// town style; nothing of `p` is written. The reference stays valid until the island's tiles
     /// change and land_use() is asked again for the city (the scans themselves stay in place).
     [[nodiscard]] const LandUse& land_use(const AiPlayer& p);
+    /// P2.8: a building of a raw-material colony's planned build-out, at the minute it enters.
+    struct ColonyBuild {
+        std::uint32_t minute = 0;
+        const assets::BuildingType* type = nullptr;
+    };
+    /// P2.8, the computer log only: a founded colony's value with its planned build-out.
+    void log_founded_value(const AiPlayer& p, const City& c, const CityPlan& r) const;
+    /// P2.8: what the colony stage (stage::kColony) of city `c` with plan `r` builds over `minutes`
+    /// minutes, entry by entry in the handler's order, each at the first minute the projected gold
+    /// pays for it.
+    [[nodiscard]] std::vector<ColonyBuild> colony_buildout(const AiPlayer& p, const City& c, const CityPlan& r,
+                                                           std::uint32_t minutes) const;
     /// Open1602 (P2.4): city `c` (one of `p`'s) `minutes` ahead, the inflow of each ware kept at the
     /// ledger's mean of the budget's horizon. Only its own state: the copy runs its own houses and
     /// consumption alone. `extra` adds an action's goods (P2.7); `planned` adds the workshops an
@@ -1133,6 +1147,16 @@ private:
     bool iron_tools(AiPlayer& p);
     bool weapons(AiPlayer& p);
     bool luxury(AiPlayer& p, std::uint32_t n, bool exclusive);
+    /// A luxury crop of luxury(): its slot, field ware, the good the home city must lack, the running
+    /// costs of its producers and whether the player may plant it.
+    struct LuxuryCrop {
+        std::uint8_t slot;
+        std::uint8_t field;
+        std::uint8_t good;
+        std::int64_t upkeep;
+        bool eligible;
+    };
+    [[nodiscard]] std::array<LuxuryCrop, 6> luxury_crops(const AiPlayer& p) const;
     bool roads_if_mason(AiPlayer& p);
     [[nodiscard]] std::uint32_t luxury_in_stock(const AiPlayer& p, const City& c, const CityPlan& r,
                                                 std::uint32_t level) const;

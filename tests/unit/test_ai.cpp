@@ -4357,6 +4357,41 @@ TEST_CASE(
     CHECK(d.gold[20] == -1000 + 20 * (100 - u.colony) - 10 * u.workshop);
 }
 
+TEST_CASE("ai: a raw-material colony's build-out follows its stage handler, slot by slot (P2.8)") {
+    // The town as a colony of a computer with no crops seen on its island: its order's market first,
+    // once; the animals and materials its table has no building for are passed over.
+    const assets::BuildingTable buildings = hungry_town_table();
+    const assets::FigureTable figures = make_figures();
+    sim::World world{60, 60};
+    build_hungry_town(world, buildings);
+    world.player(kHuman)->role = sim::PlayerRole::Computer;
+    sim::Simulation s(world, buildings, figures);
+    sim::ai::State state;
+    sim::ai::Engine engine(s, state);
+    sim::ai::AiPlayer p;
+    p.player = kHuman;
+    sim::ai::CityPlan r;
+    r.land = 240;
+    const sim::City& town = *world.city(0, 0);
+    const std::vector<sim::ai::Engine::ColonyBuild> fresh = engine.colony_buildout(p, town, r, 30);
+    REQUIRE(fresh.size() == 1);
+    CHECK(fresh.front().minute == 1);
+    CHECK(fresh.front().type == buildings.by_id(20809));
+    r.slots[sim::ai::kSlotMarket].count = 1;  // its market stands
+    CHECK(engine.colony_buildout(p, town, r, 30).empty());
+}
+
+TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat one (P2.8)") {
+    sim::ai::ColonyUpkeep u;
+    u.by_minute = {10, 10, 30, 30};
+    sim::ai::ActionValue v;
+    v.gold.assign(5, -100);
+    const sim::ai::ActionValue d = sim::ai::with_upkeep(v, 20, u);
+    CHECK(d.gold[1] == -100 + 10);
+    CHECK(d.gold[2] == -100 + 20);
+    CHECK(d.gold[4] == -100 + 20 - 20);
+}
+
 TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
     sim::ai::ActionValue v;
     v.gold = {-100, -90, -80, -70, -60, -50, -40};  // six minutes, +10 a minute

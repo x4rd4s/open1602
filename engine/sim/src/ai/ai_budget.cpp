@@ -335,7 +335,8 @@ ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& 
     std::int64_t diff = 0;
     v.payback = 0;
     for (std::size_t m = 1; m < v.gold.size(); ++m) {
-        diff += booked - u.colony - (u.workshop_from != 0 && m >= u.workshop_from ? u.workshop : 0);
+        const std::int64_t colony = u.by_minute.empty() ? u.colony : u.by_minute[std::min(m, u.by_minute.size()) - 1];
+        diff += booked - colony - (u.workshop_from != 0 && m >= u.workshop_from ? u.workshop : 0);
         v.gold[m] += diff;
         if (v.payback == 0 && v.gold[m] > 0) {
             v.payback = static_cast<std::uint32_t>(m);
