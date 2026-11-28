@@ -260,6 +260,13 @@ struct ColonyUpkeep {
 /// Open1602 (P2.8): a minute of producer `b` at its table rate on `stock`: from its raw material in
 /// stock, or from its own fields where no staffed producer makes the raw material.
 void produce_minute(const Sheet& sheet, const assets::BuildingType& b, std::vector<std::uint32_t>& stock);
+/// Open1602 (P2.9): the colony patience rule. A raw-material colony that brings `gold` by the budget's
+/// horizon for `cost` is worth founding when that is above zero and, per gold, above a home build
+/// that brings `home_gold` for `home_cost` (none: home_cost 0); idle gold earns nothing.
+enum class Patience : std::uint8_t { Pays, NotPositive, HomeRate };
+[[nodiscard]] Patience patience(std::int64_t gold, std::int64_t cost, std::int64_t home_gold,
+                                std::int64_t home_cost) noexcept;
+[[nodiscard]] const char* patience_name(Patience v) noexcept;
 /// `v`, weighed with `booked` gold a minute of running costs, weighed with `u`'s instead.
 [[nodiscard]] ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u);
 
@@ -489,6 +496,26 @@ public:
     };
     /// P2.8, the computer log only: a founded colony's value with its planned build-out.
     void log_founded_value(const AiPlayer& p, const City& c, const CityPlan& r) const;
+    /// P2.9: a raw-material colony (becomes_colony) of `crop` on `island` with plan `r` and goods
+    /// `stock`, valued for home city `home`: the bundle's inflow with the upkeep of its planned
+    /// build-out (colony_buildout) minute by minute, and the build-out's gold.
+    struct RawColonyValue {
+        ActionValue value;  ///< with the derived upkeep
+        std::vector<ColonyBuild> builds;
+        ColonyUpkeep upkeep;
+        std::int64_t spent = 0;  ///< the build-out's gold
+        std::int64_t cost = 0;   ///< the founding's gold and the build-out's
+    };
+    [[nodiscard]] RawColonyValue raw_colony_value(const AiPlayer& p, const City& home, std::uint8_t crop,
+                                                  std::uint16_t island, const CityPlan& r,
+                                                  std::vector<std::uint32_t> stock) const;
+    /// P2.9: the island colony_rank values a colony of `crop` on: the nearest it knows to grow the
+    /// crop (any it knows for none), allowed, without a city of its own; none without.
+    [[nodiscard]] std::optional<std::uint16_t> colony_island(const AiPlayer& p, const City& home, std::uint8_t crop);
+    /// P2.9, the computer log only: each colony candidate weighed at a new plan, a raw-material one
+    /// with its gold at the budget's horizon per gold of its cost against the best home build's
+    /// (home_build_rate), and the verdict the patience rule would give.
+    void log_colony_rates(const AiPlayer& p, std::span<const std::uint8_t> crops);
     /// P2.8: what the colony stage (stage::kColony) of a city on `island` with plan `r` (its land,
     /// its slot counts) builds over `minutes` minutes, entry by entry in the handler's order, each at
     /// the first minute the projected gold pays for it. A candidate island takes a plan of its own.
@@ -1817,6 +1844,14 @@ private:
     mutable PathFinder m_reach_finder;
     /// The step colony_plan last ran in, per player.
     std::vector<std::uint64_t> m_colony_plan_ms;
+    /// P2.9, only the log: a home build's gold at the budget's horizon and its cost (plan_building).
+    struct HomeBuildValue {
+        std::uint64_t ms = 0;
+        std::int64_t gold = 0;
+        std::int64_t cost = 0;
+    };
+    /// The home builds planned within the last budget horizon, per player (only the log).
+    std::vector<std::vector<HomeBuildValue>> m_home_builds;
     /// The game minute of the last refusal logged, per player and kind of plan (only the log).
     mutable std::vector<std::array<std::uint64_t, kSpends>> m_refusals_logged;
     /// Why need_shipyard() builds no yard: the last reason logged per player (only the log).
@@ -1855,6 +1890,23 @@ private:
     mutable std::uint32_t m_decision_seq = 0;
     /// Per player: the game time of track's next lines (only the log).
     mutable std::vector<std::uint64_t> m_track_ms;
+    /// P2.9, only the log: what each own city's stage handler did in the track window (track idle).
+    struct CityVisits {
+        std::uint16_t island = 0;
+        std::uint8_t city = 0;
+        std::uint8_t stage = 0;
+        std::uint32_t visits = 0;
+        std::uint32_t done = 0;      ///< visits that ended with nothing to do (nothing_to_do)
+        std::uint8_t hold_kind = 0;  ///< the last order entry that held the visit (StageNeed::Kind + 1)
+        std::uint8_t hold_slot = 0;
+    };
+    struct IdleWindow {
+        std::uint32_t decisions = 0;
+        std::vector<CityVisits> cities;
+    };
+    mutable std::vector<IdleWindow> m_idle;
+    /// The window's entry of city `c` of `p` (only the log).
+    CityVisits& visits_of(const AiPlayer& p, const City& c) const;
     /// Per player: war_supplied's gold held back by the floor alone at the last look (only the log).
     std::vector<bool> m_floor_logged;
     /// Per island and city: the fires and plagues logged at the last look (only the log).

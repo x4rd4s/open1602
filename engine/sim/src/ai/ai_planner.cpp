@@ -14,6 +14,7 @@
 
 #include "o1602/sim/consumption.hpp"
 #include "o1602/sim/disasters.hpp"
+#include "o1602/sim/goods_statistics.hpp"
 #include "o1602/sim/houses.hpp"
 #include "o1602/sim/mission.hpp"
 
@@ -1222,6 +1223,9 @@ bool Engine::first_need(AiPlayer& p, const City& c, const CityPlan& r, std::int3
                     m_last_need.resize(std::size_t{p.player} + 1, -1);
                 }
                 m_last_need[p.player] = static_cast<std::int32_t>(n.kind) << 8 | n.slot;
+                CityVisits& v = visits_of(p, c);
+                v.hold_kind = static_cast<std::uint8_t>(static_cast<std::uint8_t>(n.kind) + 1);
+                v.hold_slot = n.slot;
             }
             return true;
         }
@@ -1334,6 +1338,11 @@ bool Engine::farm_animals(AiPlayer& p, const CityPlan& r) {
 
 void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
     const std::int32_t money = player(p).money;
+    if (logging()) {
+        CityVisits& v = visits_of(p, c);
+        ++v.visits;
+        v.stage = r.stage;
+    }
     // When the city moves on (balance.toml [computer_stages]; the original's numbers by default).
     const Balance& at = m_world.balance();
     const auto has = [&](std::uint32_t gold) { return std::int64_t{money} >= stage_gold(gold); };
@@ -1380,6 +1389,9 @@ void Engine::run_stage(AiPlayer& p, City& c, CityPlan& r) {
                                                        home_shortfall(p, ware::kCloth) != 0);
         if (&c == home_city(p) && (wants_room(p) || short_home) && want_colony(p, 0, short_home, true)) {
             return;
+        }
+        if (logging()) {
+            ++visits_of(p, c).done;
         }
         nothing_to_do(p);
     };
@@ -1677,8 +1689,25 @@ bool Engine::plan_building(AiPlayer& p, std::uint8_t task, const assets::Buildin
         if (at != nullptr && b.ware != 0) {
             // shortcut: its good as made by the producers like it there, from now on, its inputs not
             // taken; upgrade when the projection runs the city's producers.
-            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, m_world.balance().ai_budget_horizon_minutes}};
+            const std::uint32_t horizon = m_world.balance().ai_budget_horizon_minutes;
+            const Inflow made[] = {{b.ware, made_per_minute(*at, b), 1, horizon}};
             log_value(p, "build", *at, made, c);
+            // P2.9: the home build's rate for the colony patience rule (log_colony_rates), from the
+            // player's own cities only.
+            if (at->owner == p.player && c.cost > 0) {
+                const ActionValue v =
+                    action_value(project_city(p, *at, horizon, made), project_city(p, *at, horizon), c);
+                if (m_home_builds.size() <= p.player) {
+                    m_home_builds.resize(std::size_t{p.player} + 1);
+                }
+                std::vector<HomeBuildValue>& list = m_home_builds[p.player];
+                const std::uint64_t now = now_ms();
+                std::erase_if(list, [&](const HomeBuildValue& h) {
+                    return now - h.ms > std::uint64_t{horizon} * kGoodsMinuteMs;
+                });
+                list.push_back(
+                    {now, v.gold.empty() ? 0 : v.gold[std::min<std::size_t>(horizon, v.gold.size() - 1)], c.cost});
+            }
         }
     }
     return true;

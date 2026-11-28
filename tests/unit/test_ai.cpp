@@ -4468,6 +4468,22 @@ TEST_CASE("ai: a colony's upkeep minute by minute takes the place of its flat on
     CHECK(d.gold[4] == -100 + 20 - 20);
 }
 
+TEST_CASE(
+    "ai: a raw-material colony pays when its gold at the horizon beats idle gold and the best home build (P2.9)") {
+    using sim::ai::Patience;
+    using sim::ai::patience;
+    // Not above zero by the horizon: refused whatever home does.
+    CHECK(patience(0, 3000, 0, 0) == Patience::NotPositive);
+    CHECK(patience(-500, 3000, 100, 1000) == Patience::NotPositive);
+    // No home build, or one that does not pay: idle gold is the bar.
+    CHECK(patience(1, 3000, 0, 0) == Patience::Pays);
+    CHECK(patience(1, 3000, -200, 1000) == Patience::Pays);
+    // Per gold against the home build: 300/3000 is 100/1000, so the colony does not beat it.
+    CHECK(patience(300, 3000, 100, 1000) == Patience::HomeRate);
+    CHECK(patience(301, 3000, 100, 1000) == Patience::Pays);
+    CHECK(sim::ai::patience_name(Patience::HomeRate) == std::string{"refused: home rate"});
+}
+
 TEST_CASE("ai: past the validated horizon an action goes on at its last period's slope until it pays back (P2.8)") {
     sim::ai::ActionValue v;
     v.gold = {-100, -90, -80, -70, -60, -50, -40};  // six minutes, +10 a minute

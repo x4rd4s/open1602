@@ -331,6 +331,29 @@ ColonyUpkeep colony_upkeep(const Sheet& sheet, const ColonyBundle& b, std::int64
     return u;
 }
 
+Patience patience(std::int64_t gold, std::int64_t cost, std::int64_t home_gold, std::int64_t home_cost) noexcept {
+    if (gold <= 0) {
+        return Patience::NotPositive;
+    }
+    // gold / cost at or below home_gold / home_cost; a home build that does not pay sets no bar.
+    if (home_cost > 0 && home_gold > 0 && gold * home_cost <= home_gold * cost) {
+        return Patience::HomeRate;
+    }
+    return Patience::Pays;
+}
+
+const char* patience_name(Patience v) noexcept {
+    switch (v) {
+        case Patience::Pays:
+            return "pays";
+        case Patience::NotPositive:
+            return "refused: not positive";
+        case Patience::HomeRate:
+            return "refused: home rate";
+    }
+    return "";
+}
+
 ActionValue with_upkeep(ActionValue v, std::int64_t booked, const ColonyUpkeep& u) {
     std::int64_t diff = 0;
     v.payback = 0;

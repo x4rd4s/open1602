@@ -97,6 +97,10 @@ void Engine::log_decision(const AiPlayer& p, const char* kind, std::uint32_t can
     if (!logging()) {
         return;
     }
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    ++m_idle[p.player].decisions;
     const std::uint64_t ms = now_ms();
     m_decision_seq = ms == m_decision_ms ? m_decision_seq + 1 : 0;
     m_decision_ms = ms;
@@ -118,6 +122,22 @@ constexpr std::uint32_t kTrackMinutes = 10;
 
 }  // namespace
 
+Engine::CityVisits& Engine::visits_of(const AiPlayer& p, const City& c) const {
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    std::vector<CityVisits>& list = m_idle[p.player].cities;
+    for (CityVisits& v : list) {
+        if (v.island == c.island && v.city == c.index) {
+            return v;
+        }
+    }
+    CityVisits v;
+    v.island = c.island;
+    v.city = c.index;
+    return list.emplace_back(v);
+}
+
 void Engine::track(const AiPlayer& p) const {
     constexpr std::uint64_t kTrackMs = std::uint64_t{kTrackMinutes} * 60 * 1000;
     if (!logging()) {
@@ -131,6 +151,34 @@ void Engine::track(const AiPlayer& p) const {
     }
     m_track_ms[p.player] = now_ms() + kTrackMs;
     log(p, "track gold %d", player(p).money);
+    // P2.9: a window with gold above the cushion and no decision: what each city's order did, so that
+    // a list gone through (done) tells apart from an entry that held it (holds kind:slot).
+    // shortcut: the entry that held the visit, not why it held; upgrade with a reason per need().
+    if (m_idle.size() <= p.player) {
+        m_idle.resize(std::size_t{p.player} + 1);
+    }
+    IdleWindow& window = m_idle[p.player];
+    if (window.decisions == 0 && m_world.balance().ai_budget_horizon_minutes != 0) {
+        const std::vector<BudgetCache> budgets = m_budgets;
+        const Census census = m_census;
+        const std::vector<OverviewCache> overviews = m_overviews;
+        const Budget b = gold_budget(p);
+        m_budgets = budgets;
+        m_census = census;
+        m_overviews = overviews;
+        if (b.cash - b.reserved > b.cushion()) {
+            std::string cities;
+            for (const CityVisits& v : window.cities) {
+                cities += " " + std::to_string(v.island) + "/" + std::to_string(v.city) + " stage " +
+                          std::to_string(v.stage) + " visits " + std::to_string(v.visits) + " done " +
+                          std::to_string(v.done) + " holds " + std::to_string(v.hold_kind) + ":" +
+                          std::to_string(v.hold_slot);
+            }
+            log(p, "track idle cash %lld reserved %lld cushion %lld cities%s", static_cast<long long>(b.cash),
+                static_cast<long long>(b.reserved), static_cast<long long>(b.cushion()), cities.c_str());
+        }
+    }
+    window = IdleWindow{};
     // The Kontors' share of the trade balance; the rest is the ships' (supply runs that buy at
     // partners, P2.6).
     std::int64_t kontors = 0;
