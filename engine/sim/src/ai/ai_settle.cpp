@@ -79,8 +79,19 @@ void Engine::log_seen_cities(const AiPlayer& p, PlayerId owner, std::uint16_t is
     log(p, "seen cities: player %u has %u (all %u), %s island %u", unsigned{owner}, seen, all, where, unsigned{island});
 }
 
+bool Engine::raw_colony_forbidden(const AiPlayer& p, std::uint16_t island) const {
+    // A measurement's counterfactual (forbid_raw_colonies, P2.9): an improved computer with a city
+    // does not choose an island where its city would become a colony without houses, judged as the
+    // colony stage will judge it, on the island's land free of other cities.
+    return m_no_raw_colonies && rivals() && !p.pirates && p.home_valid &&
+           becomes_colony(p, nullptr, free_land(island, MapCell::kNoCity, nullptr), 0);
+}
+
 bool Engine::island_allowed(const AiPlayer& p, std::uint16_t island) const {
     // No own city there, and no city of a human or computer with at most two cities.
+    if (raw_colony_forbidden(p, island)) {
+        return false;
+    }
     for (const City& c : m_world.cities()) {
         if (c.island != island) {
             continue;
@@ -121,6 +132,9 @@ bool Engine::island_contested(const AiPlayer& p, std::uint16_t island) const {
     // that the original's computers never settle, when it has a free vein of the ore or gold its
     // goal looks for. Not next to a partner or an ally, not next to a rival stronger than itself,
     // and never on an island with a city of its own.
+    if (raw_colony_forbidden(p, island)) {
+        return false;
+    }
     const std::uint8_t crop = p.settle.crop;
     if (crop == 0 || crop != goal_crop(p) || !knows_crops(p, island) || !view(p).free_deposit(island, crop)) {
         return false;
@@ -1091,11 +1105,9 @@ void Engine::task_settle_land(AiPlayer& p) {
         site_unreachable(p);
         return;
     }
-    // A measurement's counterfactual (forbid_raw_colonies, P2.9): no city that becomes a colony
-    // without houses, judged as the colony stage will judge it, on the island's land free of other
-    // cities.
-    if (m_no_raw_colonies && rivals() && !p.pirates &&
-        becomes_colony(p, nullptr, free_land(island, MapCell::kNoCity, nullptr), 0)) {
+    // The measurement's counterfactual once more, where the island was chosen before it held (a
+    // city of its own grew beside it on the way): logged, so that the probe counts what leaks.
+    if (raw_colony_forbidden(p, island)) {
         log(p, "measurement: no raw-material colony on island %u", island);
         end_settlement(p);
         return;

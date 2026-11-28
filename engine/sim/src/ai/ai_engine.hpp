@@ -401,6 +401,8 @@ public:
     void reset();
     void delay_first_step(std::uint32_t steps) { m_delay_steps = steps; }
     void forbid_raw_colonies(bool on) { m_no_raw_colonies = on; }
+    /// The measurement's counterfactual (forbid_raw_colonies): `island` is not to be settled.
+    [[nodiscard]] bool raw_colony_forbidden(const AiPlayer& p, std::uint16_t island) const;
     void init_player(AiPlayer& p);
     /// Gives every computer slot without a state one (reset() makes them for the slots of the start).
     void adopt_new_computers();
